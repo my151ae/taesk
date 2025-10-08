@@ -320,7 +320,7 @@ function SortableList({
 
 // Main Kanban Board Component
 export default function KanbanBoard() {
-  const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
+  const [boardData, setBoardData] = useState<BoardData>(() => loadFromStorage());
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // モバイル対応のセンサー設定
@@ -337,10 +337,6 @@ export default function KanbanBoard() {
       },
     })
   );
-
-  useEffect(() => {
-    setBoardData(loadFromStorage());
-  }, []);
 
   const updateData = (newData: BoardData) => {
     setBoardData(newData);
