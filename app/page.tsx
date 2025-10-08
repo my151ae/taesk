@@ -320,8 +320,14 @@ function SortableList({
 
 // Main Kanban Board Component
 export default function KanbanBoard() {
-  const [boardData, setBoardData] = useState<BoardData>(() => loadFromStorage());
+  const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    setBoardData(loadFromStorage());
+  }, []);
 
   // モバイル対応のセンサー設定
   const sensors = useSensors(
@@ -485,6 +491,10 @@ export default function KanbanBoard() {
   };
 
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
+
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-8">
