@@ -221,6 +221,15 @@ function SortableList({
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
+  const [showMenu, setShowMenu] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowMenu(false);
+    if (showMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showMenu]);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: list.id,
@@ -247,7 +256,7 @@ function SortableList({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-80 flex-shrink-0 flex flex-col max-h-[calc(100vh-12rem)] touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md"
+      className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-80 flex-shrink-0 touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md self-start"
       data-type="list"
     >
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mb-4">
@@ -271,31 +280,51 @@ function SortableList({
           </div>
         ) : (
           <div className="flex justify-between items-center">
-            <h2
-              className="font-bold text-lg cursor-pointer hover:text-sky-500 transition-colors text-slate-700 dark:text-gray-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditingTitle(true);
-              }}
-            >
+            <h2 className="font-bold text-lg text-slate-700 dark:text-gray-100">
               {list.title}
             </h2>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Delete list "${list.title}"?`)) {
-                  onDeleteList(list.id);
-                }
-              }}
-              className="text-rose-300 hover:text-rose-400 text-xl font-medium transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-rose-50 dark:hover:bg-rose-900/20"
-            >
-              ×
-            </button>
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100"
+              >
+                ⋯
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700 py-1 z-10">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      setIsEditingTitle(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-700"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      if (confirm(`Delete list "${list.title}"?`)) {
+                        onDeleteList(list.id);
+                      }
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto mb-4 min-h-[100px] px-1">
+      <div className="mb-4 px-1">
         <SortableContext items={sortedCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {sortedCards.map((card) => (
             <SortableCard
