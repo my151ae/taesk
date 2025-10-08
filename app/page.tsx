@@ -491,9 +491,9 @@ export default function KanbanBoard() {
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-8">
       <div className="max-w-full">
-        <h1 className="text-4xl font-bold mb-8 text-slate-700 dark:text-white tracking-tight">Taesk Board</h1>
+        <h1 className="text-4xl font-bold mb-8 text-slate-700 tracking-tight">Taesk Board</h1>
 
         <DndContext
           sensors={sensors}
