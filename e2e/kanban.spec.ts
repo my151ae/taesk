@@ -6,16 +6,30 @@ import { test, expect } from '@playwright/test';
  * Authentication is bypassed in test environment via NEXT_PUBLIC_BYPASS_AUTH.
  * See playwright.config.ts for configuration.
  *
- * Tests use a dedicated "E2E Test Board" (ID: 00000000-0000-0000-0000-000000000002)
- * Data is cleaned up after each test to ensure test isolation.
+ * Phase 2: Each test creates a unique board to avoid Realtime interference.
+ * See: docs/tickets/2025-10-10/01-e2e-test-stability-issues.md
  */
 
 import { supabase } from '@/lib/supabase';
 
-const TEST_BOARD_ID = '00000000-0000-0000-0000-000000000002';
+const TEST_USER_ID = 'd7ab4718-0648-43ba-a1b6-19c826608c40'; // test@example.com
 
 test.describe('Taesk Kanban Board E2E Tests', () => {
+  let testBoardId: string;
+  let testBoardName: string;
+
   test.beforeEach(async ({ page }) => {
+    // Generate unique board for this test
+    testBoardId = crypto.randomUUID();
+    testBoardName = `Test-${testBoardId.slice(0, 8)}`;
+
+    // Create test board
+    await supabase.from('boards').insert({
+      id: testBoardId,
+      name: testBoardName,
+      user_id: TEST_USER_ID,
+    });
+
     await page.goto('/');
 
     // Wait for page to load and auth to initialize
@@ -23,25 +37,24 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForSelector('text=test@example.com', { timeout: 10000 });
 
     // Switch to test board
-    await page.getByRole('button', { name: 'Main Board ▼' }).click();
-    await page.getByRole('button', { name: /E2E Test Board/ }).click();
+    await page.getByRole('button', { name: /▼/ }).click();
+    await page.getByRole('button', { name: testBoardName }).click();
 
     // Wait for board to switch
-    await page.getByRole('button', { name: 'E2E Test Board ▼' }).waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
 
-    // Clean up test board data AFTER switching to it
-    await supabase
-      .from('lists')
-      .delete()
-      .eq('board_id', TEST_BOARD_ID);
+    // Wait for board to be fully loaded
+    await page.waitForTimeout(500);
+  });
 
-    // Wait for realtime deletion to propagate
-    await page.waitForTimeout(1000);
+  test.afterEach(async () => {
+    // Clean up test board (CASCADE deletes lists and cards)
+    await supabase.from('boards').delete().eq('id', testBoardId);
   });
 
   test('should load the test board (empty initially)', async ({ page }) => {
     // Test board should be loaded and empty (no lists)
-    await expect(page.getByRole('button', { name: 'E2E Test Board ▼' })).toBeVisible();
+    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
   });
 

@@ -179,7 +179,7 @@ taesk/
 
 ### Project Management
 - [Tickets System](./tickets/README.md) - タスク管理システムの使い方
-- [Roadmap](./tickets/2025-10-09/roadmap.md) - 機能追加ロードマップ
+- [Roadmap](./tickets/roadmap.md) - 機能追加ロードマップ
 
 ## 🎯 Key Design Decisions
 
