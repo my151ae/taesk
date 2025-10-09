@@ -7,37 +7,49 @@ Taesk uses **PostgreSQL** via **Supabase** with a simple relational schema optim
 ## Schema Diagram
 
 ```
+                   ┌──────────────────────────┐
+                   │      auth.users         │
+                   │   (Supabase Auth)       │
+                   └───────────┬─────────────┘
+                               │
+                               │ 1
+                               │
+                               │
+                               │ N
+                               ▼
 ┌──────────────────────────────────────┐
 │             lists                    │
 ├──────────────────────────────────────┤
 │ id          UUID PRIMARY KEY         │
 │ title       TEXT NOT NULL            │
 │ position    INTEGER NOT NULL         │
-│ created_at  TIMESTAMPTZ NOT NULL     │
-│ updated_at  TIMESTAMPTZ NOT NULL     │
-└──────────────────┬───────────────────┘
-                   │
-                   │ 1
-                   │
-                   │
-                   │ N
-                   ▼
-┌──────────────────────────────────────┐
-│             cards                    │
-├──────────────────────────────────────┤
-│ id          UUID PRIMARY KEY         │
-│ title       TEXT NOT NULL            │
-│ description TEXT                     │
-│ list_id     UUID NOT NULL FK         │────┐
-│ position    INTEGER NOT NULL         │    │
+│ user_id     UUID NOT NULL FK         │────┐
 │ created_at  TIMESTAMPTZ NOT NULL     │    │
 │ updated_at  TIMESTAMPTZ NOT NULL     │    │
-└──────────────────────────────────────┘    │
-                                            │
-                                            │
-         FOREIGN KEY (list_id)              │
-         REFERENCES lists(id)               │
-         ON DELETE CASCADE ─────────────────┘
+└──────────────────┬───────────────────┘    │
+                   │                         │
+                   │ 1                       │
+                   │                         │
+                   │                  FOREIGN KEY (user_id)
+                   │ N                REFERENCES auth.users(id)
+                   ▼                         │
+┌──────────────────────────────────────┐    │
+│             cards                    │    │
+├──────────────────────────────────────┤    │
+│ id          UUID PRIMARY KEY         │    │
+│ title       TEXT NOT NULL            │    │
+│ description TEXT                     │    │
+│ list_id     UUID NOT NULL FK         │────┼──┐
+│ user_id     UUID NOT NULL FK         │────┘  │
+│ position    INTEGER NOT NULL         │       │
+│ created_at  TIMESTAMPTZ NOT NULL     │       │
+│ updated_at  TIMESTAMPTZ NOT NULL     │       │
+└──────────────────────────────────────┘       │
+                                               │
+                                               │
+         FOREIGN KEY (list_id)                 │
+         REFERENCES lists(id)                  │
+         ON DELETE CASCADE ────────────────────┘
 ```
 
 ## Table: `lists`
@@ -49,6 +61,7 @@ CREATE TABLE public.lists (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title TEXT NOT NULL,
   position INTEGER NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -61,6 +74,7 @@ CREATE TABLE public.lists (
 | `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique identifier |
 | `title` | TEXT | NOT NULL | Display name of the list |
 | `position` | INTEGER | NOT NULL | Order of lists (0, 1, 2...) |
+| `user_id` | UUID | NOT NULL, FK → auth.users(id) | Owner of the list |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last update timestamp |
 
@@ -68,9 +82,12 @@ CREATE TABLE public.lists (
 
 ```sql
 CREATE INDEX lists_position_idx ON public.lists(position);
+CREATE INDEX idx_lists_user_id ON public.lists(user_id);
 ```
 
-**Why**: Optimize ordering queries.
+**Why**:
+- `position`: Optimize ordering queries
+- `user_id`: Optimize user-specific queries and RLS policies
 
 ### Example Data
 
@@ -79,6 +96,7 @@ CREATE INDEX lists_position_idx ON public.lists(position);
   "id": "dc8fb019-6381-4264-8218-487db90fce48",
   "title": "To Do",
   "position": 0,
+  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "created_at": "2025-10-09T02:00:16.272332+00:00",
   "updated_at": "2025-10-09T02:00:16.272332+00:00"
 }
@@ -94,6 +112,7 @@ CREATE TABLE public.cards (
   title TEXT NOT NULL,
   description TEXT,
   list_id UUID NOT NULL REFERENCES public.lists(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
   position INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -108,6 +127,7 @@ CREATE TABLE public.cards (
 | `title` | TEXT | NOT NULL | Card title (summary) |
 | `description` | TEXT | NULLABLE | Card description (details) |
 | `list_id` | UUID | NOT NULL, FK → lists(id) | Parent list |
+| `user_id` | UUID | NOT NULL, FK → auth.users(id) | Owner of the card |
 | `position` | INTEGER | NOT NULL | Order within list (0, 1, 2...) |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last update timestamp |
@@ -117,11 +137,13 @@ CREATE TABLE public.cards (
 ```sql
 CREATE INDEX cards_list_id_idx ON public.cards(list_id);
 CREATE INDEX cards_position_idx ON public.cards(position);
+CREATE INDEX idx_cards_user_id ON public.cards(user_id);
 ```
 
 **Why**:
-- `cards_list_id_idx`: Fast lookup of cards in a list
-- `cards_position_idx`: Optimize ordering queries
+- `list_id`: Fast lookup of cards in a list
+- `position`: Optimize ordering queries
+- `user_id`: Optimize user-specific queries and RLS policies
 
 ### Cascade Behavior
 
@@ -137,8 +159,9 @@ When a list is deleted, all its cards are automatically deleted.
 {
   "id": "893c9c25-2b4c-4f98-8845-fb33647b8325",
   "title": "Implement user authentication",
-  "description": "Add Supabase Auth with email/password",
+  "description": "Add Supabase Auth with Google OAuth",
   "list_id": "dc8fb019-6381-4264-8218-487db90fce48",
+  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "position": 0,
   "created_at": "2025-10-09T02:00:22.635000+00:00",
   "updated_at": "2025-10-09T02:00:22.638000+00:00"
@@ -163,53 +186,90 @@ DELETE FROM cards WHERE list_id = 'xxx';
 
 ## Row Level Security (RLS)
 
-### Current Policies
+### Current Policies (✅ Implemented)
+
+RLS is enabled and allows all authenticated users to access all data (shared team board):
 
 ```sql
 -- Enable RLS
 ALTER TABLE public.lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations (MVP)
-CREATE POLICY "Allow all operations on lists"
-  ON public.lists FOR ALL
-  USING (true)
+-- Lists policies: all authenticated users can access all lists
+CREATE POLICY "Authenticated users can view all lists"
+  ON lists FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can insert lists"
+  ON lists FOR INSERT
+  TO authenticated
   WITH CHECK (true);
 
-CREATE POLICY "Allow all operations on cards"
-  ON public.cards FOR ALL
-  USING (true)
+CREATE POLICY "Authenticated users can update all lists"
+  ON lists FOR UPDATE
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can delete all lists"
+  ON lists FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- Cards policies: all authenticated users can access all cards
+CREATE POLICY "Authenticated users can view all cards"
+  ON cards FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can insert cards"
+  ON cards FOR INSERT
+  TO authenticated
   WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update all cards"
+  ON cards FOR UPDATE
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Authenticated users can delete all cards"
+  ON cards FOR DELETE
+  TO authenticated
+  USING (true);
 ```
 
-### Future Auth Policies
+### Security Guarantees
 
-When adding authentication:
+✅ **Authenticated users can**:
+- View all lists and cards (shared team board)
+- Create, update, and delete any lists/cards
+- Collaborate with other team members in real-time
+
+❌ **Unauthenticated users CANNOT**:
+- Access any data without logging in
+- Bypass authentication (enforced at database level)
+
+### Design Notes
+
+**Current**: Shared team board - all authenticated users see the same data
+**Future**: The `user_id` column is already in place for personal board features
+
+### Testing RLS
 
 ```sql
--- Users table
-CREATE TABLE public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  email TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+-- Test as authenticated user
+SELECT * FROM lists;  -- Shows all lists (shared board)
+SELECT * FROM cards;  -- Shows all cards (shared board)
 
--- Add user_id to lists
-ALTER TABLE public.lists ADD COLUMN user_id UUID REFERENCES public.users(id);
-
--- Update policy
-DROP POLICY "Allow all operations on lists" ON public.lists;
-
-CREATE POLICY "Users can only see their own lists"
-  ON public.lists FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can only modify their own lists"
-  ON public.lists FOR UPDATE
-  USING (auth.uid() = user_id);
-
--- Similar for cards (inherit from list's user_id)
+-- Test as unauthenticated (will fail)
+-- RLS blocks all access
 ```
+
+### Migrations
+
+- ✅ `add_user_id_and_rls_policies`: Added user_id column and initial RLS policies
+- ✅ `remove_old_permissive_policies`: Removed overly permissive policies
+- ✅ `allow_all_authenticated_users_access`: Updated to shared team board model
 
 ## Triggers
 
@@ -340,6 +400,7 @@ export interface List {
   id: string;
   title: string;
   position: number;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -349,6 +410,7 @@ export interface Card {
   title: string;
   description: string;
   list_id: string;
+  user_id: string;
   position: number;
   created_at: string;
   updated_at: string;

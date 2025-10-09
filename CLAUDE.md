@@ -14,6 +14,8 @@
 - **Deployment**: Vercel
 
 ### Key Features
+- ✅ Google Authentication (Supabase Auth)
+- ✅ Shared team board (all authenticated users collaborate)
 - ✅ Drag & drop cards and lists
 - ✅ Inline editing of cards and lists
 - ✅ Hybrid storage (offline-first)
@@ -75,13 +77,22 @@
 
 ### Committing Changes
 
-**DO NOT automatically push to main** unless user confirms the fix is working.
+**IMPORTANT: ALWAYS ask for user confirmation before committing and pushing.**
 
 Workflow:
 1. Make changes
 2. Test locally with browser DevTools
-3. **Wait for user confirmation** that it's working
-4. Then commit and push
+3. **Show the user what you did and ask for confirmation**
+4. **ONLY after user says "OK" or "push" or "commit"**, then commit and push
+5. **NEVER commit and push automatically** even if tests pass
+
+Example:
+```
+Claude: "I've implemented X. Here's what changed: [summary].
+        Tests are passing. Should I commit and push this?"
+User: "yes" or "push it" or "ok"
+Claude: [commits and pushes]
+```
 
 ## Architecture Overview
 

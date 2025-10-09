@@ -72,6 +72,13 @@ Visit `http://localhost:3000` to see the app.
 
 ## ✨ Features
 
+### Authentication & Security
+- 🔐 **Google OAuth** authentication via Supabase Auth
+- 👥 **Shared team board** - all authenticated users can collaborate
+- 🛡️ **Protected routes** - automatic redirect to login
+- 🚪 **Sign out** functionality with instant feedback
+- 💾 **User tracking** - user_id stored for future personal board features
+
 ### Core Functionality
 - ✅ **Create, Read, Update, Delete** lists and cards
 - ✅ **Drag & Drop** for cards (within/between lists) and lists
@@ -90,9 +97,9 @@ Visit `http://localhost:3000` to see the app.
 
 ### Technical Features
 - 🗄️ **PostgreSQL** database via Supabase
-- 🔐 **Row Level Security** (RLS) enabled
+- 🔐 **Row Level Security** (RLS) with strict policies
 - 📡 **RESTful API** via Supabase
-- 🧪 **E2E testing** with Playwright
+- 🧪 **E2E testing** with Playwright (auth + RLS tests)
 - 📝 **TypeScript** for type safety
 - 🚀 **Vercel** deployment ready
 
@@ -121,8 +128,14 @@ Visit `http://localhost:3000` to see the app.
 ```
 taesk/
 ├── app/                      # Next.js App Router
-│   ├── layout.tsx           # Root layout with PWA config
-│   ├── page.tsx             # Main Kanban board component
+│   ├── contexts/            # React contexts
+│   │   └── AuthContext.tsx  # Authentication context
+│   ├── login/               # Login page
+│   │   └── page.tsx        # Google OAuth login UI
+│   ├── auth/callback/       # OAuth callback handler
+│   │   └── route.ts        # Handles OAuth redirect
+│   ├── layout.tsx           # Root layout with PWA config & AuthProvider
+│   ├── page.tsx             # Main Kanban board component (protected)
 │   ├── icon.tsx             # App icon generator
 │   └── apple-icon.tsx       # Apple touch icon
 │
@@ -133,7 +146,10 @@ taesk/
 │   └── manifest.json        # PWA manifest
 │
 ├── e2e/                      # End-to-end tests
-│   └── kanban.spec.ts       # Playwright test suite
+│   ├── auth.spec.ts         # Authentication tests (✅ 5 passing)
+│   ├── rls.spec.ts          # RLS policy documentation
+│   ├── auth.setup.ts        # Auth helpers
+│   └── kanban.spec.ts       # Kanban board tests (requires auth)
 │
 ├── docs/                     # Documentation
 │   ├── index.md             # This file
@@ -190,13 +206,23 @@ taesk/
 - Touch interactions need special handling
 - Horizontal scrolling for multiple lists
 
-### 4. No Authentication (Yet)
-**Decision**: Public board with RLS allowing all operations
+### 4. Google OAuth Authentication
+**Decision**: Use Supabase Auth with Google OAuth provider
 
 **Rationale**:
-- MVP focus on core functionality
-- Easy to add auth later (Supabase Auth)
-- Current RLS setup is auth-ready
+- No password management needed
+- Secure, industry-standard OAuth flow
+- Easy UX (one-click login)
+- Supabase handles all complexity
+
+### 5. Shared Team Board with Authentication
+**Decision**: Require authentication but allow all authenticated users to access all data
+
+**Rationale**:
+- Team collaboration: everyone sees the same board
+- Authentication prevents anonymous vandalism
+- user_id is stored for future personal board features
+- RLS ensures only authenticated users have access
 
 ## 🔗 Quick Links
 

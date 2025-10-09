@@ -65,6 +65,8 @@ const loadFromSupabase = async (): Promise<BoardData> => {
 };
 
 // Initialize with default lists if empty
+// Note: user_id is stored for future features (personal boards), but currently
+// all authenticated users can see and edit all data (shared team board)
 const initializeDefaultLists = async (userId: string): Promise<List[]> => {
   const defaultLists = [
     { title: "To Do", position: 0, user_id: userId },
@@ -415,6 +417,8 @@ export default function KanbanBoard() {
   const handleAddList = async () => {
     if (!user) return;
 
+    // Note: user_id is saved for future features, but all authenticated users
+    // can currently see and edit all lists (shared team board)
     const newList: List = {
       id: uuidv4(),
       title: "New List",
@@ -431,6 +435,8 @@ export default function KanbanBoard() {
   const handleAddCard = async (listId: string) => {
     if (!user) return;
 
+    // Note: user_id is saved for future features, but all authenticated users
+    // can currently see and edit all cards (shared team board)
     const newCard: Card = {
       id: uuidv4(),
       title: "New Card",
