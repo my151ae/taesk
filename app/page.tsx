@@ -584,7 +584,7 @@ export default function KanbanBoard() {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 min-h-[calc(100vh-12rem)]">
             <SortableContext items={sortedLists.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
               {sortedLists.map((list) => (
                 <SortableList
