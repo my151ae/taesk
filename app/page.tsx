@@ -365,6 +365,10 @@ export default function KanbanBoard() {
   const [isClient, setIsClient] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [showCreateBoardDialog, setShowCreateBoardDialog] = useState(false);
+  const [newBoardName, setNewBoardName] = useState('');
+  const [newBoardDescription, setNewBoardDescription] = useState('');
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -435,6 +439,21 @@ export default function KanbanBoard() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Close board menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showBoardMenu) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.board-menu-container')) {
+          setShowBoardMenu(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBoardMenu]);
 
   // Realtime subscription for multi-device sync
   useEffect(() => {
@@ -763,6 +782,34 @@ export default function KanbanBoard() {
     }
   };
 
+  const handleCreateBoard = async () => {
+    if (!user || !newBoardName.trim()) return;
+
+    const newBoard: Board = {
+      id: uuidv4(),
+      name: newBoardName.trim(),
+      description: newBoardDescription.trim() || undefined,
+      is_test_board: false,
+      user_id: getActualUserId(user.id),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { error } = await supabase.from('boards').insert(newBoard);
+      if (error) throw error;
+
+      setBoards([...boards, newBoard]);
+      setCurrentBoardId(newBoard.id);
+      setShowCreateBoardDialog(false);
+      setNewBoardName('');
+      setNewBoardDescription('');
+    } catch (error) {
+      console.error('Error creating board:', error);
+    }
+  };
+
+  const currentBoard = boards.find(b => b.id === currentBoardId);
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
 
   if (!isClient || loading) {
@@ -782,7 +829,48 @@ export default function KanbanBoard() {
       <div className="max-w-full">
         <div className="flex justify-between items-center mb-6 md:mb-8">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-700 tracking-tight">Taesk Board</h1>
+            {/* Board selector dropdown */}
+            <div className="relative board-menu-container">
+              <button
+                onClick={() => setShowBoardMenu(!showBoardMenu)}
+                className="flex items-center gap-2 text-2xl md:text-3xl font-bold text-slate-700 tracking-tight hover:text-slate-900 transition-colors"
+              >
+                {currentBoard?.name || 'Taesk Board'}
+                <span className="text-lg">▼</span>
+              </button>
+
+              {showBoardMenu && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+                  {boards.map((board) => (
+                    <button
+                      key={board.id}
+                      onClick={() => {
+                        setCurrentBoardId(board.id);
+                        setShowBoardMenu(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${
+                        board.id === currentBoardId ? 'bg-slate-50 font-semibold' : ''
+                      }`}
+                    >
+                      <div className="font-medium text-slate-800">{board.name}</div>
+                      {board.description && (
+                        <div className="text-xs text-slate-500 mt-0.5">{board.description}</div>
+                      )}
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-200 my-2" />
+                  <button
+                    onClick={() => {
+                      setShowBoardMenu(false);
+                      setShowCreateBoardDialog(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-blue-600 hover:bg-blue-50 transition-colors font-medium"
+                  >
+                    + New Board
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Sync status indicator */}
             <div className="flex items-center gap-2 text-xs">
               {!isOnline && (
@@ -867,6 +955,64 @@ export default function KanbanBoard() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {/* Create Board Dialog */}
+      {showCreateBoardDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">Create New Board</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Board Name *
+                </label>
+                <input
+                  type="text"
+                  value={newBoardName}
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                  placeholder="e.g., Project Alpha"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newBoardDescription}
+                  onChange={(e) => setNewBoardDescription(e.target.value)}
+                  placeholder="Brief description of this board"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateBoardDialog(false);
+                  setNewBoardName('');
+                  setNewBoardDescription('');
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateBoard}
+                disabled={!newBoardName.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
