@@ -23,6 +23,8 @@ import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type BoardData } from "@/lib/supabase";
+import { useAuth } from "@/app/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -339,9 +341,18 @@ function SortableList({
 
 // Main Kanban Board Component
 export default function KanbanBoard() {
+  const { user, loading, signOut } = useAuth();
+  const router = useRouter();
   const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     setIsClient(true);
@@ -589,14 +600,33 @@ export default function KanbanBoard() {
 
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
 
-  if (!isClient) {
+  if (!isClient || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-4 md:p-8">
       <div className="max-w-full">
-        <h1 className="text-3xl md:text-4xl font-bold mb-6 md:mb-8 text-slate-700 tracking-tight">Taesk Board</h1>
+        <div className="flex justify-between items-center mb-6 md:mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-700 tracking-tight">Taesk Board</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">{user.email}</span>
+            <button
+              onClick={signOut}
+              className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
 
         <DndContext
           sensors={sensors}

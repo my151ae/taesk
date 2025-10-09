@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/app/contexts/AuthContext";
 
 export const metadata: Metadata = {
   title: "Taesk - Kanban Board",
@@ -27,7 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" className="">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
