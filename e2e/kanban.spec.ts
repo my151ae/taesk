@@ -28,15 +28,15 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Wait for board to switch
     await page.getByRole('button', { name: 'E2E Test Board ▼' }).waitFor({ state: 'visible' });
-  });
 
-  test.afterEach(async () => {
-    // Clean up test board data directly via Supabase
-    // Delete all lists (CASCADE will delete cards automatically)
+    // Clean up test board data AFTER switching to it
     await supabase
       .from('lists')
       .delete()
       .eq('board_id', TEST_BOARD_ID);
+
+    // Wait for realtime deletion to propagate
+    await page.waitForTimeout(1000);
   });
 
   test('should load the test board (empty initially)', async ({ page }) => {
@@ -158,6 +158,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Delete card
     await page.getByRole('button', { name: 'Delete', exact: true }).first().click();
+    await page.waitForTimeout(500);
 
     // Verify deletion (should only see the add card button, not "New Card" text)
     await expect(page.getByText('New Card')).toHaveCount(0);
@@ -190,9 +191,21 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
   });
 
   test('should drag and drop a card to a different list', async ({ page }) => {
-    // This test is inherently flaky due to timing issues with multiple list creation
-    // and dnd-kit's touch sensor activation delays. The functionality works correctly
-    // in manual testing. Skipping to maintain stable CI/CD.
+    // Skipping due to Realtime subscription timing issues in test environment.
+    // The functionality works correctly in manual testing.
+    // Root cause: INSERT events from previous tests or parallel runs arrive
+    // via Realtime subscription, causing list count mismatches.
+    //
+    // Mitigation implemented:
+    // - UI now uses upsert logic (idempotent)
+    // - Strict subscription cleanup
+    //
+    // Alternative testing approaches:
+    // - Manual testing (verified working)
+    // - Same-list drag test covers dnd-kit basics
+    // - Consider API-level test for card.list_id updates
+    //
+    // See: docs/tickets/2025-10-09/1530-flaky-drag-drop-test.md
     test.skip();
   });
 
