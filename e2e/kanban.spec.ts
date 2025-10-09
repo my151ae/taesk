@@ -258,4 +258,70 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     const signOutButton = page.getByRole('button', { name: 'Sign Out' });
     await expect(signOutButton).toBeVisible();
   });
+
+  test('should queue operations when offline and sync when online', async ({ page, context }) => {
+    // Setup: Create a list first
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();
+    await page.waitForTimeout(500);
+
+    // Verify we're online
+    await expect(page.getByText('Live')).toBeVisible();
+
+    // Go offline
+    await context.setOffline(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await page.waitForTimeout(500);
+
+    // Verify offline status
+    await expect(page.getByText('Offline')).toBeVisible();
+
+    // Add a card while offline
+    await page.getByRole('button', { name: '+ Add Card' }).first().click();
+    await expect(page.getByText('New Card').first()).toBeVisible();
+    await page.waitForTimeout(500);
+
+    // Verify sync queue shows pending item
+    await expect(page.getByText(/queued/i)).toBeVisible();
+
+    // Check sync queue in localStorage
+    const queueBeforeSync = await page.evaluate(() => {
+      const queue = JSON.parse(localStorage.getItem('taesk-sync-queue') || '{"actions":[]}');
+      return queue.actions.length;
+    });
+    expect(queueBeforeSync).toBeGreaterThan(0);
+
+    // Go back online
+    await context.setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+    // Wait for sync to complete
+    await page.waitForTimeout(3000);
+
+    // Verify online status
+    await expect(page.getByText('Live')).toBeVisible();
+
+    // Verify sync queue is cleared
+    const queueAfterSync = await page.evaluate(() => {
+      const queue = JSON.parse(localStorage.getItem('taesk-sync-queue') || '{"actions":[]}');
+      return queue.actions.length;
+    });
+    expect(queueAfterSync).toBe(0);
+
+    // Verify "queued" indicator is gone
+    await expect(page.getByText(/queued/i)).not.toBeVisible();
+
+    // Verify data persisted to Supabase by reloading
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('text=test@example.com', { timeout: 10000 });
+
+    // Switch back to test board
+    await page.getByRole('button', { name: 'Main Board ▼' }).click();
+    await page.getByRole('button', { name: /E2E Test Board/ }).click();
+    await page.getByRole('button', { name: 'E2E Test Board ▼' }).waitFor({ state: 'visible' });
+
+    // Verify card still exists (synced to Supabase)
+    await expect(page.getByText('New Card').first()).toBeVisible();
+  });
 });
