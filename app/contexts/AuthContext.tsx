@@ -13,12 +13,33 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Check if auth bypass is enabled (for testing)
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
+
+// Mock user for bypass mode (using valid UUID format)
+const MOCK_USER: User = {
+  id: '00000000-0000-0000-0000-000000000000',
+  email: 'test@example.com',
+  app_metadata: {},
+  user_metadata: {},
+  aud: 'authenticated',
+  created_at: new Date().toISOString(),
+} as User
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
+    // Bypass auth for testing
+    if (BYPASS_AUTH) {
+      console.warn('⚠️ AUTH BYPASS MODE ENABLED - DO NOT USE IN PRODUCTION')
+      setUser(MOCK_USER)
+      setLoading(false)
+      return
+    }
+
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -37,6 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase.auth])
 
   const signInWithGoogle = async () => {
+    if (BYPASS_AUTH) {
+      console.warn('Sign in bypassed in test mode')
+      return
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -50,6 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    if (BYPASS_AUTH) {
+      console.warn('Sign out bypassed in test mode')
+      return
+    }
+
     // Clear user state immediately for better UX
     setUser(null)
     const { error } = await supabase.auth.signOut({ scope: 'local' })

@@ -64,14 +64,24 @@ const loadFromSupabase = async (): Promise<BoardData> => {
   }
 };
 
+// Helper to get user_id that works with test mode
+// In test mode (bypass auth with mock user), returns null to avoid foreign key constraint
+const getActualUserId = (userId: string): string | null => {
+  return userId === '00000000-0000-0000-0000-000000000000' ? null : userId;
+};
+
 // Initialize with default lists if empty
 // Note: user_id is stored for future features (personal boards), but currently
 // all authenticated users can see and edit all data (shared team board)
+// In test mode (bypass auth), user_id is set to null to avoid foreign key constraint issues
 const initializeDefaultLists = async (userId: string): Promise<List[]> => {
+  // Use null for user_id in test mode to avoid foreign key constraint with auth.users
+  const actualUserId = getActualUserId(userId);
+
   const defaultLists = [
-    { title: "To Do", position: 0, user_id: userId },
-    { title: "In Progress", position: 1, user_id: userId },
-    { title: "Done", position: 2, user_id: userId },
+    { title: "To Do", position: 0, user_id: actualUserId },
+    { title: "In Progress", position: 1, user_id: actualUserId },
+    { title: "Done", position: 2, user_id: actualUserId },
   ];
 
   try {
@@ -348,6 +358,8 @@ export default function KanbanBoard() {
   const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -381,6 +393,114 @@ export default function KanbanBoard() {
     };
 
     loadData();
+  }, [user]);
+
+  // Online/Offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Realtime subscription for multi-device sync
+  useEffect(() => {
+    if (!user) return;
+
+    setRealtimeStatus('connecting');
+
+    const channel = supabase
+      .channel('board-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lists',
+        },
+        (payload) => {
+          console.log('List change detected:', payload);
+
+          if (payload.eventType === 'INSERT') {
+            setBoardData((prev) => {
+              // Avoid duplicates
+              const exists = prev.lists.some(list => list.id === (payload.new as List).id);
+              if (exists) return prev;
+              return {
+                ...prev,
+                lists: [...prev.lists, payload.new as List],
+              };
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setBoardData((prev) => ({
+              ...prev,
+              lists: prev.lists.map((list) =>
+                list.id === payload.new.id ? (payload.new as List) : list
+              ),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            setBoardData((prev) => ({
+              ...prev,
+              lists: prev.lists.filter((list) => list.id !== payload.old.id),
+              cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cards',
+        },
+        (payload) => {
+          console.log('Card change detected:', payload);
+
+          if (payload.eventType === 'INSERT') {
+            setBoardData((prev) => {
+              // Avoid duplicates
+              const exists = prev.cards.some(card => card.id === (payload.new as Card).id);
+              if (exists) return prev;
+              return {
+                ...prev,
+                cards: [...prev.cards, payload.new as Card],
+              };
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setBoardData((prev) => ({
+              ...prev,
+              cards: prev.cards.map((card) =>
+                card.id === payload.new.id ? (payload.new as Card) : card
+              ),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            setBoardData((prev) => ({
+              ...prev,
+              cards: prev.cards.filter((card) => card.id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+        } else if (status === 'CLOSED') {
+          setRealtimeStatus('disconnected');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setRealtimeStatus('disconnected');
+    };
   }, [user]);
 
   // モバイル対応のセンサー設定
@@ -423,7 +543,7 @@ export default function KanbanBoard() {
       id: uuidv4(),
       title: "New List",
       position: boardData.lists.length,
-      user_id: user.id,
+      user_id: getActualUserId(user.id),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -443,7 +563,7 @@ export default function KanbanBoard() {
       description: "",
       list_id: listId,
       position: boardData.cards.filter((c) => c.list_id === listId).length,
-      user_id: user.id,
+      user_id: getActualUserId(user.id),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -630,7 +750,36 @@ export default function KanbanBoard() {
     <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-4 md:p-8">
       <div className="max-w-full">
         <div className="flex justify-between items-center mb-6 md:mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-700 tracking-tight">Taesk Board</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-700 tracking-tight">Taesk Board</h1>
+            {/* Sync status indicator */}
+            <div className="flex items-center gap-2 text-xs">
+              {!isOnline && (
+                <span className="flex items-center gap-1 text-orange-600">
+                  <div className="w-2 h-2 rounded-full bg-orange-600" />
+                  Offline
+                </span>
+              )}
+              {isOnline && realtimeStatus === 'connected' && (
+                <span className="flex items-center gap-1 text-green-600">
+                  <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+                  Live
+                </span>
+              )}
+              {isOnline && realtimeStatus === 'connecting' && (
+                <span className="flex items-center gap-1 text-yellow-600">
+                  <div className="w-2 h-2 rounded-full bg-yellow-600 animate-pulse" />
+                  Connecting...
+                </span>
+              )}
+              {isOnline && realtimeStatus === 'disconnected' && (
+                <span className="flex items-center gap-1 text-gray-500">
+                  <div className="w-2 h-2 rounded-full bg-gray-500" />
+                  Disconnected
+                </span>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user.email}</span>
             <button

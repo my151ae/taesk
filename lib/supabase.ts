@@ -23,7 +23,7 @@ export interface Card {
   description: string;
   list_id: string;
   position: number;
-  user_id: string;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +32,7 @@ export interface List {
   id: string;
   title: string;
   position: number;
-  user_id: string;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -3,29 +3,14 @@ import { test, expect } from '@playwright/test';
 /**
  * Kanban Board E2E Tests
  *
- * NOTE: These tests currently require manual authentication setup:
- * 1. Run the tests with headed browser: npm run test:e2e:ui
- * 2. Manually login with Google when prompted
- * 3. Tests will run after authentication
- *
- * For CI/CD, you would need to:
- * - Use Supabase test credentials with email/password auth
- * - Or mock the authentication state
- * - Or use a service account for OAuth
+ * Authentication is bypassed in test environment via NEXT_PUBLIC_BYPASS_AUTH.
+ * See playwright.config.ts for configuration.
  */
 
-test.describe('Taesk Kanban Board E2E Tests (Authenticated)', () => {
+test.describe('Taesk Kanban Board E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-
-    // Check if we're on login page - if so, test is skipped
-    const currentUrl = page.url();
-    if (currentUrl.includes('/login')) {
-      test.skip(true, 'Test requires authentication - please login manually in headed mode');
-    }
-
-    // Wait for authenticated page to load
-    await page.waitForSelector('h1:has-text("Taesk Board")', { timeout: 10000 });
+    await page.waitForSelector('h1:has-text("Taesk Board")');
   });
 
   test('should load the board with default lists', async ({ page }) => {
@@ -191,23 +176,13 @@ test.describe('Taesk Kanban Board E2E Tests (Authenticated)', () => {
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
   });
 
-  test('should show user email and sign out button when authenticated', async ({ page }) => {
-    // Verify user email is displayed
-    const emailText = page.locator('text=/.*@.*/');
+  test('should show mock user email in test mode', async ({ page }) => {
+    // In bypass mode, should show test email
+    const emailText = page.getByText('test@example.com');
     await expect(emailText).toBeVisible();
 
     // Verify sign out button exists
     const signOutButton = page.getByRole('button', { name: 'Sign Out' });
     await expect(signOutButton).toBeVisible();
-  });
-
-  test('should sign out successfully', async ({ page }) => {
-    // Click sign out button
-    const signOutButton = page.getByRole('button', { name: 'Sign Out' });
-    await signOutButton.click();
-
-    // Should redirect to login page
-    await expect(page).toHaveURL('/login', { timeout: 5000 });
-    await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
   });
 });
