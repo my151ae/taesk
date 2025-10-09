@@ -5,9 +5,9 @@
 ```
 docs/tickets/
 ├── README.md                    # このファイル（ルール説明）
-├── YYYY-MM-DD/                  # 日付フォルダ
-│   ├── hhmm-slug.md            # タスクチケット
-│   ├── hhmm-another-task.md
+├── YYYY-MM-DD/                  # 日付フォルダ（日本時間）
+│   ├── 01-slug.md              # タスクチケット（連番）
+│   ├── 02-another-task.md
 │   └── ...
 └── roadmap.md                   # ロードマップ
 ```
@@ -17,18 +17,23 @@ docs/tickets/
 ### ファイル命名規則
 
 ```
-docs/tickets/YYYY-MM-DD/hhmm-<slug>.md
+docs/tickets/YYYY-MM-DD/NN-<slug>.md
 ```
 
 **例**:
-- `docs/tickets/2025-10-09/1430-add-authentication.md`
-- `docs/tickets/2025-10-09/1445-implement-realtime-sync.md`
-- `docs/tickets/2025-10-10/0900-add-tags-to-cards.md`
+- `docs/tickets/2025-10-09/01-add-authentication.md`
+- `docs/tickets/2025-10-09/02-implement-realtime-sync.md`
+- `docs/tickets/2025-10-10/01-add-tags-to-cards.md`
 
 **構成要素**:
-- `YYYY-MM-DD`: チケット作成日
-- `hhmm`: 作成時刻（24時間形式）
+- `YYYY-MM-DD`: チケット作成日（**日本時間 JST/Asia/Tokyo**）
+- `NN`: その日の連番（2桁ゼロパディング: 01, 02, 03...）
 - `<slug>`: タスクの簡潔な説明（kebab-case）
+
+**重要**:
+- 日付・時刻は必ず**日本時間（JST）**を使用すること
+- 連番は同じ日付フォルダ内で重複しないように採番
+- 既存チケットを確認して次の番号を使用する
 
 ### チケットテンプレート
 
@@ -99,11 +104,24 @@ docs/tickets/YYYY-MM-DD/hhmm-<slug>.md
 ### 1. チケット作成
 
 ```bash
-# 1. 日付フォルダ作成（なければ）
-mkdir -p docs/tickets/$(date +%Y-%m-%d)
+# 1. 日本時間で日付フォルダ作成（なければ）
+mkdir -p docs/tickets/$(TZ='Asia/Tokyo' date +%Y-%m-%d)
 
-# 2. チケットファイル作成
-touch docs/tickets/$(date +%Y-%m-%d)/$(date +%H%M)-task-name.md
+# 2. 既存チケットを確認して次の連番を取得
+DATE_DIR=docs/tickets/$(TZ='Asia/Tokyo' date +%Y-%m-%d)
+NEXT_NUM=$(printf "%02d" $(($(ls $DATE_DIR/*.md 2>/dev/null | wc -l) + 1)))
+
+# 3. チケットファイル作成
+touch $DATE_DIR/${NEXT_NUM}-task-name.md
+```
+
+**簡易版**（連番を手動で確認）:
+```bash
+# 既存ファイルを確認
+ls docs/tickets/$(TZ='Asia/Tokyo' date +%Y-%m-%d)/
+
+# 次の番号でファイル作成
+touch docs/tickets/$(TZ='Asia/Tokyo' date +%Y-%m-%d)/01-task-name.md
 ```
 
 ### 2. チケット記入
@@ -201,5 +219,23 @@ grep -r "Status.*In Progress" docs/tickets/
 ## 例
 
 実際のチケット例:
-- [2025-10-09/1430-add-authentication.md](./2025-10-09/1430-add-authentication.md)
+- [2025-10-09/01-add-google-auth.md](./2025-10-09/01-add-google-auth.md)
+- [2025-10-09/02-implement-realtime-sync.md](./2025-10-09/02-implement-realtime-sync.md)
 - [roadmap.md](./roadmap.md) - 全体ロードマップ
+
+## 日本時間の取得方法
+
+Claudeがチケットを作成する際は、以下の方法で日本時間を取得すること:
+
+```bash
+# 日付取得（YYYY-MM-DD）
+TZ='Asia/Tokyo' date +%Y-%m-%d
+
+# 時刻取得（HH:MM）
+TZ='Asia/Tokyo' date +%H:%M
+
+# フルタイムスタンプ
+TZ='Asia/Tokyo' date '+%Y-%m-%d %H:%M'
+```
+
+**注意**: システムのデフォルトタイムゾーンに依存せず、必ず `TZ='Asia/Tokyo'` を明示的に指定すること。
