@@ -628,7 +628,10 @@ export default function KanbanBoard() {
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user.email}</span>
             <button
-              onClick={signOut}
+              onClick={async () => {
+                await signOut()
+                router.push('/login')
+              }}
               className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
             >
               Sign Out
