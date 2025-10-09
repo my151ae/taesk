@@ -18,6 +18,7 @@ export interface Card {
   description: string;
   list_id: string;
   position: number;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,7 @@ export interface List {
   id: string;
   title: string;
   position: number;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }

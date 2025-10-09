@@ -65,11 +65,11 @@ const loadFromSupabase = async (): Promise<BoardData> => {
 };
 
 // Initialize with default lists if empty
-const initializeDefaultLists = async (): Promise<List[]> => {
+const initializeDefaultLists = async (userId: string): Promise<List[]> => {
   const defaultLists = [
-    { title: "To Do", position: 0 },
-    { title: "In Progress", position: 1 },
-    { title: "Done", position: 2 },
+    { title: "To Do", position: 0, user_id: userId },
+    { title: "In Progress", position: 1, user_id: userId },
+    { title: "Done", position: 2, user_id: userId },
   ];
 
   try {
@@ -359,11 +359,13 @@ export default function KanbanBoard() {
 
     // Load data from Supabase or localStorage
     const loadData = async () => {
+      if (!user) return;
+
       const data = await loadFromSupabase();
 
       // If no lists exist, initialize with defaults
       if (data.lists.length === 0) {
-        const defaultLists = await initializeDefaultLists();
+        const defaultLists = await initializeDefaultLists(user.id);
         if (defaultLists.length > 0) {
           const newData = { lists: defaultLists, cards: [] };
           setBoardData(newData);
@@ -377,7 +379,7 @@ export default function KanbanBoard() {
     };
 
     loadData();
-  }, []);
+  }, [user]);
 
   // モバイル対応のセンサー設定
   const sensors = useSensors(
@@ -411,10 +413,13 @@ export default function KanbanBoard() {
   };
 
   const handleAddList = async () => {
+    if (!user) return;
+
     const newList: List = {
       id: uuidv4(),
       title: "New List",
       position: boardData.lists.length,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -424,12 +429,15 @@ export default function KanbanBoard() {
   };
 
   const handleAddCard = async (listId: string) => {
+    if (!user) return;
+
     const newCard: Card = {
       id: uuidv4(),
       title: "New Card",
       description: "",
       list_id: listId,
       position: boardData.cards.filter((c) => c.list_id === listId).length,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
