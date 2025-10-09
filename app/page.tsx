@@ -22,7 +22,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { supabase, type Card, type List, type BoardData } from "@/lib/supabase";
+import { supabase, type Card, type List, type Board, type BoardData } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 
@@ -43,12 +43,12 @@ const saveToStorage = (data: BoardData) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 };
 
-// Supabase data loading
-const loadFromSupabase = async (): Promise<BoardData> => {
+// Supabase data loading with board filter
+const loadFromSupabase = async (boardId: string): Promise<BoardData> => {
   try {
     const [{ data: lists, error: listsError }, { data: cards, error: cardsError }] = await Promise.all([
-      supabase.from("lists").select("*").order("position", { ascending: true }),
-      supabase.from("cards").select("*").order("position", { ascending: true }),
+      supabase.from("lists").select("*").eq("board_id", boardId).order("position", { ascending: true }),
+      supabase.from("cards").select("*").eq("board_id", boardId).order("position", { ascending: true }),
     ]);
 
     if (listsError) throw listsError;
@@ -74,14 +74,14 @@ const getActualUserId = (userId: string): string | null => {
 // Note: user_id is stored for future features (personal boards), but currently
 // all authenticated users can see and edit all data (shared team board)
 // In test mode (bypass auth), user_id is set to null to avoid foreign key constraint issues
-const initializeDefaultLists = async (userId: string): Promise<List[]> => {
+const initializeDefaultLists = async (userId: string, boardId: string): Promise<List[]> => {
   // Use null for user_id in test mode to avoid foreign key constraint with auth.users
   const actualUserId = getActualUserId(userId);
 
   const defaultLists = [
-    { title: "To Do", position: 0, user_id: actualUserId },
-    { title: "In Progress", position: 1, user_id: actualUserId },
-    { title: "Done", position: 2, user_id: actualUserId },
+    { title: "To Do", position: 0, board_id: boardId, user_id: actualUserId },
+    { title: "In Progress", position: 1, board_id: boardId, user_id: actualUserId },
+    { title: "Done", position: 2, board_id: boardId, user_id: actualUserId },
   ];
 
   try {
@@ -352,9 +352,14 @@ function SortableList({
 }
 
 // Main Kanban Board Component
+// Default Main Board ID
+const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
+
 export default function KanbanBoard() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [currentBoardId, setCurrentBoardId] = useState<string>(MAIN_BOARD_ID);
   const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -368,18 +373,40 @@ export default function KanbanBoard() {
     }
   }, [user, loading, router]);
 
+  // Load boards list
+  useEffect(() => {
+    const loadBoards = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('boards')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading boards:', error);
+        return;
+      }
+
+      setBoards(data || []);
+    };
+
+    loadBoards();
+  }, [user]);
+
+  // Load board data when currentBoardId changes
   useEffect(() => {
     setIsClient(true);
 
     // Load data from Supabase or localStorage
     const loadData = async () => {
-      if (!user) return;
+      if (!user || !currentBoardId) return;
 
-      const data = await loadFromSupabase();
+      const data = await loadFromSupabase(currentBoardId);
 
       // If no lists exist, initialize with defaults
       if (data.lists.length === 0) {
-        const defaultLists = await initializeDefaultLists(user.id);
+        const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
         if (defaultLists.length > 0) {
           const newData = { lists: defaultLists, cards: [] };
           setBoardData(newData);
@@ -393,7 +420,7 @@ export default function KanbanBoard() {
     };
 
     loadData();
-  }, [user]);
+  }, [user, currentBoardId]);
 
   // Online/Offline detection
   useEffect(() => {
@@ -411,18 +438,19 @@ export default function KanbanBoard() {
 
   // Realtime subscription for multi-device sync
   useEffect(() => {
-    if (!user) return;
+    if (!user || !currentBoardId) return;
 
     setRealtimeStatus('connecting');
 
     const channel = supabase
-      .channel('board-changes')
+      .channel(`board-changes-${currentBoardId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'lists',
+          filter: `board_id=eq.${currentBoardId}`,
         },
         (payload) => {
           console.log('List change detected:', payload);
@@ -459,6 +487,7 @@ export default function KanbanBoard() {
           event: '*',
           schema: 'public',
           table: 'cards',
+          filter: `board_id=eq.${currentBoardId}`,
         },
         (payload) => {
           console.log('Card change detected:', payload);
@@ -501,7 +530,7 @@ export default function KanbanBoard() {
       supabase.removeChannel(channel);
       setRealtimeStatus('disconnected');
     };
-  }, [user]);
+  }, [user, currentBoardId]);
 
   // モバイル対応のセンサー設定
   const sensors = useSensors(
@@ -535,7 +564,7 @@ export default function KanbanBoard() {
   };
 
   const handleAddList = async () => {
-    if (!user) return;
+    if (!user || !currentBoardId) return;
 
     // Note: user_id is saved for future features, but all authenticated users
     // can currently see and edit all lists (shared team board)
@@ -543,6 +572,7 @@ export default function KanbanBoard() {
       id: uuidv4(),
       title: "New List",
       position: boardData.lists.length,
+      board_id: currentBoardId,
       user_id: getActualUserId(user.id),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -553,7 +583,7 @@ export default function KanbanBoard() {
   };
 
   const handleAddCard = async (listId: string) => {
-    if (!user) return;
+    if (!user || !currentBoardId) return;
 
     // Note: user_id is saved for future features, but all authenticated users
     // can currently see and edit all cards (shared team board)
@@ -562,6 +592,7 @@ export default function KanbanBoard() {
       title: "New Card",
       description: "",
       list_id: listId,
+      board_id: currentBoardId,
       position: boardData.cards.filter((c) => c.list_id === listId).length,
       user_id: getActualUserId(user.id),
       created_at: new Date().toISOString(),

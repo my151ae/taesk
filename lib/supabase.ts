@@ -17,11 +17,22 @@ export function createClient() {
 }
 
 // Database types
+export interface Board {
+  id: string;
+  name: string;
+  description?: string;
+  is_test_board: boolean;
+  user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Card {
   id: string;
   title: string;
   description: string;
   list_id: string;
+  board_id: string;
   position: number;
   user_id: string | null;
   created_at: string;
@@ -32,6 +43,7 @@ export interface List {
   id: string;
   title: string;
   position: number;
+  board_id: string;
   user_id: string | null;
   created_at: string;
   updated_at: string;
