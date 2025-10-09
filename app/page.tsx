@@ -841,7 +841,16 @@ export default function KanbanBoard() {
         }));
         const newData = { ...boardData, lists: newLists };
         updateData(newData);
-        await syncToSupabase(newData);
+
+        // Add to sync queue if offline, otherwise sync directly
+        if (!isOnline) {
+          // Queue all affected lists for update
+          newLists.forEach(list => {
+            addToSyncQueue({ type: 'UPDATE', table: 'lists', data: list });
+          });
+        } else {
+          await syncToSupabase(newData);
+        }
       }
       return;
     }
@@ -867,7 +876,16 @@ export default function KanbanBoard() {
         const otherCards = boardData.cards.filter((c) => c.list_id !== overCard.list_id);
         const newData = { ...boardData, cards: [...otherCards, ...newListCards] };
         updateData(newData);
-        await syncToSupabase(newData);
+
+        // Add to sync queue if offline, otherwise sync directly
+        if (!isOnline) {
+          // Queue all affected cards for update
+          newListCards.forEach(card => {
+            addToSyncQueue({ type: 'UPDATE', table: 'cards', data: card });
+          });
+        } else {
+          await syncToSupabase(newData);
+        }
       }
       // カードを空のリストにドロップ
       else if (overData?.type === "list") {
@@ -886,11 +904,20 @@ export default function KanbanBoard() {
           });
           const newData = { ...boardData, cards: updatedCards };
           updateData(newData);
-          await syncToSupabase(newData);
+
+          // Add to sync queue if offline, otherwise sync directly
+          if (!isOnline) {
+            const movedCard = updatedCards.find(c => c.id === activeCard.id);
+            if (movedCard) {
+              addToSyncQueue({ type: 'UPDATE', table: 'cards', data: movedCard });
+            }
+          } else {
+            await syncToSupabase(newData);
+          }
         }
       }
     }
-  };
+  };;
 
   const handleCreateBoard = async () => {
     if (!user || !newBoardName.trim()) return;
