@@ -22,65 +22,16 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { supabase, type Card, type List, type BoardData } from "@/lib/supabase";
 
-// Types - Supabaseのテーブル構造を想定
-interface Card {
-  id: string;
-  title: string;
-  description: string;
-  list_id: string;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface List {
-  id: string;
-  title: string;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface BoardData {
-  lists: List[];
-  cards: Card[];
-}
-
-// LocalStorage helper - 後でSupabaseクライアントに置き換え可能
+// LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
 
 const loadFromStorage = (): BoardData => {
   if (typeof window === "undefined") return { lists: [], cards: [] };
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) {
-    // 初期データ
-    return {
-      lists: [
-        {
-          id: uuidv4(),
-          title: "To Do",
-          position: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: uuidv4(),
-          title: "In Progress",
-          position: 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: uuidv4(),
-          title: "Done",
-          position: 2,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
-      cards: [],
-    };
+    return { lists: [], cards: [] };
   }
   return JSON.parse(data);
 };
@@ -88,6 +39,45 @@ const loadFromStorage = (): BoardData => {
 const saveToStorage = (data: BoardData) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+};
+
+// Supabase data loading
+const loadFromSupabase = async (): Promise<BoardData> => {
+  try {
+    const [{ data: lists, error: listsError }, { data: cards, error: cardsError }] = await Promise.all([
+      supabase.from("lists").select("*").order("position", { ascending: true }),
+      supabase.from("cards").select("*").order("position", { ascending: true }),
+    ]);
+
+    if (listsError) throw listsError;
+    if (cardsError) throw cardsError;
+
+    return {
+      lists: lists || [],
+      cards: cards || [],
+    };
+  } catch (error) {
+    console.error("Error loading from Supabase:", error);
+    return loadFromStorage();
+  }
+};
+
+// Initialize with default lists if empty
+const initializeDefaultLists = async (): Promise<List[]> => {
+  const defaultLists = [
+    { title: "To Do", position: 0 },
+    { title: "In Progress", position: 1 },
+    { title: "Done", position: 2 },
+  ];
+
+  try {
+    const { data, error } = await supabase.from("lists").insert(defaultLists).select();
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error initializing default lists:", error);
+    return [];
+  }
 };
 
 // Sortable Card Component
@@ -355,7 +345,27 @@ export default function KanbanBoard() {
 
   useEffect(() => {
     setIsClient(true);
-    setBoardData(loadFromStorage());
+
+    // Load data from Supabase or localStorage
+    const loadData = async () => {
+      const data = await loadFromSupabase();
+
+      // If no lists exist, initialize with defaults
+      if (data.lists.length === 0) {
+        const defaultLists = await initializeDefaultLists();
+        if (defaultLists.length > 0) {
+          const newData = { lists: defaultLists, cards: [] };
+          setBoardData(newData);
+          saveToStorage(newData);
+          return;
+        }
+      }
+
+      setBoardData(data);
+      saveToStorage(data);
+    };
+
+    loadData();
   }, []);
 
   // モバイル対応のセンサー設定
@@ -378,7 +388,18 @@ export default function KanbanBoard() {
     saveToStorage(newData);
   };
 
-  const handleAddList = () => {
+  const syncToSupabase = async (data: BoardData) => {
+    try {
+      await Promise.all([
+        supabase.from("lists").upsert(data.lists),
+        supabase.from("cards").upsert(data.cards),
+      ]);
+    } catch (error) {
+      console.error("Error syncing to Supabase:", error);
+    }
+  };
+
+  const handleAddList = async () => {
     const newList: List = {
       id: uuidv4(),
       title: "New List",
@@ -386,10 +407,12 @@ export default function KanbanBoard() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    updateData({ ...boardData, lists: [...boardData.lists, newList] });
+    const newData = { ...boardData, lists: [...boardData.lists, newList] };
+    updateData(newData);
+    await syncToSupabase(newData);
   };
 
-  const handleAddCard = (listId: string) => {
+  const handleAddCard = async (listId: string) => {
     const newCard: Card = {
       id: uuidv4(),
       title: "New Card",
@@ -399,32 +422,52 @@ export default function KanbanBoard() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    updateData({ ...boardData, cards: [...boardData.cards, newCard] });
+    const newData = { ...boardData, cards: [...boardData.cards, newCard] };
+    updateData(newData);
+    await syncToSupabase(newData);
   };
 
-  const handleEditCard = (id: string, title: string, description: string) => {
+  const handleEditCard = async (id: string, title: string, description: string) => {
     const updatedCards = boardData.cards.map((card) =>
       card.id === id ? { ...card, title, description, updated_at: new Date().toISOString() } : card
     );
-    updateData({ ...boardData, cards: updatedCards });
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+    await syncToSupabase(newData);
   };
 
-  const handleDeleteCard = (id: string) => {
+  const handleDeleteCard = async (id: string) => {
     const updatedCards = boardData.cards.filter((card) => card.id !== id);
-    updateData({ ...boardData, cards: updatedCards });
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    try {
+      await supabase.from("cards").delete().eq("id", id);
+    } catch (error) {
+      console.error("Error deleting card:", error);
+    }
   };
 
-  const handleEditList = (id: string, title: string) => {
+  const handleEditList = async (id: string, title: string) => {
     const updatedLists = boardData.lists.map((list) =>
       list.id === id ? { ...list, title, updated_at: new Date().toISOString() } : list
     );
-    updateData({ ...boardData, lists: updatedLists });
+    const newData = { ...boardData, lists: updatedLists };
+    updateData(newData);
+    await syncToSupabase(newData);
   };
 
-  const handleDeleteList = (id: string) => {
+  const handleDeleteList = async (id: string) => {
     const updatedLists = boardData.lists.filter((list) => list.id !== id);
     const updatedCards = boardData.cards.filter((card) => card.list_id !== id);
-    updateData({ lists: updatedLists, cards: updatedCards });
+    const newData = { lists: updatedLists, cards: updatedCards };
+    updateData(newData);
+
+    try {
+      await supabase.from("lists").delete().eq("id", id);
+    } catch (error) {
+      console.error("Error deleting list:", error);
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -471,7 +514,7 @@ export default function KanbanBoard() {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
@@ -491,7 +534,9 @@ export default function KanbanBoard() {
           position: index,
           updated_at: new Date().toISOString(),
         }));
-        updateData({ ...boardData, lists: newLists });
+        const newData = { ...boardData, lists: newLists };
+        updateData(newData);
+        await syncToSupabase(newData);
       }
       return;
     }
@@ -514,7 +559,9 @@ export default function KanbanBoard() {
         }));
 
         const otherCards = boardData.cards.filter((c) => c.list_id !== overCard.list_id);
-        updateData({ ...boardData, cards: [...otherCards, ...newListCards] });
+        const newData = { ...boardData, cards: [...otherCards, ...newListCards] };
+        updateData(newData);
+        await syncToSupabase(newData);
       }
     }
   };
