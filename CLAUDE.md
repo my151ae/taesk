@@ -31,6 +31,10 @@
 - [`/docs/detail/storage.md`](./docs/detail/storage.md) - Storage strategy
 - [`/docs/detail/deployment.md`](./docs/detail/deployment.md) - Deployment guide
 
+📋 **Project Management**:
+- [`/docs/tickets/README.md`](./docs/tickets/README.md) - タスク管理システムのルール
+- [`/docs/tickets/YYYY-MM-DD/roadmap.md`](./docs/tickets/2025-10-09/roadmap.md) - 機能追加ロードマップ
+
 **Always refer to these docs when working on Taesk to understand the full context.**
 
 ## Development Workflow

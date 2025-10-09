@@ -156,16 +156,14 @@ taesk/
 - [Architecture & Design](./detail/architecture.md) - System design and patterns
 - [Database Schema](./detail/database.md) - Supabase tables and relationships
 - [Storage Strategy](./detail/storage.md) - Hybrid storage implementation
-
-### Development
 - [Component Structure](./detail/components.md) - React components breakdown
-- [State Management](./detail/state-management.md) - How data flows
-- [Drag & Drop](./detail/drag-drop.md) - dnd-kit implementation
 
 ### Operations
 - [Deployment Guide](./detail/deployment.md) - Vercel deployment steps
-- [Testing Guide](./detail/testing.md) - Running E2E tests
-- [Troubleshooting](./detail/troubleshooting.md) - Common issues
+
+### Project Management
+- [Tickets System](./tickets/README.md) - タスク管理システムの使い方
+- [Roadmap](./tickets/2025-10-09/roadmap.md) - 機能追加ロードマップ
 
 ## 🎯 Key Design Decisions
 
