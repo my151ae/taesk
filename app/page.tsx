@@ -481,7 +481,7 @@ export default function KanbanBoard() {
     const activeData = active.data.current;
     const overData = over.data.current;
 
-    // カードをリスト間で移動
+    // カードをリスト間で移動（一時的な表示更新のみ）
     if (activeData?.type === "card") {
       const activeCard = activeData.card as Card;
 
@@ -541,16 +541,17 @@ export default function KanbanBoard() {
       return;
     }
 
-    // カードの並び替え
-    if (activeData?.type === "card" && overData?.type === "card") {
+    // カードの並び替えまたはリスト間移動
+    if (activeData?.type === "card") {
       const activeCard = activeData.card as Card;
-      const overCard = overData.card as Card;
 
-      const listCards = boardData.cards.filter((c) => c.list_id === overCard.list_id);
-      const oldIndex = listCards.findIndex((c) => c.id === active.id);
-      const newIndex = listCards.findIndex((c) => c.id === over.id);
+      // カードを他のカードの上にドロップ
+      if (overData?.type === "card") {
+        const overCard = overData.card as Card;
+        const listCards = boardData.cards.filter((c) => c.list_id === overCard.list_id);
+        const oldIndex = listCards.findIndex((c) => c.id === active.id);
+        const newIndex = listCards.findIndex((c) => c.id === over.id);
 
-      if (oldIndex !== newIndex) {
         const newListCards = arrayMove(listCards, oldIndex, newIndex).map((card, index) => ({
           ...card,
           position: index,
@@ -562,6 +563,26 @@ export default function KanbanBoard() {
         const newData = { ...boardData, cards: [...otherCards, ...newListCards] };
         updateData(newData);
         await syncToSupabase(newData);
+      }
+      // カードを空のリストにドロップ
+      else if (overData?.type === "list") {
+        const overList = overData.list as List;
+        if (activeCard.list_id !== overList.id) {
+          const updatedCards = boardData.cards.map((card) => {
+            if (card.id === activeCard.id) {
+              return {
+                ...card,
+                list_id: overList.id,
+                position: boardData.cards.filter((c) => c.list_id === overList.id).length,
+                updated_at: new Date().toISOString()
+              };
+            }
+            return card;
+          });
+          const newData = { ...boardData, cards: updatedCards };
+          updateData(newData);
+          await syncToSupabase(newData);
+        }
       }
     }
   };
