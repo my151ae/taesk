@@ -174,6 +174,9 @@ taesk/
 - [Storage Strategy](./detail/storage.md) - Hybrid storage implementation
 - [Component Structure](./detail/components.md) - React components breakdown
 
+### Development
+- [Testing Guide](./detail/testing.md) - E2E testing with Playwright, best practices
+
 ### Operations
 - [Deployment Guide](./detail/deployment.md) - Vercel deployment steps
 

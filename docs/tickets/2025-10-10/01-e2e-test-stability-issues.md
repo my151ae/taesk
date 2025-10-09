@@ -1,10 +1,12 @@
 # E2Eテストの安定化
 
-**Status**: 🟡 In Progress
+**Status**: 🟢 Phase 2 Completed (Phase 3保留)
 **Priority**: 🔥 High
 **Created**: 2025-10-10 0549
 **Assignee**: Claude
 **Estimated**: 6 hours
+**Phase 2 Completed**: 2025-10-10
+**Tests**: 21/21 passed (100%), 7 skipped (Auth only)
 
 ## 概要
 
@@ -237,14 +239,16 @@ webServer: [
 
 - [x] CI環境でworkers: 1を設定
 - [x] Auth testsを一時的にスキップ
-- [ ] Phase 1の動作確認
+- [x] Phase 1の動作確認
 
 ### Phase 2: 根本的解決
 
-- [ ] 動的Board生成の実装
-- [ ] mouse APIによるDrag実装
-- [ ] Drag testsのskip解除
-- [ ] Phase 2の動作確認
+- [x] 動的Board生成の実装
+- [x] `is_test_board: true`によるデフォルトリスト自動生成の抑止
+- [x] 削除テストの修正
+- [x] mouse APIによるDrag実装
+- [x] Drag testsのskip解除
+- [x] Phase 2の動作確認（**21/21 passed, 7 skipped** - Drag tests含む）
 
 ### Phase 3: 長期改善
 
@@ -262,9 +266,9 @@ webServer: [
 
 ### Phase 2完了時
 
-- [ ] 全テストが有効化（Auth除く）
-- [ ] 並列実行（workers: 4）で95%以上の成功率
-- [ ] Drag testsが安定して動作
+- [x] 全テストが有効化（Auth除く）
+- [x] 並列実行（workers: 4）で100%の成功率（21/21 passed）
+- [x] Drag testsが安定して動作（同一リスト内、異なるリスト間の両方）
 
 ### Phase 3完了時
 
@@ -316,3 +320,92 @@ Playwrightの`dragTo()`は：
 - **Local（Parallel）**: 速いがフラキー
 
 Phase 2完了後は、ローカルでも並列で安定動作することを目標とします。
+
+## 解決策の詳細
+
+### 問題の根本原因
+
+削除テストが失敗していた真の原因は、**テストボードに自動的にデフォルトリストが追加されていた**こと：
+
+1. `app/page.tsx`の`loadData`関数内で、ボードが空の場合に自動的に "To Do", "In Progress", "Done" リストを作成
+2. 条件: `data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board)`
+3. テストの`beforeEach`で作成するボードに`is_test_board: true`を設定していなかった
+4. 結果として、テストボードが作成されるたびにデフォルトリストが3つ追加される
+5. テストが「リストを1つ追加→削除」を試みるが、実際には4つのリストが存在（3つのデフォルト + 1つのテスト用）
+6. 削除後も3つのデフォルトリストが残り、テストが失敗
+
+### 実装した修正
+
+```typescript
+// e2e/kanban.spec.ts - beforeEach
+await supabase.from('boards').insert({
+  id: testBoardId,
+  name: testBoardName,
+  user_id: TEST_USER_ID,
+  is_test_board: true,  // ← この1行を追加
+});
+```
+
+この修正により：
+- テストボードにはデフォルトリストが自動生成されなくなる
+- 各テストは空のボードから開始し、完全な制御を持つ
+- Realtime競合も動的ボード生成により解消
+
+### テスト結果
+
+**Phase 2完了時点**（Drag実装前）:
+- ✅ 20/20 テストが成功（100%）
+- ⏭️ 8 テストがスキップ（7つのAuth + 1つのDrag to different list）
+- ❌ 0 失敗
+- ⚡ 実行時間: 30.5秒（並列実行、workers: 4）
+
+**Phase 2最終**（Drag実装後）:
+- ✅ **21/21 テストが成功（100%）**
+- ⏭️ 7 テストがスキップ（7つのAuth のみ）
+- ❌ 0 失敗
+- ⚡ 実行時間: 33.8秒（並列実行、workers: 4）
+- 🎯 **Drag & Drop完全動作**
+
+**改善ポイント**:
+1. 動的ボード生成により完全なテスト分離を実現
+2. `is_test_board: true`によりデフォルトリスト自動生成を抑止
+3. 各テストが独立した環境で実行可能
+4. 並列実行でも安定して100%成功
+
+### Drag & Drop実装
+
+**問題**: Playwrightの`dragTo()`が`@dnd-kit`で動作しない
+- `@dnd-kit`は連続的な`mousemove`イベントを監視
+- `dragTo()`は始点→終点への一気の移動で、中間イベントが不足
+
+**解決策**: mouse APIで段階的移動を実装
+
+```typescript
+async function dragAndDrop(page: Page, source: Locator, target: Locator) {
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+
+  const startX = sourceBox.x + sourceBox.width / 2;
+  const startY = sourceBox.y + sourceBox.height / 2;
+  const endX = targetBox.x + targetBox.width / 2;
+  const endY = targetBox.y + targetBox.height / 2;
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.waitForTimeout(250); // Touch sensor activation delay
+
+  // 中間イベント生成: steps: 10 で10回のmousemoveイベント
+  await page.mouse.move(midX, midY, { steps: 10 });
+  await page.mouse.move(endX, endY, { steps: 10 });
+
+  await page.mouse.up();
+  await page.waitForTimeout(500); // Drop animation + Realtime sync
+}
+```
+
+**結果**:
+- ✅ 同一リスト内のdrag成功
+- ✅ 異なるリスト間のdrag成功
+- ✅ 動的ボード生成によりRealtime競合も解消
