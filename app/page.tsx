@@ -246,7 +246,7 @@ function SortableList({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-80 flex-shrink-0 touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md self-start"
+      className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-72 md:w-80 flex-shrink-0 touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md self-start"
       data-type="list"
     >
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mb-4">
@@ -573,9 +573,9 @@ export default function KanbanBoard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-4 md:p-8">
       <div className="max-w-full">
-        <h1 className="text-4xl font-bold mb-8 text-slate-700 tracking-tight">Taesk Board</h1>
+        <h1 className="text-3xl md:text-4xl font-bold mb-6 md:mb-8 text-slate-700 tracking-tight">Taesk Board</h1>
 
         <DndContext
           sensors={sensors}
@@ -584,7 +584,7 @@ export default function KanbanBoard() {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
             <SortableContext items={sortedLists.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
               {sortedLists.map((list) => (
                 <SortableList
@@ -602,10 +602,12 @@ export default function KanbanBoard() {
 
             <button
               onClick={handleAddList}
-              className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-6 w-80 flex-shrink-0 h-fit hover:bg-white/60 dark:hover:bg-gray-800/60 border-2 border-dashed border-slate-300/60 dark:border-gray-600/50 transition-all hover:border-sky-300 dark:hover:border-sky-400 shadow-sm"
+              className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-6 w-72 md:w-80 flex-shrink-0 h-fit hover:bg-white/60 dark:hover:bg-gray-800/60 border-2 border-dashed border-slate-300/60 dark:border-gray-600/50 transition-all hover:border-sky-300 dark:hover:border-sky-400 shadow-sm"
             >
               <span className="text-slate-600 dark:text-gray-400 font-medium">+ Add List</span>
             </button>
+            {/* 横スクロール用の余白 */}
+            <div className="w-4 flex-shrink-0"></div>
           </div>
 
           <DragOverlay>
