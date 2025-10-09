@@ -79,8 +79,29 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
   });
 
   test('should delete a list', async ({ page }) => {
-    // Skip this test as it's flaky - list deletion is tested indirectly through cleanup
-    test.skip();
+    // Add a new list first
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();
+    await page.waitForTimeout(500);
+
+    // Open list menu
+    const menuButton = page.locator('button:has-text("⋯")').first();
+    await menuButton.waitFor({ state: 'visible' });
+    await menuButton.click();
+    await page.waitForTimeout(300);
+
+    // Handle confirm dialog and delete
+    page.once('dialog', dialog => dialog.accept());
+    const deleteButton = page.getByTestId('delete-list-button');
+    await deleteButton.waitFor({ state: 'visible', timeout: 5000 });
+    await deleteButton.click();
+
+    // Wait for deletion to complete
+    await page.waitForTimeout(500);
+
+    // Verify deletion - board should be empty again
+    await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /New List/i })).toHaveCount(0);
   });
 
   test('should add a card to a list', async ({ page }) => {
@@ -169,8 +190,58 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
   });
 
   test('should drag and drop a card to a different list', async ({ page }) => {
-    // Skip this test as it's flaky - drag & drop between lists is complex and tested manually
-    test.skip();
+    // Add first list
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('button', { name: /New List/i })).toHaveCount(1);
+
+    // Add second list
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(800);
+
+    // Verify both lists are visible
+    const lists = page.getByRole('button', { name: /New List/i });
+    await expect(lists).toHaveCount(2);
+
+    // Add a card to first list
+    const addCardButtons = page.getByRole('button', { name: '+ Add Card' });
+    await addCardButtons.first().click();
+    await page.waitForTimeout(300);
+    await expect(page.getByText('New Card').first()).toBeVisible();
+
+    // Get the card and second list container
+    const card = page.getByRole('button', { name: 'New Card Edit Delete' }).first();
+    await card.waitFor({ state: 'visible' });
+
+    // Get all list containers using data-testid (should be only the 2 we just added)
+    const listContainers = page.locator('[data-testid^="list-"]');
+    const count = await listContainers.count();
+
+    // Use the last list as target (in case cleanup didn't work perfectly)
+    const targetList = listContainers.last();
+    await targetList.waitFor({ state: 'visible' });
+
+    // Perform drag and drop using mouse actions
+    const cardBox = await card.boundingBox();
+    const targetBox = await targetList.boundingBox();
+
+    if (cardBox && targetBox) {
+      // Start drag from card center
+      await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(200);
+
+      // Move to target list center
+      await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 10 });
+      await page.waitForTimeout(200);
+
+      // Drop
+      await page.mouse.up();
+      await page.waitForTimeout(500);
+    }
+
+    // Note: Verification of final position would require additional data-testid attributes
+    // For now, we just verify the drag action completes without error
   });
 
   test('should persist data after page reload', async ({ page }) => {

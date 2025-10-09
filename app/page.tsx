@@ -195,6 +195,7 @@ function SortableCard({
                 onDelete(card.id);
               }}
               className="text-xs text-rose-400 hover:text-rose-500 font-medium transition-colors"
+              data-testid="delete-card-button"
             >
               Delete
             </button>
@@ -262,6 +263,7 @@ function SortableList({
       style={style}
       className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-72 md:w-80 flex-shrink-0 touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md self-start"
       data-type="list"
+      data-testid={`list-${list.id}`}
     >
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mb-4">
         {isEditingTitle ? (
@@ -318,6 +320,7 @@ function SortableList({
                       }
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    data-testid="delete-list-button"
                   >
                     Delete
                   </button>
