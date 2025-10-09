@@ -25,6 +25,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -139,6 +140,7 @@ function SortableCard({
       style={style}
       {...attributes}
       {...listeners}
+      data-testid={`card-${card.id}`}
       className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 mb-3 cursor-grab active:cursor-grabbing border border-slate-200/60 dark:border-gray-700/50 touch-none"
     >
       {isEditing ? (
@@ -331,7 +333,7 @@ function SortableList({
         )}
       </div>
 
-      <div className="mb-4 px-1">
+      <div className="mb-4 px-1" data-testid={`list-${list.id}-dropzone`}>
         <SortableContext items={sortedCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {sortedCards.map((card) => (
             <SortableCard
@@ -372,6 +374,7 @@ export default function KanbanBoard() {
   const [showCreateBoardDialog, setShowCreateBoardDialog] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
+  const [syncQueueStats, setSyncQueueStats] = useState({ pending: 0, failed: 0, total: 0, lastSyncedAt: null as number | null });
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -404,16 +407,23 @@ export default function KanbanBoard() {
   // Load board data when currentBoardId changes
   useEffect(() => {
     setIsClient(true);
+    let isCancelled = false;
 
     // Load data from Supabase or localStorage
     const loadData = async () => {
       if (!user || !currentBoardId) return;
 
+      const currentBoard = boards.find((board) => board.id === currentBoardId);
       const data = await loadFromSupabase(currentBoardId);
+      if (isCancelled) return;
 
-      // If no lists exist, initialize with defaults
-      if (data.lists.length === 0) {
+      const shouldSeedDefaults =
+        data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board);
+
+      if (shouldSeedDefaults) {
         const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
+        if (isCancelled) return;
+
         if (defaultLists.length > 0) {
           const newData = { lists: defaultLists, cards: [] };
           setBoardData(newData);
@@ -427,12 +437,32 @@ export default function KanbanBoard() {
     };
 
     loadData();
-  }, [user, currentBoardId]);
 
-  // Online/Offline detection
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, currentBoardId, boards]);
+
+  // Online/Offline detection with auto-sync
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = async () => {
+      console.log('オンライン復帰 - 同期開始');
+      setIsOnline(true);
+
+      // Sync pending queue when coming back online
+      const result = await syncQueue();
+      if (result.total > 0) {
+        console.log(`同期完了: ${result.success}件成功, ${result.failed}件失敗`);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('オフライン検出');
+      setIsOnline(false);
+    };
+
+    // Set initial online state
+    setIsOnline(navigator.onLine);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -442,6 +472,38 @@ export default function KanbanBoard() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Sync queue on app load if online
+  useEffect(() => {
+    const syncOnLoad = async () => {
+      if (navigator.onLine && user) {
+        console.log('アプリ起動時 - 同期キューをチェック');
+        const result = await syncQueue();
+        if (result.total > 0) {
+          console.log(`起動時同期完了: ${result.success}件成功, ${result.failed}件失敗`);
+        }
+        // Update stats after sync
+        setSyncQueueStats(getSyncQueueStats());
+      }
+    };
+
+    syncOnLoad();
+  }, [user]);
+
+  // Update sync queue stats periodically
+  useEffect(() => {
+    const updateStats = () => {
+      setSyncQueueStats(getSyncQueueStats());
+    };
+
+    // Update immediately
+    updateStats();
+
+    // Update every 2 seconds
+    const interval = setInterval(updateStats, 2000);
+
+    return () => clearInterval(interval);
+  }, [isOnline]);
 
   // Close board menu when clicking outside
   useEffect(() => {
@@ -477,23 +539,21 @@ export default function KanbanBoard() {
         (payload) => {
           console.log('List change detected:', payload);
 
-          if (payload.eventType === 'INSERT') {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             setBoardData((prev) => {
-              // Avoid duplicates
-              const exists = prev.lists.some(list => list.id === (payload.new as List).id);
-              if (exists) return prev;
-              return {
-                ...prev,
-                lists: [...prev.lists, payload.new as List],
-              };
+              const newList = payload.new as List;
+              const idx = prev.lists.findIndex(list => list.id === newList.id);
+
+              if (idx >= 0) {
+                // Update existing list
+                const updatedLists = [...prev.lists];
+                updatedLists[idx] = newList;
+                return { ...prev, lists: updatedLists };
+              }
+
+              // Insert new list
+              return { ...prev, lists: [...prev.lists, newList] };
             });
-          } else if (payload.eventType === 'UPDATE') {
-            setBoardData((prev) => ({
-              ...prev,
-              lists: prev.lists.map((list) =>
-                list.id === payload.new.id ? (payload.new as List) : list
-              ),
-            }));
           } else if (payload.eventType === 'DELETE') {
             setBoardData((prev) => ({
               ...prev,
@@ -514,23 +574,21 @@ export default function KanbanBoard() {
         (payload) => {
           console.log('Card change detected:', payload);
 
-          if (payload.eventType === 'INSERT') {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             setBoardData((prev) => {
-              // Avoid duplicates
-              const exists = prev.cards.some(card => card.id === (payload.new as Card).id);
-              if (exists) return prev;
-              return {
-                ...prev,
-                cards: [...prev.cards, payload.new as Card],
-              };
+              const newCard = payload.new as Card;
+              const idx = prev.cards.findIndex(card => card.id === newCard.id);
+
+              if (idx >= 0) {
+                // Update existing card
+                const updatedCards = [...prev.cards];
+                updatedCards[idx] = newCard;
+                return { ...prev, cards: updatedCards };
+              }
+
+              // Insert new card
+              return { ...prev, cards: [...prev.cards, newCard] };
             });
-          } else if (payload.eventType === 'UPDATE') {
-            setBoardData((prev) => ({
-              ...prev,
-              cards: prev.cards.map((card) =>
-                card.id === payload.new.id ? (payload.new as Card) : card
-              ),
-            }));
           } else if (payload.eventType === 'DELETE') {
             setBoardData((prev) => ({
               ...prev,
@@ -549,7 +607,10 @@ export default function KanbanBoard() {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('[Realtime] Cleaning up subscription for board:', currentBoardId);
+      supabase.removeChannel(channel).then(() => {
+        console.log('[Realtime] Channel removed successfully');
+      });
       setRealtimeStatus('disconnected');
     };
   }, [user, currentBoardId]);
@@ -575,6 +636,12 @@ export default function KanbanBoard() {
   };
 
   const syncToSupabase = async (data: BoardData) => {
+    // If offline, don't sync - operations are already in queue
+    if (!isOnline) {
+      console.log('Offline: skipping sync (operations queued)');
+      return;
+    }
+
     try {
       await Promise.all([
         supabase.from("lists").upsert(data.lists),
@@ -601,7 +668,13 @@ export default function KanbanBoard() {
     };
     const newData = { ...boardData, lists: [...boardData.lists, newList] };
     updateData(newData);
-    await syncToSupabase(newData);
+
+    // Add to sync queue if offline, otherwise sync directly
+    if (!isOnline) {
+      addToSyncQueue({ type: 'INSERT', table: 'lists', data: newList });
+    } else {
+      await syncToSupabase(newData);
+    }
   };
 
   const handleAddCard = async (listId: string) => {
@@ -622,7 +695,13 @@ export default function KanbanBoard() {
     };
     const newData = { ...boardData, cards: [...boardData.cards, newCard] };
     updateData(newData);
-    await syncToSupabase(newData);
+
+    // Add to sync queue if offline, otherwise sync directly
+    if (!isOnline) {
+      addToSyncQueue({ type: 'INSERT', table: 'cards', data: newCard });
+    } else {
+      await syncToSupabase(newData);
+    }
   };
 
   const handleEditCard = async (id: string, title: string, description: string) => {
@@ -631,7 +710,16 @@ export default function KanbanBoard() {
     );
     const newData = { ...boardData, cards: updatedCards };
     updateData(newData);
-    await syncToSupabase(newData);
+
+    // Add to sync queue if offline, otherwise sync directly
+    const updatedCard = updatedCards.find((c) => c.id === id);
+    if (updatedCard) {
+      if (!isOnline) {
+        addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
+      } else {
+        await syncToSupabase(newData);
+      }
+    }
   };
 
   const handleDeleteCard = async (id: string) => {
@@ -639,10 +727,15 @@ export default function KanbanBoard() {
     const newData = { ...boardData, cards: updatedCards };
     updateData(newData);
 
-    try {
-      await supabase.from("cards").delete().eq("id", id);
-    } catch (error) {
-      console.error("Error deleting card:", error);
+    // Add to sync queue if offline, otherwise delete directly
+    if (!isOnline) {
+      addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
+    } else {
+      try {
+        await supabase.from("cards").delete().eq("id", id);
+      } catch (error) {
+        console.error("Error deleting card:", error);
+      }
     }
   };
 
@@ -652,7 +745,16 @@ export default function KanbanBoard() {
     );
     const newData = { ...boardData, lists: updatedLists };
     updateData(newData);
-    await syncToSupabase(newData);
+
+    // Add to sync queue if offline, otherwise sync directly
+    const updatedList = updatedLists.find((l) => l.id === id);
+    if (updatedList) {
+      if (!isOnline) {
+        addToSyncQueue({ type: 'UPDATE', table: 'lists', data: updatedList });
+      } else {
+        await syncToSupabase(newData);
+      }
+    }
   };
 
   const handleDeleteList = async (id: string) => {
@@ -661,10 +763,15 @@ export default function KanbanBoard() {
     const newData = { lists: updatedLists, cards: updatedCards };
     updateData(newData);
 
-    try {
-      await supabase.from("lists").delete().eq("id", id);
-    } catch (error) {
-      console.error("Error deleting list:", error);
+    // Add to sync queue if offline, otherwise delete directly
+    if (!isOnline) {
+      addToSyncQueue({ type: 'DELETE', table: 'lists', data: { id } });
+    } else {
+      try {
+        await supabase.from("lists").delete().eq("id", id);
+      } catch (error) {
+        console.error("Error deleting list:", error);
+      }
     }
   };
 
@@ -875,29 +982,41 @@ export default function KanbanBoard() {
               )}
             </div>
             {/* Sync status indicator */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-3 text-xs">
               {!isOnline && (
-                <span className="flex items-center gap-1 text-orange-600">
+                <span className="flex items-center gap-1 text-orange-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-orange-600" />
                   Offline
                 </span>
               )}
               {isOnline && realtimeStatus === 'connected' && (
-                <span className="flex items-center gap-1 text-green-600">
+                <span className="flex items-center gap-1 text-green-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
                   Live
                 </span>
               )}
               {isOnline && realtimeStatus === 'connecting' && (
-                <span className="flex items-center gap-1 text-yellow-600">
+                <span className="flex items-center gap-1 text-yellow-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-yellow-600 animate-pulse" />
                   Connecting...
                 </span>
               )}
               {isOnline && realtimeStatus === 'disconnected' && (
-                <span className="flex items-center gap-1 text-gray-500">
+                <span className="flex items-center gap-1 text-gray-500 font-medium">
                   <div className="w-2 h-2 rounded-full bg-gray-500" />
                   Disconnected
+                </span>
+              )}
+
+              {/* Sync queue stats */}
+              {syncQueueStats.pending > 0 && (
+                <span className="flex items-center gap-1 text-yellow-600 font-medium bg-yellow-50 px-2 py-1 rounded">
+                  ⏳ {syncQueueStats.pending} queued
+                </span>
+              )}
+              {syncQueueStats.failed > 0 && (
+                <span className="flex items-center gap-1 text-red-600 font-medium bg-red-50 px-2 py-1 rounded">
+                  ⚠️ {syncQueueStats.failed} failed
                 </span>
               )}
             </div>
