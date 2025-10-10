@@ -318,6 +318,64 @@ function SortableCard({
   );
 }
 
+// Filter and sort helper functions
+const filterAndSortCards = (
+  cards: Card[],
+  searchQuery: string,
+  selectedTags: string[],
+  selectedPriority: Priority | 'all',
+  sortBy: 'none' | 'due_date_asc' | 'due_date_desc'
+): Card[] => {
+  let filtered = [...cards];
+
+  // Search filter (title + description)
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase();
+    filtered = filtered.filter(
+      (card) =>
+        card.title.toLowerCase().includes(query) || card.description?.toLowerCase().includes(query)
+    );
+  }
+
+  // Tag filter
+  if (selectedTags.length > 0) {
+    filtered = filtered.filter((card) =>
+      selectedTags.every((tag) => card.tags?.includes(tag))
+    );
+  }
+
+  // Priority filter
+  if (selectedPriority !== 'all') {
+    filtered = filtered.filter((card) => card.priority === selectedPriority);
+  }
+
+  // Sort by due date
+  if (sortBy === 'due_date_asc') {
+    filtered.sort((a, b) => {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
+  } else if (sortBy === 'due_date_desc') {
+    filtered.sort((a, b) => {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(b.due_date).getTime() - new Date(a.due_date).getTime();
+    });
+  }
+
+  return filtered;
+};
+
+// Get all unique tags from all cards
+const getAllTags = (cards: Card[]): string[] => {
+  const tagsSet = new Set<string>();
+  cards.forEach((card) => {
+    card.tags?.forEach((tag) => tagsSet.add(tag));
+  });
+  return Array.from(tagsSet).sort();
+};
+
 // Sortable List Component
 function SortableList({
   list,
@@ -327,14 +385,22 @@ function SortableList({
   onDeleteCard,
   onEditList,
   onDeleteList,
+  searchQuery,
+  selectedTags,
+  selectedPriority,
+  sortBy,
 }: {
   list: List;
   cards: Card[];
   onAddCard: (listId: string) => void;
-  onEditCard: (id: string, title: string, description: string) => void;
+  onEditCard: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
   onDeleteCard: (id: string) => void;
   onEditList: (id: string, title: string) => void;
   onDeleteList: (id: string) => void;
+  searchQuery: string;
+  selectedTags: string[];
+  selectedPriority: Priority | 'all';
+  sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -367,7 +433,9 @@ function SortableList({
     setIsEditingTitle(false);
   };
 
-  const sortedCards = [...cards].sort((a, b) => a.position - b.position);
+  // First sort by position, then apply filters and custom sorting
+  const positionSorted = [...cards].sort((a, b) => a.position - b.position);
+  const sortedCards = filterAndSortCards(positionSorted, searchQuery, selectedTags, selectedPriority, sortBy);
 
   return (
     <div
@@ -481,6 +549,12 @@ export default function KanbanBoard() {
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'none' | 'due_date_asc' | 'due_date_desc'>('none');
   const [showCreateBoardDialog, setShowCreateBoardDialog] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
@@ -1195,6 +1269,81 @@ export default function KanbanBoard() {
           </div>
         </div>
 
+        {/* Search & Filter Bar */}
+        <div className="mb-6 bg-white/60 dark:bg-gray-800/40 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-gray-700/50 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-3">
+            {/* Search input */}
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="🔍 Search cards..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              />
+            </div>
+
+            {/* Tag filter */}
+            <div className="flex-1">
+              <select
+                multiple
+                value={selectedTags}
+                onChange={(e) => setSelectedTags(Array.from(e.target.selectedOptions, option => option.value))}
+                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="" disabled>Select tags...</option>
+                {getAllTags(boardData.cards).map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority filter */}
+            <div>
+              <select
+                value={selectedPriority}
+                onChange={(e) => setSelectedPriority(e.target.value as Priority | 'all')}
+                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="all">All Priorities</option>
+                <option value="low">🟢 Low</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="high">🔴 High</option>
+              </select>
+            </div>
+
+            {/* Sort by due date */}
+            <div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'none' | 'due_date_asc' | 'due_date_desc')}
+                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="none">No Sort</option>
+                <option value="due_date_asc">📅 Due: Earliest</option>
+                <option value="due_date_desc">📅 Due: Latest</option>
+              </select>
+            </div>
+
+            {/* Clear filters button */}
+            {(searchQuery || selectedTags.length > 0 || selectedPriority !== 'all' || sortBy !== 'none') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedTags([]);
+                  setSelectedPriority('all');
+                  setSortBy('none');
+                }}
+                className="px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors whitespace-nowrap"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        </div>
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -1214,6 +1363,10 @@ export default function KanbanBoard() {
                   onDeleteCard={handleDeleteCard}
                   onEditList={handleEditList}
                   onDeleteList={handleDeleteList}
+                  searchQuery={searchQuery}
+                  selectedTags={selectedTags}
+                  selectedPriority={selectedPriority}
+                  sortBy={sortBy}
                 />
               ))}
             </SortableContext>
