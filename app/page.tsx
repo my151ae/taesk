@@ -26,6 +26,7 @@ import { supabase, type Card, type List, type Board, type BoardData, type Priori
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
+import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -293,6 +294,37 @@ function SortableCard({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Copy Links */}
+          {card.short_id && (
+            <div>
+              <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Share Link</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const shortUrl = `${window.location.origin}/c/${card.short_id}`;
+                    navigator.clipboard.writeText(shortUrl);
+                  }}
+                  className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  📋 Copy Short Link
+                </button>
+                {card.id_short && card.slug && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const readableUrl = `${window.location.origin}/c/${card.short_id}/${card.id_short}-${card.slug}`;
+                      navigator.clipboard.writeText(readableUrl);
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    📋 Copy Full Link
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -961,11 +993,17 @@ function KanbanBoard() {
   const handleAddCard = async (listId: string) => {
     if (!user || !currentBoardId) return;
 
+    // Generate short_id, id_short, and slug
+    const shortId = await createUniqueShortId();
+    const idShort = await getNextIdShort(currentBoardId);
+    const title = "New Card";
+    const slug = slugify(title);
+
     // Note: user_id is saved for future features, but all authenticated users
     // can currently see and edit all cards (shared team board)
     const newCard: Card = {
       id: uuidv4(),
-      title: "New Card",
+      title,
       description: "",
       list_id: listId,
       board_id: currentBoardId,
@@ -975,6 +1013,9 @@ function KanbanBoard() {
       due_date: null,
       priority: 'medium',
       assigned_to: null,
+      short_id: shortId,
+      id_short: idShort,
+      slug,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -998,12 +1039,16 @@ function KanbanBoard() {
     priority?: 'low' | 'medium' | 'high',
     assigned_to?: string | null
   ) => {
+    // Regenerate slug if title changed
+    const newSlug = slugify(title);
+
     const updatedCards = boardData.cards.map((card) =>
       card.id === id
         ? {
             ...card,
             title,
             description,
+            slug: newSlug,
             ...(tags !== undefined && { tags }),
             ...(due_date !== undefined && { due_date }),
             ...(priority !== undefined && { priority }),

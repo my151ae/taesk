@@ -391,4 +391,71 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Verify card still exists (synced to Supabase)
     await expect(page.getByText('New Card').first()).toBeVisible();
   });
+
+  test('should access card via short_id URL and redirect to board', async ({ page }) => {
+    // Add a list and card
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(1000);
+
+    const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
+    await addCardButton.click();
+    await expect(page.getByText('New Card').first()).toBeVisible();
+    await page.waitForTimeout(2000); // Wait for sync to Supabase
+
+    // Get the card's short_id from Supabase
+    const { data: cards } = await supabase
+      .from('cards')
+      .select('short_id, id_short, slug, id')
+      .eq('board_id', testBoardId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    expect(cards).toBeTruthy();
+    expect(cards!.length).toBe(1);
+    const card = cards![0];
+    expect(card.short_id).toBeTruthy();
+
+    // Navigate to short URL
+    await page.goto(`/c/${card.short_id}`);
+    await page.waitForLoadState('networkidle');
+
+    // Should redirect to board with card parameter
+    expect(page.url()).toContain(`?board=${testBoardId}`);
+    expect(page.url()).toContain(`&card=${card.id}`);
+
+    // Verify we're on the test board
+    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
+  });
+
+  test('should redirect to canonical URL when slug is incorrect', async ({ page }) => {
+    // Add a list and card
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(1000);
+
+    const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
+    await addCardButton.click();
+    await expect(page.getByText('New Card').first()).toBeVisible();
+    await page.waitForTimeout(2000); // Wait for sync to Supabase
+
+    // Get the card's short_id from Supabase
+    const { data: cards } = await supabase
+      .from('cards')
+      .select('short_id, id_short, slug')
+      .eq('board_id', testBoardId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    expect(cards).toBeTruthy();
+    expect(cards!.length).toBe(1);
+    const card = cards![0];
+    expect(card.short_id).toBeTruthy();
+
+    // Navigate with incorrect slug
+    const response = await page.goto(`/c/${card.short_id}/wrong-slug`);
+    await page.waitForLoadState('networkidle');
+
+    // Should redirect (status might be 307/308 for Next.js redirects, or we check final URL)
+    // The redirect happens, so we just verify the final URL contains board parameter
+    expect(page.url()).toContain(`?board=${testBoardId}`);
+  });
 });

@@ -41,6 +41,9 @@ export interface Card {
   due_date: string | null;
   priority: Priority;
   assigned_to: string | null;
+  short_id: string | null;
+  id_short: number | null;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }
