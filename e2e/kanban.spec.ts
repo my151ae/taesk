@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 import { supabase } from '@/lib/supabase';
 import type { Page, Locator } from '@playwright/test';
 
-const TEST_USER_ID = 'd7ab4718-0648-43ba-a1b6-19c826608c40'; // test@example.com
+const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 
 /**
  * Drag and drop helper using mouse API with intermediate steps
@@ -72,7 +72,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Wait for page to load and auth to initialize
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('text=test@example.com', { timeout: 10000 });
+    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+    await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Switch to test board
     await page.getByRole('button', { name: /▼/ }).click();
@@ -292,7 +293,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Reload page
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('text=test@example.com', { timeout: 10000 });
+    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+    await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Switch back to test board after reload
     await page.getByRole('button', { name: 'Main Board ▼' }).click();
@@ -317,8 +319,9 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
   });
 
   test('should show mock user email in test mode', async ({ page }) => {
-    // In bypass mode, should show test email
-    const emailText = page.getByText('test@example.com');
+    // Should show actual E2E test user email
+    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+    const emailText = page.getByText(testUserEmail);
     await expect(emailText).toBeVisible();
 
     // Verify sign out button exists
@@ -381,7 +384,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Verify data persisted to Supabase by reloading
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('text=test@example.com', { timeout: 10000 });
+    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+    await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Switch back to test board
     await page.getByRole('button', { name: 'Main Board ▼' }).click();

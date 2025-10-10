@@ -8,9 +8,15 @@ export default defineConfig({
   // Phase 1: Sequential execution in CI for stability
   workers: process.env.CI ? 1 : 4,
   reporter: 'html',
+
+  // Global setup for authentication
+  globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
+
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    // Use authenticated state by default (created by globalSetup)
+    storageState: 'playwright/.auth/user.json',
   },
 
   projects: [
@@ -21,7 +27,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'NODE_ENV=test NEXT_PUBLIC_BYPASS_AUTH=true npm run dev',
+    // Removed NEXT_PUBLIC_BYPASS_AUTH - now using real authentication
+    command: 'NODE_ENV=test npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },

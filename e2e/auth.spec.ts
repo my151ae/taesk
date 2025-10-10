@@ -7,12 +7,14 @@ import { test, expect } from '@playwright/test';
  * For Google OAuth, we test the UI elements and redirects rather than
  * the full OAuth flow (which would require real Google credentials)
  *
- * TEMPORARILY SKIPPED: NEXT_PUBLIC_BYPASS_AUTH is globally enabled in
- * playwright.config.ts, which prevents proper auth testing.
- * See: docs/tickets/2025-10-10/01-e2e-test-stability-issues.md
+ * These tests use unauthenticated state by resetting storageState.
+ * See: docs/tickets/2025-10-10/02-programmatic-sign-in-e2e-plan.md
  */
 
-test.describe.skip('Authentication', () => {
+// Reset storage state for this file - tests run as unauthenticated users
+test.use({ storageState: { cookies: [], origins: [] } });
+
+test.describe('Authentication', () => {
   test('should redirect to login page when not authenticated', async ({ page }) => {
     await page.goto('/');
 
@@ -71,7 +73,7 @@ test.describe('Data Isolation (requires manual setup)', () => {
   });
 });
 
-test.describe.skip('Session Management', () => {
+test.describe('Session Management', () => {
   test('should show login page after visiting any protected route', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL('/login');

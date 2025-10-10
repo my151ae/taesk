@@ -68,6 +68,7 @@ Desktop.ini
 .playwright-mcp/
 playwright-report/
 test-results/
+playwright/.auth/
 
 # Temporary files
 *.tmp
