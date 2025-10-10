@@ -71,6 +71,32 @@ const getActualUserId = (userId: string): string | null => {
   return userId === '00000000-0000-0000-0000-000000000000' ? null : userId;
 };
 
+// Activity log helper
+const logActivity = async (
+  boardId: string,
+  userId: string,
+  action: 'created' | 'updated' | 'deleted' | 'moved',
+  entityType: 'card' | 'list',
+  entityId: string,
+  entityTitle: string,
+  details?: Record<string, unknown>
+) => {
+  try {
+    const actualUserId = getActualUserId(userId);
+    await supabase.from('activity_logs').insert({
+      board_id: boardId,
+      user_id: actualUserId,
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      entity_title: entityTitle,
+      details: details || null,
+    });
+  } catch (error) {
+    console.error('Error logging activity:', error);
+  }
+};
+
 // Initialize with default lists if empty
 // Note: user_id is stored for future features (personal boards), but currently
 // all authenticated users can see and edit all data (shared team board)
@@ -100,10 +126,14 @@ function SortableCard({
   card,
   onEdit,
   onDelete,
+  boards,
+  onMoveToBoard,
 }: {
   card: Card;
   onEdit: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
   onDelete: (id: string) => void;
+  boards: Board[];
+  onMoveToBoard: (cardId: string, targetBoardId: string) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(card.title);
@@ -113,6 +143,7 @@ function SortableCard({
   const [dueDate, setDueDate] = useState(card.due_date || '');
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
   const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
+  const [targetBoardId, setTargetBoardId] = useState(card.board_id);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -130,6 +161,12 @@ function SortableCard({
 
   const handleSave = () => {
     onEdit(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
+
+    // Check if board has changed
+    if (targetBoardId !== card.board_id) {
+      onMoveToBoard(card.id, targetBoardId);
+    }
+
     setIsEditing(false);
   };
 
@@ -140,6 +177,7 @@ function SortableCard({
     setDueDate(card.due_date || '');
     setPriority(card.priority || 'medium');
     setAssignedTo(card.assigned_to || '');
+    setTargetBoardId(card.board_id);
     setIsEditing(false);
   };
 
@@ -239,6 +277,24 @@ function SortableCard({
               <option value="high">🔴 High</option>
             </select>
           </div>
+
+          {/* Move to Board */}
+          {boards.length > 1 && (
+            <div>
+              <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Move to Board</label>
+              <select
+                value={targetBoardId}
+                onChange={(e) => setTargetBoardId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                {boards.map((board) => (
+                  <option key={board.id} value={board.id}>
+                    {board.name} {board.id === card.board_id ? '(current)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <button
@@ -389,6 +445,8 @@ function SortableList({
   selectedTags,
   selectedPriority,
   sortBy,
+  boards,
+  onMoveToBoard,
 }: {
   list: List;
   cards: Card[];
@@ -401,6 +459,8 @@ function SortableList({
   selectedTags: string[];
   selectedPriority: Priority | 'all';
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
+  boards: Board[];
+  onMoveToBoard: (cardId: string, targetBoardId: string) => void;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -519,6 +579,8 @@ function SortableList({
               card={card}
               onEdit={onEditCard}
               onDelete={onDeleteCard}
+              boards={boards}
+              onMoveToBoard={onMoveToBoard}
             />
           ))}
         </SortableContext>
@@ -946,6 +1008,77 @@ export default function KanbanBoard() {
     }
   };
 
+  const handleMoveCardToBoard = async (cardId: string, targetBoardId: string) => {
+    const card = boardData.cards.find((c) => c.id === cardId);
+    if (!card || card.board_id === targetBoardId) return;
+
+    // Remove card from current board's local data
+    const updatedCards = boardData.cards.filter((c) => c.id !== cardId);
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    // Update card's board_id in database
+    // The card will no longer appear in current board after sync
+    // We also need to find a list in the target board to place the card
+    try {
+      // Get first list from target board
+      const { data: targetLists, error: listsError } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('board_id', targetBoardId)
+        .order('position', { ascending: true })
+        .limit(1);
+
+      if (listsError) throw listsError;
+
+      if (targetLists && targetLists.length > 0) {
+        const targetListId = targetLists[0].id;
+
+        // Get max position in target list
+        const { data: targetCards, error: cardsError } = await supabase
+          .from('cards')
+          .select('position')
+          .eq('list_id', targetListId)
+          .order('position', { ascending: false })
+          .limit(1);
+
+        if (cardsError) throw cardsError;
+
+        const newPosition = targetCards && targetCards.length > 0 ? targetCards[0].position + 1 : 0;
+
+        // Update card to move it to target board
+        const { error: updateError } = await supabase
+          .from('cards')
+          .update({
+            board_id: targetBoardId,
+            list_id: targetListId,
+            position: newPosition,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', cardId);
+
+        if (updateError) throw updateError;
+
+        // Log activity
+        if (user) {
+          await logActivity(
+            card.board_id,
+            user.id,
+            'moved',
+            'card',
+            cardId,
+            card.title,
+            { from_board: card.board_id, to_board: targetBoardId }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error moving card to board:', error);
+      // Restore card to local data on error
+      updateData(boardData);
+    }
+  };
+
   const handleEditList = async (id: string, title: string) => {
     const updatedLists = boardData.lists.map((list) =>
       list.id === id ? { ...list, title, updated_at: new Date().toISOString() } : list
@@ -1367,6 +1500,8 @@ export default function KanbanBoard() {
                   selectedTags={selectedTags}
                   selectedPriority={selectedPriority}
                   sortBy={sortBy}
+                  boards={boards}
+                  onMoveToBoard={handleMoveCardToBoard}
                 />
               ))}
             </SortableContext>

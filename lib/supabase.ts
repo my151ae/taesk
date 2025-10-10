@@ -59,3 +59,15 @@ export interface BoardData {
   lists: List[];
   cards: Card[];
 }
+
+export interface ActivityLog {
+  id: string;
+  board_id: string;
+  user_id: string | null;
+  action: 'created' | 'updated' | 'deleted' | 'moved';
+  entity_type: 'card' | 'list';
+  entity_id: string | null;
+  entity_title: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}

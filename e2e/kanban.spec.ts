@@ -121,8 +121,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Click rename
     await page.getByRole('button', { name: 'Rename', exact: true }).click();
 
-    // Enter new name
-    const input = page.locator('input').filter({ hasValue: 'New List' });
+    // Enter new name - use more specific selector to avoid search input
+    const input = page.locator('[data-testid^="list-"]').locator('input').filter({ hasValue: 'New List' });
     await input.fill('Renamed List');
     await page.keyboard.press('Enter');
 
