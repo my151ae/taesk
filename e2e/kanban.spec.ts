@@ -290,15 +290,13 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Wait for sync to Supabase (important!)
     await page.waitForTimeout(2000);
 
-    // Reload page
-    await page.reload();
+    // Reload page directly to test board URL
+    await page.goto(`/?board=${testBoardId}`);
     await page.waitForLoadState('networkidle');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
-    // Switch back to test board after reload
-    await page.getByRole('button', { name: 'Main Board ▼' }).click();
-    await page.getByRole('button', { name: testBoardName }).click();
+    // Wait for board to load
     await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
 
     // Verify data persists
@@ -381,15 +379,13 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Verify "queued" indicator is gone
     await expect(page.getByText(/queued/i)).not.toBeVisible();
 
-    // Verify data persisted to Supabase by reloading
-    await page.reload();
+    // Verify data persisted to Supabase by reloading directly to test board URL
+    await page.goto(`/?board=${testBoardId}`);
     await page.waitForLoadState('networkidle');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
-    // Switch back to test board
-    await page.getByRole('button', { name: 'Main Board ▼' }).click();
-    await page.getByRole('button', { name: testBoardName }).click();
+    // Wait for board to load
     await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
 
     // Verify card still exists (synced to Supabase)

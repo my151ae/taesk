@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -24,7 +24,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
@@ -600,9 +600,10 @@ function SortableList({
 // Default Main Board ID
 const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
-export default function KanbanBoard() {
+function KanbanBoard() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [boards, setBoards] = useState<Board[]>([]);
   const [currentBoardId, setCurrentBoardId] = useState<string>(MAIN_BOARD_ID);
   const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
@@ -611,6 +612,7 @@ export default function KanbanBoard() {
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -628,6 +630,20 @@ export default function KanbanBoard() {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Handle URL parameters for board and card selection
+  useEffect(() => {
+    const boardParam = searchParams.get('board');
+    const cardParam = searchParams.get('card');
+
+    // Update board from URL
+    if (boardParam && boardParam !== currentBoardId) {
+      setCurrentBoardId(boardParam);
+    }
+
+    // Update card selection from URL
+    setSelectedCardId(cardParam);
+  }, [searchParams]);
 
   // Load boards list
   useEffect(() => {
@@ -879,6 +895,25 @@ export default function KanbanBoard() {
   const updateData = (newData: BoardData) => {
     setBoardData(newData);
     saveToStorage(newData);
+  };
+
+  // Helper to update URL with board/card parameters
+  const updateURL = (boardId?: string, cardId?: string | null) => {
+    const params = new URLSearchParams();
+
+    // Only add board param if it's not the main board
+    if (boardId && boardId !== MAIN_BOARD_ID) {
+      params.set('board', boardId);
+    }
+
+    // Add card param if provided
+    if (cardId) {
+      params.set('card', cardId);
+    }
+
+    const queryString = params.toString();
+    const newUrl = queryString ? `/?${queryString}` : '/';
+    router.push(newUrl, { scroll: false });
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1278,6 +1313,7 @@ export default function KanbanBoard() {
 
       setBoards([...boards, newBoard]);
       setCurrentBoardId(newBoard.id);
+      updateURL(newBoard.id);
       setShowCreateBoardDialog(false);
       setNewBoardName('');
       setNewBoardDescription('');
@@ -1323,6 +1359,7 @@ export default function KanbanBoard() {
                       key={board.id}
                       onClick={() => {
                         setCurrentBoardId(board.id);
+                        updateURL(board.id);
                         setShowBoardMenu(false);
                       }}
                       className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${
@@ -1584,5 +1621,14 @@ export default function KanbanBoard() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function KanbanBoardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <KanbanBoard />
+    </Suspense>
   );
 }
