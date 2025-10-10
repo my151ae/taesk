@@ -27,6 +27,8 @@ export interface Board {
   updated_at: string;
 }
 
+export type Priority = 'low' | 'medium' | 'high';
+
 export interface Card {
   id: string;
   title: string;
@@ -35,6 +37,10 @@ export interface Card {
   board_id: string;
   position: number;
   user_id: string | null;
+  tags: string[];
+  due_date: string | null;
+  priority: Priority;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
 }

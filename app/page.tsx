@@ -22,7 +22,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { supabase, type Card, type List, type Board, type BoardData } from "@/lib/supabase";
+import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
@@ -102,12 +102,17 @@ function SortableCard({
   onDelete,
 }: {
   card: Card;
-  onEdit: (id: string, title: string, description: string) => void;
+  onEdit: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
   onDelete: (id: string) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description);
+  const [tags, setTags] = useState<string[]>(card.tags || []);
+  const [tagInput, setTagInput] = useState('');
+  const [dueDate, setDueDate] = useState(card.due_date || '');
+  const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
+  const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -124,14 +129,32 @@ function SortableCard({
   };
 
   const handleSave = () => {
-    onEdit(card.id, title, description);
+    onEdit(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setTitle(card.title);
     setDescription(card.description);
+    setTags(card.tags || []);
+    setDueDate(card.due_date || '');
+    setPriority(card.priority || 'medium');
+    setAssignedTo(card.assigned_to || '');
     setIsEditing(false);
+  };
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      if (!tags.includes(tagInput.trim())) {
+        setTags([...tags, tagInput.trim()]);
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove));
   };
 
   return (
@@ -160,6 +183,63 @@ function SortableCard({
             placeholder="Description"
             rows={2}
           />
+
+          {/* Tags */}
+          <div>
+            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Tags</label>
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleAddTag}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              placeholder="Press Enter to add tag"
+            />
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
+                  >
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Due Date</label>
+            <input
+              type="date"
+              value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+              onChange={(e) => setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+            />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as Priority)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+            >
+              <option value="low">🟢 Low</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+          </div>
+
           <div className="flex gap-2">
             <button
               onClick={handleSave}
@@ -177,10 +257,40 @@ function SortableCard({
         </div>
       ) : (
         <div>
-          <h3 className="font-semibold mb-1.5 text-sm text-slate-700 dark:text-gray-100">{card.title}</h3>
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <h3 className="font-semibold text-sm text-slate-700 dark:text-gray-100">{card.title}</h3>
+            {card.priority && card.priority !== 'medium' && (
+              <span className="text-xs">
+                {card.priority === 'high' ? '🔴' : '🟢'}
+              </span>
+            )}
+          </div>
+
           {card.description && (
-            <p className="text-xs text-slate-500 dark:text-gray-400 mb-3 leading-relaxed">{card.description}</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400 mb-2 leading-relaxed">{card.description}</p>
           )}
+
+          {/* Tags */}
+          {card.tags && card.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {card.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Due Date */}
+          {card.due_date && (
+            <div className="text-xs text-slate-500 dark:text-gray-400 mb-2">
+              📅 {new Date(card.due_date).toLocaleDateString()}
+            </div>
+          )}
+
           <div className="flex gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-gray-700">
             <button
               onClick={(e) => {
@@ -690,6 +800,10 @@ export default function KanbanBoard() {
       board_id: currentBoardId,
       position: boardData.cards.filter((c) => c.list_id === listId).length,
       user_id: getActualUserId(user.id),
+      tags: [],
+      due_date: null,
+      priority: 'medium',
+      assigned_to: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -704,9 +818,28 @@ export default function KanbanBoard() {
     }
   };
 
-  const handleEditCard = async (id: string, title: string, description: string) => {
+  const handleEditCard = async (
+    id: string,
+    title: string,
+    description: string,
+    tags?: string[],
+    due_date?: string | null,
+    priority?: 'low' | 'medium' | 'high',
+    assigned_to?: string | null
+  ) => {
     const updatedCards = boardData.cards.map((card) =>
-      card.id === id ? { ...card, title, description, updated_at: new Date().toISOString() } : card
+      card.id === id
+        ? {
+            ...card,
+            title,
+            description,
+            ...(tags !== undefined && { tags }),
+            ...(due_date !== undefined && { due_date }),
+            ...(priority !== undefined && { priority }),
+            ...(assigned_to !== undefined && { assigned_to }),
+            updated_at: new Date().toISOString(),
+          }
+        : card
     );
     const newData = { ...boardData, cards: updatedCards };
     updateData(newData);
