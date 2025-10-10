@@ -27,6 +27,7 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
+import { CardModal } from "@/app/components/CardModal";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -125,27 +126,11 @@ const initializeDefaultLists = async (userId: string, boardId: string): Promise<
 // Sortable Card Component
 function SortableCard({
   card,
-  onEdit,
-  onDelete,
-  boards,
-  onMoveToBoard,
+  onClick,
 }: {
   card: Card;
-  onEdit: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
-  onDelete: (id: string) => void;
-  boards: Board[];
-  onMoveToBoard: (cardId: string, targetBoardId: string) => void;
+  onClick: (id: string) => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState(card.title);
-  const [description, setDescription] = useState(card.description);
-  const [tags, setTags] = useState<string[]>(card.tags || []);
-  const [tagInput, setTagInput] = useState('');
-  const [dueDate, setDueDate] = useState(card.due_date || '');
-  const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
-  const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
-  const [targetBoardId, setTargetBoardId] = useState(card.board_id);
-
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: {
@@ -160,248 +145,56 @@ function SortableCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleSave = () => {
-    onEdit(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
-
-    // Check if board has changed
-    if (targetBoardId !== card.board_id) {
-      onMoveToBoard(card.id, targetBoardId);
-    }
-
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setTitle(card.title);
-    setDescription(card.description);
-    setTags(card.tags || []);
-    setDueDate(card.due_date || '');
-    setPriority(card.priority || 'medium');
-    setAssignedTo(card.assigned_to || '');
-    setTargetBoardId(card.board_id);
-    setIsEditing(false);
-  };
-
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
-      }
-      setTagInput('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(t => t !== tagToRemove));
-  };
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      onClick={(e) => {
+        // Only trigger onClick if not dragging
+        if (!isDragging) {
+          onClick(card.id);
+        }
+      }}
       data-testid={`card-${card.id}`}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 mb-3 cursor-grab active:cursor-grabbing border border-slate-200/60 dark:border-gray-700/50 touch-none"
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 mb-3 cursor-pointer border border-slate-200/60 dark:border-gray-700/50 touch-none"
     >
-      {isEditing ? (
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            placeholder="Card title"
-            autoFocus
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent resize-none"
-            placeholder="Description"
-            rows={2}
-          />
+      {/* Title and Priority */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="font-semibold text-sm text-slate-700 dark:text-gray-100 flex-1">
+          {card.title}
+        </h3>
+        {card.priority && card.priority !== 'medium' && (
+          <span className="text-xs flex-shrink-0">
+            {card.priority === 'high' ? '🔴' : '🟢'}
+          </span>
+        )}
+      </div>
 
-          {/* Tags */}
-          <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Tags</label>
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              placeholder="Press Enter to add tag"
-            />
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(tag)}
-                      className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Due Date */}
-          <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Due Date</label>
-            <input
-              type="date"
-              value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-              onChange={(e) => setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            />
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            >
-              <option value="low">🟢 Low</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="high">🔴 High</option>
-            </select>
-          </div>
-
-          {/* Move to Board */}
-          {boards.length > 1 && (
-            <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Move to Board</label>
-              <select
-                value={targetBoardId}
-                onChange={(e) => setTargetBoardId(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                {boards.map((board) => (
-                  <option key={board.id} value={board.id}>
-                    {board.name} {board.id === card.board_id ? '(current)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Copy Links */}
-          {card.short_id && (
-            <div>
-              <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Share Link</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const shortUrl = `${window.location.origin}/c/${card.short_id}`;
-                    navigator.clipboard.writeText(shortUrl);
-                  }}
-                  className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  📋 Copy Short Link
-                </button>
-                {card.id_short && card.slug && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const readableUrl = `${window.location.origin}/c/${card.short_id}/${card.id_short}-${card.slug}`;
-                      navigator.clipboard.writeText(readableUrl);
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    📋 Copy Full Link
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="px-3 py-1.5 bg-sky-400 text-white rounded-lg text-sm hover:bg-sky-500 transition-colors font-medium"
-            >
-              Save
-            </button>
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1.5 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors font-medium"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-semibold text-sm text-slate-700 dark:text-gray-100">{card.title}</h3>
-            {card.priority && card.priority !== 'medium' && (
-              <span className="text-xs">
-                {card.priority === 'high' ? '🔴' : '🟢'}
-              </span>
-            )}
-          </div>
-
-          {card.description && (
-            <p className="text-xs text-slate-500 dark:text-gray-400 mb-2 leading-relaxed">{card.description}</p>
-          )}
-
-          {/* Tags */}
-          {card.tags && card.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {card.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Due Date */}
-          {card.due_date && (
-            <div className="text-xs text-slate-500 dark:text-gray-400 mb-2">
-              📅 {new Date(card.due_date).toLocaleDateString()}
-            </div>
-          )}
-
-          <div className="flex gap-3 mt-3 pt-2 border-t border-slate-100 dark:border-gray-700">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditing(true);
-              }}
-              className="text-xs text-sky-500 hover:text-sky-600 font-medium transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(card.id);
-              }}
-              className="text-xs text-rose-400 hover:text-rose-500 font-medium transition-colors"
-              data-testid="delete-card-button"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
+      {/* Description (truncated) */}
+      {card.description && (
+        <p className="text-xs text-slate-500 dark:text-gray-400 mb-2 leading-relaxed line-clamp-2">
+          {card.description}
+        </p>
       )}
+
+      {/* Badges: Tags, Due Date */}
+      <div className="flex flex-wrap gap-1">
+        {card.tags && card.tags.length > 0 && card.tags.map((tag) => (
+          <span
+            key={tag}
+            className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
+          >
+            {tag}
+          </span>
+        ))}
+        {card.due_date && (
+          <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded text-xs">
+            📅 {new Date(card.due_date).toLocaleDateString()}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -469,30 +262,24 @@ function SortableList({
   list,
   cards,
   onAddCard,
-  onEditCard,
-  onDeleteCard,
+  onClickCard,
   onEditList,
   onDeleteList,
   searchQuery,
   selectedTags,
   selectedPriority,
   sortBy,
-  boards,
-  onMoveToBoard,
 }: {
   list: List;
   cards: Card[];
   onAddCard: (listId: string) => void;
-  onEditCard: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
-  onDeleteCard: (id: string) => void;
+  onClickCard: (id: string) => void;
   onEditList: (id: string, title: string) => void;
   onDeleteList: (id: string) => void;
   searchQuery: string;
   selectedTags: string[];
   selectedPriority: Priority | 'all';
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
-  boards: Board[];
-  onMoveToBoard: (cardId: string, targetBoardId: string) => void;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -609,10 +396,7 @@ function SortableList({
             <SortableCard
               key={card.id}
               card={card}
-              onEdit={onEditCard}
-              onDelete={onDeleteCard}
-              boards={boards}
-              onMoveToBoard={onMoveToBoard}
+              onClick={onClickCard}
             />
           ))}
         </SortableContext>
@@ -946,6 +730,38 @@ function KanbanBoard() {
     const queryString = params.toString();
     const newUrl = queryString ? `/?${queryString}` : '/';
     router.push(newUrl, { scroll: false });
+  };
+
+  const openCardModal = (cardId: string) => {
+    setSelectedCardId(cardId);
+
+    // Find the card to get short_id and slug
+    const card = boardData.cards.find(c => c.id === cardId);
+    if (card?.short_id) {
+      // Use Trello-style URL without navigation (update URL bar only, no page reload)
+      const slug = card.id_short && card.slug
+        ? `${card.id_short}-${card.slug}`
+        : card.slug || '';
+      const newUrl = `/c/${card.short_id}${slug ? '/' + slug : ''}`;
+
+      // Update URL without navigation (replaceState doesn't trigger routing)
+      window.history.replaceState({ ...window.history.state }, '', newUrl);
+    } else {
+      // Fallback to old URL format if short_id doesn't exist
+      updateURL(currentBoardId, cardId);
+    }
+  };
+
+  const closeCardModal = () => {
+    setSelectedCardId(null);
+
+    // Return to board view URL without navigation
+    const params = new URLSearchParams();
+    if (currentBoardId) {
+      params.set('board', currentBoardId);
+    }
+    const newUrl = params.toString() ? `/?${params.toString()}` : '/';
+    window.history.replaceState({ ...window.history.state }, '', newUrl);
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1574,16 +1390,13 @@ function KanbanBoard() {
                   list={list}
                   cards={boardData.cards.filter((card) => card.list_id === list.id)}
                   onAddCard={handleAddCard}
-                  onEditCard={handleEditCard}
-                  onDeleteCard={handleDeleteCard}
+                  onClickCard={openCardModal}
                   onEditList={handleEditList}
                   onDeleteList={handleDeleteList}
                   searchQuery={searchQuery}
                   selectedTags={selectedTags}
                   selectedPriority={selectedPriority}
                   sortBy={sortBy}
-                  boards={boards}
-                  onMoveToBoard={handleMoveCardToBoard}
                 />
               ))}
             </SortableContext>
@@ -1665,6 +1478,21 @@ function KanbanBoard() {
           </div>
         </div>
       )}
+
+      {/* Card Modal */}
+      {selectedCardId && (() => {
+        const card = boardData.cards.find(c => c.id === selectedCardId);
+        return card ? (
+          <CardModal
+            card={card}
+            boards={boards}
+            onSave={handleEditCard}
+            onDelete={handleDeleteCard}
+            onMoveToBoard={handleMoveCardToBoard}
+            onClose={closeCardModal}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

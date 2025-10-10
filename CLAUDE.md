@@ -37,6 +37,11 @@
 - [`/docs/tickets/README.md`](./docs/tickets/README.md) - タスク管理システムのルール
 - [`/docs/tickets/YYYY-MM-DD/roadmap.md`](./docs/tickets/2025-10-09/roadmap.md) - 機能追加ロードマップ
 
+**IMPORTANT: When creating tickets or documentation:**
+- **Always use the current date** from the `<env>` context (Today's date: YYYY-MM-DD)
+- Create ticket directories as `/docs/tickets/YYYY-MM-DD/` using the current date
+- Never use dates from previous sessions or arbitrary dates
+
 **Always refer to these docs when working on Taesk to understand the full context.**
 
 ## Development Workflow

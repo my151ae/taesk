@@ -181,15 +181,16 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await addCardButton.click();
     await page.waitForTimeout(300);
 
-    // Click Edit
-    await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
+    // Click card to open modal
+    await page.getByText('New Card').first().click();
+    await page.waitForTimeout(300);
 
-    // Wait for edit mode and edit title
+    // Wait for modal and edit title
     const titleInput = page.locator('input[placeholder="Card title"]');
     await titleInput.waitFor({ state: 'visible' });
     await titleInput.fill('Updated Card Title');
 
-    const descInput = page.locator('textarea[placeholder="Description"]');
+    const descInput = page.locator('textarea[placeholder="Add a description..."]');
     await descInput.fill('Updated description');
 
     // Save
@@ -211,8 +212,15 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByText('New Card').first()).toBeVisible();
     await page.waitForTimeout(1000); // Wait for card creation to sync
 
-    // Delete card
-    await page.getByRole('button', { name: 'Delete', exact: true }).first().click();
+    // Click card to open modal
+    await page.getByText('New Card').first().click();
+    await page.waitForTimeout(300);
+
+    // Delete card from modal
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+
+    // Confirm deletion dialog
+    page.on('dialog', dialog => dialog.accept());
 
     // Wait for deletion to complete (Realtime propagation + UI update)
     await page.waitForTimeout(2000);
