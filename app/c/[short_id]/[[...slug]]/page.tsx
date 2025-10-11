@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 interface PageProps {
@@ -22,10 +22,13 @@ export default async function CardPage({ params }: PageProps) {
     notFound();
   }
 
-  // Build expected slug
-  const expectedSlug = card.id_short && card.slug
-    ? `${card.id_short}-${card.slug}`
-    : card.slug || '';
+  // Build expected slug from card title
+  const expectedSlug = card.title
+    ? card.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+    : '';
 
   // Build canonical path
   const canonicalPath = expectedSlug
@@ -35,13 +38,13 @@ export default async function CardPage({ params }: PageProps) {
   // Check if current slug matches expected slug
   const currentSlug = slug?.join('/') || '';
 
-  // If slugs don't match, 301 redirect to canonical URL
+  // If slugs don't match, 308 permanent redirect to canonical URL
   if (currentSlug !== expectedSlug) {
-    redirect(canonicalPath);
+    permanentRedirect(canonicalPath);
   }
 
   // Redirect to board with card parameter
   // This will open the card in a modal on the kanban board
   const boardUrl = `/?board=${card.board_id}&card=${card.id}`;
-  redirect(boardUrl);
+  permanentRedirect(boardUrl);
 }

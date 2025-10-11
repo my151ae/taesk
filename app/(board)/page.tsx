@@ -28,6 +28,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { CardModal } from "@/app/components/CardModal";
+import { buildCardUrl } from "@/lib/card-url";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -145,18 +146,19 @@ function SortableCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleClick = () => {
+    if (!isDragging) {
+      onClick(card.id);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      onClick={(e) => {
-        // Only trigger onClick if not dragging
-        if (!isDragging) {
-          onClick(card.id);
-        }
-      }}
+      onClick={handleClick}
       data-testid={`card-${card.id}`}
       className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 mb-3 cursor-pointer border border-slate-200/60 dark:border-gray-700/50 touch-none"
     >
@@ -735,14 +737,11 @@ function KanbanBoard() {
   const openCardModal = (cardId: string) => {
     setSelectedCardId(cardId);
 
-    // Find the card to get short_id and slug
+    // Find the card to get short_id and title
     const card = boardData.cards.find(c => c.id === cardId);
     if (card?.short_id) {
-      // Use Trello-style URL without navigation (update URL bar only, no page reload)
-      const slug = card.id_short && card.slug
-        ? `${card.id_short}-${card.slug}`
-        : card.slug || '';
-      const newUrl = `/c/${card.short_id}${slug ? '/' + slug : ''}`;
+      // Use short_id URL without navigation (update URL bar only, no page reload)
+      const newUrl = buildCardUrl(card.short_id, card.title);
 
       // Update URL without navigation (replaceState doesn't trigger routing)
       window.history.replaceState({ ...window.history.state }, '', newUrl);
