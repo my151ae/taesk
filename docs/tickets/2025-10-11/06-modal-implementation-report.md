@@ -22,7 +22,7 @@ Next.js 15 App Router の **Intercepting Routes** と **Parallel Routes** を使
 
 ## 🚨 遭遇した課題と解決方法
 
-### 課題1: Intercepting Routes のディレクトリ構造の誤解
+### 課題1: Intercepting Routes のディレクトリ構造の誤解（公式ドキュメントとの矛盾）
 
 **問題**:
 ```
@@ -32,17 +32,45 @@ Cannot use (..) marker at the root level, use (.) instead.
 
 最初、`app/(board)/@modal/(..)c/` というディレクトリ構造を作成していましたが、これは誤りでした。
 
-**原因**:
-- `(..)` は「1階層上をインターセプト」という意味
-- `(board)` グループ内の `@modal` スロットから見ると、`/c` ルートは同じ階層
-- したがって、`(.)` を使うべきだった
+**理論的な理解（公式ドキュメント）**:
+Next.js 15 公式ドキュメント（https://nextjs.org/docs/app/building-your-application/routing/intercepting-routes）によると：
 
-**解決策**:
+- `(.)` : 同じ階層のセグメントをインターセプト
+- `(..)` : 1階層上のセグメントをインターセプト
+- **重要**: "These conventions are based on route segments, not the file-system."
+- Parallel Route スロット（`@modal`）は**ルートセグメントとしてカウントされない**
+
+この理論に基づくと：
+```
+app/
+├── (board)/                    # ルートグループ（セグメント）
+│   ├── @modal/                 # Parallel Route（セグメントではない）
+│   │   └── (..)c/              # 理論的には (..) で1階層上の /c をインターセプトすべき
+└── c/                          # app ルートレベルのセグメント
+```
+
+**実際の動作（Next.js ランタイム）**:
+しかし、実際に `(..)c` を使用すると以下のエラーが発生：
+```
+Error: Invalid interception route: /(..)c/[short_id]/[[...slug]].
+Cannot use (..) marker at the root level, use (.) instead.
+```
+
+**実際の解決策**:
 ```
 app/(board)/@modal/(.)c/[short_id]/[[...slug]]/page.tsx
 ```
 
-`(..)c` → `(.)c` に修正することで、正しく同階層の `/c` ルートをインターセプトできるようになりました。
+**なぜ理論と実装が異なるのか（推測）**:
+1. Next.js ランタイムは `(board)` ルートグループを「root level」として扱っている
+2. Parallel Route スロット (`@modal`) がセグメントとしてカウントされないのは正しいが、
+3. `(board)` 自体がルートレベルと見なされるため、`(..)` は使用できない
+4. したがって、`(.)` を使って同じレベルの `/c` をインターセプトする必要がある
+
+**結論**:
+- **実装**: `app/(board)/@modal/(.)c/` が正しい
+- **理由**: Next.js は `(board)` をルートレベルとして扱い、`(..)` の使用を許可しない
+- **教訓**: 公式ドキュメントの理論と実装には乖離がある場合があるため、エラーメッセージに従うべき
 
 ---
 
