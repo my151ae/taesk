@@ -4,23 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 
 import { buildReadableTail, toSlugBase } from './slug';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) {
-  throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server-side card lookups');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
-
-if (!serviceRoleKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server-side card lookups');
-}
-
-const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
 
 type CardRow = {
   id: string;
@@ -62,7 +64,8 @@ export const CARD_TAG_PREFIX = 'card:';
 export async function getCardByShortId(shortId: string): Promise<CardDetail | null> {
   if (!shortId) return null;
 
-  const { data, error } = await supabaseAdmin
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error} = await supabaseAdmin
     .from('cards')
     .select(
       [
