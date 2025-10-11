@@ -2,10 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/app/contexts/AuthContext";
 
+const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
   title: "Taesk - Kanban Board",
   description: "Trello-like Kanban board with drag and drop",
   manifest: "/manifest.json",
+  metadataBase: new URL(appOrigin),
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

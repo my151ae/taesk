@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -24,14 +25,15 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
-import { CardModal } from "@/app/components/CardModal";
 import { buildCardUrl } from "@/lib/card-url";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
+const CARD_CLICK_THRESHOLD = 5;
 
 const loadFromStorage = (): BoardData => {
   if (typeof window === "undefined") return { lists: [], cards: [] };
@@ -125,13 +127,7 @@ const initializeDefaultLists = async (userId: string, boardId: string): Promise<
 };
 
 // Sortable Card Component
-function SortableCard({
-  card,
-  onClick,
-}: {
-  card: Card;
-  onClick: (id: string) => void;
-}) {
+function SortableCard({ card }: { card: Card }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: {
@@ -146,9 +142,58 @@ function SortableCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleClick = () => {
-    if (!isDragging) {
-      onClick(card.id);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const allowNavigationRef = useRef(true);
+
+  const href = card.short_id
+    ? buildCardUrl({
+        shortId: card.short_id,
+        slug: card.slug ?? undefined,
+        idShort: card.id_short ?? undefined,
+        title: card.title,
+      })
+    : '#';
+
+  const registerPointerStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    allowNavigationRef.current = true;
+  };
+
+  const evaluatePointerDelta = (event: ReactPointerEvent<HTMLDivElement | HTMLAnchorElement>) => {
+    const origin = pointerStartRef.current;
+    if (!origin) return;
+    const moved = Math.hypot(event.clientX - origin.x, event.clientY - origin.y);
+    if (moved > CARD_CLICK_THRESHOLD) {
+      allowNavigationRef.current = false;
+    }
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    evaluatePointerDelta(event);
+    pointerStartRef.current = null;
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    evaluatePointerDelta(event);
+  };
+
+  const handlePointerCancel = () => {
+    pointerStartRef.current = null;
+  };
+
+  const handleClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.button === 1) {
+      return;
+    }
+
+    if (!card.short_id) {
+      event.preventDefault();
+      console.warn('[Card] short_id missing, skipping navigation', card.id);
+      return;
+    }
+
+    if (isDragging || !allowNavigationRef.current) {
+      event.preventDefault();
     }
   };
 
@@ -158,45 +203,52 @@ function SortableCard({
       style={style}
       {...attributes}
       {...listeners}
-      onClick={handleClick}
+      onPointerDown={registerPointerStart}
+      onPointerUp={handlePointerUp}
+      onPointerMove={handlePointerMove}
+      onPointerCancel={handlePointerCancel}
       data-testid={`card-${card.id}`}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 mb-3 cursor-pointer border border-slate-200/60 dark:border-gray-700/50 touch-none"
+      className="mb-3 touch-none"
     >
-      {/* Title and Priority */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-semibold text-sm text-slate-700 dark:text-gray-100 flex-1">
-          {card.title}
-        </h3>
-        {card.priority && card.priority !== 'medium' && (
-          <span className="text-xs flex-shrink-0">
-            {card.priority === 'high' ? '🔴' : '🟢'}
-          </span>
-        )}
-      </div>
+      <Link
+        href={href}
+        prefetch={false}
+        scroll={false}
+        aria-label={`Open card: ${card.title}`}
+        onClick={handleClick}
+        className="block rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700/50 dark:bg-gray-800"
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
+          {card.priority && card.priority !== "medium" && (
+            <span className="text-xs">
+              {card.priority === "high" ? "🔴" : "🟢"}
+            </span>
+          )}
+        </div>
 
-      {/* Description (truncated) */}
-      {card.description && (
-        <p className="text-xs text-slate-500 dark:text-gray-400 mb-2 leading-relaxed line-clamp-2">
-          {card.description}
-        </p>
-      )}
-
-      {/* Badges: Tags, Due Date */}
-      <div className="flex flex-wrap gap-1">
-        {card.tags && card.tags.length > 0 && card.tags.map((tag) => (
-          <span
-            key={tag}
-            className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
-          >
-            {tag}
-          </span>
-        ))}
-        {card.due_date && (
-          <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded text-xs">
-            📅 {new Date(card.due_date).toLocaleDateString()}
-          </span>
+        {card.description && (
+          <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-gray-400">
+            {card.description}
+          </p>
         )}
-      </div>
+
+        <div className="flex flex-wrap gap-1">
+          {card.tags && card.tags.length > 0 && card.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
+            >
+              {tag}
+            </span>
+          ))}
+          {card.due_date && (
+            <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+              📅 {new Date(card.due_date).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      </Link>
     </div>
   );
 }
@@ -264,7 +316,6 @@ function SortableList({
   list,
   cards,
   onAddCard,
-  onClickCard,
   onEditList,
   onDeleteList,
   searchQuery,
@@ -275,7 +326,6 @@ function SortableList({
   list: List;
   cards: Card[];
   onAddCard: (listId: string) => void;
-  onClickCard: (id: string) => void;
   onEditList: (id: string, title: string) => void;
   onDeleteList: (id: string) => void;
   searchQuery: string;
@@ -398,7 +448,6 @@ function SortableList({
             <SortableCard
               key={card.id}
               card={card}
-              onClick={onClickCard}
             />
           ))}
         </SortableContext>
@@ -430,7 +479,6 @@ function KanbanBoard() {
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [showBoardMenu, setShowBoardMenu] = useState(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -449,19 +497,15 @@ function KanbanBoard() {
     }
   }, [user, loading, router]);
 
-  // Handle URL parameters for board and card selection
+  // Handle URL parameters for board selection
   useEffect(() => {
     const boardParam = searchParams.get('board');
-    const cardParam = searchParams.get('card');
 
     // Update board from URL
     if (boardParam && boardParam !== currentBoardId) {
       setCurrentBoardId(boardParam);
     }
-
-    // Update card selection from URL
-    setSelectedCardId(cardParam);
-  }, [searchParams]);
+  }, [searchParams, currentBoardId]);
 
   // Load boards list
   useEffect(() => {
@@ -715,8 +759,8 @@ function KanbanBoard() {
     saveToStorage(newData);
   };
 
-  // Helper to update URL with board/card parameters
-  const updateURL = (boardId?: string, cardId?: string | null) => {
+  // Helper to update URL with board parameter
+  const updateURL = (boardId?: string) => {
     const params = new URLSearchParams();
 
     // Only add board param if it's not the main board
@@ -724,43 +768,9 @@ function KanbanBoard() {
       params.set('board', boardId);
     }
 
-    // Add card param if provided
-    if (cardId) {
-      params.set('card', cardId);
-    }
-
     const queryString = params.toString();
     const newUrl = queryString ? `/?${queryString}` : '/';
     router.push(newUrl, { scroll: false });
-  };
-
-  const openCardModal = (cardId: string) => {
-    setSelectedCardId(cardId);
-
-    // Find the card to get short_id and title
-    const card = boardData.cards.find(c => c.id === cardId);
-    if (card?.short_id) {
-      // Use short_id URL without navigation (update URL bar only, no page reload)
-      const newUrl = buildCardUrl(card.short_id, card.title);
-
-      // Update URL without navigation (replaceState doesn't trigger routing)
-      window.history.replaceState({ ...window.history.state }, '', newUrl);
-    } else {
-      // Fallback to old URL format if short_id doesn't exist
-      updateURL(currentBoardId, cardId);
-    }
-  };
-
-  const closeCardModal = () => {
-    setSelectedCardId(null);
-
-    // Return to board view URL without navigation
-    const params = new URLSearchParams();
-    if (currentBoardId) {
-      params.set('board', currentBoardId);
-    }
-    const newUrl = params.toString() ? `/?${params.toString()}` : '/';
-    window.history.replaceState({ ...window.history.state }, '', newUrl);
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -842,135 +852,6 @@ function KanbanBoard() {
       addToSyncQueue({ type: 'INSERT', table: 'cards', data: newCard });
     } else {
       await syncToSupabase(newData);
-    }
-  };
-
-  const handleEditCard = async (
-    id: string,
-    title: string,
-    description: string,
-    tags?: string[],
-    due_date?: string | null,
-    priority?: 'low' | 'medium' | 'high',
-    assigned_to?: string | null
-  ) => {
-    // Regenerate slug if title changed
-    const newSlug = slugify(title);
-
-    const updatedCards = boardData.cards.map((card) =>
-      card.id === id
-        ? {
-            ...card,
-            title,
-            description,
-            slug: newSlug,
-            ...(tags !== undefined && { tags }),
-            ...(due_date !== undefined && { due_date }),
-            ...(priority !== undefined && { priority }),
-            ...(assigned_to !== undefined && { assigned_to }),
-            updated_at: new Date().toISOString(),
-          }
-        : card
-    );
-    const newData = { ...boardData, cards: updatedCards };
-    updateData(newData);
-
-    // Add to sync queue if offline, otherwise sync directly
-    const updatedCard = updatedCards.find((c) => c.id === id);
-    if (updatedCard) {
-      if (!isOnline) {
-        addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
-      } else {
-        await syncToSupabase(newData);
-      }
-    }
-  };
-
-  const handleDeleteCard = async (id: string) => {
-    const updatedCards = boardData.cards.filter((card) => card.id !== id);
-    const newData = { ...boardData, cards: updatedCards };
-    updateData(newData);
-
-    // Add to sync queue if offline, otherwise delete directly
-    if (!isOnline) {
-      addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
-    } else {
-      try {
-        await supabase.from("cards").delete().eq("id", id);
-      } catch (error) {
-        console.error("Error deleting card:", error);
-      }
-    }
-  };
-
-  const handleMoveCardToBoard = async (cardId: string, targetBoardId: string) => {
-    const card = boardData.cards.find((c) => c.id === cardId);
-    if (!card || card.board_id === targetBoardId) return;
-
-    // Remove card from current board's local data
-    const updatedCards = boardData.cards.filter((c) => c.id !== cardId);
-    const newData = { ...boardData, cards: updatedCards };
-    updateData(newData);
-
-    // Update card's board_id in database
-    // The card will no longer appear in current board after sync
-    // We also need to find a list in the target board to place the card
-    try {
-      // Get first list from target board
-      const { data: targetLists, error: listsError } = await supabase
-        .from('lists')
-        .select('*')
-        .eq('board_id', targetBoardId)
-        .order('position', { ascending: true })
-        .limit(1);
-
-      if (listsError) throw listsError;
-
-      if (targetLists && targetLists.length > 0) {
-        const targetListId = targetLists[0].id;
-
-        // Get max position in target list
-        const { data: targetCards, error: cardsError } = await supabase
-          .from('cards')
-          .select('position')
-          .eq('list_id', targetListId)
-          .order('position', { ascending: false })
-          .limit(1);
-
-        if (cardsError) throw cardsError;
-
-        const newPosition = targetCards && targetCards.length > 0 ? targetCards[0].position + 1 : 0;
-
-        // Update card to move it to target board
-        const { error: updateError } = await supabase
-          .from('cards')
-          .update({
-            board_id: targetBoardId,
-            list_id: targetListId,
-            position: newPosition,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', cardId);
-
-        if (updateError) throw updateError;
-
-        // Log activity
-        if (user) {
-          await logActivity(
-            card.board_id,
-            user.id,
-            'moved',
-            'card',
-            cardId,
-            card.title,
-            { from_board: card.board_id, to_board: targetBoardId }
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error moving card to board:', error);
-      // Restore card to local data on error
-      updateData(boardData);
     }
   };
 
@@ -1389,7 +1270,6 @@ function KanbanBoard() {
                   list={list}
                   cards={boardData.cards.filter((card) => card.list_id === list.id)}
                   onAddCard={handleAddCard}
-                  onClickCard={openCardModal}
                   onEditList={handleEditList}
                   onDeleteList={handleDeleteList}
                   searchQuery={searchQuery}
@@ -1478,20 +1358,6 @@ function KanbanBoard() {
         </div>
       )}
 
-      {/* Card Modal */}
-      {selectedCardId && (() => {
-        const card = boardData.cards.find(c => c.id === selectedCardId);
-        return card ? (
-          <CardModal
-            card={card}
-            boards={boards}
-            onSave={handleEditCard}
-            onDelete={handleDeleteCard}
-            onMoveToBoard={handleMoveCardToBoard}
-            onClose={closeCardModal}
-          />
-        ) : null;
-      })()}
     </div>
   );
 }

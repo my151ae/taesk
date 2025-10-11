@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { toSlugBase } from './slug';
 
 // Base62 character set (0-9a-zA-Z)
 const BASE62 = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -79,11 +80,5 @@ export async function getNextIdShort(boardId: string): Promise<number> {
  * Convert a string to URL-friendly slug (supports Japanese)
  */
 export function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '') // Keep alphanumeric, spaces, and Japanese characters
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .trim()
-    .slice(0, 100); // Limit length to 100 characters
+  return toSlugBase(title);
 }

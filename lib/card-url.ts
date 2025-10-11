@@ -1,17 +1,17 @@
-/**
- * Generate slug from card title
- */
-export function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
+import { buildCanonicalPath, toSlugBase } from './slug';
+
+type CardLike = {
+  shortId: string;
+  title: string;
+  slug?: string | null;
+  idShort?: number | null;
+};
 
 /**
- * Build canonical URL for a card
+ * Build the canonical path for a card. Falls back to regenerated slug if the
+ * stored slug is missing to keep legacy rows working.
  */
-export function buildCardUrl(shortId: string, title: string): string {
-  const slug = generateSlug(title);
-  return slug ? `/c/${shortId}/${slug}` : `/c/${shortId}`;
+export function buildCardUrl(card: CardLike): string {
+  const slug = card.slug ?? toSlugBase(card.title);
+  return buildCanonicalPath({ shortId: card.shortId, idShort: card.idShort ?? undefined, slug });
 }

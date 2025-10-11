@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Card, Board, Priority } from "@/lib/supabase";
 
 interface CardModalProps {
@@ -29,27 +29,87 @@ export function CardModal({
   const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
 
-  // Escape key to close
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Escape key to close + focus trap
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+    const focusFirstElement = () => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const autoFocusTarget = dialog.querySelector<HTMLElement>('[data-autofocus]');
+      if (autoFocusTarget) {
+        autoFocusTarget.focus();
+        return;
+      }
+      const focusable = dialog.querySelectorAll<HTMLElement>(focusableSelector);
+      (focusable[0] ?? dialog).focus();
+    };
+
+    const trapFocus = (event: KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("disabled"),
+      );
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const current = document.activeElement as HTMLElement | null;
+      const isShift = event.shiftKey;
+
+      if (!current) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+
+      if (!isShift && current === last) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+
+      if (isShift && current === first) {
+        event.preventDefault();
+        last.focus();
+        return;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", trapFocus);
+    focusFirstElement();
+
+    return () => {
+      document.removeEventListener("keydown", trapFocus);
+    };
   }, [onClose]);
 
   const handleSave = () => {
     onSave(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
 
-    // Check if board has changed
     if (targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);
     }
-
-    onClose();
   };
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -69,20 +129,24 @@ export function CardModal({
   const handleDelete = () => {
     if (confirm('Delete this card?')) {
       onDelete(card.id);
-      onClose();
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        aria-hidden="true"
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+        data-testid="card-modal-overlay"
+      />
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -94,6 +158,7 @@ export function CardModal({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
             aria-label="Close modal"
+            data-autofocus
           >
             ✕
           </button>
