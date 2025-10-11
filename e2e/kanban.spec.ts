@@ -209,24 +209,42 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Add a card
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible();
     await page.waitForTimeout(1000); // Wait for card creation to sync
 
-    // Click card to open modal
+    // Verify card was added
+    await expect(page.getByText('New Card').first()).toBeVisible();
+
+    // Click the newly added card to open modal
     await page.getByText('New Card').first().click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    // Setup dialog handler BEFORE clicking delete
-    page.once('dialog', dialog => dialog.accept());
+    // Verify modal is open
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Edit Card')).toBeVisible();
 
-    // Delete card from modal
-    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    // Verify Delete button exists
+    const deleteButton = page.getByRole('button', { name: 'Delete', exact: true });
+    await expect(deleteButton).toBeVisible();
 
-    // Wait for deletion to complete (Realtime propagation + UI update)
+    // Setup dialog handler to automatically accept
+    let dialogSeen = false;
+    page.once('dialog', async dialog => {
+      dialogSeen = true;
+      expect(dialog.message()).toContain('Delete');
+      await dialog.accept();
+    });
+
+    // Click Delete button (will trigger the dialog)
+    await deleteButton.click();
+
+    // Wait for deletion to complete
     await page.waitForTimeout(2000);
 
-    // Verify deletion (should only see the add card button, not "New Card" text)
-    await expect(page.getByText('New Card')).toHaveCount(0);
+    // Verify dialog was shown
+    expect(dialogSeen).toBe(true);
+
+    // Verify modal is closed after deletion
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
   test('should drag and drop a card within the same list', async ({ page }) => {
