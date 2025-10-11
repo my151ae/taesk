@@ -1,19 +1,25 @@
 # Repository Guidelines
 
+## Communication Rules
+対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
+
 ## Project Structure & Module Organization
-The Next.js app lives under `app/` with route groups split by feature; shared utilities (Supabase client, board helpers) sit in `lib/`. End-to-end specs and setup scripts are under `e2e/`, while Playwright state is stored in `playwright/.auth/`. Assets and static files belong in `public/`, and generated docs live in `docs/`. Keep new scripts in `scripts/` so they remain discoverable.
+Keep UI routes under `app/`, grouped by feature folders so components stay close to their pages; core board logic lives in `app/page.tsx`. Shared utilities such as the Supabase client and board helpers belong in `lib/`. End-to-end specs and Playwright setup scripts sit in `e2e/`, with persistent auth state cached in `playwright/.auth/`. Place images and static assets in `public/`, generated documentation under `docs/`, and any new automation scripts inside `scripts/`. Review the docs in `/docs` (especially architecture and tickets) before tackling feature-level work.
 
 ## Build, Test, and Development Commands
-Use `npm run dev` to launch the local dev server on port 3000. `npm run build` produces the production bundle, and `npm run start` serves the built output. `npm run lint` runs Next.js ESLint rules. Run UI automation with `npm run test:e2e`; add `--ui` or `--debug` for interactive modes. Before running tests, export `.env.test` (e.g. ``set -a && source .env.test && set +a``) so Supabase credentials are available.
+Use `npm run dev` for the local Next.js server on port 3000. Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
 
 ## Coding Style & Naming Conventions
-Follow TypeScript strictness from `tsconfig.json`; prefer explicit types on exported functions. Use 2-space indentation, kebab-case for routes, camelCase for functions and variables, and PascalCase for React components. Keep React files co-located with their route or feature folder. Run `npm run lint` prior to commits to enforce formatting and import order.
+The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explicit types on exported functions and keep indentation at two spaces. Use kebab-case for routes (`app/board-overview/page.tsx`), camelCase for variables and helpers, PascalCase for React components, and Tailwind utility classes for layout. Run `npm run lint` before sending changes to ensure consistent formatting.
 
 ## Testing Guidelines
-Playwright (`@playwright/test`) drives E2E coverage; place new specs under `e2e/` and group them with `test.describe`. Name files with the feature they cover (e.g. `board.spec.ts`). Tests rely on Supabase auth state created by `e2e/.setup/auth-global-setup.ts`; avoid bypassing it unless you update the global setup. Commit new recordings or reports inside `playwright-report/` only when they illustrate a failure being investigated.
+Playwright (`@playwright/test`) powers end-to-end coverage; organize scenarios with `test.describe` blocks and name files after the feature (`e2e/board.spec.ts`). Reuse the seeded Supabase auth state from `e2e/.setup/auth-global-setup.ts` rather than bypassing login flows. Reset the cached session if failures suggest expired tokens (`rm playwright/.auth/user.json`), and verify with browser DevTools that pages render without console errors or failed network requests.
 
 ## Commit & Pull Request Guidelines
-Existing history favors short, imperative summaries (Japanese or English), e.g. `Add card modal view`. Scope commits narrowly around a single feature or fix. PRs should describe the user-facing impact, list key changes, and note any follow-up tasks. Attach screenshots or Playwright traces when touching UI flows, and reference ticket IDs from `docs/tickets/` when applicable.
+Write short, imperative commit messages (English or Japanese), mirroring existing history such as `Add card modal view`. Keep each commit focused on one fix or feature. Pull requests should describe user-facing impact, summarize key changes, attach relevant screenshots or Playwright traces for UI work, and link tickets from `docs/tickets/` when applicable. Never commit or push without explicit user approval.
 
 ## Security & Configuration Tips
-Never check real Supabase service role keys into `.env.local`; rely on `.env.test` copies for shared testing. Reset the cached Playwright auth state via `rm playwright/.auth/user.json` if tests fail due to expired sessions. When adding environment variables, document them in `.env.example` and update the global setup if they affect authentication.
+Never commit real Supabase service-role keys; rely on `.env.test` copies for shared testing. Update `.env.example` whenever new variables are introduced and note authentication-sensitive changes in the global setup. Avoid destructive git commands unless explicitly requested, and leave unrelated worktree changes untouched.
+
+## Workflow Reminders
+Before starting, skim the relevant `/docs` material and check existing implementations for similar patterns. During development, keep the dev server running, test interactions in Chrome DevTools, and address console warnings promptly. Run the appropriate npm scripts before handing off work, and document notable deviations in the PR description.
