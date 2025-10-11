@@ -61,7 +61,7 @@ Last Updated: 2025-10-10
 | 2.2 | 検索・フィルター | 🟢 完了 | 🔵 Medium | カード全文検索、タグ/ラベルフィルタ、期限ソート |
 | 2.3 | アクティビティログ | 🟢 完了 | ⚪ Low | カード/リスト変更履歴、誰がいつ何を変更したか記録、アクティビティフィード |
 | 2.4 | ボード間カード移動 | 🟢 完了 | ⚪ Low | ボード間でカードを移動（編集UIから） |
-| 2.5 | URL Routing | 🟡 進行中 | 🔵 Medium | ボード・カードごとの個別URL、直接リンク共有可能 |
+| 2.5 | URL Routing & Modal | 🟢 完了 | 🔵 Medium | Trello風カードURL、Intercepting Routes、モーダル/スタンドアロン表示 |
 
 ---
 
@@ -121,6 +121,15 @@ Last Updated: 2025-10-10
 ---
 
 ## 📝 完了履歴
+
+### 2025-10-11
+- ✅ **Phase 2.5 Complete** - Trello風カードURL & モーダル表示機能完成
+- ✅ **Intercepting Routes** - Next.js 15の最新機能を活用（`(.)c` パターン確立）
+- ✅ **Card URLs** - Short ID + SEO-friendly slug対応、多言語slug対応
+- ✅ **Modal View** - ボードからクリックでモーダル表示、Close/Escで戻る
+- ✅ **Standalone Page** - 直接URL入力でフルページ表示、共有可能
+- ✅ **308 Redirect** - Canonical URL正規化でSEO最適化
+- ✅ **Documentation** - `/docs/detail/routing.md` 追加、実装詳細を完全ドキュメント化
 
 ### 2025-10-10
 - ✅ **E2E Test Stability** - Phase 3完了（Programmatic Sign-in実装）

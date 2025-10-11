@@ -86,6 +86,10 @@ Visit `http://localhost:3000` to see the app.
 - ✅ **Delete with confirmation** for lists and cards
 - ✅ **Auto-save** to Supabase on every change
 - ✅ **Offline-first** with localStorage cache
+- ✅ **Trello-style card URLs** with short IDs and SEO-friendly slugs
+- ✅ **Modal card view** with Intercepting Routes (board context preserved)
+- ✅ **Standalone card pages** for direct URL access and sharing
+- ✅ **308 Permanent Redirect** for canonical URL normalization
 
 ### UX Features
 - 📱 **Mobile-responsive** design with optimized touch interactions
@@ -158,6 +162,7 @@ taesk/
 │       ├── database.md      # Database schema
 │       ├── components.md    # Component structure
 │       ├── storage.md       # Storage strategy
+│       ├── routing.md       # Routing & Card URLs (NEW)
 │       └── deployment.md    # Deployment guide
 │
 ├── playwright.config.ts      # Playwright configuration
@@ -173,6 +178,7 @@ taesk/
 - [Database Schema](./detail/database.md) - Supabase tables and relationships
 - [Storage Strategy](./detail/storage.md) - Hybrid storage implementation
 - [Component Structure](./detail/components.md) - React components breakdown
+- [Routing & Card URLs](./detail/routing.md) - Intercepting Routes, modal views, canonical URLs
 
 ### Development
 - [Testing Guide](./detail/testing.md) - E2E testing with Playwright, best practices
