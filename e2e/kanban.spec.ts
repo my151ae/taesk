@@ -76,7 +76,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Switch to test board
-    await page.getByRole('button', { name: /▼/ }).click();
+    await page.getByRole('button', { name: /Board ▼/ }).click();
     await page.getByRole('button', { name: testBoardName }).click();
 
     // Wait for board to switch

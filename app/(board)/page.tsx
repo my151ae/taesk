@@ -202,22 +202,25 @@ function SortableCard({ card }: { card: Card }) {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      data-testid={`card-${card.id}`}
+      className="mb-3 touch-none"
       onPointerDown={registerPointerStart}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
       onPointerCancel={handlePointerCancel}
-      data-testid={`card-${card.id}`}
-      className="mb-3 touch-none"
     >
-      <Link
-        href={href}
-        prefetch={false}
-        scroll={false}
-        aria-label={`Open card: ${card.title}`}
-        onClick={handleClick}
-        className="block rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700/50 dark:bg-gray-800"
+      <div
+        {...listeners}
+        className="block rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700/50 dark:bg-gray-800 cursor-grab active:cursor-grabbing"
       >
+        <Link
+          href={href}
+          prefetch={false}
+          scroll={false}
+          aria-label={`Open card: ${card.title}`}
+          onClick={handleClick}
+          className="block"
+        >
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
           {card.priority && card.priority !== "medium" && (
@@ -248,7 +251,8 @@ function SortableCard({ card }: { card: Card }) {
             </span>
           )}
         </div>
-      </Link>
+        </Link>
+      </div>
     </div>
   );
 }
