@@ -3,6 +3,8 @@ import { buildCanonicalPath } from '@/lib/slug';
 
 import CardModalClient from './CardModalClient';
 
+export const runtime = 'nodejs';
+
 type PageParams = {
   params: Promise<{
     short_id: string;

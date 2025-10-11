@@ -7,6 +7,8 @@ import { buildCanonicalPath } from '@/lib/slug';
 
 import CardAnalyticsClient from './CardAnalyticsClient';
 
+export const runtime = 'nodejs';
+
 type PageParams = {
   params: Promise<{
     short_id: string;
