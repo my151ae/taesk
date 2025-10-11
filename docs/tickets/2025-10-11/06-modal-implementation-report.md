@@ -22,7 +22,7 @@ Next.js 15 App Router の **Intercepting Routes** と **Parallel Routes** を使
 
 ## 🚨 遭遇した課題と解決方法
 
-### 課題1: Intercepting Routes のディレクトリ構造の誤解（公式ドキュメントとの矛盾）
+### 課題1: Intercepting Routes のディレクトリ構造（公式ドキュメントとの矛盾）
 
 **問題**:
 ```
@@ -30,13 +30,14 @@ Error: Invalid interception route: /(..)c/[short_id]/[[...slug]].
 Cannot use (..) marker at the root level, use (.) instead.
 ```
 
-最初、`app/(board)/@modal/(..)c/` というディレクトリ構造を作成していましたが、これは誤りでした。
+最初、公式ドキュメントの理論に基づいて `app/(board)/@modal/(..)c/` を試しましたが、上記のエラーが発生しました。
 
 **理論的な理解（公式ドキュメント）**:
 Next.js 15 公式ドキュメント（https://nextjs.org/docs/app/building-your-application/routing/intercepting-routes）によると：
 
 - `(.)` : 同じ階層のセグメントをインターセプト
 - `(..)` : 1階層上のセグメントをインターセプト
+- `(...)` : ルートからインターセプト
 - **重要**: "These conventions are based on route segments, not the file-system."
 - Parallel Route スロット（`@modal`）は**ルートセグメントとしてカウントされない**
 
@@ -49,11 +50,17 @@ app/
 └── c/                          # app ルートレベルのセグメント
 ```
 
-**実際の動作（Next.js ランタイム）**:
-しかし、実際に `(..)c` を使用すると以下のエラーが発生：
-```
-Error: Invalid interception route: /(..)c/[short_id]/[[...slug]].
-Cannot use (..) marker at the root level, use (.) instead.
+**実際の動作（Next.js 15.5.4）**:
+
+1. `(..)c` を使用 → エラー: "Cannot use (..) marker at the root level"
+2. `(...)c` を使用 → エラーは出ないが、Intercepting Routes が動作せず、常にスタンドアロンページに遷移
+3. `(.)c` を使用 → ✅ **正常に動作！**
+
+**検証結果**:
+```bash
+# ログに表示される成功メッセージ
+○ Compiling /(.)c/[short_id]/[[...slug]] ...
+✓ Compiled /(.)c/[short_id]/[[...slug]] in 643ms (922 modules)
 ```
 
 **実際の解決策**:
@@ -61,16 +68,19 @@ Cannot use (..) marker at the root level, use (.) instead.
 app/(board)/@modal/(.)c/[short_id]/[[...slug]]/page.tsx
 ```
 
-**なぜ理論と実装が異なるのか（推測）**:
-1. Next.js ランタイムは `(board)` ルートグループを「root level」として扱っている
-2. Parallel Route スロット (`@modal`) がセグメントとしてカウントされないのは正しいが、
-3. `(board)` 自体がルートレベルと見なされるため、`(..)` は使用できない
-4. したがって、`(.)` を使って同じレベルの `/c` をインターセプトする必要がある
+**なぜ理論と実装が異なるのか（分析）**:
+1. Next.js 15.5.4 の実装では、Route Group `(board)` 内から `/c` をインターセプトする際、`(board)` を基準とした「同階層」として `(.)` を使用する必要がある
+2. 公式ドキュメントの「Parallel Route スロットはセグメントとしてカウントされない」という説明は正しいが、**Route Group の扱いについては明示されていない**
+3. 実装上、Route Group `(board)` は `/` (ルート) と同じレベルとして扱われているため、その内部から `/c` を参照する場合は `(.)c` が正しい
 
 **結論**:
-- **実装**: `app/(board)/@modal/(.)c/` が正しい
-- **理由**: Next.js は `(board)` をルートレベルとして扱い、`(..)` の使用を許可しない
-- **教訓**: 公式ドキュメントの理論と実装には乖離がある場合があるため、エラーメッセージに従うべき
+- **実装**: `app/(board)/@modal/(.)c/` が正しい（Next.js 15.5.4 で動作確認済み）
+- **理由**: Route Group 内の Parallel Route から app ルートレベルのルートをインターセプトする場合、`(.)` を使用する
+- **検証済みの動作**:
+  - ✅ ボードからカードクリック → モーダル表示
+  - ✅ Close ボタンでモーダルを閉じてボードに戻る
+  - ✅ 直接 URL アクセス → スタンドアロンページ表示
+- **教訓**: 公式ドキュメントの理論と実装には乖離がある場合があるため、**実際の動作を優先し、エラーメッセージに従うべき**
 
 ---
 
