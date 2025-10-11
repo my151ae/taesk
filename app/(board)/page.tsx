@@ -485,6 +485,7 @@ function KanbanBoard() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
   const [sortBy, setSortBy] = useState<'none' | 'due_date_asc' | 'due_date_desc'>('none');
+  const [showFilters, setShowFilters] = useState(false);
   const [showCreateBoardDialog, setShowCreateBoardDialog] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
@@ -1181,78 +1182,119 @@ function KanbanBoard() {
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="mb-6 bg-white/60 dark:bg-gray-800/40 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-gray-700/50 shadow-sm">
-          <div className="flex flex-col md:flex-row gap-3">
-            {/* Search input */}
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="🔍 Search cards..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              />
+        <div className="mb-6 bg-white/60 dark:bg-gray-800/40 backdrop-blur-sm rounded-xl border border-slate-200/50 dark:border-gray-700/50 shadow-sm overflow-hidden">
+          {/* Toggle button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-100/50 dark:hover:bg-gray-700/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700 dark:text-gray-200">
+                🔍 Search & Filters
+              </span>
+              {(searchQuery || selectedTags.length > 0 || selectedPriority !== 'all' || sortBy !== 'none') && (
+                <span className="px-2 py-0.5 bg-sky-500 text-white text-xs rounded-full">
+                  Active
+                </span>
+              )}
             </div>
+            <span className={`text-slate-500 dark:text-gray-400 transition-transform ${showFilters ? 'rotate-180' : ''}`}>
+              ▼
+            </span>
+          </button>
 
-            {/* Tag filter */}
-            <div className="flex-1">
-              <select
-                multiple
-                value={selectedTags}
-                onChange={(e) => setSelectedTags(Array.from(e.target.selectedOptions, option => option.value))}
-                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="" disabled>Select tags...</option>
-                {getAllTags(boardData.cards).map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
+          {/* Collapsible content */}
+          {showFilters && (
+            <div className="p-4 pt-0 border-t border-slate-200/50 dark:border-gray-700/50">
+              <div className="flex flex-col md:flex-row gap-3 pt-3">
+                {/* Search input */}
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search cards..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Tag filter */}
+                <div className="flex-1 flex items-start gap-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-gray-400 whitespace-nowrap pt-1">
+                    Tags:
+                  </label>
+                  <div className="flex-1 flex flex-wrap gap-2">
+                    {getAllTags(boardData.cards).length > 0 ? (
+                      getAllTags(boardData.cards).map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            if (selectedTags.includes(tag)) {
+                              setSelectedTags(selectedTags.filter(t => t !== tag));
+                            } else {
+                              setSelectedTags([...selectedTags, tag]);
+                            }
+                          }}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                            selectedTags.includes(tag)
+                              ? 'bg-sky-500 text-white hover:bg-sky-600'
+                              : 'bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 hover:bg-slate-300 dark:hover:bg-gray-500'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-gray-500 py-1">No tags available</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Priority filter */}
+                <div>
+                  <select
+                    value={selectedPriority}
+                    onChange={(e) => setSelectedPriority(e.target.value as Priority | 'all')}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  >
+                    <option value="all">All Priorities</option>
+                    <option value="low">🟢 Low</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="high">🔴 High</option>
+                  </select>
+                </div>
+
+                {/* Sort by due date */}
+                <div>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'none' | 'due_date_asc' | 'due_date_desc')}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  >
+                    <option value="none">No Sort</option>
+                    <option value="due_date_asc">📅 Due: Earliest</option>
+                    <option value="due_date_desc">📅 Due: Latest</option>
+                  </select>
+                </div>
+
+                {/* Clear filters button */}
+                {(searchQuery || selectedTags.length > 0 || selectedPriority !== 'all' || sortBy !== 'none') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedTags([]);
+                      setSelectedPriority('all');
+                      setSortBy('none');
+                    }}
+                    className="px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors whitespace-nowrap"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
             </div>
-
-            {/* Priority filter */}
-            <div>
-              <select
-                value={selectedPriority}
-                onChange={(e) => setSelectedPriority(e.target.value as Priority | 'all')}
-                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="all">All Priorities</option>
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-              </select>
-            </div>
-
-            {/* Sort by due date */}
-            <div>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'none' | 'due_date_asc' | 'due_date_desc')}
-                className="w-full px-4 py-2 border border-slate-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="none">No Sort</option>
-                <option value="due_date_asc">📅 Due: Earliest</option>
-                <option value="due_date_desc">📅 Due: Latest</option>
-              </select>
-            </div>
-
-            {/* Clear filters button */}
-            {(searchQuery || selectedTags.length > 0 || selectedPriority !== 'all' || sortBy !== 'none') && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedTags([]);
-                  setSelectedPriority('all');
-                  setSortBy('none');
-                }}
-                className="px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors whitespace-nowrap"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
         <DndContext
