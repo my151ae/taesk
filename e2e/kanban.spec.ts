@@ -216,11 +216,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByText('New Card').first().click();
     await page.waitForTimeout(300);
 
+    // Setup dialog handler BEFORE clicking delete
+    page.once('dialog', dialog => dialog.accept());
+
     // Delete card from modal
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
-
-    // Confirm deletion dialog
-    page.on('dialog', dialog => dialog.accept());
 
     // Wait for deletion to complete (Realtime propagation + UI update)
     await page.waitForTimeout(2000);
@@ -400,7 +400,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByText('New Card').first()).toBeVisible();
   });
 
-  test('should access card via short_id URL and redirect to board', async ({ page }) => {
+  test('should access card via short_id URL and display standalone page', async ({ page }) => {
     // Add a list and card
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(1000);
@@ -413,7 +413,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Get the card's short_id from Supabase
     const { data: cards } = await supabase
       .from('cards')
-      .select('short_id, id_short, slug, id')
+      .select('short_id, id_short, slug, id, title')
       .eq('board_id', testBoardId)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -427,12 +427,15 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.goto(`/c/${card.short_id}`);
     await page.waitForLoadState('networkidle');
 
-    // Should redirect to board with card parameter
-    expect(page.url()).toContain(`?board=${testBoardId}`);
-    expect(page.url()).toContain(`&card=${card.id}`);
+    // Should display standalone card page (not redirect)
+    expect(page.url()).toContain(`/c/${card.short_id}`);
 
-    // Verify we're on the test board
-    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
+    // Verify card content is displayed
+    await expect(page.getByRole('heading', { name: card.title })).toBeVisible();
+    await expect(page.getByText(`Card #${card.id_short ?? card.short_id}`)).toBeVisible();
+
+    // Verify "Back to board" link exists
+    await expect(page.getByRole('link', { name: /Back to board/i })).toBeVisible();
   });
 
   test('should redirect to canonical URL when slug is incorrect', async ({ page }) => {
@@ -448,7 +451,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Get the card's short_id from Supabase
     const { data: cards } = await supabase
       .from('cards')
-      .select('short_id, id_short, slug')
+      .select('short_id, id_short, slug, title')
       .eq('board_id', testBoardId)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -458,12 +461,22 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     const card = cards![0];
     expect(card.short_id).toBeTruthy();
 
+    // Build expected canonical path
+    const expectedSlug = card.id_short ? `${card.id_short}-${card.slug}` : card.slug || '';
+
     // Navigate with incorrect slug
-    const response = await page.goto(`/c/${card.short_id}/wrong-slug`);
+    await page.goto(`/c/${card.short_id}/wrong-slug`);
     await page.waitForLoadState('networkidle');
 
-    // Should redirect (status might be 307/308 for Next.js redirects, or we check final URL)
-    // The redirect happens, so we just verify the final URL contains board parameter
-    expect(page.url()).toContain(`?board=${testBoardId}`);
+    // Should redirect to canonical URL
+    if (expectedSlug) {
+      expect(page.url()).toContain(`/c/${card.short_id}/${expectedSlug}`);
+    } else {
+      // If no expected slug, should redirect to just short_id
+      expect(page.url()).toBe(`http://localhost:3000/c/${card.short_id}`);
+    }
+
+    // Verify card content is displayed
+    await expect(page.getByRole('heading', { name: card.title })).toBeVisible();
   });
 });
