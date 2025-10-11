@@ -12,6 +12,7 @@ import { toSlugBase } from '@/lib/slug';
 type Props = {
   card: CardDetail | null;
   canonicalPath: string | null;
+  boards: Board[];
 };
 
 function toClientCard(detail: CardDetail): Card {
@@ -35,12 +36,11 @@ function toClientCard(detail: CardDetail): Card {
   };
 }
 
-export default function CardModalClient({ card, canonicalPath }: Props) {
+export default function CardModalClient({ card, canonicalPath, boards }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [boards, setBoards] = useState<Board[]>([]);
   const [currentCard, setCurrentCard] = useState<Card | null>(card ? toClientCard(card) : null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!card) {
@@ -49,26 +49,7 @@ export default function CardModalClient({ card, canonicalPath }: Props) {
     }
 
     setCurrentCard(toClientCard(card));
-
-    let isActive = true;
-    const loadBoards = async () => {
-      const { data, error } = await supabase.from('boards').select('*').order('created_at', { ascending: true });
-      if (!isActive) return;
-      if (error) {
-        console.error('[CardModalClient] Failed to load boards', error);
-        setBoards([]);
-      } else {
-        setBoards(data || []);
-      }
-      setIsLoading(false);
-    };
-
-    loadBoards();
-
-    return () => {
-      isActive = false;
-    };
-  }, [card, router, supabase]);
+  }, [card, router]);
 
   useEffect(() => {
     if (!card) return;
