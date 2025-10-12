@@ -8,8 +8,9 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   closestCorners,
@@ -19,6 +20,7 @@ import {
   arrayMove,
   verticalListSortingStrategy,
   horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
@@ -127,7 +129,7 @@ const initializeDefaultLists = async (userId: string, boardId: string): Promise<
 };
 
 // Sortable Card Component
-function SortableCard({ card }: { card: Card }) {
+function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: React.RefObject<boolean> }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: {
@@ -192,7 +194,8 @@ function SortableCard({ card }: { card: Card }) {
       return;
     }
 
-    if (isDragging || !allowNavigationRef.current) {
+    // ドラッグ中または移動があった場合はクリック無効化（Trello準拠）
+    if (isDragging || !allowNavigationRef.current || isDraggingRef.current) {
       event.preventDefault();
     }
   };
@@ -326,6 +329,7 @@ function SortableList({
   selectedTags,
   selectedPriority,
   sortBy,
+  isDraggingRef,
 }: {
   list: List;
   cards: Card[];
@@ -336,6 +340,7 @@ function SortableList({
   selectedTags: string[];
   selectedPriority: Priority | 'all';
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
+  isDraggingRef: React.RefObject<boolean>;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -452,6 +457,7 @@ function SortableList({
             <SortableCard
               key={card.id}
               card={card}
+              isDraggingRef={isDraggingRef}
             />
           ))}
         </SortableContext>
@@ -483,6 +489,9 @@ function KanbanBoard() {
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+
+  // ドラッグ中のクリック抑止用（Trello準拠）
+  const isDraggingRef = useRef(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -744,18 +753,24 @@ function KanbanBoard() {
     };
   }, [user, currentBoardId]);
 
-  // モバイル対応のセンサー設定
+  // PC/モバイル対応のセンサー設定（Trello準拠）
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    // PC用：距離でドラッグ開始（クリックは即時反応）
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8, // 8px移動後にドラッグ開始（誤操作防止）
+        distance: 6, // 6px移動後にドラッグ開始
       },
     }),
+    // モバイル用：長押しでドラッグ（タップとの区別を明確化）
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // 200ms長押しでドラッグ開始（スクロールと区別）
+        delay: 350, // 350ms長押しでドラッグ開始（タップは詳細を開く）
         tolerance: 8,
       },
+    }),
+    // キーボード操作対応
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
@@ -898,6 +913,7 @@ function KanbanBoard() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    isDraggingRef.current = true;
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -943,6 +959,10 @@ function KanbanBoard() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    // ドラッグ終了後、次ティックでクリック抑止を解除（イベント順の競合回避）
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 0);
 
     if (!over) return;
 
@@ -1307,6 +1327,13 @@ function KanbanBoard() {
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={() => {
+            setActiveId(null);
+            // ドラッグキャンセル時も次ティックで解除
+            setTimeout(() => {
+              isDraggingRef.current = false;
+            }, 0);
+          }}
         >
           <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 min-h-[calc(100vh-12rem)]">
             <SortableContext items={sortedLists.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
@@ -1322,6 +1349,7 @@ function KanbanBoard() {
                   selectedTags={selectedTags}
                   selectedPriority={selectedPriority}
                   sortBy={sortBy}
+                  isDraggingRef={isDraggingRef}
                 />
               ))}
             </SortableContext>

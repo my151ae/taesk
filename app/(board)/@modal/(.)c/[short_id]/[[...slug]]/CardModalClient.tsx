@@ -40,7 +40,6 @@ export default function CardModalClient({ card, canonicalPath }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [boards, setBoards] = useState<Board[]>([]);
   const [currentCard, setCurrentCard] = useState<Card | null>(card ? toClientCard(card) : null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!card) {
@@ -50,6 +49,7 @@ export default function CardModalClient({ card, canonicalPath }: Props) {
 
     setCurrentCard(toClientCard(card));
 
+    // モーダルは即時表示し、boards は非同期で取得（Trello準拠・パフォーマンス改善）
     let isActive = true;
     const loadBoards = async () => {
       const { data, error } = await supabase.from('boards').select('*').order('created_at', { ascending: true });
@@ -60,7 +60,6 @@ export default function CardModalClient({ card, canonicalPath }: Props) {
       } else {
         setBoards(data || []);
       }
-      setIsLoading(false);
     };
 
     loadBoards();
@@ -178,7 +177,7 @@ export default function CardModalClient({ card, canonicalPath }: Props) {
     router.back();
   };
 
-  if (!card || !currentCard || isLoading) {
+  if (!card || !currentCard) {
     return null;
   }
 
