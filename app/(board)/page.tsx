@@ -31,6 +31,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { buildCardUrl } from "@/lib/card-url";
+import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from "@/lib/board-utils";
+import { buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
@@ -1075,17 +1077,25 @@ function KanbanBoard() {
   const handleCreateBoard = async () => {
     if (!user || !newBoardName.trim()) return;
 
-    const newBoard: Board = {
-      id: uuidv4(),
-      name: newBoardName.trim(),
-      description: newBoardDescription.trim() || undefined,
-      is_test_board: false,
-      user_id: getActualUserId(user.id),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
     try {
+      // Generate short_id, id_short, and slug
+      const shortId = await createUniqueBoardShortId();
+      const idShort = await getNextBoardIdShort();
+      const slug = slugifyBoardName(newBoardName.trim());
+
+      const newBoard: Board = {
+        id: uuidv4(),
+        name: newBoardName.trim(),
+        description: newBoardDescription.trim() || undefined,
+        is_test_board: false,
+        user_id: getActualUserId(user.id),
+        short_id: shortId,
+        id_short: idShort,
+        slug,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase.from('boards').insert(newBoard);
       if (error) throw error;
 
