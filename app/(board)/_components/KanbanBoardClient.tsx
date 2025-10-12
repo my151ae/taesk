@@ -27,12 +27,12 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { buildCardUrl } from "@/lib/card-url";
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from "@/lib/board-utils";
-import { buildBoardUrl } from "@/lib/board-url";
+import { buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
 
 type KanbanBoardClientProps = {
@@ -57,6 +57,35 @@ const loadFromStorage = (): BoardData => {
 const saveToStorage = (data: BoardData) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+};
+
+const copyBoardUrl = async (url: string) => {
+  if (!url) return;
+  try {
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      if (typeof window !== "undefined") {
+        window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
+      }
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    if (typeof window !== "undefined") {
+      window.alert("URLをコピーしました");
+    }
+  } catch (error) {
+    console.error("Failed to copy board URL:", error);
+    if (typeof window !== "undefined") {
+      window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
+    }
+  }
+};
+
+const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonical"): string => {
+  if (!board?.short_id) return "";
+  const path = kind === "short" ? buildBoardShortUrl(board) : buildBoardUrl(board);
+  if (!path) return "";
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 };
 
 // Supabase data loading with board filter
@@ -463,7 +492,6 @@ const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardClientProps) {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
   const initialBoardId = initialBoard?.id ?? MAIN_BOARD_ID;
   const [boards, setBoards] = useState<Board[]>(() => (initialBoard ? [initialBoard] : []));
@@ -538,15 +566,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   }, [isClient, pathname, boardData.cards]);
 
-  // Handle URL parameters for board selection
   useEffect(() => {
-    const boardParam = searchParams.get('board');
-
-    // Update board from URL
-    if (boardParam && boardParam !== currentBoardId) {
-      setCurrentBoardId(boardParam);
+    if (initialBoard?.id && initialBoard.id !== currentBoardId) {
+      setCurrentBoardId(initialBoard.id);
     }
-  }, [searchParams, currentBoardId]);
+  }, [initialBoard?.id, currentBoardId]);
 
   // Load boards list
   useEffect(() => {
@@ -806,24 +830,19 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     saveToStorage(newData);
   };
 
-  // Helper to update URL with board parameter
-  const updateURL = (boardId?: string) => {
-    if (boardId) {
-      const targetBoard = boards.find((board) => board.id === boardId);
-      const canonical = targetBoard ? buildBoardUrl(targetBoard) : "";
-      if (canonical) {
-        router.push(canonical, { scroll: false });
-        return;
-      }
-    }
+  const getBoardPath = (board?: Board | null): string => {
+    if (!board?.short_id) return "";
+    return buildBoardUrl(board) || buildBoardShortUrl(board) || "";
+  };
 
-    const params = new URLSearchParams();
-    if (boardId && boardId !== MAIN_BOARD_ID) {
-      params.set('board', boardId);
+  const updateURL = (board?: Board | null, { replace = false }: { replace?: boolean } = {}) => {
+    const targetPath = getBoardPath(board ?? currentBoard);
+    const fallback = "/";
+    if (replace) {
+      router.replace(targetPath || fallback, { scroll: false });
+    } else {
+      router.push(targetPath || fallback, { scroll: false });
     }
-    const queryString = params.toString();
-    const fallbackUrl = queryString ? `/?${queryString}` : '/';
-    router.push(fallbackUrl, { scroll: false });
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1120,7 +1139,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
       setBoards([...boards, newBoard]);
       setCurrentBoardId(newBoard.id);
-      updateURL(newBoard.id);
+      updateURL(newBoard);
       setShowCreateBoardDialog(false);
       setNewBoardName('');
       setNewBoardDescription('');
@@ -1154,10 +1173,20 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setSelectedCardId(null);
     setCardModalStatus('loading');
 
-    // URL を `/` に戻す
-    const boardParam = searchParams.get('board');
-    const newUrl = boardParam && boardParam !== MAIN_BOARD_ID ? `/?board=${boardParam}` : '/';
-    window.history.replaceState({}, '', newUrl);
+    if (typeof window !== 'undefined') {
+      const boardPath = getBoardPath(currentBoard);
+      if (window.history.state && (window.history.state as { cardId?: string }).cardId && boardPath) {
+        window.history.replaceState({}, '', boardPath);
+        return;
+      }
+
+      if (window.history.length > 1) {
+        router.back();
+        return;
+      }
+    }
+
+    updateURL(currentBoard, { replace: true });
   };
 
   const handleSaveCard = async (
@@ -1293,7 +1322,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                       key={board.id}
                       onClick={() => {
                         setCurrentBoardId(board.id);
-                        updateURL(board.id);
+                        updateURL(board);
                         setShowBoardMenu(false);
                       }}
                       className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${
@@ -1306,6 +1335,31 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                       )}
                     </button>
                   ))}
+                  {currentBoard && (
+                    <>
+                      <div className="border-t border-slate-200 my-2" />
+                      <button
+                        onClick={() => {
+                          const url = buildBoardUrlForCopy(currentBoard, "short");
+                          copyBoardUrl(url);
+                          setShowBoardMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors text-slate-700"
+                      >
+                        短縮URLをコピー
+                      </button>
+                      <button
+                        onClick={() => {
+                          const url = buildBoardUrlForCopy(currentBoard, "canonical");
+                          copyBoardUrl(url);
+                          setShowBoardMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors text-slate-700"
+                      >
+                        正規URLをコピー
+                      </button>
+                    </>
+                  )}
                   <div className="border-t border-slate-200 my-2" />
                   <button
                     onClick={() => {

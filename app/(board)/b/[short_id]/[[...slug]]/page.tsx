@@ -10,13 +10,13 @@ type PageParams = {
 };
 
 type PageProps = {
-  params: Promise<PageParams>;
+  params: PageParams;
 };
 
 export const revalidate = 0;
 
 export default async function BoardByShortIdPage({ params }: PageProps) {
-  const { short_id, slug } = await params;
+  const { short_id, slug } = params;
   const board = await getBoardByShortId(short_id);
 
   if (!board) {
@@ -24,6 +24,9 @@ export default async function BoardByShortIdPage({ params }: PageProps) {
   }
 
   const canonical = buildBoardUrl(board);
+  if (!canonical) {
+    notFound();
+  }
   const current = ["/b", short_id, ...(slug ?? [])].join("/");
 
   if (current !== canonical) {

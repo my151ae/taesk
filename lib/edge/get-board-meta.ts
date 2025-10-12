@@ -19,16 +19,20 @@ export async function getBoardMeta(uuid: string, origin?: string): Promise<Board
   const url = new URL("/api/board-meta", baseUrl);
   url.searchParams.set("uuid", uuid);
 
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as BoardMetaResponse;
+    if (!data?.short_id || typeof data.id_short !== "number" || !data.slug) {
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.warn("[edge/get-board-meta] fetch failed:", error);
     return null;
   }
-
-  const data = (await response.json()) as BoardMetaResponse;
-  if (!data?.short_id || typeof data.id_short !== "number" || !data.slug) {
-    return null;
-  }
-
-  return data;
 }
-

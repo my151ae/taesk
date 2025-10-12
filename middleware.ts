@@ -42,7 +42,8 @@ export async function middleware(req: NextRequest) {
     const cached = await getFromCache(cacheKey);
 
     if (cached?.short_id && typeof cached.id_short === "number" && cached.slug) {
-      const redirected = new URL(`/b/${cached.short_id}/${cached.id_short}-${cached.slug}`, url.origin);
+      const canonicalPath = `/b/${cached.short_id}/${cached.id_short}-${cached.slug}`;
+      const redirected = new URL(canonicalPath, url.origin);
       return NextResponse.redirect(redirected, 308);
     }
 
@@ -55,7 +56,8 @@ export async function middleware(req: NextRequest) {
 
     await setCache(cacheKey, meta);
 
-    const redirected = new URL(`/b/${meta.short_id}/${meta.id_short}-${meta.slug}`, url.origin);
+    const canonicalPath = `/b/${meta.short_id}/${meta.id_short}-${meta.slug}`;
+    const redirected = new URL(canonicalPath, url.origin);
     return NextResponse.redirect(redirected, 308);
   }
 
@@ -65,4 +67,3 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/"],
 };
-

@@ -11,6 +11,7 @@ import { test, expect } from '@playwright/test';
  */
 
 import { supabase } from '@/lib/supabase';
+import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import type { Page, Locator } from '@playwright/test';
 
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
@@ -54,11 +55,19 @@ async function dragAndDrop(page: Page, source: Locator, target: Locator) {
 test.describe('Taesk Kanban Board E2E Tests', () => {
   let testBoardId: string;
   let testBoardName: string;
+  let testBoardShortId: string;
+  let testBoardIdShort: number;
+  let testBoardSlug: string;
+  let testBoardCanonicalPath: string;
 
   test.beforeEach(async ({ page }) => {
     // Generate unique board for this test
     testBoardId = crypto.randomUUID();
     testBoardName = `Test-${testBoardId.slice(0, 8)}`;
+    testBoardShortId = await createUniqueBoardShortId();
+    testBoardIdShort = await getNextBoardIdShort();
+    testBoardSlug = slugifyBoardName(testBoardName);
+    testBoardCanonicalPath = `/b/${testBoardShortId}/${testBoardIdShort}-${testBoardSlug}`;
 
     // Create test board (is_test_board: true prevents auto-seeding of default lists)
     await supabase.from('boards').insert({
@@ -66,6 +75,9 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
       name: testBoardName,
       user_id: TEST_USER_ID,
       is_test_board: true,
+      short_id: testBoardShortId,
+      id_short: testBoardIdShort,
+      slug: testBoardSlug,
     });
 
     await page.goto('/');
@@ -78,6 +90,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Switch to test board
     await page.getByRole('button', { name: /Board ▼/ }).click();
     await page.getByRole('button', { name: testBoardName }).click();
+
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
 
     // Wait for board to switch
     await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
@@ -321,6 +335,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Reload page directly to test board URL
     await page.goto(`/?board=${testBoardId}`);
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
     await page.waitForLoadState('networkidle');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
@@ -410,6 +425,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Verify data persisted to Supabase by reloading directly to test board URL
     await page.goto(`/?board=${testBoardId}`);
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
     await page.waitForLoadState('networkidle');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
