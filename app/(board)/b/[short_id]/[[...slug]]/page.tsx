@@ -4,15 +4,19 @@ import KanbanBoardClient from "@/app/(board)/_components/KanbanBoardClient";
 import { buildBoardUrl } from "@/lib/board-url";
 import { fetchBoardInitialData, getBoardByShortId } from "@/lib/server/boards";
 
-type Params = {
+type PageParams = {
   short_id: string;
   slug?: string[];
 };
 
+type PageProps = {
+  params: Promise<PageParams>;
+};
+
 export const revalidate = 0;
 
-export default async function BoardByShortIdPage({ params }: { params: Params }) {
-  const { short_id, slug } = params;
+export default async function BoardByShortIdPage({ params }: PageProps) {
+  const { short_id, slug } = await params;
   const board = await getBoardByShortId(short_id);
 
   if (!board) {
@@ -30,4 +34,3 @@ export default async function BoardByShortIdPage({ params }: { params: Params })
 
   return <KanbanBoardClient initialBoard={board} initialData={initialData} />;
 }
-
