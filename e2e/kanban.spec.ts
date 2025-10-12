@@ -196,9 +196,12 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Save
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-    // Verify changes
-    await expect(page.getByText('Updated Card Title')).toBeVisible();
-    await expect(page.getByText('Updated description')).toBeVisible();
+    // Wait for modal to close
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+
+    // Verify changes on the card
+    await expect(page.getByRole('button', { name: /Updated Card Title/ })).toBeVisible();
+    await expect(page.getByText('Updated description').first()).toBeVisible();
   });
 
   test('should delete a card', async ({ page }) => {
@@ -418,7 +421,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByText('New Card').first()).toBeVisible();
   });
 
-  test('should access card via short_id URL and display standalone page', async ({ page }) => {
+  test('should access card via short_id URL and display modal', async ({ page }) => {
     // Add a list and card
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(1000);
@@ -441,22 +444,23 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     const card = cards![0];
     expect(card.short_id).toBeTruthy();
 
-    // Navigate to short URL
+    // Navigate to card URL
     await page.goto(`/c/${card.short_id}`);
     await page.waitForLoadState('networkidle');
 
-    // Should display standalone card page (not redirect)
+    // Should stay on card URL (no redirect)
     expect(page.url()).toContain(`/c/${card.short_id}`);
 
-    // Verify card content is displayed
-    await expect(page.getByRole('heading', { name: card.title })).toBeVisible();
-    await expect(page.getByText(`Card #${card.id_short ?? card.short_id}`)).toBeVisible();
+    // Verify modal is displayed
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Edit Card')).toBeVisible();
 
-    // Verify "Back to board" link exists
-    await expect(page.getByRole('link', { name: /Back to board/i })).toBeVisible();
+    // Verify card title in modal
+    const titleInput = page.locator('input[placeholder="Card title"]');
+    await expect(titleInput).toHaveValue(card.title);
   });
 
-  test('should redirect to canonical URL when slug is incorrect', async ({ page }) => {
+  test('should normalize URL when slug is incorrect', async ({ page }) => {
     // Add a list and card
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(1000);
@@ -484,17 +488,26 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Navigate with incorrect slug
     await page.goto(`/c/${card.short_id}/wrong-slug`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
 
-    // Should redirect to canonical URL
+    // Should normalize URL to canonical (using replaceState)
     if (expectedSlug) {
+      await page.waitForFunction(
+        (expectedUrl) => window.location.pathname === expectedUrl,
+        `/c/${card.short_id}/${expectedSlug}`,
+        { timeout: 3000 }
+      );
       expect(page.url()).toContain(`/c/${card.short_id}/${expectedSlug}`);
     } else {
-      // If no expected slug, should redirect to just short_id
+      await page.waitForFunction(
+        (expectedUrl) => window.location.pathname === expectedUrl,
+        `/c/${card.short_id}`,
+        { timeout: 3000 }
+      );
       expect(page.url()).toBe(`http://localhost:3000/c/${card.short_id}`);
     }
 
-    // Verify card content is displayed
-    await expect(page.getByRole('heading', { name: card.title })).toBeVisible();
+    // Verify modal is displayed
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 });

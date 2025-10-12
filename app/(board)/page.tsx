@@ -27,11 +27,11 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
 import { useAuth } from "@/app/contexts/AuthContext";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { buildCardUrl } from "@/lib/card-url";
+import { CardModal } from "@/app/components/CardModal";
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
@@ -129,7 +129,7 @@ const initializeDefaultLists = async (userId: string, boardId: string): Promise<
 };
 
 // Sortable Card Component
-function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: React.RefObject<boolean> }) {
+function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDraggingRef: React.RefObject<boolean>; onCardClick: (cardId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: {
@@ -147,21 +147,12 @@ function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: Reac
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const allowNavigationRef = useRef(true);
 
-  const href = card.short_id
-    ? buildCardUrl({
-        shortId: card.short_id,
-        slug: card.slug ?? undefined,
-        idShort: card.id_short ?? undefined,
-        title: card.title,
-      })
-    : '#';
-
   const registerPointerStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     pointerStartRef.current = { x: event.clientX, y: event.clientY };
     allowNavigationRef.current = true;
   };
 
-  const evaluatePointerDelta = (event: ReactPointerEvent<HTMLDivElement | HTMLAnchorElement>) => {
+  const evaluatePointerDelta = (event: ReactPointerEvent<HTMLDivElement>) => {
     const origin = pointerStartRef.current;
     if (!origin) return;
     const moved = Math.hypot(event.clientX - origin.x, event.clientY - origin.y);
@@ -172,6 +163,13 @@ function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: Reac
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     evaluatePointerDelta(event);
+
+    // ドラッグ中または移動があった場合はクリック無効化（Trello準拠）
+    if (!isDragging && allowNavigationRef.current && !isDraggingRef.current) {
+      // クリックとみなし、モーダルを開く
+      onCardClick(card.id);
+    }
+
     pointerStartRef.current = null;
   };
 
@@ -181,23 +179,6 @@ function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: Reac
 
   const handlePointerCancel = () => {
     pointerStartRef.current = null;
-  };
-
-  const handleClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
-    if (event.metaKey || event.ctrlKey || event.button === 1) {
-      return;
-    }
-
-    if (!card.short_id) {
-      event.preventDefault();
-      console.warn('[Card] short_id missing, skipping navigation', card.id);
-      return;
-    }
-
-    // ドラッグ中または移動があった場合はクリック無効化（Trello準拠）
-    if (isDragging || !allowNavigationRef.current || isDraggingRef.current) {
-      event.preventDefault();
-    }
   };
 
   return (
@@ -216,14 +197,6 @@ function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: Reac
         {...listeners}
         className="block rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700/50 dark:bg-gray-800 cursor-grab active:cursor-grabbing"
       >
-        <Link
-          href={href}
-          prefetch={false}
-          scroll={false}
-          aria-label={`Open card: ${card.title}`}
-          onClick={handleClick}
-          className="block"
-        >
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
           {card.priority && card.priority !== "medium" && (
@@ -254,7 +227,6 @@ function SortableCard({ card, isDraggingRef }: { card: Card; isDraggingRef: Reac
             </span>
           )}
         </div>
-        </Link>
       </div>
     </div>
   );
@@ -330,6 +302,7 @@ function SortableList({
   selectedPriority,
   sortBy,
   isDraggingRef,
+  onCardClick,
 }: {
   list: List;
   cards: Card[];
@@ -341,6 +314,7 @@ function SortableList({
   selectedPriority: Priority | 'all';
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
   isDraggingRef: React.RefObject<boolean>;
+  onCardClick: (cardId: string) => void;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -458,6 +432,7 @@ function SortableList({
               key={card.id}
               card={card}
               isDraggingRef={isDraggingRef}
+              onCardClick={onCardClick}
             />
           ))}
         </SortableContext>
@@ -481,6 +456,7 @@ function KanbanBoard() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [boards, setBoards] = useState<Board[]>([]);
   const [currentBoardId, setCurrentBoardId] = useState<string>(MAIN_BOARD_ID);
   const [boardData, setBoardData] = useState<BoardData>({ lists: [], cards: [] });
@@ -492,6 +468,10 @@ function KanbanBoard() {
 
   // ドラッグ中のクリック抑止用（Trello準拠）
   const isDraggingRef = useRef(false);
+
+  // モーダル状態管理（クライアントサイド・即時表示）
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [cardModalStatus, setCardModalStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -510,6 +490,33 @@ function KanbanBoard() {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // URL からモーダル状態を復元（初回ロード時）
+  useEffect(() => {
+    if (!isClient || !pathname || boardData.cards.length === 0) return;
+
+    if (pathname.startsWith('/c/')) {
+      const [, , shortId] = pathname.split('/');
+      const card = boardData.cards.find((c) => c.short_id === shortId);
+
+      if (card) {
+        setSelectedCardId(card.id);
+        setCardModalStatus('ready');
+
+        // Slug 正規化
+        const correctUrl = buildCardUrl({
+          shortId: card.short_id,
+          slug: card.slug ?? undefined,
+          idShort: card.id_short ?? undefined,
+          title: card.title,
+        });
+
+        if (pathname !== correctUrl) {
+          window.history.replaceState({ cardId: card.id }, '', correctUrl);
+        }
+      }
+    }
+  }, [isClient, pathname, boardData.cards]);
 
   // Handle URL parameters for board selection
   useEffect(() => {
@@ -1058,7 +1065,7 @@ function KanbanBoard() {
         }
       }
     }
-  };;
+  };
 
   const handleCreateBoard = async () => {
     if (!user || !newBoardName.trim()) return;
@@ -1086,6 +1093,133 @@ function KanbanBoard() {
     } catch (error) {
       console.error('Error creating board:', error);
     }
+  };
+
+  // モーダルハンドラー（クライアントサイド・即時表示）
+  const handleOpenCardModal = (cardId: string) => {
+    const card = boardData.cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    // モーダルを即座に開く（ローディング状態）
+    setSelectedCardId(cardId);
+    setCardModalStatus('ready'); // すでにカードデータはある
+
+    // URL 同期（即時）
+    if (card.short_id) {
+      const url = buildCardUrl({
+        shortId: card.short_id,
+        slug: card.slug ?? undefined,
+        idShort: card.id_short ?? undefined,
+        title: card.title,
+      });
+      window.history.replaceState({ cardId }, '', url);
+    }
+  };
+
+  const handleCloseCardModal = () => {
+    setSelectedCardId(null);
+    setCardModalStatus('loading');
+
+    // URL を `/` に戻す
+    const boardParam = searchParams.get('board');
+    const newUrl = boardParam && boardParam !== MAIN_BOARD_ID ? `/?board=${boardParam}` : '/';
+    window.history.replaceState({}, '', newUrl);
+  };
+
+  const handleSaveCard = async (
+    id: string,
+    title: string,
+    description: string,
+    tags?: string[],
+    due_date?: string | null,
+    priority?: Priority,
+    assigned_to?: string | null
+  ) => {
+    const slug = slugify(title);
+    const updatedCards = boardData.cards.map((card) => {
+      if (card.id === id) {
+        return {
+          ...card,
+          title,
+          description,
+          tags: tags || [],
+          due_date: due_date || null,
+          priority: priority || 'medium',
+          assigned_to: assigned_to || null,
+          slug,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return card;
+    });
+
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    // Supabase に保存
+    const updatedCard = updatedCards.find((c) => c.id === id);
+    if (updatedCard) {
+      if (!isOnline) {
+        addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
+      } else {
+        await syncToSupabase(newData);
+      }
+    }
+
+    handleCloseCardModal();
+  };
+
+  const handleDeleteCard = async (id: string) => {
+    const updatedCards = boardData.cards.filter((card) => card.id !== id);
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    // Supabase から削除
+    if (!isOnline) {
+      addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
+    } else {
+      try {
+        await supabase.from('cards').delete().eq('id', id);
+      } catch (error) {
+        console.error('Error deleting card:', error);
+      }
+    }
+
+    handleCloseCardModal();
+  };
+
+  const handleMoveCardToBoard = async (cardId: string, targetBoardId: string) => {
+    // 対象ボードの最初のリストを取得
+    const targetLists = boardData.lists.filter((list) => list.board_id === targetBoardId);
+    if (targetLists.length === 0) return;
+
+    const targetListId = targetLists[0].id;
+    const updatedCards = boardData.cards.map((card) => {
+      if (card.id === cardId) {
+        return {
+          ...card,
+          board_id: targetBoardId,
+          list_id: targetListId,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return card;
+    });
+
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    // Supabase に保存
+    const movedCard = updatedCards.find((c) => c.id === cardId);
+    if (movedCard) {
+      if (!isOnline) {
+        addToSyncQueue({ type: 'UPDATE', table: 'cards', data: movedCard });
+      } else {
+        await syncToSupabase(newData);
+      }
+    }
+
+    handleCloseCardModal();
   };
 
   const currentBoard = boards.find(b => b.id === currentBoardId);
@@ -1350,6 +1484,7 @@ function KanbanBoard() {
                   selectedPriority={selectedPriority}
                   sortBy={sortBy}
                   isDraggingRef={isDraggingRef}
+                  onCardClick={handleOpenCardModal}
                 />
               ))}
             </SortableContext>
@@ -1430,6 +1565,18 @@ function KanbanBoard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Card Modal (クライアントサイド・即時表示) */}
+      {selectedCardId && (
+        <CardModal
+          card={boardData.cards.find((c) => c.id === selectedCardId)!}
+          boards={boards}
+          onSave={handleSaveCard}
+          onDelete={handleDeleteCard}
+          onMoveToBoard={handleMoveCardToBoard}
+          onClose={handleCloseCardModal}
+        />
       )}
 
     </div>
