@@ -31,6 +31,16 @@ Step 1-3 の実装・検証完了後に、体験向上のために導入しま�
 
 ---
 
+## 前提（Step 0: 必要時のみ）
+- DB: `boards.short_id (UNIQUE)`, `boards.id_short`, `boards.slug` が存在し、既存ボードへバックフィル済み。
+- ユーティリティ: `createUniqueBoardShortId()`, `getNextBoardIdShort()`, `slugifyBoardName()`。
+- URLビルダー: `buildBoardUrl(board)`, `buildBoardShortUrl(board)`。
+- 共有UI: ボード詳細メニューに短縮・正規 URL コピー導線を用意。
+
+**Exit条件**: 既存すべてのボードで `buildBoardUrl()` が正規URL（`/b/:short_id/:id_short-:slug`）を返却する。
+
+---
+
 # Step 1: SSR 基礎実装（サーバーコンポーネントで `/b/...` を確立）
 **狙い**: 追加API呼び出し無しで **直接 `/b/...` にサーバーで到達**、slug の正規化もサーバーで解決。初期データは SSR で供給、Realtime はクライアントで購読。
 
@@ -115,7 +125,7 @@ useEffect(() => {
 
 ### 実装要点
 - Middleware で `/?board=uuid` を検知し、**まず KV を参照**。
-- KV ミス時のみ DB で `uuid → { short_id, id_short, slug }` を引き、結果を **TTL付きで KV に保存**。
+- KV ミス時のみ Edge Function / ルートハンドラ経由で `uuid → { short_id, id_short, slug }` を取得し、結果を **TTL付きで KV に保存**。
 - その上で **308** で `/b/:short_id/:id_short-:slug` にリダイレクト。
 
 ### サンプル（疑似）
@@ -123,6 +133,8 @@ useEffect(() => {
 // middleware.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@vercel/kv'
+// getBoardMeta は Edge 互換な取得手段（例: Edge Function / Route Handler 経由）を想定
+import { getBoardMeta } from '@/lib/server/board-meta'
 
 export async function middleware(req: NextRequest) {
   const url = new URL(req.url)
@@ -132,8 +144,7 @@ export async function middleware(req: NextRequest) {
     if (cached) {
       return NextResponse.redirect(new URL(`/b/${cached.short_id}/${cached.id_short}-${cached.slug}`, url), 308)
     }
-    // DBはEdgeから直接叩かず、Edge Function経由などで軽量化すること
-    const board = await getBoardById(uuid)
+    const board = await getBoardMeta(uuid) // 例: Edge Function 経由の fetch
     if (!board) return NextResponse.redirect(new URL('/404', url), 308)
     await kv.set(`board:uuid:${uuid}`, {
       short_id: board.short_id, id_short: board.id_short, slug: board.slug
@@ -143,8 +154,10 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next()
 }
 
-export const config = { matcher: ['/', '/?board=:path*'] }
+export const config = { matcher: ['/'] }
 ```
+
+※ `getBoardMeta` は KV ミス時にボードの短縮メタデータを返す Edge 互換 API（例: Route Handler 経由の fetch）を薄くラップした関数を想定。
 
 ### 受け入れ条件
 - 旧リンクからの流入は **常に1回の 308** で `/b/...` に統一。
