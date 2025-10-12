@@ -504,8 +504,13 @@ function KanbanBoard() {
         setCardModalStatus('ready');
 
         // Slug 正規化
+        const cardShortId = card.short_id;
+        if (!cardShortId) {
+          return;
+        }
+
         const correctUrl = buildCardUrl({
-          shortId: card.short_id,
+          shortId: cardShortId,
           slug: card.slug ?? undefined,
           idShort: card.id_short ?? undefined,
           title: card.title,
