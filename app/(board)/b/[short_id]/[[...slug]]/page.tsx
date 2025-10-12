@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import KanbanBoardClient from "@/app/(board)/_components/KanbanBoardClient";
@@ -10,13 +11,45 @@ type PageParams = {
 };
 
 type PageProps = {
-  params: PageParams;
+  params: Promise<PageParams>;
 };
 
 export const revalidate = 0;
+export const runtime = "nodejs";
+
+export async function generateMetadata({ params }: { params: Promise<PageParams> }): Promise<Metadata> {
+  const { short_id, slug } = await params;
+  const board = await getBoardByShortId(short_id);
+
+  if (!board) {
+    return {};
+  }
+
+  const canonical = buildBoardUrl(board);
+  if (canonical) {
+    const current = ["/b", short_id, ...(slug ?? [])].join("/");
+    if (current !== canonical) {
+      permanentRedirect(canonical);
+    }
+  }
+
+  const title = board.name ? `${board.name} | Taesk` : "Taesk";
+  const description = board.description ?? undefined;
+
+  return {
+    title,
+    description,
+    alternates: canonical ? { canonical } : undefined,
+    openGraph: {
+      title,
+      description,
+      url: canonical ?? undefined,
+    },
+  };
+}
 
 export default async function BoardByShortIdPage({ params }: PageProps) {
-  const { short_id, slug } = params;
+  const { short_id, slug } = await params;
   const board = await getBoardByShortId(short_id);
 
   if (!board) {

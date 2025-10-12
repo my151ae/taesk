@@ -29,3 +29,14 @@ export function buildBoardShortUrl(board: Pick<BoardLike, 'short_id'>): string {
   if (!board.short_id) return '';
   return `/b/${board.short_id}`;
 }
+
+/**
+ * Build the canonical board URL. When origin is provided, returns an absolute URL.
+ */
+export function buildBoardCanonicalUrl(board: BoardLike, origin?: string): string {
+  const path = buildBoardUrl(board);
+  if (!path) return '';
+  if (!origin) return path;
+  const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+  return `${normalizedOrigin}${path}`;
+}

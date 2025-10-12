@@ -348,6 +348,16 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByText('New Card').first()).toBeVisible();
   });
 
+  test('should normalize board URL when slug is incorrect', async ({ page }) => {
+    const incorrectPath = `/b/${testBoardShortId}/${testBoardIdShort}-wrong-slug`;
+
+    await page.goto(incorrectPath);
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
+
+    expect(page.url()).toContain(testBoardCanonicalPath);
+    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
+  });
+
   test('should be mobile responsive', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });

@@ -8,11 +8,13 @@ import { getBoardMeta } from "@/lib/edge/get-board-meta";
 type BoardMeta = {
   short_id: string;
   id_short: number;
-  slug: string;
+  slug: string | null;
+  canonical_path: string;
 };
 
 const CACHE_TTL_SECONDS = 60 * 60;
 const KV_ENABLED = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const KV_NAMESPACE = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "local";
 
 async function getFromCache(key: string): Promise<BoardMeta | null> {
   if (!KV_ENABLED) return null;
@@ -38,11 +40,11 @@ export async function middleware(req: NextRequest) {
   const uuid = url.searchParams.get("board");
 
   if (url.pathname === "/" && uuid) {
-    const cacheKey = `board:uuid:${uuid}`;
+    const cacheKey = `board:uuid:${KV_NAMESPACE}:${uuid}`;
     const cached = await getFromCache(cacheKey);
 
-    if (cached?.short_id && typeof cached.id_short === "number" && cached.slug) {
-      const canonicalPath = `/b/${cached.short_id}/${cached.id_short}-${cached.slug}`;
+    if (cached?.canonical_path) {
+      const canonicalPath = cached.canonical_path;
       const redirected = new URL(canonicalPath, url.origin);
       return NextResponse.redirect(redirected, 308);
     }
@@ -56,7 +58,7 @@ export async function middleware(req: NextRequest) {
 
     await setCache(cacheKey, meta);
 
-    const canonicalPath = `/b/${meta.short_id}/${meta.id_short}-${meta.slug}`;
+    const canonicalPath = meta.canonical_path;
     const redirected = new URL(canonicalPath, url.origin);
     return NextResponse.redirect(redirected, 308);
   }

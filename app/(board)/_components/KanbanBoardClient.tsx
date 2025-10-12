@@ -32,7 +32,7 @@ import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { buildCardUrl } from "@/lib/card-url";
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from "@/lib/board-utils";
-import { buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
+import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
 
 type KanbanBoardClientProps = {
@@ -82,10 +82,17 @@ const copyBoardUrl = async (url: string) => {
 
 const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonical"): string => {
   if (!board?.short_id) return "";
-  const path = kind === "short" ? buildBoardShortUrl(board) : buildBoardUrl(board);
-  if (!path) return "";
-  if (typeof window === "undefined") return path;
-  return `${window.location.origin}${path}`;
+
+  const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+
+  if (kind === "short") {
+    const path = buildBoardShortUrl(board);
+    if (!path) return "";
+    if (!origin) return path;
+    return `${origin}${path}`;
+  }
+
+  return buildBoardCanonicalUrl(board, origin);
 };
 
 // Supabase data loading with board filter

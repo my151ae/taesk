@@ -1,7 +1,8 @@
 type BoardMetaResponse = {
   short_id: string;
   id_short: number;
-  slug: string;
+  slug: string | null;
+  canonical_path: string;
 };
 
 function resolveBaseUrl(origin?: string) {
@@ -26,7 +27,7 @@ export async function getBoardMeta(uuid: string, origin?: string): Promise<Board
     }
 
     const data = (await response.json()) as BoardMetaResponse;
-    if (!data?.short_id || typeof data.id_short !== "number" || !data.slug) {
+    if (!data?.short_id || typeof data.id_short !== "number" || !data.canonical_path) {
       return null;
     }
 
