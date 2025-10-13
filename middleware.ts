@@ -15,6 +15,7 @@ type BoardMeta = {
 const CACHE_TTL_SECONDS = 60 * 60;
 const KV_ENABLED = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 const KV_NAMESPACE = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "local";
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function getFromCache(key: string): Promise<BoardMeta | null> {
   if (!KV_ENABLED) return null;
@@ -37,33 +38,42 @@ async function setCache(key: string, meta: BoardMeta) {
 
 export async function middleware(req: NextRequest) {
   const url = new URL(req.url);
-  const uuid = url.searchParams.get("board");
-
-  if (url.pathname === "/" && uuid) {
-    const cacheKey = `board:uuid:${KV_NAMESPACE}:${uuid}`;
-    const cached = await getFromCache(cacheKey);
-
-    if (cached?.canonical_path) {
-      const canonicalPath = cached.canonical_path;
-      const redirected = new URL(canonicalPath, url.origin);
-      return NextResponse.redirect(redirected, 308);
-    }
-
-    const meta = await getBoardMeta(uuid, url.origin);
-
-    if (!meta) {
-      const notFoundUrl = new URL("/404", url.origin);
-      return NextResponse.redirect(notFoundUrl, 308);
-    }
-
-    await setCache(cacheKey, meta);
-
-    const canonicalPath = meta.canonical_path;
-    const redirected = new URL(canonicalPath, url.origin);
-    return NextResponse.redirect(redirected, 308);
+  if (url.pathname !== "/") {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  const uuid = url.searchParams.get("board");
+
+  if (!uuid || !UUID_V4_REGEX.test(uuid)) {
+    return NextResponse.next();
+  }
+
+  const safeRedirect = (path: string) => {
+    if (!path.startsWith("/b/")) {
+      const fallbackUrl = new URL("/", url.origin);
+      return NextResponse.redirect(fallbackUrl, 308);
+    }
+    const redirected = new URL(path, url.origin);
+    return NextResponse.redirect(redirected, 308);
+  };
+
+  const cacheKey = `board:uuid:${KV_NAMESPACE}:${uuid}`;
+  const cached = await getFromCache(cacheKey);
+
+  if (cached?.canonical_path) {
+    return safeRedirect(cached.canonical_path);
+  }
+
+  const meta = await getBoardMeta(uuid, url.origin);
+
+  if (!meta?.canonical_path) {
+    const fallbackUrl = new URL("/", url.origin);
+    return NextResponse.redirect(fallbackUrl, 308);
+  }
+
+  await setCache(cacheKey, meta);
+
+  return safeRedirect(meta.canonical_path);
 }
 
 export const config = {

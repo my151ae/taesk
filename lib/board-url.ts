@@ -17,7 +17,7 @@ export function buildBoardUrl(board: BoardLike): string {
 
   const slug = board.slug ?? toSlugBase(board.name);
   const tail = buildReadableTail(board.id_short ?? undefined, slug);
-  return `/b/${board.short_id}/${tail}`;
+  return tail ? `/b/${board.short_id}/${tail}` : `/b/${board.short_id}`;
 }
 
 /**

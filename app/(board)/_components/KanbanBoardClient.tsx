@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
@@ -34,6 +35,7 @@ import { buildCardUrl } from "@/lib/card-url";
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from "@/lib/board-utils";
 import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
+import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -61,22 +63,59 @@ const saveToStorage = (data: BoardData) => {
 
 const copyBoardUrl = async (url: string) => {
   if (!url) return;
+
+  const showMessage = (message: string) => {
+    if (typeof window !== "undefined") {
+      window.alert(message);
+    }
+  };
+
+  const copyWithFallback = (): boolean => {
+    if (typeof document === "undefined") return false;
+
+    const textarea = document.createElement("textarea");
+    textarea.value = url;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    let successful = false;
+    try {
+      successful = document.execCommand("copy");
+    } catch (error) {
+      console.error("Legacy clipboard copy failed:", error);
+      successful = false;
+    } finally {
+      document.body.removeChild(textarea);
+    }
+
+    return successful;
+  };
+
   try {
-    if (typeof navigator === "undefined" || !navigator.clipboard) {
-      if (typeof window !== "undefined") {
-        window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
-      }
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      showMessage("URLをコピーしました");
       return;
     }
-    await navigator.clipboard.writeText(url);
-    if (typeof window !== "undefined") {
-      window.alert("URLをコピーしました");
-    }
   } catch (error) {
-    console.error("Failed to copy board URL:", error);
-    if (typeof window !== "undefined") {
-      window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
-    }
+    console.warn("Primary clipboard API failed, falling back:", error);
+  }
+
+  const fallbackSuccess = copyWithFallback();
+  if (fallbackSuccess) {
+    showMessage("URLをコピーしました");
+    return;
+  }
+
+  showMessage("クリップボードにコピーできませんでした。手動でコピーしてください。");
+  if (typeof window !== "undefined") {
+    window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
   }
 };
 
@@ -493,9 +532,6 @@ function SortableList({
 }
 
 // Main Kanban Board Component
-// Default Main Board ID
-const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
-
 function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardClientProps) {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
@@ -512,6 +548,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   // ドラッグ中のクリック抑止用（Trello準拠）
   const isDraggingRef = useRef(false);
+  const realtimeChannelRef = useRef<{ channel: RealtimeChannel | null; token: number }>({ channel: null, token: 0 });
 
   // モーダル状態管理（クライアントサイド・即時表示）
   const [selectedCardId, setSelectedCardId] = useState<string | null>(initialCardId ?? null);
@@ -720,6 +757,18 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   useEffect(() => {
     if (!currentBoardId) return;
 
+    const realtimeState = realtimeChannelRef.current;
+    const token = (realtimeState.token ?? 0) + 1;
+    realtimeState.token = token;
+
+    const previousChannel = realtimeState.channel;
+    if (previousChannel) {
+      previousChannel.unsubscribe();
+      supabase.removeChannel(previousChannel).catch((error) => {
+        console.warn('[Realtime] Failed to remove previous channel:', error);
+      });
+    }
+
     setRealtimeStatus('connecting');
 
     const channel = supabase
@@ -733,6 +782,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           filter: `board_id=eq.${currentBoardId}`,
         },
         (payload) => {
+          if (realtimeState.token !== token) return;
           console.log('List change detected:', payload);
 
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -741,13 +791,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               const idx = prev.lists.findIndex(list => list.id === newList.id);
 
               if (idx >= 0) {
-                // Update existing list
                 const updatedLists = [...prev.lists];
                 updatedLists[idx] = newList;
                 return { ...prev, lists: updatedLists };
               }
 
-              // Insert new list
               return { ...prev, lists: [...prev.lists, newList] };
             });
           } else if (payload.eventType === 'DELETE') {
@@ -768,6 +816,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           filter: `board_id=eq.${currentBoardId}`,
         },
         (payload) => {
+          if (realtimeState.token !== token) return;
           console.log('Card change detected:', payload);
 
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -776,13 +825,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               const idx = prev.cards.findIndex(card => card.id === newCard.id);
 
               if (idx >= 0) {
-                // Update existing card
                 const updatedCards = [...prev.cards];
                 updatedCards[idx] = newCard;
                 return { ...prev, cards: updatedCards };
               }
 
-              // Insert new card
               return { ...prev, cards: [...prev.cards, newCard] };
             });
           } else if (payload.eventType === 'DELETE') {
@@ -790,24 +837,35 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               ...prev,
               cards: prev.cards.filter((card) => card.id !== payload.old.id),
             }));
-          }
+      }
         }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          setRealtimeStatus('connected');
-        } else if (status === 'CLOSED') {
-          setRealtimeStatus('disconnected');
-        }
-      });
+      );
+
+    realtimeState.channel = channel;
+
+    channel.subscribe((status) => {
+      if (realtimeState.token !== token) return;
+      console.log('Realtime subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        setRealtimeStatus('connected');
+      } else if (status === 'CLOSED') {
+        setRealtimeStatus('disconnected');
+      }
+    });
 
     return () => {
-      console.log('[Realtime] Cleaning up subscription for board:', currentBoardId);
-      supabase.removeChannel(channel).then(() => {
-        console.log('[Realtime] Channel removed successfully');
+      if (realtimeState.channel === channel) {
+        realtimeState.channel = null;
+      }
+
+      channel.unsubscribe();
+      supabase.removeChannel(channel).catch((error) => {
+        console.warn('[Realtime] Failed to remove channel:', error);
       });
-      setRealtimeStatus('disconnected');
+
+      if (realtimeState.token === token) {
+        setRealtimeStatus('disconnected');
+      }
     };
   }, [currentBoardId]);
 
@@ -837,18 +895,44 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     saveToStorage(newData);
   };
 
-  const getBoardPath = (board?: Board | null): string => {
+  const getBoardPath = (board?: Board | null, options: { canonical?: boolean } = {}): string => {
     if (!board?.short_id) return "";
-    return buildBoardUrl(board) || buildBoardShortUrl(board) || "";
+
+    const canonicalPath = buildBoardUrl(board);
+    const shortPath = buildBoardShortUrl(board);
+
+    if (options.canonical === false) {
+      return shortPath || canonicalPath || "";
+    }
+
+    return canonicalPath || shortPath || "";
   };
 
   const updateURL = (board?: Board | null, { replace = false }: { replace?: boolean } = {}) => {
-    const targetPath = getBoardPath(board ?? currentBoard);
-    const fallback = "/";
-    if (replace) {
-      router.replace(targetPath || fallback, { scroll: false });
-    } else {
-      router.push(targetPath || fallback, { scroll: false });
+    const targetBoard = board ?? currentBoard;
+    const canonicalPath = getBoardPath(targetBoard);
+    const shortPath = getBoardPath(targetBoard, { canonical: false });
+    const currentPath = pathname;
+
+    const navigate = replace ? router.replace : router.push;
+
+    if (!shortPath && !canonicalPath) {
+      navigate("/", { scroll: false });
+      return;
+    }
+
+    if (shortPath && currentPath !== shortPath && currentPath !== canonicalPath) {
+      navigate(shortPath, { scroll: false });
+    } else if (!shortPath && canonicalPath && currentPath !== canonicalPath) {
+      navigate(canonicalPath, { scroll: false });
+    }
+
+    if (canonicalPath && canonicalPath !== shortPath) {
+      Promise.resolve().then(() => {
+        if (typeof window === "undefined") return;
+        if (window.location.pathname === canonicalPath) return;
+        router.replace(canonicalPath, { scroll: false });
+      });
     }
   };
 
@@ -1181,14 +1265,14 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setCardModalStatus('loading');
 
     if (typeof window !== 'undefined') {
-      const boardPath = getBoardPath(currentBoard);
-      if (window.history.state && (window.history.state as { cardId?: string }).cardId && boardPath) {
-        window.history.replaceState({}, '', boardPath);
+      if (window.history.length > 1) {
+        router.back();
         return;
       }
 
-      if (window.history.length > 1) {
-        router.back();
+      const boardPath = getBoardPath(currentBoard) || getBoardPath(currentBoard, { canonical: false });
+      if (boardPath) {
+        window.history.replaceState({}, '', boardPath);
         return;
       }
     }

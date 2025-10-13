@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import KanbanBoardClient from "@/app/(board)/_components/KanbanBoardClient";
@@ -17,9 +18,13 @@ type PageProps = {
 export const revalidate = 0;
 export const runtime = "nodejs";
 
+const getBoardByShortIdCached = cache(async (shortId: string) => {
+  return getBoardByShortId(shortId);
+});
+
 export async function generateMetadata({ params }: { params: Promise<PageParams> }): Promise<Metadata> {
   const { short_id, slug } = await params;
-  const board = await getBoardByShortId(short_id);
+  const board = await getBoardByShortIdCached(short_id);
 
   if (!board) {
     return {};
@@ -50,7 +55,7 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
 
 export default async function BoardByShortIdPage({ params }: PageProps) {
   const { short_id, slug } = await params;
-  const board = await getBoardByShortId(short_id);
+  const board = await getBoardByShortIdCached(short_id);
 
   if (!board) {
     notFound();

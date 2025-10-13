@@ -12,6 +12,7 @@ import { test, expect } from '@playwright/test';
 
 import { supabase } from '@/lib/supabase';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 import type { Page, Locator } from '@playwright/test';
 
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
@@ -109,6 +110,71 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Test board should be loaded and empty (no lists)
     await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
+  });
+
+  test('should redirect legacy board query to canonical URL', async ({ request }) => {
+    const response = await request.get(`/?board=${testBoardId}`, { maxRedirects: 0 });
+    expect(response.status()).toBe(308);
+    const location = response.headers()['location'];
+    expect(location).toBeTruthy();
+    expect(location).toContain(testBoardCanonicalPath);
+  });
+
+  test('should normalize board URL when slug mismatches', async ({ page }) => {
+    await page.goto(`/b/${testBoardShortId}/bogus-segment`);
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
+    expect(new URL(page.url()).pathname).toBe(testBoardCanonicalPath);
+  });
+
+  test('should update URL immediately when switching boards', async ({ page }) => {
+    const { data: defaultBoard } = await supabase
+      .from('boards')
+      .select('name, short_id, id_short, slug')
+      .eq('id', MAIN_BOARD_ID)
+      .maybeSingle();
+
+    expect(defaultBoard).toBeTruthy();
+    const defaultBoardCanonicalTail = defaultBoard?.id_short && defaultBoard?.slug
+      ? `${defaultBoard.id_short}-${defaultBoard.slug}`
+      : defaultBoard?.slug ?? '';
+    const defaultBoardCanonicalPath = defaultBoardCanonicalTail
+      ? `/b/${defaultBoard!.short_id}/${defaultBoardCanonicalTail}`
+      : `/b/${defaultBoard!.short_id}`;
+
+    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await page.getByRole('button', { name: defaultBoard!.name }).click();
+
+    const immediatePath = await page.evaluate(() => window.location.pathname);
+    expect(immediatePath.startsWith(`/b/${defaultBoard!.short_id}`)).toBeTruthy();
+
+    await page.waitForURL(`**${defaultBoardCanonicalPath}`);
+    expect(new URL(page.url()).pathname).toBe(defaultBoardCanonicalPath);
+
+    // Return to the test board for subsequent assertions
+    await page.getByRole('button', { name: `${defaultBoard!.name} ▼` }).click();
+    await page.getByRole('button', { name: testBoardName }).click();
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
+  });
+
+  test('should copy board URLs with clipboard fallback', async ({ page }) => {
+    const dialogMessages: string[] = [];
+    page.on('dialog', async (dialog) => {
+      dialogMessages.push(dialog.message());
+      await dialog.dismiss();
+    });
+
+    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await page.getByRole('button', { name: '短縮URLをコピー' }).click();
+    await page.waitForTimeout(100);
+
+    expect(dialogMessages.length).toBeGreaterThan(0);
+    expect(dialogMessages[dialogMessages.length - 1]).toBe('URLをコピーしました');
+
+    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await page.getByRole('button', { name: '正規URLをコピー' }).click();
+    await page.waitForTimeout(100);
+
+    expect(dialogMessages[dialogMessages.length - 1]).toBe('URLをコピーしました');
   });
 
   test('should add a new list', async ({ page }) => {
@@ -484,6 +550,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Verify card title in modal
     const titleInput = page.locator('input[placeholder="Card title"]');
     await expect(titleInput).toHaveValue(card.title);
+
+    // Close modal and ensure URL returns to board canonical path
+    await page.getByLabel('Close modal').click();
+    await page.waitForURL(`**${testBoardCanonicalPath}`);
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
   });
 
   test('should normalize URL when slug is incorrect', async ({ page }) => {

@@ -9,23 +9,37 @@
  * when the normalized string becomes empty (e.g. Japanese-only titles).
  */
 export function toSlugBase(title: string): string {
-  const base = title
+  const normalized = title
     .normalize('NFKD')
     .toLowerCase()
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf\- ]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/\-+/g, '-');
+    .replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
-  return base || encodeURIComponent(title);
+  if (normalized) {
+    return normalized;
+  }
+
+  const fallback = encodeURIComponent(title.trim().toLowerCase());
+  return fallback.replace(/%20/g, '-');
 }
 
 /**
  * Compose the human-friendly tail segment (`<idShort>-<slug>` or just slug).
  */
 export function buildReadableTail(idShort: number | null | undefined, slug: string): string {
-  return idShort ? `${idShort}-${slug}` : slug;
+  const normalizedSlug = slug.trim();
+
+  if (idShort && normalizedSlug) {
+    return `${idShort}-${normalizedSlug}`;
+  }
+
+  if (idShort) {
+    return `${idShort}`;
+  }
+
+  return normalizedSlug;
 }
 
 /**
