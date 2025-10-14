@@ -202,7 +202,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByRole('button', { name: 'Rename', exact: true }).click();
 
     // Enter new name - use more specific selector to avoid search input
-    const input = page.locator('[data-testid^="list-"]').locator('input').filter({ hasValue: 'New List' });
+    const input = page.locator('[data-testid^="list-"]').locator('input').filter({ hasText: 'New List' });
     await input.fill('Renamed List');
     await page.keyboard.press('Enter');
 
@@ -268,6 +268,12 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Wait for modal and edit title
     const titleInput = page.locator('input[placeholder="Card title"]');
     await titleInput.waitFor({ state: 'visible' });
+
+    // Regression test: Verify input focus is maintained
+    await titleInput.click();
+    await page.waitForTimeout(500); // Wait to ensure focus isn't stolen
+    await expect(titleInput).toBeFocused();
+
     await titleInput.fill('Updated Card Title');
 
     const descInput = page.locator('textarea[placeholder="Add a description..."]');
@@ -276,7 +282,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Save
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-    // Wait for modal to close
+    // Regression test: Modal should close after save (not reopen)
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });
+
+    // Wait a bit to ensure modal doesn't reopen
+    await page.waitForTimeout(500);
     await expect(page.getByRole('dialog')).not.toBeVisible();
 
     // Verify changes on the card

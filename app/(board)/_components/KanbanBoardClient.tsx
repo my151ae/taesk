@@ -578,9 +578,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   }, [user, loading, router]);
 
-  // URL からモーダル状態を復元（初回ロード時）
+  // URL からモーダル状態を復元（初回ロード時のみ）
+  const hasRestoredModalFromUrl = useRef(false);
+
   useEffect(() => {
-    if (!isClient || !pathname || boardData.cards.length === 0) return;
+    if (!isClient || !pathname || hasRestoredModalFromUrl.current) return;
+    if (boardData.cards.length === 0) return; // カード読み込み待ち
 
     if (pathname.startsWith('/c/')) {
       const [, , shortId] = pathname.split('/');
@@ -589,6 +592,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       if (card) {
         setSelectedCardId(card.id);
         setCardModalStatus('ready');
+        hasRestoredModalFromUrl.current = true; // 1度だけ実行
 
         // Slug 正規化
         const cardShortId = card.short_id;
@@ -608,7 +612,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         }
       }
     }
-  }, [isClient, pathname, boardData.cards]);
+  }, [isClient, pathname, boardData.cards.length]); // .length のみを監視
 
   useEffect(() => {
     if (initialBoard?.id && initialBoard.id !== currentBoardId) {
@@ -757,12 +761,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   useEffect(() => {
     if (!currentBoardId) return;
 
+    console.log('[Realtime] Setting up subscription for board:', currentBoardId);
     const realtimeState = realtimeChannelRef.current;
     const token = (realtimeState.token ?? 0) + 1;
     realtimeState.token = token;
+    console.log('[Realtime] New token:', token);
 
     const previousChannel = realtimeState.channel;
     if (previousChannel) {
+      console.log('[Realtime] Unsubscribing from previous channel');
       previousChannel.unsubscribe();
       supabase.removeChannel(previousChannel).catch((error) => {
         console.warn('[Realtime] Failed to remove previous channel:', error);
@@ -1261,23 +1268,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   };
 
   const handleCloseCardModal = () => {
+    console.log('[handleCloseCardModal] Starting...');
+    // モーダルを閉じるだけ（URL 変更なし、ページ再レンダリングなし）
     setSelectedCardId(null);
     setCardModalStatus('loading');
-
-    if (typeof window !== 'undefined') {
-      if (window.history.length > 1) {
-        router.back();
-        return;
-      }
-
-      const boardPath = getBoardPath(currentBoard) || getBoardPath(currentBoard, { canonical: false });
-      if (boardPath) {
-        window.history.replaceState({}, '', boardPath);
-        return;
-      }
-    }
-
-    updateURL(currentBoard, { replace: true });
   };
 
   const handleSaveCard = async (
@@ -1289,6 +1283,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     priority?: Priority,
     assigned_to?: string | null
   ) => {
+    console.log('[handleSaveCard] Starting...', { id, title, description });
     const slug = slugify(title);
     const updatedCards = boardData.cards.map((card) => {
       if (card.id === id) {
@@ -1307,39 +1302,63 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       return card;
     });
 
+    console.log('[handleSaveCard] Updated cards:', updatedCards.length);
     const newData = { ...boardData, cards: updatedCards };
     updateData(newData);
+    console.log('[handleSaveCard] State updated');
 
-    // Supabase に保存
+    // Supabase に保存（変更されたカードのみ）
     const updatedCard = updatedCards.find((c) => c.id === id);
     if (updatedCard) {
       if (!isOnline) {
+        console.log('[handleSaveCard] Adding to sync queue (offline)');
         addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
       } else {
-        await syncToSupabase(newData);
+        console.log('[handleSaveCard] Syncing card to Supabase...');
+        const { error } = await supabase
+          .from('cards')
+          .upsert(updatedCard);
+        if (error) {
+          console.error('[handleSaveCard] Error syncing card:', error);
+        } else {
+          console.log('[handleSaveCard] Card synced to Supabase');
+        }
       }
     }
 
+    console.log('[handleSaveCard] Closing modal...');
     handleCloseCardModal();
   };
 
   const handleDeleteCard = async (id: string) => {
-    const updatedCards = boardData.cards.filter((card) => card.id !== id);
-    const newData = { ...boardData, cards: updatedCards };
-    updateData(newData);
+    console.log('[handleDeleteCard] Starting...', { id });
 
-    // Supabase から削除
-    if (!isOnline) {
-      addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
-    } else {
-      try {
-        await supabase.from('cards').delete().eq('id', id);
-      } catch (error) {
-        console.error('Error deleting card:', error);
+    try {
+      const updatedCards = boardData.cards.filter((card) => card.id !== id);
+      const newData = { ...boardData, cards: updatedCards };
+      updateData(newData);
+
+      // Supabase から削除
+      if (!isOnline) {
+        console.log('[handleDeleteCard] Adding to sync queue (offline)');
+        addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
+      } else {
+        console.log('[handleDeleteCard] Deleting from Supabase...');
+        const { error } = await supabase.from('cards').delete().eq('id', id);
+        if (error) {
+          console.error('[handleDeleteCard] Error deleting card:', error);
+          throw error;
+        }
+        console.log('[handleDeleteCard] Card deleted from Supabase');
       }
-    }
 
-    handleCloseCardModal();
+      console.log('[handleDeleteCard] Closing modal...');
+      handleCloseCardModal();
+    } catch (error) {
+      console.error('[handleDeleteCard] Failed to delete card:', error);
+      // エラーが発生してもモーダルは閉じる
+      handleCloseCardModal();
+    }
   };
 
   const handleMoveCardToBoard = async (cardId: string, targetBoardId: string) => {

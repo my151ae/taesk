@@ -28,8 +28,41 @@ export function CardModal({
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
   const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
+  const [isDirty, setIsDirty] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
+  const cardIdRef = useRef(card.id);
+  const onCloseRef = useRef(onClose);
+
+  // onClose ref を最新に保つ
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // card prop が変わったときの処理（ただし編集中は無視）
+  useEffect(() => {
+    // card.id が変わった場合（別のカードを開いた）、または編集していない場合のみ更新
+    if (card.id !== cardIdRef.current) {
+      cardIdRef.current = card.id;
+      setTitle(card.title);
+      setDescription(card.description);
+      setTags(card.tags || []);
+      setDueDate(card.due_date || '');
+      setPriority(card.priority || 'medium');
+      setAssignedTo(card.assigned_to || '');
+      setTargetBoardId(card.board_id);
+      setIsDirty(false);
+    } else if (!isDirty) {
+      // 同じカードで編集していない場合のみ、外部の変更を反映
+      setTitle(card.title);
+      setDescription(card.description);
+      setTags(card.tags || []);
+      setDueDate(card.due_date || '');
+      setPriority(card.priority || 'medium');
+      setAssignedTo(card.assigned_to || '');
+      setTargetBoardId(card.board_id);
+    }
+  }, [card, isDirty]);
 
   // Escape key to close + focus trap
   useEffect(() => {
@@ -54,7 +87,7 @@ export function CardModal({
 
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -102,7 +135,7 @@ export function CardModal({
     return () => {
       document.removeEventListener("keydown", trapFocus);
     };
-  }, [onClose]);
+  }, []); // 空配列でマウント時のみ実行
 
   const handleSave = () => {
     onSave(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
@@ -174,7 +207,10 @@ export function CardModal({
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setIsDirty(true);
+              }}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
               placeholder="Card title"
             />
@@ -187,7 +223,10 @@ export function CardModal({
             </label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setIsDirty(true);
+              }}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent resize-none"
               placeholder="Add a description..."
               rows={4}
