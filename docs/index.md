@@ -26,6 +26,10 @@ npm run dev
 
 # Run E2E tests
 npm run test:e2e
+
+# View test results
+# HTML レポートサーバーが自動起動します（例: http://localhost:62664）
+# 詳細は docs/detail/testing.md を参照
 ```
 
 Visit `http://localhost:3000` to see the app.
@@ -163,6 +167,7 @@ taesk/
 │       ├── components.md    # Component structure
 │       ├── storage.md       # Storage strategy
 │       ├── routing.md       # Routing & Card URLs (NEW)
+│       ├── testing.md       # E2E テスト & HTML レポート取得方法
 │       └── deployment.md    # Deployment guide
 │
 ├── playwright.config.ts      # Playwright configuration

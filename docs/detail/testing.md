@@ -273,6 +273,114 @@ npx playwright test --grep "drag and drop"
 
 # 並列度指定
 npx playwright test --workers=1
+
+# ターミナル上で結果を収集したい場合（HTML不要）
+npx playwright test --reporter=json
+
+# HTML レポートのみ見たい場合（ポート競合を避ける）
+npx playwright show-report --port=0
+# もしくは実行前に lsof -i :9323 → kill <PID> で既存サーバーを停止
+# レポート閲覧後は Ctrl+C でプロセスを終了させ、ポートを解放する
+```
+
+### HTML レポートの取得
+
+Playwright は自動的に HTML レポートを生成します。Claude Code CLI から結果を取得する方法：
+
+#### 方法 1: レポートサーバーから取得（推奨）
+
+テスト実行後、Playwright は自動的に HTML レポートサーバーを起動します：
+
+```bash
+# テスト実行
+npm run test:e2e
+
+# 自動的に起動されるレポートサーバー
+# 出力例: "Serving HTML report at http://localhost:53829"
+```
+
+**Claude Code CLI での取得方法**:
+```typescript
+// WebFetch ツールを使用してレポートを取得
+// URL: http://localhost:<port>/ (ログに表示されるポート番号)
+```
+
+**注意点**:
+- レポートサーバーのポート番号は毎回変わります（例: 62664, 53829 など）
+- テスト実行ログの最後に表示される URL を使用してください
+- デフォルトタイムアウト: サーバーは Ctrl+C で終了するまで稼働
+
+#### 方法 2: HTML ファイルを直接読む
+
+```bash
+# HTML レポート生成
+npx playwright test --reporter=html
+
+# レポートファイルの場所
+# playwright-report/index.html
+```
+
+**Claude Code CLI での取得方法**:
+```bash
+# Read ツールで HTML ファイルを読む
+Read: playwright-report/index.html
+
+# または、結果サマリーを JSON で取得
+Read: test-results/**/*.json
+```
+
+#### 方法 3: CLI レポート出力
+
+リアルタイムで結果を取得したい場合：
+
+```bash
+# Line reporter（1行ずつ結果表示）
+npx playwright test --reporter=line
+
+# List reporter（詳細表示）
+npx playwright test --reporter=list
+
+# JSON reporter（プログラム処理用）
+npx playwright test --reporter=json > test-results.json
+```
+
+### テストタイムアウト設定
+
+Playwright のタイムアウトは `playwright.config.ts` で設定されています：
+
+```typescript
+// playwright.config.ts
+export default defineConfig({
+  // グローバルタイムアウト（全テストの合計実行時間）
+  globalTimeout: 10 * 60 * 1000, // 10分
+
+  // 個別テストのタイムアウト
+  timeout: 60 * 1000, // 60秒
+
+  // Expect アサーションのタイムアウト
+  expect: {
+    timeout: 10 * 1000, // 10秒
+  },
+
+  // Web サーバー起動の待機時間
+  webServer: {
+    timeout: 120 * 1000, // 2分
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+
+**タイムアウト調整が必要な場合**:
+
+```typescript
+// テスト単位でタイムアウトを延長
+test('slow test', async ({ page }) => {
+  test.setTimeout(120000); // 2分
+  // ...
+});
+
+// 個別の操作でタイムアウトを指定
+await expect(element).toBeVisible({ timeout: 30000 }); // 30秒
 ```
 
 ### CI実行
@@ -280,6 +388,9 @@ npx playwright test --workers=1
 ```bash
 # Sequential execution for stability
 npx playwright test --workers=1 --reporter=line
+
+# With HTML report
+npx playwright test --workers=1 --reporter=html,line
 ```
 
 ## テスト結果（2025-10-10時点）

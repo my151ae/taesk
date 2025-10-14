@@ -9,6 +9,8 @@ Keep UI routes under `app/`, grouped by feature folders so components stay close
 ## Build, Test, and Development Commands
 Use `npm run dev` for the local Next.js server on port 3000. Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
 
+テスト結果だけ確認したい場合は `npx playwright test --reporter=json` を利用するとターミナルで完結して結果を取得できる。HTML レポートを開きたい場合は `npx playwright show-report --port=0` を推奨（または事前に `lsof -i :9323` で既存の show-report プロセスを停止してから実行）し、終了時は `Ctrl+C` でサーバーを明示的に止める。
+
 ## Coding Style & Naming Conventions
 The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explicit types on exported functions and keep indentation at two spaces. Use kebab-case for routes (`app/board-overview/page.tsx`), camelCase for variables and helpers, PascalCase for React components, and Tailwind utility classes for layout. Run `npm run lint` before sending changes to ensure consistent formatting.
 
