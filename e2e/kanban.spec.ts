@@ -144,6 +144,13 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
     await page.getByRole('button', { name: defaultBoard!.name }).click();
 
+    // Wait for URL to update to at least /b/:sid (immediate)
+    await page.waitForFunction(
+      (shortId) => window.location.pathname.startsWith(`/b/${shortId}`),
+      defaultBoard!.short_id,
+      { timeout: 1000 }
+    );
+
     const immediatePath = await page.evaluate(() => window.location.pathname);
     expect(immediatePath.startsWith(`/b/${defaultBoard!.short_id}`)).toBeTruthy();
 
@@ -202,7 +209,8 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByRole('button', { name: 'Rename', exact: true }).click();
 
     // Enter new name - use more specific selector to avoid search input
-    const input = page.locator('[data-testid^="list-"]').locator('input').filter({ hasText: 'New List' });
+    const input = page.locator('[data-testid^="list-title-input-"]').first();
+    await expect(input).toBeVisible();
     await input.fill('Renamed List');
     await page.keyboard.press('Enter');
 

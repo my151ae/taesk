@@ -459,6 +459,8 @@ function SortableList({
               }}
               className="flex-1 px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
               autoFocus
+              aria-label="List title"
+              data-testid={`list-title-input-${list.id}`}
             />
           </div>
         ) : (
@@ -580,14 +582,24 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   // URL からモーダル状態を復元（初回ロード時のみ）
   const hasRestoredModalFromUrl = useRef(false);
+  const cards = boardData.cards;
+
+  useEffect(() => {
+    if (!selectedCardId) return;
+    const exists = boardData.cards.some((card) => card.id === selectedCardId);
+    if (!exists) {
+      setSelectedCardId(null);
+      setCardModalStatus('loading');
+    }
+  }, [boardData.cards, selectedCardId]);
 
   useEffect(() => {
     if (!isClient || !pathname || hasRestoredModalFromUrl.current) return;
-    if (boardData.cards.length === 0) return; // カード読み込み待ち
+    if (cards.length === 0) return; // カード読み込み待ち
 
     if (pathname.startsWith('/c/')) {
       const [, , shortId] = pathname.split('/');
-      const card = boardData.cards.find((c) => c.short_id === shortId);
+      const card = cards.find((c) => c.short_id === shortId);
 
       if (card) {
         setSelectedCardId(card.id);
@@ -612,7 +624,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         }
       }
     }
-  }, [isClient, pathname, boardData.cards.length]); // .length のみを監視
+  }, [isClient, pathname, cards]);
 
   useEffect(() => {
     if (initialBoard?.id && initialBoard.id !== currentBoardId) {
@@ -917,30 +929,31 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   const updateURL = (board?: Board | null, { replace = false }: { replace?: boolean } = {}) => {
     const targetBoard = board ?? currentBoard;
-    const canonicalPath = getBoardPath(targetBoard);
-    const shortPath = getBoardPath(targetBoard, { canonical: false });
-    const currentPath = pathname;
+    const shortId = targetBoard?.short_id;
 
-    const navigate = replace ? router.replace : router.push;
-
-    if (!shortPath && !canonicalPath) {
+    if (!shortId) {
+      const navigate = replace ? router.replace : router.push;
       navigate("/", { scroll: false });
       return;
     }
 
-    if (shortPath && currentPath !== shortPath && currentPath !== canonicalPath) {
-      navigate(shortPath, { scroll: false });
-    } else if (!shortPath && canonicalPath && currentPath !== canonicalPath) {
-      navigate(canonicalPath, { scroll: false });
-    }
+    // ① 即時反映（同期）: /b/:sid のみ
+    const shortPath = `/b/${shortId}`;
+    const navigate = replace ? router.replace : router.push;
+    navigate(shortPath, { scroll: false });
 
-    if (canonicalPath && canonicalPath !== shortPath) {
-      Promise.resolve().then(() => {
-        if (typeof window === "undefined") return;
-        if (window.location.pathname === canonicalPath) return;
+    // ② 同一 tick で上書き（tail あれば）
+    queueMicrotask(() => {
+      if (typeof window === "undefined") return;
+      const canonicalPath = buildBoardUrl(targetBoard);
+      if (canonicalPath && canonicalPath !== shortPath) {
+        // 既に別のページに遷移していたら何もしない
+        if (window.location.pathname !== shortPath && window.location.pathname !== canonicalPath) {
+          return;
+        }
         router.replace(canonicalPath, { scroll: false });
-      });
-    }
+      }
+    });
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1397,6 +1410,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   const currentBoard = boards.find(b => b.id === currentBoardId);
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
+  const selectedCard = selectedCardId ? boardData.cards.find((c) => c.id === selectedCardId) : null;
 
   if (!isClient || loading) {
     return (
@@ -1766,9 +1780,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       )}
 
       {/* Card Modal (クライアントサイド・即時表示) */}
-      {selectedCardId && (
+      {selectedCard && (
         <CardModal
-          card={boardData.cards.find((c) => c.id === selectedCardId)!}
+          card={selectedCard}
           boards={boards}
           onSave={handleSaveCard}
           onDelete={handleDeleteCard}
