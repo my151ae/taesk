@@ -1,6 +1,6 @@
 # Board Short URL - Step4 モーダル統合
 
-**Status**: 🔴 Not Started
+**Status**: 🟢 Completed
 **Priority**: 🔥 High
 **Created**: 2025-10-15 0135
 **Assignee**: Claude
@@ -16,11 +16,11 @@
 
 ## 実装内容
 
-- [ ] `/c/:short_id/[[...slug]]` の intercepting route とレイアウト（parallel routes）を実装
-- [ ] `/c/:short_id` 直アクセス時にボードを背景読み込みしカードモーダルを開くフローを構築
-- [ ] slug/id_short の正規化ロジックを共有化し、誤ったslugでも置換されるようにする
-- [ ] KanbanBoardClient の URL 復元処理を `/c` ルートでも動作するよう拡張
-- [ ] E2E（kanban.spec.ts）で `/c` 系シナリオが通過するよう調整
+- [x] `/c/:short_id/[[...slug]]` の intercepting route とレイアウト（parallel routes）を実装
+- [x] `/c/:short_id` 直アクセス時にボードを背景読み込みしカードモーダルを開くフローを構築
+- [x] slug/id_short の正規化ロジックを共有化し、誤ったslugでも置換されるようにする
+- [x] KanbanBoardClient の URL 復元処理を `/c` ルートでも動作するよう拡張
+- [x] E2E（kanban.spec.ts）で `/c` 系シナリオが通過するよう調整
 
 ## 技術的詳細
 
@@ -31,10 +31,10 @@
 
 ## 受け入れ基準
 
-- [ ] `/c/:short_id` アクセスでカードモーダルが表示され、URLが維持される
-- [ ] `/c/:short_id/wrong-slug` アクセスで canonical slug に置換される
-- [ ] モーダルを閉じた後にボードURLへ戻り、再度リロードしてもエラーが出ない
-- [ ] Playwright E2E が 33/33 Pass になる
+- [x] `/c/:short_id` アクセスでカードモーダルが表示され、URLが維持される
+- [x] `/c/:short_id/wrong-slug` アクセスで canonical slug に置換される
+- [x] モーダルを閉じた後にボードURLへ戻り、再度リロードしてもエラーが出ない
+- [x] Playwright E2E が 34/34 Pass になる
 
 ## 関連チケット
 
@@ -44,3 +44,7 @@
 
 - Step1-3 修正で `/c` 系が未着手なため作成
 - 既存ボードロード処理との競合に注意
+- `/c` ソフトナビゲーションは Intercepting Routes（`app/(board)/@modal/(...)c/[short_id]/[[...slug]]`）で実装し、フルページは `app/c/[short_id]/[[...slug]]/page.tsx` に分離
+- `KanbanBoardClient` で `/c` ルート監視・`router.push/back/replace` を制御し、モーダル開閉のURL整合性を保証
+- `lib/server/cards.ts` を追加し、カード取得＋slug正規化をサーバー側で集約
+- Playwright 34件 (jsonレポート) すべて成功済み

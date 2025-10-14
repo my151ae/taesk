@@ -582,6 +582,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   // URL からモーダル状態を復元（初回ロード時のみ）
   const hasRestoredModalFromUrl = useRef(false);
+  const modalNavigationRef = useRef(false);
+  const selectedCardIdRef = useRef<string | null>(selectedCardId);
   const cards = boardData.cards;
 
   useEffect(() => {
@@ -592,6 +594,24 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       setCardModalStatus('loading');
     }
   }, [boardData.cards, selectedCardId]);
+
+  useEffect(() => {
+    selectedCardIdRef.current = selectedCardId;
+  }, [selectedCardId]);
+
+  useEffect(() => {
+    if (!pathname) return;
+    if (pathname.startsWith('/c/')) {
+      return;
+    }
+
+    modalNavigationRef.current = false;
+
+    if (selectedCardIdRef.current) {
+      setSelectedCardId(null);
+      setCardModalStatus('loading');
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (!isClient || !pathname || hasRestoredModalFromUrl.current) return;
@@ -620,11 +640,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         });
 
         if (pathname !== correctUrl) {
-          window.history.replaceState({ cardId: card.id }, '', correctUrl);
+          router.replace(correctUrl, { scroll: false });
         }
       }
     }
-  }, [isClient, pathname, cards]);
+  }, [isClient, pathname, cards, router]);
 
   useEffect(() => {
     if (initialBoard?.id && initialBoard.id !== currentBoardId) {
@@ -1264,11 +1284,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const card = boardData.cards.find((c) => c.id === cardId);
     if (!card) return;
 
-    // モーダルを即座に開く（ローディング状態）
     setSelectedCardId(cardId);
-    setCardModalStatus('ready'); // すでにカードデータはある
+    setCardModalStatus('ready');
 
-    // URL 同期（即時）
     if (card.short_id) {
       const url = buildCardUrl({
         shortId: card.short_id,
@@ -1276,15 +1294,38 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         idShort: card.id_short ?? undefined,
         title: card.title,
       });
-      window.history.replaceState({ cardId }, '', url);
+
+      if (pathname !== url) {
+        modalNavigationRef.current = true;
+        router.push(url, { scroll: false });
+      }
     }
   };
 
   const handleCloseCardModal = () => {
     console.log('[handleCloseCardModal] Starting...');
-    // モーダルを閉じるだけ（URL 変更なし、ページ再レンダリングなし）
     setSelectedCardId(null);
     setCardModalStatus('loading');
+
+    const fallbackPath = getBoardPath(currentBoard) || getBoardPath(currentBoard, { canonical: false }) || '/';
+
+    if (modalNavigationRef.current) {
+      modalNavigationRef.current = false;
+      router.back();
+
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          if (window.location.pathname.startsWith('/c/')) {
+            router.replace(fallbackPath, { scroll: false });
+          }
+        }, 100);
+      }
+      return;
+    }
+
+    if (pathname && pathname.startsWith('/c/')) {
+      router.replace(fallbackPath, { scroll: false });
+    }
   };
 
   const handleSaveCard = async (
