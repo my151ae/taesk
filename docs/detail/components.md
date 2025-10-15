@@ -1,575 +1,109 @@
 # Component Structure
 
-## Component Hierarchy
+Taesk の UI ロジックは `app/(board)/_components/KanbanBoardClient.tsx` に集約されています。ここではコンポーネント階層と主要な責務、重要なハンドラについて最新の実装に基づいて整理します。
+
+## 1. トップレベル: `KanbanBoardClient`
+
+- **場所**: `app/(board)/_components/KanbanBoardClient.tsx`
+- **役割**: 認証済みユーザー向けの Kanban 体験を完全に提供（ボード切替、リスト & カード CRUD、ドラッグ＆ドロップ、オフライン同期、Realtime 連携、カードモーダル）。
+- **入力**: サーバーコンポーネントから渡される `initialBoard`, `initialData`, `initialCardId`
+- **内部状態（抜粋）**:
+  - `boards`, `currentBoardId`: ボードの選択状況
+  - `boardData`: 現在のボードに紐づくリスト/カード（Supabase + localStorage キャッシュ）
+  - `selectedCardId`, `cardModalStatus`: カードモーダル表示/状態管理
+  - `lastBoardPathRef`, `modalReturnPathRef`: インターセプトされたモーダル遷移後に元の URL を復元するための履歴
+  - `syncQueueStats`, `isOnline`: オフライン同期キューとネットワーク状態
+
+### レンダリングツリー（一部省略）
 
 ```
-KanbanBoard (Root Component)
-│
-├── State Management
-│   ├── boardData: { lists, cards }
-│   ├── activeId: string | null
-│   └── isClient: boolean
-│
-├── Event Handlers
-│   ├── handleAddList()
-│   ├── handleAddCard(listId)
-│   ├── handleEditCard(id, title, desc)
-│   ├── handleDeleteCard(id)
-│   ├── handleEditList(id, title)
-│   ├── handleDeleteList(id)
-│   ├── handleDragStart(event)
-│   ├── handleDragOver(event)
-│   └── handleDragEnd(event)
-│
-└── Rendered Tree
-    └── DndContext
-        ├── SortableContext (horizontal)
-        │   └── SortableList × N
-        │       ├── List Header
-        │       │   ├── Title (editable)
-        │       │   └── Menu (⋯)
-        │       │       ├── Rename
-        │       │       └── Delete
-        │       ├── SortableContext (vertical)
-        │       │   └── SortableCard × N
-        │       │       ├── Card Content
-        │       │       │   ├── Title
-        │       │       │   ├── Description
-        │       │       │   └── Actions (Edit/Delete)
-        │       │       └── Edit Mode
-        │       │           ├── Title Input
-        │       │           ├── Description Textarea
-        │       │           └── Save/Cancel Buttons
-        │       └── Add Card Button
-        ├── Add List Button
-        └── DragOverlay
+KanbanBoardClient
+├── ヘッダー
+│   ├── ボードドロップダウン (board-menu)
+│   ├── 検索 & フィルター UI
+│   └── 同期ステータス表示（Live / Queued など）
+├── DndContext (@dnd-kit)
+│   ├── SortableContext (リスト横並び)
+│   │   └── SortableList × N
+│   │       ├── List header（タイトル編集 / メニュー）
+│   │       ├── SortableContext (カード縦並び)
+│   │       │   └── SortableCard × M
+│   │       └── 「+ Add Card」ボタン
+│   └── 「+ Add List」ボタン
+├── DragOverlay (ドラッグ中のプレビュー)
+└── CardModal (selectedCard がある場合のみ)
 ```
 
-## KanbanBoard Component
+### 主要ハンドラ
 
-**Location**: `app/page.tsx`
+| ハンドラ | 目的 | 補足 |
+|----------|------|------|
+| `handleAddList` | 新規リスト作成 | Supabase へ upsert / オフライン時はキュー追加 |
+| `handleAddCard` | 新規カード作成 | `createUniqueShortId` + `getNextIdShort` で card short ID を生成 |
+| `handleSaveCard` | カード更新 | タイトル/説明/タグ/期限/優先度/アサイニー/スラッグを更新し Supabase へ同期 |
+| `handleDeleteCard` | カード削除 | confirm → オフラインキュー or Supabase `delete` |
+| `handleMoveCardToBoard` | 他ボードへカード移動 | カード移動後に対象ボードへ同期、モーダルを閉じる |
+| `handleOpenCardModal` | カードクリック時のモーダル表示 | `router.push` で `/c/:shortId/...` へ遷移しつつ `selectedCardId` を更新 |
+| `handleCloseCardModal` | モーダル閉鎖 | `router.back()` の結果 `/` へ落ちた際にも `lastBoardPathRef` を使って安全に元のボードへ戻す |
+| `handleDragOver` / `handleDragEnd` | @dnd-kit 用のドラッグ処理 | オプティミスティック更新 → Supabase へ同期 |
 
-### Responsibilities
+### Realtime 連携
 
-- Main container and state owner
-- Orchestrates all operations
-- Manages data persistence
-- Handles drag & drop events
+- `useEffect([currentBoardId])` 内で Supabase の `postgres_changes` を購読
+- `realtimeChannelRef` と `token` を用いて重複購読や古いイベントを防止
+- `React Strict Mode` 下では `useEffect` が 2 回呼ばれるため、`token` と `unsubscribe` ログ (`SUBSCRIBED` → `CLOSED`) がペアで発生するのは仕様
+- カード/リスト更新は `setBoardData` でマージしつつローカルキャッシュも更新
 
-### Props
+## 2. リスト & カードのサブコンポーネント
 
-None (root page component)
+`KanbanBoardClient.tsx` 内部で定義されているローカルコンポーネント。
 
-### State
+### `SortableList`
 
-```typescript
-const [boardData, setBoardData] = useState<BoardData>({
-  lists: [],
-  cards: []
-});
-const [activeId, setActiveId] = useState<string | null>(null);
-const [isClient, setIsClient] = useState(false);
-```
+- **責務**: 単一リストの表示、タイトル編集、「⋯」メニュー、カードのフィルタリング表示、カード追加ボタン
+- **特徴**:
+  - `useSortable` によるリスト並び替え
+  - フィルター状態（検索 / タグ / 優先度 / 期限ソート）を `filterAndSortCards` で適用
+  - メニュー開閉を `showMenu` + `document` クリックリスナーで制御
 
-### Key Functions
+### `SortableCard`
 
-#### Data Loading
+- **責務**: 個別カードのドラッグ＆ドロップ、クリック時のモーダル遷移
+- **特徴**:
+  - `pointerdown/up` の座標差を監視し、ドラッグ閾値 (`CARD_CLICK_THRESHOLD`) 超過時はクリック扱いにしない
+  - `allowNavigationRef` ＋ `isDraggingRef` でドラッグとクリックの競合を解決
 
-```typescript
-useEffect(() => {
-  setIsClient(true);
-  const loadData = async () => {
-    const data = await loadFromSupabase();
-    if (data.lists.length === 0) {
-      const defaultLists = await initializeDefaultLists();
-      // ...
-    }
-    setBoardData(data);
-    saveToStorage(data);
-  };
-  loadData();
-}, []);
-```
+### `CardModal`
 
-#### Data Persistence
+- **場所**: `app/components/CardModal.tsx`
+- **機能**: カード編集 UI（タイトル、説明、タグ、期限、優先度、担当者、ボード移動、リンクコピー、削除）
+- **連携**: `onSave` → `handleSaveCard`、`onClose` → `handleCloseCardModal`
+- **UI 補助**: `useEffect` によるフォーカストラップ、Escape キーでのクローズ、`data-autofocus` 対応
 
-```typescript
-const updateData = (newData: BoardData) => {
-  setBoardData(newData);        // Update UI
-  saveToStorage(newData);        // Cache
-};
+## 3. Intercepting Routes & モーダル
 
-const syncToSupabase = async (data: BoardData) => {
-  await supabase.from('lists').upsert(data.lists);
-  await supabase.from('cards').upsert(data.cards);
-};
-```
+- **Intercept hook**: `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx`
+  - 役割はモーダル表示中の `<body>` に `overflow-hidden` を付与/解除するのみ（UI はクライアント側）
+- **Standalone page**: `app/c/[short_id]/[[...slug]]/page.tsx`
+  - カード詳細の SSR 表示、メタデータ生成、ボードへの戻りリンクを提供
 
-#### CRUD Operations
+## 4. URL ナビゲーションのポイント
 
-```typescript
-// CREATE
-const handleAddList = async () => {
-  const newList = { id: uuidv4(), title: 'New List', ... };
-  const newData = { ...boardData, lists: [...boardData.lists, newList] };
-  updateData(newData);
-  await syncToSupabase(newData);
-};
+- `updateURL` は **1 回の `router.push/replace`** で canonical URL に遷移（以前の段階的な `/b/:sid` → `/b/:sid/:tail` 二度更新を解消）
+- モーダルオープン時に `modalReturnPathRef` / `lastBoardPathRef` を記録し、モーダルクローズ後に確実に元のボードへ戻る
+- `usePathname` のウォッチで `/c/` 以外へ遷移した場合は `selectedCardId` をリセットしモーダルを閉じる
 
-// UPDATE
-const handleEditCard = async (id, title, description) => {
-  const updatedCards = boardData.cards.map(card =>
-    card.id === id ? { ...card, title, description, updated_at: ... } : card
-  );
-  const newData = { ...boardData, cards: updatedCards };
-  updateData(newData);
-  await syncToSupabase(newData);
-};
+## 5. オフライン同期とローカルキャッシュ
 
-// DELETE
-const handleDeleteCard = async (id) => {
-  const updatedCards = boardData.cards.filter(card => card.id !== id);
-  const newData = { ...boardData, cards: updatedCards };
-  updateData(newData);
-  await supabase.from('cards').delete().eq('id', id);
-};
-```
+- `syncQueue.ts` と連携し、`navigator.onLine` に従って INSERT/UPDATE/DELETE をキューイング
+- アプリ起動時およびオンライン復帰時に `syncQueue()` を実行し、`syncQueueStats` を UI に反映
+- ローカルキャッシュは `localStorage`（キー: `kanban_board_data`）に保存、Supabase 読み込み失敗時のフェールオーバーとして利用
 
-#### Drag & Drop
+---
 
-```typescript
-const handleDragStart = (event) => {
-  setActiveId(event.active.id);
-};
+### 参考リンク
+- [`KanbanBoardClient.tsx`](../../app/(board)/_components/KanbanBoardClient.tsx)
+- [`CardModal.tsx`](../../app/components/CardModal.tsx)
+- [`lib/syncQueue.ts`](../../lib/syncQueue.ts)
 
-const handleDragOver = (event) => {
-  // Optimistic UI updates during drag
-  // Move cards between lists visually
-};
-
-const handleDragEnd = async (event) => {
-  setActiveId(null);
-  // Calculate final positions
-  // Save to database
-  await syncToSupabase(newData);
-};
-```
-
-### Render
-
-```tsx
-return (
-  <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/30 to-blue-50/50 p-4 md:p-8">
-    <h1>Taesk Board</h1>
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={...} onDragOver={...} onDragEnd={...}>
-      <div className="flex gap-3 md:gap-4 overflow-x-auto">
-        <SortableContext items={sortedLists.map(l => l.id)} strategy={horizontalListSortingStrategy}>
-          {sortedLists.map(list => (
-            <SortableList key={list.id} list={list} cards={...} onAddCard={...} onEditCard={...} onDeleteCard={...} onEditList={...} onDeleteList={...} />
-          ))}
-        </SortableContext>
-        <button onClick={handleAddList}>+ Add List</button>
-      </div>
-      <DragOverlay>{activeId ? <div>Dragging...</div> : null}</DragOverlay>
-    </DndContext>
-  </div>
-);
-```
-
-## SortableList Component
-
-**Location**: `app/page.tsx` (function component)
-
-### Responsibilities
-
-- Render a single list
-- Manage list title editing
-- Contain sortable cards
-- Provide add card functionality
-
-### Props
-
-```typescript
-interface SortableListProps {
-  list: List;
-  cards: Card[];
-  onAddCard: (listId: string) => void;
-  onEditCard: (id: string, title: string, description: string) => void;
-  onDeleteCard: (id: string) => void;
-  onEditList: (id: string, title: string) => void;
-  onDeleteList: (id: string) => void;
-}
-```
-
-### State
-
-```typescript
-const [isEditingTitle, setIsEditingTitle] = useState(false);
-const [title, setTitle] = useState(list.title);
-const [showMenu, setShowMenu] = useState(false);
-```
-
-### Hooks
-
-```typescript
-const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-  id: list.id,
-  data: { type: 'list', list }
-});
-```
-
-### Key Features
-
-#### Title Editing
-
-```tsx
-{isEditingTitle ? (
-  <input
-    value={title}
-    onChange={(e) => setTitle(e.target.value)}
-    onBlur={handleSaveTitle}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter') handleSaveTitle();
-      if (e.key === 'Escape') {
-        setTitle(list.title);
-        setIsEditingTitle(false);
-      }
-    }}
-  />
-) : (
-  <h2>{list.title}</h2>
-)}
-```
-
-#### Menu (Rename/Delete)
-
-```tsx
-<button onClick={() => setShowMenu(!showMenu)}>⋯</button>
-{showMenu && (
-  <div className="menu">
-    <button onClick={() => setIsEditingTitle(true)}>Rename</button>
-    <button onClick={() => { if (confirm('Delete?')) onDeleteList(list.id); }}>Delete</button>
-  </div>
-)}
-```
-
-#### Card Container
-
-```tsx
-<SortableContext items={sortedCards.map(c => c.id)} strategy={verticalListSortingStrategy}>
-  {sortedCards.map(card => (
-    <SortableCard key={card.id} card={card} onEdit={onEditCard} onDelete={onDeleteCard} />
-  ))}
-</SortableContext>
-<button onClick={() => onAddCard(list.id)}>+ Add Card</button>
-```
-
-### Render
-
-```tsx
-return (
-  <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="bg-white/70 rounded-2xl p-4 w-72 md:w-80">
-    {/* Header */}
-    {/* Cards */}
-    {/* Add Card Button */}
-  </div>
-);
-```
-
-## SortableCard Component
-
-**Location**: `app/page.tsx` (function component)
-
-### Responsibilities
-
-- Render a single card
-- Handle card editing (inline)
-- Provide delete functionality
-- Enable dragging
-
-### Props
-
-```typescript
-interface SortableCardProps {
-  card: Card;
-  onEdit: (id: string, title: string, description: string) => void;
-  onDelete: (id: string) => void;
-}
-```
-
-### State
-
-```typescript
-const [isEditing, setIsEditing] = useState(false);
-const [title, setTitle] = useState(card.title);
-const [description, setDescription] = useState(card.description);
-```
-
-### Hooks
-
-```typescript
-const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-  id: card.id,
-  data: { type: 'card', card }
-});
-```
-
-### Key Features
-
-#### View Mode
-
-```tsx
-<div>
-  <h3>{card.title}</h3>
-  {card.description && <p>{card.description}</p>}
-  <button onClick={() => setIsEditing(true)}>Edit</button>
-  <button onClick={() => onDelete(card.id)}>Delete</button>
-</div>
-```
-
-#### Edit Mode
-
-```tsx
-<div>
-  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Card title" />
-  <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
-  <button onClick={handleSave}>Save</button>
-  <button onClick={handleCancel}>Cancel</button>
-</div>
-```
-
-#### Save/Cancel
-
-```typescript
-const handleSave = () => {
-  onEdit(card.id, title, description);
-  setIsEditing(false);
-};
-
-const handleCancel = () => {
-  setTitle(card.title);
-  setDescription(card.description);
-  setIsEditing(false);
-};
-```
-
-### Render
-
-```tsx
-return (
-  <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="bg-white rounded-xl p-4 mb-3 cursor-grab">
-    {isEditing ? <EditMode /> : <ViewMode />}
-  </div>
-);
-```
-
-## Shared Utilities
-
-### loadFromSupabase
-
-```typescript
-const loadFromSupabase = async (): Promise<BoardData> => {
-  try {
-    const [{ data: lists }, { data: cards }] = await Promise.all([
-      supabase.from('lists').select('*').order('position'),
-      supabase.from('cards').select('*').order('position'),
-    ]);
-    return { lists: lists || [], cards: cards || [] };
-  } catch (error) {
-    console.error('Error loading from Supabase:', error);
-    return loadFromStorage();  // Fallback
-  }
-};
-```
-
-### saveToStorage / loadFromStorage
-
-```typescript
-const STORAGE_KEY = 'kanban_board_data';
-
-const saveToStorage = (data: BoardData) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-};
-
-const loadFromStorage = (): BoardData => {
-  if (typeof window === 'undefined') return { lists: [], cards: [] };
-  const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : { lists: [], cards: [] };
-};
-```
-
-### initializeDefaultLists
-
-```typescript
-const initializeDefaultLists = async (): Promise<List[]> => {
-  const defaultLists = [
-    { title: 'To Do', position: 0 },
-    { title: 'In Progress', position: 1 },
-    { title: 'Done', position: 2 },
-  ];
-  const { data } = await supabase.from('lists').insert(defaultLists).select();
-  return data || [];
-};
-```
-
-## Styling Conventions
-
-### Tailwind Classes
-
-- **Responsive**: `w-72 md:w-80`, `p-4 md:p-8`
-- **Colors**: `bg-white/70`, `text-slate-700`, `border-slate-200`
-- **Interactive**: `hover:bg-sky-500`, `cursor-grab active:cursor-grabbing`
-- **Mobile**: `touch-none` (prevent scroll while dragging)
-
-### Dark Mode
-
-```tsx
-className="bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-100"
-```
-
-Uses system preference (`prefers-color-scheme`).
-
-## Component Best Practices
-
-### 1. Single Responsibility
-
-Each component has one job:
-- `KanbanBoard`: State & orchestration
-- `SortableList`: List rendering & editing
-- `SortableCard`: Card rendering & editing
-
-### 2. Props Down, Events Up
-
-- Parent passes data down via props
-- Children notify parent via callbacks
-- No prop drilling (only 2 levels deep)
-
-### 3. Controlled Components
-
-All inputs are controlled:
-```tsx
-<input value={title} onChange={(e) => setTitle(e.target.value)} />
-```
-
-### 4. Optimistic UI
-
-Update UI immediately, sync async:
-```typescript
-updateData(newData);           // UI updates now
-await syncToSupabase(newData); // Background
-```
-
-### 5. Error Boundaries
-
-Future improvement:
-```tsx
-<ErrorBoundary fallback={<ErrorUI />}>
-  <KanbanBoard />
-</ErrorBoundary>
-```
-
-## Performance Optimizations
-
-### Current
-
-- Lazy state initialization: `useState(() => loadFromStorage())`
-- Stable keys: Use UUIDs, not array indexes
-- Sorted only when needed: `const sortedLists = [...boardData.lists].sort(...)`
-
-### Future
-
-```typescript
-const MemoizedCard = React.memo(SortableCard, (prev, next) =>
-  prev.card.id === next.card.id &&
-  prev.card.title === next.card.title &&
-  prev.card.description === next.card.description
-);
-```
-
-## Accessibility
-
-### Current
-
-- Semantic HTML: `<button>`, `<input>`, `<h1>`, `<h2>`
-- Keyboard support: dnd-kit handles keyboard drag
-- Focus management: `autoFocus` on inputs
-
-### Future Improvements
-
-- [ ] ARIA labels for screen readers
-- [ ] Focus trap in edit mode
-- [ ] Keyboard shortcuts (Ctrl+N for new card)
-- [ ] Announce drag actions to screen readers
-
-## Testing Strategy
-
-### E2E Tests
-
-Test user flows:
-```typescript
-test('should add a card', async ({ page }) => {
-  await page.getByRole('button', { name: '+ Add Card' }).first().click();
-  await expect(page.getByText('New Card')).toBeVisible();
-});
-```
-
-### Future Unit Tests
-
-```typescript
-describe('handleEditCard', () => {
-  it('should update card title and description', () => {
-    const { result } = renderHook(() => useKanbanBoard());
-    act(() => {
-      result.current.handleEditCard('id-1', 'New Title', 'New Desc');
-    });
-    expect(result.current.boardData.cards[0].title).toBe('New Title');
-  });
-});
-```
-
-## Component Diagram
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   KanbanBoard                       │
-│  ┌───────────────────────────────────────────────┐  │
-│  │ State: boardData, activeId, isClient         │  │
-│  └───────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────┐  │
-│  │ Handlers: handleAdd*, handleEdit*,           │  │
-│  │           handleDelete*, handleDrag*         │  │
-│  └───────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────┐  │
-│  │ Render:                                      │  │
-│  │   <DndContext>                               │  │
-│  │     <SortableList /> × N                     │  │
-│  │     <AddListButton />                        │  │
-│  │   </DndContext>                              │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                        │
-        ┌───────────────┴───────────────┐
-        ▼                               ▼
-┌──────────────────┐           ┌──────────────────┐
-│  SortableList    │           │  SortableList    │
-│  ┌────────────┐  │           │  ┌────────────┐  │
-│  │ State:     │  │           │  │ State:     │  │
-│  │ isEditing  │  │           │  │ isEditing  │  │
-│  │ title      │  │           │  │ title      │  │
-│  │ showMenu   │  │           │  │ showMenu   │  │
-│  └────────────┘  │           │  └────────────┘  │
-│  ┌────────────┐  │           │  ┌────────────┐  │
-│  │ Render:    │  │           │  │ Render:    │  │
-│  │ Header     │  │           │  │ Header     │  │
-│  │ Cards      │  │           │  │ Cards      │  │
-│  │ AddCard    │  │           │  │ AddCard    │  │
-│  └────────────┘  │           │  └────────────┘  │
-└────────┬─────────┘           └────────┬─────────┘
-         │                              │
-    ┌────┴────┐                    ┌────┴────┐
-    ▼         ▼                    ▼         ▼
-┌────────┐ ┌────────┐          ┌────────┐ ┌────────┐
-│ Card 1 │ │ Card 2 │          │ Card 3 │ │ Card 4 │
-└────────┘ └────────┘          └────────┘ └────────┘
-```
+最新の挙動と一致するよう、このドキュメントは 2025-10-15 の実装内容を反映しています。

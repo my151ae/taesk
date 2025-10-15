@@ -1,498 +1,165 @@
-# Database Schema
+# Database Schema (2025-10-15)
 
-## Overview
+Taesk は Supabase（PostgreSQL）を使用し、ボードを中心にリスト・カードがぶら下がる 3 層構造です。追加で活動履歴やオフライン同期キュー向けのテーブルを利用します。
 
-Taesk uses **PostgreSQL** via **Supabase** with a simple relational schema optimized for a Kanban board.
+## テーブル一覧
 
-## Schema Diagram
+| テーブル | 役割 | 補足 |
+|----------|------|------|
+| `boards` | ボード本体 | ショートURL・正規URL用の `short_id` / `id_short` / `slug` を保持 |
+| `lists`  | ボード内のリスト | ボード FK、表示順 (`position`) を管理 |
+| `cards`  | リスト内のカード | タグ、期限、優先度、担当者、ショートURLを持つ |
+| `activity_logs` | 監査ログ | 操作履歴（作成/更新/削除/移動）を記録 |
+| `profiles`※ | 将来拡張用 | Supabase Auth ユーザー情報を拡張予定（現在は未使用） |
+
+※ Supabase の `auth.users` と連動させる場合に使用予定（現状は共有ボード運用のため `user_id` を `NULL` 許容）。
+
+## エンティティ関係図
 
 ```
-                   ┌──────────────────────────┐
-                   │      auth.users         │
-                   │   (Supabase Auth)       │
-                   └───────────┬─────────────┘
-                               │
-                               │ 1
-                               │
-                               │
-                               │ N
-                               ▼
-┌──────────────────────────────────────┐
-│             lists                    │
-├──────────────────────────────────────┤
-│ id          UUID PRIMARY KEY         │
-│ title       TEXT NOT NULL            │
-│ position    INTEGER NOT NULL         │
-│ user_id     UUID NOT NULL FK         │────┐
-│ created_at  TIMESTAMPTZ NOT NULL     │    │
-│ updated_at  TIMESTAMPTZ NOT NULL     │    │
-└──────────────────┬───────────────────┘    │
-                   │                         │
-                   │ 1                       │
-                   │                         │
-                   │                  FOREIGN KEY (user_id)
-                   │ N                REFERENCES auth.users(id)
-                   ▼                         │
-┌──────────────────────────────────────┐    │
-│             cards                    │    │
-├──────────────────────────────────────┤    │
-│ id          UUID PRIMARY KEY         │    │
-│ title       TEXT NOT NULL            │    │
-│ description TEXT                     │    │
-│ list_id     UUID NOT NULL FK         │────┼──┐
-│ user_id     UUID NOT NULL FK         │────┘  │
-│ position    INTEGER NOT NULL         │       │
-│ created_at  TIMESTAMPTZ NOT NULL     │       │
-│ updated_at  TIMESTAMPTZ NOT NULL     │       │
-└──────────────────────────────────────┘       │
-                                               │
-                                               │
-         FOREIGN KEY (list_id)                 │
-         REFERENCES lists(id)                  │
-         ON DELETE CASCADE ────────────────────┘
+boards 1 ── n lists 1 ── n cards
+   │                    │
+   └─────── n activity_logs (board 単位の監査)
 ```
 
-## Table: `lists`
+## boards
 
-### Schema
+```sql
+CREATE TABLE public.boards (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  user_id UUID NULL,
+  is_test_board BOOLEAN DEFAULT FALSE,
+  short_id TEXT UNIQUE,
+  id_short INTEGER UNIQUE,
+  slug TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+- `short_id`: `createUniqueBoardShortId()` で生成される base58 風 8 文字 ID。
+- `id_short`: `getNextBoardIdShort()` が連番を払い出し、正規 URL で `:id_short-:slug` に利用。
+- `is_test_board`: E2E 用ボードに付与し、デフォルトリストの自動シードを抑止。
+
+## lists
 
 ```sql
 CREATE TABLE public.lists (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY,
   title TEXT NOT NULL,
   position INTEGER NOT NULL,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
+  board_id UUID NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
+  user_id UUID NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_lists_board ON public.lists(board_id, position ASC);
 ```
 
-### Fields
+- `user_id` は共有ボード設計のため `NULL` を許容。`getActualUserId` でテストユーザーの場合 `NULL` をセット。
+- リストの並び順は `position` だけでなくドラッグ操作時に動的に再計算される。
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique identifier |
-| `title` | TEXT | NOT NULL | Display name of the list |
-| `position` | INTEGER | NOT NULL | Order of lists (0, 1, 2...) |
-| `user_id` | UUID | NOT NULL, FK → auth.users(id) | Owner of the list |
-| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
-| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last update timestamp |
-
-### Indexes
-
-```sql
-CREATE INDEX lists_position_idx ON public.lists(position);
-CREATE INDEX idx_lists_user_id ON public.lists(user_id);
-```
-
-**Why**:
-- `position`: Optimize ordering queries
-- `user_id`: Optimize user-specific queries and RLS policies
-
-### Example Data
-
-```json
-{
-  "id": "dc8fb019-6381-4264-8218-487db90fce48",
-  "title": "To Do",
-  "position": 0,
-  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "created_at": "2025-10-09T02:00:16.272332+00:00",
-  "updated_at": "2025-10-09T02:00:16.272332+00:00"
-}
-```
-
-## Table: `cards`
-
-### Schema
+## cards
 
 ```sql
 CREATE TABLE public.cards (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY,
   title TEXT NOT NULL,
-  description TEXT,
+  description TEXT DEFAULT '' NOT NULL,
   list_id UUID NOT NULL REFERENCES public.lists(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id),
+  board_id UUID NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
+  user_id UUID NULL,
   position INTEGER NOT NULL,
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+  due_date TIMESTAMPTZ NULL,
+  priority TEXT NOT NULL DEFAULT 'medium', -- enum: low / medium / high
+  assigned_to TEXT NULL,
+  short_id TEXT UNIQUE,
+  id_short INTEGER NULL,
+  slug TEXT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_cards_list ON public.cards(list_id, position ASC);
+CREATE INDEX idx_cards_board ON public.cards(board_id);
+CREATE INDEX idx_cards_short_id ON public.cards(short_id);
 ```
 
-### Fields
+- ショート URL は `createUniqueShortId()`（base62 8 文字）と `slugify()` で生成。
+- `id_short` はボード内の連番（例: `1-setup-backlog`）。
+- `tags` は Playwright テストで `Array.isArray()` か確認されるため空配列で初期化。
+- `assigned_to` は v0.3 で追加（将来的には `profiles` テーブル参照予定）。
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Unique identifier |
-| `title` | TEXT | NOT NULL | Card title (summary) |
-| `description` | TEXT | NULLABLE | Card description (details) |
-| `list_id` | UUID | NOT NULL, FK → lists(id) | Parent list |
-| `user_id` | UUID | NOT NULL, FK → auth.users(id) | Owner of the card |
-| `position` | INTEGER | NOT NULL | Order within list (0, 1, 2...) |
-| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Creation timestamp |
-| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Last update timestamp |
-
-### Indexes
+## activity_logs
 
 ```sql
-CREATE INDEX cards_list_id_idx ON public.cards(list_id);
-CREATE INDEX cards_position_idx ON public.cards(position);
-CREATE INDEX idx_cards_user_id ON public.cards(user_id);
+CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  board_id UUID NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
+  user_id UUID NULL,
+  action TEXT NOT NULL CHECK (action IN ('created','updated','deleted','moved')),
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('card','list')),
+  entity_id TEXT NULL,
+  entity_title TEXT NULL,
+  details JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_activity_logs_board ON public.activity_logs(board_id, created_at DESC);
 ```
 
-**Why**:
-- `list_id`: Fast lookup of cards in a list
-- `position`: Optimize ordering queries
-- `user_id`: Optimize user-specific queries and RLS policies
+- `logActivity` ヘルパー (`lib/supabase.ts`) がカード/リスト操作時に呼び出される。
+- `details` には移動元/先のボード ID などを JSON で保持可能。
 
-### Cascade Behavior
+## シーケンス & 補助関数
+
+- `lib/board-utils.ts`
+  - `createUniqueBoardShortId()`: base58 文字列生成。Supabase 側でも UNIQUE 制約で衝突を防止。
+  - `getNextBoardIdShort()`: Supabase RPC または `boards` テーブルから最大値 + 1 を算出。
+  - `slugifyBoardName()`: ボード名から URL フレンドリーな slug を生成。
+- `lib/card-utils.ts`
+  - `createUniqueShortId()`: カード同士でかぶらない short ID を発行。
+  - `getNextIdShort(boardId)`: カード用の連番。ボード単位で採番し canonical URL を構築。
+
+## RLS ポリシー概要
+
+現状は「ログイン済みユーザーは全データにアクセス可」という共有ボード運用です。実際のポリシー例：
 
 ```sql
-ON DELETE CASCADE
-```
-
-When a list is deleted, all its cards are automatically deleted.
-
-### Example Data
-
-```json
-{
-  "id": "893c9c25-2b4c-4f98-8845-fb33647b8325",
-  "title": "Implement user authentication",
-  "description": "Add Supabase Auth with Google OAuth",
-  "list_id": "dc8fb019-6381-4264-8218-487db90fce48",
-  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "position": 0,
-  "created_at": "2025-10-09T02:00:22.635000+00:00",
-  "updated_at": "2025-10-09T02:00:22.638000+00:00"
-}
-```
-
-## Relationships
-
-### One-to-Many: List → Cards
-
-- **One list** can have **many cards**
-- **Each card** belongs to **one list**
-- Foreign key: `cards.list_id → lists.id`
-
-### Cascade Delete
-
-```
-DELETE FROM lists WHERE id = 'xxx';
-  ↓ (CASCADE)
-DELETE FROM cards WHERE list_id = 'xxx';
-```
-
-## Row Level Security (RLS)
-
-### Current Policies (✅ Implemented)
-
-RLS is enabled and allows all authenticated users to access all data (shared team board):
-
-```sql
--- Enable RLS
+ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
 
--- Lists policies: all authenticated users can access all lists
-CREATE POLICY "Authenticated users can view all lists"
-  ON lists FOR SELECT
-  TO authenticated
-  USING (true);
+CREATE POLICY "Authenticated users can manage all boards"
+  ON public.boards FOR ALL
+  USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Authenticated users can insert lists"
-  ON lists FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
+CREATE POLICY "Authenticated users can manage all lists"
+  ON public.lists FOR ALL
+  USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Authenticated users can update all lists"
-  ON lists FOR UPDATE
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can delete all lists"
-  ON lists FOR DELETE
-  TO authenticated
-  USING (true);
-
--- Cards policies: all authenticated users can access all cards
-CREATE POLICY "Authenticated users can view all cards"
-  ON cards FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can insert cards"
-  ON cards FOR INSERT
-  TO authenticated
-  WITH CHECK (true);
-
-CREATE POLICY "Authenticated users can update all cards"
-  ON cards FOR UPDATE
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can delete all cards"
-  ON cards FOR DELETE
-  TO authenticated
-  USING (true);
+CREATE POLICY "Authenticated users can manage all cards"
+  ON public.cards FOR ALL
+  USING (auth.role() = 'authenticated');
 ```
 
-### Security Guarantees
+将来的にボード単位の権限を導入する際は `board_members` / `board_roles` テーブルを追加し、`auth.uid()` による紐付けへ移行予定です。
 
-✅ **Authenticated users can**:
-- View all lists and cards (shared team board)
-- Create, update, and delete any lists/cards
-- Collaborate with other team members in real-time
+## データ初期化フロー
 
-❌ **Unauthenticated users CANNOT**:
-- Access any data without logging in
-- Bypass authentication (enforced at database level)
+1. ログイン後、`getBoardById` → メインボードを読み込み
+2. `fetchBoardInitialData` で `lists` と `cards` を取得
+3. `initializeDefaultLists` が、テストボード以外で空の場合に `To Do / In Progress / Done` をシード
+4. クライアントで `saveToStorage` により localStorage にキャッシュ
 
-### Design Notes
+## テスト用フラグ `is_test_board`
 
-**Current**: Shared team board - all authenticated users see the same data
-**Future**: The `user_id` column is already in place for personal board features
+Playwright テストでは毎回一意のボードを作成し `is_test_board: true` をセットしています。これにより、アプリ起動時のデフォルトリスト自動シードが抑止され、テストデータを完全にコントロールできます（`docs/detail/testing.md` 参照）。
 
-### Testing RLS
+---
 
-```sql
--- Test as authenticated user
-SELECT * FROM lists;  -- Shows all lists (shared board)
-SELECT * FROM cards;  -- Shows all cards (shared board)
-
--- Test as unauthenticated (will fail)
--- RLS blocks all access
-```
-
-### Migrations
-
-- ✅ `add_user_id_and_rls_policies`: Added user_id column and initial RLS policies
-- ✅ `remove_old_permissive_policies`: Removed overly permissive policies
-- ✅ `allow_all_authenticated_users_access`: Updated to shared team board model
-
-## Triggers
-
-### Auto-update `updated_at`
-
-```sql
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER handle_lists_updated_at
-  BEFORE UPDATE ON public.lists
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
-
-CREATE TRIGGER handle_cards_updated_at
-  BEFORE UPDATE ON public.cards
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
-```
-
-**Why**: Automatically track when records are modified.
-
-## Migrations
-
-### Migration File
-
-Located in Supabase migrations:
-
-```sql
--- supabase/migrations/YYYYMMDDHHMMSS_create_lists_and_cards_tables.sql
-
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Create lists table
-CREATE TABLE public.lists (...);
-
--- Create cards table
-CREATE TABLE public.cards (...);
-
--- Create indexes
-CREATE INDEX ...;
-
--- Enable RLS
-ALTER TABLE ...;
-
--- Create policies
-CREATE POLICY ...;
-
--- Create triggers
-CREATE TRIGGER ...;
-```
-
-### Running Migrations
-
-Via Supabase MCP:
-```typescript
-await mcp.supabase.apply_migration({
-  name: 'create_lists_and_cards_tables',
-  query: `...`
-});
-```
-
-Or via Supabase CLI:
-```bash
-supabase migration new create_lists_and_cards_tables
-supabase db push
-```
-
-## Queries
-
-### Fetch All Data
-
-```typescript
-// Lists
-const { data: lists } = await supabase
-  .from('lists')
-  .select('*')
-  .order('position', { ascending: true });
-
-// Cards
-const { data: cards } = await supabase
-  .from('cards')
-  .select('*')
-  .order('position', { ascending: true });
-```
-
-### Create (Insert)
-
-```typescript
-const { data, error } = await supabase
-  .from('lists')
-  .insert([
-    { title: 'To Do', position: 0 },
-    { title: 'In Progress', position: 1 },
-    { title: 'Done', position: 2 },
-  ])
-  .select();
-```
-
-### Update (Upsert)
-
-```typescript
-// Upsert = Insert or Update based on primary key
-await supabase.from('lists').upsert(data.lists);
-await supabase.from('cards').upsert(data.cards);
-```
-
-**Why upsert**: Idempotent, works for both create and update.
-
-### Delete
-
-```typescript
-await supabase.from('cards').delete().eq('id', cardId);
-await supabase.from('lists').delete().eq('id', listId);
-// Cards cascade-deleted automatically
-```
-
-## Data Types (TypeScript)
-
-```typescript
-export interface List {
-  id: string;
-  title: string;
-  position: number;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Card {
-  id: string;
-  title: string;
-  description: string;
-  list_id: string;
-  user_id: string;
-  position: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface BoardData {
-  lists: List[];
-  cards: Card[];
-}
-```
-
-## Performance Considerations
-
-### Indexing Strategy
-
-- **Primary keys** (UUIDs): Automatic B-tree index
-- **Foreign keys** (`list_id`): Indexed for JOIN performance
-- **Position columns**: Indexed for ORDER BY
-
-### Query Optimization
-
-- **Batch reads**: Fetch all lists + cards in parallel
-- **Upsert**: Single operation for create or update
-- **Cascade delete**: Database handles cleanup
-
-### Scaling
-
-Current schema handles:
-- ✅ Thousands of lists
-- ✅ Hundreds of cards per list
-- ✅ Fast queries with indexes
-
-For millions of cards:
-- Consider partitioning by user_id
-- Add pagination
-- Use Supabase Realtime for live updates
-
-## Backup & Recovery
-
-### Supabase Automatic Backups
-
-- Daily backups (retained 7 days on free tier)
-- Point-in-time recovery (paid plans)
-
-### Manual Export
-
-```bash
-# Via Supabase CLI
-supabase db dump -f backup.sql
-
-# Via pg_dump
-pg_dump -h db.xxx.supabase.co -U postgres -d postgres > backup.sql
-```
-
-## Monitoring
-
-### Supabase Dashboard
-
-- Query performance
-- Table sizes
-- Index usage
-- Slow queries
-
-### Logs
-
-```typescript
-// Via MCP
-await mcp.supabase.get_logs({ service: 'api' });
-```
-
-## Future Schema Changes
-
-### Planned Additions
-
-1. **Users table** (for authentication)
-2. **Boards table** (for multiple boards per user)
-3. **Card metadata** (tags, due dates, assignees)
-4. **Activity log** (audit trail)
-
-### Migration Strategy
-
-- Always use migrations (never manual SQL)
-- Test in development branch first
-- Use transactions for multi-step changes
-- Keep migrations reversible when possible
+最新更新日: 2025-10-15

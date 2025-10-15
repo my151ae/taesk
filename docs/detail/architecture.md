@@ -22,7 +22,7 @@
 │  ┌─────────────────────┐    ┌─────────────────────────┐  │
 │  │  React Components   │    │  Custom Hooks           │  │
 │  │                     │    │                         │  │
-│  │  • KanbanBoard      │    │  • useSensor            │  │
+│  │  • KanbanBoardClient │   │  • useSensor            │  │
 │  │  • SortableList     │    │  • useSortable          │  │
 │  │  • SortableCard     │    │  • useDndContext        │  │
 │  └─────────────────────┘    └─────────────────────────┘  │
@@ -50,7 +50,7 @@
 │  │                     │    │                      │     │
 │  │  • Cache            │    │  • PostgreSQL DB     │     │
 │  │  • Offline support  │◄──►│  • REST API          │     │
-│  │  • Fast reads       │    │  • Real-time (TBD)   │     │
+│  │  • Fast reads       │    │  • Realtime (cards/lists) │ │
 │  └─────────────────────┘    └──────────────────────┘     │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -138,61 +138,37 @@ onEdit(card.id, title, description);
 ### Component Tree
 
 ```
-App (layout.tsx)
-└── KanbanBoard (page.tsx)
-    ├── DndContext (from @dnd-kit)
-    │   ├── SortableContext (horizontal, for lists)
-    │   │   └── SortableList (× N lists)
-    │   │       ├── useSortable hook
-    │   │       ├── List Header (with edit/delete menu)
-    │   │       ├── SortableContext (vertical, for cards)
-    │   │       │   └── SortableCard (× N cards)
-    │   │       │       ├── useSortable hook
-    │   │       │       └── Card content (edit/delete buttons)
-    │   │       └── Add Card Button
-    │   └── Add List Button
-    └── DragOverlay (visual feedback while dragging)
+app/layout.tsx
+└── app/(board)/layout.tsx   # @modal parallel route
+    └── KanbanBoardClient    # Client-side UI shell
+        ├── Header (board selector, filters, status)
+        ├── DndContext (@dnd-kit)
+        │   ├── SortableContext (lists)
+        │   │   └── SortableList × N
+        │   │       ├── List header & menu (rename/delete)
+        │   │       ├── SortableContext (cards)
+        │   │       │   └── SortableCard × M
+        │   │       └── “+ Add Card” button
+        │   └── “+ Add List” button
+        ├── DragOverlay
+        └── CardModal (selectedCardId が存在する場合)
 ```
 
 ### Data Flow
 
 ```
-                    ┌──────────────┐
-                    │ KanbanBoard  │
-                    │  Component   │
-                    │              │
-                    │ State:       │
-                    │ • boardData  │
-                    │ • activeId   │
-                    └───────┬──────┘
-                            │
-            ┌───────────────┼───────────────┐
-            │               │               │
-            ▼               ▼               ▼
-    ┌───────────┐   ┌──────────┐   ┌──────────┐
-    │ List 1    │   │ List 2   │   │ List 3   │
-    ├───────────┤   ├──────────┤   ├──────────┤
-    │ Card A    │   │ Card C   │   │ Card E   │
-    │ Card B    │   │ Card D   │   │          │
-    └───────────┘   └──────────┘   └──────────┘
-           │               │               │
-           └───────────────┴───────────────┘
-                           │
-                           ▼
-                    User Actions
-                  (onClick, onDrag)
-                           │
-                           ▼
-                 Event Handlers in Parent
-              (handleAddCard, handleDragEnd)
-                           │
-                           ▼
-                    updateData()
-                           │
-              ┌────────────┴────────────┐
-              ▼                         ▼
-       localStorage               Supabase
+User Action (e.g. add card / drag card / edit card)
+        ↓
+Optimistic update in KanbanBoardClient (React state)
+        ↓
+Persist to localStorage (offline cache)
+        ↓
+Supabase sync
+    ├─ Online: 直接 upsert / delete
+    └─ Offline: syncQueue に enqueue → 後で自動再送
 ```
+
+Realtime 経由の外部更新は `postgres_changes` → `setBoardData` でローカル状態にマージされ、UI とキャッシュが即時更新されます。
 
 ## State Management
 
@@ -228,11 +204,13 @@ interface Card {
 All state lives in `KanbanBoard` component:
 
 ```typescript
-const [boardData, setBoardData] = useState<BoardData>({
-  lists: [],
-  cards: []
-});
+const [boards, setBoards] = useState<Board[]>(initialBoard ? [initialBoard] : []);
+const [currentBoardId, setCurrentBoardId] = useState(initialBoard?.id ?? MAIN_BOARD_ID);
+const [boardData, setBoardData] = useState<BoardData>(initialData ?? { lists: [], cards: [] });
 const [activeId, setActiveId] = useState<string | null>(null);
+const [selectedCardId, setSelectedCardId] = useState<string | null>(initialCardId ?? null);
+const [cardModalStatus, setCardModalStatus] = useState<'loading' | 'ready' | 'error'>(initialCardId ? 'ready' : 'loading');
+const [isOnline, setIsOnline] = useState(true);
 ```
 
 Updates always follow this pattern:
@@ -288,7 +266,7 @@ Works well for both touch and mouse input.
 ```typescript
 useSensor(TouchSensor, {
   activationConstraint: {
-    delay: 200,        // Long-press to drag
+    delay: 350,        // Long-press to drag (aligns with CARD_CLICK_THRESHOLD)
     tolerance: 8,      // Forgive small movements
   },
 })

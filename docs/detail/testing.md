@@ -1,468 +1,147 @@
 # Testing Guide
 
-## Overview
+Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前にセットアップしてから各シナリオを実行します。本ドキュメントは 2025-10-15 時点の構成に基づいています。
 
-Taeskのテスト戦略とベストプラクティスをまとめたドキュメントです。
+## 基本ルール
 
-## E2E Tests (Playwright)
+- **必ず JSON レポーターを使用**: `npx playwright test --reporter=json > playwright-report.json`
+- **レポート解析はプログラムで**: Python や Node.js スクリプトで JSON を読み取り、成功/失敗の内訳を確認
+- **`NODE_ENV=test` で dev サーバーを起動**: Playwright が自動起動する `npm run dev`
+- **Supabase 認証をバイパスしない**: グローバルセットアップで正式にサインインし、`playwright/.auth/user.json` を利用
 
-### テスト環境
+## 設定ファイル
 
-```typescript
-// playwright.config.ts
-webServer: {
-  command: 'NODE_ENV=test NEXT_PUBLIC_BYPASS_AUTH=true npm run dev',
-  url: 'http://localhost:3000',
-  reuseExistingServer: !process.env.CI,
-}
-```
-
-- **認証バイパス**: `NEXT_PUBLIC_BYPASS_AUTH=true`でGoogle OAuth不要
-- **テストユーザー**: `test@example.com` (UUID: `d7ab4718-0648-43ba-a1b6-19c826608c40`)
-- **並列実行**: CIでは`workers: 1`（安定性優先）、ローカルでは`workers: 4`
-
-### テスト分離戦略
-
-#### 動的ボード生成
-
-各テストで固有のボードを作成し、完全な分離を実現：
+`playwright.config.ts` の主要ポイント:
 
 ```typescript
-test.describe('Taesk Kanban Board E2E Tests', () => {
-  let testBoardId: string;
-  let testBoardName: string;
-
-  test.beforeEach(async ({ page }) => {
-    // Generate unique board for this test
-    testBoardId = crypto.randomUUID();
-    testBoardName = `Test-${testBoardId.slice(0, 8)}`;
-
-    // Create test board with is_test_board flag
-    await supabase.from('boards').insert({
-      id: testBoardId,
-      name: testBoardName,
-      user_id: TEST_USER_ID,
-      is_test_board: true,  // IMPORTANT: Prevents default list auto-seeding
-    });
-
-    // Navigate and switch to test board
-    await page.goto('/');
-    await page.getByRole('button', { name: /▼/ }).click();
-    await page.getByRole('button', { name: testBoardName }).click();
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor();
-
-    // Wait for Realtime subscription to be ready
-    await page.waitForTimeout(1500);
-  });
-
-  test.afterEach(async () => {
-    // Clean up test board (CASCADE deletes lists and cards)
-    await supabase.from('boards').delete().eq('id', testBoardId);
-  });
-});
-```
-
-**重要ポイント**:
-- `is_test_board: true`を必ず設定（デフォルトリスト自動生成を抑止）
-- `crypto.randomUUID()`で完全にユニークなボードID
-- `afterEach`で確実にクリーンアップ
-- Realtime購読の準備完了を待機（1500ms）
-
-#### なぜis_test_board: trueが必要か
-
-`app/page.tsx`には以下のロジックがあります：
-
-```typescript
-const shouldSeedDefaults =
-  data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board);
-
-if (shouldSeedDefaults) {
-  await initializeDefaultLists(user.id, currentBoardId);
-  // Creates "To Do", "In Progress", "Done" lists
-}
-```
-
-`is_test_board: true`を設定しないと：
-1. 空のテストボードが作成される
-2. アプリが自動的に3つのデフォルトリストを追加
-3. テストが「1つ追加→削除→0件期待」しても、実際は3件残る
-4. テスト失敗 ❌
-
-### Drag & Drop実装
-
-#### 問題: dragTo()が動かない
-
-Playwrightの`locator.dragTo()`は@dnd-kitで動作しません：
-
-```typescript
-// ❌ これは動かない
-await secondCard.dragTo(firstCard);
-```
-
-**理由**:
-- @dnd-kitは**連続的なmousemoveイベント**を監視
-- `dragTo()`は始点→終点への**一気の移動**
-- 中間の`mousemove`イベントが不足し、@dnd-kitが検出できない
-
-#### 解決策: mouse APIで段階的移動
-
-```typescript
-/**
- * Drag and drop helper using mouse API with intermediate steps
- * Required for @dnd-kit which needs continuous mousemove events
- */
-async function dragAndDrop(page: Page, source: Locator, target: Locator) {
-  // Get bounding boxes
-  const sourceBox = await source.boundingBox();
-  const targetBox = await target.boundingBox();
-
-  if (!sourceBox || !targetBox) {
-    throw new Error('Source or target element not visible');
-  }
-
-  // Calculate positions (center of elements)
-  const startX = sourceBox.x + sourceBox.width / 2;
-  const startY = sourceBox.y + sourceBox.height / 2;
-  const endX = targetBox.x + targetBox.width / 2;
-  const endY = targetBox.y + targetBox.height / 2;
-
-  // Calculate midpoint for smoother drag
-  const midX = (startX + endX) / 2;
-  const midY = (startY + endY) / 2;
-
-  // Perform drag with intermediate mousemove events
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.waitForTimeout(250); // Wait for touch sensor activation delay
-
-  // Move with steps to generate intermediate mousemove events
-  await page.mouse.move(midX, midY, { steps: 10 });
-  await page.mouse.move(endX, endY, { steps: 10 });
-
-  await page.mouse.up();
-  await page.waitForTimeout(500); // Wait for drop animation and Realtime sync
-}
-```
-
-**使用例**:
-
-```typescript
-test('should drag and drop a card to a different list', async ({ page }) => {
-  // Setup: Create lists and card
-  await page.getByRole('button', { name: '+ Add List' }).click();
-  await page.waitForTimeout(1000);
-  await page.getByRole('button', { name: '+ Add List' }).click();
-  await page.waitForTimeout(1000);
-
-  const addCardButtons = page.getByRole('button', { name: '+ Add Card' });
-  await addCardButtons.first().click();
-  await page.waitForTimeout(1000);
-
-  const card = page.getByText('New Card').first();
-  const secondList = page.getByRole('button', { name: /New List/i }).nth(1);
-
-  // Drag using mouse API
-  await dragAndDrop(page, card, secondList);
-
-  // Verify
-  await expect(page.getByText('New Card')).toHaveCount(1);
-});
-```
-
-**キーポイント**:
-- `steps: 10`: 10回の中間`mousemove`イベントを生成
-- `waitForTimeout(250)`: @dnd-kitのTouch sensorの`activationDelay`に対応
-- `waitForTimeout(500)`: Drop後のアニメーション + Realtime同期を待機
-- 中間点（midpoint）を経由することでスムーズな動き
-
-### Realtime同期の待機
-
-Supabaseのリアルタイム同期には時間がかかるため、適切な待機が必要：
-
-```typescript
-// ❌ 悪い例: 待機なし
-await page.getByRole('button', { name: '+ Add List' }).click();
-await page.getByRole('button', { name: '+ Add Card' }).click(); // リスト作成が完了していない
-
-// ✅ 良い例: 適切な待機
-await page.getByRole('button', { name: '+ Add List' }).click();
-await page.waitForTimeout(1000); // Realtimeで同期完了を待つ
-await page.getByRole('button', { name: '+ Add Card' }).click();
-```
-
-**推奨待機時間**:
-- リスト/カード作成: `1000ms`
-- 削除操作: `2000ms`（Realtime DELETE伝播 + UI更新）
-- Drag & Drop: `500ms`（アニメーション + 同期）
-- ボード切り替え: `1500ms`（Realtime購読の再接続）
-
-### 削除テストのパターン
-
-```typescript
-test('should delete a list', async ({ page }) => {
-  // 1. Create item
-  await page.getByRole('button', { name: '+ Add List' }).click();
-  await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();
-  await page.waitForTimeout(1000); // Wait for Realtime sync
-
-  // 2. Open menu and delete
-  const menuButton = page.locator('button:has-text("⋯")').first();
-  await menuButton.click();
-  await page.waitForTimeout(500);
-
-  page.once('dialog', dialog => dialog.accept()); // Handle confirm dialog
-  const deleteButton = page.getByTestId('delete-list-button');
-  await deleteButton.click();
-
-  // 3. Wait for deletion to propagate
-  await page.waitForTimeout(2000); // Realtime propagation + UI update
-
-  // 4. Verify deletion
-  await expect(page.getByRole('button', { name: /New List/i })).toHaveCount(0);
-});
-```
-
-### テストデータのクリーンアップ
-
-**自動クリーンアップ**:
-- `afterEach`でボード削除（CASCADE設定によりリスト・カードも削除）
-- テスト失敗時でも必ず実行される
-
-**手動クリーンアップ**（デバッグ用）:
-
-```typescript
-// Old test boards cleanup
-await supabase.from('boards').delete().match({ is_test_board: true });
-```
-
-または Supabase MCPツールで：
-
-```sql
-DELETE FROM boards WHERE name LIKE 'Test-%' OR is_test_board = true;
-```
-
-## スキップされたテスト
-
-### Auth Tests (7テスト)
-
-認証テストは`NEXT_PUBLIC_BYPASS_AUTH=true`と競合するため一時的にスキップ：
-
-```typescript
-test.describe.skip('Authentication', () => {
-  // Tests that require real auth flow
-});
-```
-
-**将来の解決策**: 二重webServer構成
-- Port 3000: `NEXT_PUBLIC_BYPASS_AUTH=true`（Kanban tests用）
-- Port 3001: 通常モード（Auth tests用）
-
-## テスト実行
-
-### ローカル実行
-
-```bash
-# 全テスト実行
-npm run test:e2e
-
-# UIモード（デバッグ用）
-npm run test:e2e:ui
-
-# 特定のテストのみ
-npx playwright test --grep "drag and drop"
-
-# 並列度指定
-npx playwright test --workers=1
-
-# ターミナル上で結果を収集したい場合（HTML不要）
-npx playwright test --reporter=json
-
-# HTML レポートのみ見たい場合（ポート競合を避ける）
-npx playwright show-report --port=0
-# もしくは実行前に lsof -i :9323 → kill <PID> で既存サーバーを停止
-# レポート閲覧後は Ctrl+C でプロセスを終了させ、ポートを解放する
-```
-
-### HTML レポートの取得
-
-Playwright は自動的に HTML レポートを生成します。Claude Code CLI から結果を取得する方法：
-
-#### 方法 1: レポートサーバーから取得（推奨）
-
-テスト実行後、Playwright は自動的に HTML レポートサーバーを起動します：
-
-```bash
-# テスト実行
-npm run test:e2e
-
-# 自動的に起動されるレポートサーバー
-# 出力例: "Serving HTML report at http://localhost:53829"
-```
-
-**Claude Code CLI での取得方法**:
-```typescript
-// WebFetch ツールを使用してレポートを取得
-// URL: http://localhost:<port>/ (ログに表示されるポート番号)
-```
-
-**注意点**:
-- レポートサーバーのポート番号は毎回変わります（例: 62664, 53829 など）
-- テスト実行ログの最後に表示される URL を使用してください
-- デフォルトタイムアウト: サーバーは Ctrl+C で終了するまで稼働
-
-#### 方法 2: HTML ファイルを直接読む
-
-```bash
-# HTML レポート生成
-npx playwright test --reporter=html
-
-# レポートファイルの場所
-# playwright-report/index.html
-```
-
-**Claude Code CLI での取得方法**:
-```bash
-# Read ツールで HTML ファイルを読む
-Read: playwright-report/index.html
-
-# または、結果サマリーを JSON で取得
-Read: test-results/**/*.json
-```
-
-#### 方法 3: CLI レポート出力
-
-リアルタイムで結果を取得したい場合：
-
-```bash
-# Line reporter（1行ずつ結果表示）
-npx playwright test --reporter=line
-
-# List reporter（詳細表示）
-npx playwright test --reporter=list
-
-# JSON reporter（プログラム処理用）
-npx playwright test --reporter=json > test-results.json
-```
-
-### テストタイムアウト設定
-
-Playwright のタイムアウトは `playwright.config.ts` で設定されています：
-
-```typescript
-// playwright.config.ts
 export default defineConfig({
-  // グローバルタイムアウト（全テストの合計実行時間）
-  globalTimeout: 10 * 60 * 1000, // 10分
-
-  // 個別テストのタイムアウト
-  timeout: 60 * 1000, // 60秒
-
-  // Expect アサーションのタイムアウト
-  expect: {
-    timeout: 10 * 1000, // 10秒
+  testDir: './e2e',
+  fullyParallel: true,
+  workers: process.env.CI ? 1 : 4,
+  reporter: 'html', // CLI で --reporter=json を指定して上書きする
+  globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
+  use: {
+    baseURL: 'http://localhost:3000',
+    storageState: 'playwright/.auth/user.json',
+    trace: 'on-first-retry',
   },
-
-  // Web サーバー起動の待機時間
   webServer: {
-    timeout: 120 * 1000, // 2分
+    command: 'NODE_ENV=test npm run dev',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },
 });
 ```
 
-**タイムアウト調整が必要な場合**:
+- `globalSetup`: Supabase へメール+パスワードでサインインし、トークンを `playwright/.auth/user.json` に保存
+- `storageState`: すべてのテストで同じセッションを再利用
+- `workers`: CI は安定性優先で 1、本地は 4
 
-```typescript
-// テスト単位でタイムアウトを延長
-test('slow test', async ({ page }) => {
-  test.setTimeout(120000); // 2分
-  // ...
-});
-
-// 個別の操作でタイムアウトを指定
-await expect(element).toBeVisible({ timeout: 30000 }); // 30秒
-```
-
-### CI実行
+## コマンド例
 
 ```bash
-# Sequential execution for stability
-npx playwright test --workers=1 --reporter=line
+# JSON レポートを生成
+npx playwright test --reporter=json > playwright-report.json
 
-# With HTML report
-npx playwright test --workers=1 --reporter=html,line
+# Python でサマリーを表示
+python3 - <<'PY'
+import json
+from pathlib import Path
+report = json.loads(Path('playwright-report.json').read_text())
+totals = {'passed': 0, 'failed': 0, 'skipped': 0}
+for project in report.get('suites', []):
+    for suite in project.get('suites', []):
+        for spec in suite.get('specs', []):
+            for test in spec.get('tests', []):
+                for result in test.get('results', []):
+                    status = result.get('status')
+                    totals[status if status in totals else 'failed'] += 1
+print(totals)
+PY
 ```
 
-## テスト結果（2025-10-10時点）
+## テスト分離戦略
 
-**Phase 2完了**:
-- ✅ **21/21 テストが成功（100%）**
-- ⏭️ 7 テストがスキップ（Authのみ）
-- ❌ 0 失敗
-- ⚡ 実行時間: 33.8秒（並列実行、workers: 4）
+`e2e/kanban.spec.ts` では **各テストごとにユニークなボードを作成** して干渉を防ぎます。
 
-**カバレッジ**:
-- ✅ リスト CRUD（作成、読取、更新、削除）
-- ✅ カード CRUD
-- ✅ Drag & Drop（同一リスト内、異なるリスト間）
-- ✅ データ永続化（ページリロード後）
-- ✅ オフライン同期キュー
-- ✅ モバイルレスポンシブ
-- ✅ RLS ポリシー検証
-- ⏭️ 認証フロー（Phase 3で対応予定）
+```typescript
+test.beforeEach(async ({ page }) => {
+  testBoardId = crypto.randomUUID();
+  testBoardName = `Test-${testBoardId.slice(0, 8)}`;
+  testBoardShortId = await createUniqueBoardShortId();
+  testBoardIdShort = await getNextBoardIdShort();
+  testBoardSlug = slugifyBoardName(testBoardName);
 
-## トラブルシューティング
+  await supabase.from('boards').insert({
+    id: testBoardId,
+    name: testBoardName,
+    user_id: TEST_USER_ID,
+    is_test_board: true,
+    short_id: testBoardShortId,
+    id_short: testBoardIdShort,
+    slug: testBoardSlug,
+  });
 
-### テストがフラキー（不安定）
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: /Board ▼/ }).click();
+  await page.getByRole('button', { name: testBoardName }).click();
+  await page.waitForURL(`**${testBoardCanonicalPath}`);
+  await page.waitForTimeout(1500); // Realtime 受信準備
+});
 
-**症状**: 同じテストが成功したり失敗したりする
+test.afterEach(async () => {
+  await supabase.from('boards').delete().eq('id', testBoardId);
+});
+```
 
-**原因と対策**:
-1. **Realtime競合**: 動的ボード生成を使用（`crypto.randomUUID()`）
-2. **待機時間不足**: 適切な`waitForTimeout`を追加
-3. **デフォルトリスト自動生成**: `is_test_board: true`を設定
+ポイント:
+- `is_test_board: true` を必ず付与（デフォルトリスト自動生成を防止）
+- `page.waitForURL` と `waitForTimeout` で Realtime の遅延を吸収
+- 片付けは `afterEach` で実施（CASCADE により lists/cards も削除）
 
-### Drag & Dropが動かない
+## ドラッグ & ドロップ
 
-**症状**: カードがドラッグされない
+@dnd-kit は連続した `mousemove` が必要なため、Playwright の `page.mouse` API を使用して段階的に移動します。
 
-**対策**:
-1. `locator.dragTo()`ではなく`dragAndDrop()`ヘルパー関数を使用
-2. `steps: 10`で中間イベントを生成
-3. Touch sensor activation delay (250ms)を考慮
+```typescript
+async function dragAndDrop(page: Page, source: Locator, target: Locator) {
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) throw new Error('Source or target not visible');
 
-### 削除テストが失敗
+  const startX = sourceBox.x + sourceBox.width / 2;
+  const startY = sourceBox.y + sourceBox.height / 2;
+  const endX = targetBox.x + targetBox.width / 2;
+  const endY = targetBox.y + targetBox.height / 2;
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2;
 
-**症状**: 削除後もアイテムが残る
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.waitForTimeout(250);
+  await page.mouse.move(midX, midY, { steps: 10 });
+  await page.mouse.move(endX, endY, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+}
+```
 
-**チェックリスト**:
-- [ ] `is_test_board: true`を設定したか？
-- [ ] 削除後に十分な待機時間（2000ms）を設けたか？
-- [ ] Realtimeサブスクリプションが正しく設定されているか？
+## ボード URL の検証
 
-## ベストプラクティス
+2025-10-15 時点では `updateURL` が canonical URL へ一度の遷移で更新するため、テストも canonical への到達のみ確認します。
 
-### ✅ DO
+```typescript
+await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+await page.getByRole('button', { name: defaultBoard!.name }).click();
+await page.waitForURL(`**${defaultBoardCanonicalPath}`);
+expect(new URL(page.url()).pathname).toBe(defaultBoardCanonicalPath);
+```
 
-- 各テストで固有のボードを作成（`crypto.randomUUID()`）
-- `is_test_board: true`を必ず設定
-- Realtime同期に適切な待機時間を設ける
-- Drag & DropはmouseAPIを使用
-- `afterEach`で確実にクリーンアップ
-- テスト名は動作を明確に記述（"should ..."形式）
+## レポートの添付ファイル
 
-### ❌ DON'T
+失敗時は `test-results/<spec>/error-context.md` にページスナップショットが生成されます。`playwright-report.json` の `attachments` フィールドからパスを取得し、原因調査に活用してください。
 
-- 共有ボードを複数テストで使い回さない
-- `is_test_board`フラグを省略しない
-- `locator.dragTo()`を@dnd-kitで使わない
-- 待機時間を短くしすぎない（フラキーの原因）
-- テスト失敗時のクリーンアップを忘れない
+---
 
-## 参考資料
-
-- [Playwright Documentation](https://playwright.dev/)
-- [Playwright Best Practices](https://playwright.dev/docs/best-practices)
-- [@dnd-kit Documentation](https://docs.dndkit.com/)
-- [Supabase Realtime](https://supabase.com/docs/guides/realtime)
-- [チケット: E2Eテストの安定化](../tickets/2025-10-10/01-e2e-test-stability-issues.md)
+最新更新日: 2025-10-15 / テスト総数: 34

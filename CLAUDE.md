@@ -31,11 +31,14 @@
 - [`/docs/detail/database.md`](./docs/detail/database.md) - Database schema
 - [`/docs/detail/components.md`](./docs/detail/components.md) - Component structure
 - [`/docs/detail/storage.md`](./docs/detail/storage.md) - Storage strategy
+- [`/docs/detail/routing.md`](./docs/detail/routing.md) - Intercepting routes & canonical URLs
+- [`/docs/detail/testing.md`](./docs/detail/testing.md) - Playwright E2E guidelines
 - [`/docs/detail/deployment.md`](./docs/detail/deployment.md) - Deployment guide
 
 📋 **Project Management**:
 - [`/docs/tickets/README.md`](./docs/tickets/README.md) - タスク管理システムのルール
-- [`/docs/tickets/YYYY-MM-DD/roadmap.md`](./docs/tickets/2025-10-09/roadmap.md) - 機能追加ロードマップ
+- [`/docs/roadmap.md`](./docs/roadmap.md) - 最新のハイライト
+- 詳細ロードマップ: `/docs/tickets/YYYY-MM-DD/roadmap.md`
 
 **IMPORTANT: When creating tickets or documentation:**
 - **Always use the current date** from the `<env>` context (Today's date: YYYY-MM-DD)
@@ -49,7 +52,7 @@
 ### Before Starting Work
 
 1. **Read relevant documentation** from `/docs` to understand the system
-2. **Check existing code** in `app/page.tsx` (main component)
+2. **Check existing code** in `app/(board)/_components/KanbanBoardClient.tsx`（メインのクライアントロジック）
 3. **Review database schema** in Supabase or docs
 
 ### During Development
@@ -59,7 +62,7 @@
 3. **Test in browser** with DevTools (use chrome-devtools MCP)
 4. **Check for errors/warnings** in console
 5. **Fix any issues** before proceeding
-6. **Run E2E tests** if relevant (`npm run test:e2e`)
+6. **Run E2E tests** if relevant (`npx playwright test --reporter=json > playwright-report.json`)
 
 ### Before Completing Work
 
@@ -104,14 +107,15 @@ Claude: [commits and pushes]
 ### Component Structure
 
 ```
-KanbanBoard (app/page.tsx)
-├── State: boardData, activeId
-├── Handlers: handleAdd*, handleEdit*, handleDelete*, handleDrag*
-└── Render
-    └── DndContext
-        ├── SortableList × N
-        │   └── SortableCard × N
-        └── Add List Button
+app/layout.tsx
+└── app/(board)/layout.tsx (@modal parallel route)
+    └── KanbanBoardClient (client component)
+        ├── Header (board selector, filters, sync status)
+        ├── DndContext (@dnd-kit)
+        │   ├── SortableList × N
+        │   │   └── SortableCard × M
+        │   └── “+ Add List” button
+        └── CardModal (selectedCardId が存在するときのみ)
 ```
 
 ### Data Flow
@@ -119,41 +123,35 @@ KanbanBoard (app/page.tsx)
 ```
 User Action
   ↓
-Update React State (instant UI)
+Update React State (optimistic UI)
   ↓
-Save to localStorage (cache)
+Persist to localStorage (`kanban_board_data`)
   ↓
-Sync to Supabase (async, background)
+Online? → `syncToSupabase(newData)`
+Offline? → `addToSyncQueue({ type, table, data })`
 ```
 
 ### Storage Layers
 
-1. **React State**: In-memory, for UI
-2. **localStorage**: Client cache, offline support
-3. **Supabase**: Cloud persistence, multi-device sync
+1. **React State**: In-memory, for UI (KanbanBoardClient)
+2. **localStorage**: Client cache, offline support (`saveToStorage`)
+3. **syncQueue.ts**: Offline queue（INSERT/UPDATE/DELETE）
+4. **Supabase**: Cloud persistence + Realtime
 
 ## Database Schema
 
-### Tables
+### Tables (key fields)
 
-**lists**:
-- `id` (UUID, PK)
-- `title` (TEXT)
-- `position` (INTEGER)
-- `created_at`, `updated_at` (TIMESTAMPTZ)
-
-**cards**:
-- `id` (UUID, PK)
-- `title` (TEXT)
-- `description` (TEXT, nullable)
-- `list_id` (UUID, FK → lists.id)
-- `position` (INTEGER)
-- `created_at`, `updated_at` (TIMESTAMPTZ)
+- **boards**: `id`, `name`, `short_id`, `id_short`, `slug`, `is_test_board`, timestamps
+- **lists**: `id`, `title`, `position`, `board_id`, `user_id`, timestamps
+- **cards**: `id`, `title`, `description`, `list_id`, `board_id`, `tags[]`, `due_date`, `priority`, `assigned_to`, `short_id`, `id_short`, `slug`, timestamps
+- **activity_logs**: ボードごとの監査ログ（`action`, `entity_type`, `details`）
 
 ### Relationships
 
-- One list → Many cards
-- ON DELETE CASCADE (deleting list deletes its cards)
+- board 1 → n lists / cards / activity_logs
+- list 1 → n cards
+- `ON DELETE CASCADE` により親削除で子レコードも削除
 
 ## Key Implementation Details
 
@@ -182,7 +180,7 @@ Uses `@dnd-kit`:
 
 ### Mobile Optimizations
 
-- Touch sensors with activation delay (200ms)
+- Touch sensors with activation delay (350ms)
 - Responsive widths: `w-72 md:w-80`
 - Horizontal scroll with extended touch area
 - PWA manifest for installation
@@ -192,9 +190,8 @@ Uses `@dnd-kit`:
 ### E2E Tests (Playwright)
 
 ```bash
-npm run test:e2e       # Run tests
-npm run test:e2e:ui    # Interactive UI
-npm run test:e2e:debug # Debug mode
+npx playwright test --reporter=json > playwright-report.json
+# 必要に応じて JSON を python / node で解析
 ```
 
 ### Test Coverage
@@ -209,7 +206,7 @@ npm run test:e2e:debug # Debug mode
 
 ### Adding a New Feature
 
-1. Update component in `app/page.tsx`
+1. Update component(s) in `app/(board)/_components/KanbanBoardClient.tsx`
 2. Add database changes if needed (migration)
 3. Update types in `lib/supabase.ts`
 4. Add E2E test in `e2e/kanban.spec.ts`
@@ -284,7 +281,7 @@ git push origin main
 ### Drag & Drop Not Working
 
 **Check**:
-1. Touch sensor activation (200ms delay on mobile)
+1. Touch sensor activation (350ms delay on mobile)
 2. `touch-none` class on draggable elements
 3. Console errors in dnd-kit
 
@@ -302,7 +299,7 @@ git push origin main
 ### Code Style
 
 - Use TypeScript strict mode
-- Follow existing patterns in `app/page.tsx`
+- Follow existing patterns in `app/(board)/_components/KanbanBoardClient.tsx`
 - Use Tailwind for styling
 - Async/await for all Supabase calls
 - Handle errors gracefully (log, don't crash)
@@ -311,14 +308,21 @@ git push origin main
 
 ```
 taesk/
-├── app/                  # Next.js App Router
-│   ├── page.tsx         # Main Kanban component
-│   ├── layout.tsx       # Root layout + PWA
-│   └── *.tsx            # Icons
+├── app/
+│   ├── (board)/
+│   │   ├── page.tsx                  # / → canonical board redirect
+│   │   ├── layout.tsx                # @modal parallel route
+│   │   └── _components/KanbanBoardClient.tsx
+│   ├── b/[short_id]/[[...slug]]/page.tsx   # Board canonical route
+│   ├── c/[short_id]/[[...slug]]/page.tsx   # Card standalone page
+│   ├── contexts/AuthContext.tsx
+│   ├── login/page.tsx
+│   └── icon.tsx / apple-icon.tsx
 ├── lib/
 │   └── supabase.ts      # Supabase client + types
 ├── e2e/
-│   └── kanban.spec.ts   # Playwright tests
+│   ├── .setup/auth-global-setup.ts
+│   ├── auth.spec.ts / kanban.spec.ts / rls.spec.ts
 ├── docs/                # Documentation
 │   ├── index.md         # Overview
 │   └── detail/          # Detailed docs

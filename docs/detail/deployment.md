@@ -103,18 +103,34 @@ supabase db push
 
 ### RLS Policies
 
-Current (public access):
+Current (shared board model):
 ```sql
-CREATE POLICY "Allow all operations on lists"
+ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can manage all boards"
+  ON public.boards FOR ALL
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can manage all lists"
   ON public.lists FOR ALL
-  USING (true) WITH CHECK (true);
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can manage all cards"
+  ON public.cards FOR ALL
+  USING (auth.role() = 'authenticated');
 ```
 
-Future (authenticated):
+Future (per-board permissions):
 ```sql
-CREATE POLICY "Users can only access their own lists"
-  ON public.lists FOR ALL
-  USING (auth.uid() = user_id);
+CREATE POLICY "Users manage cards of boards they are a member of"
+  ON public.cards FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM public.board_members
+    WHERE board_members.board_id = cards.board_id
+      AND board_members.user_id = auth.uid()
+  ));
 ```
 
 ## Custom Domain (Optional)

@@ -75,34 +75,20 @@ export function toSlugBase(title: string): string {
 
 ```
 app/
-├── (board)/                      # Route Group
-│   ├── @modal/                   # Parallel Route
-│   │   ├── (.)c/                 # Intercepting Route
-│   │   │   └── [short_id]/
-│   │   │       └── [[...slug]]/
-│   │   │           ├── page.tsx         # モーダル用サーバーコンポーネント
-│   │   │           └── CardModalClient.tsx # モーダルUI (Client Component)
-│   │   └── default.tsx          # モーダルなし時のフォールバック
-│   ├── layout.tsx               # @modal スロットを受け取るレイアウト
-│   └── page.tsx                 # ボード本体
-└── c/                           # カードの実際のルート
-    └── [short_id]/
-        └── [[...slug]]/
-            ├── page.tsx             # スタンドアロンページ
-            └── CardAnalyticsClient.tsx # アナリティクス
+├── (board)/
+│   ├── layout.tsx                    # @modal parallel route を提供
+│   ├── page.tsx                      # ルート / を canonical board へ permanent redirect
+│   ├── _components/KanbanBoardClient.tsx  # カードモーダルや URL 制御を担うクライアント
+│   └── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # body スクロール制御のみを行う hook
+├── b/[short_id]/[[...slug]]/page.tsx # ボード canonical ルート (SSR)
+└── c/[short_id]/[[...slug]]/page.tsx # カードスタンドアロンページ
 ```
 
-### Intercepting Routes の規約
+### Intercepting Routes のポイント
 
-Next.js 15.5.4 では、以下の規約が実装上正しいことが確認されています：
-
-| パターン | 動作 | 説明 |
-|---------|-----|------|
-| `(.)c` | ✅ 動作 | Route Group 内から同階層の `/c` をインターセプト |
-| `(..)c` | ❌ エラー | "Cannot use (..) marker at the root level" |
-| `(...)c` | ❌ 機能しない | 常にスタンドアロンページに遷移 |
-
-**重要**: 公式ドキュメントでは `(..)c` が理論的に正しいとされていますが、実装上は `(.)c` が正しく動作します。
+- `(...)c` パターンを使用して `/c` ルートをインターセプト
+- サーバー側では UI を描画せず、モーダル開閉時に `document.body` に `overflow-hidden` を付与/解除するだけ
+- 実際のモーダル UI は `KanbanBoardClient` → `CardModal` がクライアント側で制御
 
 ### 動作の流れ
 
@@ -111,13 +97,13 @@ Next.js 15.5.4 では、以下の規約が実装上正しいことが確認さ�
 ```
 ユーザー: カードをクリック
    ↓
-Next.js: Link コンポーネントで /c/<short_id>/<idShort>-<slug> にナビゲート
+Next.js: `router.push` で `/c/<short_id>/<idShort>-<slug>` へ遷移
    ↓
-Next.js: Intercepting Route (.)c にマッチ
+Intercepting Route にマッチし、サーバー側では body overflow をロックするのみ
    ↓
-レンダリング: app/(board)/@modal/(.)c/[short_id]/[[...slug]]/page.tsx
+`KanbanBoardClient` が `selectedCardId` をセット → `CardModal` をクライアントで描画
    ↓
-結果: モーダル表示（ボードは背景に残る）
+結果: ボードは背景に残り、カードがモーダルで開く
 ```
 
 #### 2. 直接URL入力/リロード（スタンドアロンページ）
@@ -125,11 +111,11 @@ Next.js: Intercepting Route (.)c にマッチ
 ```
 ユーザー: URL直接入力 or ページリロード
    ↓
-Next.js: /c/<short_id>/<idShort>-<slug> にアクセス
+Next.js: `/c/<short_id>/<idShort>-<slug>` を直接レンダリング
    ↓
-Next.js: Intercepting Route にマッチしない
+`normalizeCardSlugOrRedirect` が正規 URL を計算し、誤った slug は 308 Redirect
    ↓
-レンダリング: app/c/[short_id]/[[...slug]]/page.tsx
+結果: フルページ表示（共有用 / SEO 対応）
    ↓
 結果: フルページ表示
 ```
@@ -146,30 +132,15 @@ SEO最適化のため、すべてのカードURLを正規化します：
 ### 実装
 
 ```typescript
-// app/c/[short_id]/[[...slug]]/page.tsx
-export default async function CardPage({ params }: PageParams) {
-  const { short_id, slug } = await params;
-  const card = await getCardByShortId(short_id);
+const { card } = await normalizeCardSlugOrRedirect(short_id, slug);
+if (!card) notFound();
 
-  if (!card || !card.permitted) {
-    notFound();
-  }
-
-  const expectedTail = buildCanonicalTail(card);
-  const providedTail = (slug ?? []).join('/');
-
-  // slug が期待と異なる場合、308 リダイレクト
-  if (expectedTail && providedTail !== expectedTail) {
-    const canonicalPath = buildCanonicalPath({
-      shortId: card.shortId,
-      idShort: card.idShort,
-      slug: card.slug,
-    });
-    permanentRedirect(canonicalPath);
-  }
-
-  // 以下、ページレンダリング
-}
+const boardUrl = card.board ? buildBoardUrl(card.board) : '';
+return (
+  <CardFullPage>
+    <Link href={boardUrl}>ボードを開く</Link>
+  </CardFullPage>
+);
 ```
 
 ### 308 vs 301
@@ -178,6 +149,12 @@ export default async function CardPage({ params }: PageParams) {
 - **301 Moved Permanently**: POST → GET に変換される可能性
 
 Taesk では将来的な API 互換性のため 308 を使用しています。
+
+## URL 正規化と `updateURL`
+
+- ボード切替時は `updateURL` が **一度の `router.push/replace`** で canonical URL に遷移（以前の `/b/:sid` → `/b/:sid/:tail` 二段階遷移は撤廃）
+- モーダル表示時は `modalReturnPathRef` と `lastBoardPathRef` を保持し、`router.back()` で `/` に落ちた場合でも確実に元のボードへ `replace`
+- Playwright の `should update URL immediately when switching boards` も canonical URL への到達のみを確認するよう更新済み
 
 ## 📊 メタデータ生成
 

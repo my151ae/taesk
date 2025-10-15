@@ -584,6 +584,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const hasRestoredModalFromUrl = useRef(false);
   const modalNavigationRef = useRef(false);
   const selectedCardIdRef = useRef<string | null>(selectedCardId);
+  const lastBoardPathRef = useRef<string | null>(null);
+  const modalReturnPathRef = useRef<string | null>(null);
   const cards = boardData.cards;
 
   useEffect(() => {
@@ -601,6 +603,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   useEffect(() => {
     if (!pathname) return;
+
+    if (pathname.startsWith('/b/')) {
+      lastBoardPathRef.current = pathname;
+    }
+
     if (pathname.startsWith('/c/')) {
       return;
     }
@@ -949,31 +956,20 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   const updateURL = (board?: Board | null, { replace = false }: { replace?: boolean } = {}) => {
     const targetBoard = board ?? currentBoard;
-    const shortId = targetBoard?.short_id;
+    const canonicalPath = targetBoard ? buildBoardUrl(targetBoard) : "";
+    const shortPath = targetBoard?.short_id ? `/b/${targetBoard.short_id}` : "";
+    const nextPath = canonicalPath || shortPath || "/";
 
-    if (!shortId) {
-      const navigate = replace ? router.replace : router.push;
-      navigate("/", { scroll: false });
+    if (!nextPath) {
       return;
     }
 
-    // ① 即時反映（同期）: /b/:sid のみ
-    const shortPath = `/b/${shortId}`;
-    const navigate = replace ? router.replace : router.push;
-    navigate(shortPath, { scroll: false });
+    if (pathname === nextPath) {
+      return;
+    }
 
-    // ② 同一 tick で上書き（tail あれば）
-    queueMicrotask(() => {
-      if (typeof window === "undefined") return;
-      const canonicalPath = buildBoardUrl(targetBoard);
-      if (canonicalPath && canonicalPath !== shortPath) {
-        // 既に別のページに遷移していたら何もしない
-        if (window.location.pathname !== shortPath && window.location.pathname !== canonicalPath) {
-          return;
-        }
-        router.replace(canonicalPath, { scroll: false });
-      }
-    });
+    const navigate = replace ? router.replace : router.push;
+    navigate(nextPath, { scroll: false });
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1284,6 +1280,13 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const card = boardData.cards.find((c) => c.id === cardId);
     if (!card) return;
 
+    if (pathname?.startsWith('/b/')) {
+      modalReturnPathRef.current = pathname;
+      lastBoardPathRef.current = pathname;
+    } else if (lastBoardPathRef.current) {
+      modalReturnPathRef.current = lastBoardPathRef.current;
+    }
+
     setSelectedCardId(cardId);
     setCardModalStatus('ready');
 
@@ -1307,7 +1310,13 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setSelectedCardId(null);
     setCardModalStatus('loading');
 
-    const fallbackPath = getBoardPath(currentBoard) || getBoardPath(currentBoard, { canonical: false }) || '/';
+    const fallbackPath =
+      modalReturnPathRef.current ||
+      lastBoardPathRef.current ||
+      getBoardPath(currentBoard) ||
+      getBoardPath(currentBoard, { canonical: false }) ||
+      '/';
+    modalReturnPathRef.current = null;
 
     if (modalNavigationRef.current) {
       modalNavigationRef.current = false;
@@ -1315,7 +1324,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
       if (typeof window !== 'undefined') {
         setTimeout(() => {
-          if (window.location.pathname.startsWith('/c/')) {
+          const currentPath = window.location.pathname;
+          if (currentPath.startsWith('/c/') || currentPath !== fallbackPath) {
             router.replace(fallbackPath, { scroll: false });
           }
         }, 100);

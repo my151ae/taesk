@@ -19,17 +19,22 @@ npm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Add your Supabase URL and keys
+# Add NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Run development server
 npm run dev
 
-# Run E2E tests
-npm run test:e2e
+# Run E2E tests (JSON reporter is mandatory)
+npx playwright test --reporter=json > playwright-report.json
 
-# View test results
-# HTML レポートサーバーが自動起動します（例: http://localhost:62664）
-# 詳細は docs/detail/testing.md を参照
+# Inspect the JSON report (example)
+python3 - <<'PY'
+import json
+from pathlib import Path
+report = json.loads(Path('playwright-report.json').read_text())
+print('status:', report.get('status'))
+print('total suites:', len(report.get('suites', [])))
+PY
 ```
 
 Visit `http://localhost:3000` to see the app.
@@ -135,45 +140,43 @@ Visit `http://localhost:3000` to see the app.
 
 ```
 taesk/
-├── app/                      # Next.js App Router
-│   ├── contexts/            # React contexts
-│   │   └── AuthContext.tsx  # Authentication context
-│   ├── login/               # Login page
-│   │   └── page.tsx        # Google OAuth login UI
-│   ├── auth/callback/       # OAuth callback handler
-│   │   └── route.ts        # Handles OAuth redirect
-│   ├── layout.tsx           # Root layout with PWA config & AuthProvider
-│   ├── page.tsx             # Main Kanban board component (protected)
-│   ├── icon.tsx             # App icon generator
-│   └── apple-icon.tsx       # Apple touch icon
+├── app/
+│   ├── (board)/
+│   │   ├── page.tsx                       # Redirects top-level / → canonical board URL
+│   │   ├── layout.tsx                     # Provides @modal parallel route for card modal
+│   │   ├── _components/
+│   │   │   └── KanbanBoardClient.tsx      # Core Kanban experience (lists/cards/realtime)
+│   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Intercept hook (locks scroll)
+│   │   └── b/[short_id]/[[...slug]]/page.tsx             # SSR + data hydration for boards
+│   ├── b/[short_id]/[[...slug]]/page.tsx                  # Canonical board route resolver
+│   ├── c/[short_id]/[[...slug]]/page.tsx                  # Standalone card detail page
+│   ├── contexts/AuthContext.tsx                           # Supabase auth provider
+│   ├── login/page.tsx                                     # Supabase OAuth entry
+│   ├── auth/callback/route.ts                             # OAuth callback handler
+│   ├── layout.tsx                                         # Root layout, PWA setup
+│   └── icon.tsx / apple-icon.tsx                          # Manifest-driven icons
 │
-├── lib/                      # Shared utilities
-│   └── supabase.ts          # Supabase client & types
+├── lib/
+│   ├── supabase.ts                    # Typed client + DB interfaces
+│   ├── board-utils.ts / card-utils.ts # Short IDs, slug generation, sequencing
+│   ├── board-url.ts / card-url.ts     # URL builders + canonical helpers
+│   ├── server/boards.ts / cards.ts    # Server utilities for data fetch & normalize
+│   └── syncQueue.ts                   # Offline queue + background sync helpers
 │
-├── public/                   # Static assets
-│   └── manifest.json        # PWA manifest
+├── public/                             # Static assets (PWA manifest, icons)
+│   └── manifest.json
 │
-├── e2e/                      # End-to-end tests
-│   ├── auth.spec.ts         # Authentication tests (✅ 5 passing)
-│   ├── rls.spec.ts          # RLS policy documentation
-│   ├── auth.setup.ts        # Auth helpers
-│   └── kanban.spec.ts       # Kanban board tests (requires auth)
+├── e2e/
+│   ├── .setup/auth-global-setup.ts     # Programmatic Supabase sign-in
+│   ├── auth.spec.ts / kanban.spec.ts   # Playwright suites
+│   └── rls.spec.ts                     # RLS バリデーション用シナリオ（必要に応じて実行）
 │
-├── docs/                     # Documentation
-│   ├── index.md             # This file
-│   └── detail/              # Detailed documentation
-│       ├── architecture.md  # System architecture
-│       ├── database.md      # Database schema
-│       ├── components.md    # Component structure
-│       ├── storage.md       # Storage strategy
-│       ├── routing.md       # Routing & Card URLs (NEW)
-│       ├── testing.md       # E2E テスト & HTML レポート取得方法
-│       └── deployment.md    # Deployment guide
-│
-├── playwright.config.ts      # Playwright configuration
-├── tailwind.config.ts        # Tailwind configuration
-├── tsconfig.json             # TypeScript configuration
-└── next.config.ts            # Next.js configuration
+├── playwright/.auth/user.json          # Persisted auth state for Playwright
+├── docs/                               # Documentation hub (details below)
+├── playwright.config.ts                # Playwright configuration (dev server, auth)
+├── tailwind.config.ts
+├── tsconfig.json
+└── next.config.ts
 ```
 
 ## 📚 Detailed Documentation
@@ -193,7 +196,7 @@ taesk/
 
 ### Project Management
 - [Tickets System](./tickets/README.md) - タスク管理システムの使い方
-- [Roadmap](./tickets/roadmap.md) - 機能追加ロードマップ
+- [Roadmap Overview](./roadmap.md) - 最新サマリー（詳細は tickets/roadmap.md）
 
 ## 🎯 Key Design Decisions
 

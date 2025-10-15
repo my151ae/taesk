@@ -144,16 +144,6 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
     await page.getByRole('button', { name: defaultBoard!.name }).click();
 
-    // Wait for URL to update to at least /b/:sid (immediate)
-    await page.waitForFunction(
-      (shortId) => window.location.pathname.startsWith(`/b/${shortId}`),
-      defaultBoard!.short_id,
-      { timeout: 1000 }
-    );
-
-    const immediatePath = await page.evaluate(() => window.location.pathname);
-    expect(immediatePath.startsWith(`/b/${defaultBoard!.short_id}`)).toBeTruthy();
-
     await page.waitForURL(`**${defaultBoardCanonicalPath}`);
     expect(new URL(page.url()).pathname).toBe(defaultBoardCanonicalPath);
 
