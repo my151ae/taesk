@@ -5,15 +5,15 @@ import { normalizeCardSlugOrRedirect } from "@/lib/server/cards";
 
 export const revalidate = 0;
 
-interface CardPageParams {
-  params: {
+export default async function CardFullPage({
+  params,
+}: {
+  params: Promise<{
     short_id: string;
     slug?: string[];
-  };
-}
-
-export default async function CardFullPage({ params }: CardPageParams) {
-  const { short_id, slug = [] } = params;
+  }>;
+}) {
+  const { short_id, slug = [] } = await params;
   const { card } = await normalizeCardSlugOrRedirect(short_id, slug);
 
   if (!card) {
