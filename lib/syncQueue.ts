@@ -1,5 +1,71 @@
-import { supabase } from './supabase';
+import { supabase, sanitizeCardForUpload, isAssigneeColumnMissing } from './supabase';
 import type { List, Card } from './supabase';
+
+let supportsAssigneeIdForQueue: boolean | null = null;
+
+const prepareCardPayload = (
+  data: Partial<Card> & { id: string },
+  includeAssigneeId: boolean
+): Record<string, unknown> => {
+  const maybeCard = data as Card;
+  const hasFullShape =
+    typeof maybeCard.title === 'string' &&
+    typeof maybeCard.board_id === 'string' &&
+    typeof maybeCard.list_id === 'string';
+
+  if (hasFullShape) {
+    return sanitizeCardForUpload(maybeCard, includeAssigneeId);
+  }
+
+  const payload: Record<string, unknown> = { ...data };
+
+  if (!includeAssigneeId) {
+    delete payload.assignee_id;
+  } else if ('assignee_id' in payload) {
+    payload.assignee_id = (payload.assignee_id as string | null | undefined) ?? null;
+  }
+
+  if ('assigned_to' in payload) {
+    payload.assigned_to = (payload.assigned_to as string | null | undefined) ?? null;
+  }
+
+  return payload;
+};
+
+const performCardMutation = async (
+  data: Partial<Card> & { id: string },
+  type: 'INSERT' | 'UPDATE'
+): Promise<void> => {
+  const includeAssigneeId = supportsAssigneeIdForQueue !== false;
+
+  const attempt = async (include: boolean) => {
+    const payload = prepareCardPayload(data, include);
+    if (type === 'INSERT') {
+      const { error } = await supabase.from('cards').insert(payload as Card);
+      return error ?? null;
+    }
+
+    const { error } = await supabase
+      .from('cards')
+      .update(payload)
+      .eq('id', data.id);
+    return error ?? null;
+  };
+
+  let error = await attempt(includeAssigneeId);
+
+  if (isAssigneeColumnMissing(error ?? undefined)) {
+    supportsAssigneeIdForQueue = false;
+    console.warn('[syncQueue] assignee_id column missing on Supabase; retrying without that column');
+    error = await attempt(false);
+  } else if (!error) {
+    supportsAssigneeIdForQueue = true;
+  }
+
+  if (error) {
+    throw error;
+  }
+};
 
 // Sync action types
 export type SyncActionType = 'INSERT' | 'UPDATE' | 'DELETE';
@@ -79,8 +145,7 @@ const executeSyncAction = async (action: SyncAction): Promise<void> => {
           const { error } = await supabase.from('lists').insert(data as List);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('cards').insert(data as Card);
-          if (error) throw error;
+          await performCardMutation(data as Partial<Card> & { id: string }, 'INSERT');
         }
         break;
 
@@ -92,11 +157,7 @@ const executeSyncAction = async (action: SyncAction): Promise<void> => {
             .eq('id', data.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase
-            .from('cards')
-            .update(data as Partial<Card>)
-            .eq('id', data.id);
-          if (error) throw error;
+          await performCardMutation(data as Partial<Card> & { id: string }, 'UPDATE');
         }
         break;
 

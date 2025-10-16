@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, type PostgrestError } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -51,6 +51,40 @@ export interface Card {
   slug: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type CardUpsertPayload = Omit<Card, 'assignee_id'> & {
+  assignee_id?: string | null;
+};
+
+export function sanitizeCardForUpload(card: Card, includeAssigneeId: boolean): CardUpsertPayload {
+  const { assignee_id, ...rest } = card;
+  const payload: CardUpsertPayload = {
+    ...rest,
+    assigned_to: card.assigned_to ?? null,
+  };
+
+  if (includeAssigneeId) {
+    payload.assignee_id = assignee_id ?? null;
+  }
+
+  return payload;
+}
+
+export function sanitizeCardsForUpload(cards: Card[], includeAssigneeId: boolean): CardUpsertPayload[] {
+  if (!cards.length) return [];
+  return cards.map((card) => sanitizeCardForUpload(card, includeAssigneeId));
+}
+
+export function isAssigneeColumnMissing(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false;
+  if (
+    error.code !== 'PGRST204' &&
+    error.code !== '42703'
+  ) {
+    return false;
+  }
+  return typeof error.message === 'string' && error.message.includes('assignee_id');
 }
 
 export interface ProfileSummary {

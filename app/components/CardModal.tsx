@@ -46,7 +46,8 @@ interface CardModalProps {
     due_date?: string | null,
     priority?: Priority,
     assigneeId?: string | null,
-    assigneeTouched?: boolean
+    assigneeTouched?: boolean,
+    assigneeDisplayName?: string | null
   ) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -213,7 +214,20 @@ export function CardModal({
   }, []); // 空配列でマウント時のみ実行
 
   const handleSave = () => {
-    onSave(card.id, title, description, tags, dueDate || null, priority, assigneeId || null, assigneeTouched);
+    const selectedDisplayName = selectedAssignee ? getProfileDisplayName(selectedAssignee) : null;
+    const displayNameFallback = selectedDisplayName ?? (legacyAssignee ?? null);
+
+    onSave(
+      card.id,
+      title,
+      description,
+      tags,
+      dueDate || null,
+      priority,
+      assigneeId || null,
+      assigneeTouched,
+      displayNameFallback
+    );
 
     if (targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);

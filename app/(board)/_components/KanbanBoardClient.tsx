@@ -26,8 +26,18 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { supabase, type Card, type List, type Board, type BoardData, type Priority, type ProfileSummary } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  supabase,
+  sanitizeCardsForUpload,
+  isAssigneeColumnMissing,
+  type Card,
+  type List,
+  type Board,
+  type BoardData,
+  type Priority,
+  type ProfileSummary,
+} from "@/lib/supabase";
+import type { PostgrestError, RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
@@ -62,6 +72,17 @@ const loadFromStorage = (): BoardData => {
     return { lists: [], cards: [] };
   }
   return JSON.parse(data);
+};
+
+const getProfileDisplayName = (profile?: ProfileSummary | null): string | null => {
+  if (!profile) return null;
+  if (typeof profile.full_name === 'string' && profile.full_name.trim().length > 0) {
+    return profile.full_name.trim();
+  }
+  if (typeof profile.email === 'string' && profile.email.trim().length > 0) {
+    return profile.email;
+  }
+  return null;
 };
 
 const saveToStorage = (data: BoardData) => {
@@ -695,6 +716,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const selectedCardIdRef = useRef<string | null>(selectedCardId);
   const lastBoardPathRef = useRef<string | null>(null);
   const modalReturnPathRef = useRef<string | null>(null);
+  const supportsAssigneeIdRef = useRef<boolean | null>(null);
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
     return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
@@ -1164,6 +1186,35 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     navigate(nextPath, { scroll: false });
   };
 
+  const upsertCardsWithAssigneeFallback = async (cardsToSync: Card[]): Promise<PostgrestError | null> => {
+    if (cardsToSync.length === 0) {
+      return null;
+    }
+
+    const includeAssigneeId = supportsAssigneeIdRef.current !== false;
+    const firstPayload = sanitizeCardsForUpload(cardsToSync, includeAssigneeId);
+    let { error } = await supabase.from('cards').upsert(firstPayload);
+
+    if (isAssigneeColumnMissing(error)) {
+      supportsAssigneeIdRef.current = false;
+      console.warn('[cards] assignee_id column missing on Supabase; retrying without that column');
+      const fallbackPayload = sanitizeCardsForUpload(cardsToSync, false);
+      ({ error } = await supabase.from('cards').upsert(fallbackPayload));
+    } else if (!error) {
+      supportsAssigneeIdRef.current = true;
+    }
+
+    if (error) {
+      console.error('[cards] Failed to sync cards:', error);
+    }
+
+    return error ?? null;
+  };
+
+  const upsertSingleCardWithAssigneeFallback = async (card: Card): Promise<PostgrestError | null> => {
+    return upsertCardsWithAssigneeFallback([card]);
+  };
+
   const syncToSupabase = async (data: BoardData) => {
     // If offline, don't sync - operations are already in queue
     if (!isOnline) {
@@ -1172,10 +1223,17 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
 
     try {
-      await Promise.all([
-        supabase.from("lists").upsert(data.lists),
-        supabase.from("cards").upsert(data.cards),
-      ]);
+      if (data.lists.length > 0) {
+        const { error: listError } = await supabase.from("lists").upsert(data.lists);
+        if (listError) {
+          throw listError;
+        }
+      }
+
+      const cardError = await upsertCardsWithAssigneeFallback(data.cards);
+      if (cardError) {
+        throw cardError;
+      }
     } catch (error) {
       console.error("Error syncing to Supabase:", error);
     }
@@ -1556,14 +1614,22 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     due_date?: string | null,
     priority?: Priority,
     assigneeId?: string | null,
-    assigneeTouched?: boolean
+    assigneeTouched?: boolean,
+    assigneeDisplayName?: string | null
   ) => {
     console.log('[handleSaveCard] Starting...', { id, title, description });
     const slug = slugify(title);
     const updatedCards = boardData.cards.map((card) => {
       if (card.id === id) {
-        const nextAssigneeId = assigneeId ?? null;
-        const shouldClearLegacy = nextAssigneeId !== null || assigneeTouched === true;
+        const nextAssigneeId =
+          typeof assigneeId === 'string' && assigneeId.length > 0 ? assigneeId : null;
+        const shouldClearLegacy = assigneeTouched === true || nextAssigneeId !== (card.assignee_id ?? null);
+        const resolvedAssignedTo = nextAssigneeId
+          ? assigneeDisplayName ?? getProfileDisplayName(profilesById[nextAssigneeId]) ?? null
+          : assigneeTouched
+            ? null
+            : card.assigned_to ?? null;
+
         return {
           ...card,
           title,
@@ -1572,7 +1638,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           due_date: due_date || null,
           priority: priority || 'medium',
           assignee_id: nextAssigneeId,
-          assigned_to: nextAssigneeId ? null : shouldClearLegacy ? null : card.assigned_to ?? null,
+          assigned_to: shouldClearLegacy ? resolvedAssignedTo : (card.assigned_to ?? resolvedAssignedTo),
           slug,
           updated_at: new Date().toISOString(),
         };
@@ -1593,9 +1659,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
       } else {
         console.log('[handleSaveCard] Syncing card to Supabase...');
-        const { error } = await supabase
-          .from('cards')
-          .upsert(updatedCard);
+        const error = await upsertSingleCardWithAssigneeFallback(updatedCard);
         if (error) {
           console.error('[handleSaveCard] Error syncing card:', error);
         } else {

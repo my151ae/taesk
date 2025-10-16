@@ -1,4 +1,4 @@
-[dotenv@17.2.3] injecting env (7) from .env.test -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (7) from .env.test -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
 [Global Setup] Starting authentication setup...
 [Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
 [Global Setup] User status: already exists
@@ -77,7 +77,7 @@
           "specs": [
             {
               "title": "should redirect to login page when not authenticated",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -90,48 +90,18 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 8835,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/auth.spec.ts:22:24",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                          "column": 24,
-                          "line": 22
-                        },
-                        "snippet": "  20 |\n  21 |     // Should redirect to /login\n> 22 |     await expect(page).toHaveURL('/login');\n     |                        ^\n  23 |\n  24 |     // Should show login UI\n  25 |     await expect(page.getByRole('heading', { name: 'Taesk' })).toBeVisible();"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                            "column": 24,
-                            "line": 22
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n\n\n  20 |\n  21 |     // Should redirect to /login\n> 22 |     await expect(page).toHaveURL('/login');\n     |                        ^\n  23 |\n  24 |     // Should show login UI\n  25 |     await expect(page.getByRole('heading', { name: 'Taesk' })).toBeVisible();\n    at /Users/yossydie/dev/taesk/e2e/auth.spec.ts:22:24"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 5882,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:17.100Z",
+                      "startTime": "2025-10-16T07:09:20.158Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/auth-Authentication-should-5d0ba-page-when-not-authenticated-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                        "column": 24,
-                        "line": 22
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "d748ac400d08b85935ef-5b2157824fb0a6376c09",
@@ -155,12 +125,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 3464,
+                      "duration": 2890,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:17.080Z",
+                      "startTime": "2025-10-16T07:09:20.157Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -189,12 +159,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 3580,
+                      "duration": 2875,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:17.088Z",
+                      "startTime": "2025-10-16T07:09:20.158Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -217,7 +187,7 @@
           "specs": [
             {
               "title": "should show login page after visiting any protected route",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -230,48 +200,18 @@
                     {
                       "workerIndex": 3,
                       "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 8802,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/auth.spec.ts:64:24",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                          "column": 24,
-                          "line": 64
-                        },
-                        "snippet": "  62 |   test('should show login page after visiting any protected route', async ({ page }) => {\n  63 |     await page.goto('/');\n> 64 |     await expect(page).toHaveURL('/login');\n     |                        ^\n  65 |   });\n  66 |\n  67 |   test('auth callback should handle errors gracefully', async ({ page }) => {"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                            "column": 24,
-                            "line": 64
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveURL\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nExpected: \u001b[32m\"http://localhost:3000/\u001b[7mlogin\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"http://localhost:3000/\u001b[7mb/4WvvAVw1/1-main-board\u001b[27m\"\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveURL\" with timeout 5000ms\u001b[22m\n\u001b[2m    8 × unexpected value \"http://localhost:3000/b/4WvvAVw1/1-main-board\"\u001b[22m\n\n\n  62 |   test('should show login page after visiting any protected route', async ({ page }) => {\n  63 |     await page.goto('/');\n> 64 |     await expect(page).toHaveURL('/login');\n     |                        ^\n  65 |   });\n  66 |\n  67 |   test('auth callback should handle errors gracefully', async ({ page }) => {\n    at /Users/yossydie/dev/taesk/e2e/auth.spec.ts:64:24"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 5420,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:17.087Z",
+                      "startTime": "2025-10-16T07:09:20.151Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/auth-Session-Management-sh-c925f-isiting-any-protected-route-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/auth.spec.ts",
-                        "column": 24,
-                        "line": 64
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "d748ac400d08b85935ef-48535f4a4c9d0bf22164",
@@ -295,12 +235,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 15491,
+                      "duration": 2585,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:21.015Z",
+                      "startTime": "2025-10-16T07:09:23.707Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -327,7 +267,7 @@
         {
           "title": "Taesk Kanban Board E2E Tests",
           "file": "kanban.spec.ts",
-          "line": 89,
+          "line": 116,
           "column": 6,
           "specs": [
             {
@@ -346,12 +286,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 25026,
+                      "duration": 9397,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:21.105Z",
+                      "startTime": "2025-10-16T07:09:23.840Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -361,12 +301,12 @@
               ],
               "id": "7a6a8de26a6a6c44d713-c0cec41ac9b278372838",
               "file": "kanban.spec.ts",
-              "line": 149,
+              "line": 176,
               "column": 7
             },
             {
               "title": "should redirect legacy board query to canonical URL",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -377,102 +317,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 30272,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                      },
-                      "errors": [
-                        {
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 36,
-                            "line": 156
-                          },
-                          "message": "Error: apiRequestContext.get: Request context disposed.\nCall log:\n\u001b[2m  - → GET http://localhost:3000/?board=1b4b4ee7-ff3c-4550-bef4-0bc29c7bd9e8\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.37 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\n\n  154 |\n  155 |   test('should redirect legacy board query to canonical URL', async ({ request }) => {\n> 156 |     const response = await request.get(`/?board=${testBoardId}`, { maxRedirects: 0 });\n      |                                    ^\n  157 |     expect(response.status()).toBe(308);\n  158 |     const location = response.headers()['location'];\n  159 |     expect(location).toBeTruthy();\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:156:36"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2025-10-16T05:00:28.404Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--517dd-oard-query-to-canonical-URL-chromium/error-context.md"
-                        }
-                      ]
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "7a6a8de26a6a6c44d713-ac8c804daed39e4991db",
-              "file": "kanban.spec.ts",
-              "line": 155,
-              "column": 7
-            },
-            {
-              "title": "should normalize board URL when slug mismatches",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 4,
+                      "workerIndex": 3,
                       "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 32121,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                      },
-                      "errors": [
-                        {
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 164
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/Np45LWMw/bogus-segment\", waiting until \"load\"\u001b[22m\n\n\n  162 |\n  163 |   test('should normalize board URL when slug mismatches', async ({ page }) => {\n> 164 |     await page.goto(`/b/${testBoardShortId}/bogus-segment`);\n      |                ^\n  165 |     await page.waitForURL(`**${testBoardCanonicalPath}`);\n  166 |     expect(new URL(page.url()).pathname).toBe(testBoardCanonicalPath);\n  167 |   });\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:164:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 14498,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:28.402Z",
+                      "startTime": "2025-10-16T07:09:26.410Z",
                       "annotations": [],
                       "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
-              "id": "7a6a8de26a6a6c44d713-24c4fde953a54311bed6",
+              "id": "7a6a8de26a6a6c44d713-ac8c804daed39e4991db",
               "file": "kanban.spec.ts",
-              "line": 163,
+              "line": 182,
               "column": 7
             },
             {
-              "title": "should update URL immediately when switching boards",
-              "ok": false,
+              "title": "should normalize board URL when slug mismatches",
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -485,45 +353,57 @@
                     {
                       "workerIndex": 2,
                       "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 30700,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                      },
-                      "errors": [
-                        {
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 61,
-                            "line": 192
-                          },
-                          "message": "Error: locator.click: Target page, context or browser has been closed\n\n  190 |     // Return to the test board for subsequent assertions\n  191 |     await page.getByRole('button', { name: `${defaultBoard!.name} ▼` }).click();\n> 192 |     await page.getByRole('button', { name: testBoardName }).click();\n      |                                                             ^\n  193 |     await page.waitForURL(`**${testBoardCanonicalPath}`);\n  194 |   });\n  195 |\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:192:61"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 14895,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:36.647Z",
+                      "startTime": "2025-10-16T07:09:26.411Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--6063b-ately-when-switching-boards-chromium/error-context.md"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-24c4fde953a54311bed6",
+              "file": "kanban.spec.ts",
+              "line": 190,
+              "column": 7
+            },
+            {
+              "title": "should update URL immediately when switching boards",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13681,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-16T07:09:27.058Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-ed6d212f1a7e9a537615",
               "file": "kanban.spec.ts",
-              "line": 169,
+              "line": 196,
               "column": 7
             },
             {
@@ -542,12 +422,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 21713,
+                      "duration": 7295,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:00:46.183Z",
+                      "startTime": "2025-10-16T07:09:33.533Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -557,12 +437,12 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a724f34b87ccb66ad5f5",
               "file": "kanban.spec.ts",
-              "line": 196,
+              "line": 223,
               "column": 7
             },
             {
               "title": "should add a new list",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -573,68 +453,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 30925,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 5862,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:00.912Z",
+                      "startTime": "2025-10-16T07:09:40.851Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board-E2E-Tests-should-add-a-new-list-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-02ad4038e7986b0956c5",
               "file": "kanban.spec.ts",
-              "line": 217,
+              "line": 244,
               "column": 7
             },
             {
               "title": "should rename a list",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -645,134 +487,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 7,
+                      "workerIndex": 3,
                       "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 30269,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 6449,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:02.389Z",
+                      "startTime": "2025-10-16T07:09:40.977Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board-E2E-Tests-should-rename-a-list-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-5680e67341e3951a49f6",
               "file": "kanban.spec.ts",
-              "line": 225,
+              "line": 252,
               "column": 7
             },
             {
               "title": "should delete a list",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 8,
-                      "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 35459,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2025-10-16T05:01:10.559Z",
-                      "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
-                }
-              ],
-              "id": "7a6a8de26a6a6c44d713-563c846752dcaa900657",
-              "file": "kanban.spec.ts",
-              "line": 251,
-              "column": 7
-            },
-            {
-              "title": "should add a card to a list",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -785,60 +523,62 @@
                     {
                       "workerIndex": 1,
                       "parallelIndex": 1,
-                      "status": "timedOut",
-                      "duration": 35266,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 9355,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:07.945Z",
+                      "startTime": "2025-10-16T07:09:41.096Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-563c846752dcaa900657",
+              "file": "kanban.spec.ts",
+              "line": 278,
+              "column": 7
+            },
+            {
+              "title": "should add a card to a list",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 6016,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-16T07:09:41.428Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-3c0e29b0e3ee751e4256",
               "file": "kanban.spec.ts",
-              "line": 279,
+              "line": 306,
               "column": 7
             },
             {
               "title": "should edit a card",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -849,62 +589,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 9,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 35353,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 6274,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:35.016Z",
+                      "startTime": "2025-10-16T07:09:46.728Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-141de73105dee1601802",
               "file": "kanban.spec.ts",
-              "line": 292,
+              "line": 319,
               "column": 7
             },
             {
               "title": "should delete a card",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -915,62 +623,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 10,
+                      "workerIndex": 3,
                       "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 35370,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 8667,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:35.016Z",
+                      "startTime": "2025-10-16T07:09:47.442Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-f25b95cd6316336e108e",
               "file": "kanban.spec.ts",
-              "line": 344,
+              "line": 387,
               "column": 7
             },
             {
               "title": "should assign and clear a card assignee",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -981,62 +657,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 11,
-                      "parallelIndex": 1,
-                      "status": "timedOut",
-                      "duration": 35425,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 5852,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:45.443Z",
+                      "startTime": "2025-10-16T07:09:47.471Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-9f16ba163d5347334c10",
               "file": "kanban.spec.ts",
-              "line": 390,
+              "line": 433,
               "column": 7
             },
             {
               "title": "should drag and drop a card within the same list",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1047,68 +691,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 12,
-                      "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 33972,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 8476,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:01:47.663Z",
+                      "startTime": "2025-10-16T07:09:50.466Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--75cca-a-card-within-the-same-list-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-d520cbf701cfb4afb5e3",
               "file": "kanban.spec.ts",
-              "line": 442,
+              "line": 518,
               "column": 7
             },
             {
               "title": "should drag and drop a card to a different list",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1119,62 +725,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 13,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 35304,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 9381,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:14.310Z",
+                      "startTime": "2025-10-16T07:09:53.027Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-a38f0c18c888a753f7eb",
               "file": "kanban.spec.ts",
-              "line": 468,
+              "line": 544,
               "column": 7
             },
             {
               "title": "should persist data after page reload",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1185,62 +759,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 14,
-                      "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 35303,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 11700,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:14.311Z",
+                      "startTime": "2025-10-16T07:09:53.335Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-a0400f7813e80587053f",
               "file": "kanban.spec.ts",
-              "line": 498,
+              "line": 574,
               "column": 7
             },
             {
               "title": "should normalize board URL when slug is incorrect",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1251,62 +793,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 15,
-                      "parallelIndex": 1,
-                      "status": "timedOut",
-                      "duration": 35265,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 8395,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:24.408Z",
+                      "startTime": "2025-10-16T07:09:56.126Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-ac158ecdfff8f34f2143",
               "file": "kanban.spec.ts",
-              "line": 526,
+              "line": 602,
               "column": 7
             },
             {
               "title": "should be mobile responsive",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1317,62 +827,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 16,
-                      "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 35216,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 8777,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:24.578Z",
+                      "startTime": "2025-10-16T07:09:58.959Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-f85e626f89fa58d034c4",
               "file": "kanban.spec.ts",
-              "line": 536,
+              "line": 612,
               "column": 7
             },
             {
               "title": "should show mock user email in test mode",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1383,68 +861,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 17,
-                      "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 32709,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6558,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:53.272Z",
+                      "startTime": "2025-10-16T07:10:02.444Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--8c534-ock-user-email-in-test-mode-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-80bd8b44a12150583e53",
               "file": "kanban.spec.ts",
-              "line": 548,
+              "line": 624,
               "column": 7
             },
             {
               "title": "should queue operations when offline and sync when online",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1455,68 +895,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 18,
-                      "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 32156,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 14391,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:02:53.273Z",
+                      "startTime": "2025-10-16T07:10:04.592Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--a2bc0-ffline-and-sync-when-online-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-46f2a30c7599f7ec2cd7",
               "file": "kanban.spec.ts",
-              "line": 559,
+              "line": 635,
               "column": 7
             },
             {
               "title": "should open card modal via short URL navigation",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1527,68 +929,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 19,
+                      "workerIndex": 2,
                       "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 30490,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 135
-                          },
-                          "message": "Error: page.waitForURL: Test timeout of 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/b/0qf55G3f/6-test-d9774e7b\" until \"load\"\n============================================================\n\n  133 |     await page.getByRole('button', { name: testBoardName }).click();\n  134 |\n> 135 |     await page.waitForURL(`**${testBoardCanonicalPath}`);\n      |                ^\n  136 |\n  137 |     // Wait for board to switch\n  138 |     await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:135:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 9417,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:02.280Z",
+                      "startTime": "2025-10-16T07:10:05.339Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--32f6b-al-via-short-URL-navigation-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-b1a4ab0131ed45f4c8e5",
               "file": "kanban.spec.ts",
-              "line": 625,
+              "line": 701,
               "column": 7
             },
             {
               "title": "should render full card page on direct navigation",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1599,68 +963,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 20,
+                      "workerIndex": 1,
                       "parallelIndex": 1,
-                      "status": "timedOut",
-                      "duration": 30433,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 135
-                          },
-                          "message": "Error: page.waitForURL: Test timeout of 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/b/YiNufJiZ/6-test-d12f83ae\" until \"load\"\n============================================================\n\n  133 |     await page.getByRole('button', { name: testBoardName }).click();\n  134 |\n> 135 |     await page.waitForURL(`**${testBoardCanonicalPath}`);\n      |                ^\n  136 |\n  137 |     // Wait for board to switch\n  138 |     await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:135:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 11804,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:02.357Z",
+                      "startTime": "2025-10-16T07:10:07.758Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--f705d-d-page-on-direct-navigation-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-7ea69653d85b3eacb8b5",
               "file": "kanban.spec.ts",
-              "line": 658,
+              "line": 734,
               "column": 7
             },
             {
               "title": "should normalize URL when slug is incorrect",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1671,57 +997,25 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 21,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 35507,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 97
-                        },
-                        "snippet": "   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 97
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n   95 |   let testBoardCanonicalPath: string;\n   96 |\n>  97 |   test.beforeEach(async ({ page }) => {\n      |        ^\n   98 |     // Generate unique board for this test\n   99 |     testBoardId = crypto.randomUUID();\n  100 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:97:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 124
-                          },
-                          "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  122 |     });\n  123 |\n> 124 |     await page.goto('/');\n      |                ^\n  125 |\n  126 |     // Wait for page to load and auth to initialize\n  127 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:16"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 11080,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.601Z",
+                      "startTime": "2025-10-16T07:10:09.036Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 97
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-a6e7d7adb91ae80b29f3",
               "file": "kanban.spec.ts",
-              "line": 687,
+              "line": 764,
               "column": 7
             }
           ]
@@ -1754,15 +1048,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 50,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:30.947Z",
+                      "startTime": "2025-10-16T07:10:14.825Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1788,15 +1082,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 7,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.229Z",
+                      "startTime": "2025-10-16T07:10:14.831Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1822,15 +1116,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.295Z",
+                      "startTime": "2025-10-16T07:10:14.837Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1856,15 +1150,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.355Z",
+                      "startTime": "2025-10-16T07:10:14.843Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1890,15 +1184,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.430Z",
+                      "startTime": "2025-10-16T07:10:14.847Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1932,15 +1226,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.455Z",
+                      "startTime": "2025-10-16T07:10:14.851Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1966,15 +1260,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.493Z",
+                      "startTime": "2025-10-16T07:10:14.860Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2000,15 +1294,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 22,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T05:03:31.515Z",
+                      "startTime": "2025-10-16T07:10:14.864Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2028,11 +1322,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-10-16T04:59:59.698Z",
-    "duration": 249924.959,
-    "expected": 13,
+    "startTime": "2025-10-16T07:09:07.795Z",
+    "duration": 72496.73300000001,
+    "expected": 35,
     "skipped": 0,
-    "unexpected": 22,
+    "unexpected": 0,
     "flaky": 0
   }
 }

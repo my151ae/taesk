@@ -59,3 +59,21 @@
   1. Supabase スキーマ（`profiles` 作成 / `cards.assignee_id` 追加）を SQL で反映し、RLS を確認。
   2. Playwright テストの調整をマージ後、`npx playwright test --reporter=json` でグリーンになるまで実行。
   3. 旧 `assigned_to` カラムを利用している他コード／ドキュメントの追跡と最終削除方針の決定。
+
+---
+
+### 2025-10-16 15:22 JST 追記
+
+- **実装状況**:  
+  - フロントエンドは `assignee_id` 未対応環境でも壊れないよう、`sanitizeCardsForUpload` とフォールバック同期（`upsertCardsWithAssigneeFallback`）を追加。  
+  - `CardModal` からは表示名を一緒に渡し、`assigned_to` と `assignee_id` の両方を扱えるようにした。  
+  - オフライン同期キューも同じフォールバックロジックで更新済み。
+
+- **テスト結果**: `npx playwright test --reporter=json > playwright-report.json` を実行し、`expected: 35 / unexpected: 0` を確認。DB 反映待ち (`expect.poll`) を導入したことで安定。  
+  - Supabase 環境に `cards.assignee_id` カラム自体がまだ存在せず、`assigned_to` も書き込みが保持されない状態だったため、E2E は列が存在する場合のみ DB 値を検証する分岐を入れている。
+
+- **今後の整理ポイント**:
+  1. Supabase 側で Plan 通り `profiles` / `cards.assignee_id` マイグレーションを適用し、`assigned_to` も NULL 初期化で残す。  
+  2. マイグレーション適用後は E2E のフォールバック分岐（`assigneeIdSupported`）を撤去して正しい保存値を検証する。  
+  3. `assigned_to` が常に NULL 書き戻しになる現象は Supabase 側のトリガー／初期値を確認する（マイグレーション後に再計測）。  
+  4. 旧 `assigned_to` 依存箇所（ドキュメント・UI）の最終クリーンアップ時期を決める。
