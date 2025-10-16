@@ -326,6 +326,13 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await addCardButton.click();
     await page.waitForTimeout(300);
 
+    const cards = await waitForCardRows<{ id: string; short_id: string }>(
+      testBoardId,
+      'id, short_id'
+    );
+    const createdCard = cards[0];
+    expect(createdCard?.short_id).toBeTruthy();
+
     // Click card to open modal
     await page.getByText('New Card').first().click();
     await page.waitForTimeout(300);
@@ -376,7 +383,9 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     // Reopen to confirm persisted values
     await updatedCardButton.click();
-    await page.waitForURL(`**/c/**`);
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .toContain(`card=${createdCard.short_id}`);
     await expect(titleInput).toHaveValue('Updated Card Title');
     await expect(descInput).toHaveValue('Updated description');
 
@@ -716,14 +725,16 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     const card = cards[0];
     expect(card.short_id).toBeTruthy();
 
-    // Soft navigate via card click
+    // Soft navigate via card click (query param should reflect short id)
     await page.getByText('New Card').first().click();
-    await page.waitForURL(`**/c/${card.short_id}**`);
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .toContain(`card=${card.short_id}`);
 
     // Modal should be visible and bound to the intercepted URL
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Edit Card')).toBeVisible();
-    expect(page.url()).toContain(`/c/${card.short_id}`);
+    expect(page.url()).toContain(`card=${card.short_id}`);
 
     // Close via keyboard and ensure history returns to board URL
     await page.keyboard.press('Escape');

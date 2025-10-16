@@ -39,7 +39,7 @@ import {
 } from "@/lib/supabase";
 import type { PostgrestError, RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { addToSyncQueue, syncQueue, getSyncQueueStats } from "@/lib/syncQueue";
 import { createUniqueShortId, getNextIdShort, slugify } from "@/lib/card-utils";
 import { buildCardUrl } from "@/lib/card-url";
@@ -146,55 +146,6 @@ const copyBoardUrl = async (url: string) => {
   if (typeof window !== "undefined") {
     window.prompt("クリップボードにコピーできませんでした。手動でコピーしてください。", url);
   }
-};
-
-const CARD_ROUTE_POLL_INTERVAL_MS = 250;
-const CARD_ROUTE_POLL_TIMEOUT_MS = 5000;
-
-const waitForCardCanonicalUrl = async (card: Card): Promise<string | null> => {
-  if (!card.short_id) {
-    return null;
-  }
-
-  const startedAt = Date.now();
-  let lastError: PostgrestError | null = null;
-  const transientCodes = new Set(["PGRST116", "PGRST204"]);
-
-  while (Date.now() - startedAt < CARD_ROUTE_POLL_TIMEOUT_MS) {
-    const { data, error } = await supabase
-      .from("cards")
-      .select("id, short_id, slug, id_short")
-      .eq("id", card.id)
-      .maybeSingle();
-
-    if (error) {
-      lastError = error;
-      if (!error.code || !transientCodes.has(error.code)) {
-        console.warn("[card-route] Unexpected error while polling for card availability:", error);
-        break;
-      }
-    } else if (data) {
-      const shortId = data.short_id ?? card.short_id;
-      if (!shortId) {
-        break;
-      }
-
-      return buildCardUrl({
-        shortId,
-        slug: data.slug ?? card.slug ?? null,
-        idShort: data.id_short ?? card.id_short ?? null,
-        title: card.title,
-      });
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, CARD_ROUTE_POLL_INTERVAL_MS));
-  }
-
-  if (lastError) {
-    console.warn("[card-route] Giving up waiting for card availability due to persistent error:", lastError);
-  }
-
-  return null;
 };
 
 const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonical"): string => {
@@ -761,12 +712,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   // URL からモーダル状態を復元（初回ロード時のみ）
   const hasRestoredModalFromUrl = useRef(false);
-  const modalNavigationRef = useRef(false);
   const selectedCardIdRef = useRef<string | null>(selectedCardId);
   const lastBoardPathRef = useRef<string | null>(null);
   const modalReturnPathRef = useRef<string | null>(null);
   const supportsAssigneeIdRef = useRef<boolean | null>(null);
-  const cardNavigationTokenRef = useRef(0);
+  const searchParams = useSearchParams();
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
     return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
@@ -799,13 +749,29 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       return;
     }
 
-    modalNavigationRef.current = false;
-
-    if (selectedCardIdRef.current) {
+    const cardParam = searchParams?.get('card');
+    if (!cardParam && selectedCardIdRef.current) {
       setSelectedCardId(null);
       setCardModalStatus('loading');
     }
-  }, [pathname]);
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const shortId = searchParams?.get('card');
+    if (!shortId) {
+      return;
+    }
+
+    const cardByShortId = cards.find((card) => card.short_id === shortId);
+    if (cardByShortId) {
+      if (selectedCardIdRef.current !== cardByShortId.id) {
+        setSelectedCardId(cardByShortId.id);
+      }
+      setCardModalStatus('ready');
+    } else {
+      setCardModalStatus('loading');
+    }
+  }, [searchParams, cards]);
 
   useEffect(() => {
     if (!isClient || !pathname || hasRestoredModalFromUrl.current) return;
@@ -1598,11 +1564,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const card = boardData.cards.find((c) => c.id === cardId);
     if (!card) return;
 
-    const navigationToken = ++cardNavigationTokenRef.current;
-
     if (pathname?.startsWith('/b/')) {
-      modalReturnPathRef.current = pathname;
       lastBoardPathRef.current = pathname;
+      modalReturnPathRef.current = pathname;
     } else if (lastBoardPathRef.current) {
       modalReturnPathRef.current = lastBoardPathRef.current;
     }
@@ -1610,39 +1574,34 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setSelectedCardId(cardId);
     setCardModalStatus('ready');
 
-    if (!card.short_id) {
+    if (!isOnline) {
+      console.warn('[card-route] Skipping card URL update while offline');
       return;
     }
 
-    const scheduleNavigation = async () => {
-      if (!isOnline) {
-        console.warn('[card-route] Skipping card URL update while offline');
-        return;
-      }
+    if (!card.short_id || typeof window === "undefined") {
+      return;
+    }
 
-      const canonicalUrl = await waitForCardCanonicalUrl(card);
+    const currentUrl = new URL(window.location.href);
+    const basePath =
+      modalReturnPathRef.current ||
+      getBoardPath(currentBoard) ||
+      getBoardPath(currentBoard, { canonical: false }) ||
+      currentUrl.pathname;
 
-      if (cardNavigationTokenRef.current !== navigationToken) {
-        return;
-      }
+    currentUrl.pathname = basePath || currentUrl.pathname;
+    currentUrl.searchParams.set('card', card.short_id);
 
-      if (!canonicalUrl) {
-        console.warn('[card-route] Card route is not ready; keeping current location');
-        return;
-      }
+    const target = currentUrl.search
+      ? `${currentUrl.pathname}${currentUrl.search}`
+      : currentUrl.pathname;
 
-      if (pathname !== canonicalUrl) {
-        modalNavigationRef.current = true;
-        router.push(canonicalUrl, { scroll: false });
-      }
-    };
-
-    void scheduleNavigation();
+    router.push(target, { scroll: false });
   };
 
   const handleCloseCardModal = () => {
     console.log('[handleCloseCardModal] Starting...');
-    cardNavigationTokenRef.current += 1;
     setSelectedCardId(null);
     setCardModalStatus('loading');
 
@@ -1652,26 +1611,28 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       getBoardPath(currentBoard) ||
       getBoardPath(currentBoard, { canonical: false }) ||
       '/';
+
     modalReturnPathRef.current = null;
-
-    if (modalNavigationRef.current) {
-      modalNavigationRef.current = false;
-      router.back();
-
-      if (typeof window !== 'undefined') {
-        setTimeout(() => {
-          const currentPath = window.location.pathname;
-          if (currentPath.startsWith('/c/') || currentPath !== fallbackPath) {
-            router.replace(fallbackPath, { scroll: false });
-          }
-        }, 100);
-      }
-      return;
-    }
 
     if (pathname && pathname.startsWith('/c/')) {
       router.replace(fallbackPath, { scroll: false });
+      return;
     }
+
+    if (typeof window !== "undefined") {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.pathname = fallbackPath;
+      currentUrl.searchParams.delete('card');
+
+      const target = currentUrl.search
+        ? `${currentUrl.pathname}${currentUrl.search}`
+        : currentUrl.pathname;
+
+      router.replace(target, { scroll: false });
+      return;
+    }
+
+    router.replace(fallbackPath, { scroll: false });
   };
 
   const handleSaveCard = async (
