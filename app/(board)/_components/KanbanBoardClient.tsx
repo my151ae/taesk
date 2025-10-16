@@ -148,6 +148,55 @@ const copyBoardUrl = async (url: string) => {
   }
 };
 
+const CARD_ROUTE_POLL_INTERVAL_MS = 250;
+const CARD_ROUTE_POLL_TIMEOUT_MS = 5000;
+
+const waitForCardCanonicalUrl = async (card: Card): Promise<string | null> => {
+  if (!card.short_id) {
+    return null;
+  }
+
+  const startedAt = Date.now();
+  let lastError: PostgrestError | null = null;
+  const transientCodes = new Set(["PGRST116", "PGRST204"]);
+
+  while (Date.now() - startedAt < CARD_ROUTE_POLL_TIMEOUT_MS) {
+    const { data, error } = await supabase
+      .from("cards")
+      .select("id, short_id, slug, id_short")
+      .eq("id", card.id)
+      .maybeSingle();
+
+    if (error) {
+      lastError = error;
+      if (!error.code || !transientCodes.has(error.code)) {
+        console.warn("[card-route] Unexpected error while polling for card availability:", error);
+        break;
+      }
+    } else if (data) {
+      const shortId = data.short_id ?? card.short_id;
+      if (!shortId) {
+        break;
+      }
+
+      return buildCardUrl({
+        shortId,
+        slug: data.slug ?? card.slug ?? null,
+        idShort: data.id_short ?? card.id_short ?? null,
+        title: card.title,
+      });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, CARD_ROUTE_POLL_INTERVAL_MS));
+  }
+
+  if (lastError) {
+    console.warn("[card-route] Giving up waiting for card availability due to persistent error:", lastError);
+  }
+
+  return null;
+};
+
 const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonical"): string => {
   if (!board?.short_id) return "";
 
@@ -717,6 +766,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const lastBoardPathRef = useRef<string | null>(null);
   const modalReturnPathRef = useRef<string | null>(null);
   const supportsAssigneeIdRef = useRef<boolean | null>(null);
+  const cardNavigationTokenRef = useRef(0);
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
     return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
@@ -1548,6 +1598,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const card = boardData.cards.find((c) => c.id === cardId);
     if (!card) return;
 
+    const navigationToken = ++cardNavigationTokenRef.current;
+
     if (pathname?.startsWith('/b/')) {
       modalReturnPathRef.current = pathname;
       lastBoardPathRef.current = pathname;
@@ -1558,23 +1610,39 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setSelectedCardId(cardId);
     setCardModalStatus('ready');
 
-    if (card.short_id) {
-      const url = buildCardUrl({
-        shortId: card.short_id,
-        slug: card.slug ?? undefined,
-        idShort: card.id_short ?? undefined,
-        title: card.title,
-      });
-
-      if (pathname !== url) {
-        modalNavigationRef.current = true;
-        router.push(url, { scroll: false });
-      }
+    if (!card.short_id) {
+      return;
     }
+
+    const scheduleNavigation = async () => {
+      if (!isOnline) {
+        console.warn('[card-route] Skipping card URL update while offline');
+        return;
+      }
+
+      const canonicalUrl = await waitForCardCanonicalUrl(card);
+
+      if (cardNavigationTokenRef.current !== navigationToken) {
+        return;
+      }
+
+      if (!canonicalUrl) {
+        console.warn('[card-route] Card route is not ready; keeping current location');
+        return;
+      }
+
+      if (pathname !== canonicalUrl) {
+        modalNavigationRef.current = true;
+        router.push(canonicalUrl, { scroll: false });
+      }
+    };
+
+    void scheduleNavigation();
   };
 
   const handleCloseCardModal = () => {
     console.log('[handleCloseCardModal] Starting...');
+    cardNavigationTokenRef.current += 1;
     setSelectedCardId(null);
     setCardModalStatus('loading');
 
