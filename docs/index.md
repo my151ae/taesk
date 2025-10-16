@@ -208,7 +208,7 @@ taesk/
 
 ### Project Management
 - [Tickets System](./tickets/README.md) - タスク管理システムの使い方
-- [Roadmap Overview](./roadmap.md) - 最新サマリー（詳細は tickets/roadmap.md）
+- [Roadmap](./roadmap.md) - 最新版ロードマップ（単一ドキュメント）
 
 ## 🎯 Key Design Decisions
 

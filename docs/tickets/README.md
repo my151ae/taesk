@@ -9,7 +9,6 @@ docs/tickets/
 │   ├── 01-slug.md              # タスクチケット（連番）
 │   ├── 02-another-task.md
 │   └── ...
-└── roadmap.md                   # ロードマップ
 ```
 
 ## チケット作成ルール
@@ -130,7 +129,7 @@ touch docs/tickets/$(TZ='Asia/Tokyo' date +%Y-%m-%d)/01-task-name.md
 
 ### 3. ロードマップ更新
 
-`docs/tickets/roadmap.md` にチケットを追加
+`docs/roadmap.md` にチケットの概要・進捗を反映
 
 ### 4. 作業開始
 
@@ -221,7 +220,7 @@ grep -r "Status.*In Progress" docs/tickets/
 実際のチケット例:
 - [2025-10-09/01-add-google-auth.md](./2025-10-09/01-add-google-auth.md)
 - [2025-10-09/02-implement-realtime-sync.md](./2025-10-09/02-implement-realtime-sync.md)
-- [roadmap.md](./roadmap.md) - 全体ロードマップ
+- [docs/roadmap.md](../roadmap.md) - 全体ロードマップ
 
 ## 日本時間の取得方法
 
