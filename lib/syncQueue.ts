@@ -1,12 +1,12 @@
 import { supabase, sanitizeCardForUpload, isAssigneeColumnMissing } from './supabase';
-import type { List, Card } from './supabase';
+import type { List, Card, CardUpsertPayload } from './supabase';
 
 let supportsAssigneeIdForQueue: boolean | null = null;
 
 const prepareCardPayload = (
   data: Partial<Card> & { id: string },
   includeAssigneeId: boolean
-): Record<string, unknown> => {
+): CardUpsertPayload | Partial<CardUpsertPayload> => {
   const maybeCard = data as Card;
   const hasFullShape =
     typeof maybeCard.title === 'string' &&
@@ -17,7 +17,7 @@ const prepareCardPayload = (
     return sanitizeCardForUpload(maybeCard, includeAssigneeId);
   }
 
-  const payload: Record<string, unknown> = { ...data };
+  const payload: Partial<CardUpsertPayload> = { ...data };
 
   if (!includeAssigneeId) {
     delete payload.assignee_id;
@@ -41,7 +41,7 @@ const performCardMutation = async (
   const attempt = async (include: boolean) => {
     const payload = prepareCardPayload(data, include);
     if (type === 'INSERT') {
-      const { error } = await supabase.from('cards').insert(payload as Card);
+      const { error } = await supabase.from('cards').insert(payload as CardUpsertPayload);
       return error ?? null;
     }
 
