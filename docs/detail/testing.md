@@ -9,11 +9,33 @@ Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前に
 - **`NODE_ENV=test` で dev サーバーを起動**: Playwright が自動起動する `npm run dev`
 - **Supabase 認証をバイパスしない**: グローバルセットアップで正式にサインインし、`playwright/.auth/user.json` を利用
 
+## 環境変数の設定
+
+テスト実行には `.env.test` ファイルが必要です。以下の内容を含めてください:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key
+E2E_ENABLED=true
+E2E_SECRET=redacted-e2e-secret
+E2E_USER_EMAIL=e2e.taesk.test@gmail.com
+E2E_USER_PASSWORD=replace-with-local-test-password
+```
+
+**重要**: `playwright.config.ts` は起動時に自動的に `.env.test` を読み込みます。手動で環境変数を設定する必要はありません。
+
 ## 設定ファイル
 
 `playwright.config.ts` の主要ポイント:
 
 ```typescript
+import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+
+// Load .env.test before running tests
+dotenv.config({ path: '.env.test' });
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -33,6 +55,7 @@ export default defineConfig({
 });
 ```
 
+- **`dotenv.config()`**: テスト実行前に `.env.test` を自動読み込み
 - `globalSetup`: Supabase へメール+パスワードでサインインし、トークンを `playwright/.auth/user.json` に保存
 - `storageState`: すべてのテストで同じセッションを再利用
 - `workers`: CI は安定性優先で 1、本地は 4
@@ -43,21 +66,23 @@ export default defineConfig({
 # JSON レポートを生成
 npx playwright test --reporter=json > playwright-report.json
 
-# Python でサマリーを表示
-python3 - <<'PY'
-import json
-from pathlib import Path
-report = json.loads(Path('playwright-report.json').read_text())
-totals = {'passed': 0, 'failed': 0, 'skipped': 0}
-for project in report.get('suites', []):
-    for suite in project.get('suites', []):
-        for spec in suite.get('specs', []):
-            for test in spec.get('tests', []):
-                for result in test.get('results', []):
-                    status = result.get('status')
-                    totals[status if status in totals else 'failed'] += 1
-print(totals)
-PY
+# jq でサマリーを表示（推奨）
+cat playwright-report.json | jq '.stats'
+# Output:
+# {
+#   "expected": 34,
+#   "skipped": 0,
+#   "unexpected": 0,
+#   "flaky": 0
+# }
+
+# jq がない場合: tail + grep を使用
+tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
+# Output:
+#     "expected": 34,
+#     "skipped": 0,
+#     "unexpected": 0,
+#     "flaky": 0
 ```
 
 ## テスト分離戦略

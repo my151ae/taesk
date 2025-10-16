@@ -17,27 +17,39 @@
 # Install dependencies
 npm install
 
-# Set up environment variables
+# Set up environment variables for development
 cp .env.example .env.local
 # Add NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Run development server
 npm run dev
-
-# Run E2E tests (JSON reporter is mandatory)
-npx playwright test --reporter=json > playwright-report.json
-
-# Inspect the JSON report (example)
-python3 - <<'PY'
-import json
-from pathlib import Path
-report = json.loads(Path('playwright-report.json').read_text())
-print('status:', report.get('status'))
-print('total suites:', len(report.get('suites', [])))
-PY
 ```
 
 Visit `http://localhost:3000` to see the app.
+
+### Running E2E Tests
+
+```bash
+# 1. Set up test environment variables
+# Create .env.test with the following:
+#   NEXT_PUBLIC_SUPABASE_URL=...
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+#   SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key
+#   E2E_ENABLED=true
+#   E2E_SECRET=...
+#   E2E_USER_EMAIL=...
+#   E2E_USER_PASSWORD=...
+
+# 2. Run tests (playwright.config.ts automatically loads .env.test)
+npx playwright test --reporter=json > playwright-report.json
+
+# 3. Check test results
+cat playwright-report.json | jq '.stats'
+# If jq is not installed:
+# tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
+```
+
+**Note**: The `playwright.config.ts` file automatically loads `.env.test` using `dotenv`, so you don't need to manually set environment variables before running tests.
 
 ## 🏗️ Architecture Overview
 

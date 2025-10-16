@@ -212,6 +212,59 @@ const initializeDefaultLists = async (userId: string, boardId: string): Promise<
 };
 
 // Sortable Card Component
+type CardVisualProps = React.HTMLAttributes<HTMLDivElement> & {
+  card: Card;
+  subtle?: boolean;
+  withGrab?: boolean;
+};
+
+function CardVisual({ card, subtle = false, withGrab = false, className = '', ...rest }: CardVisualProps) {
+  const priorityIcon = card.priority && card.priority !== 'medium'
+    ? card.priority === 'high'
+      ? '🔴'
+      : '🟢'
+    : null;
+
+  const baseClasses = `rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
+  const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
+
+  return (
+    <div
+      {...rest}
+      className={`${baseClasses}${subtleClasses} ${className}`.trim()}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
+        {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
+      </div>
+
+      {card.description ? (
+        <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-gray-400">
+          {card.description}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-1">
+        {card.tags && card.tags.length > 0
+          ? card.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
+              >
+                {tag}
+              </span>
+            ))
+          : null}
+        {card.due_date ? (
+          <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+            📅 {new Date(card.due_date).toLocaleDateString()}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDraggingRef: React.RefObject<boolean>; onCardClick: (cardId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -224,7 +277,7 @@ function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDrag
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.35 : 1,
   };
 
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -276,41 +329,12 @@ function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDrag
       onPointerMove={handlePointerMove}
       onPointerCancel={handlePointerCancel}
     >
-      <div
+      <CardVisual
         {...listeners}
-        className="block rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700/50 dark:bg-gray-800 cursor-grab active:cursor-grabbing"
-      >
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
-          {card.priority && card.priority !== "medium" && (
-            <span className="text-xs">
-              {card.priority === "high" ? "🔴" : "🟢"}
-            </span>
-          )}
-        </div>
-
-        {card.description && (
-          <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-gray-400">
-            {card.description}
-          </p>
-        )}
-
-        <div className="flex flex-wrap gap-1">
-          {card.tags && card.tags.length > 0 && card.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
-            >
-              {tag}
-            </span>
-          ))}
-          {card.due_date && (
-            <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-              📅 {new Date(card.due_date).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-      </div>
+        card={card}
+        withGrab
+        subtle={isDragging}
+      />
     </div>
   );
 }
@@ -386,6 +410,7 @@ function SortableList({
   sortBy,
   isDraggingRef,
   onCardClick,
+  isDropTarget,
 }: {
   list: List;
   cards: Card[];
@@ -398,6 +423,7 @@ function SortableList({
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
   isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
+  isDropTarget: boolean;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -434,11 +460,21 @@ function SortableList({
   const positionSorted = [...cards].sort((a, b) => a.position - b.position);
   const sortedCards = filterAndSortCards(positionSorted, searchQuery, selectedTags, selectedPriority, sortBy);
 
+  const containerClasses = `backdrop-blur-sm rounded-2xl p-4 w-72 md:w-80 flex-shrink-0 touch-none self-start transition-shadow transition-colors duration-150 ${
+    isDropTarget
+      ? 'bg-white/90 dark:bg-gray-800/70 border border-sky-300/70 shadow-lg ring-2 ring-sky-200/60 dark:ring-sky-600/40'
+      : 'bg-white/70 dark:bg-gray-800/60 border border-slate-200/50 dark:border-gray-700/50 shadow-md'
+  }`;
+
+  const dropZoneClasses = `mb-4 px-1 transition-colors duration-150 ${
+    isDropTarget ? 'bg-slate-100/70 dark:bg-gray-700/40 rounded-xl py-1' : ''
+  }`;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 w-72 md:w-80 flex-shrink-0 touch-none border border-slate-200/50 dark:border-gray-700/50 shadow-md self-start"
+      className={containerClasses}
       data-type="list"
       data-testid={`list-${list.id}`}
     >
@@ -510,7 +546,7 @@ function SortableList({
         )}
       </div>
 
-      <div className="mb-4 px-1" data-testid={`list-${list.id}-dropzone`}>
+      <div className={dropZoneClasses} data-testid={`list-${list.id}-dropzone`}>
         <SortableContext items={sortedCards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {sortedCards.map((card) => (
             <SortableCard
@@ -543,6 +579,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [currentBoardId, setCurrentBoardId] = useState<string>(initialBoardId);
   const [boardData, setBoardData] = useState<BoardData>(() => initialData ?? { lists: [], cards: [] });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
@@ -1093,16 +1130,28 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
     isDraggingRef.current = true;
+    const activeData = event.active.data.current;
+    if (activeData?.type === "card") {
+      const activeCard = activeData.card as Card;
+      setDragOverListId(activeCard.list_id);
+    } else {
+      setDragOverListId(null);
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      setDragOverListId(null);
+      return;
+    }
 
     const activeData = active.data.current;
     const overData = over.data.current;
 
     // カードをリスト間で移動（一時的な表示更新のみ）
+    let targetListId: string | null = null;
+
     if (activeData?.type === "card") {
       const activeCard = activeData.card as Card;
 
@@ -1118,6 +1167,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           });
           setBoardData({ ...boardData, cards: updatedCards });
         }
+        targetListId = overCard.list_id;
       }
       // リストの上に直接ドロップした場合
       else if (overData?.type === "list") {
@@ -1131,13 +1181,17 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           });
           setBoardData({ ...boardData, cards: updatedCards });
         }
+        targetListId = overList.id;
       }
     }
+
+    setDragOverListId(targetListId);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDragOverListId(null);
     // ドラッグ終了後、次ティックでクリック抑止を解除（イベント順の競合回避）
     setTimeout(() => {
       isDraggingRef.current = false;
@@ -1462,6 +1516,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const currentBoard = boards.find(b => b.id === currentBoardId);
   const sortedLists = [...boardData.lists].sort((a, b) => a.position - b.position);
   const selectedCard = selectedCardId ? boardData.cards.find((c) => c.id === selectedCardId) : null;
+  const activeCardOverlay = activeId ? boardData.cards.find((c) => c.id === activeId) ?? null : null;
+  const activeListOverlay = !activeCardOverlay && activeId ? boardData.lists.find((l) => l.id === activeId) ?? null : null;
 
   if (!isClient || loading) {
     return (
@@ -1726,6 +1782,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           onDragEnd={handleDragEnd}
           onDragCancel={() => {
             setActiveId(null);
+            setDragOverListId(null);
             // ドラッグキャンセル時も次ティックで解除
             setTimeout(() => {
               isDraggingRef.current = false;
@@ -1748,6 +1805,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                   sortBy={sortBy}
                   isDraggingRef={isDraggingRef}
                   onCardClick={handleOpenCardModal}
+                  isDropTarget={dragOverListId === list.id}
                 />
               ))}
             </SortableContext>
@@ -1763,9 +1821,16 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           </div>
 
           <DragOverlay>
-            {activeId ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-4 opacity-95 rotate-2 cursor-grabbing border border-sky-300 scale-105">
-                <span className="text-sm text-slate-600 dark:text-gray-300 font-medium">Dragging...</span>
+            {activeCardOverlay ? (
+              <CardVisual
+                card={activeCardOverlay}
+                withGrab={false}
+                className="shadow-2xl scale-105 border-sky-300/80 ring-2 ring-sky-200/50 dark:ring-sky-600/40"
+              />
+            ) : activeListOverlay ? (
+              <div className="w-72 md:w-80 rounded-2xl bg-white dark:bg-gray-800 border border-slate-200/70 dark:border-gray-700/70 shadow-2xl p-4">
+                <h2 className="font-bold text-lg text-slate-700 dark:text-gray-100 mb-2">{activeListOverlay.title}</h2>
+                <p className="text-xs text-slate-500 dark:text-gray-400">Dragging list...</p>
               </div>
             ) : null}
           </DragOverlay>

@@ -21,7 +21,11 @@ Use `npm run dev` for the local Next.js server on port 3000. Create production b
 The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explicit types on exported functions and keep indentation at two spaces. Use kebab-case for routes (`app/board-overview/page.tsx`), camelCase for variables and helpers, PascalCase for React components, and Tailwind utility classes for layout. Run `npm run lint` before sending changes to ensure consistent formatting.
 
 ## Testing Guidelines
-Playwright (`@playwright/test`) powers end-to-end coverage; organize scenarios with `test.describe` blocks and name files after the feature (`e2e/board.spec.ts`). Reuse the seeded Supabase auth state from `e2e/.setup/auth-global-setup.ts` rather than bypassing login flows. Reset the cached session if failures suggest expired tokens (`rm playwright/.auth/user.json`), and verify with browser DevTools that pages render without console errors or failed network requests.
+- Playwright (`@playwright/test`) で E2E を実行する際は、`npx playwright test --reporter=json > playwright-report.json` を必須コマンドとして使用し、常に JSON レポートを生成する。`.env.test` は `playwright.config.ts` が自動で読み込むため追加の `set -a` は不要。
+- 生成されたレポートは `cat playwright-report.json | jq '.stats'` で確認する。ファイル冒頭にセットアップのログが付く場合は `sed -n '/^{/,$p' playwright-report.json | jq '.stats'` として JSON 部分だけを jq に渡すこと。
+- `jq` が利用できない環境では `tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'` を用いて件数を抽出し、成功/失敗を明示する。
+- グローバルセットアップが Supabase 認証情報を `playwright/.auth/user.json` に保存するため、バイパスせず必ずこれを利用する。トークン失効時はファイルを削除して再実行する。
+- `e2e/` の各 spec はテスト用ボードを作成して `afterEach` で削除する設計なので、シナリオ追加時もデータ分離を徹底する。ドラッグ&ドロップなど時間が掛かる操作は既存ヘルパー (`dragAndDrop` など) を活用し、`waitForURL` や適切な待機を入れて安定化させる。
 
 ## Commit & Pull Request Guidelines
 Write short, imperative commit messages (English or Japanese), mirroring existing history such as `Add card modal view`. Keep each commit focused on one fix or feature. Pull requests should describe user-facing impact, summarize key changes, attach relevant screenshots or Playwright traces for UI work, and link tickets from `docs/tickets/` when applicable. Never commit or push without explicit user approval.
