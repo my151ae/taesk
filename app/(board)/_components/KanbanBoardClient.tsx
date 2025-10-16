@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, useMemo } from "react";
+import Image from "next/image";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
   DndContext,
@@ -25,7 +26,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { supabase, type Card, type List, type Board, type BoardData, type Priority } from "@/lib/supabase";
+import { supabase, type Card, type List, type Board, type BoardData, type Priority, type ProfileSummary } from "@/lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
@@ -41,6 +42,13 @@ type KanbanBoardClientProps = {
   initialBoard?: Board | null;
   initialData?: BoardData | null;
   initialCardId?: string | null;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
 };
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
@@ -216,14 +224,40 @@ type CardVisualProps = React.HTMLAttributes<HTMLDivElement> & {
   card: Card;
   subtle?: boolean;
   withGrab?: boolean;
+  assigneeProfile?: ProfileSummary | null;
+  legacyAssignee?: string | null;
 };
 
-function CardVisual({ card, subtle = false, withGrab = false, className = '', ...rest }: CardVisualProps) {
+function CardVisual({ card, subtle = false, withGrab = false, className = '', assigneeProfile = null, legacyAssignee = null, ...rest }: CardVisualProps) {
   const priorityIcon = card.priority && card.priority !== 'medium'
     ? card.priority === 'high'
       ? '🔴'
       : '🟢'
     : null;
+
+  const assigneeName = assigneeProfile
+    ? (assigneeProfile.full_name && assigneeProfile.full_name.trim().length > 0
+        ? assigneeProfile.full_name.trim()
+        : assigneeProfile.email ?? 'Unknown user')
+    : legacyAssignee;
+
+  const assigneeAlt = assigneeName ?? 'Assignee avatar';
+
+  const initialsSource = assigneeProfile?.full_name
+    ?? assigneeProfile?.email
+    ?? legacyAssignee
+    ?? '';
+
+  const assigneeInitials = initialsSource
+    ? initialsSource
+        .replace(/[^\p{L}\p{N}\s@.]/gu, ' ')
+        .trim()
+        .split(/\s+|@|\.|_/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('') || initialsSource.slice(0, 1).toUpperCase()
+    : '?';
 
   const baseClasses = `rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
@@ -242,6 +276,25 @@ function CardVisual({ card, subtle = false, withGrab = false, className = '', ..
         <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-gray-400">
           {card.description}
         </p>
+      ) : null}
+
+      {assigneeName ? (
+        <div className="mb-2 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
+          {assigneeProfile?.avatar_url ? (
+            <Image
+              src={assigneeProfile.avatar_url}
+              alt={assigneeAlt}
+              width={24}
+              height={24}
+              className="h-6 w-6 flex-none rounded-full object-cover shadow-sm"
+            />
+          ) : (
+            <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-200 text-slate-600 font-semibold dark:bg-gray-700 dark:text-gray-200">
+              {assigneeInitials}
+            </span>
+          )}
+          <span className="truncate">{assigneeName}</span>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-1">
@@ -265,7 +318,19 @@ function CardVisual({ card, subtle = false, withGrab = false, className = '', ..
   );
 }
 
-function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDraggingRef: React.RefObject<boolean>; onCardClick: (cardId: string) => void }) {
+function SortableCard({
+  card,
+  isDraggingRef,
+  onCardClick,
+  assigneeProfile = null,
+  legacyAssignee = null,
+}: {
+  card: Card;
+  isDraggingRef: React.RefObject<boolean>;
+  onCardClick: (cardId: string) => void;
+  assigneeProfile?: ProfileSummary | null;
+  legacyAssignee?: string | null;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: {
@@ -332,6 +397,8 @@ function SortableCard({ card, isDraggingRef, onCardClick }: { card: Card; isDrag
       <CardVisual
         {...listeners}
         card={card}
+        assigneeProfile={assigneeProfile}
+        legacyAssignee={legacyAssignee}
         withGrab
         subtle={isDragging}
       />
@@ -411,6 +478,7 @@ function SortableList({
   isDraggingRef,
   onCardClick,
   isDropTarget,
+  profilesById,
 }: {
   list: List;
   cards: Card[];
@@ -424,6 +492,7 @@ function SortableList({
   isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
   isDropTarget: boolean;
+  profilesById: Record<string, ProfileSummary>;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -554,6 +623,8 @@ function SortableList({
               card={card}
               isDraggingRef={isDraggingRef}
               onCardClick={onCardClick}
+              assigneeProfile={card.assignee_id ? profilesById[card.assignee_id] ?? null : null}
+              legacyAssignee={!card.assignee_id ? card.assigned_to ?? null : null}
             />
           ))}
         </SortableContext>
@@ -578,6 +649,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [boards, setBoards] = useState<Board[]>(() => (initialBoard ? [initialBoard] : []));
   const [currentBoardId, setCurrentBoardId] = useState<string>(initialBoardId);
   const [boardData, setBoardData] = useState<BoardData>(() => initialData ?? { lists: [], cards: [] });
+  const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dragOverListId, setDragOverListId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -624,6 +696,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const lastBoardPathRef = useRef<string | null>(null);
   const modalReturnPathRef = useRef<string | null>(null);
   const cards = boardData.cards;
+  const profilesById = useMemo(() => {
+    return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
+      map[profile.id] = profile;
+      return map;
+    }, {});
+  }, [profiles]);
 
   useEffect(() => {
     if (!selectedCardId) return;
@@ -715,6 +793,83 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     };
 
     loadBoards();
+  }, [user]);
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    const loadProfiles = async () => {
+      if (!user) {
+        if (!isDisposed) {
+          setProfiles([]);
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, email')
+          .order('full_name', { ascending: true });
+
+        if (error) {
+          console.warn('Error loading profiles:', error);
+        }
+
+        const rows = (data ?? []) as ProfileRow[];
+        const sanitized: ProfileSummary[] = rows.map((row) => ({
+          id: row.id,
+          full_name: row.full_name ?? null,
+          avatar_url: row.avatar_url ?? null,
+          email: row.email ?? null,
+        }));
+
+        const currentUserProfile: ProfileSummary | null = user
+          ? {
+              id: user.id,
+              full_name:
+                typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim().length > 0
+                  ? user.user_metadata.full_name
+                  : null,
+              avatar_url: typeof user.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null,
+              email: user.email ?? null,
+            }
+          : null;
+
+        const deduped = new Map<string, ProfileSummary>();
+        sanitized.forEach((profile) => {
+          deduped.set(profile.id, profile);
+        });
+
+        if (currentUserProfile && !deduped.has(currentUserProfile.id)) {
+          deduped.set(currentUserProfile.id, currentUserProfile);
+        }
+
+        if (!isDisposed) {
+          setProfiles(Array.from(deduped.values()));
+        }
+      } catch (profileError) {
+        console.error('Unexpected error loading profiles:', profileError);
+        if (!isDisposed && user) {
+          setProfiles([
+            {
+              id: user.id,
+              full_name: typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null,
+              avatar_url: typeof user.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null,
+              email: user.email ?? null,
+            },
+          ]);
+        } else if (!isDisposed) {
+          setProfiles([]);
+        }
+      }
+    };
+
+    loadProfiles();
+
+    return () => {
+      isDisposed = true;
+    };
   }, [user]);
 
   // Load board data when currentBoardId changes
@@ -1074,6 +1229,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_date: null,
       priority: 'medium',
       assigned_to: null,
+      assignee_id: null,
       short_id: shortId,
       id_short: idShort,
       slug,
@@ -1399,12 +1555,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     tags?: string[],
     due_date?: string | null,
     priority?: Priority,
-    assigned_to?: string | null
+    assigneeId?: string | null,
+    assigneeTouched?: boolean
   ) => {
     console.log('[handleSaveCard] Starting...', { id, title, description });
     const slug = slugify(title);
     const updatedCards = boardData.cards.map((card) => {
       if (card.id === id) {
+        const nextAssigneeId = assigneeId ?? null;
+        const shouldClearLegacy = nextAssigneeId !== null || assigneeTouched === true;
         return {
           ...card,
           title,
@@ -1412,7 +1571,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           tags: tags || [],
           due_date: due_date || null,
           priority: priority || 'medium',
-          assigned_to: assigned_to || null,
+          assignee_id: nextAssigneeId,
+          assigned_to: nextAssigneeId ? null : shouldClearLegacy ? null : card.assigned_to ?? null,
           slug,
           updated_at: new Date().toISOString(),
         };
@@ -1518,6 +1678,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const selectedCard = selectedCardId ? boardData.cards.find((c) => c.id === selectedCardId) : null;
   const activeCardOverlay = activeId ? boardData.cards.find((c) => c.id === activeId) ?? null : null;
   const activeListOverlay = !activeCardOverlay && activeId ? boardData.lists.find((l) => l.id === activeId) ?? null : null;
+  const activeCardAssigneeProfile = activeCardOverlay?.assignee_id
+    ? profilesById[activeCardOverlay.assignee_id] ?? null
+    : null;
+  const activeCardLegacyAssignee = activeCardOverlay && !activeCardOverlay.assignee_id
+    ? activeCardOverlay.assigned_to ?? null
+    : null;
 
   if (!isClient || loading) {
     return (
@@ -1806,6 +1972,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                   isDraggingRef={isDraggingRef}
                   onCardClick={handleOpenCardModal}
                   isDropTarget={dragOverListId === list.id}
+                  profilesById={profilesById}
                 />
               ))}
             </SortableContext>
@@ -1824,6 +1991,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             {activeCardOverlay ? (
               <CardVisual
                 card={activeCardOverlay}
+                assigneeProfile={activeCardAssigneeProfile}
+                legacyAssignee={activeCardLegacyAssignee}
                 withGrab={false}
                 className="shadow-2xl scale-105 border-sky-300/80 ring-2 ring-sky-200/50 dark:ring-sky-600/40"
               />
@@ -1900,6 +2069,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         <CardModal
           card={selectedCard}
           boards={boards}
+          profiles={profiles}
           onSave={handleSaveCard}
           onDelete={handleDeleteCard}
           onMoveToBoard={handleMoveCardToBoard}

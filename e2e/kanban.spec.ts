@@ -53,6 +53,39 @@ async function dragAndDrop(page: Page, source: Locator, target: Locator) {
   await page.waitForTimeout(500); // Wait for drop animation and Realtime sync
 }
 
+async function waitForCardRows<T extends Record<string, unknown>>(
+  boardId: string,
+  selectColumns: string,
+  options: { timeout?: number } = {}
+): Promise<T[]> {
+  const { timeout = 10000 } = options;
+  const start = Date.now();
+  let lastError: Error | null = null;
+
+  while (Date.now() - start < timeout) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select(selectColumns)
+      .eq('board_id', boardId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      lastError = new Error(error.message);
+    } else if (data && data.length > 0) {
+      return data as T[];
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);
+}
+
 test.describe('Taesk Kanban Board E2E Tests', () => {
   let testBoardId: string;
   let testBoardName: string;
@@ -81,10 +114,17 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
       slug: testBoardSlug,
     });
 
+    await supabase.from('profiles').upsert({
+      id: TEST_USER_ID,
+      full_name: 'E2E Test User',
+      email: process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com',
+      avatar_url: null,
+    });
+
     await page.goto('/');
 
     // Wait for page to load and auth to initialize
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
@@ -347,6 +387,58 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
+  test('should assign and clear a card assignee', async ({ page }) => {
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(300);
+
+    const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
+    await addCardButton.click();
+    await page.waitForTimeout(600);
+
+    const recentCards = await waitForCardRows<{ id: string }>(testBoardId, 'id');
+    const createdCardId = recentCards[0].id;
+
+    const cardLocator = page.locator(`[data-testid="card-${createdCardId}"]`).first();
+    await cardLocator.waitFor({ state: 'visible' });
+    await cardLocator.click();
+    await page.waitForTimeout(300);
+
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByLabel('Assignee')).toBeVisible();
+
+    const assigneeSearchInput = page.getByLabel('Assignee search');
+    await assigneeSearchInput.fill('E2E');
+    await page.getByLabel('Assignee').selectOption(TEST_USER_ID);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });
+    await expect(cardLocator.getByText('E2E Test User')).toBeVisible();
+
+    await cardLocator.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    const assigneeSelect = page.getByLabel('Assignee');
+    await expect(assigneeSelect).toHaveValue(TEST_USER_ID);
+
+    await assigneeSelect.selectOption('');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });
+    await expect(cardLocator.getByText('E2E Test User')).toHaveCount(0);
+
+    await expect.poll(async () => {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('assignee_id, assigned_to')
+        .eq('id', createdCardId)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    }, { timeout: 10000 }).toMatchObject({ assignee_id: null, assigned_to: null });
+  });
+
   test('should drag and drop a card within the same list', async ({ page }) => {
     // First add a list
     await page.getByRole('button', { name: '+ Add List' }).click();
@@ -419,7 +511,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Reload page directly to test board URL
     await page.goto(`/?board=${testBoardId}`);
     await page.waitForURL(`**${testBoardCanonicalPath}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
@@ -519,7 +611,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     // Verify data persisted to Supabase by reloading directly to test board URL
     await page.goto(`/?board=${testBoardId}`);
     await page.waitForURL(`**${testBoardCanonicalPath}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
@@ -541,16 +633,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
-    const { data: cards } = await supabase
-      .from('cards')
-      .select('short_id, id_short, slug, id, title')
-      .eq('board_id', testBoardId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    expect(cards).toBeTruthy();
-    expect(cards!.length).toBe(1);
-    const card = cards![0];
+    const cards = await waitForCardRows<{ short_id: string; id_short: number | null; slug: string | null; id: string; title: string }>(
+      testBoardId,
+      'short_id, id_short, slug, id, title'
+    );
+    const card = cards[0];
     expect(card.short_id).toBeTruthy();
 
     // Soft navigate via card click
@@ -579,16 +666,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
-    const { data: cards } = await supabase
-      .from('cards')
-      .select('short_id, id_short, slug, title')
-      .eq('board_id', testBoardId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    expect(cards).toBeTruthy();
-    expect(cards!.length).toBe(1);
-    const card = cards![0];
+    const cards = await waitForCardRows<{ short_id: string; id_short: number | null; slug: string | null; title: string }>(
+      testBoardId,
+      'short_id, id_short, slug, title'
+    );
+    const card = cards[0];
     expect(card.short_id).toBeTruthy();
 
     await page.goto(`/c/${card.short_id}`);
@@ -613,16 +695,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
-    const { data: cards } = await supabase
-      .from('cards')
-      .select('short_id, id_short, slug, title')
-      .eq('board_id', testBoardId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    expect(cards).toBeTruthy();
-    expect(cards!.length).toBe(1);
-    const card = cards![0];
+    const cards = await waitForCardRows<{ short_id: string; id_short: number | null; slug: string | null; title: string }>(
+      testBoardId,
+      'short_id, id_short, slug, title'
+    );
+    const card = cards[0];
     expect(card.short_id).toBeTruthy();
 
     // Build expected canonical path

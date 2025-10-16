@@ -1,12 +1,53 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { Card, Board, Priority } from "@/lib/supabase";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import type { Card, Board, Priority, ProfileSummary } from "@/lib/supabase";
+
+const getProfileDisplayName = (profile: ProfileSummary): string => {
+  if (profile.full_name && profile.full_name.trim().length > 0) {
+    return profile.full_name.trim();
+  }
+  if (profile.email) {
+    return profile.email;
+  }
+  return 'Unknown user';
+};
+
+const getProfileInitials = (profile: ProfileSummary): string => {
+  const source = profile.full_name && profile.full_name.trim().length > 0 ? profile.full_name : profile.email ?? '';
+  if (!source) return '?';
+
+  const words = source
+    .replace(/[^\p{L}\p{N}\s@.]/gu, ' ')
+    .trim()
+    .split(/\s+|@|\.|_/)
+    .filter(Boolean);
+
+  if (words.length === 0) return source.slice(0, 1).toUpperCase();
+
+  const initials = words
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+
+  return initials || source.slice(0, 1).toUpperCase();
+};
 
 interface CardModalProps {
   card: Card;
   boards: Board[];
-  onSave: (id: string, title: string, description: string, tags?: string[], due_date?: string | null, priority?: Priority, assigned_to?: string | null) => void;
+  profiles: ProfileSummary[];
+  onSave: (
+    id: string,
+    title: string,
+    description: string,
+    tags?: string[],
+    due_date?: string | null,
+    priority?: Priority,
+    assigneeId?: string | null,
+    assigneeTouched?: boolean
+  ) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
   onClose: () => void;
@@ -17,6 +58,7 @@ export function CardModal({
   boards,
   onSave,
   onDelete,
+  profiles,
   onMoveToBoard,
   onClose,
 }: CardModalProps) {
@@ -26,13 +68,41 @@ export function CardModal({
   const [tagInput, setTagInput] = useState('');
   const [dueDate, setDueDate] = useState(card.due_date || '');
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
-  const [assignedTo, setAssignedTo] = useState(card.assigned_to || '');
+  const [assigneeId, setAssigneeId] = useState(card.assignee_id || '');
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [legacyAssignee, setLegacyAssignee] = useState(card.assignee_id ? null : (card.assigned_to ?? null));
+  const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const onCloseRef = useRef(onClose);
+
+  const filteredProfiles = useMemo(() => {
+    const query = assigneeSearch.trim().toLowerCase();
+    const base = !query
+      ? profiles
+      : profiles.filter((profile) => {
+        const name = profile.full_name?.toLowerCase() ?? '';
+        const email = profile.email?.toLowerCase() ?? '';
+        return name.includes(query) || email.includes(query);
+      });
+
+    if (assigneeId) {
+      const selected = profiles.find((profile) => profile.id === assigneeId);
+      if (selected && !base.some((profile) => profile.id === selected.id)) {
+        return [...base, selected];
+      }
+    }
+
+    return base;
+  }, [profiles, assigneeSearch, assigneeId]);
+
+  const selectedAssignee = useMemo(() => {
+    if (!assigneeId) return null;
+    return profiles.find((profile) => profile.id === assigneeId) ?? null;
+  }, [profiles, assigneeId]);
 
   // onClose ref を最新に保つ
   useEffect(() => {
@@ -49,7 +119,10 @@ export function CardModal({
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setPriority(card.priority || 'medium');
-      setAssignedTo(card.assigned_to || '');
+      setAssigneeId(card.assignee_id || '');
+      setLegacyAssignee(card.assignee_id ? null : (card.assigned_to ?? null));
+      setAssigneeSearch('');
+      setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
       setIsDirty(false);
     } else if (!isDirty) {
@@ -59,7 +132,9 @@ export function CardModal({
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setPriority(card.priority || 'medium');
-      setAssignedTo(card.assigned_to || '');
+      setAssigneeId(card.assignee_id || '');
+      setLegacyAssignee(card.assignee_id ? null : (card.assigned_to ?? null));
+      setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
     }
   }, [card, isDirty]);
@@ -138,7 +213,7 @@ export function CardModal({
   }, []); // 空配列でマウント時のみ実行
 
   const handleSave = () => {
-    onSave(card.id, title, description, tags, dueDate || null, priority, assignedTo || null);
+    onSave(card.id, title, description, tags, dueDate || null, priority, assigneeId || null, assigneeTouched);
 
     if (targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);
@@ -294,6 +369,68 @@ export function CardModal({
               <option value="medium">🟡 Medium</option>
               <option value="high">🔴 High</option>
             </select>
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <label htmlFor="assignee-select" className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+              Assignee
+            </label>
+            {legacyAssignee ? (
+              <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
+                旧形式で登録された担当者: {legacyAssignee}（新しい担当者を選択すると更新されます）
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              <input
+                id="assignee-search"
+                type="text"
+                value={assigneeSearch}
+                onChange={(e) => setAssigneeSearch(e.target.value)}
+                placeholder="Search by name or email"
+                aria-label="Assignee search"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              />
+              <select
+                id="assignee-select"
+                value={assigneeId}
+                onChange={(e) => {
+                  setAssigneeId(e.target.value);
+                  setLegacyAssignee(null);
+                  setIsDirty(true);
+                  setAssigneeTouched(true);
+                }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="">未割り当て</option>
+                {filteredProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {getProfileDisplayName(profile)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedAssignee ? (
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
+                {selectedAssignee.avatar_url ? (
+                  <Image
+                    src={selectedAssignee.avatar_url}
+                    alt={getProfileDisplayName(selectedAssignee)}
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-semibold dark:bg-gray-700 dark:text-gray-200">
+                    {getProfileInitials(selectedAssignee)}
+                  </span>
+                )}
+                <span>{getProfileDisplayName(selectedAssignee)}</span>
+                {selectedAssignee.email ? (
+                  <span className="text-slate-400 dark:text-gray-500">({selectedAssignee.email})</span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {/* Move to Board */}

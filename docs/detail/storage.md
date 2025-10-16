@@ -77,6 +77,7 @@ const handleAddCard = async (listId: string) => {
     due_date: null,
     priority: 'medium',
     assigned_to: null,
+    assignee_id: null,
     short_id: shortId,
     id_short: idShort,
     slug: slugify('New Card'),

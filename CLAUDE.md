@@ -144,7 +144,7 @@ Offline? → `addToSyncQueue({ type, table, data })`
 
 - **boards**: `id`, `name`, `short_id`, `id_short`, `slug`, `is_test_board`, timestamps
 - **lists**: `id`, `title`, `position`, `board_id`, `user_id`, timestamps
-- **cards**: `id`, `title`, `description`, `list_id`, `board_id`, `tags[]`, `due_date`, `priority`, `assigned_to`, `short_id`, `id_short`, `slug`, timestamps
+- **cards**: `id`, `title`, `description`, `list_id`, `board_id`, `tags[]`, `due_date`, `priority`, `assignee_id`, `short_id`, `id_short`, `slug`, timestamps（`assigned_to` は legacy）
 - **activity_logs**: ボードごとの監査ログ（`action`, `entity_type`, `details`）
 
 ### Relationships

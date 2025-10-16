@@ -43,12 +43,21 @@ export interface Card {
   tags: string[];
   due_date: string | null;
   priority: Priority;
+  /** @deprecated legacy text-based assignee field */
   assigned_to: string | null;
+  assignee_id: string | null;
   short_id: string | null;
   id_short: number | null;
   slug: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProfileSummary {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
 }
 
 export interface List {

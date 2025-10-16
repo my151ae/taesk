@@ -37,6 +37,7 @@ type CardRow = {
   due_date: string | null;
   priority: CardDetail['priority'] | null;
   assigned_to: string | null;
+  assignee_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -81,6 +82,7 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
         'due_date',
         'priority',
         'assigned_to',
+        'assignee_id',
         'created_at',
         'updated_at',
       ].join(','),
@@ -112,7 +114,7 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
     tags: Array.isArray(data.tags) ? data.tags : [],
     dueDate: data.due_date ?? null,
     priority: (data.priority ?? 'medium') as CardDetail['priority'],
-    assignedTo: data.assigned_to ?? null,
+    assignedTo: data.assignee_id ?? data.assigned_to ?? null,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     permitted: true,

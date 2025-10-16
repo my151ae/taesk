@@ -10,9 +10,9 @@ Taesk は Supabase（PostgreSQL）を使用し、ボードを中心にリスト�
 | `lists`  | ボード内のリスト | ボード FK、表示順 (`position`) を管理 |
 | `cards`  | リスト内のカード | タグ、期限、優先度、担当者、ショートURLを持つ |
 | `activity_logs` | 監査ログ | 操作履歴（作成/更新/削除/移動）を記録 |
-| `profiles`※ | 将来拡張用 | Supabase Auth ユーザー情報を拡張予定（現在は未使用） |
+| `profiles` | ユーザープロファイル | Supabase Auth ユーザー情報の拡張・担当者選択に利用 |
 
-※ Supabase の `auth.users` と連動させる場合に使用予定（現状は共有ボード運用のため `user_id` を `NULL` 許容）。
+`profiles` テーブルは Supabase の `auth.users` を拡張し、担当者表示名やアバターなどのメタデータを保持します。共有ボード運用のため `user_id` はこれまで同様 `NULL` を許容します。
 
 ## エンティティ関係図
 
@@ -76,7 +76,8 @@ CREATE TABLE public.cards (
   tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   due_date TIMESTAMPTZ NULL,
   priority TEXT NOT NULL DEFAULT 'medium', -- enum: low / medium / high
-  assigned_to TEXT NULL,
+  assignee_id UUID NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
+  assigned_to TEXT NULL, -- legacy fallback (v0.3 以前のテキスト担当者)
   short_id TEXT UNIQUE,
   id_short INTEGER NULL,
   slug TEXT NULL,
@@ -92,7 +93,26 @@ CREATE INDEX idx_cards_short_id ON public.cards(short_id);
 - ショート URL は `createUniqueShortId()`（base62 8 文字）と `slugify()` で生成。
 - `id_short` はボード内の連番（例: `1-setup-backlog`）。
 - `tags` は Playwright テストで `Array.isArray()` か確認されるため空配列で初期化。
-- `assigned_to` は v0.3 で追加（将来的には `profiles` テーブル参照予定）。
+- `assignee_id` は v0.3.1 で追加。`profiles` テーブルを参照して担当者の ID を保持する。
+- `assigned_to` はレガシー互換用のテキスト列（旧データの移行完了後に削除予定）。
+
+## profiles
+
+```sql
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT,
+  avatar_url TEXT,
+  email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_profiles_email ON public.profiles(email);
+```
+
+- Supabase Auth からのサインアップ時に Edge Function などで `full_name` / `avatar_url` を同期する想定。
+- Playwright/E2E テストでは `profiles` にテストユーザーを upsert して担当者選択を検証する。
 
 ## activity_logs
 
