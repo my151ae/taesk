@@ -1,4 +1,4 @@
-[dotenv@17.2.3] injecting env (7) from .env.test -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
 [Global Setup] Starting authentication setup...
 [Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
 [Global Setup] User status: already exists
@@ -91,12 +91,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5882,
+                      "duration": 1968,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:20.158Z",
+                      "startTime": "2025-10-16T08:29:48.737Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -125,12 +125,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 2890,
+                      "duration": 1525,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:20.157Z",
+                      "startTime": "2025-10-16T08:29:48.730Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -159,12 +159,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 2875,
+                      "duration": 1541,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:20.158Z",
+                      "startTime": "2025-10-16T08:29:48.730Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -201,12 +201,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 5420,
+                      "duration": 2004,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:20.151Z",
+                      "startTime": "2025-10-16T08:29:48.732Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -235,12 +235,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 2585,
+                      "duration": 833,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:23.707Z",
+                      "startTime": "2025-10-16T08:29:50.483Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -286,12 +286,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 9397,
+                      "duration": 6412,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:23.840Z",
+                      "startTime": "2025-10-16T08:29:50.580Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -317,15 +317,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 14498,
+                      "duration": 6484,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:26.410Z",
+                      "startTime": "2025-10-16T08:29:50.942Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -351,15 +351,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 14895,
+                      "duration": 8096,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:26.411Z",
+                      "startTime": "2025-10-16T08:29:50.995Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -385,15 +385,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 13681,
+                      "duration": 6686,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:27.058Z",
+                      "startTime": "2025-10-16T08:29:51.404Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -422,12 +422,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 7295,
+                      "duration": 4859,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:33.533Z",
+                      "startTime": "2025-10-16T08:29:57.020Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -456,12 +456,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5862,
+                      "duration": 5122,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:40.851Z",
+                      "startTime": "2025-10-16T08:29:57.451Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -487,15 +487,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 6449,
+                      "duration": 5311,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:40.977Z",
+                      "startTime": "2025-10-16T08:29:58.118Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -521,15 +521,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 9355,
+                      "duration": 8602,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:41.096Z",
+                      "startTime": "2025-10-16T08:29:59.143Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -555,15 +555,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 6016,
+                      "duration": 5033,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:41.428Z",
+                      "startTime": "2025-10-16T08:30:01.903Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -592,12 +592,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6274,
+                      "duration": 7137,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:46.728Z",
+                      "startTime": "2025-10-16T08:30:02.585Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -623,15 +623,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 8667,
+                      "duration": 9147,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:47.442Z",
+                      "startTime": "2025-10-16T08:30:03.450Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -641,7 +641,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-f25b95cd6316336e108e",
               "file": "kanban.spec.ts",
-              "line": 387,
+              "line": 396,
               "column": 7
             },
             {
@@ -657,15 +657,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 5852,
+                      "duration": 6102,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:47.471Z",
+                      "startTime": "2025-10-16T08:30:06.951Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -675,7 +675,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-9f16ba163d5347334c10",
               "file": "kanban.spec.ts",
-              "line": 433,
+              "line": 442,
               "column": 7
             },
             {
@@ -691,15 +691,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 8476,
+                      "duration": 7977,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:50.466Z",
+                      "startTime": "2025-10-16T08:30:07.780Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -709,7 +709,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-d520cbf701cfb4afb5e3",
               "file": "kanban.spec.ts",
-              "line": 518,
+              "line": 527,
               "column": 7
             },
             {
@@ -728,12 +728,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 9381,
+                      "duration": 8035,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:53.027Z",
+                      "startTime": "2025-10-16T08:30:09.736Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -743,7 +743,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a38f0c18c888a753f7eb",
               "file": "kanban.spec.ts",
-              "line": 544,
+              "line": 553,
               "column": 7
             },
             {
@@ -762,12 +762,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 11700,
+                      "duration": 8574,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:53.335Z",
+                      "startTime": "2025-10-16T08:30:12.616Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -777,7 +777,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a0400f7813e80587053f",
               "file": "kanban.spec.ts",
-              "line": 574,
+              "line": 583,
               "column": 7
             },
             {
@@ -793,15 +793,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 8395,
+                      "duration": 6158,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:56.126Z",
+                      "startTime": "2025-10-16T08:30:13.062Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -811,7 +811,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-ac158ecdfff8f34f2143",
               "file": "kanban.spec.ts",
-              "line": 602,
+              "line": 611,
               "column": 7
             },
             {
@@ -827,15 +827,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 8777,
+                      "duration": 3664,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:09:58.959Z",
+                      "startTime": "2025-10-16T08:30:15.795Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -845,7 +845,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-f85e626f89fa58d034c4",
               "file": "kanban.spec.ts",
-              "line": 612,
+              "line": 621,
               "column": 7
             },
             {
@@ -864,12 +864,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6558,
+                      "duration": 4051,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:02.444Z",
+                      "startTime": "2025-10-16T08:30:17.790Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -879,7 +879,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-80bd8b44a12150583e53",
               "file": "kanban.spec.ts",
-              "line": 624,
+              "line": 633,
               "column": 7
             },
             {
@@ -895,15 +895,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 14391,
+                      "duration": 14154,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:04.592Z",
+                      "startTime": "2025-10-16T08:30:19.236Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -913,7 +913,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-46f2a30c7599f7ec2cd7",
               "file": "kanban.spec.ts",
-              "line": 635,
+              "line": 644,
               "column": 7
             },
             {
@@ -929,15 +929,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 9417,
+                      "duration": 11535,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:05.339Z",
+                      "startTime": "2025-10-16T08:30:19.470Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -947,7 +947,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-b1a4ab0131ed45f4c8e5",
               "file": "kanban.spec.ts",
-              "line": 701,
+              "line": 710,
               "column": 7
             },
             {
@@ -963,15 +963,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 11804,
+                      "duration": 11838,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:07.758Z",
+                      "startTime": "2025-10-16T08:30:21.864Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -981,7 +981,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-7ea69653d85b3eacb8b5",
               "file": "kanban.spec.ts",
-              "line": 734,
+              "line": 745,
               "column": 7
             },
             {
@@ -1000,12 +1000,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 11080,
+                      "duration": 12402,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:09.036Z",
+                      "startTime": "2025-10-16T08:30:21.878Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1015,7 +1015,75 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a6e7d7adb91ae80b29f3",
               "file": "kanban.spec.ts",
-              "line": 764,
+              "line": 775,
+              "column": 7
+            },
+            {
+              "title": "should handle invalid card URL gracefully without crashing",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 7073,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-16T08:30:31.050Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-b5323dbe57c8286f212b",
+              "file": "kanban.spec.ts",
+              "line": 822,
+              "column": 7
+            },
+            {
+              "title": "should prevent navigation crash when card not yet synced",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 6733,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-16T08:30:33.422Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-89acde676aaa1409ef78",
+              "file": "kanban.spec.ts",
+              "line": 852,
               "column": 7
             }
           ]
@@ -1051,12 +1119,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 0,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.825Z",
+                      "startTime": "2025-10-16T08:30:33.752Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1085,12 +1153,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 0,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.831Z",
+                      "startTime": "2025-10-16T08:30:33.767Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1124,7 +1192,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.837Z",
+                      "startTime": "2025-10-16T08:30:33.779Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1158,7 +1226,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.843Z",
+                      "startTime": "2025-10-16T08:30:33.790Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1187,12 +1255,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 0,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.847Z",
+                      "startTime": "2025-10-16T08:30:33.797Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1229,12 +1297,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.851Z",
+                      "startTime": "2025-10-16T08:30:33.806Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1268,7 +1336,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.860Z",
+                      "startTime": "2025-10-16T08:30:33.818Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1302,7 +1370,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-16T07:10:14.864Z",
+                      "startTime": "2025-10-16T08:30:33.823Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1322,9 +1390,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-10-16T07:09:07.795Z",
-    "duration": 72496.73300000001,
-    "expected": 35,
+    "startTime": "2025-10-16T08:29:45.029Z",
+    "duration": 55192.366,
+    "expected": 37,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

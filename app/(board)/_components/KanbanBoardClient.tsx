@@ -717,6 +717,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const modalReturnPathRef = useRef<string | null>(null);
   const supportsAssigneeIdRef = useRef<boolean | null>(null);
   const searchParams = useSearchParams();
+  const suppressModalFromQueryRef = useRef(false);
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
     return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
@@ -751,6 +752,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
     const cardParam = searchParams?.get('card');
     if (!cardParam && selectedCardIdRef.current) {
+      suppressModalFromQueryRef.current = false;
       setSelectedCardId(null);
       setCardModalStatus('loading');
     }
@@ -759,6 +761,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   useEffect(() => {
     const shortId = searchParams?.get('card');
     if (!shortId) {
+      suppressModalFromQueryRef.current = false;
+      return;
+    }
+
+    if (suppressModalFromQueryRef.current) {
+      suppressModalFromQueryRef.current = false;
       return;
     }
 
@@ -1602,6 +1610,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   const handleCloseCardModal = () => {
     console.log('[handleCloseCardModal] Starting...');
+    suppressModalFromQueryRef.current = true;
     setSelectedCardId(null);
     setCardModalStatus('loading');
 
