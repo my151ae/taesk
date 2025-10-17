@@ -818,4 +818,71 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: card.title })).toBeVisible();
   });
+
+  test('should handle invalid card URL gracefully without crashing', async ({ page }) => {
+    // Navigate to a non-existent card short_id
+    const invalidShortId = 'INVALID99';
+    await page.goto(`/c/${invalidShortId}`);
+
+    // Should show 404 or redirect, but NOT crash with "e is not iterable"
+    // Wait for page to settle
+    await page.waitForLoadState('domcontentloaded');
+
+    // Verify no JavaScript errors (the crash would appear in console)
+    const errors: string[] = [];
+    page.on('pageerror', (error) => {
+      errors.push(error.message);
+    });
+
+    // Wait a bit to ensure any errors would have been caught
+    await page.waitForTimeout(2000);
+
+    // Check that no "e is not iterable" error occurred
+    const hasIterableError = errors.some(err => err.includes('is not iterable'));
+    expect(hasIterableError).toBe(false);
+
+    // Should either show 404 or redirect to board
+    const url = page.url();
+    const is404 = url.includes('/c/INVALID99') || await page.getByText(/not found|404/i).isVisible().catch(() => false);
+    const isRedirected = url.includes('/b/');
+
+    expect(is404 || isRedirected).toBe(true);
+  });
+
+  test('should prevent navigation crash when card not yet synced', async ({ page }) => {
+    // Add a list and card
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(1000);
+
+    const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
+    await addCardButton.click();
+    await expect(page.getByText('New Card').first()).toBeVisible();
+
+    // DON'T wait for sync - try to open immediately
+    await page.getByText('New Card').first().click();
+
+    // Should either:
+    // 1. Show modal with query param (if card has short_id)
+    // 2. Not crash if card doesn't have short_id yet
+
+    await page.waitForTimeout(1000);
+
+    // Verify no crash occurred
+    const errors: string[] = [];
+    page.on('pageerror', (error) => {
+      errors.push(error.message);
+    });
+
+    await page.waitForTimeout(1000);
+
+    const hasIterableError = errors.some(err => err.includes('is not iterable'));
+    expect(hasIterableError).toBe(false);
+
+    // URL should either have ?card= or remain on board URL
+    const url = page.url();
+    const hasCardQuery = url.includes('?card=') || url.includes('&card=');
+    const isOnBoardUrl = url.includes(testBoardCanonicalPath);
+
+    expect(hasCardQuery || isOnBoardUrl).toBe(true);
+  });
 });

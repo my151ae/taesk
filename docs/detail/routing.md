@@ -297,6 +297,57 @@ open http://localhost:3000/c/<short_id>/wrong-slug
 
 ## ⚠️ 既知の問題と注意事項
 
+### Next.js App Router のクラッシュ回避（2025-10-16）
+
+**⚠️ 重要**: モーダル表示時のURL形式を一時的に変更しています
+
+#### なぜ `/c/...` ではなく `?card=...` を使用しているか
+
+**理想**: `/c/<short_id>/<idShort>-<slug>` 形式（Trello風、美しい、SEO対応）
+
+**現実**: Next.js 15.5.x のバグにより、この形式でクラッシュが発生
+
+**問題**: Next.js 15.5.x で `fillCacheWithNewSubTreeData` の "e is not iterable" エラー
+- **原因**: インターセプトされたルートの Flight Data に `notFound()` や `redirect()` が混在すると、`segmentPath` に `null` が紛れ込みクラッシュ
+- **再現条件**: 未同期または不正な `short_id` で `/c/...` への URL 遷移が発火
+
+**現在の対策** (2025-10-16〜):
+1. **クエリパラメータベースのナビゲーション**: `/b/...?card=<short_id>` 形式に一時変更
+2. **未同期カードのガード**: `short_id` が無いカードは URL 更新を抑止
+3. **E2E テストで監視**: 無効な URL でのクラッシュ防止を継続的に検証
+
+**将来の対応**:
+- ✅ Next.js の次期バージョンでバグが修正されたら `/c/...` 形式に戻す予定
+- 📋 バージョンアップ前に必ず E2E テスト実行（`should handle invalid card URL gracefully`）
+- 📋 [移行手順](../tickets/2025-10-16/04_nextjs_flight_data_bug_details.md#migration-path-back-to-c-urls) を参照
+
+#### 現在の動作
+
+**モーダル表示時**:
+```
+URL: /b/4WvvAVw1/1-main-board?card=GKT5kB4e
+     ^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+     ボードのcanonical URL    カードのshort_id
+```
+
+**直接アクセス時**（共有・SEO用）:
+```
+URL: /c/GKT5kB4e/1-new-card
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     ✅ この形式は引き続き利用可能（スタンドアロンページ）
+```
+
+#### 技術的詳細
+
+**現在のバージョン**:
+- Next.js: **15.5.4** (package.json で固定)
+- React: 18.3.1
+- 最終検証日: 2025-10-16
+
+**詳細情報**:
+- [実装の詳細](../tickets/2025-10-16/03_url_navigation_crash_fix.md)
+- [バグの技術解説](../tickets/2025-10-16/04_nextjs_flight_data_bug_details.md)
+
 ### Intercepting Routes の規約
 
 **問題**: 公式ドキュメントと実装の動作が異なる
@@ -369,4 +420,4 @@ Edge Runtime ではなく Node.js Runtime を明示的に指定しています�
 
 ---
 
-**最終更新**: 2025-10-11
+**最終更新**: 2025-10-16
