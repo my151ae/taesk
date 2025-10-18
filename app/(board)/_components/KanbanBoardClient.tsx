@@ -47,6 +47,8 @@ import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from 
 import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
+import ShareDialog from "./ShareDialog";
+import NotificationsBell from "./NotificationsBell";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -685,6 +687,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   // モーダル状態管理（クライアントサイド・即時表示）
   const [selectedCardId, setSelectedCardId] = useState<string | null>(initialCardId ?? null);
   const [cardModalStatus, setCardModalStatus] = useState<'loading' | 'ready' | 'error'>(initialCardId ? 'ready' : 'loading');
+
+  // Phase3: Share dialog state
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -1913,6 +1918,17 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <NotificationsBell />
+            <button
+              onClick={() => setShowShareDialog(true)}
+              className="px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              title="Share board"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share
+            </button>
             <span className="text-sm text-gray-600">{user.email}</span>
             <button
               onClick={async () => {
@@ -2176,6 +2192,14 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           onDelete={handleDeleteCard}
           onMoveToBoard={handleMoveCardToBoard}
           onClose={handleCloseCardModal}
+        />
+      )}
+
+      {/* Phase3: Share Dialog */}
+      {showShareDialog && (
+        <ShareDialog
+          boardId={currentBoardId}
+          onClose={() => setShowShareDialog(false)}
         />
       )}
 
