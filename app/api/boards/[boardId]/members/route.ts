@@ -5,10 +5,10 @@ import { BoardMember, MemberRole, ProfileSummary } from '@/lib/supabase';
 // GET /api/boards/[boardId]/members - List members with optional search
 export async function GET(
   request: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   const supabase = createClient();
-  const { boardId } = params;
+  const { boardId } = await params;
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
 
@@ -76,10 +76,10 @@ export async function GET(
 // POST /api/boards/[boardId]/members - Add member
 export async function POST(
   request: NextRequest,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
   const supabase = createClient();
-  const { boardId } = params;
+  const { boardId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

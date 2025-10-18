@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 // PATCH /api/notifications/[notificationId] - Mark notification as read
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { notificationId: string } }
+  { params }: { params: Promise<{ notificationId: string }> }
 ) {
   const supabase = createClient();
-  const { notificationId } = params;
+  const { notificationId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

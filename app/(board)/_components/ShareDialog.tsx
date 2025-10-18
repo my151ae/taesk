@@ -35,6 +35,7 @@ export default function ShareDialog({ boardId, onClose }: ShareDialogProps) {
     if (featureFlags.boardPermissions) {
       loadMembers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);
 
   const loadMembers = async () => {

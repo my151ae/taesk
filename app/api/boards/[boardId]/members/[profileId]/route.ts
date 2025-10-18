@@ -5,10 +5,10 @@ import { MemberRole } from '@/lib/supabase';
 // PATCH /api/boards/[boardId]/members/[profileId] - Update member role
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { boardId: string; profileId: string } }
+  { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
   const supabase = createClient();
-  const { boardId, profileId } = params;
+  const { boardId, profileId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -47,10 +47,10 @@ export async function PATCH(
 // DELETE /api/boards/[boardId]/members/[profileId] - Remove member
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { boardId: string; profileId: string } }
+  { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
   const supabase = createClient();
-  const { boardId, profileId } = params;
+  const { boardId, profileId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

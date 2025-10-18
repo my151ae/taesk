@@ -31,6 +31,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
       loadComments();
       loadMembers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardId]);
 
   useEffect(() => {

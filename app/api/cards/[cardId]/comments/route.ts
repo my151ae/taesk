@@ -5,10 +5,10 @@ import { Comment, CommentWithAuthor } from '@/lib/supabase';
 // GET /api/cards/[cardId]/comments - List comments for a card
 export async function GET(
   request: NextRequest,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   const supabase = createClient();
-  const { cardId } = params;
+  const { cardId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -61,10 +61,10 @@ export async function GET(
 // POST /api/cards/[cardId]/comments - Create a comment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   const supabase = createClient();
-  const { cardId } = params;
+  const { cardId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

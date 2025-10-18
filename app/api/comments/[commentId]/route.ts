@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 // PATCH /api/comments/[commentId] - Update a comment
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   const supabase = createClient();
-  const { commentId } = params;
+  const { commentId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -57,10 +57,10 @@ export async function PATCH(
 // DELETE /api/comments/[commentId] - Soft delete a comment
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   const supabase = createClient();
-  const { commentId } = params;
+  const { commentId } = await params;
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
