@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 
 // PATCH /api/comments/[commentId] - Update a comment
@@ -6,7 +6,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ commentId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { commentId } = await params;
 
   try {
@@ -59,7 +59,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ commentId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { commentId } = await params;
 
   try {

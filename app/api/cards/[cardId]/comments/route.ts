@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { Comment, CommentWithAuthor } from '@/lib/supabase';
 
@@ -7,7 +7,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ cardId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { cardId } = await params;
 
   try {
@@ -63,7 +63,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ cardId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { cardId } = await params;
 
   try {

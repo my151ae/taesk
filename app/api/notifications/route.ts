@@ -1,10 +1,10 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { Notification } from '@/lib/supabase';
 
 // GET /api/notifications - List notifications for current user
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/notifications - Create a notification
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

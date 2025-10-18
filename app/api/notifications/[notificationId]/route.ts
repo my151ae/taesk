@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 
 // PATCH /api/notifications/[notificationId] - Mark notification as read
@@ -6,7 +6,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ notificationId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { notificationId } = await params;
 
   try {

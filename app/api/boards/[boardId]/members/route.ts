@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { BoardMember, MemberRole, ProfileSummary } from '@/lib/supabase';
 
@@ -7,7 +7,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { boardId } = await params;
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
@@ -78,7 +78,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { boardId } = await params;
 
   try {

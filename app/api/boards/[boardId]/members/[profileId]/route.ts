@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { MemberRole } from '@/lib/supabase';
 
@@ -7,7 +7,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
 
   try {
@@ -49,7 +49,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
 
   try {
