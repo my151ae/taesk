@@ -120,3 +120,66 @@ export interface ActivityLog {
   details: Record<string, unknown> | null;
   created_at: string;
 }
+
+// Phase 3: Collaboration types
+
+export type MemberRole = 'owner' | 'editor' | 'commenter' | 'viewer';
+
+export interface BoardMember {
+  board_id: string;
+  profile_id: string;
+  role: MemberRole;
+  created_at: string;
+}
+
+export interface BoardInvite {
+  id: string;
+  board_id: string;
+  email: string;
+  role: MemberRole;
+  token: string;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  card_id: string;
+  author_id: string;
+  parent_id: string | null;
+  body: string;
+  mentions: string[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface CommentWithAuthor extends Comment {
+  author: ProfileSummary;
+}
+
+export type NotificationType = 'mention' | 'assignee_changed' | 'due_soon' | 'comment_reply';
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  type: NotificationType;
+  payload: {
+    card_id?: string;
+    comment_id?: string;
+    message: string;
+    [key: string]: unknown;
+  };
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface PushSubscription {
+  id: string;
+  profile_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+}

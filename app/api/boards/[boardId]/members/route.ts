@@ -1,0 +1,118 @@
+import { createClient } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { BoardMember, MemberRole, ProfileSummary } from '@/lib/supabase';
+
+// GET /api/boards/[boardId]/members - List members with optional search
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { boardId: string } }
+) {
+  const supabase = createClient();
+  const { boardId } = params;
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query');
+
+  try {
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Build query
+    let membersQuery = supabase
+      .from('board_members')
+      .select(`
+        board_id,
+        profile_id,
+        role,
+        created_at,
+        profiles:profile_id (
+          id,
+          full_name,
+          avatar_url,
+          email
+        )
+      `)
+      .eq('board_id', boardId);
+
+    const { data: members, error } = await membersQuery;
+
+    if (error) {
+      console.error('Error fetching board members:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Filter by search query if provided
+    let results = members || [];
+    if (query && query.trim()) {
+      const lowerQuery = query.toLowerCase();
+      results = results.filter((member: any) => {
+        const profile = member.profiles;
+        if (!profile) return false;
+        return (
+          profile.full_name?.toLowerCase().includes(lowerQuery) ||
+          profile.email?.toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
+
+    // Transform to include profile data
+    const transformedMembers = results.map((member: any) => ({
+      board_id: member.board_id,
+      profile_id: member.profile_id,
+      role: member.role,
+      created_at: member.created_at,
+      profile: member.profiles as ProfileSummary,
+    }));
+
+    return NextResponse.json({ members: transformedMembers });
+  } catch (error) {
+    console.error('Unexpected error in GET /api/boards/[boardId]/members:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// POST /api/boards/[boardId]/members - Add member
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { boardId: string } }
+) {
+  const supabase = createClient();
+  const { boardId } = params;
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { profile_id, role = 'editor' } = body as { profile_id: string; role?: MemberRole };
+
+    if (!profile_id) {
+      return NextResponse.json({ error: 'profile_id is required' }, { status: 400 });
+    }
+
+    // Insert new member
+    const { data: newMember, error } = await supabase
+      .from('board_members')
+      .insert({
+        board_id: boardId,
+        profile_id,
+        role,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding board member:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ member: newMember }, { status: 201 });
+  } catch (error) {
+    console.error('Unexpected error in POST /api/boards/[boardId]/members:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
