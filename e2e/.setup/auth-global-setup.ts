@@ -87,16 +87,33 @@ export default async function globalSetup(config: FullConfig) {
     // 4. Navigate to app to establish session in browser context
     await page.goto(BASE_URL);
 
-    // 5. Inject Supabase session into localStorage
+    // 5. Inject Supabase session into localStorage and cookies
     // Extract project ref from Supabase URL
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
     const storageKey = `sb-${projectRef}-auth-token`;
 
+    // Store in localStorage (for backward compatibility)
     await page.evaluate(({ key, sessionData }) => {
       localStorage.setItem(key, JSON.stringify(sessionData));
       console.log('[Global Setup] Session stored in localStorage with key:', key);
     }, { key: storageKey, sessionData: session });
+
+    // Store in cookies (required for @supabase/ssr)
+    const domain = new URL(BASE_URL).hostname;
+    const accessTokenCookie = {
+      name: `sb-${projectRef}-auth-token`,
+      value: JSON.stringify(session),
+      domain: domain,
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax' as const,
+      expires: session.expires_at || Date.now() / 1000 + 3600,
+    };
+
+    await context.addCookies([accessTokenCookie]);
+    console.log('[Global Setup] Session stored in cookies');
 
     // 5. Save storage state
     await context.storageState({ path: AUTH_FILE });
