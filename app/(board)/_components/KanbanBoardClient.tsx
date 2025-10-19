@@ -192,7 +192,8 @@ const getActualUserId = (userId: string): string | null => {
   return userId === '00000000-0000-0000-0000-000000000000' ? null : userId;
 };
 
-// Activity log helper
+// Activity logging is now handled server-side in API routes
+// This function is kept for backward compatibility but does nothing
 const logActivity = async (
   boardId: string,
   userId: string,
@@ -202,40 +203,34 @@ const logActivity = async (
   entityTitle: string,
   details?: Record<string, unknown>
 ) => {
-  try {
-    const actualUserId = getActualUserId(userId);
-    await supabase.from('activity_logs').insert({
-      board_id: boardId,
-      user_id: actualUserId,
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      entity_title: entityTitle,
-      details: details || null,
-    });
-  } catch (error) {
-    console.error('Error logging activity:', error);
-  }
+  // Server-side API routes automatically log activities
+  // No client-side action needed
 };
 
 // Initialize with default lists if empty
-// Note: user_id is stored for future features (personal boards), but currently
-// all authenticated users can see and edit all data (shared team board)
-// In test mode (bypass auth), user_id is set to null to avoid foreign key constraint issues
 const initializeDefaultLists = async (userId: string, boardId: string): Promise<List[]> => {
-  // Use null for user_id in test mode to avoid foreign key constraint with auth.users
   const actualUserId = getActualUserId(userId);
 
   const defaultLists = [
-    { title: "To Do", position: 0, board_id: boardId, user_id: actualUserId },
-    { title: "In Progress", position: 1, board_id: boardId, user_id: actualUserId },
-    { title: "Done", position: 2, board_id: boardId, user_id: actualUserId },
+    { title: "To Do", position: 0, user_id: actualUserId },
+    { title: "In Progress", position: 1, user_id: actualUserId },
+    { title: "Done", position: 2, user_id: actualUserId },
   ];
 
   try {
-    const { data, error } = await supabase.from("lists").insert(defaultLists).select();
-    if (error) throw error;
-    return data || [];
+    const response = await fetch(`/api/boards/${boardId}/lists`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lists: defaultLists }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to create default lists');
+    }
+
+    const { lists } = await response.json();
+    return lists || [];
   } catch (error) {
     console.error("Error initializing default lists:", error);
     return [];
@@ -1181,50 +1176,75 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     navigate(nextPath, { scroll: false });
   };
 
-  const upsertCardsWithAssigneeFallback = async (cardsToSync: Card[]): Promise<PostgrestError | null> => {
-    if (cardsToSync.length === 0) {
+  const upsertCardsWithAssigneeFallback = async (cardsToSync: Card[]): Promise<Error | null> => {
+    if (cardsToSync.length === 0 || !currentBoardId) {
       return null;
     }
 
-    const includeAssigneeId = supportsAssigneeIdRef.current !== false;
-    const firstPayload = sanitizeCardsForUpload(cardsToSync, includeAssigneeId);
-    let { error } = await supabase.from('cards').upsert(firstPayload);
+    try {
+      const updates = cardsToSync.map(card => ({
+        id: card.id,
+        list_id: card.list_id,
+        position: card.position,
+        title: card.title,
+        description: card.description,
+        tags: card.tags,
+        due_date: card.due_date,
+        priority: card.priority,
+        assignee_id: card.assignee_id,
+      }));
 
-    if (isAssigneeColumnMissing(error)) {
-      supportsAssigneeIdRef.current = false;
-      console.warn('[cards] assignee_id column missing on Supabase; retrying without that column');
-      const fallbackPayload = sanitizeCardsForUpload(cardsToSync, false);
-      ({ error } = await supabase.from('cards').upsert(fallbackPayload));
-    } else if (!error) {
-      supportsAssigneeIdRef.current = true;
-    }
+      const response = await fetch(`/api/boards/${currentBoardId}/cards/reorder`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
 
-    if (error) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to sync cards');
+      }
+
+      return null;
+    } catch (error) {
       console.error('[cards] Failed to sync cards:', error);
+      return error as Error;
     }
-
-    return error ?? null;
   };
 
-  const upsertSingleCardWithAssigneeFallback = async (card: Card): Promise<PostgrestError | null> => {
+  const upsertSingleCardWithAssigneeFallback = async (card: Card): Promise<Error | null> => {
     return upsertCardsWithAssigneeFallback([card]);
   };
 
   const syncToSupabase = async (data: BoardData) => {
     // If offline, don't sync - operations are already in queue
-    if (!isOnline) {
-      console.log('Offline: skipping sync (operations queued)');
+    if (!isOnline || !currentBoardId) {
+      console.log('Offline or no board: skipping sync (operations queued)');
       return;
     }
 
     try {
+      // Sync lists via API route
       if (data.lists.length > 0) {
-        const { error: listError } = await supabase.from("lists").upsert(data.lists);
-        if (listError) {
-          throw listError;
+        const listUpdates = data.lists.map(list => ({
+          id: list.id,
+          position: list.position,
+          title: list.title,
+        }));
+
+        const listResponse = await fetch(`/api/boards/${currentBoardId}/lists/reorder`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates: listUpdates }),
+        });
+
+        if (!listResponse.ok) {
+          const errorData = await listResponse.json();
+          throw new Error(errorData.error?.message || 'Failed to sync lists');
         }
       }
 
+      // Sync cards via API route
       const cardError = await upsertCardsWithAssigneeFallback(data.cards);
       if (cardError) {
         throw cardError;
@@ -1319,17 +1339,26 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   };
 
   const handleDeleteList = async (id: string) => {
+    if (!currentBoardId) return;
+
     const updatedLists = boardData.lists.filter((list) => list.id !== id);
     const updatedCards = boardData.cards.filter((card) => card.list_id !== id);
     const newData = { lists: updatedLists, cards: updatedCards };
     updateData(newData);
 
-    // Add to sync queue if offline, otherwise delete directly
+    // Add to sync queue if offline, otherwise delete via API
     if (!isOnline) {
       addToSyncQueue({ type: 'DELETE', table: 'lists', data: { id } });
     } else {
       try {
-        await supabase.from("lists").delete().eq("id", id);
+        const response = await fetch(`/api/boards/${currentBoardId}/lists/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to delete list');
+        }
       } catch (error) {
         console.error("Error deleting list:", error);
       }
@@ -1506,30 +1535,26 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     if (!user || !newBoardName.trim()) return;
 
     try {
-      // Generate short_id, id_short, and slug
-      const shortId = await createUniqueBoardShortId();
-      const idShort = await getNextBoardIdShort();
-      const slug = slugifyBoardName(newBoardName.trim());
+      const response = await fetch('/api/boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newBoardName.trim(),
+          description: newBoardDescription.trim() || undefined,
+          is_test_board: false,
+        }),
+      });
 
-      const newBoard: Board = {
-        id: uuidv4(),
-        name: newBoardName.trim(),
-        description: newBoardDescription.trim() || undefined,
-        is_test_board: false,
-        user_id: getActualUserId(user.id),
-        short_id: shortId,
-        id_short: idShort,
-        slug,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to create board');
+      }
 
-      const { error } = await supabase.from('boards').insert(newBoard);
-      if (error) throw error;
+      const { board } = await response.json();
 
-      setBoards([...boards, newBoard]);
-      setCurrentBoardId(newBoard.id);
-      updateURL(newBoard);
+      setBoards([...boards, board]);
+      setCurrentBoardId(board.id);
+      updateURL(board);
       setShowCreateBoardDialog(false);
       setNewBoardName('');
       setNewBoardDescription('');
@@ -1689,18 +1714,25 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       const newData = { ...boardData, cards: updatedCards };
       updateData(newData);
 
-      // Supabase から削除
+      // Delete via API route
       if (!isOnline) {
         console.log('[handleDeleteCard] Adding to sync queue (offline)');
         addToSyncQueue({ type: 'DELETE', table: 'cards', data: { id } });
       } else {
-        console.log('[handleDeleteCard] Deleting from Supabase...');
-        const { error } = await supabase.from('cards').delete().eq('id', id);
-        if (error) {
-          console.error('[handleDeleteCard] Error deleting card:', error);
-          throw error;
+        console.log('[handleDeleteCard] Deleting via API...');
+        if (!currentBoardId) {
+          throw new Error('No board selected');
         }
-        console.log('[handleDeleteCard] Card deleted from Supabase');
+
+        const response = await fetch(`/api/boards/${currentBoardId}/cards/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to delete card');
+        }
+        console.log('[handleDeleteCard] Card deleted via API');
       }
 
       console.log('[handleDeleteCard] Closing modal...');
