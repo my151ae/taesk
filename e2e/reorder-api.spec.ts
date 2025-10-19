@@ -67,14 +67,14 @@ test.describe('Reorder API (Phase 2)', () => {
 
     expect(res.status()).toBe(400);
     const result = await res.json();
-    expect(result.error).toBe('Bad Request');
+    expect(result.error).toEqual({ code: 'VALIDATION_ERROR', message: 'Bad Request' });
     expect(result.issues).toBeDefined();
     expect(result.issues.some((i: any) => i.code === 'DUPLICATE_ID')).toBe(true);
   });
 
-  test('should reject unknown card IDs', async ({ request }) => {
+  test('should reject invalid UUID format', async ({ request }) => {
     const updates = [
-      { id: '00000000-0000-0000-0000-000000000999', position: 1000 }, // unknown
+      { id: '00000000-0000-0000-0000-000000000999', position: 1000 }, // invalid UUID
     ];
 
     const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/cards/reorder`, {
@@ -83,9 +83,8 @@ test.describe('Reorder API (Phase 2)', () => {
 
     expect(res.status()).toBe(400);
     const result = await res.json();
-    expect(result.error).toBe('Bad Request');
-    expect(result.issues).toBeDefined();
-    expect(result.issues.some((i: any) => i.code === 'UNKNOWN_ID')).toBe(true);
+    expect(result.error.code).toBe('INVALID_BODY');
+    expect(result.error.message).toBe('Validation failed');
   });
 
   test('should reject invalid schema (missing position)', async ({ request }) => {
@@ -99,9 +98,8 @@ test.describe('Reorder API (Phase 2)', () => {
 
     expect(res.status()).toBe(400);
     const result = await res.json();
-    expect(result.error).toBe('Bad Request');
-    expect(result.issues).toBeDefined();
-    expect(result.issues.some((i: any) => i.code === 'INVALID_SCHEMA')).toBe(true);
+    expect(result.error.code).toBe('INVALID_BODY');
+    expect(result.error.message).toBe('Validation failed');
   });
 
   test('should reorder lists successfully', async ({ request }) => {

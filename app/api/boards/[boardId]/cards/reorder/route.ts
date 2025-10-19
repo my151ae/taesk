@@ -86,7 +86,10 @@ export async function PATCH(
     }
 
     if (issues.length > 0) {
-      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Bad Request' }, issues },
+        { status: 400 }
+      );
     }
 
     const cardIds = updates.map((u) => u.id);
@@ -155,7 +158,10 @@ export async function PATCH(
     }
 
     if (issues.length > 0) {
-      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Bad Request' }, issues },
+        { status: 400 }
+      );
     }
 
     // Phase 2: Use database transaction with advisory lock
