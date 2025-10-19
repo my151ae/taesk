@@ -37,10 +37,37 @@ export async function POST(req: NextRequest) {
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const userExists = existingUsers.users?.some((u) => u.email === email);
+    const existingUser = existingUsers.users?.find((u) => u.email === email);
 
-    if (userExists) {
-      console.log(`[E2E] User ${email} already exists, skipping creation`);
+    const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
+
+    if (existingUser) {
+      console.log(`[E2E] User ${email} already exists, ensuring board membership`);
+
+      // Ensure user is a member of the test board
+      const { data: membership } = await supabaseAdmin
+        .from('board_members')
+        .select('role')
+        .eq('board_id', MAIN_TEST_BOARD_ID)
+        .eq('profile_id', existingUser.id)
+        .maybeSingle();
+
+      if (!membership) {
+        const { error: memberError } = await supabaseAdmin
+          .from('board_members')
+          .insert({
+            board_id: MAIN_TEST_BOARD_ID,
+            profile_id: existingUser.id,
+            role: 'owner',
+          });
+
+        if (memberError) {
+          console.error('[E2E] Failed to add existing user to test board:', memberError);
+        } else {
+          console.log(`[E2E] Added existing user ${email} as owner of test board`);
+        }
+      }
+
       return NextResponse.json({ created: false, exists: true }, { status: 200 });
     }
 
@@ -54,6 +81,22 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('[E2E] Failed to create user:', error);
       throw error;
+    }
+
+    // Add user as member of main test board
+    const { error: memberError } = await supabaseAdmin
+      .from('board_members')
+      .insert({
+        board_id: MAIN_TEST_BOARD_ID,
+        profile_id: data.user.id,
+        role: 'owner',
+      });
+
+    if (memberError) {
+      console.error('[E2E] Failed to add user to test board:', memberError);
+      // Continue anyway - user was created successfully
+    } else {
+      console.log(`[E2E] Added user ${email} as owner of test board ${MAIN_TEST_BOARD_ID}`);
     }
 
     console.log(`[E2E] Created test user: ${email}`);

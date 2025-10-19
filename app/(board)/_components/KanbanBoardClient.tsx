@@ -165,16 +165,16 @@ const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonic
   return buildBoardCanonicalUrl(board, origin);
 };
 
-// Supabase data loading with board filter
+// Load board data from API route (replaces direct Supabase access)
 const loadFromSupabase = async (boardId: string): Promise<BoardData> => {
   try {
-    const [{ data: lists, error: listsError }, { data: cards, error: cardsError }] = await Promise.all([
-      supabase.from("lists").select("*").eq("board_id", boardId).order("position", { ascending: true }),
-      supabase.from("cards").select("*").eq("board_id", boardId).order("position", { ascending: true }),
-    ]);
+    const response = await fetch(`/api/boards/${boardId}/data`);
 
-    if (listsError) throw listsError;
-    if (cardsError) throw cardsError;
+    if (!response.ok) {
+      throw new Error(`Failed to load board data: ${response.statusText}`);
+    }
+
+    const { lists, cards } = await response.json();
 
     return {
       lists: lists || [],

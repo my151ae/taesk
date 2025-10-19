@@ -141,6 +141,13 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
       slug: testBoardSlug,
     });
 
+    // Add test user as board member
+    await supabase.from('board_members').insert({
+      board_id: testBoardId,
+      profile_id: TEST_USER_ID,
+      role: 'owner',
+    });
+
     await supabase.from('profiles').upsert({
       id: TEST_USER_ID,
       full_name: 'E2E Test User',
