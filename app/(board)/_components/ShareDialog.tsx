@@ -7,6 +7,7 @@ import { MemberRole, ProfileSummary } from '@/lib/supabase';
 interface ShareDialogProps {
   boardId: string;
   onClose: () => void;
+  onMemberAdded?: () => void | Promise<void>;
 }
 
 interface BoardMemberWithProfile {
@@ -24,7 +25,7 @@ const ROLE_LABELS: Record<MemberRole, string> = {
   viewer: 'Viewer',
 };
 
-export default function ShareDialog({ boardId, onClose }: ShareDialogProps) {
+export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDialogProps) {
   const [members, setMembers] = useState<BoardMemberWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -59,14 +60,54 @@ export default function ShareDialog({ boardId, onClose }: ShareDialogProps) {
 
     setInviting(true);
     try {
-      // TODO: Implement invite by email (create board_invite record)
-      // For now, just show success message
-      alert(`Invite sent to ${inviteEmail} as ${ROLE_LABELS[inviteRole]}`);
+      // 1. Search for existing user by email
+      const searchRes = await fetch(`/api/profiles/search?email=${encodeURIComponent(inviteEmail.trim())}`);
+
+      if (!searchRes.ok) {
+        if (searchRes.status === 404) {
+          alert('このメールアドレスは Taesk に登録されていません。\n先に https://taesk.vercel.app でアカウント作成してもらってください。');
+        } else {
+          alert('ユーザー検索に失敗しました');
+        }
+        return;
+      }
+
+      const { profile } = await searchRes.json();
+
+      // 2. Check if already a member
+      if (members.some((m) => m.profile_id === profile.id)) {
+        alert('このユーザーは既にメンバーです。');
+        return;
+      }
+
+      // 3. Add as board member
+      const addRes = await fetch(`/api/boards/${boardId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile_id: profile.id,
+          role: inviteRole,
+        }),
+      });
+
+      if (!addRes.ok) {
+        alert('メンバー追加に失敗しました');
+        return;
+      }
+
+      // 4. Success - reload members and reset form
+      alert(`${profile.full_name || profile.email} をボードに追加しました！`);
       setInviteEmail('');
       setInviteRole('editor');
+      await loadMembers();
+
+      // 5. Notify parent to reload board members
+      if (onMemberAdded) {
+        await onMemberAdded();
+      }
     } catch (error) {
       console.error('Error inviting member:', error);
-      alert('Failed to send invite');
+      alert('メンバー追加に失敗しました');
     } finally {
       setInviting(false);
     }
@@ -134,13 +175,13 @@ export default function ShareDialog({ boardId, onClose }: ShareDialogProps) {
         <div className="space-y-6">
           {/* Invite new member */}
           <div>
-            <h3 className="text-sm font-medium mb-2">Invite by Email</h3>
+            <h3 className="text-sm font-medium mb-2">メンバーを追加</h3>
             <form onSubmit={handleInvite} className="flex gap-2">
               <input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="email@example.com"
+                placeholder="メールアドレス（Taesk 登録済みユーザー）"
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={inviting}
               />
@@ -159,7 +200,7 @@ export default function ShareDialog({ boardId, onClose }: ShareDialogProps) {
                 disabled={inviting || !inviteEmail.trim()}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Invite
+                追加
               </button>
             </form>
           </div>

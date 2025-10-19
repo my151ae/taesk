@@ -672,7 +672,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [boards, setBoards] = useState<Board[]>(() => (initialBoard ? [initialBoard] : []));
   const [currentBoardId, setCurrentBoardId] = useState<string>(initialBoardId);
   const [boardData, setBoardData] = useState<BoardData>(() => initialData ?? { lists: [], cards: [] });
-  const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
+  const [boardMembers, setBoardMembers] = useState<ProfileSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dragOverListId, setDragOverListId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -725,11 +725,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const suppressModalFromQueryRef = useRef(false);
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
-    return profiles.reduce<Record<string, ProfileSummary>>((map, profile) => {
+    return boardMembers.reduce<Record<string, ProfileSummary>>((map, profile) => {
       map[profile.id] = profile;
       return map;
     }, {});
-  }, [profiles]);
+  }, [boardMembers]);
 
   useEffect(() => {
     if (!selectedCardId) return;
@@ -849,79 +849,45 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   useEffect(() => {
     let isDisposed = false;
 
-    const loadProfiles = async () => {
-      if (!user) {
+    const loadBoardMembers = async () => {
+      if (!user || !currentBoardId) {
         if (!isDisposed) {
-          setProfiles([]);
+          setBoardMembers([]);
         }
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, email')
-          .order('full_name', { ascending: true });
+        const response = await fetch(`/api/boards/${currentBoardId}/members`);
 
-        if (error) {
-          console.warn('Error loading profiles:', error);
+        if (!response.ok) {
+          console.warn('Error loading board members:', response.statusText);
+          if (!isDisposed) {
+            setBoardMembers([]);
+          }
+          return;
         }
 
-        const rows = (data ?? []) as ProfileRow[];
-        const sanitized: ProfileSummary[] = rows.map((row) => ({
-          id: row.id,
-          full_name: row.full_name ?? null,
-          avatar_url: row.avatar_url ?? null,
-          email: row.email ?? null,
-        }));
-
-        const currentUserProfile: ProfileSummary | null = user
-          ? {
-              id: user.id,
-              full_name:
-                typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim().length > 0
-                  ? user.user_metadata.full_name
-                  : null,
-              avatar_url: typeof user.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null,
-              email: user.email ?? null,
-            }
-          : null;
-
-        const deduped = new Map<string, ProfileSummary>();
-        sanitized.forEach((profile) => {
-          deduped.set(profile.id, profile);
-        });
-
-        if (currentUserProfile && !deduped.has(currentUserProfile.id)) {
-          deduped.set(currentUserProfile.id, currentUserProfile);
-        }
+        const { members } = await response.json();
+        const profiles: ProfileSummary[] = members.map((m: any) => m.profile);
 
         if (!isDisposed) {
-          setProfiles(Array.from(deduped.values()));
+          setBoardMembers(profiles);
         }
-      } catch (profileError) {
-        console.error('Unexpected error loading profiles:', profileError);
-        if (!isDisposed && user) {
-          setProfiles([
-            {
-              id: user.id,
-              full_name: typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null,
-              avatar_url: typeof user.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null,
-              email: user.email ?? null,
-            },
-          ]);
-        } else if (!isDisposed) {
-          setProfiles([]);
+      } catch (error) {
+        console.error('Unexpected error loading board members:', error);
+        if (!isDisposed) {
+          setBoardMembers([]);
         }
       }
     };
 
-    loadProfiles();
+    loadBoardMembers();
 
     return () => {
       isDisposed = true;
     };
-  }, [user]);
+  }, [user, currentBoardId]);
 
   // Load board data when currentBoardId changes
   useEffect(() => {
@@ -2187,7 +2153,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         <CardModal
           card={selectedCard}
           boards={boards}
-          profiles={profiles}
+          profiles={boardMembers}
           onSave={handleSaveCard}
           onDelete={handleDeleteCard}
           onMoveToBoard={handleMoveCardToBoard}
@@ -2200,6 +2166,19 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         <ShareDialog
           boardId={currentBoardId}
           onClose={() => setShowShareDialog(false)}
+          onMemberAdded={async () => {
+            // Reload board members after adding a new member
+            try {
+              const response = await fetch(`/api/boards/${currentBoardId}/members`);
+              if (response.ok) {
+                const { members } = await response.json();
+                const profiles: ProfileSummary[] = members.map((m: any) => m.profile);
+                setBoardMembers(profiles);
+              }
+            } catch (error) {
+              console.error('Error reloading board members:', error);
+            }
+          }}
         />
       )}
 
