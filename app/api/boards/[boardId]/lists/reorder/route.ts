@@ -2,26 +2,42 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
+// Phase 1: Validation + Sequential Update + Rollback
 const ReorderListsSchema = z.object({
-  updates: z.array(z.object({
-    id: z.string().uuid(),
-    position: z.number().int().min(0),
-  })).min(1),
+  updates: z.array(
+    z.object({
+      id: z.string().min(1),
+      position: z.number().int(),
+    })
+  ).min(1),
 });
+
+interface ValidationIssue {
+  code: string;
+  id?: string;
+  expectedBoardId?: string;
+  actualBoardId?: string;
+}
 
 /**
  * PATCH /api/boards/[boardId]/lists/reorder
  *
- * Bulk update list positions (for drag & drop and sync).
+ * Phase 1: Position-only reorder API with strict validation and failsafe rollback.
+ * - Only updates `position`.
+ * - Validates: duplicate IDs, existence, board ownership.
+ * - Sequential updates with snapshot-based rollback on failure.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
+  const startTime = Date.now();
+  const { boardId } = await params;
+
   try {
-    const { boardId } = await params;
     const supabase = await createServerSupabaseClient();
 
+    // Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
@@ -30,6 +46,7 @@ export async function PATCH(
       );
     }
 
+    // Permission check
     const { data: membership } = await supabase
       .from('board_members')
       .select('role')
@@ -44,47 +61,40 @@ export async function PATCH(
       );
     }
 
+    // Parse request body
     const body = await request.json();
     const parsed = ReorderListsSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
         {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'Validation failed',
-            details: parsed.error.flatten(),
-          },
+          error: 'Bad Request',
+          issues: [{ code: 'INVALID_SCHEMA', details: parsed.error.flatten() }],
         },
-        { status: 422 }
+        { status: 400 }
       );
     }
 
     const updates = parsed.data.updates;
+    const issues: ValidationIssue[] = [];
 
+    // 1. Check duplicate IDs
     const idSet = new Set<string>();
-    const positionSet = new Set<number>();
-
     for (const update of updates) {
       if (idSet.has(update.id)) {
-        return NextResponse.json(
-          { error: { code: 'INVALID_BODY', message: 'Duplicate list ID detected in updates payload.' } },
-          { status: 400 }
-        );
+        issues.push({ code: 'DUPLICATE_ID', id: update.id });
       }
       idSet.add(update.id);
-
-      if (positionSet.has(update.position)) {
-        return NextResponse.json(
-          { error: { code: 'INVALID_BODY', message: 'Duplicate list position detected.' } },
-          { status: 400 }
-        );
-      }
-      positionSet.add(update.position);
     }
 
-    const listIds = updates.map((u) => u.id);
+    if (issues.length > 0) {
+      const durationMs = Date.now() - startTime;
+      logReorderEvent(boardId, user.id, updates.length, 0, durationMs, issues);
+      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
+    }
 
+    // 2. Fetch existing lists and validate existence + board ownership
+    const listIds = updates.map((u) => u.id);
     const { data: existingLists, error: fetchListsError } = await supabase
       .from('lists')
       .select('id, board_id, position')
@@ -98,89 +108,138 @@ export async function PATCH(
       );
     }
 
-    if (!existingLists || existingLists.length !== updates.length) {
-      const foundIds = new Set(existingLists?.map((list) => list.id) ?? []);
-      const missing = updates.filter((u) => !foundIds.has(u.id)).map((u) => u.id);
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'One or more lists do not exist or do not belong to this board.',
-            details: { missing },
-          },
-        },
-        { status: 400 }
-      );
-    }
+    const foundIds = new Set(existingLists?.map((list) => list.id) ?? []);
+    const unknownIds = updates.filter((u) => !foundIds.has(u.id));
+    unknownIds.forEach((u) => issues.push({ code: 'UNKNOWN_ID', id: u.id }));
 
-    const invalidList = existingLists.find((list) => list.board_id !== boardId);
-    if (invalidList) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'Updates contain lists from a different board.',
-            details: { listId: invalidList.id, boardId: invalidList.board_id },
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    const originalState = new Map(existingLists.map((list) => [list.id, list.position]));
-
-    for (const { id, position } of updates) {
-      const { error: updateError } = await supabase
-        .from('lists')
-        .update({ position })
-        .eq('id', id)
-        .eq('board_id', boardId);
-
-      if (updateError) {
-        console.error('[lists/reorder] Update failed', {
-          payload: { id, position },
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          code: updateError.code,
+    // Check board ownership
+    existingLists?.forEach((list) => {
+      if (list.board_id !== boardId) {
+        issues.push({
+          code: 'CROSS_BOARD',
+          id: list.id,
+          expectedBoardId: boardId,
+          actualBoardId: list.board_id,
         });
-
-        await Promise.all(
-          Array.from(originalState.entries()).map(([listId, originalPosition]) =>
-            supabase
-              .from('lists')
-              .update({ position: originalPosition })
-              .eq('id', listId)
-              .eq('board_id', boardId)
-          )
-        );
-
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: updateError.message } },
-          { status: 500 }
-        );
       }
-    }
-
-    // Log activity
-    supabase.from('activity_logs').insert({
-      board_id: boardId,
-      user_id: user.id,
-      action: 'updated',
-      entity_type: 'list',
-      entity_id: boardId,
-      entity_title: 'Lists reordered',
-      details: { count: updates.length },
-    }).then(({ error: logError }) => {
-      if (logError) console.error('Activity log failed:', logError);
     });
 
-    return NextResponse.json({ ok: true }, { status: 200 });
+    if (issues.length > 0) {
+      const durationMs = Date.now() - startTime;
+      logReorderEvent(boardId, user.id, updates.length, 0, durationMs, issues);
+      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
+    }
+
+    // 3. Snapshot original positions for rollback
+    const originalState = new Map(
+      existingLists!.map((list) => [list.id, list.position])
+    );
+
+    // 4. Sequential update with failsafe rollback
+    let updated = 0;
+    try {
+      for (const update of updates) {
+        const { error: updateError } = await supabase
+          .from('lists')
+          .update({ position: update.position })
+          .eq('id', update.id)
+          .eq('board_id', boardId);
+
+        if (updateError) {
+          console.error('[lists/reorder] Update failed', {
+            payload: update,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+            code: updateError.code,
+          });
+
+          // Attempt rollback
+          console.warn('[lists/reorder] Attempting rollback...');
+          await Promise.all(
+            Array.from(originalState.entries()).map(([listId, originalPosition]) =>
+              supabase
+                .from('lists')
+                .update({ position: originalPosition })
+                .eq('id', listId)
+                .eq('board_id', boardId)
+            )
+          );
+
+          return NextResponse.json(
+            { error: { code: 'DB_ERROR', message: updateError.message } },
+            { status: 500 }
+          );
+        }
+        updated++;
+      }
+    } catch (error) {
+      console.error('[lists/reorder] Unexpected error during update', error);
+      // Attempt rollback
+      await Promise.all(
+        Array.from(originalState.entries()).map(([listId, originalPosition]) =>
+          supabase
+            .from('lists')
+            .update({ position: originalPosition })
+            .eq('id', listId)
+            .eq('board_id', boardId)
+        )
+      );
+      throw error;
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    // 5. Log activity
+    supabase
+      .from('activity_logs')
+      .insert({
+        board_id: boardId,
+        user_id: user.id,
+        action: 'updated',
+        entity_type: 'list',
+        entity_id: boardId,
+        entity_title: 'Lists reordered',
+        details: { count: updated },
+      })
+      .then(({ error: logError }) => {
+        if (logError) console.error('[lists/reorder] Activity log failed:', logError);
+      });
+
+    // 6. Structured logging
+    logReorderEvent(boardId, user.id, updates.length, updated, durationMs, []);
+
+    return NextResponse.json(
+      { updated, unchanged: 0, durationMs },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Unexpected error in PATCH /api/boards/[boardId]/lists/reorder:', error);
+    console.error('[lists/reorder] Unexpected error:', error);
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }
     );
   }
+}
+
+function logReorderEvent(
+  boardId: string,
+  actorId: string,
+  updates: number,
+  changed: number,
+  durationMs: number,
+  issues: ValidationIssue[]
+) {
+  console.log(
+    JSON.stringify({
+      event: 'lists.reorder',
+      boardId,
+      actorId,
+      updates,
+      changed,
+      durationMs,
+      issues,
+      hint: issues.length > 0 ? 'Validation failed' : '',
+    })
+  );
 }

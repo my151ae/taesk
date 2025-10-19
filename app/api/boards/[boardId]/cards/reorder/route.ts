@@ -2,29 +2,44 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
+// Phase 1: Validation + Sequential Update + Rollback
 const CardReorderUpdateSchema = z.object({
-  id: z.string().uuid(),
-  list_id: z.string().uuid(),
-  position: z.number().int().min(0),
+  id: z.string().min(1),
+  position: z.number().int(),
+  listId: z.string().min(1).optional(), // optional for cross-list moves
 });
 
 const ReorderCardsSchema = z.object({
   updates: z.array(CardReorderUpdateSchema).min(1),
 });
 
+interface ValidationIssue {
+  code: string;
+  id?: string;
+  listId?: string;
+  expectedBoardId?: string;
+  actualBoardId?: string;
+}
+
 /**
  * PATCH /api/boards/[boardId]/cards/reorder
  *
- * Bulk update card positions and list assignments (for drag & drop and sync).
+ * Phase 1: Position-only reorder API with strict validation and failsafe rollback.
+ * - Only updates `position` (and `list_id` if provided for cross-list moves).
+ * - Validates: duplicate IDs, existence, board ownership, list ownership.
+ * - Sequential updates with snapshot-based rollback on failure.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
+  const startTime = Date.now();
+  const { boardId } = await params;
+
   try {
-    const { boardId } = await params;
     const supabase = await createServerSupabaseClient();
 
+    // Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
@@ -33,6 +48,7 @@ export async function PATCH(
       );
     }
 
+    // Permission check
     const { data: membership } = await supabase
       .from('board_members')
       .select('role')
@@ -47,49 +63,40 @@ export async function PATCH(
       );
     }
 
+    // Parse request body
     const body = await request.json();
     const parsed = ReorderCardsSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
         {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'Validation failed',
-            details: parsed.error.flatten(),
-          },
+          error: 'Bad Request',
+          issues: [{ code: 'INVALID_SCHEMA', details: parsed.error.flatten() }],
         },
-        { status: 422 }
+        { status: 400 }
       );
     }
 
     const updates = parsed.data.updates;
+    const issues: ValidationIssue[] = [];
 
-    // Basic validation: duplicate IDs and duplicate (list_id, position)
+    // 1. Check duplicate IDs
     const idSet = new Set<string>();
-    const positionSet = new Set<string>();
-
     for (const update of updates) {
       if (idSet.has(update.id)) {
-        return NextResponse.json(
-          { error: { code: 'INVALID_BODY', message: 'Duplicate card ID detected in updates payload.' } },
-          { status: 400 }
-        );
+        issues.push({ code: 'DUPLICATE_ID', id: update.id });
       }
       idSet.add(update.id);
-
-      const positionKey = `${update.list_id}:${update.position}`;
-      if (positionSet.has(positionKey)) {
-        return NextResponse.json(
-          { error: { code: 'INVALID_BODY', message: 'Duplicate position within the same list detected.' } },
-          { status: 400 }
-        );
-      }
-      positionSet.add(positionKey);
     }
 
-    const cardIds = updates.map((u) => u.id);
+    if (issues.length > 0) {
+      const durationMs = Date.now() - startTime;
+      logReorderEvent(boardId, user.id, updates.length, 0, durationMs, issues);
+      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
+    }
 
+    // 2. Fetch existing cards and validate existence + board ownership
+    const cardIds = updates.map((u) => u.id);
     const { data: existingCards, error: fetchCardsError } = await supabase
       .from('cards')
       .select('id, board_id, list_id, position')
@@ -103,37 +110,24 @@ export async function PATCH(
       );
     }
 
-    if (!existingCards || existingCards.length !== updates.length) {
-      const foundIds = new Set(existingCards?.map((card) => card.id) ?? []);
-      const missing = updates.filter((u) => !foundIds.has(u.id)).map((u) => u.id);
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'One or more cards do not exist or do not belong to this board.',
-            details: { missing },
-          },
-        },
-        { status: 400 }
-      );
-    }
+    const foundIds = new Set(existingCards?.map((card) => card.id) ?? []);
+    const unknownIds = updates.filter((u) => !foundIds.has(u.id));
+    unknownIds.forEach((u) => issues.push({ code: 'UNKNOWN_ID', id: u.id }));
 
-    const invalidBoardCard = existingCards.find((card) => card.board_id !== boardId);
-    if (invalidBoardCard) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_BODY',
-            message: 'Updates contain cards from a different board.',
-            details: { cardId: invalidBoardCard.id, boardId: invalidBoardCard.board_id },
-          },
-        },
-        { status: 400 }
-      );
-    }
+    // Check board ownership
+    existingCards?.forEach((card) => {
+      if (card.board_id !== boardId) {
+        issues.push({
+          code: 'CROSS_BOARD',
+          id: card.id,
+          expectedBoardId: boardId,
+          actualBoardId: card.board_id,
+        });
+      }
+    });
 
-    const listIds = Array.from(new Set(updates.map((u) => u.list_id)));
-
+    // 3. Validate listId ownership (if provided)
+    const listIds = Array.from(new Set(updates.filter((u) => u.listId).map((u) => u.listId!)));
     if (listIds.length > 0) {
       const { data: targetLists, error: fetchListsError } = await supabase
         .from('lists')
@@ -148,91 +142,154 @@ export async function PATCH(
         );
       }
 
-      if (!targetLists || targetLists.length !== listIds.length) {
-        const foundListIds = new Set(targetLists?.map((list) => list.id) ?? []);
-        const missingLists = listIds.filter((id) => !foundListIds.has(id));
-        return NextResponse.json(
-          {
-            error: {
-              code: 'INVALID_BODY',
-              message: 'One or more lists do not exist.',
-              details: { missingLists },
-            },
-          },
-          { status: 400 }
-        );
-      }
+      const foundListIds = new Set(targetLists?.map((list) => list.id) ?? []);
+      targetLists?.forEach((list) => {
+        if (list.board_id !== boardId) {
+          updates
+            .filter((u) => u.listId === list.id)
+            .forEach((u) => {
+              issues.push({ code: 'FOREIGN_LIST', id: u.id, listId: list.id });
+            });
+        }
+      });
 
-      const invalidList = targetLists.find((list) => list.board_id !== boardId);
-      if (invalidList) {
-        return NextResponse.json(
-          {
-            error: {
-              code: 'INVALID_BODY',
-              message: 'Updates contain lists from a different board.',
-              details: { listId: invalidList.id, boardId: invalidList.board_id },
-            },
-          },
-          { status: 400 }
-        );
-      }
+      listIds.forEach((listId) => {
+        if (!foundListIds.has(listId)) {
+          updates
+            .filter((u) => u.listId === listId)
+            .forEach((u) => {
+              issues.push({ code: 'FOREIGN_LIST', id: u.id, listId });
+            });
+        }
+      });
     }
 
-    const originalState = new Map(existingCards.map((card) => [card.id, { list_id: card.list_id, position: card.position }]));
-
-    for (const { id, list_id, position } of updates) {
-      const { error: updateError } = await supabase
-        .from('cards')
-        .update({ list_id, position })
-        .eq('id', id)
-        .eq('board_id', boardId);
-
-      if (updateError) {
-        console.error('[cards/reorder] Update failed', {
-          payload: { id, list_id, position },
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          code: updateError.code,
-        });
-
-        // Attempt rollback to the original state to keep consistency
-        await Promise.all(
-          Array.from(originalState.entries()).map(([cardId, snapshot]) =>
-            supabase
-              .from('cards')
-              .update({ list_id: snapshot.list_id, position: snapshot.position })
-              .eq('id', cardId)
-              .eq('board_id', boardId)
-          )
-        );
-
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: updateError.message } },
-          { status: 500 }
-        );
-      }
+    if (issues.length > 0) {
+      const durationMs = Date.now() - startTime;
+      logReorderEvent(boardId, user.id, updates.length, 0, durationMs, issues);
+      return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
     }
 
-    // Log activity
-    supabase.from('activity_logs').insert({
-      board_id: boardId,
-      user_id: user.id,
-      action: 'updated',
-      entity_type: 'card',
-      entity_id: boardId,
-      entity_title: 'Cards reordered',
-      details: { count: updates.length },
-    }).then(({ error: logError }) => {
-      if (logError) console.error('Activity log failed:', logError);
-    });
+    // 4. Snapshot original positions for rollback
+    const originalState = new Map(
+      existingCards!.map((card) => [
+        card.id,
+        { list_id: card.list_id, position: card.position },
+      ])
+    );
 
-    return NextResponse.json({ ok: true }, { status: 200 });
+    // 5. Sequential update with failsafe rollback
+    let updated = 0;
+    try {
+      for (const update of updates) {
+        const updatePayload: { position: number; list_id?: string } = {
+          position: update.position,
+        };
+        if (update.listId) {
+          updatePayload.list_id = update.listId;
+        }
+
+        const { error: updateError } = await supabase
+          .from('cards')
+          .update(updatePayload)
+          .eq('id', update.id)
+          .eq('board_id', boardId);
+
+        if (updateError) {
+          console.error('[cards/reorder] Update failed', {
+            payload: update,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+            code: updateError.code,
+          });
+
+          // Attempt rollback
+          console.warn('[cards/reorder] Attempting rollback...');
+          await Promise.all(
+            Array.from(originalState.entries()).map(([cardId, snapshot]) =>
+              supabase
+                .from('cards')
+                .update({ list_id: snapshot.list_id, position: snapshot.position })
+                .eq('id', cardId)
+                .eq('board_id', boardId)
+            )
+          );
+
+          return NextResponse.json(
+            { error: { code: 'DB_ERROR', message: updateError.message } },
+            { status: 500 }
+          );
+        }
+        updated++;
+      }
+    } catch (error) {
+      console.error('[cards/reorder] Unexpected error during update', error);
+      // Attempt rollback
+      await Promise.all(
+        Array.from(originalState.entries()).map(([cardId, snapshot]) =>
+          supabase
+            .from('cards')
+            .update({ list_id: snapshot.list_id, position: snapshot.position })
+            .eq('id', cardId)
+            .eq('board_id', boardId)
+        )
+      );
+      throw error;
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    // 6. Log activity
+    supabase
+      .from('activity_logs')
+      .insert({
+        board_id: boardId,
+        user_id: user.id,
+        action: 'updated',
+        entity_type: 'card',
+        entity_id: boardId,
+        entity_title: 'Cards reordered',
+        details: { count: updated },
+      })
+      .then(({ error: logError }) => {
+        if (logError) console.error('[cards/reorder] Activity log failed:', logError);
+      });
+
+    // 7. Structured logging
+    logReorderEvent(boardId, user.id, updates.length, updated, durationMs, []);
+
+    return NextResponse.json(
+      { updated, unchanged: 0, durationMs },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Unexpected error in PATCH /api/boards/[boardId]/cards/reorder:', error);
+    console.error('[cards/reorder] Unexpected error:', error);
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }
     );
   }
+}
+
+function logReorderEvent(
+  boardId: string,
+  actorId: string,
+  updates: number,
+  changed: number,
+  durationMs: number,
+  issues: ValidationIssue[]
+) {
+  console.log(
+    JSON.stringify({
+      event: 'cards.reorder',
+      boardId,
+      actorId,
+      updates,
+      changed,
+      durationMs,
+      issues,
+      hint: issues.length > 0 ? 'Validation failed' : '',
+    })
+  );
 }
