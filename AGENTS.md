@@ -22,6 +22,7 @@ Shared utilities such as the Supabase client, board/card helpers, and sync queue
 - Cards now carry `assignee_id` (linked to `profiles`) with a legacy `assigned_to` text fallback; server/API code must upsert both to keep backwards compatibility.
 - Short URLs for cards and boards rely on `short_id`, `id_short`, and `slug`; ensure these fields travel through sync endpoints when creating or reordering records.
 - Offline sync queues should continue to flow through the API routes so server-side activity logging and permissions remain consistent.
+- Cards/lists reorder API routes now validate duplicate/foreign IDs, check board ownership, and roll back to the previous snapshot on failure; send only position (and optional `list_id`) when reordering.
 
 ## Build, Test, and Development Commands
 Use `npm run dev` for the local Next.js server on port 3000. Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
