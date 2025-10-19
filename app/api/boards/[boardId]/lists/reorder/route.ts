@@ -6,6 +6,7 @@ const ReorderListsSchema = z.object({
   updates: z.array(z.object({
     id: z.string().uuid(),
     position: z.number().int().min(0),
+    title: z.string().min(1).max(255),
     updated_at: z.string().datetime().optional(),
   })).min(1),
 });
