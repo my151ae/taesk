@@ -62,32 +62,104 @@ export async function PATCH(
 
     const updates = parsed.data.updates;
 
-    const results = await Promise.all(
-      updates.map(({ id, position }) =>
-        supabase
-          .from('lists')
-          .update({ position })
-          .eq('id', id)
-          .eq('board_id', boardId)
-      )
-    );
+    const idSet = new Set<string>();
+    const positionSet = new Set<number>();
 
-    const firstError = results.find(({ error }) => error);
+    for (const update of updates) {
+      if (idSet.has(update.id)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_BODY', message: 'Duplicate list ID detected in updates payload.' } },
+          { status: 400 }
+        );
+      }
+      idSet.add(update.id);
 
-    if (firstError?.error) {
-      const failingIndex = results.findIndex(({ error }) => error);
-      const failingPayload = failingIndex >= 0 ? updates[failingIndex] : null;
-      console.error('[lists/reorder] Update failed', {
-        payload: failingPayload,
-        message: firstError.error.message,
-        details: firstError.error.details,
-        hint: firstError.error.hint,
-        code: firstError.error.code,
-      });
+      if (positionSet.has(update.position)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_BODY', message: 'Duplicate list position detected.' } },
+          { status: 400 }
+        );
+      }
+      positionSet.add(update.position);
+    }
+
+    const listIds = updates.map((u) => u.id);
+
+    const { data: existingLists, error: fetchListsError } = await supabase
+      .from('lists')
+      .select('id, board_id, position')
+      .in('id', listIds);
+
+    if (fetchListsError) {
+      console.error('[lists/reorder] Failed to fetch current list state', fetchListsError);
       return NextResponse.json(
-        { error: { code: 'DB_ERROR', message: firstError.error.message } },
+        { error: { code: 'DB_ERROR', message: fetchListsError.message } },
         { status: 500 }
       );
+    }
+
+    if (!existingLists || existingLists.length !== updates.length) {
+      const foundIds = new Set(existingLists?.map((list) => list.id) ?? []);
+      const missing = updates.filter((u) => !foundIds.has(u.id)).map((u) => u.id);
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_BODY',
+            message: 'One or more lists do not exist or do not belong to this board.',
+            details: { missing },
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const invalidList = existingLists.find((list) => list.board_id !== boardId);
+    if (invalidList) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_BODY',
+            message: 'Updates contain lists from a different board.',
+            details: { listId: invalidList.id, boardId: invalidList.board_id },
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const originalState = new Map(existingLists.map((list) => [list.id, list.position]));
+
+    for (const { id, position } of updates) {
+      const { error: updateError } = await supabase
+        .from('lists')
+        .update({ position })
+        .eq('id', id)
+        .eq('board_id', boardId);
+
+      if (updateError) {
+        console.error('[lists/reorder] Update failed', {
+          payload: { id, position },
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code,
+        });
+
+        await Promise.all(
+          Array.from(originalState.entries()).map(([listId, originalPosition]) =>
+            supabase
+              .from('lists')
+              .update({ position: originalPosition })
+              .eq('id', listId)
+              .eq('board_id', boardId)
+          )
+        );
+
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: updateError.message } },
+          { status: 500 }
+        );
+      }
     }
 
     // Log activity

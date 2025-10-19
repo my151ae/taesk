@@ -65,32 +65,153 @@ export async function PATCH(
 
     const updates = parsed.data.updates;
 
-    const updatePromises = updates.map(({ id, list_id, position }) =>
-      supabase
+    // Basic validation: duplicate IDs and duplicate (list_id, position)
+    const idSet = new Set<string>();
+    const positionSet = new Set<string>();
+
+    for (const update of updates) {
+      if (idSet.has(update.id)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_BODY', message: 'Duplicate card ID detected in updates payload.' } },
+          { status: 400 }
+        );
+      }
+      idSet.add(update.id);
+
+      const positionKey = `${update.list_id}:${update.position}`;
+      if (positionSet.has(positionKey)) {
+        return NextResponse.json(
+          { error: { code: 'INVALID_BODY', message: 'Duplicate position within the same list detected.' } },
+          { status: 400 }
+        );
+      }
+      positionSet.add(positionKey);
+    }
+
+    const cardIds = updates.map((u) => u.id);
+
+    const { data: existingCards, error: fetchCardsError } = await supabase
+      .from('cards')
+      .select('id, board_id, list_id, position')
+      .in('id', cardIds);
+
+    if (fetchCardsError) {
+      console.error('[cards/reorder] Failed to fetch current card state', fetchCardsError);
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: fetchCardsError.message } },
+        { status: 500 }
+      );
+    }
+
+    if (!existingCards || existingCards.length !== updates.length) {
+      const foundIds = new Set(existingCards?.map((card) => card.id) ?? []);
+      const missing = updates.filter((u) => !foundIds.has(u.id)).map((u) => u.id);
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_BODY',
+            message: 'One or more cards do not exist or do not belong to this board.',
+            details: { missing },
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const invalidBoardCard = existingCards.find((card) => card.board_id !== boardId);
+    if (invalidBoardCard) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_BODY',
+            message: 'Updates contain cards from a different board.',
+            details: { cardId: invalidBoardCard.id, boardId: invalidBoardCard.board_id },
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const listIds = Array.from(new Set(updates.map((u) => u.list_id)));
+
+    if (listIds.length > 0) {
+      const { data: targetLists, error: fetchListsError } = await supabase
+        .from('lists')
+        .select('id, board_id')
+        .in('id', listIds);
+
+      if (fetchListsError) {
+        console.error('[cards/reorder] Failed to verify list ownership', fetchListsError);
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: fetchListsError.message } },
+          { status: 500 }
+        );
+      }
+
+      if (!targetLists || targetLists.length !== listIds.length) {
+        const foundListIds = new Set(targetLists?.map((list) => list.id) ?? []);
+        const missingLists = listIds.filter((id) => !foundListIds.has(id));
+        return NextResponse.json(
+          {
+            error: {
+              code: 'INVALID_BODY',
+              message: 'One or more lists do not exist.',
+              details: { missingLists },
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      const invalidList = targetLists.find((list) => list.board_id !== boardId);
+      if (invalidList) {
+        return NextResponse.json(
+          {
+            error: {
+              code: 'INVALID_BODY',
+              message: 'Updates contain lists from a different board.',
+              details: { listId: invalidList.id, boardId: invalidList.board_id },
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const originalState = new Map(existingCards.map((card) => [card.id, { list_id: card.list_id, position: card.position }]));
+
+    for (const { id, list_id, position } of updates) {
+      const { error: updateError } = await supabase
         .from('cards')
         .update({ list_id, position })
         .eq('id', id)
-        .eq('board_id', boardId)
-    );
+        .eq('board_id', boardId);
 
-    const results = await Promise.all(updatePromises);
+      if (updateError) {
+        console.error('[cards/reorder] Update failed', {
+          payload: { id, list_id, position },
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code,
+        });
 
-    const firstError = results.find(({ error }) => error);
+        // Attempt rollback to the original state to keep consistency
+        await Promise.all(
+          Array.from(originalState.entries()).map(([cardId, snapshot]) =>
+            supabase
+              .from('cards')
+              .update({ list_id: snapshot.list_id, position: snapshot.position })
+              .eq('id', cardId)
+              .eq('board_id', boardId)
+          )
+        );
 
-    if (firstError?.error) {
-      const failingIndex = results.findIndex(({ error }) => error);
-      const failingPayload = failingIndex >= 0 ? updates[failingIndex] : null;
-      console.error('[cards/reorder] Update failed', {
-        payload: failingPayload,
-        message: firstError.error.message,
-        details: firstError.error.details,
-        hint: firstError.error.hint,
-        code: firstError.error.code,
-      });
-      return NextResponse.json(
-        { error: { code: 'DB_ERROR', message: firstError.error.message } },
-        { status: 500 }
-      );
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: updateError.message } },
+          { status: 500 }
+        );
+      }
     }
 
     // Log activity
