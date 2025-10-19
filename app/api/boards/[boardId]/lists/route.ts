@@ -89,14 +89,16 @@ export async function POST(
     // 5. Log activity (for single list creation only)
     if (!isBatch && createdLists && createdLists.length > 0) {
       const list = createdLists[0];
-      await supabase.from('activity_logs').insert({
+      supabase.from('activity_logs').insert({
         board_id: boardId,
         user_id: user.id,
         action: 'created',
         entity_type: 'list',
         entity_id: list.id,
         entity_title: list.title,
-      }).catch((err) => console.error('Activity log failed:', err));
+      }).then(({ error: logError }) => {
+        if (logError) console.error('Activity log failed:', logError);
+      });
     }
 
     return NextResponse.json(

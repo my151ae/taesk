@@ -7,6 +7,7 @@ const ReorderCardsSchema = z.object({
     id: z.string().uuid(),
     list_id: z.string().uuid(),
     position: z.number().int().min(0),
+    title: z.string().min(1).max(255),
     updated_at: z.string().datetime().optional(),
   })).min(1),
 });
@@ -81,7 +82,7 @@ export async function PATCH(
     }
 
     // Log activity
-    await supabase.from('activity_logs').insert({
+    supabase.from('activity_logs').insert({
       board_id: boardId,
       user_id: user.id,
       action: 'updated',
@@ -89,7 +90,9 @@ export async function PATCH(
       entity_id: boardId,
       entity_title: 'Cards reordered',
       details: { count: updates.length },
-    }).catch((err) => console.error('Activity log failed:', err));
+    }).then(({ error: logError }) => {
+      if (logError) console.error('Activity log failed:', logError);
+    });
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {

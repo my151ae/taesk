@@ -79,14 +79,16 @@ export async function POST(
     }
 
     // Log activity
-    await supabase.from('activity_logs').insert({
+    supabase.from('activity_logs').insert({
       board_id: boardId,
       user_id: user.id,
       action: 'created',
       entity_type: 'card',
       entity_id: createdCard.id,
       entity_title: createdCard.title,
-    }).catch((err) => console.error('Activity log failed:', err));
+    }).then(({ error: logError }) => {
+      if (logError) console.error('Activity log failed:', logError);
+    });
 
     return NextResponse.json({ card: createdCard }, { status: 201 });
   } catch (error) {

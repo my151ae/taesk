@@ -89,14 +89,16 @@ export async function PATCH(
 
     // Log activity
     const action = parsed.data.list_id ? 'moved' : 'updated';
-    await supabase.from('activity_logs').insert({
+    supabase.from('activity_logs').insert({
       board_id: boardId,
       user_id: user.id,
       action,
       entity_type: 'card',
       entity_id: cardId,
       entity_title: updatedCard.title,
-    }).catch((err) => console.error('Activity log failed:', err));
+    }).then(({ error: logError }) => {
+      if (logError) console.error('Activity log failed:', logError);
+    });
 
     return NextResponse.json({ card: updatedCard }, { status: 200 });
   } catch (error) {
@@ -167,14 +169,16 @@ export async function DELETE(
 
     // Log activity
     if (card) {
-      await supabase.from('activity_logs').insert({
+      supabase.from('activity_logs').insert({
         board_id: boardId,
         user_id: user.id,
         action: 'deleted',
         entity_type: 'card',
         entity_id: cardId,
         entity_title: card.title,
-      }).catch((err) => console.error('Activity log failed:', err));
+      }).then(({ error: logError }) => {
+        if (logError) console.error('Activity log failed:', logError);
+      });
     }
 
     return new NextResponse(null, { status: 204 });
