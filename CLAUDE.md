@@ -62,7 +62,10 @@
 3. **Test in browser** with DevTools (use chrome-devtools MCP)
 4. **Check for errors/warnings** in console
 5. **Fix any issues** before proceeding
-6. **Run E2E tests** if relevant (`npx playwright test --reporter=json > playwright-report.json`)
+6. **Run E2E tests** if relevant:
+   - **前提**: `.env.test` ファイルが必須（後述）
+   - **実行**: `npx playwright test --reporter=json > playwright-report.json`
+   - **結果確認**: `cat playwright-report.json | jq '.stats'` (推奨) または `tail -20 playwright-report.json | grep -E '"(expected|unexpected)"'`
 
 ### Before Completing Work
 
@@ -189,18 +192,45 @@ Uses `@dnd-kit`:
 
 ### E2E Tests (Playwright)
 
+**前提条件**:
+1. **`.env.test` ファイルが必須** - プロジェクトルートに配置（`.env.example` を参考に作成）
+2. 以下の環境変数を設定:
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key
+   E2E_ENABLED=true
+   E2E_SECRET=redacted-e2e-secret
+   E2E_USER_EMAIL=e2e.taesk.test@gmail.com
+   E2E_USER_PASSWORD=replace-with-local-test-password
+   ```
+
+**実行方法**:
 ```bash
+# すべてのテストを実行（50 tests）
 npx playwright test --reporter=json > playwright-report.json
-# 必要に応じて JSON を python / node で解析
+
+# 結果確認（推奨: jq コマンド）
+cat playwright-report.json | jq '.stats'
+
+# jq がない場合
+tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
 ```
 
-### Test Coverage
+**テスト成果物**（すべて `.gitignore` に含まれる）:
+- `playwright-report.json` - テスト結果
+- `playwright/.auth/user.json` - 認証セッション
+- `test-results/` - 失敗時のスクリーンショット
+- `playwright-report/` - HTML レポート
 
-- ✅ Add/edit/delete lists
-- ✅ Add/edit/delete cards
-- ✅ Drag & drop within/between lists
-- ✅ Data persistence after reload
+### Test Coverage (50 tests)
+
+- ✅ Auth tests (5): Login, logout, profile
+- ✅ Kanban tests (37): Add/edit/delete lists/cards, drag & drop, persistence
+- ✅ Reorder API tests (8): Validation, transactions, concurrent updates
 - ✅ Mobile responsiveness
+
+**詳細**: `/docs/detail/testing.md` を参照
 
 ## Common Tasks
 
@@ -231,15 +261,25 @@ When making significant changes:
 
 ## Environment Variables
 
+### Development (`.env.local`)
+
 Required for Supabase:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
 ```
 
-Set in:
-- Local: `.env.local` (gitignored)
-- Vercel: Project settings → Environment Variables
+### Testing (`.env.test`)
+
+**Required for E2E tests** - see Testing section above for full details.
+
+### Production (Vercel)
+
+Set in: Vercel Project Settings → Environment Variables
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+**Note**: All `.env*` files are gitignored except `.env.example`
 
 ## Deployment
 

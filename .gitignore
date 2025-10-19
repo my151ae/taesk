@@ -67,8 +67,12 @@ Desktop.ini
 # Playwright and browser testing
 .playwright-mcp/
 playwright-report/
+playwright-report*.json
 test-results/
 playwright/.auth/
+*.playwright.log
+debug-report*.json
+dev-server.log
 
 # Temporary files
 *.tmp

@@ -29,27 +29,44 @@ Visit `http://localhost:3000` to see the app.
 
 ### Running E2E Tests
 
-```bash
-# 1. Set up test environment variables
-# Create .env.test with the following:
-#   NEXT_PUBLIC_SUPABASE_URL=...
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-#   SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key
-#   E2E_ENABLED=true
-#   E2E_SECRET=...
-#   E2E_USER_EMAIL=...
-#   E2E_USER_PASSWORD=...
+**前提条件**: `.env.test` ファイルが必須
 
-# 2. Run tests (playwright.config.ts automatically loads .env.test)
+```bash
+# 1. .env.test ファイルを作成（存在しない場合）
+cp .env.example .env.test
+
+# 2. .env.test を編集して実際の値を設定:
+#   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...  # 実際の値
+#   SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key      # 実際の値
+#   E2E_ENABLED=true
+#   E2E_SECRET=redacted-e2e-secret
+#   E2E_USER_EMAIL=e2e.taesk.test@gmail.com
+#   E2E_USER_PASSWORD=replace-with-local-test-password
+
+# 3. テストを実行（playwright.config.ts が自動的に .env.test を読み込む）
 npx playwright test --reporter=json > playwright-report.json
 
-# 3. Check test results
+# 4. 結果確認（推奨: jq コマンド）
 cat playwright-report.json | jq '.stats'
-# If jq is not installed:
-# tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
+
+# jq がない場合:
+tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
 ```
 
-**Note**: The `playwright.config.ts` file automatically loads `.env.test` using `dotenv`, so you don't need to manually set environment variables before running tests.
+**テスト成果物**（すべて `.gitignore` に含まれる）:
+- `playwright-report.json` - テスト結果
+- `playwright/.auth/user.json` - 認証セッション
+- `test-results/` - 失敗時のスクリーンショット
+- `playwright-report/` - HTML レポート
+
+**Test Coverage (50 tests)**:
+- ✅ Auth tests (5/5): Login, logout, profile
+- ✅ Kanban tests (37/37): CRUD operations, drag & drop
+- ✅ Reorder API tests (8/8): Validation, transactions, concurrent updates
+- ✅ RLS tests (optional): Permission enforcement
+
+**詳細**: [`/docs/detail/testing.md`](./detail/testing.md) を参照
 
 ## 🏗️ Architecture Overview
 

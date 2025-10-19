@@ -1,29 +1,54 @@
 # Testing Guide
 
-Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前にセットアップしてから各シナリオを実行します。本ドキュメントは 2025-10-15 時点の構成に基づいています。
+Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前にセットアップしてから各シナリオを実行します。本ドキュメントは 2025-10-19 時点の構成に基づいています。
+
+**最新情報（2025-10-19）**: Reorder API の E2E テストを追加し、合計テスト数が 50 件になりました。
 
 ## 基本ルール
 
-- **必ず JSON レポーターを使用**: `npx playwright test --reporter=json > playwright-report.json`
-- **レポート解析はプログラムで**: Python や Node.js スクリプトで JSON を読み取り、成功/失敗の内訳を確認
-- **`NODE_ENV=test` で dev サーバーを起動**: Playwright が自動起動する `npm run dev`
-- **Supabase 認証をバイパスしない**: グローバルセットアップで正式にサインインし、`playwright/.auth/user.json` を利用
+- **`.env.test` ファイルが必須**: `playwright.config.ts` が起動時に自動読み込み（後述の「環境変数の設定」参照）
+- **JSON レポーターで結果確認**: `npx playwright test --reporter=json > playwright-report.json`
+- **レポート解析は `jq` コマンドで**: `cat playwright-report.json | jq '.stats'` でテスト結果を即座に確認（Python/Node.js 不要）
+- **`NODE_ENV=test` で dev サーバーを起動**: Playwright が自動起動（`playwright.config.ts` で設定済み）
+- **正式な Supabase 認証**: グローバルセットアップで自動サインインし、`playwright/.auth/user.json` にセッション保存
 
-## 環境変数の設定
+## 環境変数の設定（必須）
 
-テスト実行には `.env.test` ファイルが必要です。以下の内容を含めてください:
+### `.env.test` ファイルの作成
+
+テスト実行には **`.env.test` ファイルが必須**です。プロジェクトルートに以下の内容で作成してください：
 
 ```bash
+# Supabase Configuration (本番環境と同じ)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...  # 実際の anon key
+
+# Supabase Service Role Key (テストユーザー作成に必要)
+SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key  # 実際の service role key
+
+# E2E Testing Configuration
 E2E_ENABLED=true
-E2E_SECRET=redacted-e2e-secret
-E2E_USER_EMAIL=e2e.taesk.test@gmail.com
-E2E_USER_PASSWORD=replace-with-local-test-password
+E2E_SECRET=redacted-e2e-secret  # 任意の秘密鍵
+E2E_USER_EMAIL=e2e.taesk.test@gmail.com       # テスト用メールアドレス
+E2E_USER_PASSWORD=replace-with-local-test-password            # テスト用パスワード
 ```
 
-**重要**: `playwright.config.ts` は起動時に自動的に `.env.test` を読み込みます。手動で環境変数を設定する必要はありません。
+**重要なポイント**:
+- ✅ `playwright.config.ts` が起動時に **自動的に** `.env.test` を読み込む（`dotenv.config({ path: '.env.test' })`）
+- ✅ 手動で環境変数を設定する必要はありません
+- ✅ `.env.test` は `.gitignore` に含まれているため Git にコミットされません
+- ⚠️ `.env.example` をコピーして作成すると便利ですが、**実際の値に置き換える**必要があります
+
+### 環境変数の取得方法
+
+1. **Supabase URL & Anon Key**:
+   - Supabase Dashboard → Settings → API → Project URL / anon public
+2. **Service Role Key**:
+   - Supabase Dashboard → Settings → API → service_role (⚠️ 秘密鍵、慎重に扱う)
+3. **E2E_SECRET**:
+   - 任意の文字列（例: `redacted-e2e-secret`）
+4. **E2E_USER_EMAIL / PASSWORD**:
+   - テスト用の認証情報（実在するメールアドレスである必要はありません）
 
 ## 設定ファイル
 
@@ -60,30 +85,80 @@ export default defineConfig({
 - `storageState`: すべてのテストで同じセッションを再利用
 - `workers`: CI は安定性優先で 1、本地は 4
 
-## コマンド例
+## テスト実行方法
+
+### 1. 前提条件の確認
 
 ```bash
-# JSON レポートを生成
+# .env.test ファイルが存在することを確認
+ls -la .env.test
+
+# 存在しない場合は作成
+cp .env.example .env.test
+# → .env.test を編集して実際の値に置き換える
+```
+
+### 2. テストの実行
+
+```bash
+# すべてのテストを実行（JSON レポート生成）
 npx playwright test --reporter=json > playwright-report.json
 
-# jq でサマリーを表示（推奨）
+# 特定のテストファイルのみ実行
+npx playwright test e2e/auth.spec.ts --reporter=json > playwright-report.json
+npx playwright test e2e/kanban.spec.ts --reporter=json > playwright-report.json
+npx playwright test e2e/reorder-api.spec.ts --reporter=json > playwright-report.json
+```
+
+### 3. テスト結果の確認
+
+**推奨: `jq` コマンドを使用**
+
+```bash
+# jq でサマリーを表示
 cat playwright-report.json | jq '.stats'
-# Output:
+
+# 出力例（50 tests）:
 # {
-#   "expected": 34,
+#   "expected": 50,
 #   "skipped": 0,
 #   "unexpected": 0,
 #   "flaky": 0
 # }
+```
 
-# jq がない場合: tail + grep を使用
+**`jq` がない場合: `tail` + `grep` を使用**
+
+```bash
 tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
-# Output:
-#     "expected": 34,
+
+# 出力例:
+#     "expected": 50,
 #     "skipped": 0,
 #     "unexpected": 0,
 #     "flaky": 0
 ```
+
+**`jq` のインストール (推奨)**
+
+```bash
+# macOS
+brew install jq
+
+# Ubuntu/Debian
+sudo apt-get install jq
+```
+
+### テスト成果物の管理
+
+テスト実行により以下のファイルが生成されます（すべて `.gitignore` に含まれています）：
+
+- `playwright-report.json` - テスト結果（JSON形式）
+- `playwright/.auth/user.json` - 認証セッション（globalSetup で自動生成）
+- `test-results/` - 失敗時のスクリーンショット・トレース
+- `playwright-report/` - HTML レポート（`--reporter=html` 使用時）
+
+これらのファイルはプロジェクトルートに生成されますが、Git には追跡されません。
 
 ## テスト分離戦略
 

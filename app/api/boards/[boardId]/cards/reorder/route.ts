@@ -20,6 +20,19 @@ interface ValidationIssue {
   actual_board_id?: string;
 }
 
+/**
+ * Hash board ID to a 32-bit integer for PostgreSQL advisory lock
+ */
+function hashBoardId(boardId: string): number {
+  let hash = 0;
+  for (let i = 0; i < boardId.length; i++) {
+    const char = boardId.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
@@ -145,47 +158,47 @@ export async function PATCH(
       return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
     }
 
-    const originalSnapshot = new Map(
-      Array.from(existingMap.entries()).map(([id, card]) => [id, { list_id: card.list_id, position: card.position }])
-    );
+    // Phase 2: Use database transaction with advisory lock
+    const startTime = Date.now();
+    const lockKey = hashBoardId(boardId);
 
-    for (const update of updates) {
-      const current = existingMap.get(update.id);
-      if (!current) continue;
+    const { data, error: rpcError } = await supabase.rpc('reorder_cards_tx', {
+      p_board_id: boardId,
+      p_lock_key: lockKey,
+      p_updates: updates.map((u) => ({
+        id: u.id,
+        position: u.position,
+        list_id: u.list_id || null,
+      })),
+    });
 
-      const nextListId = update.list_id ?? current.list_id;
-
-      const { error: updateError } = await supabase
-        .from('cards')
-        .update({
-          position: update.position,
-          list_id: nextListId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', update.id)
-        .eq('board_id', boardId);
-
-      if (updateError) {
-        console.error('[cards/reorder] Update failed', { update, error: updateError });
-
-        await Promise.all(
-          Array.from(originalSnapshot.entries()).map(([cardId, snapshot]) =>
-            supabase
-              .from('cards')
-              .update({ position: snapshot.position, list_id: snapshot.list_id })
-              .eq('id', cardId)
-              .eq('board_id', boardId)
-          )
-        );
-
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: updateError.message } },
-          { status: 500 }
-        );
-      }
+    if (rpcError) {
+      console.error('[cards/reorder] Transaction failed', rpcError);
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: rpcError.message } },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ ok: true, updated: updates.length }, { status: 200 });
+    const durationMs = Date.now() - startTime;
+    const updatedCount = data?.updated_count || 0;
+    const unchangedCount = updates.length - updatedCount;
+
+    console.log(
+      JSON.stringify({
+        event: 'cards.reorder',
+        boardId,
+        actorId: user.id,
+        updated: updatedCount,
+        unchanged: unchangedCount,
+        durationMs,
+      })
+    );
+
+    return NextResponse.json(
+      { updated: updatedCount, unchanged: unchangedCount, durationMs },
+      { status: 200 }
+    );
   } catch (error) {
     console.error('Unexpected error in PATCH /api/boards/[boardId]/cards/reorder:', error);
     return NextResponse.json(
