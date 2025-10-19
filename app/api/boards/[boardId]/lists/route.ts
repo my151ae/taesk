@@ -70,8 +70,8 @@ export async function POST(
 
     // 4. Create list(s)
     const listsToCreate = isBatch
-      ? parsed.data.map((list: any) => ({ ...list, board_id: boardId, user_id: user.id }))
-      : [{ ...parsed.data, board_id: boardId, user_id: user.id }];
+      ? (parsed.data as Array<{ title: string; position: number }>).map(list => ({ ...list, board_id: boardId, user_id: user.id }))
+      : [{ ...parsed.data as { title: string; position: number }, board_id: boardId, user_id: user.id }];
 
     const { data: createdLists, error } = await supabase
       .from('lists')
