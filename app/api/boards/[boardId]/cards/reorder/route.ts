@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
-// Phase 1: Validation + Sequential Update + Rollback
+// Phase 2: Transaction + Advisory Lock + CTE Bulk Update
 const CardReorderUpdateSchema = z.object({
   id: z.string().min(1),
   position: z.number().int(),
@@ -10,7 +10,7 @@ const CardReorderUpdateSchema = z.object({
 });
 
 const ReorderCardsSchema = z.object({
-  updates: z.array(CardReorderUpdateSchema).min(1),
+  updates: z.array(CardReorderUpdateSchema).min(1).max(1000), // limit payload size
 });
 
 interface ValidationIssue {
@@ -24,10 +24,11 @@ interface ValidationIssue {
 /**
  * PATCH /api/boards/[boardId]/cards/reorder
  *
- * Phase 1: Position-only reorder API with strict validation and failsafe rollback.
+ * Phase 2: Position-only reorder API with transactions and bulk updates.
  * - Only updates `position` (and `list_id` if provided for cross-list moves).
  * - Validates: duplicate IDs, existence, board ownership, list ownership.
- * - Sequential updates with snapshot-based rollback on failure.
+ * - Uses PostgreSQL transactions with advisory locks for consistency.
+ * - Bulk updates via CTE for performance.
  */
 export async function PATCH(
   request: NextRequest,
@@ -170,72 +171,52 @@ export async function PATCH(
       return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
     }
 
-    // 4. Snapshot original positions for rollback
-    const originalState = new Map(
-      existingCards!.map((card) => [
-        card.id,
-        { list_id: card.list_id, position: card.position },
-      ])
-    );
-
-    // 5. Sequential update with failsafe rollback
+    // 4. Execute bulk update in transaction with advisory lock
     let updated = 0;
     try {
-      for (const update of updates) {
-        const updatePayload: { position: number; list_id?: string } = {
-          position: update.position,
-        };
-        if (update.listId) {
-          updatePayload.list_id = update.listId;
-        }
+      // Acquire advisory lock based on board ID hash
+      const lockKey = hashBoardId(boardId);
 
-        const { error: updateError } = await supabase
-          .from('cards')
-          .update(updatePayload)
-          .eq('id', update.id)
-          .eq('board_id', boardId);
+      // Build CTE bulk update query
+      const values = updates
+        .map((u) => {
+          const listIdValue = u.listId ? `'${u.listId}'` : 'NULL';
+          return `('${u.id}', ${u.position}, ${listIdValue})`;
+        })
+        .join(', ');
 
-        if (updateError) {
-          console.error('[cards/reorder] Update failed', {
-            payload: update,
-            message: updateError.message,
-            details: updateError.details,
-            hint: updateError.hint,
-            code: updateError.code,
-          });
+      // Use PostgreSQL transaction with advisory lock + CTE bulk update
+      const { data, error: rpcError } = await supabase.rpc('reorder_cards_tx', {
+        p_board_id: boardId,
+        p_lock_key: lockKey,
+        p_updates: updates.map((u) => ({
+          id: u.id,
+          position: u.position,
+          list_id: u.listId || null,
+        })),
+      });
 
-          // Attempt rollback
-          console.warn('[cards/reorder] Attempting rollback...');
-          await Promise.all(
-            Array.from(originalState.entries()).map(([cardId, snapshot]) =>
-              supabase
-                .from('cards')
-                .update({ list_id: snapshot.list_id, position: snapshot.position })
-                .eq('id', cardId)
-                .eq('board_id', boardId)
-            )
-          );
+      if (rpcError) {
+        console.error('[cards/reorder] Transaction failed', {
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
+          code: rpcError.code,
+        });
 
-          return NextResponse.json(
-            { error: { code: 'DB_ERROR', message: updateError.message } },
-            { status: 500 }
-          );
-        }
-        updated++;
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: rpcError.message } },
+          { status: 500 }
+        );
       }
+
+      updated = data?.updated_count || 0;
     } catch (error) {
-      console.error('[cards/reorder] Unexpected error during update', error);
-      // Attempt rollback
-      await Promise.all(
-        Array.from(originalState.entries()).map(([cardId, snapshot]) =>
-          supabase
-            .from('cards')
-            .update({ list_id: snapshot.list_id, position: snapshot.position })
-            .eq('id', cardId)
-            .eq('board_id', boardId)
-        )
+      console.error('[cards/reorder] Unexpected error during transaction', error);
+      return NextResponse.json(
+        { error: { code: 'INTERNAL_ERROR', message: 'Transaction failed' } },
+        { status: 500 }
       );
-      throw error;
     }
 
     const durationMs = Date.now() - startTime;
@@ -292,4 +273,17 @@ function logReorderEvent(
       hint: issues.length > 0 ? 'Validation failed' : '',
     })
   );
+}
+
+/**
+ * Hash board ID to get advisory lock key (32-bit integer)
+ */
+function hashBoardId(boardId: string): number {
+  let hash = 0;
+  for (let i = 0; i < boardId.length; i++) {
+    const char = boardId.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
 }

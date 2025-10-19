@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
-// Phase 1: Validation + Sequential Update + Rollback
+// Phase 2: Transaction + Advisory Lock + CTE Bulk Update
 const ReorderListsSchema = z.object({
   updates: z.array(
     z.object({
       id: z.string().min(1),
       position: z.number().int(),
     })
-  ).min(1),
+  ).min(1).max(1000), // limit payload size
 });
 
 interface ValidationIssue {
@@ -22,10 +22,11 @@ interface ValidationIssue {
 /**
  * PATCH /api/boards/[boardId]/lists/reorder
  *
- * Phase 1: Position-only reorder API with strict validation and failsafe rollback.
+ * Phase 2: Position-only reorder API with transactions and bulk updates.
  * - Only updates `position`.
  * - Validates: duplicate IDs, existence, board ownership.
- * - Sequential updates with snapshot-based rollback on failure.
+ * - Uses PostgreSQL transactions with advisory locks for consistency.
+ * - Bulk updates via CTE for performance.
  */
 export async function PATCH(
   request: NextRequest,
@@ -130,62 +131,43 @@ export async function PATCH(
       return NextResponse.json({ error: 'Bad Request', issues }, { status: 400 });
     }
 
-    // 3. Snapshot original positions for rollback
-    const originalState = new Map(
-      existingLists!.map((list) => [list.id, list.position])
-    );
-
-    // 4. Sequential update with failsafe rollback
+    // 3. Execute bulk update in transaction with advisory lock
     let updated = 0;
     try {
-      for (const update of updates) {
-        const { error: updateError } = await supabase
-          .from('lists')
-          .update({ position: update.position })
-          .eq('id', update.id)
-          .eq('board_id', boardId);
+      // Acquire advisory lock based on board ID hash
+      const lockKey = hashBoardId(boardId);
 
-        if (updateError) {
-          console.error('[lists/reorder] Update failed', {
-            payload: update,
-            message: updateError.message,
-            details: updateError.details,
-            hint: updateError.hint,
-            code: updateError.code,
-          });
+      // Use PostgreSQL transaction with advisory lock + CTE bulk update
+      const { data, error: rpcError } = await supabase.rpc('reorder_lists_tx', {
+        p_board_id: boardId,
+        p_lock_key: lockKey,
+        p_updates: updates.map((u) => ({
+          id: u.id,
+          position: u.position,
+        })),
+      });
 
-          // Attempt rollback
-          console.warn('[lists/reorder] Attempting rollback...');
-          await Promise.all(
-            Array.from(originalState.entries()).map(([listId, originalPosition]) =>
-              supabase
-                .from('lists')
-                .update({ position: originalPosition })
-                .eq('id', listId)
-                .eq('board_id', boardId)
-            )
-          );
+      if (rpcError) {
+        console.error('[lists/reorder] Transaction failed', {
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
+          code: rpcError.code,
+        });
 
-          return NextResponse.json(
-            { error: { code: 'DB_ERROR', message: updateError.message } },
-            { status: 500 }
-          );
-        }
-        updated++;
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: rpcError.message } },
+          { status: 500 }
+        );
       }
+
+      updated = data?.updated_count || 0;
     } catch (error) {
-      console.error('[lists/reorder] Unexpected error during update', error);
-      // Attempt rollback
-      await Promise.all(
-        Array.from(originalState.entries()).map(([listId, originalPosition]) =>
-          supabase
-            .from('lists')
-            .update({ position: originalPosition })
-            .eq('id', listId)
-            .eq('board_id', boardId)
-        )
+      console.error('[lists/reorder] Unexpected error during transaction', error);
+      return NextResponse.json(
+        { error: { code: 'INTERNAL_ERROR', message: 'Transaction failed' } },
+        { status: 500 }
       );
-      throw error;
     }
 
     const durationMs = Date.now() - startTime;
@@ -242,4 +224,17 @@ function logReorderEvent(
       hint: issues.length > 0 ? 'Validation failed' : '',
     })
   );
+}
+
+/**
+ * Hash board ID to get advisory lock key (32-bit integer)
+ */
+function hashBoardId(boardId: string): number {
+  let hash = 0;
+  for (let i = 0; i < boardId.length; i++) {
+    const char = boardId.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
 }
