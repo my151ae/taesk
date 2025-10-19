@@ -2,14 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
+const CardUpdateSchema = z.object({
+  id: z.string().uuid(),
+  list_id: z.string().uuid(),
+  position: z.number().int().min(0),
+  title: z.string().min(1).max(255),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  due_date: z.union([z.string().datetime(), z.null()]).optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  assignee_id: z.union([z.string().uuid(), z.null()]).optional(),
+  assigned_to: z.union([z.string(), z.null()]).optional(),
+  user_id: z.union([z.string().uuid(), z.null()]).optional(),
+  short_id: z.union([z.string(), z.null()]).optional(),
+  id_short: z.union([z.number().int().min(0), z.null()]).optional(),
+  slug: z.union([z.string(), z.null()]).optional(),
+  updated_at: z.string().datetime().optional(),
+  created_at: z.string().datetime().optional(),
+});
+
 const ReorderCardsSchema = z.object({
-  updates: z.array(z.object({
-    id: z.string().uuid(),
-    list_id: z.string().uuid(),
-    position: z.number().int().min(0),
-    title: z.string().min(1).max(255),
-    updated_at: z.string().datetime().optional(),
-  })).min(1),
+  updates: z.array(CardUpdateSchema).min(1),
 });
 
 /**
@@ -63,13 +76,32 @@ export async function PATCH(
       );
     }
 
-    // Add board_id to each update
-    const updates = parsed.data.updates.map(u => ({
-      id: u.id,
-      board_id: boardId,
-      list_id: u.list_id,
-      position: u.position,
-    }));
+    // Add board_id and retain card attributes needed for inserts
+    const updates = parsed.data.updates.map((u) => {
+      const assigneeId = typeof u.assignee_id === 'string' && u.assignee_id.length > 0
+        ? u.assignee_id
+        : null;
+
+      return {
+        id: u.id,
+        board_id: boardId,
+        list_id: u.list_id,
+        position: u.position,
+        title: u.title,
+        description: u.description ?? '',
+        tags: u.tags ?? [],
+        due_date: u.due_date ?? null,
+        priority: u.priority ?? 'medium',
+        assignee_id: assigneeId,
+        assigned_to: (u.assigned_to ?? null) || null,
+        user_id: u.user_id ?? null,
+        short_id: u.short_id ?? null,
+        id_short: u.id_short ?? null,
+        slug: u.slug ?? null,
+        ...(u.updated_at ? { updated_at: u.updated_at } : {}),
+        ...(u.created_at ? { created_at: u.created_at } : {}),
+      };
+    });
 
     const { error } = await supabase.from('cards').upsert(updates);
 

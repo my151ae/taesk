@@ -1182,7 +1182,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
 
     try {
-      const updates = cardsToSync.map(card => ({
+      const updates = cardsToSync.map((card) => ({
         id: card.id,
         list_id: card.list_id,
         position: card.position,
@@ -1192,6 +1192,13 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         due_date: card.due_date,
         priority: card.priority,
         assignee_id: card.assignee_id,
+        assigned_to: card.assigned_to ?? null,
+        user_id: card.user_id ?? null,
+        short_id: card.short_id ?? null,
+        id_short: card.id_short ?? null,
+        slug: card.slug ?? null,
+        updated_at: card.updated_at,
+        created_at: card.created_at,
       }));
 
       const response = await fetch(`/api/boards/${currentBoardId}/cards/reorder`, {
@@ -1257,25 +1264,70 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const handleAddList = async () => {
     if (!user || !currentBoardId) return;
 
-    // Note: user_id is saved for future features, but all authenticated users
-    // can currently see and edit all lists (shared team board)
-    const newList: List = {
+    const position = boardData.lists.length;
+    const title = "New List";
+
+    const previousData: BoardData = {
+      lists: [...boardData.lists],
+      cards: [...boardData.cards],
+    };
+
+    // Optimistic UI update
+    const tempList: List = {
       id: uuidv4(),
-      title: "New List",
-      position: boardData.lists.length,
+      title,
+      position,
       board_id: currentBoardId,
       user_id: getActualUserId(user.id),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const newData = { ...boardData, lists: [...boardData.lists, newList] };
-    updateData(newData);
+    const optimisticData: BoardData = {
+      lists: [...previousData.lists, tempList],
+      cards: previousData.cards,
+    };
+    updateData(optimisticData);
 
-    // Add to sync queue if offline, otherwise sync directly
+    // Add to sync queue if offline, otherwise create via API
     if (!isOnline) {
-      addToSyncQueue({ type: 'INSERT', table: 'lists', data: newList });
+      addToSyncQueue({ type: 'INSERT', table: 'lists', data: tempList });
     } else {
-      await syncToSupabase(newData);
+      try {
+        const response = await fetch(`/api/boards/${currentBoardId}/lists`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: tempList.id,
+            title,
+            position,
+            user_id: tempList.user_id,
+            created_at: tempList.created_at,
+            updated_at: tempList.updated_at,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to create list');
+        }
+
+        const { lists: createdLists } = await response.json();
+        const createdList = createdLists?.[0];
+
+        if (createdList) {
+          const updatedLists = optimisticData.lists.map((list) =>
+            list.id === tempList.id ? { ...list, ...createdList } : list
+          );
+
+          updateData({
+            lists: updatedLists,
+            cards: optimisticData.cards,
+          });
+        }
+      } catch (error) {
+        console.error("Error creating list:", error);
+        updateData(previousData);
+      }
     }
   };
 
@@ -1288,15 +1340,16 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const title = "New Card";
     const slug = slugify(title);
 
-    // Note: user_id is saved for future features, but all authenticated users
-    // can currently see and edit all cards (shared team board)
-    const newCard: Card = {
+    const position = boardData.cards.filter((c) => c.list_id === listId).length;
+
+    // Optimistic UI update
+    const tempCard: Card = {
       id: uuidv4(),
       title,
       description: "",
       list_id: listId,
       board_id: currentBoardId,
-      position: boardData.cards.filter((c) => c.list_id === listId).length,
+      position,
       user_id: getActualUserId(user.id),
       tags: [],
       due_date: null,
@@ -1309,14 +1362,66 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const newData = { ...boardData, cards: [...boardData.cards, newCard] };
-    updateData(newData);
+    const previousData: BoardData = {
+      lists: [...boardData.lists],
+      cards: [...boardData.cards],
+    };
 
-    // Add to sync queue if offline, otherwise sync directly
+    const optimisticData: BoardData = {
+      lists: previousData.lists,
+      cards: [...previousData.cards, tempCard],
+    };
+    updateData(optimisticData);
+
+    // Add to sync queue if offline, otherwise create via API
     if (!isOnline) {
-      addToSyncQueue({ type: 'INSERT', table: 'cards', data: newCard });
+      addToSyncQueue({ type: 'INSERT', table: 'cards', data: tempCard });
     } else {
-      await syncToSupabase(newData);
+      try {
+        const response = await fetch(`/api/boards/${currentBoardId}/cards`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: tempCard.id,
+            title,
+            description: "",
+            list_id: listId,
+            position,
+            tags: tempCard.tags,
+            due_date: tempCard.due_date,
+            priority: tempCard.priority,
+            assignee_id: tempCard.assignee_id,
+            assigned_to: tempCard.assigned_to,
+            user_id: tempCard.user_id,
+            short_id: tempCard.short_id,
+            id_short: tempCard.id_short,
+            slug: tempCard.slug,
+            created_at: tempCard.created_at,
+            updated_at: tempCard.updated_at,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'Failed to create card');
+        }
+
+        const { card: createdCard } = await response.json();
+
+        if (createdCard) {
+          const updatedCards = optimisticData.cards.map((card) =>
+            card.id === tempCard.id ? { ...card, ...createdCard } : card
+          );
+
+          updateData({
+            lists: optimisticData.lists,
+            cards: updatedCards,
+          });
+        }
+      } catch (error) {
+        console.error("Error creating card:", error);
+        updateData(previousData);
+      }
     }
   };
 

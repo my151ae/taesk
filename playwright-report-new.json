@@ -1,4 +1,4 @@
-[dotenv@17.2.3] injecting env (7) from .env.test -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
 [Global Setup] Starting authentication setup...
 [Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
 [Global Setup] User status: already exists
@@ -92,12 +92,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4481,
+                      "duration": 5289,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:41.455Z",
+                      "startTime": "2025-10-19T07:13:08.220Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -126,12 +126,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 2483,
+                      "duration": 2012,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:41.458Z",
+                      "startTime": "2025-10-19T07:13:08.223Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -160,12 +160,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 2479,
+                      "duration": 2018,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:41.459Z",
+                      "startTime": "2025-10-19T07:13:08.220Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -202,12 +202,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 4456,
+                      "duration": 5234,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:41.458Z",
+                      "startTime": "2025-10-19T07:13:08.218Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -236,12 +236,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 1942,
+                      "duration": 3091,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:44.223Z",
+                      "startTime": "2025-10-19T07:13:10.619Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -287,12 +287,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 4246,
+                      "duration": 6162,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:44.328Z",
+                      "startTime": "2025-10-19T07:13:10.715Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -321,12 +321,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 9569,
+                      "duration": 14724,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:46.242Z",
+                      "startTime": "2025-10-19T07:13:13.971Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -355,12 +355,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 12498,
+                      "duration": 17991,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:46.291Z",
+                      "startTime": "2025-10-19T07:13:14.045Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -389,12 +389,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 11578,
+                      "duration": 16509,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:46.306Z",
+                      "startTime": "2025-10-19T07:13:14.082Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -423,12 +423,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 10111,
+                      "duration": 17776,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:48.609Z",
+                      "startTime": "2025-10-19T07:13:16.924Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -457,12 +457,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 6508,
+                      "duration": 8145,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:55.841Z",
+                      "startTime": "2025-10-19T07:13:28.765Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -491,12 +491,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5664,
+                      "duration": 8859,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:57.903Z",
+                      "startTime": "2025-10-19T07:13:30.706Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -511,6 +511,62 @@
             },
             {
               "title": "should delete a list",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "timedOut",
+                      "duration": 30130,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 24,
+                            "line": 301
+                          },
+                          "message": "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('delete-list-button')\u001b[22m\n\u001b[2m    - locator resolved to <button data-testid=\"delete-list-button\" class=\"w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20\">Delete</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m  - element was detached from the DOM, retrying\u001b[22m\n\n\n  299 |     const deleteButton = page.getByTestId('delete-list-button');\n  300 |     await deleteButton.waitFor({ state: 'visible', timeout: 5000 });\n> 301 |     await deleteButton.click();\n      |                        ^\n  302 |\n  303 |     // Wait for deletion to complete (Realtime propagation + UI update)\n  304 |     await page.waitForTimeout(2000);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:301:24"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-19T07:13:32.072Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board-E2E-Tests-should-delete-a-list-chromium/error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-563c846752dcaa900657",
+              "file": "kanban.spec.ts",
+              "line": 285,
+              "column": 7
+            },
+            {
+              "title": "should add a card to a list",
               "ok": true,
               "tags": [],
               "tests": [
@@ -525,81 +581,17 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 16933,
+                      "duration": 14871,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:35:58.739Z",
+                      "startTime": "2025-10-19T07:13:34.721Z",
                       "annotations": [],
                       "attachments": []
                     }
                   ],
                   "status": "expected"
-                }
-              ],
-              "id": "7a6a8de26a6a6c44d713-563c846752dcaa900657",
-              "file": "kanban.spec.ts",
-              "line": 285,
-              "column": 7
-            },
-            {
-              "title": "should add a card to a list",
-              "ok": false,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 18519,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:323:54",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 54,
-                          "line": 323
-                        },
-                        "snippet": "  321 |\n  322 |     // Verify card appears\n> 323 |     await expect(page.getByText('New Card').first()).toBeVisible();\n      |                                                      ^\n  324 |   });\n  325 |\n  326 |   test('should edit a card', async ({ page }) => {"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 54,
-                            "line": 323
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n\n\n  321 |\n  322 |     // Verify card appears\n> 323 |     await expect(page.getByText('New Card').first()).toBeVisible();\n      |                                                      ^\n  324 |   });\n  325 |\n  326 |   test('should edit a card', async ({ page }) => {\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:323:54"
-                        }
-                      ],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2025-10-19T07:35:58.808Z",
-                      "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--327cd-should-add-a-card-to-a-list-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 54,
-                        "line": 323
-                      }
-                    }
-                  ],
-                  "status": "unexpected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-3c0e29b0e3ee751e4256",
@@ -623,31 +615,31 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "failed",
-                      "duration": 23823,
+                      "duration": 27299,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:365:48",
+                        "message": "Error: Timed out waiting for cards to be persisted for board 10753665-ff68-4ded-b761-fa410ed6c052",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 10753665-ff68-4ded-b761-fa410ed6c052\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:336:19",
                         "location": {
                           "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 48,
-                          "line": 365
+                          "column": 9,
+                          "line": 86
                         },
-                        "snippet": "  363 |\n  364 |     // Regression test: Modal should close after save (not reopen)\n> 365 |     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });\n      |                                                ^\n  366 |\n  367 |     // Wait a bit to ensure modal doesn't reopen\n  368 |     await page.waitForTimeout(500);"
+                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 48,
-                            "line": 365
+                            "column": 9,
+                            "line": 86
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n\n\n  363 |\n  364 |     // Regression test: Modal should close after save (not reopen)\n> 365 |     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });\n      |                                                ^\n  366 |\n  367 |     // Wait a bit to ensure modal doesn't reopen\n  368 |     await page.waitForTimeout(500);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:365:48"
+                          "message": "Error: Timed out waiting for cards to be persisted for board 10753665-ff68-4ded-b761-fa410ed6c052\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:336:19"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:02.360Z",
+                      "startTime": "2025-10-19T07:13:36.935Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -658,8 +650,8 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 48,
-                        "line": 365
+                        "column": 9,
+                        "line": 86
                       }
                     }
                   ],
@@ -687,12 +679,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 15762,
+                      "duration": 18382,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:03.613Z",
+                      "startTime": "2025-10-19T07:13:39.634Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -721,31 +713,31 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "failed",
-                      "duration": 29379,
+                      "duration": 17288,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:478:7",
+                        "message": "Error: Timed out waiting for cards to be persisted for board 80632fd9-5881-44ec-87fa-98dbb154e939",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 80632fd9-5881-44ec-87fa-98dbb154e939\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:457:25",
                         "location": {
                           "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 7,
-                          "line": 478
+                          "column": 9,
+                          "line": 86
                         },
-                        "snippet": "  476 |\n  477 |     if (assigneeIdSupported) {\n> 478 |       await expect.poll(async () => {\n      |       ^\n  479 |         const { data, error } = await supabase\n  480 |           .from('cards')\n  481 |           .select('assignee_id, assigned_to')"
+                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 7,
-                            "line": 478
+                            "column": 9,
+                            "line": 86
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mnull\u001b[39m\n\nCall Log:\n- Timeout 10000ms exceeded while waiting on the predicate\n\n  476 |\n  477 |     if (assigneeIdSupported) {\n> 478 |       await expect.poll(async () => {\n      |       ^\n  479 |         const { data, error } = await supabase\n  480 |           .from('cards')\n  481 |           .select('assignee_id, assigned_to')\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:478:7"
+                          "message": "Error: Timed out waiting for cards to be persisted for board 80632fd9-5881-44ec-87fa-98dbb154e939\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:457:25"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:15.695Z",
+                      "startTime": "2025-10-19T07:13:49.612Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -756,8 +748,8 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 7,
-                        "line": 478
+                        "column": 9,
+                        "line": 86
                       }
                     }
                   ],
@@ -782,15 +774,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 19061,
+                      "duration": 8736,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:18.623Z",
+                      "startTime": "2025-10-19T07:13:58.067Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -805,7 +797,7 @@
             },
             {
               "title": "should drag and drop a card to a different list",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -816,20 +808,50 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 20147,
-                      "errors": [],
+                      "workerIndex": 4,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 19137,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:578:24",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 24,
+                          "line": 578
+                        },
+                        "snippet": "  576 |     // Verify card appears\n  577 |     const card = page.getByText('New Card').first();\n> 578 |     await expect(card).toBeVisible();\n      |                        ^\n  579 |\n  580 |     // Get the second list's dropzone area\n  581 |     const secondList = page.getByRole('button', { name: /New List/i }).nth(1);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 24,
+                            "line": 578
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('New Card').first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('New Card').first()\u001b[22m\n\n\n  576 |     // Verify card appears\n  577 |     const card = page.getByText('New Card').first();\n> 578 |     await expect(card).toBeVisible();\n      |                        ^\n  579 |\n  580 |     // Get the second list's dropzone area\n  581 |     const secondList = page.getByRole('button', { name: /New List/i }).nth(1);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:578:24"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:19.402Z",
+                      "startTime": "2025-10-19T07:14:03.572Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--09380--a-card-to-a-different-list-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 24,
+                        "line": 578
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-a38f0c18c888a753f7eb",
@@ -839,7 +861,7 @@
             },
             {
               "title": "should persist data after page reload",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -852,18 +874,48 @@
                     {
                       "workerIndex": 5,
                       "parallelIndex": 1,
-                      "status": "passed",
-                      "duration": 27643,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 26582,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /New List/i }).first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /New List/i }).first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /New List/i }).first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /New List/i }).first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:614:75",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 75,
+                          "line": 614
+                        },
+                        "snippet": "  612 |\n  613 |     // Verify data persists\n> 614 |     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();\n      |                                                                           ^\n  615 |     await expect(page.getByText('New Card').first()).toBeVisible();\n  616 |   });\n  617 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 75,
+                            "line": 614
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /New List/i }).first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /New List/i }).first()\u001b[22m\n\n\n  612 |\n  613 |     // Verify data persists\n> 614 |     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();\n      |                                                                           ^\n  615 |     await expect(page.getByText('New Card').first()).toBeVisible();\n  616 |   });\n  617 |\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:614:75"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:27.253Z",
+                      "startTime": "2025-10-19T07:14:05.668Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--de40f-sist-data-after-page-reload-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 75,
+                        "line": 614
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-a0400f7813e80587053f",
@@ -884,15 +936,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 28105,
+                      "duration": 20583,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:37.953Z",
+                      "startTime": "2025-10-19T07:14:06.826Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -918,15 +970,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 16716,
+                      "duration": 14127,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:39.570Z",
+                      "startTime": "2025-10-19T07:14:08.570Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -952,15 +1004,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
-                      "parallelIndex": 2,
+                      "workerIndex": 7,
+                      "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 17849,
+                      "duration": 6620,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:45.927Z",
+                      "startTime": "2025-10-19T07:14:24.656Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -986,10 +1038,10 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
-                      "parallelIndex": 1,
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
                       "status": "timedOut",
-                      "duration": 30169,
+                      "duration": 30090,
                       "error": {
                         "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
                         "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
@@ -1001,16 +1053,16 @@
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 45,
-                            "line": 674
+                            "column": 68,
+                            "line": 669
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText(/queued/i)\nExpected: visible\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText(/queued/i)\u001b[22m\n\n\n  672 |\n  673 |     // Verify sync queue shows pending item\n> 674 |     await expect(page.getByText(/queued/i)).toBeVisible();\n      |                                             ^\n  675 |\n  676 |     // Check sync queue in localStorage\n  677 |     const queueBeforeSync = await page.evaluate(() => {\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:674:45"
+                          "message": "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '+ Add Card' }).first()\u001b[22m\n\n\n  667 |\n  668 |     // Add a card while offline\n> 669 |     await page.getByRole('button', { name: '+ Add Card' }).first().click();\n      |                                                                    ^\n  670 |     await expect(page.getByText('New Card').first()).toBeVisible();\n  671 |     await page.waitForTimeout(500);\n  672 |\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:669:68"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:55.171Z",
+                      "startTime": "2025-10-19T07:14:23.677Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1044,29 +1096,32 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 30125,
+                      "status": "failed",
+                      "duration": 21100,
                       "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        "message": "Error: Timed out waiting for cards to be persisted for board 8d690202-635c-4125-9113-fd8a2da2e322",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 8d690202-635c-4125-9113-fd8a2da2e322\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:728:19",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 9,
+                          "line": 86
+                        },
+                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
                       },
                       "errors": [
                         {
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
-                        },
-                        {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 720
+                            "column": 9,
+                            "line": 86
                           },
-                          "message": "Error: page.waitForTimeout: Test timeout of 30000ms exceeded.\n\n  718 |     // Add a list and card\n  719 |     await page.getByRole('button', { name: '+ Add List' }).click();\n> 720 |     await page.waitForTimeout(1000);\n      |                ^\n  721 |\n  722 |     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();\n  723 |     await addCardButton.click();\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:720:16"
+                          "message": "Error: Timed out waiting for cards to be persisted for board 8d690202-635c-4125-9113-fd8a2da2e322\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:728:19"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:36:56.307Z",
+                      "startTime": "2025-10-19T07:14:27.445Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1074,7 +1129,12 @@
                           "contentType": "text/markdown",
                           "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--32f6b-al-via-short-URL-navigation-chromium/error-context.md"
                         }
-                      ]
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 9,
+                        "line": 86
+                      }
                     }
                   ],
                   "status": "unexpected"
@@ -1098,42 +1158,34 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
-                      "parallelIndex": 2,
-                      "status": "timedOut",
-                      "duration": 30954,
+                      "workerIndex": 7,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 19214,
                       "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8",
+                        "message": "Error: Timed out waiting for cards to be persisted for board 4ae0d0d9-a208-477a-b8b7-4e1721f32247",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 4ae0d0d9-a208-477a-b8b7-4e1721f32247\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:763:19",
                         "location": {
                           "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 124
+                          "column": 9,
+                          "line": 86
                         },
-                        "snippet": "  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
+                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 124
+                            "column": 9,
+                            "line": 86
                           },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 158
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  156 |     });\n  157 |\n> 158 |     await page.goto('/');\n      |                ^\n  159 |\n  160 |     // Wait for page to load and auth to initialize\n  161 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:158:16"
+                          "message": "Error: Timed out waiting for cards to be persisted for board 4ae0d0d9-a208-477a-b8b7-4e1721f32247\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:763:19"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:04.241Z",
+                      "startTime": "2025-10-19T07:14:31.726Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1144,8 +1196,8 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 124
+                        "column": 9,
+                        "line": 86
                       }
                     }
                   ],
@@ -1170,42 +1222,34 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 3,
-                      "status": "timedOut",
-                      "duration": 30974,
+                      "workerIndex": 8,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 18737,
                       "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8",
+                        "message": "Error: Timed out waiting for cards to be persisted for board b9adb5c6-f819-40ef-9594-15161aa2d535",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board b9adb5c6-f819-40ef-9594-15161aa2d535\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:793:19",
                         "location": {
                           "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 124
+                          "column": 9,
+                          "line": 86
                         },
-                        "snippet": "  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
+                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 124
+                            "column": 9,
+                            "line": 86
                           },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 158
-                          },
-                          "message": "Error: page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"load\"\u001b[22m\n\n\n  156 |     });\n  157 |\n> 158 |     await page.goto('/');\n      |                ^\n  159 |\n  160 |     // Wait for page to load and auth to initialize\n  161 |     await page.waitForLoadState('domcontentloaded');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:158:16"
+                          "message": "Error: Timed out waiting for cards to be persisted for board b9adb5c6-f819-40ef-9594-15161aa2d535\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:793:19"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:06.090Z",
+                      "startTime": "2025-10-19T07:14:33.758Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -1216,8 +1260,8 @@
                       ],
                       "errorLocation": {
                         "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 124
+                        "column": 9,
+                        "line": 86
                       }
                     }
                   ],
@@ -1231,7 +1275,7 @@
             },
             {
               "title": "should handle invalid card URL gracefully without crashing",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1242,58 +1286,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 7,
-                      "parallelIndex": 1,
-                      "status": "timedOut",
-                      "duration": 30547,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 124
-                        },
-                        "snippet": "  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 124
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 16,
-                            "line": 163
-                          },
-                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('text=e2e.taesk.test@gmail.com') to be visible\u001b[22m\n\u001b[2m    - locator resolved to visible <span class=\"text-sm text-gray-600\">e2e.taesk.test@gmail.com</span>\u001b[22m\n\n\n  161 |     await page.waitForLoadState('domcontentloaded');\n  162 |     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';\n> 163 |     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });\n      |                ^\n  164 |\n  165 |     // Switch to test board\n  166 |     await page.getByRole('button', { name: /Board ▼/ }).click();\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16"
-                        }
-                      ],
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 9504,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:26.410Z",
+                      "startTime": "2025-10-19T07:14:49.131Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--77a53-gracefully-without-crashing-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 124
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-b5323dbe57c8286f212b",
@@ -1303,7 +1309,7 @@
             },
             {
               "title": "should prevent navigation crash when card not yet synced",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1314,58 +1320,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 0,
-                      "status": "timedOut",
-                      "duration": 30491,
-                      "error": {
-                        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-                        "stack": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 8,
-                          "line": 124
-                        },
-                        "snippet": "  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 8,
-                            "line": 124
-                          },
-                          "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m\n\n  122 |   let testBoardCanonicalPath: string;\n  123 |\n> 124 |   test.beforeEach(async ({ page }) => {\n      |        ^\n  125 |     // Generate unique board for this test\n  126 |     testBoardId = crypto.randomUUID();\n  127 |     testBoardName = `Test-${testBoardId.slice(0, 8)}`;\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:124:8"
-                        },
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 61,
-                            "line": 167
-                          },
-                          "message": "Error: locator.click: Target page, context or browser has been closed\n\n  165 |     // Switch to test board\n  166 |     await page.getByRole('button', { name: /Board ▼/ }).click();\n> 167 |     await page.getByRole('button', { name: testBoardName }).click();\n      |                                                             ^\n  168 |\n  169 |     await page.waitForURL(`**${testBoardCanonicalPath}`);\n  170 |\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:167:61"
-                        }
-                      ],
+                      "workerIndex": 10,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 8722,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:27.603Z",
+                      "startTime": "2025-10-19T07:14:52.042Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--f72c5-sh-when-card-not-yet-synced-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 8,
-                        "line": 124
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-89acde676aaa1409ef78",
@@ -1403,15 +1371,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 9,
-                      "parallelIndex": 2,
+                      "workerIndex": 11,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 28279,
+                      "duration": 7450,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:38.712Z",
+                      "startTime": "2025-10-19T07:14:53.255Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1437,15 +1405,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 10,
-                      "parallelIndex": 3,
+                      "workerIndex": 12,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 28310,
+                      "duration": 5890,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:39.805Z",
+                      "startTime": "2025-10-19T07:14:54.603Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1471,15 +1439,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 11,
-                      "parallelIndex": 1,
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 11495,
+                      "duration": 4619,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:59.894Z",
+                      "startTime": "2025-10-19T07:14:58.810Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1506,14 +1474,14 @@
                   "results": [
                     {
                       "workerIndex": 12,
-                      "parallelIndex": 0,
+                      "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 10164,
+                      "duration": 1857,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:37:59.895Z",
+                      "startTime": "2025-10-19T07:15:00.871Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1539,15 +1507,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 9,
-                      "parallelIndex": 2,
+                      "workerIndex": 11,
+                      "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 3277,
+                      "duration": 1737,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.280Z",
+                      "startTime": "2025-10-19T07:15:00.915Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1598,7 +1566,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.357Z",
+                      "startTime": "2025-10-19T07:15:00.976Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1627,12 +1595,12 @@
                       "workerIndex": 10,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.374Z",
+                      "startTime": "2025-10-19T07:15:01.030Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1661,12 +1629,12 @@
                       "workerIndex": 10,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.389Z",
+                      "startTime": "2025-10-19T07:15:01.043Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1700,7 +1668,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.416Z",
+                      "startTime": "2025-10-19T07:15:01.056Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1734,7 +1702,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.430Z",
+                      "startTime": "2025-10-19T07:15:01.070Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1771,12 +1739,12 @@
                       "workerIndex": 10,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 3,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.441Z",
+                      "startTime": "2025-10-19T07:15:01.085Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1805,12 +1773,12 @@
                       "workerIndex": 10,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 0,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.456Z",
+                      "startTime": "2025-10-19T07:15:01.107Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1839,12 +1807,12 @@
                       "workerIndex": 10,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 2,
+                      "duration": 1,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T07:38:08.464Z",
+                      "startTime": "2025-10-19T07:15:01.127Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1864,8 +1832,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-10-19T07:35:33.280Z",
-    "duration": 159395.695,
+    "startTime": "2025-10-19T07:13:03.198Z",
+    "duration": 120285.177,
     "expected": 33,
     "skipped": 0,
     "unexpected": 9,

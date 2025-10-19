@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
 const CreateCardSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(255),
   description: z.string().optional(),
   list_id: z.string().uuid(),
@@ -11,6 +12,13 @@ const CreateCardSchema = z.object({
   due_date: z.string().datetime().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
+  assigned_to: z.string().nullable().optional(),
+  user_id: z.string().uuid().nullable().optional(),
+  short_id: z.string().nullable().optional(),
+  id_short: z.number().int().min(0).nullable().optional(),
+  slug: z.string().nullable().optional(),
+  created_at: z.string().datetime().optional(),
+  updated_at: z.string().datetime().optional(),
 });
 
 /**
@@ -64,9 +72,35 @@ export async function POST(
       );
     }
 
+    const payload: Record<string, unknown> = {
+      board_id: boardId,
+      id: parsed.data.id,
+      title: parsed.data.title,
+      description: parsed.data.description ?? '',
+      list_id: parsed.data.list_id,
+      position: parsed.data.position,
+      tags: parsed.data.tags ?? [],
+      due_date: parsed.data.due_date ?? null,
+      priority: parsed.data.priority ?? 'medium',
+      assignee_id: parsed.data.assignee_id ?? null,
+      assigned_to: parsed.data.assigned_to ?? null,
+      user_id: parsed.data.user_id ?? user.id,
+      short_id: parsed.data.short_id ?? null,
+      id_short: parsed.data.id_short ?? null,
+      slug: parsed.data.slug ?? null,
+      created_at: parsed.data.created_at,
+      updated_at: parsed.data.updated_at,
+    };
+
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined) {
+        delete payload[key];
+      }
+    });
+
     const { data: createdCard, error } = await supabase
       .from('cards')
-      .insert({ ...parsed.data, board_id: boardId })
+      .insert(payload)
       .select()
       .single();
 

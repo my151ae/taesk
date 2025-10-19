@@ -11,7 +11,17 @@
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
 
 ## Project Structure & Module Organization
-Keep UI routes under `app/`, grouped by feature folders so components stay close to their pages; core board logic lives in `app/page.tsx`. Shared utilities such as the Supabase client and board helpers belong in `lib/`. End-to-end specs and Playwright setup scripts sit in `e2e/`, with persistent auth state cached in `playwright/.auth/`. Place images and static assets in `public/`, generated documentation under `docs/`, and any new automation scripts inside `scripts/`. Review the docs in `/docs` (especially architecture and tickets) before tackling feature-level work.
+Keep UI routes under `app/`, grouped by feature folders so components stay close to their pages. The canonical board experience lives in `app/(board)/`:
+- `app/(board)/_components/KanbanBoardClient.tsx` contains nearly all board logic (lists, cards, realtime sync, offline queue).
+- `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` wires the intercepting modal flow, rendering `app/components/CardModal.tsx` for editing.
+- `app/(board)/b/[short_id]/[[...slug]]/page.tsx` resolves canonical board URLs and hydrates data.
+
+Shared utilities such as the Supabase client, board/card helpers, and sync queue live under `lib/`. API routes for lists/cards/boards are colocated at `app/api/boards/...` and should be preferred over direct Supabase usage inside client components. End-to-end specs and Playwright setup scripts sit in `e2e/`, with persistent auth state cached in `playwright/.auth/`. Place images and static assets in `public/`, generated documentation under `docs/`, and any new automation scripts inside `scripts/`. Review the docs in `/docs` (especially architecture and tickets) before tackling feature-level work.
+
+### Recent Architectural Notes
+- Cards now carry `assignee_id` (linked to `profiles`) with a legacy `assigned_to` text fallback; server/API code must upsert both to keep backwards compatibility.
+- Short URLs for cards and boards rely on `short_id`, `id_short`, and `slug`; ensure these fields travel through sync endpoints when creating or reordering records.
+- Offline sync queues should continue to flow through the API routes so server-side activity logging and permissions remain consistent.
 
 ## Build, Test, and Development Commands
 Use `npm run dev` for the local Next.js server on port 3000. Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).

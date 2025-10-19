@@ -3,8 +3,12 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
 const CreateListSchema = z.object({
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(255),
   position: z.number().int().min(0),
+  user_id: z.string().uuid().nullable().optional(),
+  created_at: z.string().datetime().optional(),
+  updated_at: z.string().datetime().optional(),
 });
 
 const CreateListsSchema = z.array(CreateListSchema).min(1);
@@ -69,9 +73,29 @@ export async function POST(
     }
 
     // 4. Create list(s)
-    const listsToCreate = isBatch
-      ? (parsed.data as Array<{ title: string; position: number }>).map(list => ({ ...list, board_id: boardId, user_id: user.id }))
-      : [{ ...parsed.data as { title: string; position: number }, board_id: boardId, user_id: user.id }];
+    const listsToCreateRaw = isBatch
+      ? parsed.data as Array<z.infer<typeof CreateListSchema>>
+      : [parsed.data as z.infer<typeof CreateListSchema>];
+
+    const listsToCreate = listsToCreateRaw.map((list) => {
+      const payload: Record<string, unknown> = {
+        board_id: boardId,
+        id: list.id,
+        title: list.title,
+        position: list.position,
+        user_id: list.user_id ?? user.id,
+        created_at: list.created_at,
+        updated_at: list.updated_at,
+      };
+
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
+
+      return payload;
+    });
 
     const { data: createdLists, error } = await supabase
       .from('lists')
