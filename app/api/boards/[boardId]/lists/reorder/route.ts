@@ -6,8 +6,6 @@ const ReorderListsSchema = z.object({
   updates: z.array(z.object({
     id: z.string().uuid(),
     position: z.number().int().min(0),
-    title: z.string().min(1).max(255),
-    updated_at: z.string().datetime().optional(),
   })).min(1),
 });
 
@@ -62,19 +60,32 @@ export async function PATCH(
       );
     }
 
-    // Add board_id to each update
-    const updates = parsed.data.updates.map(u => ({
-      id: u.id,
-      board_id: boardId,
-      position: u.position,
-    }));
+    const updates = parsed.data.updates;
 
-    const { error } = await supabase.from('lists').upsert(updates);
+    const results = await Promise.all(
+      updates.map(({ id, position }) =>
+        supabase
+          .from('lists')
+          .update({ position })
+          .eq('id', id)
+          .eq('board_id', boardId)
+      )
+    );
 
-    if (error) {
-      console.error('Error reordering lists:', error);
+    const firstError = results.find(({ error }) => error);
+
+    if (firstError?.error) {
+      const failingIndex = results.findIndex(({ error }) => error);
+      const failingPayload = failingIndex >= 0 ? updates[failingIndex] : null;
+      console.error('[lists/reorder] Update failed', {
+        payload: failingPayload,
+        message: firstError.error.message,
+        details: firstError.error.details,
+        hint: firstError.error.hint,
+        code: firstError.error.code,
+      });
       return NextResponse.json(
-        { error: { code: 'DB_ERROR', message: error.message } },
+        { error: { code: 'DB_ERROR', message: firstError.error.message } },
         { status: 500 }
       );
     }

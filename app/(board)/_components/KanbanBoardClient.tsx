@@ -1219,8 +1219,41 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   };
 
-  const upsertSingleCardWithAssigneeFallback = async (card: Card): Promise<Error | null> => {
-    return upsertCardsWithAssigneeFallback([card]);
+  const updateCardDetailsOnServer = async (card: Card): Promise<Error | null> => {
+    if (!currentBoardId) {
+      return new Error('No board selected');
+    }
+
+    try {
+      const payload = {
+        title: card.title,
+        description: card.description,
+        list_id: card.list_id,
+        position: card.position,
+        tags: card.tags,
+        due_date: card.due_date,
+        priority: card.priority,
+        assignee_id: card.assignee_id,
+        assigned_to: card.assigned_to ?? null,
+        slug: card.slug ?? undefined,
+      };
+
+      const response = await fetch(`/api/boards/${currentBoardId}/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error?.message || 'Failed to update card');
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[cards] Failed to update card:', error);
+      return error as Error;
+    }
   };
 
   const syncToSupabase = async (data: BoardData) => {
@@ -1798,7 +1831,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
       } else {
         console.log('[handleSaveCard] Syncing card to Supabase...');
-        const error = await upsertSingleCardWithAssigneeFallback(updatedCard);
+        const error = await updateCardDetailsOnServer(updatedCard);
         if (error) {
           console.error('[handleSaveCard] Error syncing card:', error);
         } else {

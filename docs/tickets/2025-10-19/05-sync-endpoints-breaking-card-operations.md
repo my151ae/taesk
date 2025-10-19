@@ -13,33 +13,33 @@
 - Playwright でもカード追加・編集・D&D 関連の全テストが Timeout / 失敗で落ちている。
 
 ## 原因分析
-1. `app/api/boards/[boardId]/cards/reorder/route.ts`
-   - `zod` スキーマが `title` を必須としているが、クライアントの `upsertCardsWithAssigneeFallback` では `title` を含めないケースがあり 422 が発生。
-   - API 側も upsert 時に `title` を落とす構造になっており、既存レコードとの差分マージをしていない。
+1. `cards/reorder` API が position 更新しか必要ないのに、全カラムを upsert しようとしていた。
+   - Zod スキーマで `title` を必須にしていたため、クライアント側が position のみ送るケースで 422 が発生。
+   - upsert により既存列が `null` 上書きされ、NOT NULL 制約に抵触。
 
-2. `app/api/boards/[boardId]/lists/reorder/route.ts`
-   - 同じく `title` を送らずに position のみ更新しているため、Supabase upsert 時に `title` が null で 500。
+2. `lists/reorder` も同様に upsert で `title` を `null` にしてしまい、500 エラーを誘発。
 
-3. 旧実装ではクライアントが Supabase REST を直接叩いており、今回の API routes 移行で必須フィールドの扱いが変わったが、クライアント側の payload 更新が不完全のままになっている。
+3. カード編集ハンドラ（`handleSaveCard`）は内容更新も `cards/reorder` に乗せていたため、position 専用 API として整理できていなかった。
 
-## 対応方針
-1. **API スキーマ＆アップサート修正**
-   - `cards/reorder` / `lists/reorder` の `zod` スキーマを `partial()` にするか、API 側で既存レコードを読み込んで欠損フィールドを補完した上で upsert する。
-   - もしくはクライアントから `title` / `description` など必要フィールドを常に送るように仕様を揃える。どちらを採るか決めて実装。
+4. エラーハンドリング不足で、実際の 500 の原因（未定義変数など）がログに出ず、調査しづらい状態だった。
 
-2. **クライアント側 payload の見直し**
-   - `upsertCardsWithAssigneeFallback` と `syncToSupabase` の `listUpdates` で必須フィールドを明示的に送る。
-   - D&D などで position を並び替える際も `title` を保持するようにする。
+## 実施した修正
+1. **API 側の役割分離**
+   - `cards/reorder` と `lists/reorder` を position 更新専用に変更。Zod スキーマを `id/list_id/position` のみに絞り、`update` に切り替え。
+   - 失敗時に payload や Supabase からの詳細をログ出力するよう改善。
 
-3. **再発防止**
-   - カード/リスト保存用のユニットテスト or Playwright の assertions を追加し、200 を返すことと DB 反映を検証。
-   - API routes の仕様差分を `docs/detail` に追記。
+2. **カード内容更新 API の強化**
+   - `/api/boards/[boardId]/cards/[cardId]` で `assigned_to`/`slug` を受け取れるようスキーマ拡張。
+   - クライアントの `handleSaveCard` を更新し、タイトル変更などは専用 PATCH を呼ぶように修正。
 
-## ブロッカー
-- なし（API とフロントの両方を調整すれば解消可能）。ただし修正範囲が広いため影響調査が必要。
+3. **再現用スクリプトとログで検証**
+   - `.env.test` のテストユーザーで auth し、Cookie を付けた fetch で API を直接叩く Node スクリプトを追加検証に使用。
+   - `dev-server.log` に `status 200` とリクエスト結果が出ることを確認し、再現リポートにログを添付。
 
-## 次のアクション
-1. スキーマ/アップサート修正案を決定し、実装着手。
-2. カード・リスト更新系のフロント payload を統一。
-3. Playwright を JSON レポート付きで再実行し、パスを確認。
+## 検証結果
+- 手動: 上記スクリプトでカードのタイトルを PATCH → Supabase レコードが更新されることを確認。
+- Playwright: フルスイートは別チケットで調整継続中だが、少なくともカード編集の API エラーは解消。
 
+## 残課題
+- 並び替え API をトランザクション化して競合を防ぐこと。
+- Playwright のタイムアウトが残っているケースを追跡し、完全な自動テスト成功を目指す。
