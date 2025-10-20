@@ -96,7 +96,7 @@ test.describe('Phase3 - Invite Existing User', () => {
     expect(response.status()).toBe(404);
 
     const body = await response.json();
-    expect(body.error).toBe('User not found');
+    expect(body.error).toEqual({ code: 'NOT_FOUND', message: 'User not found' });
   });
 
   test('API: GET /api/profiles/search should require email param', async ({ request }) => {
@@ -104,6 +104,6 @@ test.describe('Phase3 - Invite Existing User', () => {
     expect(response.status()).toBe(400);
 
     const body = await response.json();
-    expect(body.error).toBe('Email parameter is required');
+    expect(body.error).toEqual({ code: 'INVALID_PARAM', message: 'Email parameter is required' });
   });
 });

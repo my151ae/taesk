@@ -417,13 +417,15 @@ type SystemErrorResponse = {
    - `app/api/boards/[boardId]/cards/reorder/route.ts:89, 158`
    - 変更内容: `{ error: 'Bad Request', issues }` → `{ error: { code: 'VALIDATION_ERROR', message: 'Bad Request' }, issues }`
 
-2. **テスト側の修正（3箇所）**:
+2. **テスト側の修正（5箇所）**:
    - `e2e/reorder-api.spec.ts:70, 86, 102`
-   - 変更内容: `expect(result.error).toBe('Bad Request')` → `expect(result.error).toEqual({ code: 'VALIDATION_ERROR', message: 'Bad Request' })`
+   - **`e2e/phase3-invite.spec.ts:99, 107`** ← 追加対応
+   - 変更内容: `expect(result.error).toBe('xxx')` → `expect(result.error).toEqual({ code: 'XXX', message: 'xxx' })`
 
 3. **追加修正（テストケース名の明確化）**:
    - "should reject unknown card IDs" → "should reject invalid UUID format" (INVALID_BODY エラーが正しい)
    - "should reject invalid schema" のアサーションも INVALID_BODY に修正
+   - Phase3 テストのエラーコード: `NOT_FOUND`, `INVALID_PARAM`
 
 ### 検証結果
 ```
@@ -441,6 +443,7 @@ npx playwright test e2e/reorder-api.spec.ts --reporter=json
 - `app/api/boards/[boardId]/lists/reorder/route.ts`
 - `app/api/boards/[boardId]/cards/reorder/route.ts`
 - `e2e/reorder-api.spec.ts`
+- **`e2e/phase3-invite.spec.ts`** ← 追加対応
 
 ### Definition of Done 達成確認
 - ✅ Reorder API テスト（8/8）が通る
