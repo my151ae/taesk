@@ -13,7 +13,10 @@ export async function GET(
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
+        { status: 401 }
+      );
     }
 
     // Fetch comments with author info
@@ -34,7 +37,10 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching comments:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: error.message } },
+        { status: 500 }
+      );
     }
 
     // Transform data
