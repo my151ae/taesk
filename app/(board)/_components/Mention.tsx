@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import type { ProfileSummary } from '@/lib/supabase';
 
@@ -31,9 +32,11 @@ export function Mention({ userId, profile }: MentionProps) {
         <span className="absolute bottom-full left-0 mb-2 z-10 w-64 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
           <div className="flex items-center gap-3">
             {profile.avatar_url ? (
-              <img
+              <Image
                 src={profile.avatar_url}
                 alt={displayName}
+                width={40}
+                height={40}
                 className="w-10 h-10 rounded-full object-cover"
               />
             ) : (

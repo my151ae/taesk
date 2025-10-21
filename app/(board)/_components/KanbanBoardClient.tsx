@@ -36,6 +36,7 @@ import {
   type BoardData,
   type Priority,
   type ProfileSummary,
+  type CommentWithAuthor,
 } from "@/lib/supabase";
 import type { PostgrestError, RealtimeChannel } from "@supabase/supabase-js";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -47,6 +48,7 @@ import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from 
 import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
+import { initializeCommentsStore, useCommentsStore } from "../_stores/comments-store";
 import ShareDialog from "./ShareDialog";
 import NotificationsBell from "./NotificationsBell";
 
@@ -697,11 +699,18 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [newBoardDescription, setNewBoardDescription] = useState('');
   const [syncQueueStats, setSyncQueueStats] = useState({ pending: 0, failed: 0, total: 0, lastSyncedAt: null as number | null });
 
+  const upsertComment = useCommentsStore((state) => state.upsertComment);
+  const removeComment = useCommentsStore((state) => state.removeComment);
+
   useEffect(() => {
     if (initialData) {
       saveToStorage(initialData);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    initializeCommentsStore();
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -1087,7 +1096,47 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               ...prev,
               cards: prev.cards.filter((card) => card.id !== payload.old.id),
             }));
-      }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `board_id=eq.${currentBoardId}`,
+        },
+        async (payload) => {
+          if (realtimeState.token !== token) return;
+
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { id: string; card_id: string };
+            if (oldRow?.card_id && oldRow?.id) {
+              removeComment(oldRow.card_id, oldRow.id);
+            }
+            return;
+          }
+
+          const newRow = payload.new as { id?: string };
+          if (!newRow?.id) return;
+
+          const { data, error } = await supabase
+            .from('comments')
+            .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
+            .eq('id', newRow.id)
+            .single();
+
+          if (error || !data) {
+            console.warn('[Realtime] Failed to fetch comment for update', error);
+            return;
+          }
+
+          const commentData = data as CommentWithAuthor;
+          upsertComment(commentData.card_id, {
+            ...commentData,
+            idempotencyKey: commentData.idempotency_key ?? null,
+          });
         }
       );
 
@@ -1117,7 +1166,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         setRealtimeStatus('disconnected');
       }
     };
-  }, [currentBoardId]);
+  }, [currentBoardId, removeComment, upsertComment]);
 
   // PC/モバイル対応のセンサー設定（Trello準拠）
   const sensors = useSensors(
@@ -1790,58 +1839,61 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     assigneeDisplayName?: string | null
   ) => {
     console.log('[handleSaveCard] Starting...', { id, title, description });
-    const slug = slugify(title);
-    const updatedCards = boardData.cards.map((card) => {
-      if (card.id === id) {
-        const nextAssigneeId =
-          typeof assigneeId === 'string' && assigneeId.length > 0 ? assigneeId : null;
-        const shouldClearLegacy = assigneeTouched === true || nextAssigneeId !== (card.assignee_id ?? null);
-        const resolvedAssignedTo = nextAssigneeId
-          ? assigneeDisplayName ?? getProfileDisplayName(profilesById[nextAssigneeId]) ?? null
-          : assigneeTouched
-            ? null
-            : card.assigned_to ?? null;
 
-        return {
-          ...card,
-          title,
-          description,
-          tags: tags || [],
-          due_date: due_date || null,
-          priority: priority || 'medium',
-          assignee_id: nextAssigneeId,
-          assigned_to: shouldClearLegacy ? resolvedAssignedTo : (card.assigned_to ?? resolvedAssignedTo),
-          slug,
-          updated_at: new Date().toISOString(),
-        };
-      }
-      return card;
-    });
+    try {
+      const slug = slugify(title);
+      const updatedCards = boardData.cards.map((card) => {
+        if (card.id === id) {
+          const nextAssigneeId =
+            typeof assigneeId === 'string' && assigneeId.length > 0 ? assigneeId : null;
+          const shouldClearLegacy = assigneeTouched === true || nextAssigneeId !== (card.assignee_id ?? null);
+          const resolvedAssignedTo = nextAssigneeId
+            ? assigneeDisplayName ?? getProfileDisplayName(profilesById[nextAssigneeId]) ?? null
+            : assigneeTouched
+              ? null
+              : card.assigned_to ?? null;
 
-    console.log('[handleSaveCard] Updated cards:', updatedCards.length);
-    const newData = { ...boardData, cards: updatedCards };
-    updateData(newData);
-    console.log('[handleSaveCard] State updated');
+          return {
+            ...card,
+            title,
+            description,
+            tags: tags || [],
+            due_date: due_date || null,
+            priority: priority || 'medium',
+            assignee_id: nextAssigneeId,
+            assigned_to: shouldClearLegacy ? resolvedAssignedTo : (card.assigned_to ?? resolvedAssignedTo),
+            slug,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return card;
+      });
 
-    // Supabase に保存（変更されたカードのみ）
-    const updatedCard = updatedCards.find((c) => c.id === id);
-    if (updatedCard) {
-      if (!isOnline) {
-        console.log('[handleSaveCard] Adding to sync queue (offline)');
-        addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
-      } else {
-        console.log('[handleSaveCard] Syncing card to Supabase...');
-        const error = await updateCardDetailsOnServer(updatedCard);
-        if (error) {
-          console.error('[handleSaveCard] Error syncing card:', error);
+      console.log('[handleSaveCard] Updated cards:', updatedCards.length);
+      const newData = { ...boardData, cards: updatedCards };
+      updateData(newData);
+      console.log('[handleSaveCard] State updated');
+
+      // Supabase に保存（変更されたカードのみ）
+      const updatedCard = updatedCards.find((c) => c.id === id);
+      if (updatedCard) {
+        if (!isOnline) {
+          console.log('[handleSaveCard] Adding to sync queue (offline)');
+          addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
         } else {
-          console.log('[handleSaveCard] Card synced to Supabase');
+          console.log('[handleSaveCard] Syncing card to Supabase...');
+          const error = await updateCardDetailsOnServer(updatedCard);
+          if (error) {
+            console.error('[handleSaveCard] Error syncing card:', error);
+          } else {
+            console.log('[handleSaveCard] Card synced to Supabase');
+          }
         }
       }
+    } finally {
+      console.log('[handleSaveCard] Closing modal...');
+      handleCloseCardModal();
     }
-
-    console.log('[handleSaveCard] Closing modal...');
-    handleCloseCardModal();
   };
 
   const handleDeleteCard = async (id: string) => {
