@@ -9,8 +9,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // Phase 1: Sequential execution in CI for stability
-  workers: process.env.CI ? 1 : 4,
+  // Force sequential execution to avoid race conditions (especially with CardModal tests)
+  workers: 1,
   reporter: 'html',
 
   // Global setup for authentication
