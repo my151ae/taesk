@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
-import { CommentWithAuthor, ProfileSummary } from '@/lib/supabase';
+import { supabase, CommentWithAuthor, ProfileSummary } from '@/lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface CommentsPanelProps {
   cardId: string;
@@ -32,6 +33,81 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
       loadMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardId]);
+
+  // Realtime subscription for comments
+  useEffect(() => {
+    if (!featureFlags.comments || !cardId) return;
+
+    let channel: RealtimeChannel;
+
+    const setupRealtimeSubscription = async () => {
+      // Subscribe to comments changes for this card
+      channel = supabase
+        .channel(`comments:card_id=${cardId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'comments',
+            filter: `card_id=eq.${cardId}`,
+          },
+          async (payload) => {
+            console.log('Comment change detected:', payload);
+
+            if (payload.eventType === 'INSERT') {
+              // Fetch the full comment with author info
+              const { data: newComment } = await supabase
+                .from('comments')
+                .select(`
+                  *,
+                  author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)
+                `)
+                .eq('id', payload.new.id)
+                .is('deleted_at', null)
+                .single();
+
+              if (newComment) {
+                setComments((prev) => {
+                  // Avoid duplicates
+                  if (prev.some((c) => c.id === newComment.id)) return prev;
+                  return [...prev, newComment as CommentWithAuthor];
+                });
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const { data: updatedComment } = await supabase
+                .from('comments')
+                .select(`
+                  *,
+                  author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)
+                `)
+                .eq('id', payload.new.id)
+                .single();
+
+              if (updatedComment) {
+                setComments((prev) =>
+                  prev.map((c) =>
+                    c.id === updatedComment.id ? (updatedComment as CommentWithAuthor) : c
+                  )
+                );
+              }
+            } else if (payload.eventType === 'DELETE') {
+              // Remove deleted comment
+              setComments((prev) => prev.filter((c) => c.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [cardId]);
 
   useEffect(() => {
