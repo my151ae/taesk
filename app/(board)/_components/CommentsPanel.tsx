@@ -30,19 +30,23 @@ const buildThreads = (comments: BoardComment[]): CommentThread[] => {
 
 const EMPTY_COMMENTS: BoardComment[] = [];
 
-const parseMentions = (text: string, members: ProfileSummary[]): string[] => {
-  const mentionRegex = /@([\w\s]+)/g;
+/**
+ * Parse UUID mention tokens (<@uuid>) from comment body
+ * Returns array of unique UUIDs
+ */
+const parseMentions = (text: string): string[] => {
+  const mentionRegex = /<@([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})>/gi;
   const matches = text.match(mentionRegex) || [];
 
-  return matches
-    .map(mention => mention.slice(1).trim())
-    .map(name =>
-      members.find(member =>
-        member.full_name?.toLowerCase().includes(name.toLowerCase()) ||
-        member.email?.toLowerCase().includes(name.toLowerCase()),
-      )?.id ?? null,
-    )
-    .filter((id): id is string => Boolean(id));
+  const uuids = matches
+    .map(match => {
+      const uuidMatch = match.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      return uuidMatch ? uuidMatch[0] : null;
+    })
+    .filter((uuid): uuid is string => Boolean(uuid));
+
+  // Return unique UUIDs
+  return Array.from(new Set(uuids));
 };
 
 export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
@@ -166,8 +170,20 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
     const lastAtIndex = textBefore.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
-      const newText = `${textBefore.slice(0, lastAtIndex + 1)}${member.full_name ?? member.email ?? ''} ${textAfter}`;
+      // Insert UUID token directly: <@uuid>
+      const displayName = member.full_name || member.email || 'Unknown';
+      const mentionToken = `<@${member.id}>`;
+      const newText = `${textBefore.slice(0, lastAtIndex)}@${displayName}${mentionToken} ${textAfter}`;
       setNewComment(newText);
+
+      // Move cursor after the mention
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const newPos = lastAtIndex + displayName.length + mentionToken.length + 2;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+          textareaRef.current.focus();
+        }
+      }, 0);
     }
 
     setShowMentions(false);
@@ -209,7 +225,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
           setEditText('');
         }
       } else {
-        const mentions = parseMentions(text, members);
+        const mentions = parseMentions(text);
         const result = await submitComment({
           cardId,
           body: text,

@@ -124,8 +124,28 @@ export async function POST(
       );
     }
 
-    // Validate mentions - ensure all mentioned users are board members
+    // Validate mentions - ensure all are valid UUIDs and board members
     if (mentions && mentions.length > 0) {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const invalidUUIDs = mentions.filter((id) => !uuidRegex.test(id));
+
+      if (invalidUUIDs.length > 0) {
+        return NextResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Invalid mention UUID format',
+            },
+            issues: invalidUUIDs.map((id) => ({
+              field: 'mentions',
+              message: `Invalid UUID: ${id}`,
+            })),
+          },
+          { status: 400 }
+        );
+      }
+
       // Get the board_id for this card
       const { data: card, error: cardError } = await supabase
         .from('cards')

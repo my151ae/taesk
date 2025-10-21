@@ -79,14 +79,24 @@ export async function resolveCommentRecipients(
   if (eventType === 'mention' && recipientIds) {
     recipientIds.forEach((id) => recipients.add(id));
   } else {
-    // Get card creator and assignee
+    // Get card info including creator (user_id) and assignee
     const { data: card } = await supabase
       .from('cards')
-      .select('assignee_id, board_id')
+      .select('user_id, assignee_id, board_id')
       .eq('id', cardId)
       .single();
 
     if (card) {
+      // Add card creator
+      if (card.user_id) {
+        recipients.add(card.user_id);
+      }
+
+      // Add assignee
+      if (card.assignee_id) {
+        recipients.add(card.assignee_id);
+      }
+
       // Get all previous commenters on this card
       const { data: previousComments } = await supabase
         .from('comments')
@@ -96,11 +106,6 @@ export async function resolveCommentRecipients(
 
       if (previousComments) {
         previousComments.forEach((c) => recipients.add(c.author_id));
-      }
-
-      // Add assignee
-      if (card.assignee_id) {
-        recipients.add(card.assignee_id);
       }
     }
   }
