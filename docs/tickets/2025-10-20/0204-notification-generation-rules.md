@@ -19,7 +19,7 @@
 ## ✅ スコープ
 - 通知生成サービス（`lib/server/notifications.ts` 等）を新設し、イベント駆動で呼び出す
 - コメント作成/返信/編集 API からサービスを呼び出し、通知レコードを upsert
-- 冪等キー（`comment_id + recipient_id + event_type`）で重複登録を防止
+- 冪等キー（`dedupe_key = concat_ws(':', type, recipient_id, payload->>'comment_id', payload->>'card_id')`）で重複登録を防止
 - 通知 payload にはカード/コメント情報、メンション対象、ボードURLなどを含める
 - In-App 未読バッジ向けに `notifications` Realtime チャンネルへブロードキャスト
 
@@ -31,16 +31,17 @@
 ## 📦 実装タスク
 1. **通知サービス設計**
    - `createNotification(event: CommentNotificationEvent)` の API を定義
-   - Event payload: `{ event: 'comment_created' | 'comment_replied' | 'comment_mentioned', commentId, cardId, boardId, senderId, recipientIds[] }`
+   - Event payload: `{ event: 'comment_created' | 'comment_replied' | 'mention', commentId, cardId, boardId, senderId, recipientIds[] }`
    - 通知本文テンプレート（`payload.message`）をローカライズ前提で組み立て
 2. **対象者解決**
    - カード作成者、`assignee_id`, コメントスレッド参加者、@メンションの受信者をユーティリティで抽出
    - 自分自身への通知は除外
 3. **冪等処理**
-   - `notifications` テーブルに `dedupe_key` (text) を追加するか、`insert ... on conflict` で `recipient_id + type + payload->>'comment_id'` をユニーク扱いにする
-   - 重複時は既存レコードを更新（`created_at` は保持、`payload.message` を差し替え）
+   - `notifications` テーブルに `dedupe_key text` を追加し、UNIQUE 制約を付与
+   - `insert ... on conflict (dedupe_key) do update` で重複時は既存レコードを更新（`created_at` は保持、`payload.message` を差し替え）
+   - API レイヤでは Idempotency-Key を尊重し、再送時は既存通知を返す
 4. **API 統合**
-   - `/api/cards/[cardId]/comments` の POST/DELETE/ PATCH 完了後に通知サービスを呼び出し
+   - `/api/cards/[cardId]/comments` の POST/DELETE/PATCH 完了後に通知サービスを呼び出し
    - エラー時はトランザクションをロールバックし、HTTP 500 を返す
    - 非同期キュー（Supabase Edge Functions Queue）が必要な場合に備え、フックポイントを用意
 5. **Realtime 連携**
@@ -49,6 +50,7 @@
 
 ## ✅ 受け入れ基準
 - [ ] コメント/返信/メンション発生時に対象ユーザーの `notifications` にレコードが1件ずつ作成される
+- [ ] `type` フィールドが `'comment_created' | 'comment_replied' | 'mention' | 'assignee_changed' | 'due_soon'` のいずれかで保存される
 - [ ] 同じコメントに対して複数回編集/再送しても通知が重複しない（`dedupe_key` が機能する）
 - [ ] 権限外ユーザーがコメント操作を行った場合、通知は生成されない
 - [ ] Realtime 経由で通知が配信され、FE の未読件数が即座に更新される
@@ -67,4 +69,3 @@
 ## ❓ オープン課題
 - 通知テンプレートの多言語対応タイミング
 - コメント削除時に通知をどう扱うか（履歴保持 vs 取り消し）
-

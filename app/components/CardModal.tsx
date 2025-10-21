@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary } from "@/lib/supabase";
+import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 
 const getProfileDisplayName = (profile: ProfileSummary): string => {
   if (profile.full_name && profile.full_name.trim().length > 0) {
@@ -75,6 +76,7 @@ export function CardModal({
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
@@ -272,7 +274,7 @@ export function CardModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start mb-4">
           <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
             Edit Card
           </h2>
@@ -286,7 +288,32 @@ export function CardModal({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 border-b border-slate-200 dark:border-gray-700">
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+              activeTab === 'details'
+                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
+                : 'border-transparent text-slate-600 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200'
+            }`}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab('comments')}
+            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+              activeTab === 'comments'
+                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
+                : 'border-transparent text-slate-600 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200'
+            }`}
+          >
+            Comments
+          </button>
+        </div>
+
         {/* Modal Body */}
+        {activeTab === 'details' ? (
         <div className="space-y-4">
           {/* Title */}
           <div>
@@ -500,6 +527,11 @@ export function CardModal({
             </div>
           )}
         </div>
+        ) : (
+          <div className="min-h-[400px]">
+            <CommentsPanel cardId={card.id} boardId={card.board_id} />
+          </div>
+        )}
 
         {/* Modal Footer */}
         <div className="flex gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-gray-700">

@@ -21,7 +21,7 @@
 - Supabase Realtime (`notifications` チャンネル) の購読で新着をストリーミング反映
 - 未読・既読の状態管理（`read_at`）と「すべて既読」ボタン
 - オフライン時はローカルキャッシュ（IndexedDB or localStorage）から表示
-- 通知クリックで関連カードへのディープリンク（`/c/[short_id]/...`）
+- 通知クリックで関連カードへのディープリンク（暫定: `/b/[short_id]?card=<card_id>`、将来 `/c/...` 復帰）
 
 ## 🚫 非スコープ
 - Web Push 設定 UI（0206/0208）
@@ -38,7 +38,8 @@
    - `notifications:recipient_id={user.id}` を購読し、INSERT/UPDATE を反映
    - オフライン検知時は購読を停止し、再接続後に差分同期
 4. **既読操作の最適化**
-   - 個別既読 (`PATCH /api/notifications/[id]`) とまとめて既読 API (`POST /api/notifications/mark-all-read`) を追加
+   - 個別既読 (`PATCH /api/notifications/[id]`) は既存実装を活用し、UI から楽観更新
+   - まとめて既読は BE で `POST /api/notifications/mark-all-read`（0204終了後に追加）を先に実装してから UI へ組み込む
    - 楽観更新 → 失敗時はロールバック
 5. **アクセシビリティ**
    - キーボード操作、`aria-live` で新着を告知、フォーカス管理
@@ -62,9 +63,9 @@
 
 ## 📎 依存関係
 - 前提: 0204（通知生成）が完了し、コメント通知が発火すること
+- 前提: 0204 完了後に `POST /api/notifications/mark-all-read` を BE 側で実装済みであること
 - 後続: 0206（Push購読UI）、0207（Push送信）
 
 ## ❓ オープン課題
 - 大量通知（>500件）時のページング/検索対応
 - モバイルビューでの通知表示（全画面モーダル化するか）
-

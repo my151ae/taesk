@@ -225,6 +225,7 @@ export interface Comment {
   parent_id: string | null;
   body: string;
   mentions: string[];
+  idempotency_key?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

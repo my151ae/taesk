@@ -30,6 +30,7 @@
 ## 📦 実装タスク
 1. **Playwright テスト整備**
    - `e2e/phase3-comments.spec.ts`：メンション作成/編集/削除、Realtime 反映チェック
+   - `e2e/phase3-comments.spec.ts`：暫定モーダル経路（`/b/[short_id]?card=`）での直接アクセス・リロードを検証
    - `e2e/phase3-notifications.spec.ts`：通知生成→UI反映→既読処理、Quiet hours、設定変更
    - `e2e/phase3-webpush.spec.ts`（新規）：Service Worker モック経由で Push 受信フローを検証
    - テスト用フラグ/環境変数の整理（`PLAYWRIGHT_WEBPUSH_STUB=1` 等）
@@ -40,6 +41,7 @@
    - `docs/detail/notifications.md`：通知生成フロー、Push 設定、トラブルシュート（iOS PWA など）
    - `docs/setup/local-dev.md` に Service Worker 登録・VAPID 鍵設定手順を追記
    - `docs/tickets/2025-10-20/0200-comments-notifications-epic.md` へのリンク/進捗表を更新
+   - 暫定カードモーダル仕様（`?card=`）を `docs/detail/architecture.md` へ追記し、復帰条件を明文化
 4. **リリースノート草案**
    - `docs/releases/2025-Phase3-Comments-Notifications.md`（仮）にハイライト・既知の制約・ロールアウト手順をまとめる
 
@@ -62,4 +64,3 @@
 ## ❓ オープン課題
 - Web Push モックをどのレイヤーで提供するか（Service Worker スタブ vs Supabase Edge Function の stub）
 - iOS デバイスでの自動テスト戦略（現状は手動検証のみ）
-

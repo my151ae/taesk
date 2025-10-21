@@ -13,11 +13,13 @@
 
 ## 📝 背景
 - 現在 `CommentsPanel` は独立コンポーネントであり、カード詳細モーダルに組み込まれていない
+- Next.js 15.5 系の Intercepting Route バグ回避のため、カードモーダルは暫定的に `/b/[short_id]?card=<card_id>` クエリ遷移で開く（詳細は `docs/detail/architecture.md#card-modal-workaround`）
 - 楽観更新はあるが、ボード全体の state（`KanbanBoardClient` の Zustand ストア）とは疎結合で、Realtime 購読も未実装
 - コメント機能をボードの主要フローに載せることで、通知・メンションとセットでユーザー価値が高まる
 
 ## ✅ スコープ
-- `app/components/CardModal.tsx`（または `app/(board)/@modal/...` の page）にコメントタブ（またはセクション）を追加
+- `app/components/CardModal.tsx`（暫定クエリ遷移版）にコメントタブ（またはセクション）を追加
+- Intercepting Route (`app/(board)/@modal/...`) はバグ修正が正式リリースされるまで封印し、復帰条件をチケットに明記
 - `CommentsPanel` をカードデータにバインドし直し、`KanbanBoardClient` の state/selectors を利用
 - コメントローディング・エラー・リトライ UI の整備、スレッド表示のデザイン調整
 - Realtime コメント購読の初期実装（`supabase.channel('comments:board_id=...')`）を `KanbanBoardClient` から呼び出し、`CommentsPanel` に流す
@@ -46,6 +48,9 @@
    - プレースホルダー文言・空状態・ローディングスケルトン
    - 編集フォーム/返信フォームのアクセシビリティ（ラベル・ボタン説明）
    - スクロール位置の自動調整（新着コメントへジャンプ）
+6. **ルーティング整理**
+   - 暫定クエリ遷移 (`?card=`) でのモーダル表示が崩れないように `CardModal` エントリポイントを更新
+   - Next.js のバグ修正が入った場合に `/c/[short_id]/[[...slug]]` へ戻す手順を `docs/tickets/2025-10-20/0200-comments-notifications-epic.md` へ追記
 
 ## ✅ 受け入れ基準
 - [ ] CardModal を開くとコメントタブ/セクションが表示され、既存コメントが読み込まれる
@@ -60,6 +65,7 @@
   - [ ] `cat playwright-report-comments.json | jq '.stats'`
 - [ ] Storybook/Chromatic があればスクリーンショット更新（任意）
 - [ ] Realtime テスト: 2つのブラウザセッションで手動確認（必要なら録画）
+- [ ] `?card=` 経路でのリロード/直接アクセスを Playwright で検証
 
 ## 📎 依存関係
 - 前提: 0201 の DB/API 更新が完了し、コメントAPIが安定していること
@@ -68,4 +74,4 @@
 ## ❓ オープン課題
 - コメント履歴の無限スクロール対応が必要か（現状 50件制限）
 - CardModal の SSR/Streaming との相性確認
-
+- Intercepting Route を再有効化する際の QA 計画（Next.js リリースノート監視）

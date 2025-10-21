@@ -12,14 +12,20 @@ export async function PATCH(
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();
     const { body: commentBody } = body as { body: string };
 
     if (!commentBody || !commentBody.trim()) {
-      return NextResponse.json({ error: 'Comment body is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Comment body is required' } },
+        { status: 400 }
+      );
     }
 
     // Update comment
@@ -44,13 +50,19 @@ export async function PATCH(
 
     if (error) {
       console.error('Error updating comment:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: error.message } },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ comment: updatedComment });
   } catch (error) {
     console.error('Unexpected error in PATCH /api/comments/[commentId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { status: 500 }
+    );
   }
 }
 
@@ -65,7 +77,10 @@ export async function DELETE(
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
+        { status: 401 }
+      );
     }
 
     // Soft delete by setting deleted_at
@@ -81,12 +96,18 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting comment:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: error.message } },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Unexpected error in DELETE /api/comments/[commentId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { status: 500 }
+    );
   }
 }

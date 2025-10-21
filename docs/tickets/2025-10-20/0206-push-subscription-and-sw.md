@@ -17,7 +17,7 @@
 - Service Worker は今後のオフラインキャッシュ/背景同期にも活用する基盤となる
 
 ## ✅ スコープ
-- `public/sw.js`（または `app/sw.ts` → build 時出力）を作成し、`push`/`notificationclick`/`pushsubscriptionchange` ハンドラを実装
+- `public/sw.js` を作成し、`push`/`notificationclick`/`pushsubscriptionchange` ハンドラを実装
 - Next.js クライアントで Service Worker を登録し、購読UI（設定メニュー or 通知ベル）を追加
 - `/api/push-subscriptions` API Route（POST/DELETE）を実装して購読情報を永続化
 - VAPID 公開鍵をクライアントに渡す仕組み（`NEXT_PUBLIC_WEBPUSH_PUBLIC_KEY`）
@@ -67,6 +67,5 @@
 - 後続: 0207（Push送信実装）、0208（設定UI）
 
 ## ❓ オープン課題
-- Next.js での Service Worker ビルド/キャッシュ戦略（`next-pwa` を導入するか）
+- `public/sw.js` のキャッシュ戦略（更新検知のための versioning）
 - マルチテナント環境での VAPID Key 管理
-

@@ -60,7 +60,10 @@ export async function GET(
     return NextResponse.json({ comments: transformedComments });
   } catch (error) {
     console.error('Unexpected error in GET /api/cards/[cardId]/comments:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { status: 500 }
+    );
   }
 }
 
@@ -75,7 +78,35 @@ export async function POST(
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
+        { status: 401 }
+      );
+    }
+
+    // Check Idempotency-Key header for duplicate prevention
+    const idempotencyKey = request.headers.get('Idempotency-Key');
+    if (idempotencyKey) {
+      // Check if a comment with this key already exists
+      const { data: existingComment, error: checkError } = await supabase
+        .from('comments')
+        .select(`
+          *,
+          author:author_id (
+            id,
+            full_name,
+            avatar_url,
+            email
+          )
+        `)
+        .eq('idempotency_key', idempotencyKey)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (!checkError && existingComment) {
+        // Return existing comment (idempotent response)
+        return NextResponse.json({ comment: existingComment }, { status: 200 });
+      }
     }
 
     const body = await request.json();
@@ -86,7 +117,10 @@ export async function POST(
     };
 
     if (!commentBody || !commentBody.trim()) {
-      return NextResponse.json({ error: 'Comment body is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Comment body is required' } },
+        { status: 400 }
+      );
     }
 
     // Insert comment
@@ -98,6 +132,7 @@ export async function POST(
         parent_id,
         body: commentBody,
         mentions,
+        idempotency_key: idempotencyKey || null,
       })
       .select(`
         *,
@@ -112,7 +147,10 @@ export async function POST(
 
     if (error) {
       console.error('Error creating comment:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: error.message } },
+        { status: 500 }
+      );
     }
 
     // TODO: Create notifications for mentions
@@ -123,6 +161,9 @@ export async function POST(
     return NextResponse.json({ comment: newComment }, { status: 201 });
   } catch (error) {
     console.error('Unexpected error in POST /api/cards/[cardId]/comments:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
+      { status: 500 }
+    );
   }
 }
