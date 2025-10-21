@@ -310,7 +310,176 @@ useSensor(TouchSensor, {
 - [ ] Debounce sync to Supabase
 - [ ] React.memo for Card/List components
 - [ ] Service Worker for true offline mode
-- [ ] Real-time subscriptions (Supabase Realtime)
+- [x] Real-time subscriptions (Supabase Realtime) - **完了 (2025-10-22)**
+
+## Comments & Notifications Architecture
+
+### Overview (Phase 3 - 2025-10-22)
+
+コメント機能と通知システムはリアルタイム同期とオフライン対応を備えた協働機能です。
+
+```
+User posts comment
+      ↓
+Zustand Store (optimistic update)
+      ↓
+API Route (/api/cards/[cardId]/comments)
+      ↓
+Supabase Insert (comments table)
+      ↓
+Notification Generation (lib/server/notifications.ts)
+      ↓
+Supabase Realtime → All connected clients
+      ↓
+UI updates automatically
+```
+
+### Comments State Management
+
+**Zustand Store** (`app/(board)/_stores/comments-store.ts`):
+- 楽観更新（Optimistic UI）
+- オフラインキュー（Offline Queue）
+- エラーハンドリング（Error Handling）
+
+```typescript
+interface CommentsStore {
+  comments: CommentWithAuthor[];
+  // CRUD operations with optimistic updates
+  createComment: (cardId: string, body: string, mentions: string[]) => Promise<void>;
+  updateComment: (id: string, body: string) => Promise<void>;
+  deleteComment: (id: string) => Promise<void>;
+  // Realtime sync
+  syncComment: (comment: CommentWithAuthor) => void;
+}
+```
+
+### Mentions System
+
+**UUID-based Tokenization** (`<@uuid>` format):
+1. UI では `@DisplayName` として表示
+2. テキストエリアには `@DisplayName<@uuid>` として挿入
+3. サーバー送信時に UUID を抽出して `mentions` 配列へ
+4. サーバーで UUID 形式検証 + ボードメンバー確認
+5. 表示時は `RenderCommentBody` で安全に変換
+
+### Notification Generation
+
+**Trigger Points**:
+- コメント作成時（`comment_created` または `comment_replied`）
+- メンション作成時（`mention`）
+
+**Recipients** (`lib/server/notifications.ts:resolveCommentRecipients`):
+- カード作成者（`cards.user_id`）
+- 担当者（`cards.assignee_id`）
+- 過去のコメント参加者（`comments.author_id`）
+- メンション対象者（`mentions` 配列）
+- **除外**: 送信者自身
+
+**Deduplication**:
+- `notifications.dedupe_key` で重複防止（UNIQUE 制約）
+- 形式: `{type}:{recipient_id}:{comment_id}:{card_id}`
+
+### Realtime Subscriptions
+
+**Cards & Lists** (`KanbanBoardClient.tsx:1055-1102`):
+```typescript
+supabase
+  .channel('board-changes')
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'cards',
+    filter: `board_id=eq.${currentBoardId}`,
+  }, handleCardChange)
+  .subscribe();
+```
+
+**Comments** (`KanbanBoardClient.tsx:1103-1141`):
+```typescript
+supabase
+  .channel('comments-changes')
+  .on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: 'comments',
+  }, (payload) => {
+    // Zustand store に同期
+    useCommentsStore.getState().syncComment(payload.new);
+  })
+  .subscribe();
+```
+
+### Card Modal Routing (Interim Solution)
+
+**Background**:
+- Next.js 15 の Intercepting Routes に `router.back()` バグあり
+- 暫定的に `?card=<card_id>` クエリパラメータで対応
+
+**Implementation** (`KanbanBoardClient.tsx:195-239`):
+```typescript
+// URL 更新
+const openCardModal = (cardId: string) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set('card', cardId);
+  window.history.pushState({}, '', url);
+  setSelectedCardId(cardId);
+};
+
+// 初期化時に ?card= を検出
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const cardId = params.get('card');
+  if (cardId) {
+    setSelectedCardId(cardId);
+  }
+}, []);
+```
+
+**Future**:
+- Next.js のバグ修正後、`/c/[short_id]/[[...slug]]` Intercepting Routes に復帰予定
+- 参考: `docs/detail/routing.md`
+
+### Permission-Based Access Control
+
+**Role Hierarchy** (`board_members.role`):
+- `owner`: 完全なアクセス
+- `editor`: コメント投稿可能
+- `commenter`: コメント投稿可能
+- `viewer`: 読み取り専用（コメントフォーム非表示）
+
+**Implementation** (`CommentsPanel.tsx:106-121`):
+```typescript
+const [userRole, setUserRole] = useState<MemberRole | null>(null);
+
+// Fetch user role
+useEffect(() => {
+  const fetchRole = async () => {
+    const res = await fetch(`/api/boards/${boardId}/members/me`);
+    const data = await res.json();
+    setUserRole(data.role);
+  };
+  fetchRole();
+}, [boardId]);
+
+// Hide form for viewer
+{!editingId && userRole === 'viewer' && (
+  <div>閲覧専用の権限のため、コメントを投稿できません。</div>
+)}
+```
+
+### E2E Testing
+
+**Test Coverage** (`e2e/phase3-comments.spec.ts`):
+- ✅ コメント CRUD 操作
+- ✅ 返信機能
+- ✅ `?card=` 経路でのモーダル表示
+- ✅ リロード時の状態保持
+- ✅ Realtime 同期（2ブラウザコンテキスト）
+
+**Test Strategy**:
+- 各テストで独立したボード作成
+- `beforeEach` で setup、`afterEach` で cleanup
+- Realtime テストは複数コンテキストで検証
 
 ## Security Architecture
 
