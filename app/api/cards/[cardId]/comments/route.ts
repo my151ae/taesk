@@ -123,6 +123,55 @@ export async function POST(
       );
     }
 
+    // Validate mentions - ensure all mentioned users are board members
+    if (mentions && mentions.length > 0) {
+      // Get the board_id for this card
+      const { data: card, error: cardError } = await supabase
+        .from('cards')
+        .select('board_id')
+        .eq('id', cardId)
+        .single();
+
+      if (cardError || !card) {
+        return NextResponse.json(
+          { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+          { status: 404 }
+        );
+      }
+
+      // Check if all mentioned users are board members
+      const { data: boardMembers, error: membersError } = await supabase
+        .from('board_members')
+        .select('profile_id')
+        .eq('board_id', card.board_id);
+
+      if (membersError) {
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: 'Failed to validate mentions' } },
+          { status: 500 }
+        );
+      }
+
+      const memberIds = new Set(boardMembers?.map((m) => m.profile_id) || []);
+      const invalidMentions = mentions.filter((id) => !memberIds.has(id));
+
+      if (invalidMentions.length > 0) {
+        return NextResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Some mentioned users are not board members',
+            },
+            issues: invalidMentions.map((id) => ({
+              field: 'mentions',
+              message: `User ${id} is not a board member`,
+            })),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Insert comment
     const { data: newComment, error } = await supabase
       .from('comments')

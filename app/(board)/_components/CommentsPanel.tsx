@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
 import { supabase, CommentWithAuthor, ProfileSummary } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { RenderCommentBody } from './Mention';
 
 interface CommentsPanelProps {
   cardId: string;
@@ -311,8 +312,12 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
             </div>
           ) : (
             <>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
-                {comment.body}
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <RenderCommentBody
+                  body={comment.body}
+                  mentions={comment.mentions || []}
+                  profiles={members}
+                />
               </div>
               <div className="flex gap-3 mt-2 text-xs text-gray-500">
                 <button
