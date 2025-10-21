@@ -1,8 +1,8 @@
 # Testing Guide
 
-Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前にセットアップしてから各シナリオを実行します。本ドキュメントは 2025-10-19 時点の構成に基づいています。
+Taesk の E2E テストは Playwright を使用し、Supabase 認証を事前にセットアップしてから各シナリオを実行します。本ドキュメントは 2025-10-22 時点の構成に基づいています。
 
-**最新情報（2025-10-19）**: Reorder API の E2E テストを追加し、合計テスト数が 50 件になりました。
+**最新情報（2025-10-22）**: Comments 機能の E2E テストを追加しました（`phase3-comments.spec.ts`）。Realtime 同期を含む包括的なテストカバレッジを実現しています。
 
 ## 基本ルール
 
@@ -108,6 +108,7 @@ npx playwright test --reporter=json > playwright-report.json
 npx playwright test e2e/auth.spec.ts --reporter=json > playwright-report.json
 npx playwright test e2e/kanban.spec.ts --reporter=json > playwright-report.json
 npx playwright test e2e/reorder-api.spec.ts --reporter=json > playwright-report.json
+npx playwright test e2e/phase3-comments.spec.ts --reporter=json > playwright-report.json
 ```
 
 ### 3. テスト結果の確認
@@ -173,10 +174,11 @@ sudo apt-get install jq
 - ファイル内のコメントに未実装理由と有効化方法を記載
 - 実装完了後、`.skip` を削除して有効化すること
 
-**現在のテスト状況**:
-- **全テスト数**: 50件
-- **実行されるテスト**: 45件（phase3-invite.spec.tsの5件をスキップ）
-- **期待される成功率**: 100%（45/45）
+**現在のテスト状況** (2025-10-22):
+- **全テスト数**: 56件
+- **実行されるテスト**: 51件（phase3-invite.spec.tsの5件をスキップ）
+- **期待される成功率**: 100%（51/51）
+- **新規追加**: `phase3-comments.spec.ts` (6件) - コメント機能とRealtime同期
 
 ## テスト分離戦略
 
@@ -245,6 +247,66 @@ async function dragAndDrop(page: Page, source: Locator, target: Locator) {
 }
 ```
 
+## Phase 3 コメント機能のテスト (2025-10-22)
+
+`e2e/phase3-comments.spec.ts` では Comments 機能の包括的なテストを実施します。
+
+### テストカバレッジ
+
+**基本機能テスト** (`Comments Feature` describe):
+1. **`?card=` 経路でのモーダル表示**: Comments タブの表示確認
+2. **リロード時の状態保持**: `?card=` クエリパラメータの永続化確認
+3. **コメント作成**: 新規コメントの投稿と表示確認
+4. **コメント編集・削除**: 自分のコメントの編集・削除機能
+5. **返信機能**: スレッド型の返信投稿
+
+**Realtime 同期テスト** (`Comments Realtime` describe):
+6. **マルチコンテキスト同期**: 2つのブラウザコンテキスト間でのRealtime反映確認
+
+### 実装パターン
+
+```typescript
+// Helper: ボード作成
+async function createTestBoard(page: Page, boardName: string): Promise<string> {
+  await page.goto('/');
+  const boardSelector = page.locator('[data-testid="board-selector"]');
+  await boardSelector.click();
+  const newBoardButton = page.locator('text=New Board');
+  await newBoardButton.click();
+  await page.fill('input[placeholder*="ボード名"]', boardName);
+  await page.keyboard.press('Enter');
+  const url = page.url();
+  const match = url.match(/\/b\/([^\/\?]+)/);
+  return match ? match[1] : '';
+}
+
+// Realtime 検証（2ブラウザコンテキスト）
+test('should sync comments across multiple browser contexts', async ({ browser }) => {
+  const context1 = await browser.newContext({ storageState: 'playwright/.auth/user.json' });
+  const context2 = await browser.newContext({ storageState: 'playwright/.auth/user.json' });
+  const page1 = await context1.newPage();
+  const page2 = await context2.newPage();
+
+  // Page 1: コメント投稿
+  const commentText = `Realtime test ${Date.now()}`;
+  await page1.fill('textarea', commentText);
+  await page1.click('button:has-text("コメントを投稿")');
+
+  // Page 2: Realtime 経由で即座に表示されることを確認
+  await expect(page2.locator(`text="${commentText}"`)).toBeVisible({ timeout: 10000 });
+
+  await context1.close();
+  await context2.close();
+});
+```
+
+### ポイント
+
+- **独立したボード**: 各テストで一意のボード作成（干渉防止）
+- **`?card=` 経路テスト**: Intercepting Routes のバグ回避策を検証
+- **Realtime 遅延考慮**: `timeout: 10000` で Supabase Realtime のラグを吸収
+- **cleanup**: `afterEach` でテストボード削除（手動検査用に一時保留も可能）
+
 ## ボード URL の検証
 
 2025-10-15 時点では `updateURL` が canonical URL へ一度の遷移で更新するため、テストも canonical への到達のみ確認します。
@@ -262,4 +324,4 @@ expect(new URL(page.url()).pathname).toBe(defaultBoardCanonicalPath);
 
 ---
 
-最新更新日: 2025-10-15 / テスト総数: 34
+最新更新日: 2025-10-22 / テスト総数: 56 (実行: 51)
