@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
-import type { ProfileSummary } from '@/lib/supabase';
+import type { ProfileSummary, MemberRole } from '@/lib/supabase';
 import { RenderCommentBody } from './Mention';
 import { useAuth } from '@/app/contexts/AuthContext';
 import {
@@ -48,6 +48,7 @@ const parseMentions = (text: string, members: ProfileSummary[]): string[] => {
 export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   const { user } = useAuth();
   const [members, setMembers] = useState<ProfileSummary[]>([]);
+  const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -120,6 +121,16 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
         const { members: fetchedMembers } = await response.json();
         if (!ignore) {
           setMembers(fetchedMembers.map((member: { profile: ProfileSummary }) => member.profile));
+
+          // Set current user's role
+          if (user?.id) {
+            const currentMember = fetchedMembers.find(
+              (m: { profile_id: string; role: MemberRole }) => m.profile_id === user.id
+            );
+            if (currentMember) {
+              setUserRole(currentMember.role);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading members:', error);
@@ -131,7 +142,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
     return () => {
       ignore = true;
     };
-  }, [boardId]);
+  }, [boardId, user?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -276,9 +287,11 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
             )}
 
             <div className="flex gap-3 mt-2 text-xs text-gray-500">
-              <button onClick={() => setReplyTo(comment.id)} className="hover:text-blue-500">
-                返信
-              </button>
+              {userRole !== 'viewer' && (
+                <button onClick={() => setReplyTo(comment.id)} className="hover:text-blue-500">
+                  返信
+                </button>
+              )}
               {isAuthor && !comment.optimistic && (
                 <>
                   <button
@@ -402,7 +415,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
       </div>
 
       {/* New comment form */}
-      {!editingId && (
+      {!editingId && userRole !== 'viewer' && (
         <form onSubmit={handleSubmit} className="space-y-2 relative">
           {formError && (
             <div className="text-sm text-red-500">{formError}</div>
@@ -451,6 +464,13 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
             {isSubmitting ? '送信中...' : 'コメントを投稿'}
           </button>
         </form>
+      )}
+
+      {/* Read-only message for viewers */}
+      {!editingId && userRole === 'viewer' && (
+        <div className="rounded bg-gray-100 dark:bg-gray-800 px-4 py-3 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+          閲覧専用の権限のため、コメントを投稿できません。
+        </div>
       )}
     </div>
   );
