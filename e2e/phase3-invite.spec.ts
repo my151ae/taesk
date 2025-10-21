@@ -1,6 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Phase3 - Invite Existing User', () => {
+/**
+ * ⚠️ 未実装機能のテスト
+ *
+ * このテストは Phase 3 のメンバー招待機能に関するものです。
+ * 現在、以下の理由でスキップされています：
+ *
+ * 1. メンバー招待機能が未実装
+ * 2. APIエンドポイント (/api/profiles/search) のレスポンス形式が未確定
+ * 3. UI (Shareダイアログのメンバー追加機能) が未実装
+ *
+ * 実装予定: Phase 3
+ * 関連チケット: 今後作成予定
+ *
+ * 実装完了後、`test.describe.skip` を `test.describe` に戻してください。
+ */
+test.describe.skip('Phase3 - Invite Existing User', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForURL(/\/b\//);

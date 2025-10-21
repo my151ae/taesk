@@ -1,4 +1,4 @@
-[dotenv@17.2.3] injecting env (7) from .env.test -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
 [Global Setup] Starting authentication setup...
 [Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
 [Global Setup] User status: already exists
@@ -20,7 +20,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 4
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "reporter": [
@@ -39,7 +39,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "chromium",
         "name": "chromium",
@@ -55,7 +55,7 @@
     "updateSnapshots": "missing",
     "updateSourceMethod": "patch",
     "version": "1.56.0",
-    "workers": 4,
+    "workers": 1,
     "webServer": {
       "command": "NODE_ENV=test npm run dev",
       "url": "http://localhost:3000",
@@ -92,12 +92,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2527,
+                      "duration": 1716,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:14.508Z",
+                      "startTime": "2025-10-21T05:13:27.391Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -123,15 +123,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2115,
+                      "duration": 551,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:14.508Z",
+                      "startTime": "2025-10-21T05:13:29.221Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -157,15 +157,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2118,
+                      "duration": 513,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:14.508Z",
+                      "startTime": "2025-10-21T05:13:29.782Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -199,15 +199,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2509,
+                      "duration": 808,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:14.507Z",
+                      "startTime": "2025-10-21T05:13:30.304Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -233,15 +233,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1202,
+                      "duration": 760,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:16.897Z",
+                      "startTime": "2025-10-21T05:13:31.117Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -284,15 +284,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4625,
+                      "duration": 3140,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:16.952Z",
+                      "startTime": "2025-10-21T05:13:31.916Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -318,15 +318,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6339,
+                      "duration": 4183,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:17.304Z",
+                      "startTime": "2025-10-21T05:13:35.067Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -355,12 +355,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 7769,
+                      "duration": 3973,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:17.318Z",
+                      "startTime": "2025-10-21T05:13:39.263Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -386,15 +386,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6456,
+                      "duration": 3771,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:18.189Z",
+                      "startTime": "2025-10-21T05:13:43.245Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -420,15 +420,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6938,
+                      "duration": 3498,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:21.616Z",
+                      "startTime": "2025-10-21T05:13:47.029Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -454,15 +454,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4776,
+                      "duration": 3418,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:23.671Z",
+                      "startTime": "2025-10-21T05:13:50.536Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -488,15 +488,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5587,
+                      "duration": 4593,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:24.679Z",
+                      "startTime": "2025-10-21T05:13:53.967Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -525,12 +525,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8832,
+                      "duration": 6851,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:25.100Z",
+                      "startTime": "2025-10-21T05:13:58.570Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -556,15 +556,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 11513,
+                      "duration": 3999,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:28.467Z",
+                      "startTime": "2025-10-21T05:14:05.433Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -579,7 +579,7 @@
             },
             {
               "title": "should edit a card",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -590,50 +590,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 13981,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:365:48",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 48,
-                          "line": 365
-                        },
-                        "snippet": "  363 |\n  364 |     // Regression test: Modal should close after save (not reopen)\n> 365 |     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });\n      |                                                ^\n  366 |\n  367 |     // Wait a bit to ensure modal doesn't reopen\n  368 |     await page.waitForTimeout(500);"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 48,
-                            "line": 365
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('dialog')\nExpected: not visible\nReceived: visible\nTimeout:  2000ms\n\nCall log:\n\u001b[2m  - Expect \"not toBeVisible\" with timeout 2000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('dialog')\u001b[22m\n\u001b[2m    6 × locator resolved to <div tabindex=\"-1\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-title\" class=\"relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800\">…</div>\u001b[22m\n\u001b[2m      - unexpected value \"visible\"\u001b[22m\n\n\n  363 |\n  364 |     // Regression test: Modal should close after save (not reopen)\n> 365 |     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });\n      |                                                ^\n  366 |\n  367 |     // Wait a bit to ensure modal doesn't reopen\n  368 |     await page.waitForTimeout(500);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:365:48"
-                        }
-                      ],
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8298,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:28.573Z",
+                      "startTime": "2025-10-21T05:14:09.441Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board-E2E-Tests-should-edit-a-card-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 48,
-                        "line": 365
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-141de73105dee1601802",
@@ -654,15 +624,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 12352,
+                      "duration": 8139,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:30.284Z",
+                      "startTime": "2025-10-21T05:14:17.747Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -672,12 +642,12 @@
               ],
               "id": "7a6a8de26a6a6c44d713-f25b95cd6316336e108e",
               "file": "kanban.spec.ts",
-              "line": 403,
+              "line": 407,
               "column": 7
             },
             {
               "title": "should assign and clear a card assignee",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -690,53 +660,23 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 17780,
-                      "error": {
-                        "message": "Error: Timed out waiting for cards to be persisted for board dbdc3065-79b9-4042-83ef-2b2aaf8b08bb",
-                        "stack": "Error: Timed out waiting for cards to be persisted for board dbdc3065-79b9-4042-83ef-2b2aaf8b08bb\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:457:25",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                          "column": 9,
-                          "line": 86
-                        },
-                        "snippet": "  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                            "column": 9,
-                            "line": 86
-                          },
-                          "message": "Error: Timed out waiting for cards to be persisted for board dbdc3065-79b9-4042-83ef-2b2aaf8b08bb\n\n  84 |   }\n  85 |\n> 86 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  87 | }\n  88 |\n  89 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:86:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:457:25"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 6003,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:33.964Z",
+                      "startTime": "2025-10-21T05:14:25.899Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--4a3d6-n-and-clear-a-card-assignee-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
-                        "column": 9,
-                        "line": 86
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "7a6a8de26a6a6c44d713-9f16ba163d5347334c10",
               "file": "kanban.spec.ts",
-              "line": 449,
+              "line": 457,
               "column": 7
             },
             {
@@ -752,15 +692,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 9605,
+                      "duration": 6420,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:40.008Z",
+                      "startTime": "2025-10-21T05:14:31.913Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -770,7 +710,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-d520cbf701cfb4afb5e3",
               "file": "kanban.spec.ts",
-              "line": 534,
+              "line": 552,
               "column": 7
             },
             {
@@ -786,15 +726,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 9419,
+                      "duration": 7793,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:43.505Z",
+                      "startTime": "2025-10-21T05:14:38.340Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -804,7 +744,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a38f0c18c888a753f7eb",
               "file": "kanban.spec.ts",
-              "line": 560,
+              "line": 578,
               "column": 7
             },
             {
@@ -820,15 +760,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 10894,
+                      "duration": 6988,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:42.665Z",
+                      "startTime": "2025-10-21T05:14:46.141Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -838,7 +778,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a0400f7813e80587053f",
               "file": "kanban.spec.ts",
-              "line": 590,
+              "line": 608,
               "column": 7
             },
             {
@@ -854,15 +794,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 10505,
+                      "duration": 4694,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:49.656Z",
+                      "startTime": "2025-10-21T05:14:53.140Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -872,7 +812,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-ac158ecdfff8f34f2143",
               "file": "kanban.spec.ts",
-              "line": 618,
+              "line": 636,
               "column": 7
             },
             {
@@ -888,15 +828,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6211,
+                      "duration": 4437,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:53.194Z",
+                      "startTime": "2025-10-21T05:14:57.850Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -906,7 +846,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-f85e626f89fa58d034c4",
               "file": "kanban.spec.ts",
-              "line": 628,
+              "line": 646,
               "column": 7
             },
             {
@@ -922,15 +862,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6430,
+                      "duration": 3673,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:53.204Z",
+                      "startTime": "2025-10-21T05:15:02.300Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -940,7 +880,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-80bd8b44a12150583e53",
               "file": "kanban.spec.ts",
-              "line": 640,
+              "line": 658,
               "column": 7
             },
             {
@@ -956,15 +896,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 14284,
+                      "duration": 10632,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:53.611Z",
+                      "startTime": "2025-10-21T05:15:05.986Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -974,7 +914,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-46f2a30c7599f7ec2cd7",
               "file": "kanban.spec.ts",
-              "line": 651,
+              "line": 669,
               "column": 7
             },
             {
@@ -990,15 +930,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 14798,
+                      "duration": 7632,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:59.657Z",
+                      "startTime": "2025-10-21T05:15:16.631Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1008,7 +948,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-b1a4ab0131ed45f4c8e5",
               "file": "kanban.spec.ts",
-              "line": 717,
+              "line": 735,
               "column": 7
             },
             {
@@ -1024,15 +964,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 17554,
+                      "duration": 9671,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:15:59.711Z",
+                      "startTime": "2025-10-21T05:15:24.272Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1042,7 +982,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-7ea69653d85b3eacb8b5",
               "file": "kanban.spec.ts",
-              "line": 752,
+              "line": 770,
               "column": 7
             },
             {
@@ -1058,15 +998,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 17736,
+                      "duration": 8554,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:00.192Z",
+                      "startTime": "2025-10-21T05:15:33.951Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1076,7 +1016,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-a6e7d7adb91ae80b29f3",
               "file": "kanban.spec.ts",
-              "line": 782,
+              "line": 800,
               "column": 7
             },
             {
@@ -1092,15 +1032,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 10927,
+                      "duration": 5872,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:07.953Z",
+                      "startTime": "2025-10-21T05:15:42.515Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1110,7 +1050,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-b5323dbe57c8286f212b",
               "file": "kanban.spec.ts",
-              "line": 829,
+              "line": 847,
               "column": 7
             },
             {
@@ -1126,15 +1066,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8309,
+                      "duration": 6714,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:14.481Z",
+                      "startTime": "2025-10-21T05:15:48.399Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1144,7 +1084,7 @@
               ],
               "id": "7a6a8de26a6a6c44d713-89acde676aaa1409ef78",
               "file": "kanban.spec.ts",
-              "line": 859,
+              "line": 877,
               "column": 7
             }
           ]
@@ -1166,7 +1106,7 @@
           "specs": [
             {
               "title": "should search and add existing user to board",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1177,50 +1117,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 5,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 6985,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:15:45",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 45,
-                          "line": 15
-                        },
-                        "snippet": "  13 |\n  14 |     // Wait for dialog\n> 15 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  16 |\n  17 |     // Enter test email (we'll need an existing user email)\n  18 |     const emailInput = page.getByPlaceholder(/メールアドレス/);"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 45,
-                            "line": 15
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n\n  13 |\n  14 |     // Wait for dialog\n> 15 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  16 |\n  17 |     // Enter test email (we'll need an existing user email)\n  18 |     const emailInput = page.getByPlaceholder(/メールアドレス/);\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:15:45"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 1652,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:17.287Z",
+                      "startTime": "2025-10-21T05:15:55.137Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-74d4d--add-existing-user-to-board-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 45,
-                        "line": 15
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-b6ed4c94674a13941c0b",
@@ -1230,7 +1140,7 @@
             },
             {
               "title": "should show error for non-existent user",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1241,50 +1151,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 6401,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:47:45",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 45,
-                          "line": 47
-                        },
-                        "snippet": "  45 |     await shareButton.click();\n  46 |\n> 47 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  48 |\n  49 |     // Enter non-existent email\n  50 |     const emailInput = page.getByPlaceholder(/メールアドレス/);"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 45,
-                            "line": 47
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n\n  45 |     await shareButton.click();\n  46 |\n> 47 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  48 |\n  49 |     // Enter non-existent email\n  50 |     const emailInput = page.getByPlaceholder(/メールアドレス/);\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:47:45"
-                        }
-                      ],
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1192,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:17.952Z",
+                      "startTime": "2025-10-21T05:15:56.800Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-f72ff-error-for-non-existent-user-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 45,
-                        "line": 47
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-f51b770decaab7795be3",
@@ -1305,46 +1185,40 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
                       "status": "failed",
-                      "duration": 6967,
+                      "duration": 1299,
                       "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:74:45",
+                        "message": "Error: dialog.accept: Test ended.",
+                        "stack": "Error: dialog.accept: Test ended.\n    at Page.<anonymous> (/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:68:20)",
                         "location": {
                           "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 45,
-                          "line": 74
+                          "column": 20,
+                          "line": 68
                         },
-                        "snippet": "  72 |     await shareButton.click();\n  73 |\n> 74 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  75 |\n  76 |     // Get current user's email from members list\n  77 |     const membersSection = page.locator('text=Members').locator('..');"
+                        "snippet": "  66 |     page.on('dialog', async (dialog) => {\n  67 |       expect(dialog.message()).toContain('既にメンバーです');\n> 68 |       await dialog.accept();\n     |                    ^\n  69 |     });\n  70 |\n  71 |     const shareButton = page.getByRole('button', { name: /share/i });"
                       },
                       "errors": [
                         {
                           "location": {
                             "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 45,
-                            "line": 74
+                            "column": 20,
+                            "line": 68
                           },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('メンバーを追加')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('メンバーを追加')\u001b[22m\n\n\n  72 |     await shareButton.click();\n  73 |\n> 74 |     await expect(page.getByText('メンバーを追加')).toBeVisible();\n     |                                             ^\n  75 |\n  76 |     // Get current user's email from members list\n  77 |     const membersSection = page.locator('text=Members').locator('..');\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:74:45"
+                          "message": "Error: dialog.accept: Test ended.\n\n  66 |     page.on('dialog', async (dialog) => {\n  67 |       expect(dialog.message()).toContain('既にメンバーです');\n> 68 |       await dialog.accept();\n     |                    ^\n  69 |     });\n  70 |\n  71 |     const shareButton = page.getByRole('button', { name: /share/i });\n    at Page.<anonymous> (/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:68:20)"
                         }
                       ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:18.915Z",
+                      "startTime": "2025-10-21T05:15:57.998Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-8d880-nt-adding-duplicate-members-chromium/error-context.md"
-                        }
-                      ],
+                      "attachments": [],
                       "errorLocation": {
                         "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 45,
-                        "line": 74
+                        "column": 20,
+                        "line": 68
                       }
                     }
                   ],
@@ -1358,7 +1232,7 @@
             },
             {
               "title": "API: GET /api/profiles/search should work",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -1369,20 +1243,50 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
-                      "status": "passed",
-                      "duration": 2805,
-                      "errors": [],
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 893,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:99:24",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                          "column": 24,
+                          "line": 99
+                        },
+                        "snippet": "   97 |\n   98 |     const body = await response.json();\n>  99 |     expect(body.error).toEqual({ code: 'NOT_FOUND', message: 'User not found' });\n      |                        ^\n  100 |   });\n  101 |\n  102 |   test('API: GET /api/profiles/search should require email param', async ({ request }) => {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                            "column": 24,
+                            "line": 99
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m\n\n   97 |\n   98 |     const body = await response.json();\n>  99 |     expect(body.error).toEqual({ code: 'NOT_FOUND', message: 'User not found' });\n      |                        ^\n  100 |   });\n  101 |\n  102 |   test('API: GET /api/profiles/search should require email param', async ({ request }) => {\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:99:24"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:22.808Z",
+                      "startTime": "2025-10-21T05:15:59.770Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-e24be-profiles-search-should-work-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "column": 24,
+                        "line": 99
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-8ba9e6c7e605db968ac1",
@@ -1392,7 +1296,7 @@
             },
             {
               "title": "API: GET /api/profiles/search should require email param",
-              "ok": true,
+              "ok": false,
               "tags": [],
               "tests": [
                 {
@@ -1403,20 +1307,50 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
+                      "workerIndex": 2,
                       "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 2077,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 875,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:107:24",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                          "column": 24,
+                          "line": 107
+                        },
+                        "snippet": "  105 |\n  106 |     const body = await response.json();\n> 107 |     expect(body.error).toEqual({ code: 'INVALID_PARAM', message: 'Email parameter is required' });\n      |                        ^\n  108 |   });\n  109 | });\n  110 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                            "column": 24,
+                            "line": 107
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m\n\n  105 |\n  106 |     const body = await response.json();\n> 107 |     expect(body.error).toEqual({ code: 'INVALID_PARAM', message: 'Email parameter is required' });\n      |                        ^\n  108 |   });\n  109 | });\n  110 |\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:107:24"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:25.270Z",
+                      "startTime": "2025-10-21T05:16:01.255Z",
                       "annotations": [],
-                      "attachments": []
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-6c968--should-require-email-param-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "column": 24,
+                        "line": 107
+                      }
                     }
                   ],
-                  "status": "expected"
+                  "status": "unexpected"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-22c478d3b665638067cf",
@@ -1443,7 +1377,7 @@
           "specs": [
             {
               "title": "should reorder cards successfully",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1454,44 +1388,20 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 7,
-                      "parallelIndex": 3,
-                      "status": "failed",
-                      "duration": 312,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:54:30",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                          "column": 30,
-                          "line": 54
-                        },
-                        "snippet": "  52 |     const result = await res.json();\n  53 |     expect(result.updated).toBe(3);\n> 54 |     expect(result.unchanged).toBe(0);\n     |                              ^\n  55 |     expect(result.durationMs).toBeGreaterThan(0);\n  56 |   });\n  57 |"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                            "column": 30,
-                            "line": 54
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  52 |     const result = await res.json();\n  53 |     expect(result.updated).toBe(3);\n> 54 |     expect(result.unchanged).toBe(0);\n     |                              ^\n  55 |     expect(result.durationMs).toBeGreaterThan(0);\n  56 |   });\n  57 |\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:54:30"
-                        }
-                      ],
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 382,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:25.271Z",
+                      "startTime": "2025-10-21T05:16:02.639Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                        "column": 30,
-                        "line": 54
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "d9d40746f28a2f470bd1-f932d47583f2e5d12431",
@@ -1512,15 +1422,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 10,
-                      "parallelIndex": 3,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 116,
+                      "duration": 141,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:28.830Z",
+                      "startTime": "2025-10-21T05:16:04.562Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1534,8 +1444,8 @@
               "column": 7
             },
             {
-              "title": "should reject unknown card IDs",
-              "ok": false,
+              "title": "should reject invalid UUID format",
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1546,54 +1456,30 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 4,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 191,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid UUID\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid UUID\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:86:26",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                          "column": 26,
-                          "line": 86
-                        },
-                        "snippet": "  84 |     expect(res.status()).toBe(400);\n  85 |     const result = await res.json();\n> 86 |     expect(result.error).toBe('Bad Request');\n     |                          ^\n  87 |     expect(result.issues).toBeDefined();\n  88 |     expect(result.issues.some((i: any) => i.code === 'UNKNOWN_ID')).toBe(true);\n  89 |   });"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                            "column": 26,
-                            "line": 86
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid UUID\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m\n\n  84 |     expect(res.status()).toBe(400);\n  85 |     const result = await res.json();\n> 86 |     expect(result.error).toBe('Bad Request');\n     |                          ^\n  87 |     expect(result.issues).toBeDefined();\n  88 |     expect(result.issues.some((i: any) => i.code === 'UNKNOWN_ID')).toBe(true);\n  89 |   });\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:86:26"
-                        }
-                      ],
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 117,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:25.635Z",
+                      "startTime": "2025-10-21T05:16:04.710Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                        "column": 26,
-                        "line": 86
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
-              "id": "d9d40746f28a2f470bd1-f28316b8e13447aa834c",
+              "id": "d9d40746f28a2f470bd1-c3b17d091f070c26449f",
               "file": "reorder-api.spec.ts",
               "line": 75,
               "column": 7
             },
             {
               "title": "should reject invalid schema (missing position)",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -1604,49 +1490,25 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 9,
-                      "parallelIndex": 2,
-                      "status": "failed",
-                      "duration": 133,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid input: expected number, received undefined\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid input: expected number, received undefined\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:102:26",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                          "column": 26,
-                          "line": 102
-                        },
-                        "snippet": "  100 |     expect(res.status()).toBe(400);\n  101 |     const result = await res.json();\n> 102 |     expect(result.error).toBe('Bad Request');\n      |                          ^\n  103 |     expect(result.issues).toBeDefined();\n  104 |     expect(result.issues.some((i: any) => i.code === 'INVALID_SCHEMA')).toBe(true);\n  105 |   });"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                            "column": 26,
-                            "line": 102
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Bad Request\"\u001b[39m\nReceived: \u001b[31m{\"code\": \"INVALID_BODY\", \"details\": {\"fieldErrors\": {\"updates\": [\"Invalid input: expected number, received undefined\"]}, \"formErrors\": []}, \"message\": \"Validation failed\"}\u001b[39m\n\n  100 |     expect(res.status()).toBe(400);\n  101 |     const result = await res.json();\n> 102 |     expect(result.error).toBe('Bad Request');\n      |                          ^\n  103 |     expect(result.issues).toBeDefined();\n  104 |     expect(result.issues.some((i: any) => i.code === 'INVALID_SCHEMA')).toBe(true);\n  105 |   });\n    at /Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts:102:26"
-                        }
-                      ],
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 104,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:28.691Z",
+                      "startTime": "2025-10-21T05:16:04.832Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/reorder-api.spec.ts",
-                        "column": 26,
-                        "line": 102
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
               "id": "d9d40746f28a2f470bd1-a373173bf31af87bdc71",
               "file": "reorder-api.spec.ts",
-              "line": 91,
+              "line": 90,
               "column": 7
             },
             {
@@ -1662,15 +1524,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 846,
+                      "duration": 1078,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:26.460Z",
+                      "startTime": "2025-10-21T05:16:04.943Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1680,7 +1542,7 @@
               ],
               "id": "d9d40746f28a2f470bd1-b4a485fdf5c48737bfa8",
               "file": "reorder-api.spec.ts",
-              "line": 107,
+              "line": 105,
               "column": 7
             },
             {
@@ -1696,15 +1558,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1801,
+                      "duration": 937,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:28.917Z",
+                      "startTime": "2025-10-21T05:16:06.026Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1714,7 +1576,7 @@
               ],
               "id": "d9d40746f28a2f470bd1-25e6cb2102de97bd5d3f",
               "file": "reorder-api.spec.ts",
-              "line": 133,
+              "line": 131,
               "column": 7
             },
             {
@@ -1730,15 +1592,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
+                      "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1594,
+                      "duration": 708,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:27.648Z",
+                      "startTime": "2025-10-21T05:16:06.967Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1748,7 +1610,7 @@
               ],
               "id": "d9d40746f28a2f470bd1-c2868dc67bf3cc8cb63e",
               "file": "reorder-api.spec.ts",
-              "line": 155,
+              "line": 153,
               "column": 7
             },
             {
@@ -1764,15 +1626,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 6,
+                      "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1697,
+                      "duration": 1639,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.517Z",
+                      "startTime": "2025-10-21T05:16:07.682Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1782,7 +1644,7 @@
               ],
               "id": "d9d40746f28a2f470bd1-478c798a7834a1f7621c",
               "file": "reorder-api.spec.ts",
-              "line": 164,
+              "line": 162,
               "column": 7
             }
           ]
@@ -1815,15 +1677,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1,
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.731Z",
+                      "startTime": "2025-10-21T05:16:09.330Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1849,15 +1711,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.744Z",
+                      "startTime": "2025-10-21T05:16:09.335Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1883,15 +1745,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.752Z",
+                      "startTime": "2025-10-21T05:16:09.339Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1917,15 +1779,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.761Z",
+                      "startTime": "2025-10-21T05:16:09.343Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1951,15 +1813,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.768Z",
+                      "startTime": "2025-10-21T05:16:09.346Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1993,15 +1855,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.777Z",
+                      "startTime": "2025-10-21T05:16:09.350Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2027,15 +1889,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.784Z",
+                      "startTime": "2025-10-21T05:16:09.354Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2061,15 +1923,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 8,
-                      "parallelIndex": 1,
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-19T22:16:30.789Z",
+                      "startTime": "2025-10-21T05:16:09.358Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -2089,11 +1951,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-10-19T22:15:00.483Z",
-    "duration": 91848.872,
-    "expected": 42,
+    "startTime": "2025-10-21T05:13:17.237Z",
+    "duration": 172253.063,
+    "expected": 47,
     "skipped": 0,
-    "unexpected": 8,
+    "unexpected": 3,
     "flaky": 0
   }
 }
