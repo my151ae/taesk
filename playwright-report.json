@@ -1,4 +1,4 @@
-[dotenv@17.2.3] injecting env (0) from .env.test -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (7) from .env.test -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
 [Global Setup] Starting authentication setup...
 [Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
 [Global Setup] User status: already exists
@@ -92,12 +92,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1716,
+                      "duration": 2860,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:27.391Z",
+                      "startTime": "2025-10-21T07:24:33.592Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -126,12 +126,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 551,
+                      "duration": 774,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:29.221Z",
+                      "startTime": "2025-10-21T07:24:36.607Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -160,12 +160,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 513,
+                      "duration": 589,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:29.782Z",
+                      "startTime": "2025-10-21T07:24:37.391Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -202,12 +202,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 808,
+                      "duration": 1055,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:30.304Z",
+                      "startTime": "2025-10-21T07:24:37.989Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -236,12 +236,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 760,
+                      "duration": 1860,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:31.117Z",
+                      "startTime": "2025-10-21T07:24:39.050Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -287,12 +287,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3140,
+                      "duration": 3954,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:31.916Z",
+                      "startTime": "2025-10-21T07:24:40.973Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -321,12 +321,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4183,
+                      "duration": 5028,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:35.067Z",
+                      "startTime": "2025-10-21T07:24:44.941Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -355,12 +355,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3973,
+                      "duration": 4579,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:39.263Z",
+                      "startTime": "2025-10-21T07:24:49.982Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -389,12 +389,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3771,
+                      "duration": 4733,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:43.245Z",
+                      "startTime": "2025-10-21T07:24:54.571Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -423,12 +423,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3498,
+                      "duration": 3811,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:47.029Z",
+                      "startTime": "2025-10-21T07:24:59.322Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -457,12 +457,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3418,
+                      "duration": 4791,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:50.536Z",
+                      "startTime": "2025-10-21T07:25:03.146Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -491,12 +491,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4593,
+                      "duration": 7709,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:53.967Z",
+                      "startTime": "2025-10-21T07:25:07.953Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -525,12 +525,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6851,
+                      "duration": 7196,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:13:58.570Z",
+                      "startTime": "2025-10-21T07:25:15.674Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -559,12 +559,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3999,
+                      "duration": 4294,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:05.433Z",
+                      "startTime": "2025-10-21T07:25:22.882Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -593,12 +593,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8298,
+                      "duration": 8038,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:09.441Z",
+                      "startTime": "2025-10-21T07:25:27.185Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -627,12 +627,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8139,
+                      "duration": 11001,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:17.747Z",
+                      "startTime": "2025-10-21T07:25:35.234Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -661,12 +661,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6003,
+                      "duration": 7477,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:25.899Z",
+                      "startTime": "2025-10-21T07:25:46.250Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -695,12 +695,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6420,
+                      "duration": 6672,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:31.913Z",
+                      "startTime": "2025-10-21T07:25:53.739Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -729,12 +729,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 7793,
+                      "duration": 7944,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:38.340Z",
+                      "startTime": "2025-10-21T07:26:00.419Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -763,12 +763,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6988,
+                      "duration": 7162,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:46.141Z",
+                      "startTime": "2025-10-21T07:26:08.373Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -797,12 +797,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4694,
+                      "duration": 4281,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:53.140Z",
+                      "startTime": "2025-10-21T07:26:15.546Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -831,12 +831,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4437,
+                      "duration": 5765,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:14:57.850Z",
+                      "startTime": "2025-10-21T07:26:19.849Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -865,12 +865,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3673,
+                      "duration": 3568,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:02.300Z",
+                      "startTime": "2025-10-21T07:26:25.633Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -899,12 +899,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 10632,
+                      "duration": 10814,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:05.986Z",
+                      "startTime": "2025-10-21T07:26:29.216Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -933,12 +933,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 7632,
+                      "duration": 7913,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:16.631Z",
+                      "startTime": "2025-10-21T07:26:40.045Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -967,12 +967,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 9671,
+                      "duration": 10552,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:24.272Z",
+                      "startTime": "2025-10-21T07:26:47.966Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1001,12 +1001,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 8554,
+                      "duration": 8884,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:33.951Z",
+                      "startTime": "2025-10-21T07:26:58.532Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1035,12 +1035,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 5872,
+                      "duration": 5991,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:42.515Z",
+                      "startTime": "2025-10-21T07:27:07.426Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1069,12 +1069,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 6714,
+                      "duration": 6978,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:48.399Z",
+                      "startTime": "2025-10-21T07:27:13.434Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1101,8 +1101,8 @@
         {
           "title": "Phase3 - Invite Existing User",
           "file": "phase3-invite.spec.ts",
-          "line": 3,
-          "column": 6,
+          "line": 18,
+          "column": 15,
           "specs": [
             {
               "title": "should search and add existing user to board",
@@ -1111,31 +1111,40 @@
               "tests": [
                 {
                   "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "line": 18,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 1652,
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:55.137Z",
+                      "startTime": "2025-10-21T07:27:20.422Z",
                       "annotations": [],
                       "attachments": []
                     }
                   ],
-                  "status": "expected"
+                  "status": "skipped"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-b6ed4c94674a13941c0b",
               "file": "phase3-invite.spec.ts",
-              "line": 9,
+              "line": 24,
               "column": 7
             },
             {
@@ -1145,217 +1154,169 @@
               "tests": [
                 {
                   "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "line": 18,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "passed",
-                      "duration": 1192,
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:56.800Z",
+                      "startTime": "2025-10-21T07:27:20.423Z",
                       "annotations": [],
                       "attachments": []
                     }
                   ],
-                  "status": "expected"
+                  "status": "skipped"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-f51b770decaab7795be3",
               "file": "phase3-invite.spec.ts",
-              "line": 36,
+              "line": 51,
               "column": 7
             },
             {
               "title": "should prevent adding duplicate members",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
                   "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "line": 18,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 0,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 1299,
-                      "error": {
-                        "message": "Error: dialog.accept: Test ended.",
-                        "stack": "Error: dialog.accept: Test ended.\n    at Page.<anonymous> (/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:68:20)",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 20,
-                          "line": 68
-                        },
-                        "snippet": "  66 |     page.on('dialog', async (dialog) => {\n  67 |       expect(dialog.message()).toContain('既にメンバーです');\n> 68 |       await dialog.accept();\n     |                    ^\n  69 |     });\n  70 |\n  71 |     const shareButton = page.getByRole('button', { name: /share/i });"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 20,
-                            "line": 68
-                          },
-                          "message": "Error: dialog.accept: Test ended.\n\n  66 |     page.on('dialog', async (dialog) => {\n  67 |       expect(dialog.message()).toContain('既にメンバーです');\n> 68 |       await dialog.accept();\n     |                    ^\n  69 |     });\n  70 |\n  71 |     const shareButton = page.getByRole('button', { name: /share/i });\n    at Page.<anonymous> (/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:68:20)"
-                        }
-                      ],
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:57.998Z",
+                      "startTime": "2025-10-21T07:27:20.423Z",
                       "annotations": [],
-                      "attachments": [],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 20,
-                        "line": 68
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "skipped"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-0bcf5d5945f981914a1b",
               "file": "phase3-invite.spec.ts",
-              "line": 62,
+              "line": 77,
               "column": 7
             },
             {
               "title": "API: GET /api/profiles/search should work",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
                   "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "line": 18,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 893,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:99:24",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 24,
-                          "line": 99
-                        },
-                        "snippet": "   97 |\n   98 |     const body = await response.json();\n>  99 |     expect(body.error).toEqual({ code: 'NOT_FOUND', message: 'User not found' });\n      |                        ^\n  100 |   });\n  101 |\n  102 |   test('API: GET /api/profiles/search should require email param', async ({ request }) => {"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 24,
-                            "line": 99
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"NOT_FOUND\", \"message\": \"User not found\"}\u001b[39m\nReceived: \u001b[31m\"User not found\"\u001b[39m\n\n   97 |\n   98 |     const body = await response.json();\n>  99 |     expect(body.error).toEqual({ code: 'NOT_FOUND', message: 'User not found' });\n      |                        ^\n  100 |   });\n  101 |\n  102 |   test('API: GET /api/profiles/search should require email param', async ({ request }) => {\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:99:24"
-                        }
-                      ],
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:15:59.770Z",
+                      "startTime": "2025-10-21T07:27:20.423Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-e24be-profiles-search-should-work-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 24,
-                        "line": 99
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "skipped"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-8ba9e6c7e605db968ac1",
               "file": "phase3-invite.spec.ts",
-              "line": 93,
+              "line": 108,
               "column": 7
             },
             {
               "title": "API: GET /api/profiles/search should require email param",
-              "ok": false,
+              "ok": true,
               "tags": [],
               "tests": [
                 {
                   "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
+                        "line": 18,
+                        "column": 15
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 2,
-                      "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 875,
-                      "error": {
-                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m",
-                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:107:24",
-                        "location": {
-                          "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                          "column": 24,
-                          "line": 107
-                        },
-                        "snippet": "  105 |\n  106 |     const body = await response.json();\n> 107 |     expect(body.error).toEqual({ code: 'INVALID_PARAM', message: 'Email parameter is required' });\n      |                        ^\n  108 |   });\n  109 | });\n  110 |"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                            "column": 24,
-                            "line": 107
-                          },
-                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected: \u001b[32m{\"code\": \"INVALID_PARAM\", \"message\": \"Email parameter is required\"}\u001b[39m\nReceived: \u001b[31m\"Email parameter is required\"\u001b[39m\n\n  105 |\n  106 |     const body = await response.json();\n> 107 |     expect(body.error).toEqual({ code: 'INVALID_PARAM', message: 'Email parameter is required' });\n      |                        ^\n  108 |   });\n  109 | });\n  110 |\n    at /Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts:107:24"
-                        }
-                      ],
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:01.255Z",
+                      "startTime": "2025-10-21T07:27:20.423Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "error-context",
-                          "contentType": "text/markdown",
-                          "path": "/Users/yossydie/dev/taesk/test-results/phase3-invite-Phase3---Inv-6c968--should-require-email-param-chromium/error-context.md"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/yossydie/dev/taesk/e2e/phase3-invite.spec.ts",
-                        "column": 24,
-                        "line": 107
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "skipped"
                 }
               ],
               "id": "b79992a33a9eaf9a34d7-22c478d3b665638067cf",
               "file": "phase3-invite.spec.ts",
-              "line": 102,
+              "line": 117,
               "column": 7
             }
           ]
@@ -1388,15 +1349,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 382,
+                      "duration": 637,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:02.639Z",
+                      "startTime": "2025-10-21T07:27:20.428Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1422,15 +1383,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 141,
+                      "duration": 245,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:04.562Z",
+                      "startTime": "2025-10-21T07:27:22.821Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1456,15 +1417,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 117,
+                      "duration": 124,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:04.710Z",
+                      "startTime": "2025-10-21T07:27:23.080Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1490,15 +1451,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 104,
+                      "duration": 123,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:04.832Z",
+                      "startTime": "2025-10-21T07:27:23.209Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1524,15 +1485,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1078,
+                      "duration": 1104,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:04.943Z",
+                      "startTime": "2025-10-21T07:27:23.337Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1558,15 +1519,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 937,
+                      "duration": 770,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:06.026Z",
+                      "startTime": "2025-10-21T07:27:24.448Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1592,15 +1553,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 708,
+                      "duration": 471,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:06.967Z",
+                      "startTime": "2025-10-21T07:27:25.224Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1626,15 +1587,15 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1639,
+                      "duration": 5101,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:07.682Z",
+                      "startTime": "2025-10-21T07:27:25.708Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1677,7 +1638,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1685,7 +1646,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.330Z",
+                      "startTime": "2025-10-21T07:27:30.819Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1711,7 +1672,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1719,7 +1680,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.335Z",
+                      "startTime": "2025-10-21T07:27:30.825Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1745,7 +1706,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1753,7 +1714,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.339Z",
+                      "startTime": "2025-10-21T07:27:30.830Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1779,7 +1740,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1787,7 +1748,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.343Z",
+                      "startTime": "2025-10-21T07:27:30.835Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1813,7 +1774,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1821,7 +1782,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.346Z",
+                      "startTime": "2025-10-21T07:27:30.839Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1855,7 +1816,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1863,7 +1824,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.350Z",
+                      "startTime": "2025-10-21T07:27:30.842Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1889,7 +1850,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1897,7 +1858,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.354Z",
+                      "startTime": "2025-10-21T07:27:30.847Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1923,7 +1884,7 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 3,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
                       "duration": 0,
@@ -1931,7 +1892,7 @@
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2025-10-21T05:16:09.358Z",
+                      "startTime": "2025-10-21T07:27:30.850Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1951,11 +1912,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2025-10-21T05:13:17.237Z",
-    "duration": 172253.063,
-    "expected": 47,
-    "skipped": 0,
-    "unexpected": 3,
+    "startTime": "2025-10-21T07:24:21.532Z",
+    "duration": 189377.397,
+    "expected": 45,
+    "skipped": 5,
+    "unexpected": 0,
     "flaky": 0
   }
 }
