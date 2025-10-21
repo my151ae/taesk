@@ -344,6 +344,10 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByText('New Card').first().click();
     await page.waitForTimeout(300);
 
+    // Ensure Details tab is active
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.waitForTimeout(200);
+
     // Wait for modal and edit title
     const titleInput = page.locator('input[placeholder="Card title"]');
     await titleInput.waitFor({ state: 'visible' });
@@ -421,6 +425,10 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Edit Card')).toBeVisible();
 
+    // Ensure Details tab is active
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.waitForTimeout(200);
+
     // Verify Delete button exists
     const deleteButton = page.getByRole('button', { name: 'Delete', exact: true });
     await expect(deleteButton).toBeVisible();
@@ -464,6 +472,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.waitForTimeout(300);
 
     await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Ensure Details tab is active
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.waitForTimeout(200);
+
     await expect(page.getByLabel('Assignee', { exact: true })).toBeVisible();
 
     const assigneeSearchInput = page.getByLabel('Assignee search');
@@ -492,6 +505,11 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     await cardLocator.click();
     await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Ensure Details tab is active
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.waitForTimeout(200);
+
     if (assigneeIdSupported) {
       await expect(assigneeSelect).toHaveValue(TEST_USER_ID);
     }
