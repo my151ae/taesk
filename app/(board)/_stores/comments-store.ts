@@ -204,6 +204,16 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
     const tempId = getTempId();
     const now = new Date().toISOString();
 
+    const fallbackDisplayName = (authorProfile?.full_name && authorProfile.full_name.trim().length > 0)
+      ? authorProfile.full_name.trim()
+      : authorProfile?.email ?? 'Unknown user';
+    const fallbackAuthor: ProfileSummary = {
+      id: authorId ?? 'unknown',
+      full_name: fallbackDisplayName,
+      avatar_url: authorProfile?.avatar_url ?? null,
+      email: authorProfile?.email ?? null,
+    };
+
     const optimistic: BoardComment = {
       id: tempId,
       card_id: cardId,
@@ -214,12 +224,7 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
       created_at: now,
       updated_at: now,
       deleted_at: null,
-      author: authorProfile ?? {
-        id: authorId ?? 'unknown',
-        full_name: authorProfile?.full_name ?? authorProfile?.email ?? 'Unknown user',
-        avatar_url: authorProfile?.avatar_url ?? null,
-        email: authorProfile?.email ?? null,
-      },
+      author: authorProfile ?? fallbackAuthor,
       optimistic: true,
       idempotencyKey,
     };
