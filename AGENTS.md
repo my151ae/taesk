@@ -1,11 +1,11 @@
 # Repository Guidelines
 
-> **最優先ルール（テスト実行）**
-> - `npx playwright test --reporter=json` で **必ず JSON 出力に保存**し、そのファイルを解析すること。
-> - `NODE_ENV=test npm run dev` などのサーバー起動・手動検証コマンド、Playwright 実行時に JSON を出さない手法は **全面禁止**。どうしても必要な場合はユーザー許可を得ること。
-> - テスト結果を確認せずに止まらないよう、必ず JSON ファイルを生成・確認し、失敗時は解析用スクリプト（例: `python - ... json.loads`）で詳細を抽出する。
-> - 上記に違反するコマンドや手順は今後一切行わないこと。
-> - `npx playwright test --reporter=list` は CLI がフリーズして結果取得できなくなるため **禁止**（JSON レポートのみ使用）。
+> **最優先ルール（テスト・ログ取得）**
+> - いかなる理由でも `npm run dev` および `NODE_ENV=test npm run dev` を **絶対に実行しない**。サーバーを直接起動しての手動検証・ログ確認も禁止。
+> - Playwright を含むすべての検証・テストは `npx playwright test --reporter=json` のように **必ず JSON レポートを出力**して解析すること。
+> - テスト結果やログ確認で停止せずに済むよう、JSON ファイルを生成したうえで内容を確認し、失敗時は解析用スクリプト（例: `python - ... json.loads`）で詳細を抽出する。
+> - 上記方針に反するコマンド・手順は今後一切行わない。
+> - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
 
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
@@ -25,7 +25,7 @@ Shared utilities such as the Supabase client, board/card helpers, and sync queue
 - Cards/lists reorder API routes now validate duplicate/foreign IDs, check board ownership, and roll back to the previous snapshot on failure; send only position (and optional `list_id`) when reordering.
 
 ## Build, Test, and Development Commands
-Use `npm run dev` for the local Next.js server on port 3000. Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
+`npm run dev` は全面禁止。ローカルでの挙動確認やログ取得も Playwright テストなどの JSON レポート経由で実施すること。Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
 
 テスト結果だけ確認したい場合は `npx playwright test --reporter=json` を利用するとターミナルで完結して結果を取得できる。HTML レポートを開きたい場合は `npx playwright show-report --port=0` を推奨（または事前に `lsof -i :9323` で既存の show-report プロセスを停止してから実行）し、終了時は `Ctrl+C` でサーバーを明示的に止める。
 
@@ -47,4 +47,4 @@ Write short, imperative commit messages (English or Japanese), mirroring existin
 Never commit real Supabase service-role keys; rely on `.env.test` copies for shared testing. Update `.env.example` whenever new variables are introduced and note authentication-sensitive changes in the global setup. Avoid destructive git commands unless explicitly requested, and leave unrelated worktree changes untouched.
 
 ## Workflow Reminders
-Before starting, skim the relevant `/docs` material and check existing implementations for similar patterns. During development, keep the dev server running, test interactions in Chrome DevTools, and address console warnings promptly. Run the appropriate npm scripts before handing off work, and document notable deviations in the PR description.
+Before starting, skim the relevant `/docs` material and check existing implementations for similar patterns. 開発中は Playwright テストの JSON レポートを継続的に確認し、必要な挙動差分はテスト結果とログ解析で把握する。Run the appropriate npm scripts before handing off work, and document notable deviations in the PR description.
