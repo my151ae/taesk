@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { Comment, CommentWithAuthor } from '@/lib/supabase';
+import { createCommentNotifications } from '@/lib/server/notifications';
 
 // GET /api/cards/[cardId]/comments - List comments for a card
 export async function GET(
@@ -202,9 +203,57 @@ export async function POST(
       );
     }
 
-    // TODO: Create notifications for mentions
-    if (mentions && mentions.length > 0) {
-      // This will be implemented in the notifications route
+    // Get card's board_id for notifications
+    const { data: cardData } = await supabase
+      .from('cards')
+      .select('board_id')
+      .eq('id', cardId)
+      .single();
+
+    // Get sender name
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', user.id)
+      .single();
+
+    const senderName = senderProfile?.full_name || senderProfile?.email || 'Unknown';
+
+    // Create notifications
+    if (cardData) {
+      try {
+        // Mention notifications
+        if (mentions && mentions.length > 0) {
+          await createCommentNotifications(
+            supabase,
+            {
+              event: 'mention',
+              commentId: newComment.id,
+              cardId,
+              boardId: cardData.board_id,
+              senderId: user.id,
+              recipientIds: mentions,
+            },
+            senderName
+          );
+        }
+
+        // Comment notification (for card participants)
+        await createCommentNotifications(
+          supabase,
+          {
+            event: parent_id ? 'comment_replied' : 'comment_created',
+            commentId: newComment.id,
+            cardId,
+            boardId: cardData.board_id,
+            senderId: user.id,
+          },
+          senderName
+        );
+      } catch (notifError) {
+        // Log but don't fail the comment creation
+        console.error('Error creating notifications:', notifError);
+      }
     }
 
     return NextResponse.json({ comment: newComment }, { status: 201 });
