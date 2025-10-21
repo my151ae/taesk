@@ -97,7 +97,7 @@
 | 0206 | 0% | ⚪ 未着手 |
 | 0207 | 0% | ⚪ 未着手 |
 | 0208 | 0% | ⚪ 未着手 |
-| 0209 | 0% | ⚪ 未着手 (テスト作成済み・実行待ち) |
+| 0209 | 60% | 🟡 部分完了 (ドキュメント更新済み、Push関連テストは0206以降) |
 
 ---
 
@@ -118,6 +118,20 @@
    - サーバー側UUID検証
    - カード作成者を通知受信者に追加
 
+4. **docs: update implementation status for priorities 1-4** (89614fb)
+   - 優先度1-4の完了状態を反映
+   - コミット履歴と受け入れ基準を追加
+
+5. **docs: update roadmap and architecture for Phase 3 completion** (6b67711)
+   - roadmap.md: Phase 3 コメント・通知機能完了を反映
+   - architecture.md: Comments & Notifications Architecture セクション追加
+   - Realtime購読、メンションシステム、通知生成を文書化
+
+6. **docs: update testing.md with phase3-comments test coverage** (efa78ce)
+   - phase3-comments.spec.ts のテスト内容を文書化
+   - テスト総数を56件に更新（実行51件、スキップ5件）
+   - Realtime同期テストの戦略を追加
+
 ### 受け入れ基準達成状況
 - ✅ コメント作成・編集・削除機能
 - ✅ Realtime 反映 (Supabase購読実装済み)
@@ -129,4 +143,25 @@
 
 ---
 
-**次のアクション**: 0206〜0209 (Push購読・送信・設定UI・E2E実行・ドキュメント) は別途実装予定
+## 📝 **実装完了サマリ**
+
+### ✅ 完全完了 (0202-0204)
+- **0202**: CardModal コメントUI統合 (権限管理・E2Eテスト含む)
+- **0203**: メンション機能 (UUID ベース・サーバー検証)
+- **0204**: 通知生成ルール (カード作成者・受信者解決)
+
+### 🟡 部分完了 (0209)
+- **0209**: ドキュメント更新完了 (roadmap, architecture, testing)
+  - ✅ phase3-comments E2Eテスト文書化
+  - ✅ アーキテクチャドキュメント追加
+  - ⚠️ Web Push関連テストは0206-0208実装後に追加予定
+
+### 🔴 未着手 (0205-0208)
+- **0205**: In-App通知UI刷新 (Zustand store + タブUI)
+- **0206**: Push購読 & Service Worker
+- **0207**: Edge Function Web Push送信
+- **0208**: 通知許可・設定UX
+
+---
+
+**次のアクション**: 0205-0208 (In-App UI刷新・Push通知機能) は別途実装予定
