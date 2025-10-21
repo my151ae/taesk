@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
-import { Notification } from '@/lib/supabase';
+import { supabase, Notification } from '@/lib/supabase';
+import { useAuth } from '@/app/contexts/AuthContext';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export default function NotificationsBell() {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -14,6 +17,43 @@ export default function NotificationsBell() {
       loadNotifications();
     }
   }, []);
+
+  // Realtime subscription for notifications
+  useEffect(() => {
+    if (!featureFlags.notifications || !user?.id) return;
+
+    let channel: RealtimeChannel;
+
+    const setupRealtimeSubscription = async () => {
+      // Subscribe to notifications for this user
+      channel = supabase
+        .channel(`notifications:recipient_id=${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `recipient_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('New notification received:', payload);
+            // Add new notification to the list
+            const newNotification = payload.new as Notification;
+            setNotifications((prev) => [newNotification, ...prev]);
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user?.id]);
 
   const loadNotifications = async () => {
     setLoading(true);
