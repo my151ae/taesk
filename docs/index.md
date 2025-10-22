@@ -216,9 +216,13 @@ taesk/
 - [Storage Strategy](./detail/storage.md) - Hybrid storage implementation
 - [Component Structure](./detail/components.md) - React components breakdown
 - [Routing & Card URLs](./detail/routing.md) - Intercepting Routes, modal views, canonical URLs
+- [Notifications](./detail/notifications.md) - Preferences, quiet hours, Web Push delivery
 
 ### Development
 - [Testing Guide](./detail/testing.md) - E2E testing with Playwright, best practices
+
+### Setup
+- [Local Development](./setup/local-dev.md) - Environment variables, Service Worker & push setup
 
 ### Operations
 - [Deployment Guide](./detail/deployment.md) - Vercel deployment steps

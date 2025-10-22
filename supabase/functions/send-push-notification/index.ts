@@ -14,6 +14,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import webPush from 'npm:web-push@3.5.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,9 +36,58 @@ interface NotificationPayload {
   };
 }
 
+interface QuietHoursPreference {
+  start: string;
+  end: string;
+  timezone: string;
+}
+
+function isWithinQuietHours(quietHours: QuietHoursPreference, referenceDate: Date = new Date()): boolean {
+  try {
+    if (!quietHours.start || !quietHours.end || !quietHours.timezone) {
+      return false;
+    }
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: quietHours.timezone,
+    });
+
+    const userTime = formatter.format(referenceDate);
+    const [hours, minutes] = userTime.split(':').map(Number);
+    const currentMinutes = hours * 60 + minutes;
+
+    const [startHours, startMinutes] = quietHours.start.split(':').map(Number);
+    const [endHours, endMinutes] = quietHours.end.split(':').map(Number);
+    const startTotal = startHours * 60 + startMinutes;
+    const endTotal = endHours * 60 + endMinutes;
+
+    if (Number.isNaN(startTotal) || Number.isNaN(endTotal)) {
+      return false;
+    }
+
+    if (startTotal > endTotal) {
+      return currentMinutes >= startTotal || currentMinutes < endTotal;
+    }
+
+    return currentMinutes >= startTotal && currentMinutes < endTotal;
+  } catch (error) {
+    console.error('Error evaluating quiet hours:', error);
+    return false;
+  }
+}
+
 /**
  * Send Web Push notification using web-push compatible API
  */
+interface WebPushResult {
+  success: boolean;
+  statusCode?: number;
+  error?: string;
+}
+
 async function sendWebPush(
   subscription: {
     endpoint: string;
@@ -50,27 +100,51 @@ async function sendWebPush(
     privateKey: string;
     subject: string;
   }
-): Promise<boolean> {
+): Promise<WebPushResult> {
   try {
-    // In a real implementation, you would use the web-push library
-    // For now, this is a placeholder that logs the attempt
-    console.log('Sending push notification to:', subscription.endpoint);
-    console.log('Payload:', payload);
+    const response = await webPush.sendNotification(
+      {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+        },
+      },
+      payload,
+      {
+        vapidDetails: {
+          subject: vapidDetails.subject,
+          publicKey: vapidDetails.publicKey,
+          privateKey: vapidDetails.privateKey,
+        },
+        TTL: 60,
+      },
+    );
 
-    // TODO: Implement actual Web Push API call
-    // This requires:
-    // 1. VAPID authentication
-    // 2. Encryption of payload
-    // 3. HTTP/2 request to push service endpoint
+    const statusCode = typeof response?.statusCode === 'number' ? response.statusCode : undefined;
+    if (statusCode && statusCode >= 400) {
+      return {
+        success: false,
+        statusCode,
+        error: typeof response?.body === 'string' ? response.body : 'Push service responded with error',
+      };
+    }
 
-    // For MVP, we'll return true
-    // In production, use a library like web-push (npm package)
-    // or implement the Web Push protocol manually
-
-    return true;
+    return { success: true, statusCode };
   } catch (error) {
     console.error('Error sending push notification:', error);
-    return false;
+    const statusCode = typeof (error as { statusCode?: number }).statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : undefined;
+    const errorMessage = (error as { body?: string }).body
+      || (error as { message?: string }).message
+      || String(error);
+
+    return {
+      success: false,
+      statusCode,
+      error: errorMessage,
+    };
   }
 }
 
@@ -102,12 +176,40 @@ Deno.serve(async (req) => {
       );
     }
 
+    webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse notification payload
     const notificationData: NotificationPayload = await req.json();
 
     console.log('Processing notification:', notificationData);
+
+    const { data: recipientPrefs, error: prefsError } = await supabase
+      .from('notification_preferences')
+      .select('web_push_enabled, quiet_hours')
+      .eq('profile_id', notificationData.recipient_id)
+      .maybeSingle();
+
+    if (prefsError) {
+      console.error('Failed to load notification preferences:', prefsError);
+    }
+
+    if (!recipientPrefs || recipientPrefs.web_push_enabled !== true) {
+      console.log('Web Push disabled for user:', notificationData.recipient_id);
+      return new Response(
+        JSON.stringify({ success: true, message: 'Web Push disabled' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (recipientPrefs.quiet_hours && isWithinQuietHours(recipientPrefs.quiet_hours as QuietHoursPreference)) {
+      console.log('Quiet hours active for user:', notificationData.recipient_id);
+      return new Response(
+        JSON.stringify({ success: true, message: 'Quiet hours active' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get all push subscriptions for the recipient
     const { data: subscriptions, error: subsError } = await supabase
@@ -147,52 +249,123 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Send push notification to all subscriptions
-    const results = await Promise.allSettled(
-      subscriptions.map((sub) =>
-        sendWebPush(
-          {
-            endpoint: sub.endpoint,
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-          pushPayload,
-          {
-            publicKey: vapidPublicKey,
-            privateKey: vapidPrivateKey,
-            subject: vapidSubject,
-          }
-        )
-      )
-    );
+    const rateLimitPerMinute = parseInt(Deno.env.get('PUSH_RATE_LIMIT_PER_MINUTE') ?? '10', 10);
+    const summary = { sent: 0, failed: 0, skipped: 0 };
 
-    // Count successes and failures
-    const successful = results.filter((r) => r.status === 'fulfilled' && r.value).length;
-    const failed = results.length - successful;
+    for (const sub of subscriptions) {
+      const subscriptionId = sub.id as string | undefined;
+      if (!subscriptionId) {
+        console.warn('Subscription without ID encountered, skipping');
+        summary.skipped += 1;
+        continue;
+      }
 
-    // Clean up failed subscriptions (endpoint no longer valid)
-    if (failed > 0) {
-      const failedIndices = results
-        .map((r, i) => (r.status === 'rejected' ? i : -1))
-        .filter((i) => i !== -1);
+      // Skip if this notification was already delivered to this subscription
+      const { data: existingLog, error: existingLogError } = await supabase
+        .from('notification_delivery_logs')
+        .select('id')
+        .eq('notification_id', notificationData.notification_id)
+        .eq('subscription_id', subscriptionId)
+        .maybeSingle();
 
-      for (const index of failedIndices) {
-        const failedSub = subscriptions[index];
-        console.log('Removing invalid subscription:', failedSub.endpoint);
-        await supabase
-          .from('push_subscriptions')
-          .delete()
-          .eq('id', failedSub.id);
+      if (existingLogError) {
+        console.error('Failed to check existing delivery log:', existingLogError);
+      }
+
+      if (existingLog) {
+        console.log('Notification already delivered to subscription, skipping:', subscriptionId);
+        summary.skipped += 1;
+        continue;
+      }
+
+      // Rate limiting per subscription
+      const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+      const { count: recentCount, error: recentError } = await supabase
+        .from('notification_delivery_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('subscription_id', subscriptionId)
+        .gte('created_at', oneMinuteAgo);
+
+      if (recentError) {
+        console.error('Failed to check rate limit:', recentError);
+      }
+
+      if ((recentCount ?? 0) >= rateLimitPerMinute) {
+        console.log('Rate limit exceeded for subscription, skipping:', subscriptionId);
+        summary.skipped += 1;
+        await supabase.from('notification_delivery_logs').insert({
+          notification_id: notificationData.notification_id,
+          subscription_id: subscriptionId,
+          status: 'retrying',
+          error: 'rate_limit_exceeded',
+        });
+        continue;
+      }
+
+      const result = await sendWebPush(
+        {
+          endpoint: sub.endpoint,
+          p256dh: sub.p256dh,
+          auth: sub.auth,
+        },
+        pushPayload,
+        {
+          publicKey: vapidPublicKey,
+          privateKey: vapidPrivateKey,
+          subject: vapidSubject,
+        }
+      );
+
+      if (result.success) {
+        summary.sent += 1;
+        await supabase.from('notification_delivery_logs').insert({
+          notification_id: notificationData.notification_id,
+          subscription_id: subscriptionId,
+          status: 'success',
+          error: null,
+        });
+
+        await supabase.from('push_subscriptions').update({
+          last_sent_at: new Date().toISOString(),
+          failure_count: 0,
+        }).eq('id', subscriptionId);
+      } else {
+        summary.failed += 1;
+        await supabase.from('notification_delivery_logs').insert({
+          notification_id: notificationData.notification_id,
+          subscription_id: subscriptionId,
+          status: 'failure',
+          error: result.error ?? null,
+        });
+
+        const currentFailureCount = typeof sub.failure_count === 'number' ? sub.failure_count : 0;
+        const nextFailureCount = currentFailureCount + 1;
+        const shouldRemove =
+          result.statusCode === 410 ||
+          result.statusCode === 404 ||
+          nextFailureCount >= 5;
+
+        if (shouldRemove) {
+          console.log('Removing subscription due to repeated failures:', subscriptionId);
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('id', subscriptionId);
+        } else {
+          await supabase
+            .from('push_subscriptions')
+            .update({ failure_count: nextFailureCount })
+            .eq('id', subscriptionId);
+        }
       }
     }
 
-    console.log(`Push notifications sent: ${successful} successful, ${failed} failed`);
+    console.log(`Push notifications processed: ${summary.sent} sent, ${summary.failed} failed, ${summary.skipped} skipped`);
 
     return new Response(
       JSON.stringify({
-        success: true,
-        sent: successful,
-        failed,
+        success: summary.failed === 0,
+        ...summary,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

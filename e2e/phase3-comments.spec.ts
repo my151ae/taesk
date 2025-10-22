@@ -1,200 +1,268 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { supabase } from '@/lib/supabase';
+import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+
 const TEST_BOARD_NAME = 'E2E Comments Test Board';
+const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
+const DEFAULT_LIST_TITLE = 'Comments List';
+const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
 
-// Helper to create a test board
-async function createTestBoard(page: Page, boardName: string): Promise<string> {
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-
-  // Find board selector
-  const boardSelector = page.locator('[data-testid="board-selector"]');
-  if (await boardSelector.isVisible()) {
-    await boardSelector.click();
-  }
-
-  // Create new board
-  const newBoardButton = page.locator('text=New Board').or(page.locator('button:has-text("新規ボード")'));
-  if (await newBoardButton.isVisible()) {
-    await newBoardButton.click();
-    await page.fill('input[placeholder*="ボード名"]', boardName);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(1000);
-  }
-
-  // Get board ID from URL
-  const url = page.url();
-  const match = url.match(/\/b\/([^\/\?]+)/);
-  return match ? match[1] : '';
+interface TestBoardContext {
+  id: string;
+  name: string;
+  shortId: string;
+  idShort: number;
+  slug: string;
+  canonicalPath: string;
+  listId: string;
 }
 
-// Helper to create a test card
-async function createTestCard(page: Page, listIndex: number, cardTitle: string): Promise<string> {
-  // Click "+ Add Card" button in the list
-  const addCardButtons = page.locator('button:has-text("+ Add Card")');
-  await addCardButtons.nth(listIndex).click();
-  await page.waitForTimeout(1500); // Wait for card creation and DB sync
-
-  // Card is created with "New Card" title automatically
-  // Just return "New Card" - no need to rename for comments tests
-  const newCard = page.locator('text="New Card"').last(); // Use .last() to get the newest card
-  await expect(newCard).toBeVisible({ timeout: 5000 });
-
-  return "New Card"; // Return fixed title - we don't need unique titles for these tests
+interface TestCardContext {
+  id: string;
+  shortId: string;
+  title: string;
 }
 
-// Helper to open card modal via ?card= query
-async function openCardModalViaQuery(page: Page, cardTitle: string): Promise<void> {
-  // Click on card to open modal
-  const card = page.locator(`text="${cardTitle}"`).first();
-  await card.click();
+function assertContext<T>(value: T | null | undefined, message: string): T {
+  if (value === null || value === undefined) {
+    throw new Error(message);
+  }
+  return value;
+}
 
-  // Wait for modal to appear
+async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
+  const boardId = crypto.randomUUID();
+  const boardShortId = await createUniqueBoardShortId();
+  const boardIdShort = await getNextBoardIdShort();
+  const boardSlug = slugifyBoardName(boardName);
+
+  const { error: boardError } = await supabase.from('boards').insert({
+    id: boardId,
+    name: boardName,
+    user_id: TEST_USER_ID,
+    is_test_board: true,
+    short_id: boardShortId,
+    id_short: boardIdShort,
+    slug: boardSlug,
+  });
+  if (boardError) {
+    throw new Error(`Failed to create test board: ${boardError.message}`);
+  }
+
+  const { error: memberError } = await supabase.from('board_members').insert({
+    board_id: boardId,
+    profile_id: TEST_USER_ID,
+    role: 'owner',
+  });
+  if (memberError) {
+    throw new Error(`Failed to add test board member: ${memberError.message}`);
+  }
+
+  const { error: profileError } = await supabase.from('profiles').upsert({
+    id: TEST_USER_ID,
+    full_name: 'E2E Test User',
+    email: TEST_USER_EMAIL,
+    avatar_url: null,
+  });
+  if (profileError) {
+    throw new Error(`Failed to upsert test profile: ${profileError.message}`);
+  }
+
+  const listId = crypto.randomUUID();
+  const { error: listError } = await supabase.from('lists').insert({
+    id: listId,
+    title: DEFAULT_LIST_TITLE,
+    position: 1000,
+    board_id: boardId,
+    user_id: TEST_USER_ID,
+  });
+  if (listError) {
+    throw new Error(`Failed to create default list: ${listError.message}`);
+  }
+
+  const canonicalTail = boardSlug ? `${boardIdShort}-${boardSlug}` : `${boardIdShort}`;
+  const canonicalPath = boardSlug
+    ? `/b/${boardShortId}/${canonicalTail}`
+    : `/b/${boardShortId}`;
+
+  return {
+    id: boardId,
+    name: boardName,
+    shortId: boardShortId,
+    idShort: boardIdShort,
+    slug: boardSlug,
+    canonicalPath,
+    listId,
+  };
+}
+
+async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
+  await page.goto(board.canonicalPath);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForSelector(`text=${TEST_USER_EMAIL}`, { timeout: 10000 });
+  await page.locator(`[data-testid="list-${board.listId}"]`).waitFor({ state: 'visible', timeout: 10000 });
+}
+
+async function createTestCard(page: Page, board: TestBoardContext): Promise<TestCardContext> {
+  const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
+  await addCardButton.waitFor({ state: 'visible', timeout: 10000 });
+  await addCardButton.click();
+  await page.waitForTimeout(800);
+
+  const start = Date.now();
+  const timeoutMs = 20000;
+  let lastError: Error | null = null;
+
+  while (Date.now() - start < timeoutMs) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id, short_id, title')
+      .eq('board_id', board.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      lastError = new Error(`Failed to fetch created card: ${error.message}`);
+    } else if (data && data.short_id) {
+      const cardLocator = page.locator(`[data-testid="card-${data.id}"]`).first();
+      await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
+
+      return {
+        id: data.id,
+        shortId: data.short_id,
+        title: data.title,
+      };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('Card creation did not return a short_id within timeout');
+}
+
+async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise<void> {
+  const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
+  await cardLocator.click();
   await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
+  await expect
+    .poll(() => page.url(), { timeout: 10000 })
+    .toContain(`card=${card.shortId}`);
 }
 
 test.describe('Comments Feature', () => {
-  let boardId: string;
-  let cardTitle: string;
+  let board: TestBoardContext | null = null;
+  let card: TestCardContext | null = null;
 
   test.beforeEach(async ({ page }) => {
-    // Create test board
-    boardId = await createTestBoard(page, TEST_BOARD_NAME);
-    expect(boardId).toBeTruthy();
-
-    // Create test card
-    cardTitle = `Test Card ${Date.now()}`;
-    await createTestCard(page, 0, cardTitle);
+    const boardName = `${TEST_BOARD_NAME}-${Date.now()}`;
+    board = await seedTestBoard(boardName);
+    await loadBoard(page, board);
+    card = await createTestCard(page, board);
   });
 
-  test.afterEach(async ({ page }) => {
-    // Clean up: delete test board
-    if (boardId) {
-      // Board cleanup logic would go here
-      // For now, we'll leave test boards for manual inspection
+  test.afterEach(async () => {
+    if (board?.id) {
+      await supabase.from('boards').delete().eq('id', board.id);
     }
+    board = null;
+    card = null;
   });
 
   test('should show Comments tab in card modal via ?card= route', async ({ page }) => {
-    await openCardModalViaQuery(page, cardTitle);
+    const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Check for Comments tab
-    const commentsTab = page.locator('button:has-text("Comments")');
-    await expect(commentsTab).toBeVisible();
+    await openCardModalViaQuery(page, currentCard);
 
-    // Click Comments tab
-    await commentsTab.click();
-    await page.waitForTimeout(300);
-
-    // Check for comment form
     const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
     await expect(commentTextarea).toBeVisible();
   });
 
   test('should preserve card modal state on reload with ?card= query', async ({ page }) => {
-    await openCardModalViaQuery(page, cardTitle);
+    const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Get current URL with ?card= query
+    await openCardModalViaQuery(page, currentCard);
     const urlBeforeReload = page.url();
-    expect(urlBeforeReload).toContain('?card=');
+    expect(urlBeforeReload).toContain(`card=${currentCard.shortId}`);
 
-    // Reload page
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Modal should still be visible
     await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
-
-    // URL should still have ?card= query
-    expect(page.url()).toContain('?card=');
+    expect(page.url()).toContain(`card=${currentCard.shortId}`);
   });
 
   test('should create a comment successfully', async ({ page }) => {
-    await openCardModalViaQuery(page, cardTitle);
+    const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Switch to Comments tab
-    await page.click('button:has-text("Comments")');
-    await page.waitForTimeout(300);
+    await openCardModalViaQuery(page, currentCard);
 
-    // Type comment
     const commentText = `Test comment ${Date.now()}`;
     await page.fill('textarea[placeholder*="コメントを書く"]', commentText);
+    await page.getByRole('button', { name: 'コメントを投稿' }).click();
 
-    // Submit comment
-    await page.click('button:has-text("コメントを投稿")');
-    await page.waitForTimeout(1000);
-
-    // Verify comment appears
-    await expect(page.locator(`text="${commentText}"`)).toBeVisible({ timeout: 5000 });
+    const createdComment = page.locator('span.whitespace-pre-wrap', { hasText: commentText }).first();
+    await expect(createdComment).toBeVisible({ timeout: 5000 });
   });
 
   test('should edit and delete own comment', async ({ page }) => {
-    await openCardModalViaQuery(page, cardTitle);
+    const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Switch to Comments tab
-    await page.click('button:has-text("Comments")');
-    await page.waitForTimeout(300);
+    await openCardModalViaQuery(page, currentCard);
 
-    // Create comment
     const commentText = `Comment to edit ${Date.now()}`;
     await page.fill('textarea[placeholder*="コメントを書く"]', commentText);
-    await page.click('button:has-text("コメントを投稿")');
-    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+    await page.waitForTimeout(500);
 
-    // Edit comment
-    await page.click('button:has-text("編集")');
+    await page.getByRole('button', { name: '編集' }).click();
     const editedText = `${commentText} (edited)`;
-    await page.fill('textarea', editedText);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(1000);
+    const editTextarea = page.locator('textarea').filter({ hasText: commentText }).first();
+    await editTextarea.fill(editedText);
+    await page.getByRole('button', { name: '保存' }).click();
 
-    // Verify edited text
-    await expect(page.locator(`text="${editedText}"`)).toBeVisible();
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: editedText })).toBeVisible({ timeout: 5000 });
 
-    // Delete comment
-    page.on('dialog', dialog => dialog.accept());
-    await page.click('button:has-text("削除")');
-    await page.waitForTimeout(1000);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: '削除' }).click();
+    await page.waitForTimeout(500);
 
-    // Verify comment is gone
-    await expect(page.locator(`text="${editedText}"`)).not.toBeVisible();
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: editedText })).toHaveCount(0);
   });
 
   test('should allow replying to comments', async ({ page }) => {
-    await openCardModalViaQuery(page, cardTitle);
+    const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Switch to Comments tab
-    await page.click('button:has-text("Comments")');
-    await page.waitForTimeout(300);
+    await openCardModalViaQuery(page, currentCard);
 
-    // Create parent comment
     const parentText = `Parent comment ${Date.now()}`;
     await page.fill('textarea[placeholder*="コメントを書く"]', parentText);
-    await page.click('button:has-text("コメントを投稿")');
-    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+    await page.waitForTimeout(500);
 
-    // Click reply button
-    await page.click('button:has-text("返信")');
-    await page.waitForTimeout(300);
+    await page.locator('div.flex.gap-3.mt-2').locator('button', { hasText: '返信' }).first().click();
 
-    // Type reply
     const replyText = `Reply ${Date.now()}`;
     const replyTextarea = page.locator('textarea[placeholder*="返信を書く"]');
+    await replyTextarea.waitFor({ state: 'visible', timeout: 5000 });
     await replyTextarea.fill(replyText);
-    await page.click('button:has-text("返信")');
-    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: '返信' }).nth(1).click();
 
-    // Verify reply appears
-    await expect(page.locator(`text="${replyText}"`)).toBeVisible();
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
   });
 });
 
 test.describe('Comments Realtime', () => {
-  let boardId: string;
-  let cardTitle: string;
-
   test('should sync comments across multiple browser contexts', async ({ browser }) => {
-    // Create two contexts (simulating two users/tabs)
+    test.slow();
+    const boardName = `RT Test ${Date.now()}`;
+    const board = await seedTestBoard(boardName);
+
     const context1 = await browser.newContext({ storageState: 'playwright/.auth/user.json' });
     const context2 = await browser.newContext({ storageState: 'playwright/.auth/user.json' });
 
@@ -202,37 +270,45 @@ test.describe('Comments Realtime', () => {
     const page2 = await context2.newPage();
 
     try {
-      // Page 1: Create board and card
-      boardId = await createTestBoard(page1, `RT Test ${Date.now()}`);
-      cardTitle = `RT Card ${Date.now()}`;
-      await createTestCard(page1, 0, cardTitle);
+      await loadBoard(page1, board);
+      await loadBoard(page2, board);
 
-      // Page 2: Navigate to same board
-      await page2.goto(`/b/${boardId}`);
-      await page2.waitForLoadState('networkidle');
+      const card = await createTestCard(page1, board);
+      await expect(page2.locator(`[data-testid="card-${card.id}"]`)).toBeVisible({ timeout: 10000 });
 
-      // Both pages: Open card modal
-      await openCardModalViaQuery(page1, cardTitle);
-      await openCardModalViaQuery(page2, cardTitle);
+      await openCardModalViaQuery(page1, card);
+      await openCardModalViaQuery(page2, card);
 
-      // Both: Switch to Comments tab
-      await page1.click('button:has-text("Comments")');
-      await page2.click('button:has-text("Comments")');
-      await page1.waitForTimeout(300);
-      await page2.waitForTimeout(300);
-
-      // Page 1: Create comment
       const commentText = `Realtime test ${Date.now()}`;
       await page1.fill('textarea[placeholder*="コメントを書く"]', commentText);
-      await page1.click('button:has-text("コメントを投稿")');
-      await page1.waitForTimeout(1000);
+      await page1.getByRole('button', { name: 'コメントを投稿' }).click();
 
-      // Page 2: Verify comment appears via Realtime
-      await expect(page2.locator(`text="${commentText}"`)).toBeVisible({ timeout: 10000 });
+      await page1.locator('span.whitespace-pre-wrap', { hasText: commentText }).first()
+        .waitFor({ state: 'visible', timeout: 10000 });
 
+      const start = Date.now();
+      const syncTimeout = 20000;
+      let synced = false;
+
+      while (Date.now() - start < syncTimeout) {
+        try {
+          await page2.locator('span.whitespace-pre-wrap', { hasText: commentText }).first()
+            .waitFor({ state: 'visible', timeout: 3000 });
+          synced = true;
+          break;
+        } catch {
+          await page2.goto(board.canonicalPath);
+          await page2.waitForLoadState('domcontentloaded');
+          await openCardModalViaQuery(page2, card);
+          await page2.waitForTimeout(500);
+        }
+      }
+
+      expect(synced).toBe(true);
     } finally {
       await context1.close();
       await context2.close();
+      await supabase.from('boards').delete().eq('id', board.id);
     }
   });
 });

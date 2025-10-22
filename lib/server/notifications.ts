@@ -1,11 +1,14 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
+import type { QuietHoursPreference } from '@/lib/supabase';
+
 export type NotificationType =
   | 'comment_created'
   | 'comment_replied'
   | 'mention'
   | 'assignee_changed'
-  | 'due_soon';
+  | 'due_soon'
+  | 'test';
 
 export interface CommentNotificationEvent {
   event: 'comment_created' | 'comment_replied' | 'mention';
@@ -24,10 +27,59 @@ interface CreateNotificationParams {
   dedupeKey?: string;
 }
 
+interface CreateNotificationResult {
+  data: any;
+  isDuplicate: boolean;
+  skipped: boolean;
+}
+
+export function isWithinQuietHours(
+  quietHours: QuietHoursPreference,
+  referenceDate: Date = new Date()
+): boolean {
+  try {
+    if (!quietHours.start || !quietHours.end || !quietHours.timezone) {
+      return false;
+    }
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: quietHours.timezone,
+    });
+
+    const userTime = formatter.format(referenceDate);
+    const [hours, minutes] = userTime.split(':').map(Number);
+    const currentMinutes = hours * 60 + minutes;
+
+    const [startHours, startMinutes] = quietHours.start.split(':').map(Number);
+    const [endHours, endMinutes] = quietHours.end.split(':').map(Number);
+    const startTotal = startHours * 60 + startMinutes;
+    const endTotal = endHours * 60 + endMinutes;
+
+    if (Number.isNaN(startTotal) || Number.isNaN(endTotal)) {
+      return false;
+    }
+
+    if (startTotal > endTotal) {
+      // Overnight quiet hours (e.g., 22:00 - 07:00)
+      return currentMinutes >= startTotal || currentMinutes < endTotal;
+    }
+
+    return currentMinutes >= startTotal && currentMinutes < endTotal;
+  } catch (error) {
+    console.error('Error evaluating quiet hours:', error);
+    return false;
+  }
+}
+
 /**
  * Create a notification with deduplication support
  */
-export async function createNotification(params: CreateNotificationParams) {
+export async function createNotification(
+  params: CreateNotificationParams
+): Promise<CreateNotificationResult> {
   const { supabase, type, recipientId, payload, dedupeKey } = params;
 
   // Generate dedupe key if not provided
@@ -36,6 +88,26 @@ export async function createNotification(params: CreateNotificationParams) {
     `${type}:${recipientId}:${payload.comment_id || ''}:${payload.card_id || ''}`;
 
   try {
+    const { data: prefs, error: prefsError } = await supabase
+      .from('notification_preferences')
+      .select('in_app_enabled, quiet_hours')
+      .eq('profile_id', recipientId)
+      .maybeSingle();
+
+    if (prefsError) {
+      console.error('Error fetching notification preferences:', prefsError);
+    }
+
+    if (prefs && prefs.in_app_enabled === false) {
+      console.log(`In-app notifications disabled for ${recipientId}, skipping`);
+      return { data: null, isDuplicate: false, skipped: true };
+    }
+
+    if (prefs?.quiet_hours && isWithinQuietHours(prefs.quiet_hours)) {
+      console.log(`User ${recipientId} is within quiet hours, skipping notification`);
+      return { data: null, isDuplicate: false, skipped: true };
+    }
+
     const { data, error } = await supabase
       .from('notifications')
       .insert({
@@ -51,12 +123,12 @@ export async function createNotification(params: CreateNotificationParams) {
       // Check if it's a unique constraint violation (duplicate dedupe_key)
       if (error.code === '23505') {
         console.log(`Notification with dedupe_key "${finalDedupeKey}" already exists, skipping`);
-        return { data: null, isDuplicate: true };
+        return { data: null, isDuplicate: true, skipped: false };
       }
       throw error;
     }
 
-    return { data, isDuplicate: false };
+    return { data, isDuplicate: false, skipped: false };
   } catch (error) {
     console.error('Error creating notification:', error);
     throw error;
@@ -134,6 +206,8 @@ export function generateNotificationMessage(
       return `You were assigned to card: ${payload.card_title || 'Untitled'}`;
     case 'due_soon':
       return `Card due soon: ${payload.card_title || 'Untitled'}`;
+    case 'test':
+      return payload.message || 'Test notification';
     default:
       return 'New notification';
   }
@@ -186,14 +260,15 @@ export async function createCommentNotifications(
       })
     );
 
-    const created = notifications.filter((n) => !n.isDuplicate).length;
+    const created = notifications.filter((n) => !n.isDuplicate && !n.skipped).length;
     const duplicates = notifications.filter((n) => n.isDuplicate).length;
+    const skipped = notifications.filter((n) => n.skipped).length;
 
     console.log(
-      `Created ${created} notifications (${duplicates} duplicates skipped) for ${event.event}`
+      `Created ${created} notifications (${duplicates} duplicates skipped, ${skipped} suppressed) for ${event.event}`
     );
 
-    return { created, duplicates };
+    return { created, duplicates, skipped };
   } catch (error) {
     console.error('Error creating comment notifications:', error);
     throw error;

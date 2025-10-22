@@ -259,4 +259,21 @@ export interface PushSubscription {
   p256dh: string;
   auth: string;
   created_at: string;
+  last_sent_at: string | null;
+  failure_count: number | null;
+}
+
+export interface QuietHoursPreference {
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  timezone: string;
+}
+
+export interface NotificationPreferences {
+  profile_id: string;
+  in_app_enabled: boolean;
+  web_push_enabled: boolean;
+  quiet_hours: QuietHoursPreference | null;
+  created_at: string;
+  updated_at: string;
 }
