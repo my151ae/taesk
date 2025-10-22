@@ -1440,6 +1440,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       priority: 'medium',
       assigned_to: null,
       assignee_id: null,
+      assignee_ids: null,
       short_id: shortId,
       id_short: idShort,
       slug,

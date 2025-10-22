@@ -104,7 +104,7 @@ export async function subscribeToPushNotifications(
     const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: convertedVapidKey,
+      applicationServerKey: convertedVapidKey as BufferSource,
     });
 
     console.log('Push subscription created:', subscription);
