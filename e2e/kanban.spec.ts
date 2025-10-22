@@ -344,11 +344,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await page.getByText('New Card').first().click();
     await page.waitForTimeout(300);
 
-    // Ensure Details tab is active
-    await page.getByRole('button', { name: 'Details' }).click();
-    await page.waitForTimeout(200);
-
-    // Wait for modal and edit title
+    // Wait for modal and edit title (no tabs in new UI)
     const titleInput = page.locator('input[placeholder="Card title"]');
     await titleInput.waitFor({ state: 'visible' });
 
@@ -425,11 +421,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Edit Card')).toBeVisible();
 
-    // Ensure Details tab is active
-    await page.getByRole('button', { name: 'Details' }).click();
-    await page.waitForTimeout(200);
-
-    // Verify Delete button exists
+    // Verify Delete button exists (no tabs in new UI)
     const deleteButton = page.getByRole('button', { name: 'Delete', exact: true });
     await expect(deleteButton).toBeVisible();
 
@@ -454,7 +446,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
-  test('should assign and clear a card assignee', async ({ page }) => {
+  test('should assign and clear card members (multi-assignee)', async ({ page }) => {
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(300);
 
@@ -464,7 +456,6 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     const recentCards = await waitForCardRows<{ id: string }>(testBoardId, 'id');
     const createdCardId = recentCards[0].id;
-    const assigneeIdSupported = await ensureAssigneeIdSupport();
 
     const cardLocator = page.locator(`[data-testid="card-${createdCardId}"]`).first();
     await cardLocator.waitFor({ state: 'visible' });
@@ -473,80 +464,76 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Ensure Details tab is active
-    await page.getByRole('button', { name: 'Details' }).click();
+    // New UI: No tabs, Members section is in left column
+    const membersLabel = page.getByText('Members', { exact: true });
+    await expect(membersLabel).toBeVisible();
+
+    // Click "+" button to add member
+    const addMemberButton = page.locator('button[aria-label="Add member"]');
+    await addMemberButton.click();
     await page.waitForTimeout(200);
 
-    await expect(page.getByLabel('Assignee', { exact: true })).toBeVisible();
+    // Search and select member from dropdown
+    const memberSearchInput = page.getByPlaceholder('Search members...');
+    await memberSearchInput.fill('E2E');
+    await page.waitForTimeout(200);
 
-    const assigneeSearchInput = page.getByLabel('Assignee search');
-    const assigneeSelect = page.getByLabel('Assignee', { exact: true });
-    await assigneeSearchInput.fill('E2E');
-    await assigneeSelect.selectOption(TEST_USER_ID);
+    // Click on the E2E user in the dropdown
+    await page.getByText('e2e.taesk.test@gmail.com').first().click();
+    await page.waitForTimeout(300);
+
+    // Save the card
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });
 
-    if (assigneeIdSupported) {
-      await expect.poll(async () => {
-        const { data, error } = await supabase
-          .from('cards')
-          .select('assignee_id, assigned_to')
-          .eq('id', createdCardId)
-          .maybeSingle();
+    // Verify assignee_ids array contains the user
+    await expect.poll(async () => {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('assignee_id, assignee_ids, assigned_to')
+        .eq('id', createdCardId)
+        .maybeSingle();
 
-        if (error) {
-          throw new Error(error.message);
-        }
+      if (error) {
+        throw new Error(error.message);
+      }
 
-        return data?.assignee_id ?? null;
-      }, { timeout: 10000 }).not.toBeNull();
-    }
+      return data?.assignee_ids ?? [];
+    }, { timeout: 10000 }).toContain(TEST_USER_ID);
 
+    // Reopen card and verify member chip is visible
     await cardLocator.click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Ensure Details tab is active
-    await page.getByRole('button', { name: 'Details' }).click();
+    // Verify member chip is displayed (look for email or name in chip)
+    const memberChipContainer = page.locator('.group.relative.inline-flex');
+    await expect(memberChipContainer.first()).toBeVisible();
+
+    // Hover over chip and click remove button
+    await memberChipContainer.first().hover();
     await page.waitForTimeout(200);
+    const removeButton = memberChipContainer.first().locator('button').first();
+    await removeButton.click();
+    await page.waitForTimeout(300);
 
-    if (assigneeIdSupported) {
-      await expect(assigneeSelect).toHaveValue(TEST_USER_ID);
-    }
-
-    await assigneeSelect.selectOption('');
+    // Save the card
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 2000 });
 
-    if (assigneeIdSupported) {
-      await expect.poll(async () => {
-        const { data, error } = await supabase
-          .from('cards')
-          .select('assignee_id, assigned_to')
-          .eq('id', createdCardId)
-          .maybeSingle();
+    // Verify assignee_ids is null or empty
+    await expect.poll(async () => {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('assignee_id, assignee_ids, assigned_to')
+        .eq('id', createdCardId)
+        .maybeSingle();
 
-        if (error) {
-          throw new Error(error.message);
-        }
+      if (error) {
+        throw new Error(error.message);
+      }
 
-        return data;
-      }, { timeout: 10000 }).toMatchObject({ assignee_id: null, assigned_to: null });
-    } else {
-      await expect.poll(async () => {
-        const { data, error } = await supabase
-          .from('cards')
-          .select('assigned_to')
-          .eq('id', createdCardId)
-          .maybeSingle();
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        return data;
-      }, { timeout: 10000 }).toMatchObject({ assigned_to: null });
-    }
+      return data;
+    }, { timeout: 10000 }).toMatchObject({ assignee_id: null, assignee_ids: null, assigned_to: null });
   });
 
   test('should drag and drop a card within the same list', async ({ page }) => {
