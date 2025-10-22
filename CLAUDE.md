@@ -8,20 +8,31 @@
 - **Frontend**: Next.js 15 (App Router), React 18, TypeScript
 - **Styling**: Tailwind CSS 3
 - **Drag & Drop**: @dnd-kit/core + @dnd-kit/sortable
+- **State Management**: Zustand (for comments & notifications)
+- **Validation**: Zod
 - **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth (@supabase/ssr)
 - **Storage**: Hybrid (Supabase + localStorage)
+- **Edge Functions**: Supabase Edge Functions (Web Push)
+- **Cache**: Vercel KV
 - **Testing**: Playwright (E2E)
 - **Deployment**: Vercel
 
 ### Key Features
 - ✅ Google Authentication (Supabase Auth)
-- ✅ Shared team board (all authenticated users collaborate)
+- ✅ Board sharing & permissions (owner/editor/commenter/viewer)
 - ✅ Drag & drop cards and lists
 - ✅ Inline editing of cards and lists
+- ✅ Multi-assignee support
+- ✅ Comments system with threaded replies
+- ✅ @Mentions with typeahead
+- ✅ In-app notifications (real-time)
+- ✅ Web Push notifications with preferences
+- ✅ Quiet hours & timezone support
 - ✅ Hybrid storage (offline-first)
 - ✅ Mobile-responsive with PWA support
 - ✅ Auto-save to Supabase
-- ✅ E2E test coverage
+- ✅ Comprehensive E2E test coverage
 
 ## Documentation
 
@@ -113,12 +124,20 @@ Claude: [commits and pushes]
 app/layout.tsx
 └── app/(board)/layout.tsx (@modal parallel route)
     └── KanbanBoardClient (client component)
-        ├── Header (board selector, filters, sync status)
+        ├── Header
+        │   ├── Board selector & create board
+        │   ├── Search & filters (tags, priority, assignees)
+        │   ├── NotificationsBell (in-app notifications)
+        │   ├── NotificationSettings (preferences, quiet hours, Web Push)
+        │   └── Sync status (Live / Queued)
         ├── DndContext (@dnd-kit)
         │   ├── SortableList × N
+        │   │   ├── List header (title, menu, ShareDialog)
         │   │   └── SortableCard × M
-        │   └── “+ Add List” button
+        │   └── "+ Add List" button
         └── CardModal (selectedCardId が存在するときのみ)
+            ├── Details tab (title, description, tags, due date, priority, assignees)
+            └── Comments tab (CommentsPanel with @Mentions)
 ```
 
 ### Data Flow
@@ -145,10 +164,20 @@ Offline? → `addToSyncQueue({ type, table, data })`
 
 ### Tables (key fields)
 
+**Core Tables:**
 - **boards**: `id`, `name`, `short_id`, `id_short`, `slug`, `is_test_board`, timestamps
 - **lists**: `id`, `title`, `position`, `board_id`, `user_id`, timestamps
-- **cards**: `id`, `title`, `description`, `list_id`, `board_id`, `tags[]`, `due_date`, `priority`, `assignee_id`, `short_id`, `id_short`, `slug`, timestamps（`assigned_to` は legacy）
+- **cards**: `id`, `title`, `description`, `list_id`, `board_id`, `tags[]`, `due_date`, `priority`, `assignee_id`, `assignee_ids[]`, `short_id`, `id_short`, `slug`, timestamps
+- **profiles**: `id`, `full_name`, `avatar_url`, `email`, timestamps
 - **activity_logs**: ボードごとの監査ログ（`action`, `entity_type`, `details`）
+
+**Collaboration Tables (Phase 3):**
+- **board_members**: `board_id`, `profile_id`, `role` (owner/editor/commenter/viewer), `created_at`
+- **board_invites**: `id`, `board_id`, `email`, `role`, `token`, `expires_at`, `accepted_at`
+- **comments**: `id`, `card_id`, `author_id`, `parent_id`, `body`, `mentions[]`, `deleted_at`, timestamps
+- **notifications**: `id`, `recipient_id`, `type`, `payload` (JSONB), `read_at`, `dedupe_key`, `created_at`
+- **push_subscriptions**: `id`, `profile_id`, `endpoint`, `p256dh`, `auth`, `user_agent`, `failure_count`, timestamps
+- **notification_delivery_logs**: `id`, `notification_id`, `subscription_id`, `status`, `error`, `created_at`
 
 ### Relationships
 
@@ -236,21 +265,40 @@ tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"
 
 ### Adding a New Feature
 
-1. Update component(s) in `app/(board)/_components/KanbanBoardClient.tsx`
-2. Add database changes if needed (migration)
+1. Update component(s) in `app/(board)/_components/KanbanBoardClient.tsx` or create new components
+2. Add database changes if needed (migration in `supabase/migrations/`)
 3. Update types in `lib/supabase.ts`
-4. Add E2E test in `e2e/kanban.spec.ts`
-5. Test with DevTools
-6. Update documentation in `/docs`
+4. If using Zustand, create or update store in `app/(board)/_stores/`
+5. Add API routes if needed in `app/api/`
+6. Add E2E test in appropriate spec file (`e2e/*.spec.ts`)
+7. Test with DevTools (console, network, Supabase data)
+8. Update documentation in `/docs`
+
+### Working with Comments & Notifications
+
+**Comments**:
+- Store: `app/(board)/_stores/comments-store.ts` (optimistic updates, offline queue)
+- UI: `app/(board)/_components/CommentsPanel.tsx` (threaded view, replies, editing)
+- API: `app/api/comments/` (CRUD, nested replies)
+- Realtime: Supabase Realtime subscription in comments store
+
+**Notifications**:
+- Store: `app/(board)/_stores/notifications-store.ts`
+- UI: `app/(board)/_components/NotificationsBell.tsx` (tabs, drawer)
+- Preferences: `app/(board)/_components/NotificationSettings.tsx`
+- API: `app/api/notifications/` (preferences, mark-read, test)
+- Server: `lib/server/notifications.ts` (creation logic, quiet hours)
+- Edge Function: `supabase/functions/send-push-notification/` (Web Push delivery)
 
 ### Fixing a Bug
 
 1. Reproduce bug in browser
 2. Check console errors
 3. Check network requests
-4. Fix code
-5. Verify with DevTools
-6. Add E2E test to prevent regression
+4. Check Supabase logs via MCP (`mcp__supabase__get_logs`)
+5. Fix code
+6. Verify with DevTools
+7. Add E2E test to prevent regression
 
 ### Updating Documentation
 
@@ -258,6 +306,7 @@ When making significant changes:
 1. Update relevant `/docs/detail/*.md` files
 2. Update `/docs/index.md` if architecture changes
 3. Update this file (`CLAUDE.md`) if workflow changes
+4. Update `/docs/roadmap.md` for feature progress
 
 ## Environment Variables
 
@@ -269,6 +318,11 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
 ```
 
+Optional for Web Push notifications:
+```bash
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
+```
+
 ### Testing (`.env.test`)
 
 **Required for E2E tests** - see Testing section above for full details.
@@ -278,6 +332,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
 Set in: Vercel Project Settings → Environment Variables
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (for Web Push notifications)
+
+### Supabase Edge Functions
+
+Set in: Supabase Dashboard → Edge Functions → Secrets
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT` (e.g., `mailto:your-email@example.com`)
 
 **Note**: All `.env*` files are gitignored except `.env.example`
 
@@ -330,11 +392,15 @@ git push origin main
 ### For Claude Code
 
 1. **Always read `/docs`** before making architectural changes
-2. **Test with DevTools** before committing
+2. **Test with DevTools** before committing (console, network, Supabase data)
 3. **Don't auto-push** unless user confirms
 4. **Update docs** when making significant changes
 5. **Run E2E tests** for user-facing changes
 6. **Check Supabase data** to verify persistence
+7. **Use Zustand stores** for comments & notifications (not React state)
+8. **Check API routes** in `app/api/` before creating new ones
+9. **Test Web Push** locally requires VAPID keys in environment
+10. **Use MCP tools** to verify Supabase logs and data
 
 ### Code Style
 
@@ -352,30 +418,61 @@ taesk/
 │   ├── (board)/
 │   │   ├── page.tsx                  # / → canonical board redirect
 │   │   ├── layout.tsx                # @modal parallel route
-│   │   └── _components/KanbanBoardClient.tsx
+│   │   ├── _components/
+│   │   │   ├── KanbanBoardClient.tsx
+│   │   │   ├── NotificationsBell.tsx
+│   │   │   ├── NotificationSettings.tsx
+│   │   │   ├── CommentsPanel.tsx
+│   │   │   ├── Mention.tsx
+│   │   │   └── ShareDialog.tsx
+│   │   └── _stores/
+│   │       ├── comments-store.ts
+│   │       └── notifications-store.ts
+│   ├── api/
+│   │   ├── boards/                   # Board CRUD & data endpoints
+│   │   ├── comments/                 # Comment CRUD & replies
+│   │   ├── notifications/            # Notification preferences & mark-read
+│   │   ├── push-subscriptions/       # Web Push subscription management
+│   │   └── profiles/                 # User profile search
 │   ├── b/[short_id]/[[...slug]]/page.tsx   # Board canonical route
 │   ├── c/[short_id]/[[...slug]]/page.tsx   # Card standalone page
 │   ├── contexts/AuthContext.tsx
+│   ├── components/CardModal.tsx
 │   ├── login/page.tsx
 │   └── icon.tsx / apple-icon.tsx
 ├── lib/
-│   └── supabase.ts      # Supabase client + types
+│   ├── supabase.ts                   # Supabase client + types
+│   ├── server/
+│   │   ├── boards.ts / cards.ts
+│   │   └── notifications.ts          # Notification creation & quiet hours
+│   └── push-notifications.ts         # Web Push helpers
+├── public/
+│   ├── manifest.json                 # PWA manifest
+│   └── sw.js                         # Service Worker for push notifications
+├── supabase/
+│   ├── functions/
+│   │   └── send-push-notification/   # Edge Function for Web Push
+│   └── migrations/                   # Database migrations
 ├── e2e/
 │   ├── .setup/auth-global-setup.ts
 │   ├── auth.spec.ts / kanban.spec.ts / rls.spec.ts
-├── docs/                # Documentation
-│   ├── index.md         # Overview
-│   └── detail/          # Detailed docs
-├── public/
-│   └── manifest.json    # PWA manifest
-├── playwright.config.ts # Playwright config
-└── CLAUDE.md           # This file
+│   ├── phase3-comments.spec.ts
+│   └── phase3-webpush.spec.ts
+├── docs/                             # Documentation
+│   ├── index.md                      # Overview
+│   └── detail/                       # Detailed docs
+│       ├── notifications.md          # Notification system docs
+│       └── ...
+├── playwright.config.ts              # Playwright config
+└── CLAUDE.md                         # This file
 ```
 
 ## Version History
 
-- **v0.1.0**: Initial MVP with Supabase integration
-- **Latest**: E2E tests, comprehensive documentation
+- **v0.1.0** (Phase 1): Initial MVP with Supabase integration, basic Kanban functionality
+- **v0.2.0** (Phase 2): Multiple boards, card tags, due dates, priorities, assignees, short URLs
+- **v0.3.0** (Phase 3): Collaboration features - comments, @mentions, notifications, Web Push, board sharing
+- **Latest**: Phase 3 complete with comprehensive E2E tests and documentation
 
 ## Contact & Links
 

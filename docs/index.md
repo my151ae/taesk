@@ -60,10 +60,12 @@ tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"
 - `test-results/` - 失敗時のスクリーンショット
 - `playwright-report/` - HTML レポート
 
-**Test Coverage (50 tests)**:
-- ✅ Auth tests (5/5): Login, logout, profile
-- ✅ Kanban tests (37/37): CRUD operations, drag & drop
-- ✅ Reorder API tests (8/8): Validation, transactions, concurrent updates
+**Test Coverage**:
+- ✅ Auth tests: Login, logout, profile
+- ✅ Kanban tests: CRUD operations, drag & drop, multi-assignee
+- ✅ Reorder API tests: Validation, transactions, concurrent updates
+- ✅ Comments tests: Threaded comments, @mentions, realtime sync
+- ✅ Notifications tests: In-app notifications, Web Push delivery
 - ✅ RLS tests (optional): Permission enforcement
 
 **詳細**: [`/docs/detail/testing.md`](./detail/testing.md) を参照
@@ -112,10 +114,11 @@ tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"
 
 ### Authentication & Security
 - 🔐 **Google OAuth** authentication via Supabase Auth
-- 👥 **Shared team board** - all authenticated users can collaborate
+- 👥 **Board sharing & permissions** - owner/editor/commenter/viewer roles
 - 🛡️ **Protected routes** - automatic redirect to login
 - 🚪 **Sign out** functionality with instant feedback
-- 💾 **User tracking** - user_id stored for future personal board features
+- 💾 **User tracking** - user_id stored for personal board features
+- 🔒 **Row Level Security (RLS)** - role-based access control
 
 ### Core Functionality
 - ✅ **Create, Read, Update, Delete** lists and cards
@@ -128,6 +131,16 @@ tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"
 - ✅ **Modal card view** with Intercepting Routes (board context preserved)
 - ✅ **Standalone card pages** for direct URL access and sharing
 - ✅ **308 Permanent Redirect** for canonical URL normalization
+- ✅ **Multi-assignee support** - assign multiple users to cards
+
+### Collaboration Features (Phase 3)
+- 💬 **Comments system** - threaded comments with replies
+- 📢 **@Mentions** - mention users in comments with typeahead
+- 🔔 **In-app notifications** - real-time notifications for mentions and comments
+- 📲 **Web Push notifications** - browser push notifications with user preferences
+- 🔕 **Quiet hours** - configure notification quiet hours with timezone support
+- 👥 **Board member management** - add/remove members and manage roles
+- 🔄 **Real-time sync** - Supabase Realtime for live comment updates
 
 ### UX Features
 - 📱 **Mobile-responsive** design with optimized touch interactions
@@ -152,12 +165,17 @@ tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"
 - **UI Library**: React 18
 - **Styling**: Tailwind CSS 3
 - **Drag & Drop**: @dnd-kit/core + @dnd-kit/sortable
+- **State Management**: Zustand (for comments & notifications)
+- **Validation**: Zod
 - **Language**: TypeScript 5
 
 ### Backend
 - **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth (@supabase/ssr)
 - **ORM**: Supabase Client (@supabase/supabase-js)
 - **Storage**: Hybrid (Supabase + localStorage)
+- **Edge Functions**: Supabase Edge Functions (for Web Push)
+- **Cache**: Vercel KV
 
 ### DevOps
 - **Testing**: Playwright (E2E)
@@ -174,30 +192,56 @@ taesk/
 │   │   ├── page.tsx                       # Redirects top-level / → canonical board URL
 │   │   ├── layout.tsx                     # Provides @modal parallel route for card modal
 │   │   ├── _components/
-│   │   │   └── KanbanBoardClient.tsx      # Core Kanban experience (lists/cards/realtime)
+│   │   │   ├── KanbanBoardClient.tsx      # Core Kanban experience (lists/cards/realtime)
+│   │   │   ├── NotificationsBell.tsx      # Notification center UI (tabs/drawer)
+│   │   │   ├── NotificationSettings.tsx   # Notification preferences & quiet hours
+│   │   │   ├── CommentsPanel.tsx          # Comments UI with replies & editing
+│   │   │   ├── Mention.tsx                # @Mention component with typeahead
+│   │   │   └── ShareDialog.tsx            # Board member management UI
+│   │   ├── _stores/
+│   │   │   ├── comments-store.ts          # Zustand store for comments (optimistic updates)
+│   │   │   └── notifications-store.ts     # Zustand store for notifications
 │   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Intercept hook (locks scroll)
 │   │   └── b/[short_id]/[[...slug]]/page.tsx             # SSR + data hydration for boards
-│   ├── b/[short_id]/[[...slug]]/page.tsx                  # Canonical board route resolver
-│   ├── c/[short_id]/[[...slug]]/page.tsx                  # Standalone card detail page
-│   ├── contexts/AuthContext.tsx                           # Supabase auth provider
-│   ├── login/page.tsx                                     # Supabase OAuth entry
-│   ├── auth/callback/route.ts                             # OAuth callback handler
-│   ├── layout.tsx                                         # Root layout, PWA setup
-│   └── icon.tsx / apple-icon.tsx                          # Manifest-driven icons
+│   ├── api/
+│   │   ├── boards/                        # Board CRUD & data endpoints
+│   │   ├── comments/                      # Comment CRUD & nested replies
+│   │   ├── notifications/                 # Notification preferences & mark-read
+│   │   ├── push-subscriptions/            # Web Push subscription management
+│   │   └── profiles/                      # User profile search
+│   ├── b/[short_id]/[[...slug]]/page.tsx  # Canonical board route resolver
+│   ├── c/[short_id]/[[...slug]]/page.tsx  # Standalone card detail page
+│   ├── contexts/AuthContext.tsx           # Supabase auth provider
+│   ├── components/CardModal.tsx           # Card modal with Details/Comments tabs
+│   ├── login/page.tsx                     # Supabase OAuth entry
+│   ├── auth/callback/route.ts             # OAuth callback handler
+│   ├── layout.tsx                         # Root layout, PWA setup
+│   └── icon.tsx / apple-icon.tsx          # Manifest-driven icons
 │
 ├── lib/
 │   ├── supabase.ts                    # Typed client + DB interfaces
 │   ├── board-utils.ts / card-utils.ts # Short IDs, slug generation, sequencing
 │   ├── board-url.ts / card-url.ts     # URL builders + canonical helpers
-│   ├── server/boards.ts / cards.ts    # Server utilities for data fetch & normalize
+│   ├── server/
+│   │   ├── boards.ts / cards.ts       # Server utilities for data fetch & normalize
+│   │   └── notifications.ts           # Notification creation & quiet hours logic
+│   ├── push-notifications.ts          # Web Push helper functions
 │   └── syncQueue.ts                   # Offline queue + background sync helpers
 │
-├── public/                             # Static assets (PWA manifest, icons)
-│   └── manifest.json
+├── public/                             # Static assets (PWA manifest, icons, Service Worker)
+│   ├── manifest.json
+│   └── sw.js                           # Service Worker for push notifications
+│
+├── supabase/
+│   ├── functions/
+│   │   └── send-push-notification/    # Edge Function for Web Push delivery
+│   └── migrations/                     # Database migration files
 │
 ├── e2e/
 │   ├── .setup/auth-global-setup.ts     # Programmatic Supabase sign-in
 │   ├── auth.spec.ts / kanban.spec.ts   # Playwright suites
+│   ├── phase3-comments.spec.ts         # Comments & mentions E2E tests
+│   ├── phase3-webpush.spec.ts          # Web Push notifications E2E tests
 │   └── rls.spec.ts                     # RLS バリデーション用シナリオ（必要に応じて実行）
 │
 ├── playwright/.auth/user.json          # Persisted auth state for Playwright
@@ -265,14 +309,32 @@ taesk/
 - Easy UX (one-click login)
 - Supabase handles all complexity
 
-### 5. Shared Team Board with Authentication
-**Decision**: Require authentication but allow all authenticated users to access all data
+### 5. Board Sharing & Role-Based Access Control (Phase 3)
+**Decision**: Implement granular permissions with owner/editor/commenter/viewer roles
 
 **Rationale**:
-- Team collaboration: everyone sees the same board
-- Authentication prevents anonymous vandalism
-- user_id is stored for future personal board features
-- RLS ensures only authenticated users have access
+- Flexible collaboration: different permission levels for different team members
+- Privacy: boards are only visible to invited members
+- RLS policies enforce role-based access at database level
+- Future-proof for personal boards and team workspaces
+
+### 6. Zustand for Collaboration State (Phase 3)
+**Decision**: Use Zustand stores for comments and notifications
+
+**Rationale**:
+- Optimistic updates for instant UI feedback
+- Offline queue for comments and notifications
+- Real-time sync with Supabase Realtime
+- Separation of concerns: board data vs. collaboration data
+
+### 7. Web Push with Edge Functions (Phase 3)
+**Decision**: Implement Web Push notifications using Supabase Edge Functions
+
+**Rationale**:
+- Native browser notifications for better engagement
+- Edge Functions handle VAPID key management securely
+- Quiet hours and preferences respected server-side
+- Delivery logs for observability and rate limiting
 
 ## 🔗 Quick Links
 

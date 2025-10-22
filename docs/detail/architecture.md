@@ -12,7 +12,7 @@
 │  │                                                    │  │
 │  │  • Server Components (SSR/SSG)                    │  │
 │  │  • Client Components (Interactive UI)            │  │
-│  │  • API Routes (Future: custom endpoints)         │  │
+│  │  • API Routes (boards, comments, notifications)  │  │
 │  └────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────┘
                             │
@@ -20,11 +20,13 @@
 ┌──────────────────────────────────────────────────────────┐
 │                    Application Layer                      │
 │  ┌─────────────────────┐    ┌─────────────────────────┐  │
-│  │  React Components   │    │  Custom Hooks           │  │
+│  │  React Components   │    │  State Management       │  │
 │  │                     │    │                         │  │
-│  │  • KanbanBoardClient │   │  • useSensor            │  │
-│  │  • SortableList     │    │  • useSortable          │  │
-│  │  • SortableCard     │    │  • useDndContext        │  │
+│  │  • KanbanBoardClient │   │  • React useState       │  │
+│  │  • SortableList     │    │  • Zustand stores       │  │
+│  │  • SortableCard     │    │    (comments, notifs)   │  │
+│  │  • CommentsPanel    │    │  • useSensor            │  │
+│  │  • NotificationsBell│    │  • useSortable          │  │
 │  └─────────────────────┘    └─────────────────────────┘  │
 └──────────────────────────────────────────────────────────┘
                             │
@@ -34,11 +36,17 @@
 │  ┌──────────────────────────────────────────────────┐    │
 │  │           Event Handlers & State Management      │    │
 │  │                                                  │    │
+│  │  Board Operations:                               │    │
 │  │  • handleAddList / handleAddCard                │    │
 │  │  • handleEditList / handleEditCard              │    │
 │  │  • handleDeleteList / handleDeleteCard          │    │
 │  │  • handleDragStart / handleDragOver / End       │    │
 │  │  • updateData (local state + cache + sync)      │    │
+│  │                                                  │    │
+│  │  Collaboration (Phase 3):                        │    │
+│  │  • comments-store: addComment, updateComment    │    │
+│  │  • notifications-store: markAsRead, polling     │    │
+│  │  • Realtime subscriptions (cards/comments)      │    │
 │  └──────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────┘
                             │
@@ -46,11 +54,15 @@
 ┌──────────────────────────────────────────────────────────┐
 │                      Data Layer                           │
 │  ┌─────────────────────┐    ┌──────────────────────┐     │
-│  │   Local Storage     │    │    Supabase Client   │     │
+│  │   Local Storage     │    │    Supabase          │     │
 │  │                     │    │                      │     │
 │  │  • Cache            │    │  • PostgreSQL DB     │     │
 │  │  • Offline support  │◄──►│  • REST API          │     │
-│  │  • Fast reads       │    │  • Realtime (cards/lists) │ │
+│  │  • Fast reads       │    │  • Realtime          │     │
+│  │                     │    │    (cards/lists/     │     │
+│  │                     │    │     comments)        │     │
+│  │                     │    │  • Edge Functions    │     │
+│  │                     │    │    (Web Push)        │     │
 │  └─────────────────────┘    └──────────────────────┘     │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -141,17 +153,28 @@ onEdit(card.id, title, description);
 app/layout.tsx
 └── app/(board)/layout.tsx   # @modal parallel route
     └── KanbanBoardClient    # Client-side UI shell
-        ├── Header (board selector, filters, status)
+        ├── Header
+        │   ├── Board selector & create
+        │   ├── Search & filters
+        │   ├── NotificationsBell (Phase 3)
+        │   ├── NotificationSettings (Phase 3)
+        │   └── Sync status
         ├── DndContext (@dnd-kit)
         │   ├── SortableContext (lists)
         │   │   └── SortableList × N
-        │   │       ├── List header & menu (rename/delete)
+        │   │       ├── List header & menu (rename/delete, ShareDialog)
         │   │       ├── SortableContext (cards)
         │   │       │   └── SortableCard × M
-        │   │       └── “+ Add Card” button
-        │   └── “+ Add List” button
+        │   │       │       └── Multi-assignee avatars (Phase 3)
+        │   │       └── "+ Add Card" button
+        │   └── "+ Add List" button
         ├── DragOverlay
+        ├── ShareDialog (Phase 3)
         └── CardModal (selectedCardId が存在する場合)
+            ├── Details tab
+            └── Comments tab (Phase 3)
+                └── CommentsPanel
+                    └── Mention component
 ```
 
 ### Data Flow
@@ -174,6 +197,7 @@ Realtime 経由の外部更新は `postgres_changes` → `setBoardData` でロ�
 
 ### State Structure
 
+**Board Data** (React State):
 ```typescript
 interface BoardData {
   lists: List[];
@@ -193,20 +217,46 @@ interface Card {
   title: string;
   description: string;
   list_id: string;      // Foreign key to List
+  assignee_ids: string[]; // Multiple assignees (Phase 3)
   position: number;     // For ordering within list
+  tags: string[];
+  due_date: string | null;
+  priority: 'low' | 'medium' | 'high';
   created_at: string;
   updated_at: string;
 }
 ```
 
+**Collaboration Data** (Zustand Stores - Phase 3):
+```typescript
+// comments-store.ts
+interface CommentsStore {
+  comments: CommentWithAuthor[];
+  fetchComments: (cardId: string) => Promise<void>;
+  addComment: (cardId: string, body: string, mentions: string[]) => Promise<void>;
+  subscribeToComments: (cardId: string) => void;
+}
+
+// notifications-store.ts
+interface NotificationsStore {
+  notifications: Notification[];
+  unreadCount: number;
+  fetchNotifications: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  startPolling: () => void;
+}
+```
+
 ### State Updates
 
-All state lives in `KanbanBoard` component:
+**Board data** lives in `KanbanBoardClient` component:
 
 ```typescript
 const [boards, setBoards] = useState<Board[]>(initialBoard ? [initialBoard] : []);
 const [currentBoardId, setCurrentBoardId] = useState(initialBoard?.id ?? MAIN_BOARD_ID);
 const [boardData, setBoardData] = useState<BoardData>(initialData ?? { lists: [], cards: [] });
+const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);  // Phase 3
 const [activeId, setActiveId] = useState<string | null>(null);
 const [selectedCardId, setSelectedCardId] = useState<string | null>(initialCardId ?? null);
 const [cardModalStatus, setCardModalStatus] = useState<'loading' | 'ready' | 'error'>(initialCardId ? 'ready' : 'loading');
@@ -218,6 +268,12 @@ Updates always follow this pattern:
 2. Call `updateData(newData)`
 3. `updateData` → `setBoardData` + `saveToStorage`
 4. Separately call `syncToSupabase(newData)`
+
+**Comments & Notifications** use Zustand stores for:
+- Optimistic updates
+- Offline queue
+- Realtime synchronization
+- Global state (accessible from any component)
 
 ## Drag & Drop Architecture
 
@@ -467,19 +523,57 @@ useEffect(() => {
 )}
 ```
 
+### Notifications Architecture (Phase 3)
+
+**In-App Notifications**:
+- Zustand Store (`notifications-store.ts`)で状態管理
+- 15秒ポーリングで新規通知を取得
+- `NotificationsBell` UIで表示（All / Unread タブ）
+- 未読カウント表示
+
+**Web Push Notifications**:
+```
+1. User grants permission (NotificationSettings UI)
+2. Service Worker registers (public/sw.js)
+3. Browser subscription created (VAPID keys)
+4. Store in push_subscriptions table
+5. When notification created → Database trigger
+6. Edge Function (send-push-notification) invoked
+7. Web Push delivered to browser
+```
+
+**Notification Preferences** (`notification_preferences` table):
+- `in_app_enabled`: In-app通知のON/OFF
+- `web_push_enabled`: Web Push通知のON/OFF
+- `quiet_hours`: JSON (`{ start, end, timezone }`)
+  - タイムゾーンを考慮したquiet hours判定
+  - 日をまたぐ範囲にも対応（22:00 → 07:00）
+
+**Delivery Logic** (`supabase/functions/send-push-notification/index.ts`):
+1. Notification作成時にDatabase triggerでEdge Function起動
+2. 受信者の`notification_preferences`を確認
+3. Quiet hours判定（現在時刻 vs. 設定範囲）
+4. レート制限チェック（per-subscription, per-minute）
+5. Web Push送信（web-push library）
+6. 配信履歴を`notification_delivery_logs`に記録
+7. 連続失敗時は購読を削除
+
 ### E2E Testing
 
-**Test Coverage** (`e2e/phase3-comments.spec.ts`):
+**Test Coverage** (`e2e/phase3-comments.spec.ts`, `e2e/phase3-webpush.spec.ts`):
 - ✅ コメント CRUD 操作
 - ✅ 返信機能
 - ✅ `?card=` 経路でのモーダル表示
 - ✅ リロード時の状態保持
 - ✅ Realtime 同期（2ブラウザコンテキスト）
+- ✅ Web Push permissions & 購読管理
+- ✅ Notification preferences（quiet hours含む）
 
 **Test Strategy**:
 - 各テストで独立したボード作成
 - `beforeEach` で setup、`afterEach` で cleanup
 - Realtime テストは複数コンテキストで検証
+- Web Push テストはService Worker起動確認
 
 ## Security Architecture
 
