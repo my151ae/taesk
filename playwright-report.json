@@ -1,9 +1,0 @@
-[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
-[Global Setup] Starting authentication setup...
-[Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
-[Global Setup] User status: already exists
-[Global Setup] Signing in...
-[Global Setup] Sign-in successful: e2e.taesk.test@gmail.com
-[Global Setup] Session stored in cookies
-[Global Setup] Storage state saved to: /Users/yossydie/dev/taesk/playwright/.auth/user.json
-[Global Setup] ✅ Authentication setup complete

@@ -11,7 +11,14 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   // Force sequential execution to avoid race conditions (especially with CardModal tests)
   workers: 1,
-  reporter: 'html',
+
+  // Output directories
+  outputDir: 'test-results',
+
+  // Reporters - use html by default, json when specified via CLI
+  reporter: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME
+    ? [['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]]
+    : 'html',
 
   // Global setup for authentication
   globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),

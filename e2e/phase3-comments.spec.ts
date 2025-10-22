@@ -30,20 +30,17 @@ async function createTestBoard(page: Page, boardName: string): Promise<string> {
 
 // Helper to create a test card
 async function createTestCard(page: Page, listIndex: number, cardTitle: string): Promise<string> {
-  // Click "Add card" button in the list
-  const addCardButtons = page.locator('button:has-text("+ Add")');
+  // Click "+ Add Card" button in the list
+  const addCardButtons = page.locator('button:has-text("+ Add Card")');
   await addCardButtons.nth(listIndex).click();
+  await page.waitForTimeout(1500); // Wait for card creation and DB sync
 
-  // Fill card title
-  await page.fill('input[placeholder="Card title"]', cardTitle);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(500);
+  // Card is created with "New Card" title automatically
+  // Just return "New Card" - no need to rename for comments tests
+  const newCard = page.locator('text="New Card"').last(); // Use .last() to get the newest card
+  await expect(newCard).toBeVisible({ timeout: 5000 });
 
-  // Find the created card
-  const cardElement = page.locator(`text="${cardTitle}"`).first();
-  await expect(cardElement).toBeVisible();
-
-  return cardTitle;
+  return "New Card"; // Return fixed title - we don't need unique titles for these tests
 }
 
 // Helper to open card modal via ?card= query
