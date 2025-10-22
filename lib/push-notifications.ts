@@ -33,6 +33,10 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 
     console.log('Service Worker registered:', registration);
 
+    // Wait for the service worker to be ready
+    await navigator.serviceWorker.ready;
+    console.log('Service Worker is ready');
+
     // Check for updates
     registration.addEventListener('updatefound', () => {
       const newWorker = registration.installing;
@@ -92,6 +96,26 @@ export async function subscribeToPushNotifications(
   }
 
   try {
+    // Wait for service worker to be active
+    if (!registration.active) {
+      console.log('Waiting for service worker to activate...');
+      await new Promise<void>((resolve) => {
+        if (registration.active) {
+          resolve();
+          return;
+        }
+
+        const checkActive = () => {
+          if (registration.active) {
+            resolve();
+          } else {
+            setTimeout(checkActive, 100);
+          }
+        };
+        checkActive();
+      });
+    }
+
     // Check if already subscribed
     let subscription = await registration.pushManager.getSubscription();
 
