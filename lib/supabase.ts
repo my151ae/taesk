@@ -121,6 +121,7 @@ export interface Card {
   /** @deprecated legacy text-based assignee field */
   assigned_to: string | null;
   assignee_id: string | null;
+  assignee_ids: string[] | null;
   short_id: string | null;
   id_short: number | null;
   slug: string | null;

@@ -46,9 +46,8 @@ interface CardModalProps {
     tags?: string[],
     due_date?: string | null,
     priority?: Priority,
-    assigneeId?: string | null,
-    assigneeTouched?: boolean,
-    assigneeDisplayName?: string | null
+    assigneeIds?: string[],
+    assigneeTouched?: boolean
   ) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -70,20 +69,28 @@ export function CardModal({
   const [tagInput, setTagInput] = useState('');
   const [dueDate, setDueDate] = useState(card.due_date || '');
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
-  const [assigneeId, setAssigneeId] = useState(card.assignee_id || '');
-  const [assigneeSearch, setAssigneeSearch] = useState('');
-  const [legacyAssignee, setLegacyAssignee] = useState(card.assignee_id ? null : (card.assigned_to ?? null));
+  // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
+    if (card.assignee_ids && card.assignee_ids.length > 0) {
+      return card.assignee_ids;
+    }
+    if (card.assignee_id) {
+      return [card.assignee_id];
+    }
+    return [];
+  });
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const onCloseRef = useRef(onClose);
 
   const filteredProfiles = useMemo(() => {
-    const query = assigneeSearch.trim().toLowerCase();
+    const query = memberSearch.trim().toLowerCase();
     const base = !query
       ? profiles
       : profiles.filter((profile) => {
@@ -92,20 +99,13 @@ export function CardModal({
         return name.includes(query) || email.includes(query);
       });
 
-    if (assigneeId) {
-      const selected = profiles.find((profile) => profile.id === assigneeId);
-      if (selected && !base.some((profile) => profile.id === selected.id)) {
-        return [...base, selected];
-      }
-    }
+    // Filter out already assigned members
+    return base.filter((profile) => !assigneeIds.includes(profile.id));
+  }, [profiles, memberSearch, assigneeIds]);
 
-    return base;
-  }, [profiles, assigneeSearch, assigneeId]);
-
-  const selectedAssignee = useMemo(() => {
-    if (!assigneeId) return null;
-    return profiles.find((profile) => profile.id === assigneeId) ?? null;
-  }, [profiles, assigneeId]);
+  const selectedAssignees = useMemo(() => {
+    return profiles.filter((profile) => assigneeIds.includes(profile.id));
+  }, [profiles, assigneeIds]);
 
   // onClose ref を最新に保つ
   useEffect(() => {
@@ -122,9 +122,14 @@ export function CardModal({
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setPriority(card.priority || 'medium');
-      setAssigneeId(card.assignee_id || '');
-      setLegacyAssignee(card.assignee_id ? null : (card.assigned_to ?? null));
-      setAssigneeSearch('');
+      // Initialize assigneeIds from card
+      const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
+        ? card.assignee_ids
+        : card.assignee_id
+          ? [card.assignee_id]
+          : [];
+      setAssigneeIds(newAssigneeIds);
+      setMemberSearch('');
       setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
       setIsDirty(false);
@@ -135,8 +140,12 @@ export function CardModal({
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setPriority(card.priority || 'medium');
-      setAssigneeId(card.assignee_id || '');
-      setLegacyAssignee(card.assignee_id ? null : (card.assigned_to ?? null));
+      const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
+        ? card.assignee_ids
+        : card.assignee_id
+          ? [card.assignee_id]
+          : [];
+      setAssigneeIds(newAssigneeIds);
       setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
     }
@@ -216,9 +225,6 @@ export function CardModal({
   }, []); // 空配列でマウント時のみ実行
 
   const handleSave = () => {
-    const selectedDisplayName = selectedAssignee ? getProfileDisplayName(selectedAssignee) : null;
-    const displayNameFallback = selectedDisplayName ?? (legacyAssignee ?? null);
-
     onSave(
       card.id,
       title,
@@ -226,14 +232,29 @@ export function CardModal({
       tags,
       dueDate || null,
       priority,
-      assigneeId || null,
-      assigneeTouched,
-      displayNameFallback
+      assigneeIds.length > 0 ? assigneeIds : [],
+      assigneeTouched
     );
 
     if (targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);
     }
+  };
+
+  const handleAddMember = (profileId: string) => {
+    if (!assigneeIds.includes(profileId)) {
+      setAssigneeIds([...assigneeIds, profileId]);
+      setAssigneeTouched(true);
+      setIsDirty(true);
+    }
+    setShowMemberDropdown(false);
+    setMemberSearch('');
+  };
+
+  const handleRemoveMember = (profileId: string) => {
+    setAssigneeIds(assigneeIds.filter(id => id !== profileId));
+    setAssigneeTouched(true);
+    setIsDirty(true);
   };
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -267,16 +288,16 @@ export function CardModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl outline-none dark:bg-gray-800"
+        className="relative z-10 max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start p-6 pb-4 border-b border-slate-200 dark:border-gray-700">
           <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
-            Edit Card
+            {title || 'Edit Card'}
           </h2>
           <button
             onClick={onClose}
@@ -288,33 +309,10 @@ export function CardModal({
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6 border-b border-slate-200 dark:border-gray-700">
-          <button
-            onClick={() => setActiveTab('details')}
-            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'details'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-slate-600 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200'
-            }`}
-          >
-            Details
-          </button>
-          <button
-            onClick={() => setActiveTab('comments')}
-            className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'comments'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-slate-600 dark:text-gray-400 hover:text-slate-800 dark:hover:text-gray-200'
-            }`}
-          >
-            Comments
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        {activeTab === 'details' ? (
-        <div className="space-y-4">
+        {/* 2 Column Layout */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Column - Details */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Title */}
           <div>
             <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
@@ -412,66 +410,109 @@ export function CardModal({
             </select>
           </div>
 
-          {/* Assignee */}
-          <div>
-            <label htmlFor="assignee-select" className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Assignee
+          {/* Members */}
+          <div className="relative">
+            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
+              Members
             </label>
-            {legacyAssignee ? (
-              <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
-                旧形式で登録された担当者: {legacyAssignee}（新しい担当者を選択すると更新されます）
-              </p>
-            ) : null}
-            <div className="space-y-2">
-              <input
-                id="assignee-search"
-                type="text"
-                value={assigneeSearch}
-                onChange={(e) => setAssigneeSearch(e.target.value)}
-                placeholder="Search by name or email"
-                aria-label="Assignee search"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              />
-              <select
-                id="assignee-select"
-                value={assigneeId}
-                onChange={(e) => {
-                  setAssigneeId(e.target.value);
-                  setLegacyAssignee(null);
-                  setIsDirty(true);
-                  setAssigneeTouched(true);
-                }}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="">未割り当て</option>
-                {filteredProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {getProfileDisplayName(profile)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {selectedAssignee ? (
-              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
-                {selectedAssignee.avatar_url ? (
-                  <Image
-                    src={selectedAssignee.avatar_url}
-                    alt={getProfileDisplayName(selectedAssignee)}
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-semibold dark:bg-gray-700 dark:text-gray-200">
-                    {getProfileInitials(selectedAssignee)}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Selected Members */}
+              {selectedAssignees.map((member) => (
+                <div
+                  key={member.id}
+                  className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                  title={getProfileDisplayName(member)}
+                >
+                  {member.avatar_url ? (
+                    <Image
+                      src={member.avatar_url}
+                      alt={getProfileDisplayName(member)}
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                      {getProfileInitials(member)}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium px-2 max-w-[100px] truncate">
+                    {getProfileDisplayName(member).split(' ')[0]}
                   </span>
-                )}
-                <span>{getProfileDisplayName(selectedAssignee)}</span>
-                {selectedAssignee.email ? (
-                  <span className="text-slate-400 dark:text-gray-500">({selectedAssignee.email})</span>
-                ) : null}
+                  <button
+                    onClick={() => handleRemoveMember(member.id)}
+                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
+                    aria-label={`Remove ${getProfileDisplayName(member)}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* Add Member Button */}
+              <button
+                onClick={() => setShowMemberDropdown(!showMemberDropdown)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-300 transition-colors"
+                aria-label="Add member"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Member Dropdown */}
+            {showMemberDropdown && (
+              <div className="absolute z-10 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700">
+                <div className="p-2">
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Search members..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {filteredProfiles.length > 0 ? (
+                    filteredProfiles.map((profile) => (
+                      <button
+                        key={profile.id}
+                        onClick={() => handleAddMember(profile.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
+                      >
+                        {profile.avatar_url ? (
+                          <Image
+                            src={profile.avatar_url}
+                            alt={getProfileDisplayName(profile)}
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                            {getProfileInitials(profile)}
+                          </span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{getProfileDisplayName(profile)}</div>
+                          {profile.email && (
+                            <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{profile.email}</div>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-gray-400">
+                      {memberSearch ? 'No members found' : 'All members assigned'}
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : null}
+            )}
           </div>
 
           {/* Move to Board */}
@@ -526,15 +567,19 @@ export function CardModal({
               </div>
             </div>
           )}
-        </div>
-        ) : (
-          <div className="min-h-[400px]">
+          </div>
+
+          {/* Right Column - Comments */}
+          <div className="w-96 border-l border-slate-200 dark:border-gray-700 overflow-y-auto p-6">
+            <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-gray-100">
+              Comments
+            </h3>
             <CommentsPanel cardId={card.id} boardId={card.board_id} />
           </div>
-        )}
+        </div>
 
         {/* Modal Footer */}
-        <div className="flex gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-gray-700">
+        <div className="flex gap-2 p-6 pt-4 border-t border-slate-200 dark:border-gray-700">
           <button
             onClick={handleSave}
             className="px-4 py-2 bg-sky-500 text-white rounded-lg text-sm hover:bg-sky-600 transition-colors font-medium"

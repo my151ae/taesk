@@ -1836,24 +1836,18 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     tags?: string[],
     due_date?: string | null,
     priority?: Priority,
-    assigneeId?: string | null,
-    assigneeTouched?: boolean,
-    assigneeDisplayName?: string | null
+    assigneeIds?: string[],
+    assigneeTouched?: boolean
   ) => {
-    console.log('[handleSaveCard] Starting...', { id, title, description });
+    console.log('[handleSaveCard] Starting...', { id, title, description, assigneeIds });
 
     try {
       const slug = slugify(title);
       const updatedCards = boardData.cards.map((card) => {
         if (card.id === id) {
-          const nextAssigneeId =
-            typeof assigneeId === 'string' && assigneeId.length > 0 ? assigneeId : null;
-          const shouldClearLegacy = assigneeTouched === true || nextAssigneeId !== (card.assignee_id ?? null);
-          const resolvedAssignedTo = nextAssigneeId
-            ? assigneeDisplayName ?? getProfileDisplayName(profilesById[nextAssigneeId]) ?? null
-            : assigneeTouched
-              ? null
-              : card.assigned_to ?? null;
+          // Handle assignee_ids (array) and maintain backward compatibility with assignee_id (single)
+          const nextAssigneeIds = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [];
+          const nextAssigneeId = nextAssigneeIds.length > 0 ? nextAssigneeIds[0] : null;
 
           return {
             ...card,
@@ -1862,8 +1856,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             tags: tags || [],
             due_date: due_date || null,
             priority: priority || 'medium',
-            assignee_id: nextAssigneeId,
-            assigned_to: shouldClearLegacy ? resolvedAssignedTo : (card.assigned_to ?? resolvedAssignedTo),
+            assignee_id: nextAssigneeId, // Keep for backward compatibility
+            assignee_ids: nextAssigneeIds.length > 0 ? nextAssigneeIds : null,
+            assigned_to: null, // Clear legacy field
             slug,
             updated_at: new Date().toISOString(),
           };
