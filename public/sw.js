@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.0.0';
+const SW_VERSION = '1.0.1';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -13,12 +13,14 @@ self.addEventListener('install', (event) => {
 
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      // Only cache resources that exist
       return cache.addAll([
         '/',
         '/manifest.json',
-        '/icon-192.png',
-        '/icon-512.png',
-      ]);
+      ]).catch((error) => {
+        console.error('[SW] Cache addAll failed:', error);
+        // Continue anyway - caching is optional
+      });
     })
   );
 
@@ -85,8 +87,8 @@ self.addEventListener('push', (event) => {
   let notificationData = {
     title: 'Taesk Notification',
     body: 'You have a new notification',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icon?size=192',
+    badge: '/icon?size=192',
     tag: 'taesk-notification',
     requireInteraction: false,
     data: {},
