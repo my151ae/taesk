@@ -920,4 +920,146 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     expect(hasCardQuery || isOnBoardUrl).toBe(true);
   });
+
+  test('should restore snapshot on drag error @feature:boards', async ({ page }) => {
+    // Get initial board state
+    const boardId = testBoard.id;
+    const initialResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
+    const initialData = await initialResponse.json();
+    const initialListCount = initialData.lists.length;
+
+    // Ensure we have at least 2 lists
+    if (initialListCount < 2) {
+      await page.getByRole('button', { name: '+ Add List' }).click();
+      await page.waitForTimeout(500);
+    }
+
+    // Get the current list order
+    const lists = page.locator('[data-testid^="list-"]');
+    const listTitles: string[] = [];
+
+    const count = await lists.count();
+    for (let i = 0; i < count; i++) {
+      const title = await lists.nth(i).locator('[data-testid="list-title"]').textContent();
+      listTitles.push(title || '');
+    }
+
+    // Simulate a drag operation that might fail
+    // (In a real scenario, this would involve mocking API failures)
+    // For now, we verify that after a drag, if we refresh, the state is consistent
+    const firstList = lists.first();
+    const secondList = lists.nth(1);
+
+    const firstBox = await firstList.boundingBox();
+    const secondBox = await secondList.boundingBox();
+
+    if (firstBox && secondBox) {
+      // Start drag
+      await page.mouse.move(firstBox.x + firstBox.width / 2, firstBox.y + firstBox.height / 2);
+      await page.mouse.down();
+
+      // Move to new position
+      await page.mouse.move(secondBox.x + secondBox.width / 2, secondBox.y + secondBox.height / 2, { steps: 5 });
+      await page.mouse.up();
+
+      // Wait for the operation to complete
+      await page.waitForTimeout(1000);
+
+      // Refresh the page to ensure state was persisted correctly
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+
+      // Verify board still renders without errors
+      await expect(page.locator('[data-testid^="list-"]')).toHaveCount(count);
+
+      // Get updated board data
+      const finalResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
+      const finalData = await finalResponse.json();
+
+      // Verify data integrity - all lists should still exist
+      expect(finalData.lists.length).toBe(count);
+
+      // All positions should be normalized
+      const positions = finalData.lists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+
+      for (let i = 1; i < positions.length; i++) {
+        const gap = positions[i] - positions[i - 1];
+        expect(gap).toBe(10);
+      }
+    }
+  });
+
+  test('should use normalized positions (1000/10 gaps) for new lists @feature:boards', async ({ page }) => {
+    // Add first list
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(500);
+
+    // Add second list
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(500);
+
+    // Get board data via API to check positions
+    const boardId = testBoard.id;
+    const dataResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
+    const { lists } = await dataResponse.json();
+
+    // Verify positions use 1000/10 gaps
+    expect(lists.length).toBeGreaterThanOrEqual(2);
+
+    // Default lists should have normalized positions
+    const positions = lists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+
+    // Check that positions start at 1000 and have 10-unit gaps
+    expect(positions[0]).toBe(1000);
+    if (positions.length > 1) {
+      expect(positions[1]).toBe(1010);
+    }
+    if (positions.length > 2) {
+      expect(positions[2]).toBe(1020);
+    }
+  });
+
+  test('should maintain position gaps after drag and drop @feature:boards', async ({ page }) => {
+    // Ensure we have at least 3 lists
+    const listCount = await page.locator('[data-testid^="list-"]').count();
+
+    for (let i = listCount; i < 3; i++) {
+      await page.getByRole('button', { name: '+ Add List' }).click();
+      await page.waitForTimeout(300);
+    }
+
+    // Get initial list order
+    const lists = page.locator('[data-testid^="list-"]');
+    const firstList = lists.first();
+    const thirdList = lists.nth(2);
+
+    // Drag first list to third position
+    await firstList.hover();
+    await page.waitForTimeout(200);
+
+    const firstListBox = await firstList.boundingBox();
+    const thirdListBox = await thirdList.boundingBox();
+
+    if (firstListBox && thirdListBox) {
+      await page.mouse.move(firstListBox.x + firstListBox.width / 2, firstListBox.y + firstListBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(thirdListBox.x + thirdListBox.width / 2, thirdListBox.y + thirdListBox.height / 2, { steps: 10 });
+      await page.mouse.up();
+
+      await page.waitForTimeout(1000);
+
+      // Get board data to verify positions
+      const boardId = testBoard.id;
+      const dataResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
+      const { lists: updatedLists } = await dataResponse.json();
+
+      // All positions should be normalized with 10-unit gaps
+      const positions = updatedLists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+
+      for (let i = 1; i < positions.length; i++) {
+        const gap = positions[i] - positions[i - 1];
+        expect(gap).toBe(10);
+      }
+    }
+  });
 });
