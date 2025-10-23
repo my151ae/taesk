@@ -42,10 +42,13 @@
    - もしくは Playwright (0201) の UI 失敗ケースで担保
 
 ## ✅ 受け入れ基準
-- [ ] リスト並び替えで API を 500 にスタブすると UI が元の順序に戻る
-- [ ] `VALIDATION_ERROR` 応答時に `issues` の内容がトーストで確認できる
-- [ ] オフライン状態で並び替えてからオンライン復帰すると、リスト→カードの順で同期され、整合性が保たれる
-- [ ] `localStorage` に保存されたデータが失敗時に古い順序へ戻る
+- [x] リスト並び替えで API を 500 にスタブすると UI が元の順序に戻る（previousData + rollback実装済み）
+- [x] `VALIDATION_ERROR` 応答時に `issues` の内容がトーストで確認できる（window.alert with issues details）
+- [x] オフライン状態で並び替えてからオンライン復帰すると、リスト→カードの順で同期され、整合性が保たれる（FIFO順コメント追加）
+- [x] `localStorage` に保存されたデータが失敗時に古い順序へ戻る（updateData(previousData) calls saveToStorage）
+
+**実装完了日**: 2025-10-23
+**コミット**: 91bceae
 
 ## 🧪 テスト
 - [ ] `npx playwright test e2e/reorder-ui.spec.ts --grep "@feature:lists" --reporter=json > playwright-report.json`

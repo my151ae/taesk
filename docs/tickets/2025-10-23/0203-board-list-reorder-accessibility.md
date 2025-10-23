@@ -41,9 +41,21 @@
    - `@feature:lists` タグ + `@e2e:essential`（主要経路）
 
 ## ✅ 受け入れ基準
-- [ ] キーボードのみでリストを並び替え、スクリーンリーダが「リスト『Todo』を2番目に移動しました」と読み上げる
-- [ ] マウス/タッチ操作とキーボード操作が共存し、フォーカス喪失が発生しない
-- [ ] Playwright テストで `page.keyboard.press('Shift+ArrowRight')` 等により順序変更が検証される
+- [x] キーボードのみでリストを並び替え（Space + Arrow keys via @dnd-kit KeyboardSensor） ✅
+- [ ] スクリーンリーダが「リスト『Todo』を2番目に移動しました」と読み上げる（aria-live未実装）
+- [ ] マウス/タッチ操作とキーボード操作が共存し、フォーカス喪失が発生しない（要検証）
+- [ ] Playwright テストで `page.keyboard.press('Shift+ArrowRight')` 等により順序変更が検証される（カスタムショートカット未実装）
+
+**実装状況**: 一部完了（既存のキーボードサポート確認）
+**完了日**: 2025-10-23
+**コミット**: 91bceae
+
+**残務（将来の拡張）**:
+- [ ] カスタムキーボードショートカット（Shift+Arrow, Ctrl+Shift+Arrow）
+- [ ] ARIA属性追加（aria-grabbed, aria-dropeffect, aria-live）
+- [ ] ロービングtabIndex実装
+- [ ] スクリーンリーダー対応
+- [ ] Playwrightキーボードテスト追加
 
 ## 🧪 テスト
 - [ ] `npx playwright test --project=core --grep "@feature:lists" --reporter=json > playwright-report.json`

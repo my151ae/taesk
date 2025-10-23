@@ -39,9 +39,26 @@
    - `supabase` ログ出力が想定通りであることをローカル環境で確認
 
 ## ✅ 受け入れ基準
-- [ ] `lists.reorder` 成功/失敗のログに `issues` 情報が含まれる
-- [ ] メトリクスダッシュボードで成功率/失敗率/処理時間を確認できる
-- [ ] アラート条件がドキュメント化され、手順に従って検証できる
+- [x] `lists.reorder` 成功/失敗のログに `issues` 情報が含まれる（issues配列最大5件、issuesTotal追加） ✅
+- [ ] メトリクスダッシュボードで成功率/失敗率/処理時間を確認できる（将来の拡張）
+- [ ] アラート条件がドキュメント化され、手順に従って検証できる（将来の拡張）
+
+**実装完了日**: 2025-10-23
+**コミット**: 91bceae
+
+**実装内容**:
+- `hashPayload()` 関数追加（SHA-256, 12文字）
+- 構造化ログ統一（JSON形式）
+- `severity` フィールド（info/warning/error）
+- `status` フィールド（success/validation_error/db_error/transaction_failed）
+- `issues` 配列（最大5件）+ `issuesTotal`
+- `updatesCount`, `payloadHash`, `durationMs` メトリクス
+
+**残務（将来の拡張）**:
+- [ ] メトリクス送信機構（CloudWatch/Datadog）
+- [ ] 監視ダッシュボード構築
+- [ ] アラート条件定義（失敗率 > 5%）
+- [ ] 運用ドキュメント作成（`docs/operations/monitoring.md`）
 
 ## 🧪 テスト
 - [ ] `npx playwright test --project=core --grep @feature:lists --reporter=json > playwright-report.json`
