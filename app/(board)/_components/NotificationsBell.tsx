@@ -14,6 +14,7 @@ export default function NotificationsBell() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   const {
     notifications,
@@ -107,6 +108,27 @@ export default function NotificationsBell() {
     };
   }, [user?.id, startPolling, stopPolling]);
 
+  // Close drawer when clicking outside
+  useEffect(() => {
+    if (!showDrawer) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (drawerRef.current && !drawerRef.current.contains(event.target as Node)) {
+        setShowDrawer(false);
+      }
+    };
+
+    // Add listener with a small delay to prevent immediate close
+    const timerId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timerId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDrawer]);
+
   if (!featureFlags.notifications) {
     return null;
   }
@@ -128,7 +150,7 @@ export default function NotificationsBell() {
   };
 
   return (
-    <div className="relative">
+    <div ref={drawerRef} className="relative">
       {/* Bell Icon Button */}
       <button
         onClick={() => setShowDrawer(!showDrawer)}
