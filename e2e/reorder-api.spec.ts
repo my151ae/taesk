@@ -128,6 +128,92 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
     expect(result.updated).toBe(3);
   });
 
+  test('should reject duplicate positions for lists @failure:validation', async ({ request }) => {
+    // Create 2 lists
+    const listIds: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
+        data: { title: `List ${i + 1}`, position: 1000 + i * 10 },
+      });
+      const data = await res.json();
+      listIds.push(data.lists[0].id);
+    }
+
+    // Try to assign same position to both lists
+    const updates = [
+      { id: listIds[0], position: 1000 },
+      { id: listIds[1], position: 1000 }, // duplicate position
+    ];
+
+    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
+      data: { updates },
+    });
+
+    expect(res.status()).toBe(400);
+    const result = await res.json();
+    expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(result.issues).toBeDefined();
+    expect(result.issues.some((i: any) => i.code === 'DUPLICATE_POSITION')).toBe(true);
+  });
+
+  test('should reject unknown list IDs @failure:validation', async ({ request }) => {
+    const updates = [
+      { id: '00000000-0000-0000-0000-000000000999', position: 1000 }, // unknown ID
+    ];
+
+    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
+      data: { updates },
+    });
+
+    expect(res.status()).toBe(400);
+    const result = await res.json();
+    expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(result.issues).toBeDefined();
+    expect(result.issues.some((i: any) => i.code === 'UNKNOWN_ID')).toBe(true);
+  });
+
+  test('should reject cross-board list updates @failure:validation', async ({ request }) => {
+    // Create another board
+    const otherBoardRes = await request.post(`${BASE_URL}/api/boards`, {
+      data: { name: 'Other Board', is_test_board: true },
+    });
+    const otherBoard = await otherBoardRes.json();
+    const otherBoardId = otherBoard.boards[0].id;
+
+    // Create a list in the other board
+    const otherListRes = await request.post(`${BASE_URL}/api/boards/${otherBoardId}/lists`, {
+      data: { title: 'Other List', position: 1000 },
+    });
+    const otherListData = await otherListRes.json();
+    const otherListId = otherListData.lists[0].id;
+
+    // Create a list in the main board
+    const mainListRes = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
+      data: { title: 'Main List', position: 1000 },
+    });
+    const mainListData = await mainListRes.json();
+    const mainListId = mainListData.lists[0].id;
+
+    // Try to reorder lists from different boards
+    const updates = [
+      { id: mainListId, position: 1000 },
+      { id: otherListId, position: 1010 }, // cross-board ID
+    ];
+
+    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
+      data: { updates },
+    });
+
+    expect(res.status()).toBe(400);
+    const result = await res.json();
+    expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(result.issues).toBeDefined();
+    expect(result.issues.some((i: any) => i.code === 'CROSS_BOARD')).toBe(true);
+
+    // Clean up other board
+    await request.delete(`${BASE_URL}/api/boards/${otherBoardId}`);
+  });
+
   test('should renumber card positions in a list', async ({ request }) => {
     const res = await request.post(`${BASE_URL}/api/boards/${boardId}/cards/renumber`, {
       data: { listId },

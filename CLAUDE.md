@@ -260,13 +260,13 @@ npm run test:summary
 - `test-results/` - 失敗時のスクリーンショット
 - `playwright-report/` - HTML レポート
 
-### Test Coverage (80 tests)
+### Test Coverage (83 tests)
 
 | カテゴリ | ファイル | テスト数 |
 |---|---|---|
 | 認証 | auth.spec.ts | 5 |
 | ボード・リスト・カード | kanban.spec.ts | 37 |
-| 並び替えAPI | reorder-api.spec.ts | 8 |
+| 並び替えAPI | reorder-api.spec.ts | 11 |
 | コメント・@メンション | comments.spec.ts | 8 |
 | 通知（Web Push、In-app） | notifications.spec.ts | 6 |
 | ボード権限管理 | board-permissions.spec.ts | 5 |

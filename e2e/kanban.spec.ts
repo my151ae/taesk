@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test';
 /**
  * Kanban Board E2E Tests
  *
- * Authentication is bypassed in test environment via NEXT_PUBLIC_BYPASS_AUTH.
- * See playwright.config.ts for configuration.
+ * Authentication uses programmatic sign-in via globalSetup.
+ * See: e2e/.setup/auth-global-setup.ts and playwright.config.ts
  *
- * Phase 2: Each test creates a unique board to avoid Realtime interference.
+ * Each test creates a unique board to avoid Realtime interference.
  * See: docs/tickets/2025-10-10/01-e2e-test-stability-issues.md
  */
 

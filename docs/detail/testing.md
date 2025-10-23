@@ -114,6 +114,26 @@ export default defineConfig({
 npx playwright show-report --host 127.0.0.1 --port 9323
 ```
 
+### JSON レポート解析（test-summary.js）
+
+テスト結果の統計と失敗詳細（`issues` 配列含む）を見やすく表示：
+
+```bash
+# デフォルト（playwright-report.json を読み取り）
+npm run test:summary
+
+# カスタムレポートファイル指定
+node test-summary.js path/to/custom-report.json
+
+# 環境変数で指定
+PLAYWRIGHT_JSON_OUTPUT_NAME=custom-report.json node test-summary.js
+```
+
+**出力内容**:
+- ✅ 統計（Passed / Failed / Skipped / Flaky / Duration）
+- ❌ 失敗テスト詳細（ファイル、行番号、タグ）
+- ⚠️ バリデーションエラーの `issues` 配列（`DUPLICATE_POSITION`, `UNKNOWN_ID`, `CROSS_BOARD` など）
+
 ---
 
 ## 5. タグ命名とテストファイル構成
@@ -124,7 +144,7 @@ npx playwright show-report --host 127.0.0.1 --port 9323
 |---|---|---|---|
 | **auth.spec.ts** | `@e2e:essential` | 5 | 認証・セッション管理 |
 | **kanban.spec.ts** | `@feature:boards` | 37 | ボード・リスト・カード CRUD、D&D |
-| **reorder-api.spec.ts** | `@feature:lists`, `@failure:validation` | 8 | リスト/カード並び替え API、異常系 |
+| **reorder-api.spec.ts** | `@feature:lists`, `@failure:validation` | 11 | リスト/カード並び替え API、異常系（DUPLICATE_POSITION, UNKNOWN_ID, CROSS_BOARD） |
 | **comments.spec.ts** | `@feature:comments`, `@e2e:essential` | 8 | コメント CRUD、返信、@メンション |
 | **notifications.spec.ts** | `@feature:notifications`, `@failure:notifications` | 6 | Web Push、In-app通知、バッジ |
 | **board-permissions.spec.ts** | `@feature:boards`, `@failure:permissions` | 5 | ShareDialog、メンバー管理 |

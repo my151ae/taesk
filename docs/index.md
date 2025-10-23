@@ -69,10 +69,10 @@ npm run test:summary
 - `test-results/` - 失敗時のスクリーンショット
 - `playwright-report/` - HTML レポート
 
-**Test Coverage (80 tests)**:
+**Test Coverage (83 tests)**:
 - ✅ Auth tests (5): Login, logout, session management
 - ✅ Kanban tests (37): CRUD operations, drag & drop, multi-assignee
-- ✅ Reorder API tests (8): Validation, transactions, concurrent updates
+- ✅ Reorder API tests (11): Validation (DUPLICATE_POSITION, UNKNOWN_ID, CROSS_BOARD), transactions, concurrent updates
 - ✅ Comments tests (8): Threaded comments, @mentions, realtime sync, UUID validation
 - ✅ Notifications tests (6): In-app notifications, Web Push, unread badge
 - ✅ Board permissions tests (5): ShareDialog, member management, role changes
