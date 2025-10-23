@@ -1196,6 +1196,22 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     saveToStorage(newData);
   };
 
+  /**
+   * Normalize list positions to maintain consistent gaps.
+   * Assigns positions starting from 1000 with 10-unit gaps (1000, 1010, 1020...).
+   * This prevents position collisions and reduces the need for frequent renumbering.
+   */
+  const normalizePositions = (lists: List[]): List[] => {
+    const START_POSITION = 1000;
+    const GAP = 10;
+
+    return lists.map((list, index) => ({
+      ...list,
+      position: START_POSITION + (index * GAP),
+      updated_at: new Date().toISOString(),
+    }));
+  };
+
   const getBoardPath = (board?: Board | null, options: { canonical?: boolean } = {}): string => {
     if (!board?.short_id) return "";
 
@@ -1331,7 +1347,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
         if (!listResponse.ok) {
           const errorData = await listResponse.json();
-          throw new Error(errorData.error?.message || 'Failed to sync lists');
+          const error = new Error(errorData.error?.message || 'Failed to sync lists') as Error & { issues?: any[] };
+          // Preserve issues array for display
+          if (errorData.issues) {
+            error.issues = errorData.issues;
+          }
+          throw error;
         }
       }
 
@@ -1636,22 +1657,49 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       const newIndex = boardData.lists.findIndex((list) => list.id === over.id);
 
       if (oldIndex !== newIndex) {
-        const newLists = arrayMove(boardData.lists, oldIndex, newIndex).map((list, index) => ({
-          ...list,
-          position: index,
-          updated_at: new Date().toISOString(),
-        }));
+        // Save snapshot for rollback on failure
+        const previousData: BoardData = {
+          lists: [...boardData.lists],
+          cards: [...boardData.cards],
+        };
+
+        // Normalize positions to maintain gaps (1000, 1010, 1020...)
+        const reorderedLists = arrayMove(boardData.lists, oldIndex, newIndex);
+        const newLists = normalizePositions(reorderedLists);
         const newData = { ...boardData, lists: newLists };
         updateData(newData);
 
         // Add to sync queue if offline, otherwise sync directly
         if (!isOnline) {
           // Queue all affected lists for update
+          // Note: Offline queue processes in FIFO order, ensuring list updates
+          // are synced before any subsequent card updates in the same session
           newLists.forEach(list => {
             addToSyncQueue({ type: 'UPDATE', table: 'lists', data: list });
           });
         } else {
-          await syncToSupabase(newData);
+          try {
+            await syncToSupabase(newData);
+          } catch (error) {
+            console.error("Error syncing list reorder:", error);
+            // Restore previous state
+            updateData(previousData);
+
+            // Display error to user with issues if available
+            let errorMessage = error instanceof Error ? error.message : 'Failed to reorder lists';
+            const errorWithIssues = error as Error & { issues?: any[] };
+
+            if (errorWithIssues.issues && errorWithIssues.issues.length > 0) {
+              const issuesText = errorWithIssues.issues
+                .map((issue: any) => `• ${issue.code}: ${issue.message || JSON.stringify(issue)}`)
+                .join('\n');
+              errorMessage = `${errorMessage}\n\n詳細:\n${issuesText}`;
+            }
+
+            if (typeof window !== 'undefined') {
+              window.alert(`リストの並び替えに失敗しました:\n${errorMessage}`);
+            }
+          }
         }
       }
       return;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import crypto from 'crypto';
 
 const ListReorderUpdateSchema = z.object({
   id: z.string().uuid(),
@@ -29,6 +30,14 @@ function hashBoardId(boardId: string): number {
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash);
+}
+
+/**
+ * Generate SHA-256 hash of payload for logging and debugging
+ */
+function hashPayload(updates: Array<{ id: string; position: number }>): string {
+  const payload = JSON.stringify(updates.map(u => ({ id: u.id, pos: u.position })));
+  return crypto.createHash('sha256').update(payload).digest('hex').substring(0, 12);
 }
 
 export async function PATCH(
@@ -90,6 +99,20 @@ export async function PATCH(
     }
 
     if (issues.length > 0) {
+      const payloadHash = hashPayload(updates);
+      // Log validation errors with issues (max 5 for brevity)
+      console.error(
+        JSON.stringify({
+          event: 'lists.reorder',
+          severity: 'warning',
+          status: 'validation_error',
+          boardId,
+          updatesCount: updates.length,
+          payloadHash,
+          issues: issues.slice(0, 5),
+          issuesTotal: issues.length,
+        })
+      );
       return NextResponse.json(
         { error: { code: 'VALIDATION_ERROR', message: 'Bad Request' }, issues },
         { status: 400 }
@@ -103,7 +126,16 @@ export async function PATCH(
       .in('id', listIds);
 
     if (fetchListsError) {
-      console.error('[lists/reorder] Failed to fetch lists', fetchListsError);
+      console.error(
+        JSON.stringify({
+          event: 'lists.reorder',
+          severity: 'error',
+          status: 'db_error',
+          boardId,
+          error: fetchListsError.message,
+          phase: 'fetch_lists',
+        })
+      );
       return NextResponse.json(
         { error: { code: 'DB_ERROR', message: fetchListsError.message } },
         { status: 500 }
@@ -126,6 +158,20 @@ export async function PATCH(
     });
 
     if (issues.length > 0) {
+      const payloadHash = hashPayload(updates);
+      // Log validation errors with issues (max 5 for brevity)
+      console.error(
+        JSON.stringify({
+          event: 'lists.reorder',
+          severity: 'warning',
+          status: 'validation_error',
+          boardId,
+          updatesCount: updates.length,
+          payloadHash,
+          issues: issues.slice(0, 5),
+          issuesTotal: issues.length,
+        })
+      );
       return NextResponse.json(
         { error: { code: 'VALIDATION_ERROR', message: 'Bad Request' }, issues },
         { status: 400 }
@@ -146,7 +192,19 @@ export async function PATCH(
     });
 
     if (rpcError) {
-      console.error('[lists/reorder] Transaction failed', rpcError);
+      const payloadHash = hashPayload(updates);
+      console.error(
+        JSON.stringify({
+          event: 'lists.reorder',
+          severity: 'error',
+          status: 'transaction_failed',
+          boardId,
+          updatesCount: updates.length,
+          payloadHash,
+          error: rpcError.message,
+          durationMs: Date.now() - startTime,
+        })
+      );
       return NextResponse.json(
         { error: { code: 'DB_ERROR', message: rpcError.message } },
         { status: 500 }
@@ -156,15 +214,20 @@ export async function PATCH(
     const durationMs = Date.now() - startTime;
     const updatedCount = data?.updated_count || 0;
     const unchangedCount = updates.length - updatedCount;
+    const payloadHash = hashPayload(updates);
 
     console.log(
       JSON.stringify({
         event: 'lists.reorder',
+        severity: 'info',
+        status: 'success',
         boardId,
         actorId: user.id,
+        updatesCount: updates.length,
         updated: updatedCount,
         unchanged: unchangedCount,
         durationMs,
+        payloadHash,
       })
     );
 
