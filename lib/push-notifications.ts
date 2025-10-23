@@ -32,7 +32,7 @@ export async function showTestNotification(): Promise<boolean> {
       tag: 'test-notification',
       requireInteraction: false,
       silent: false, // Enable sound
-      vibrate: [200, 100, 200],
+      ...(('vibrate' in Notification.prototype) && { vibrate: [200, 100, 200] }),
       data: {
         type: 'test',
         url: '/',
