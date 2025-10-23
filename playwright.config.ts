@@ -1,46 +1,46 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 
-// Load .env.test before running tests
 dotenv.config({ path: '.env.test' });
+
+const isCI = !!process.env.CI;
+const workers = process.env.PW_WORKERS
+  ? Number(process.env.PW_WORKERS)
+  : (isCI ? 1 : undefined);
+const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'playwright-report.json';
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: !isCI,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  // Force sequential execution to avoid race conditions (especially with CardModal tests)
-  workers: 1,
-
-  // Output directories
+  retries: isCI ? 2 : 0,
+  workers,
   outputDir: 'test-results',
-
-  // Reporters - use html by default, json when specified via CLI
-  reporter: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME
-    ? [['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME }]]
-    : 'html',
-
-  // Global setup for authentication
+  reporter: isCI
+    ? [['json', { outputFile: jsonOutput }]]
+    : [['list'], ['json', { outputFile: jsonOutput }], ['html', { open: 'never' }]],
   globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
-
   use: {
     baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    // Use authenticated state by default (created by globalSetup)
+    trace: isCI ? 'on-first-retry' : 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'off',
     storageState: 'playwright/.auth/user.json',
   },
-
   projects: [
     {
-      name: 'chromium',
+      name: 'core',
+      grepInvert: /@phase3|@wip/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'full',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-
   webServer: {
-    // Removed NEXT_PUBLIC_BYPASS_AUTH - now using real authentication
     command: 'NODE_ENV=test npm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCI,
   },
 });
