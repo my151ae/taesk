@@ -933,19 +933,17 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     // Ensure we have at least 2 lists
     if (initialListCount < 2) {
-      await page.getByRole('button', { name: '+ Add List' }).click();
-      await page.waitForTimeout(500);
+      for (let i = initialListCount; i < 2; i++) {
+        await page.getByRole('button', { name: '+ Add List' }).click();
+        await page.waitForTimeout(1000); // Wait for sync
+      }
     }
 
-    // Get the current list order
+    // Wait for lists to be visible
     const lists = page.locator('[data-testid^="list-"]');
-    const listTitles: string[] = [];
+    await expect(lists).toHaveCount(2, { timeout: 10000 });
 
     const count = await lists.count();
-    for (let i = 0; i < count; i++) {
-      const title = await lists.nth(i).locator('[data-testid="list-title"]').textContent();
-      listTitles.push(title || '');
-    }
 
     // Simulate a drag operation that might fail
     // (In a real scenario, this would involve mocking API failures)
@@ -998,11 +996,14 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   test('should use normalized positions (1000/10 gaps) for new lists @feature:boards', async ({ page }) => {
     // Add first list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Wait for sync
 
     // Add second list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Wait for sync
+
+    // Wait for lists to appear in UI
+    await expect(page.locator('[data-testid^="list-"]')).toHaveCount(2, { timeout: 5000 });
 
     // Get board data via Supabase to check positions
     const { data: lists } = await supabase
