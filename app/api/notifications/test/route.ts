@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createNotification } from '@/lib/server/notifications';
 
 export async function POST() {
   const supabase = await createServerSupabaseClient();
@@ -12,21 +13,23 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { error } = await supabase
-    .from('notifications')
-    .insert({
-      recipient_id: user.id,
+  try {
+    await createNotification({
+      recipientId: user.id,
       type: 'test',
       payload: {
         message: 'This is a test notification from Taesk',
         test: true,
       },
+      dedupeKey: `test:${user.id}:${Date.now()}`,
     });
 
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
     console.error('Failed to create test notification:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to create notification' },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ success: true });
 }

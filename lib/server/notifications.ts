@@ -1,6 +1,28 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import 'server-only';
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import type { QuietHoursPreference } from '@/lib/supabase';
+
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 export type NotificationType =
   | 'comment_created'
@@ -20,7 +42,6 @@ export interface CommentNotificationEvent {
 }
 
 interface CreateNotificationParams {
-  supabase: SupabaseClient;
   type: NotificationType;
   recipientId: string;
   payload: Record<string, any>;
@@ -80,7 +101,8 @@ export function isWithinQuietHours(
 export async function createNotification(
   params: CreateNotificationParams
 ): Promise<CreateNotificationResult> {
-  const { supabase, type, recipientId, payload, dedupeKey } = params;
+  const { type, recipientId, payload, dedupeKey } = params;
+  const supabase = getSupabaseAdmin();
 
   // Generate dedupe key if not provided
   const finalDedupeKey =
@@ -217,10 +239,11 @@ export function generateNotificationMessage(
  * Create notifications for a comment event
  */
 export async function createCommentNotifications(
-  supabase: SupabaseClient,
   event: CommentNotificationEvent,
   senderName?: string
 ) {
+  const supabase = getSupabaseAdmin();
+
   try {
     const recipients = await resolveCommentRecipients(supabase, event);
 
@@ -252,7 +275,6 @@ export async function createCommentNotifications(
         };
 
         return await createNotification({
-          supabase,
           type: event.event,
           recipientId,
           payload,

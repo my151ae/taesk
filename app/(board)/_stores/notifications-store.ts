@@ -11,13 +11,16 @@ interface NotificationsState {
   loading: boolean;
   error: string | null;
   unreadCount: number;
+  pollingIntervalId: ReturnType<typeof setInterval> | null;
 
   // Actions
   setNotifications: (notifications: Notification[]) => void;
   addNotification: (notification: Notification) => void;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  fetchNotifications: () => Promise<void>;
+  fetchNotifications: (options?: { silent?: boolean }) => Promise<void>;
+  startPolling: (intervalMs?: number) => void;
+  stopPolling: () => void;
   clearError: () => void;
 }
 
@@ -26,6 +29,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   loading: false,
   error: null,
   unreadCount: 0,
+  pollingIntervalId: null,
 
   setNotifications: (notifications) => {
     const unreadCount = notifications.filter((n) => !n.read_at).length;
@@ -93,8 +97,13 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     }
   },
 
-  fetchNotifications: async () => {
-    set({ loading: true, error: null });
+  fetchNotifications: async (options) => {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      set({ loading: true, error: null });
+    } else {
+      set({ error: null });
+    }
     try {
       const response = await fetch('/api/notifications');
       if (!response.ok) {
@@ -106,7 +115,34 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       console.error('Error fetching notifications:', error);
       set({ error: 'Failed to load notifications' });
     } finally {
-      set({ loading: false });
+      if (!silent) {
+        set({ loading: false });
+      }
+    }
+  },
+
+  startPolling: (intervalMs = 10000) => {
+    const { pollingIntervalId } = get();
+    if (pollingIntervalId) {
+      return;
+    }
+
+    const id = setInterval(() => {
+      get()
+        .fetchNotifications({ silent: true })
+        .catch((error) => {
+          console.warn('Failed to poll notifications:', error);
+        });
+    }, intervalMs);
+
+    set({ pollingIntervalId: id });
+  },
+
+  stopPolling: () => {
+    const { pollingIntervalId } = get();
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      set({ pollingIntervalId: null });
     }
   },
 

@@ -245,7 +245,6 @@ export async function POST(
         // Mention notifications
         if (mentions && mentions.length > 0) {
           await createCommentNotifications(
-            supabase,
             {
               event: 'mention',
               commentId: newComment.id,
@@ -260,7 +259,6 @@ export async function POST(
 
         // Comment notification (for card participants)
         await createCommentNotifications(
-          supabase,
           {
             event: parent_id ? 'comment_replied' : 'comment_created',
             commentId: newComment.id,
