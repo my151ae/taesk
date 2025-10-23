@@ -263,7 +263,8 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type @ to trigger mention typeahead
     const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
-    await commentTextarea.fill('@');
+    await commentTextarea.click();
+    await commentTextarea.type('@');
 
     // Wait for mention suggestions to appear
     const mentionDropdown = page.locator('[role="listbox"]');

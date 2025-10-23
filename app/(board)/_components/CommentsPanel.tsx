@@ -453,11 +453,15 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
           />
 
           {showMentions && filteredMembers.length > 0 && (
-            <div className="absolute bottom-full mb-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-40 overflow-y-auto z-10">
+            <div
+              role="listbox"
+              className="absolute bottom-full mb-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-40 overflow-y-auto z-10"
+            >
               {filteredMembers.slice(0, 6).map(member => (
                 <button
                   key={member.id}
                   type="button"
+                  role="option"
                   onClick={() => handleMentionSelect(member)}
                   className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                 >

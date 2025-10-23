@@ -118,8 +118,15 @@ test.describe('Board Permissions @feature:boards', () => {
   });
 
   test('should display ShareDialog when clicking share button @e2e:essential', async ({ page }) => {
+    // Wait for board to load
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('[data-testid^="list-"]', { state: 'attached', timeout: 10000 }).catch(() => {
+      // Board might have no lists yet, that's OK
+    });
+
     // Click share/settings button
     const shareButton = page.getByRole('button', { name: /share|settings/i });
+    await shareButton.waitFor({ state: 'visible', timeout: 10000 });
     await shareButton.click();
 
     // Verify ShareDialog is visible
