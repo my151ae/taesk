@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef, useMemo } from "react";
+import { useState, useEffect, Suspense, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
@@ -187,6 +187,21 @@ const loadFromSupabase = async (boardId: string): Promise<BoardData> => {
     console.error("Error loading from Supabase:", error);
     return loadFromStorage();
   }
+};
+
+const LIST_POSITION_START = 1000;
+const LIST_POSITION_GAP = 10;
+
+/**
+ * Normalize list positions to maintain consistent gaps (1000, 1010, ...).
+ * This prevents collisions when legacy sequential values remain in the database.
+ */
+const normalizePositions = (lists: List[]): List[] => {
+  return lists.map((list, index) => ({
+    ...list,
+    position: LIST_POSITION_START + (index * LIST_POSITION_GAP),
+    updated_at: new Date().toISOString(),
+  }));
 };
 
 // Helper to get user_id that works with test mode
@@ -1200,22 +1215,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     saveToStorage(newData);
   };
 
-  /**
-   * Normalize list positions to maintain consistent gaps.
-   * Assigns positions starting from 1000 with 10-unit gaps (1000, 1010, 1020...).
-   * This prevents position collisions and reduces the need for frequent renumbering.
-   */
-  const normalizePositions = (lists: List[]): List[] => {
-    const START_POSITION = 1000;
-    const GAP = 10;
-
-    return lists.map((list, index) => ({
-      ...list,
-      position: START_POSITION + (index * GAP),
-      updated_at: new Date().toISOString(),
-    }));
-  };
-
   const getBoardPath = (board?: Board | null, options: { canonical?: boolean } = {}): string => {
     if (!board?.short_id) return "";
 
@@ -1327,6 +1326,32 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   };
 
+  const syncListPositions = useCallback(async (lists: List[]) => {
+    if (!currentBoardId || lists.length === 0) {
+      return;
+    }
+
+    const listUpdates = lists.map((list) => ({
+      id: list.id,
+      position: list.position,
+    }));
+
+    const listResponse = await fetch(`/api/boards/${currentBoardId}/lists/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: listUpdates }),
+    });
+
+    if (!listResponse.ok) {
+      const errorData = await listResponse.json().catch(() => null);
+      const error = new Error(errorData?.error?.message || 'Failed to sync lists') as Error & { issues?: any[] };
+      if (errorData?.issues) {
+        error.issues = errorData.issues;
+      }
+      throw error;
+    }
+  }, [currentBoardId]);
+
   const syncToSupabase = async (data: BoardData) => {
     // If offline, don't sync - operations are already in queue
     if (!isOnline || !currentBoardId) {
@@ -1335,29 +1360,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
 
     try {
-      // Sync lists via API route
       if (data.lists.length > 0) {
-        const listUpdates = data.lists.map(list => ({
-          id: list.id,
-          position: list.position,
-          title: list.title,
-        }));
-
-        const listResponse = await fetch(`/api/boards/${currentBoardId}/lists/reorder`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: listUpdates }),
-        });
-
-        if (!listResponse.ok) {
-          const errorData = await listResponse.json();
-          const error = new Error(errorData.error?.message || 'Failed to sync lists') as Error & { issues?: any[] };
-          // Preserve issues array for display
-          if (errorData.issues) {
-            error.issues = errorData.issues;
-          }
-          throw error;
-        }
+        await syncListPositions(data.lists);
       }
 
       // Sync cards via API route
