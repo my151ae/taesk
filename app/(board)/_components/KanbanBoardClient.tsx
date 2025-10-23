@@ -214,10 +214,14 @@ const logActivity = async (
 const initializeDefaultLists = async (userId: string, boardId: string): Promise<List[]> => {
   const actualUserId = getActualUserId(userId);
 
+  // Use normalized positions (1000, 1010, 1020...) to match drag & drop behavior
+  const START_POSITION = 1000;
+  const GAP = 10;
+
   const defaultLists = [
-    { title: "To Do", position: 0, user_id: actualUserId },
-    { title: "In Progress", position: 1, user_id: actualUserId },
-    { title: "Done", position: 2, user_id: actualUserId },
+    { title: "To Do", position: START_POSITION, user_id: actualUserId },
+    { title: "In Progress", position: START_POSITION + GAP, user_id: actualUserId },
+    { title: "Done", position: START_POSITION + (GAP * 2), user_id: actualUserId },
   ];
 
   try {
@@ -1369,7 +1373,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const handleAddList = async () => {
     if (!user || !currentBoardId) return;
 
-    const position = boardData.lists.length;
+    // Use normalized position (1000, 1010, 1020...) to match drag & drop behavior
+    const START_POSITION = 1000;
+    const GAP = 10;
+    const position = START_POSITION + (boardData.lists.length * GAP);
     const title = "New List";
 
     const previousData: BoardData = {
