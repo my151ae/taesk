@@ -922,11 +922,14 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should restore snapshot on drag error @feature:boards', async ({ page }) => {
-    // Get initial board state
-    const boardId = testBoard.id;
-    const initialResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
-    const initialData = await initialResponse.json();
-    const initialListCount = initialData.lists.length;
+    // Get initial board state via Supabase
+    const { data: initialLists } = await supabase
+      .from('lists')
+      .select('*')
+      .eq('board_id', testBoardId)
+      .order('position', { ascending: true });
+
+    const initialListCount = initialLists?.length || 0;
 
     // Ensure we have at least 2 lists
     if (initialListCount < 2) {
@@ -972,15 +975,18 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       // Verify board still renders without errors
       await expect(page.locator('[data-testid^="list-"]')).toHaveCount(count);
 
-      // Get updated board data
-      const finalResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
-      const finalData = await finalResponse.json();
+      // Get updated board data via Supabase
+      const { data: finalLists } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('board_id', testBoardId)
+        .order('position', { ascending: true });
 
       // Verify data integrity - all lists should still exist
-      expect(finalData.lists.length).toBe(count);
+      expect(finalLists?.length).toBe(count);
 
       // All positions should be normalized
-      const positions = finalData.lists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+      const positions = finalLists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
 
       for (let i = 1; i < positions.length; i++) {
         const gap = positions[i] - positions[i - 1];
@@ -998,16 +1004,18 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(500);
 
-    // Get board data via API to check positions
-    const boardId = testBoard.id;
-    const dataResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
-    const { lists } = await dataResponse.json();
+    // Get board data via Supabase to check positions
+    const { data: lists } = await supabase
+      .from('lists')
+      .select('*')
+      .eq('board_id', testBoardId)
+      .order('position', { ascending: true });
 
     // Verify positions use 1000/10 gaps
-    expect(lists.length).toBeGreaterThanOrEqual(2);
+    expect(lists?.length).toBeGreaterThanOrEqual(2);
 
     // Default lists should have normalized positions
-    const positions = lists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+    const positions = lists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
 
     // Check that positions start at 1000 and have 10-unit gaps
     expect(positions[0]).toBe(1000);
@@ -1048,13 +1056,15 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
       await page.waitForTimeout(1000);
 
-      // Get board data to verify positions
-      const boardId = testBoard.id;
-      const dataResponse = await fetch(`${BASE_URL}/api/boards/${boardId}/data`);
-      const { lists: updatedLists } = await dataResponse.json();
+      // Get board data via Supabase to verify positions
+      const { data: updatedLists } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('board_id', testBoardId)
+        .order('position', { ascending: true });
 
       // All positions should be normalized with 10-unit gaps
-      const positions = updatedLists.map((list: any) => list.position).sort((a: number, b: number) => a - b);
+      const positions = updatedLists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
 
       for (let i = 1; i < positions.length; i++) {
         const gap = positions[i] - positions[i - 1];
