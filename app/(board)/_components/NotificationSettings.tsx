@@ -12,6 +12,7 @@ import {
   deletePushSubscription,
   isPushNotificationSupported,
   getNotificationPermission,
+  showTestNotification,
 } from '@/lib/push-notifications';
 import type { NotificationPreferences, QuietHoursPreference } from '@/lib/supabase';
 
@@ -265,12 +266,19 @@ export default function NotificationSettings() {
     setStatusMessage(null);
 
     try {
-      const response = await fetch('/api/notifications/test', { method: 'POST' });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error || 'Failed to send test notification');
+      // Show browser notification with sound
+      const success = await showTestNotification();
+
+      if (!success) {
+        throw new Error('Failed to show notification. Please check permissions.');
       }
-      setStatusMessage('Test notification enqueued');
+
+      setStatusMessage('Test notification sent! 🔔');
+
+      // Also send via API for in-app notification
+      fetch('/api/notifications/test', { method: 'POST' }).catch(err => {
+        console.error('Failed to send in-app test notification:', err);
+      });
     } catch (err) {
       console.error('Failed to send test notification:', err);
       setError(err instanceof Error ? err.message : 'Failed to send test notification');

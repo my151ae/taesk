@@ -4,6 +4,50 @@
  */
 
 /**
+ * Show a local notification for testing
+ */
+export async function showTestNotification(): Promise<boolean> {
+  if (!('Notification' in window)) {
+    console.warn('Notifications not supported');
+    return false;
+  }
+
+  if (Notification.permission !== 'granted') {
+    console.warn('Notification permission not granted');
+    return false;
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service Worker not supported');
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+
+    await registration.showNotification('🎉 Test Notification', {
+      body: 'This is a test notification from Taesk!',
+      icon: '/icon?size=192',
+      badge: '/icon?size=192',
+      tag: 'test-notification',
+      requireInteraction: false,
+      silent: false, // Enable sound
+      vibrate: [200, 100, 200],
+      data: {
+        type: 'test',
+        url: '/',
+      },
+    });
+
+    console.log('Test notification shown');
+    return true;
+  } catch (error) {
+    console.error('Failed to show test notification:', error);
+    return false;
+  }
+}
+
+/**
  * URL-safe base64 encoding for VAPID key
  */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
