@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
  *
  * 実装完了後、`test.describe.skip` を `test.describe` に戻してください。
  */
-test.describe.skip('Phase3 - Invite Existing User', () => {
+test.describe.skip('Invite Existing User @phase3', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForURL(/\/b\//);

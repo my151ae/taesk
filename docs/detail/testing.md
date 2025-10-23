@@ -23,28 +23,40 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.test' });
 
 const isCI = !!process.env.CI;
+const workers = process.env.PW_WORKERS
+  ? Number(process.env.PW_WORKERS)
+  : (isCI ? 1 : undefined);
 const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'playwright-report.json';
 
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: !isCI,
-  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : (isCI ? 1 : undefined),
+  forbidOnly: !!process.env.CI,
   retries: isCI ? 2 : 0,
-
+  workers,
+  outputDir: 'test-results',
   reporter: isCI
     ? [['json', { outputFile: jsonOutput }]]
     : [['list'], ['json', { outputFile: jsonOutput }], ['html', { open: 'never' }]],
-
+  globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
   use: {
     baseURL: 'http://localhost:3000',
     trace: isCI ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
+    video: 'off',
     storageState: 'playwright/.auth/user.json',
-    ...devices['Desktop Chrome'],
   },
-
-  globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
-
+  projects: [
+    {
+      name: 'core',
+      grepInvert: /@phase3|@wip/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'full',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
   webServer: {
     command: 'NODE_ENV=test npm run dev',
     url: 'http://localhost:3000',
@@ -53,7 +65,7 @@ export default defineConfig({
 });
 ```
 
-> ※ 現在の `playwright.config.ts` が HTML レポータや `workers: 1` 固定になっている場合は、上記へ寄せて整合を取ってください。
+> ※ `projects` により `core`（@phase3/@wip除外）と `full`（全テスト）を使い分けます。`devices` 設定は各プロジェクトの `use` 内に配置。
 
 ---
 
@@ -67,23 +79,36 @@ export default defineConfig({
 
 ## 4. テスト実行パターン
 
-| モード | コマンド例 | 用途 |
-|---|---|---|
-| **Essential** | `npx playwright test --project=core --grep @e2e:essential` | PR ゲート（CI） |
-| Feature別 | `npx playwright test --project=core --grep @feature:lists` | 機能回帰 |
-| Failure系 | `npx playwright test --project=core --grep @failure:` | 異常系検証 |
-| 全体回帰 | `npx playwright test --project=full` | main/nightly |
-| 直近失敗 | `npx playwright test --last-failed` | 再実行 |
-| 変更分のみ | `npx playwright test --only-changed` | 修正差分確認 |
+### package.json スクリプト（推奨）
 
-JSON 出力の確認:
-
-```bash
-npx playwright test --reporter=json > playwright-report.json
-cat playwright-report.json | jq '.stats'
+```json
+{
+  "test": "playwright test --project=core --grep @e2e:essential",
+  "test:e2e": "playwright test",
+  "test:feature:boards": "playwright test --project=core --grep @feature:boards",
+  "test:feature:lists": "playwright test --project=core --grep @feature:lists",
+  "test:feature:comments": "playwright test --project=core --grep @feature:comments",
+  "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
+  "test:failure": "playwright test --project=core --grep @failure:",
+  "test:full": "playwright test --project=full",
+  "test:summary": "cat playwright-report.json | jq '.stats'"
+}
 ```
 
-HTML レポート（ローカル補助）:
+### コマンド例
+
+| モード | コマンド | 用途 |
+|---|---|---|
+| **Essential** | `npm test` | PR ゲート（CI） |
+| Feature別（boards） | `npm run test:feature:boards` | ボード機能回帰 |
+| Feature別（lists） | `npm run test:feature:lists` | リスト機能回帰 |
+| Feature別（comments） | `npm run test:feature:comments` | コメント機能回帰 |
+| Feature別（notifications） | `npm run test:feature:notifications` | 通知機能回帰 |
+| Failure系 | `npm run test:failure` | 異常系検証 |
+| 全体回帰 | `npm run test:full` | main/nightly |
+| サマリー確認 | `npm run test:summary` | JSON統計表示 |
+
+### HTML レポート（ローカル補助）
 
 ```bash
 npx playwright show-report --host 127.0.0.1 --port 9323
@@ -91,30 +116,66 @@ npx playwright show-report --host 127.0.0.1 --port 9323
 
 ---
 
-## 5. タグ命名とファイル構成
+## 5. タグ命名とテストファイル構成
 
-- `e2e/kanban.spec.ts` … `@feature:lists` を中心に必須シナリオを保持。
-- `e2e/reorder-api.spec.ts` … API 異常系は `@failure:reorder` などを付与。
-- `e2e/comments.spec.ts`（旧 `phase3-comments`） … `@feature:comments` / `@failure:comments`。
-- `e2e/notifications.spec.ts`（旧 `phase3-webpush`）。
-- `e2e/invites.spec.ts`（旧 `phase3-invite`）。
-- 追加予定: `board-permissions.spec.ts`（ShareDialog）。
+### ファイル一覧（2025-10-23 時点）
+
+| ファイル | タグ | テスト数 | 説明 |
+|---|---|---|---|
+| **auth.spec.ts** | `@e2e:essential` | 5 | 認証・セッション管理 |
+| **kanban.spec.ts** | `@feature:boards` | 37 | ボード・リスト・カード CRUD、D&D |
+| **reorder-api.spec.ts** | `@feature:lists`, `@failure:validation` | 8 | リスト/カード並び替え API、異常系 |
+| **comments.spec.ts** | `@feature:comments`, `@e2e:essential` | 8 | コメント CRUD、返信、@メンション |
+| **notifications.spec.ts** | `@feature:notifications`, `@failure:notifications` | 6 | Web Push、In-app通知、バッジ |
+| **board-permissions.spec.ts** | `@feature:boards`, `@failure:permissions` | 5 | ShareDialog、メンバー管理 |
+| **invites.spec.ts** | `@phase3` | 5（スキップ） | 招待機能（未実装） |
+| **rls.spec.ts** | `@e2e:essential` | 6 | RLS ポリシー検証 |
+
+### 主要タグ
+
+- **`@e2e:essential`**: CI必須の最小セット（認証、基本CRUD、セキュリティ、@メンション、通知バッジ）
+- **`@feature:boards`**: ボード機能（Kanban、権限管理）
+- **`@feature:lists`**: リスト並び替えAPI
+- **`@feature:comments`**: コメント機能
+- **`@feature:notifications`**: 通知機能
+- **`@failure:*`**: 異常系テスト（validation、permissions、notificationsなど）
+- **`@phase3`**: 未実装機能（スキップ対象）
+- **`@wip`**: 作業中テスト（CI除外）
 
 ---
 
-## 6. Appendix A — 不足カバレッジ計画
+## 6. テストカバレッジ概要
 
-1. **コメントの @メンション**（`comments.spec.ts`）
-   - 候補表示 → 選択 → UUID 埋め込み（`@e2e:essential`）。
-   - 不正 UUID は 400 + トースト（`@failure:comments`）。
-2. **In-app 通知**（`notifications.spec.ts`）
-   - 未読数インクリメント、既読でバッジ減少（`@e2e:essential`）。
-   - API 失敗時のリカバリ（`@failure:notifications`）。
-3. **ボード権限管理**（`board-permissions.spec.ts` 新規）
-   - Member→Editor への昇格、Viewer 制限、メンバー削除。
-   - 権限不足 403 の UI 表示（`@failure:permissions`）。
+### 実装済み機能（2025-10-23）
 
-実装順序推奨: リネーム → コメント → 通知 → 権限 → Essential タグ見直し。
+✅ **認証・セッション** (auth.spec.ts)
+- Google OAuth リダイレクト、エラーハンドリング
+
+✅ **ボード・リスト・カード** (kanban.spec.ts)
+- CRUD操作、ドラッグ&ドロップ、オフライン同期、URL正規化
+
+✅ **リスト/カード並び替え API** (reorder-api.spec.ts)
+- トランザクション更新、重複ID検証、UUID形式検証
+
+✅ **コメント機能** (comments.spec.ts)
+- コメント投稿・編集・削除、返信機能
+- **@メンション**: タイプアヘッド、UUID v4検証、リアルタイム同期
+
+✅ **通知機能** (notifications.spec.ts)
+- Web Push設定、Quiet Hours、テスト通知送信
+- **In-app通知**: 未読バッジ表示、既読マーク、空状態ハンドリング
+
+✅ **ボード権限管理** (board-permissions.spec.ts)
+- ShareDialog表示、メンバーロール変更、メンバー削除
+- オーナーロール保護、権限エラーハンドリング
+
+✅ **RLS セキュリティ** (rls.spec.ts)
+- Row Level Security ポリシー検証、マイグレーション確認
+
+### 未実装機能（@phase3）
+
+⏸️ **招待機能** (invites.spec.ts)
+- 招待リンク生成、既存ユーザー招待（実装待ち）
 
 ---
 

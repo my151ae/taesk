@@ -7,10 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "playwright test --project=core --grep @e2e:essential",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/$(date +%Y-%m-%d-%H%M%S)/report.json playwright test"
+    "test:e2e:report": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/$(date +%Y-%m-%d-%H%M%S)/report.json playwright test",
+    "test:feature:boards": "playwright test --project=core --grep @feature:boards",
+    "test:feature:lists": "playwright test --project=core --grep @feature:lists",
+    "test:feature:comments": "playwright test --project=core --grep @feature:comments",
+    "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
+    "test:failure": "playwright test --project=core --grep @failure:",
+    "test:full": "playwright test --project=full",
+    "test:summary": "cat playwright-report.json | jq '.stats'"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

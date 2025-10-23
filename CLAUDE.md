@@ -234,30 +234,50 @@ Uses `@dnd-kit`:
    E2E_USER_PASSWORD=replace-with-local-test-password
    ```
 
-**実行方法**:
+**実行方法**（タグベース）:
 ```bash
-# すべてのテストを実行（50 tests）
-npx playwright test --reporter=json > playwright-report.json
+# CI必須テスト（@e2e:essential）
+npm test
 
-# 結果確認（推奨: jq コマンド）
-cat playwright-report.json | jq '.stats'
+# 機能別テスト
+npm run test:feature:boards      # ボード機能
+npm run test:feature:comments    # コメント・@メンション
+npm run test:feature:notifications  # 通知機能
 
-# jq がない場合
-tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
+# 異常系テスト
+npm run test:failure
+
+# 全テスト実行
+npm run test:full
+
+# JSON統計確認
+npm run test:summary
 ```
 
 **テスト成果物**（すべて `.gitignore` に含まれる）:
-- `playwright-report.json` - テスト結果
+- `playwright-report.json` - テスト結果（JSON）
 - `playwright/.auth/user.json` - 認証セッション
 - `test-results/` - 失敗時のスクリーンショット
 - `playwright-report/` - HTML レポート
 
-### Test Coverage (50 tests)
+### Test Coverage (80 tests)
 
-- ✅ Auth tests (5): Login, logout, profile
-- ✅ Kanban tests (37): Add/edit/delete lists/cards, drag & drop, persistence
-- ✅ Reorder API tests (8): Validation, transactions, concurrent updates
-- ✅ Mobile responsiveness
+| カテゴリ | ファイル | テスト数 |
+|---|---|---|
+| 認証 | auth.spec.ts | 5 |
+| ボード・リスト・カード | kanban.spec.ts | 37 |
+| 並び替えAPI | reorder-api.spec.ts | 8 |
+| コメント・@メンション | comments.spec.ts | 8 |
+| 通知（Web Push、In-app） | notifications.spec.ts | 6 |
+| ボード権限管理 | board-permissions.spec.ts | 5 |
+| RLSセキュリティ | rls.spec.ts | 6 |
+| 招待機能（未実装） | invites.spec.ts | 5 (skip) |
+
+**タグ体系**:
+- `@e2e:essential` - CI必須（約20テスト）
+- `@feature:*` - 機能別（boards, lists, comments, notifications）
+- `@failure:*` - 異常系（validation, permissions, notificationsなど）
+- `@phase3` - 未実装機能（スキップ対象）
 
 **詳細**: `/docs/detail/testing.md` を参照
 

@@ -113,7 +113,7 @@ async function ensureAssigneeIdSupport(): Promise<boolean> {
   return true;
 }
 
-test.describe('Taesk Kanban Board E2E Tests', () => {
+test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   test.describe.configure({ timeout: 60000 });
   let testBoardId: string;
   let testBoardName: string;
@@ -193,7 +193,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await supabase.from('boards').delete().eq('id', testBoardId);
   });
 
-  test('should load the test board (empty initially)', async ({ page }) => {
+  test('should load the test board (empty initially) @e2e:essential', async ({ page }) => {
     // Test board should be loaded and empty (no lists)
     await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
@@ -261,7 +261,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     expect(dialogMessages[dialogMessages.length - 1]).toBe('URLをコピーしました');
   });
 
-  test('should add a new list', async ({ page }) => {
+  test('should add a new list @e2e:essential', async ({ page }) => {
     // Click Add List button
     await page.getByRole('button', { name: '+ Add List' }).click();
 
@@ -323,7 +323,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
   });
 
-  test('should add a card to a list', async ({ page }) => {
+  test('should add a card to a list @e2e:essential', async ({ page }) => {
     // First add a list
     await page.getByRole('button', { name: '+ Add List' }).click();
     await page.waitForTimeout(300);
@@ -614,7 +614,7 @@ test.describe('Taesk Kanban Board E2E Tests', () => {
     await expect(page.getByText('New Card')).toHaveCount(1);
   });
 
-  test('should persist data after page reload', async ({ page }) => {
+  test('should persist data after page reload @e2e:essential', async ({ page }) => {
     // Add a list and card
     await page.getByRole('button', { name: '+ Add List' }).click();
     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();

@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 // Reset storage state for this file - tests run as unauthenticated users
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe('Authentication', () => {
+test.describe('Authentication @e2e:essential', () => {
   test('should redirect to login page when not authenticated', async ({ page }) => {
     await page.goto('/');
 
@@ -60,7 +60,7 @@ test.describe('Authentication', () => {
  * This means all authenticated users share the same workspace.
  */
 
-test.describe('Session Management', () => {
+test.describe('Session Management @e2e:essential', () => {
   test('should show login page after visiting any protected route', async ({ page }) => {
     await page.goto('/');
 

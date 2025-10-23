@@ -44,29 +44,45 @@ cp .env.example .env.test
 #   E2E_USER_EMAIL=e2e.taesk.test@gmail.com
 #   E2E_USER_PASSWORD=replace-with-local-test-password
 
-# 3. テストを実行（playwright.config.ts が自動的に .env.test を読み込む）
-npx playwright test --reporter=json > playwright-report.json
+# 3. テストを実行（タグベース）
+# CI必須テスト（@e2e:essential）
+npm test
 
-# 4. 結果確認（推奨: jq コマンド）
-cat playwright-report.json | jq '.stats'
+# 機能別テスト
+npm run test:feature:boards       # ボード機能
+npm run test:feature:comments     # コメント・@メンション
+npm run test:feature:notifications  # 通知機能
 
-# jq がない場合:
-tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'
+# 異常系テスト
+npm run test:failure
+
+# 全テスト実行
+npm run test:full
+
+# JSON統計確認
+npm run test:summary
 ```
 
 **テスト成果物**（すべて `.gitignore` に含まれる）:
-- `playwright-report.json` - テスト結果
+- `playwright-report.json` - テスト結果（JSON形式）
 - `playwright/.auth/user.json` - 認証セッション
 - `test-results/` - 失敗時のスクリーンショット
 - `playwright-report/` - HTML レポート
 
-**Test Coverage**:
-- ✅ Auth tests: Login, logout, profile
-- ✅ Kanban tests: CRUD operations, drag & drop, multi-assignee
-- ✅ Reorder API tests: Validation, transactions, concurrent updates
-- ✅ Comments tests: Threaded comments, @mentions, realtime sync
-- ✅ Notifications tests: In-app notifications, Web Push delivery
-- ✅ RLS tests (optional): Permission enforcement
+**Test Coverage (80 tests)**:
+- ✅ Auth tests (5): Login, logout, session management
+- ✅ Kanban tests (37): CRUD operations, drag & drop, multi-assignee
+- ✅ Reorder API tests (8): Validation, transactions, concurrent updates
+- ✅ Comments tests (8): Threaded comments, @mentions, realtime sync, UUID validation
+- ✅ Notifications tests (6): In-app notifications, Web Push, unread badge
+- ✅ Board permissions tests (5): ShareDialog, member management, role changes
+- ✅ RLS tests (6): Security policy validation
+
+**タグ体系**:
+- `@e2e:essential` - CI必須の最小セット（約20テスト）
+- `@feature:*` - 機能別（boards, lists, comments, notifications）
+- `@failure:*` - 異常系テスト（validation, permissions, notificationsなど）
+- `@phase3` - 未実装機能（スキップ対象）
 
 **詳細**: [`/docs/detail/testing.md`](./detail/testing.md) を参照
 
@@ -239,10 +255,14 @@ taesk/
 │
 ├── e2e/
 │   ├── .setup/auth-global-setup.ts     # Programmatic Supabase sign-in
-│   ├── auth.spec.ts / kanban.spec.ts   # Playwright suites
-│   ├── phase3-comments.spec.ts         # Comments & mentions E2E tests
-│   ├── phase3-webpush.spec.ts          # Web Push notifications E2E tests
-│   └── rls.spec.ts                     # RLS バリデーション用シナリオ（必要に応じて実行）
+│   ├── auth.spec.ts                    # Authentication & session tests (@e2e:essential)
+│   ├── kanban.spec.ts                  # Board/list/card CRUD & D&D (@feature:boards)
+│   ├── reorder-api.spec.ts             # List/card reorder API tests (@feature:lists)
+│   ├── comments.spec.ts                # Comments & @mentions (@feature:comments)
+│   ├── notifications.spec.ts           # Web Push & in-app notifications (@feature:notifications)
+│   ├── board-permissions.spec.ts       # ShareDialog & member management (@feature:boards)
+│   ├── invites.spec.ts                 # Invite flow (未実装、@phase3)
+│   └── rls.spec.ts                     # RLS policy validation (@e2e:essential)
 │
 ├── playwright/.auth/user.json          # Persisted auth state for Playwright
 ├── docs/                               # Documentation hub (details below)

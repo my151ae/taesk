@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
 
-test.describe('Reorder API (Phase 2)', () => {
+test.describe('Reorder API (Phase 2) @feature:lists', () => {
   let boardId: string;
   let listId: string;
   let cardIds: string[] = [];
@@ -55,7 +55,7 @@ test.describe('Reorder API (Phase 2)', () => {
     expect(result.durationMs).toBeGreaterThan(0);
   });
 
-  test('should reject duplicate IDs', async ({ request }) => {
+  test('should reject duplicate IDs @failure:validation', async ({ request }) => {
     const updates = [
       { id: cardIds[0], position: 1000 },
       { id: cardIds[0], position: 1010 }, // duplicate
@@ -72,7 +72,7 @@ test.describe('Reorder API (Phase 2)', () => {
     expect(result.issues.some((i: any) => i.code === 'DUPLICATE_ID')).toBe(true);
   });
 
-  test('should reject invalid UUID format', async ({ request }) => {
+  test('should reject invalid UUID format @failure:validation', async ({ request }) => {
     const updates = [
       { id: '00000000-0000-0000-0000-000000000999', position: 1000 }, // invalid UUID
     ];
@@ -87,7 +87,7 @@ test.describe('Reorder API (Phase 2)', () => {
     expect(result.error.message).toBe('Validation failed');
   });
 
-  test('should reject invalid schema (missing position)', async ({ request }) => {
+  test('should reject invalid schema (missing position) @failure:validation', async ({ request }) => {
     const updates = [
       { id: cardIds[0] }, // missing position
     ];

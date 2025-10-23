@@ -186,12 +186,8 @@
 - オフラインキュー経由の同期テスト。
 - アクセシビリティ（ARIA 属性 / スクリーンリーダ通知）。
 
-### 8.3 TODO（以前のメモを引き継ぎ）
-1. `phase3-comments.spec.ts` → `comments.spec.ts`
-2. `phase3-webpush.spec.ts` → `notifications.spec.ts`
-3. `phase3-invite.spec.ts` → `invites.spec.ts`
-4. 追加カバレッジ: @メンション, In-app 通知, ボード権限
-5. CI で `@e2e:essential` タグをゲートにする運用（Playwright grep）。
+### 8.3 テスト整理・追加カバレッジ
+テストファイルのリネーム、タグ付与、追加カバレッジについては **[01-testing-strategy-tags.md の Appendix A](./01-testing-strategy-tags.md#appendix-a-不足カバレッジの追加計画旧-02-の統合)** を参照。
 
 ---
 

@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * to prevent data leakage between users.
  */
 
-test.describe('RLS Policy Verification', () => {
+test.describe('RLS Policy Verification @e2e:essential', () => {
   test('should have RLS enabled on lists table', async () => {
     // This test documents the expected database configuration
     // Actual verification would require direct database access
@@ -99,7 +99,7 @@ test.describe('RLS Policy Verification', () => {
   });
 });
 
-test.describe('Database Migration Verification', () => {
+test.describe('Database Migration Verification @e2e:essential', () => {
   test('should have applied add_user_id_and_rls_policies migration', async () => {
     /**
      * Verification SQL:

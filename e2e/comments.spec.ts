@@ -155,7 +155,7 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise
     .toContain(`card=${card.shortId}`);
 }
 
-test.describe('Comments Feature', () => {
+test.describe('Comments Feature @feature:comments', () => {
   let board: TestBoardContext | null = null;
   let card: TestCardContext | null = null;
 
@@ -255,9 +255,80 @@ test.describe('Comments Feature', () => {
 
     await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
   });
+
+  test('should support @mentions with typeahead @e2e:essential', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+
+    // Type @ to trigger mention typeahead
+    const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
+    await commentTextarea.fill('@');
+
+    // Wait for mention suggestions to appear
+    const mentionDropdown = page.locator('[role="listbox"]');
+    await expect(mentionDropdown).toBeVisible({ timeout: 3000 });
+
+    // Verify user email appears in suggestions
+    const userOption = page.locator('[role="option"]', { hasText: TEST_USER_EMAIL });
+    await expect(userOption).toBeVisible();
+
+    // Select mention by pressing Enter
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+
+    // Verify mention is inserted into textarea
+    const textareaValue = await commentTextarea.inputValue();
+    expect(textareaValue).toContain(TEST_USER_EMAIL);
+
+    // Submit comment with mention
+    const commentText = `${textareaValue} Test mention ${Date.now()}`;
+    await commentTextarea.fill(commentText);
+    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+
+    // Verify comment with mention is visible
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: 'Test mention' })).toBeVisible({ timeout: 5000 });
+
+    // Verify mention renders as clickable element
+    const mentionElement = page.locator('span[class*="mention"]', { hasText: TEST_USER_EMAIL });
+    await expect(mentionElement).toBeVisible();
+  });
+
+  test('should validate mention user_id as UUID v4', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+    const currentBoard = assertContext(board, 'Board context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+
+    // Create comment with mention via API to verify UUID format
+    const commentBody = `@${TEST_USER_EMAIL} Test UUID validation`;
+    const { data: commentData, error: commentError } = await supabase
+      .from('comments')
+      .insert({
+        card_id: currentCard.id,
+        board_id: currentBoard.id,
+        user_id: TEST_USER_ID,
+        body: commentBody,
+        mentions: [TEST_USER_ID], // Should be UUID v4
+      })
+      .select()
+      .single();
+
+    expect(commentError).toBeNull();
+    expect(commentData).toBeDefined();
+    expect(commentData.mentions).toContain(TEST_USER_ID);
+
+    // Verify UUID v4 format (8-4-4-4-12 hex digits)
+    const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    expect(TEST_USER_ID).toMatch(uuidV4Regex);
+    expect(commentData.mentions[0]).toMatch(uuidV4Regex);
+
+    // Clean up
+    await supabase.from('comments').delete().eq('id', commentData.id);
+  });
 });
 
-test.describe('Comments Realtime', () => {
+test.describe('Comments Realtime @feature:comments', () => {
   test('should sync comments across multiple browser contexts', async ({ browser }) => {
     test.slow();
     const boardName = `RT Test ${Date.now()}`;
