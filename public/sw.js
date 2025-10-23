@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.0.1';
+const SW_VERSION = '1.1.0';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -109,14 +109,43 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
-      body: notificationData.body,
-      icon: notificationData.icon,
-      badge: notificationData.badge,
-      tag: notificationData.tag,
-      requireInteraction: notificationData.requireInteraction,
-      data: notificationData.data,
-    })
+    Promise.all([
+      // Show notification
+      self.registration.showNotification(notificationData.title, {
+        body: notificationData.body,
+        icon: notificationData.icon,
+        badge: notificationData.badge,
+        tag: notificationData.tag,
+        requireInteraction: notificationData.requireInteraction,
+        data: notificationData.data,
+        silent: false, // Enable sound
+        vibrate: [200, 100, 200], // Vibration pattern for mobile
+      }),
+      // Update badge
+      (async () => {
+        if (self.navigator && 'setAppBadge' in self.navigator) {
+          try {
+            // Get current badge count and increment
+            const currentCount = await self.clients.matchAll({ type: 'window' })
+              .then(clients => {
+                if (clients.length > 0) {
+                  // If app is open, client will update badge
+                  return null;
+                }
+                // App is closed, increment badge
+                return 1;
+              });
+
+            if (currentCount !== null) {
+              await self.navigator.setAppBadge(currentCount);
+              console.log('[SW] Badge updated');
+            }
+          } catch (err) {
+            console.error('[SW] Failed to update badge:', err);
+          }
+        }
+      })(),
+    ])
   );
 });
 
