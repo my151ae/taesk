@@ -5,11 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
 function LoginForm() {
-  const { user, loading, signInWithGoogle } = useAuth()
+  const { user, loading, signInWithGoogle, signInWithPassword } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [showEmailLogin, setShowEmailLogin] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
   useEffect(() => {
     if (user && !loading) {
@@ -29,6 +32,20 @@ function LoginForm() {
       setError(null)
       setIsLoggingIn(true)
       await signInWithGoogle()
+    } catch (error) {
+      console.error('Login error:', error)
+      setError(error instanceof Error ? error.message : 'ログインに失敗しました')
+      setIsLoggingIn(false)
+    }
+  }
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setError(null)
+      setIsLoggingIn(true)
+      await signInWithPassword(email, password)
+      // Success - AuthContext will handle redirect
     } catch (error) {
       console.error('Login error:', error)
       setError(error instanceof Error ? error.message : 'ログインに失敗しました')
@@ -84,9 +101,66 @@ function LoginForm() {
             />
           </svg>
           <span className="font-medium">
-            {isLoggingIn ? 'ログイン中...' : 'Continue with Google'}
+            {isLoggingIn && !showEmailLogin ? 'ログイン中...' : 'Continue with Google'}
           </span>
         </button>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <button
+              type="button"
+              onClick={() => setShowEmailLogin(!showEmailLogin)}
+              className="bg-white dark:bg-gray-800 px-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              {showEmailLogin ? 'Hide email login' : 'Or sign in with email'}
+            </button>
+          </div>
+        </div>
+
+        {showEmailLogin && (
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoggingIn}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder="your@email.com"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoggingIn}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder="••••••••"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoggingIn ? 'ログイン中...' : 'Sign in'}
+            </button>
+          </form>
+        )}
 
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
           By signing in, you agree to our Terms of Service

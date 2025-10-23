@@ -8,6 +8,7 @@ type AuthContextType = {
   user: User | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithPassword: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -74,6 +75,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signInWithPassword = async (email: string, password: string) => {
+    if (BYPASS_AUTH) {
+      console.warn('Sign in bypassed in test mode')
+      return
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (error) {
+      console.error('Error signing in with password:', error.message)
+      throw error
+    }
+  }
+
   const signOut = async () => {
     if (BYPASS_AUTH) {
       console.warn('Sign out bypassed in test mode')
@@ -90,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   )
