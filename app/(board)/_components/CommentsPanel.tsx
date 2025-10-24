@@ -59,6 +59,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   const [editText, setEditText] = useState('');
   const [mentionSearch, setMentionSearch] = useState('');
   const [showMentions, setShowMentions] = useState(false);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -201,8 +202,10 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
       const search = textBefore.slice(lastAtIndex + 1);
       setMentionSearch(search);
       setShowMentions(true);
+      setSelectedMentionIndex(0);
     } else {
       setShowMentions(false);
+      setSelectedMentionIndex(0);
     }
   };
 
@@ -445,7 +448,24 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
             rows={3}
             disabled={isSubmitting}
             onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey && !showMentions) {
+              if (showMentions && filteredMembers.length > 0) {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setSelectedMentionIndex(prev =>
+                    prev < Math.min(filteredMembers.length, 6) - 1 ? prev + 1 : prev
+                  );
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setSelectedMentionIndex(prev => (prev > 0 ? prev - 1 : 0));
+                } else if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  handleMentionSelect(filteredMembers[selectedMentionIndex]);
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setShowMentions(false);
+                  setSelectedMentionIndex(0);
+                }
+              } else if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 handleSubmit(event);
               }
@@ -457,13 +477,18 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
               role="listbox"
               className="absolute bottom-full mb-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-40 overflow-y-auto z-10"
             >
-              {filteredMembers.slice(0, 6).map(member => (
+              {filteredMembers.slice(0, 6).map((member, index) => (
                 <button
                   key={member.id}
                   type="button"
                   role="option"
+                  aria-selected={index === selectedMentionIndex}
                   onClick={() => handleMentionSelect(member)}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  className={`w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 ${
+                    index === selectedMentionIndex
+                      ? 'bg-blue-100 dark:bg-blue-900/30'
+                      : ''
+                  }`}
                 >
                   <div className="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white text-xs font-medium">
                     {member.full_name?.[0]?.toUpperCase() || member.email?.[0]?.toUpperCase() || '?'}
