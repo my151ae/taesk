@@ -287,6 +287,28 @@ export default function NotificationSettings() {
     }
   };
 
+  const handleTestSound = async () => {
+    console.log('[Audio Test] Starting audio test...');
+
+    try {
+      // Test 1: HTML5 Audio API
+      console.log('[Audio Test] Creating Audio object...');
+      const audio = new Audio('data:audio/wav;base64,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');
+      console.log('[Audio Test] Audio object created');
+
+      audio.volume = 1.0;
+      console.log('[Audio Test] Volume set to:', audio.volume);
+
+      await audio.play();
+      console.log('[Audio Test] Audio playback started successfully');
+
+      setStatusMessage('Audio test: Sound played via Audio API ✅');
+    } catch (err) {
+      console.error('[Audio Test] Failed to play audio:', err);
+      setError(`Audio test failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -466,14 +488,23 @@ export default function NotificationSettings() {
         <p className="text-sm text-gray-600 dark:text-gray-400">
           We will create a test notification for your account to verify delivery.
         </p>
-        <button
-          onClick={handleSendTestNotification}
-          disabled={testSending}
-          className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-50"
-          data-testid="send-test-notification-button"
-        >
-          {testSending ? 'Sending…' : 'Send Test Notification'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSendTestNotification}
+            disabled={testSending}
+            className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-50"
+            data-testid="send-test-notification-button"
+          >
+            {testSending ? 'Sending…' : 'Send Test Notification'}
+          </button>
+          <button
+            onClick={handleTestSound}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            data-testid="test-sound-button"
+          >
+            Test Sound Only
+          </button>
+        </div>
       </section>
     </div>
   );
