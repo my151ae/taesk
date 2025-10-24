@@ -120,6 +120,10 @@ self.addEventListener('push', (event) => {
         data: notificationData.data,
         silent: false, // Enable sound
         vibrate: [200, 100, 200], // Vibration pattern for mobile
+      }).then(() => {
+        console.log('[SW] Notification shown successfully:', notificationData.title);
+      }).catch(err => {
+        console.error('[SW] Failed to show notification:', err);
       }),
       // Update badge
       (async () => {
