@@ -116,6 +116,7 @@ self.addEventListener('push', (event) => {
         icon: notificationData.icon,
         badge: notificationData.badge,
         tag: notificationData.tag,
+        renotify: true, // Force sound even with same tag
         requireInteraction: notificationData.requireInteraction,
         data: notificationData.data,
         silent: false, // Enable sound
