@@ -239,8 +239,8 @@ Deno.serve(async (req) => {
     const pushPayload = JSON.stringify({
       title: 'Taesk Notification',
       body: notificationData.payload.message,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/icon?size=192',
+      badge: '/icon?size=192',
       tag: `notification-${notificationData.notification_id}`,
       data: {
         notification_id: notificationData.notification_id,
