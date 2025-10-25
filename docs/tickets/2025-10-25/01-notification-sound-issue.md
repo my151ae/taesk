@@ -1,7 +1,7 @@
 # Web Push通知音が鳴らない問題
 
 **作成日**: 2025-10-25
-**ステータス**: 調査完了・解決方法判明
+**ステータス**: 実装完了（Web Audio ベースで通知音復旧）
 **優先度**: Medium
 **カテゴリ**: Notifications / Web Push
 
@@ -89,6 +89,19 @@ await audio.play();
 
 **Chromeのサイト別設定で、taesk.vercel.appの「音」が許可されていない**
 
+## 最終対応（2025-10-26）
+
+- ❌ 既存の **データURL (WAV)** を廃止し、ブラウザ組み込みの Web Audio API に統一
+- ✅ `lib/notification-audio.ts` で AudioContext を集中管理し、**800Hz サイン波 + 200ms フェードアウト**のビープを生成
+- ✅ `NotificationSettings` に「🔊 音声を有効化」「🎵 テスト音を再生」ボタンを追加し、ユーザーが Chrome の Autoplay 制限を解除して即時確認できるようにした
+- ✅ `NotificationSoundPlayer`（隠しクライアントコンポーネント）が Service Worker からの `NOTIFICATION_RECEIVED` メッセージを受信し、タブが `visible` で audio unlocked のときだけ Web Audio サウンドを再生
+- ✅ Service Worker `public/sw.js` は従来通り `silent: false` を指定しつつ、前景タブに `postMessage` を送って Web Audio 側を起動
+
+### 動作確認手順
+1. NotificationSettings モーダルで **「音声を有効化」** をクリック（`unlockAudio()` → AudioContext resume）
+2. **「🎵 テスト音を再生」** をクリックし、800Hz ビープ（0.2s）が鳴ること・ログに `[Audio] Notification sound played` が出ることを確認
+3. 「テスト通知を送信」を実行し、前景タブで Web Audio ビープ、背景タブでは OS 標準通知音のみになることをコンソールで確認
+
 ## 解決方法
 
 ### 方法1: Chromeのサイト設定（推奨）
@@ -174,16 +187,23 @@ Service Worker受信 (push event)
 
 **ファイル**: `app/(board)/_components/CommentsPanel.tsx`
 
-### 2. 音声テストボタン
+### 2. 音声テストボタン（Web Audio版）
 
 **追加機能**:
-- "Test Sound Only" ボタン
-- Audio APIで直接音を再生してデバッグ
-- Consoleログで詳細な診断情報
+- 「音声を有効化」ボタンで `AudioContext` を解除し、Chromeのautoplay制限に対応
+- 「🎵 テスト音を再生」ボタンで **800Hz / 200ms フェードアウト**のビープを Web Audio オシレーターで生成
+- Consoleログに `[Audio] Notification sound played` 等を出力し、失敗時の例外も捕捉
 
 **ファイル**: `app/(board)/_components/NotificationSettings.tsx`
 
-### 3. Service Worker詳細ログ
+### 3. NotificationSoundPlayer & AudioManager
+
+**追加機能**:
+- `lib/notification-audio.ts` が AudioContext と unlock 状態を単一モジュールで管理
+- `app/components/NotificationSoundPlayer.tsx` が Service Worker からの `NOTIFICATION_RECEIVED` メッセージをリッスンし、タブが `visible` & audio unlocked のときだけ `playNotificationSound()` を呼び出し
+- 背景タブでは OS の通知音のみ鳴らし、二重再生を防止
+
+### 4. Service Worker詳細ログ
 
 **追加ログ**:
 ```javascript
@@ -203,6 +223,8 @@ console.log('[SW] Badge updated');
 - `public/sw.js` - Service Worker
 - `lib/push-notifications.ts` - クライアント側Push通知ヘルパー
 - `app/(board)/_components/NotificationSettings.tsx` - 通知設定UI
+- `lib/notification-audio.ts` - Web Audio ベースの通知音ヘルパー
+- `app/components/NotificationSoundPlayer.tsx` - Foregroundサウンド再生
 - `app/(board)/_components/CommentsPanel.tsx` - @メンション機能
 
 ## Commits

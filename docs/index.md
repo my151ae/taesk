@@ -13,19 +13,38 @@
 
 ## 🚀 Quick Start
 
+> ⚠️ **最優先ルール**: `npm run dev` / `NODE_ENV=test npm run dev` を含む手動サーバー起動は禁止。検証は Playwright JSON レポートと chrome-devtools MCP で行う。
+
 ```bash
 # Install dependencies
 npm install
 
-# Set up environment variables for development
+# Prepare environment variables
 cp .env.example .env.local
-# Add NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Populate NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY など
 
-# Run development server
-npm run dev
+# Static analysis
+npm run lint
+
+# Production bundle
+npm run build
+
+# Verification (JSON必須)
+npx playwright test --reporter=json > playwright-report.json
+cat playwright-report.json | jq '.stats'
 ```
 
-Visit `http://localhost:3000` to see the app.
+UIのレンダリング確認は chrome-devtools MCP でスナップショット/ネットワーク/コンソールを取得して行う。
+
+### 🔊 Notification Sound Check
+
+通知関連の検証手順:
+
+1. `NotificationSettings` セクションで **「音声を有効化」** ボタンを押し、Web Audio の `AudioContext` をアンロック
+2. **「🎵 テスト音を再生」** をクリックし、800Hz / 200ms フェードアウトのビープが鳴ることを確認
+3. Service Worker からの通知を確認したい場合は `showTestNotification()` を実行し、前景タブで `NotificationSoundPlayer` がサウンドを再生すること、背景タブではOS標準通知音のみ鳴ることをログで検証
+
+ビープ生成は `lib/notification-audio.ts` の Web Audio オシレーター実装に統一され、過去のデータURL(WAV)依存は排除されている。
 
 ### Running E2E Tests
 
@@ -126,6 +145,12 @@ npm run test:summary
 3. **Offline Mode**: Update UI → Save to localStorage → Sync when online
 4. **Page Reload**: Load from Supabase → Update cache → Render
 
+### Notification Audio Flow
+
+- `NotificationSettings` が Web Audio のアンロックとテスト再生を提供（`unlockAudio`, `playNotificationSound`）
+- `NotificationSoundPlayer` コンポーネントが Service Worker からの `NOTIFICATION_RECEIVED` メッセージを受け、タブが `visible` かつ audio unlocked の場合のみ 800Hz ビープを再生
+- Service Worker (`public/sw.js`) は引き続き `silent: false` / `renotify: true` を指定しつつ、前景タブへ postMessage することで OS 通知音 + Web Audio ビープを併用
+
 ## ✨ Features
 
 ### Authentication & Security
@@ -165,6 +190,7 @@ npm run test:summary
 - 📲 **PWA** installable on mobile devices
 - ⚡ **Optimistic updates** for instant feedback
 - 🔄 **Horizontal scrolling** optimized for mobile
+- 🔊 **Foreground notification beep** powered by Web Audio (800Hz / 200msフェード)
 
 ### Technical Features
 - 🗄️ **PostgreSQL** database via Supabase

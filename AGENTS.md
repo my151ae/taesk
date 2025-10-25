@@ -23,6 +23,7 @@ Shared utilities such as the Supabase client, board/card helpers, and sync queue
 - Short URLs for cards and boards rely on `short_id`, `id_short`, and `slug`; ensure these fields travel through sync endpoints when creating or reordering records.
 - Offline sync queues should continue to flow through the API routes so server-side activity logging and permissions remain consistent.
 - Cards/lists reorder API routes now validate duplicate/foreign IDs, check board ownership, and roll back to the previous snapshot on failure; send only position (and optional `list_id`) when reordering.
+- Foreground通知音は `lib/notification-audio.ts` + `app/components/NotificationSoundPlayer.tsx` で管理（800Hz/200msフェードのWeb Audioビープ）。`NotificationSettings` の「音声を有効化」「テスト音を再生」から検証する。
 
 ## Build, Test, and Development Commands
 `npm run dev` は全面禁止。ローカルでの挙動確認やログ取得も Playwright テストなどの JSON レポート経由で実施すること。Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
@@ -39,6 +40,7 @@ The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explici
 - `jq` が利用できない環境では `tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'` を用いて件数を抽出し、成功/失敗を明示する。
 - グローバルセットアップが Supabase 認証情報を `playwright/.auth/user.json` に保存するため、バイパスせず必ずこれを利用する。トークン失効時はファイルを削除して再実行する。
 - `e2e/` の各 spec はテスト用ボードを作成して `afterEach` で削除する設計なので、シナリオ追加時もデータ分離を徹底する。ドラッグ&ドロップなど時間が掛かる操作は既存ヘルパー (`dragAndDrop` など) を活用し、`waitForURL` や適切な待機を入れて安定化させる。
+- 通知音の検証は Playwright 後に chrome-devtools MCP 経由で行い、`NotificationSettings` のボタンログ (`[Audio] Unlocking audio`, `[Audio] Notification sound played`) を確認する。データURLのサウンドは廃止済みなので混在しないこと。
 
 ## Commit & Pull Request Guidelines
 Write short, imperative commit messages (English or Japanese), mirroring existing history such as `Add card modal view`. Keep each commit focused on one fix or feature. Pull requests should describe user-facing impact, summarize key changes, attach relevant screenshots or Playwright traces for UI work, and link tickets from `docs/tickets/` when applicable. Never commit or push without explicit user approval.

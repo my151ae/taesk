@@ -27,6 +27,7 @@
 - ✅ Comments system with threaded replies
 - ✅ @Mentions with typeahead
 - ✅ In-app notifications (real-time)
+- ✅ Foreground notification sound with Web Audio (800Hz / 200ms fade)
 - ✅ Web Push notifications with preferences
 - ✅ Quiet hours & timezone support
 - ✅ Hybrid storage (offline-first)
@@ -58,6 +59,8 @@
 
 **Always refer to these docs when working on Taesk to understand the full context.**
 
+> ⚠️ **環境制約（厳守）**: `npm run dev`・`NODE_ENV=test npm run dev` を含む手動サーバー起動は全面禁止。検証は Playwright JSON レポートと chrome-devtools MCP で行い、必要なログは JSON 解析（`jq` / `sed`）経由で取得すること。
+
 ## Development Workflow
 
 ### Before Starting Work
@@ -68,15 +71,15 @@
 
 ### During Development
 
-1. **Make code changes**
-2. **Verify dev server is running** (`npm run dev`)
-3. **Test in browser** with DevTools (use chrome-devtools MCP)
-4. **Check for errors/warnings** in console
-5. **Fix any issues** before proceeding
-6. **Run E2E tests** if relevant:
-   - **前提**: `.env.test` ファイルが必須（後述）
-   - **実行**: `npx playwright test --reporter=json > playwright-report.json`
-   - **結果確認**: `cat playwright-report.json | jq '.stats'` (推奨) または `tail -20 playwright-report.json | grep -E '"(expected|unexpected)"'`
+1. **コードを更新**し、関連ドキュメントを即時に追随させる
+2. **Playwright E2E（JSONレポート必須）で挙動を確認**  
+   - `npx playwright test --reporter=json > playwright-report.json`
+   - `cat playwright-report.json | jq '.stats'` で結果確認  
+   - 必要に応じて `sed -n '/^{/,$p'` を挟み、JSON開始前のログを除去
+3. **chrome-devtools MCP でレンダリングとコンソールログを確認**（サーバー起動は禁止のためブラウザはMCPで確認）
+4. **通知音などブラウザ依存機能**は `NotificationSettings` の「音声を有効化」「テスト音を再生」ボタンで検証し、ログを記録
+5. **lint / type check** (`npm run lint`) を実行し、警告を解消
+6. **必要に応じてAPIログ**や `test-summary.js` で補助的な解析を行う
 
 ### Before Completing Work
 
@@ -135,9 +138,10 @@ app/layout.tsx
         │   │   ├── List header (title, menu, ShareDialog)
         │   │   └── SortableCard × M
         │   └── "+ Add List" button
-        └── CardModal (selectedCardId が存在するときのみ)
-            ├── Details tab (title, description, tags, due date, priority, assignees)
-            └── Comments tab (CommentsPanel with @Mentions)
+        ├── CardModal (selectedCardId が存在するときのみ)
+        │   ├── Details tab (title, description, tags, due date, priority, assignees)
+        │   └── Comments tab (CommentsPanel with @Mentions)
+        └── NotificationSoundPlayer (Service Worker → Web Audio連携のサウンド再生)
 ```
 
 ### Data Flow
@@ -158,6 +162,21 @@ Offline? → `addToSyncQueue({ type, table, data })`
 1. **React State**: In-memory, for UI (KanbanBoardClient)
 2. **localStorage**: Client cache, offline support (`saveToStorage`)
 3. **syncQueue.ts**: Offline queue（INSERT/UPDATE/DELETE）
+
+### Notification Audio Pipeline
+
+1. **NotificationSettings** (`app/(board)/_components/NotificationSettings.tsx`)
+   - 「音声を有効化」ボタンで `unlockAudio()` を呼び出し、Chromeのautoplay制限を解除
+   - 「テスト音を再生」ボタンで `playNotificationSound()` を直接実行し、800Hz/200msフェードのビープを確認
+2. **lib/notification-audio.ts**
+   - Web Audio API の `AudioContext` を単一インスタンスで管理
+   - サイン波オシレーター (800Hz) + `GainNode` の指数フェード (0.2s) で WAV データURL依存を解消
+3. **NotificationSoundPlayer**
+   - Service Worker から `NOTIFICATION_RECEIVED` メッセージを受信
+   - タブが `visible` かつ audio unlocked のときだけ `playNotificationSound()` を実行
+4. **Service Worker (`public/sw.js`)**
+   - Pushイベントで `renotify: true` / `silent: false` を設定しつつ、前述のメッセージを送信
+   - バックグラウンドでは OS 標準音、フォアグラウンドでは Web Audio のビープで二重通知を防止
 4. **Supabase**: Cloud persistence + Realtime
 
 ## Database Schema
