@@ -2,6 +2,7 @@ import { trySetAppBadge, tryClearAppBadge } from './badge';
 import { setupFaviconBadge, setFaviconBadge, clearFaviconBadge } from './favicon-badge';
 
 let originalTitle: string | null = null;
+let cachedStandaloneMode: boolean | null = null;
 
 function withDocument<T>(fn: (doc: Document) => T): T | undefined {
   if (typeof document === 'undefined') {
@@ -37,6 +38,21 @@ function updateDocumentTitle(count: number) {
   });
 }
 
+function isStandaloneDisplayMode(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if (cachedStandaloneMode !== null) {
+    return cachedStandaloneMode;
+  }
+
+  const matchMedia = window.matchMedia?.('(display-mode: standalone)');
+  const standalone = Boolean(matchMedia?.matches || (window.navigator as any)?.standalone);
+  cachedStandaloneMode = standalone;
+  return standalone;
+}
+
 export function initializeUnifiedBadge(baseIconHref?: string): void {
   ensureOriginalTitle();
   setupFaviconBadge(baseIconHref);
@@ -47,7 +63,9 @@ export async function setUnifiedBadge(count: number): Promise<void> {
   updateDocumentTitle(count);
 
   const ok = await trySetAppBadge(count > 0 ? count : undefined);
-  if (ok) {
+  const preferAppBadgeOnly = isStandaloneDisplayMode();
+
+  if (ok && preferAppBadgeOnly) {
     if (count === 0) {
       clearFaviconBadge();
     }

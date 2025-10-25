@@ -117,5 +117,6 @@ Refer to `docs/setup/local-dev.md` for local testing instructions and environmen
 2. `useNotificationsStore` が Supabase Realtime / Polling で最新未読を取得すると `setUnifiedBadge(unreadCount)` が再実行され、実数値に揃う。
 3. App Badging がサポートされない Linux / Firefox などでは favicon のみが差し替わる。Service Worker から DOM を触れないため、**アプリが完全に閉じている場合は更新不可**。
 4. Web アプリ（Safari ホーム画面 / Dock, Chrome/Edge PWA）では OS バッジが優先されるため favicon 更新はスキップされる。
+5. 通常のブラウザタブ（Chrome, Edge など）では App Badging API が存在しても standalone モードではない限り favicon バッジを必ず描画し、Google Chat と同じ赤丸表示を再現する。
 
 開発時は `window.dispatchEvent(new CustomEvent('taesk:notification-received'))` で擬似通知を発火し、favicon が赤丸に変わること、タイトルが `(99+) Taesk - Kanban Board` になることを確認する。
