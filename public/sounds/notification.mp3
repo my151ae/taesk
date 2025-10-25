@@ -1,0 +1,4 @@
+This is a placeholder for the notification sound file.
+In production, replace this with an actual MP3 file (e.g., a short pleasant notification tone).
+
+For now, we'll use a data URL in the code for simplicity.

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/app/contexts/AuthContext";
+import NotificationSoundPlayer from "@/app/components/NotificationSoundPlayer";
 
 const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
 
@@ -32,7 +33,10 @@ export default function RootLayout({
   return (
     <html lang="ja" className="">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <NotificationSoundPlayer />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

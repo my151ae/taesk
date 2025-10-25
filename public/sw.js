@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.2.0';
+const SW_VERSION = '1.3.0';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -110,7 +110,7 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(
     Promise.all([
-      // Show notification
+      // Show notification (OS notification, sound depends on OS settings)
       self.registration.showNotification(notificationData.title, {
         body: notificationData.body,
         icon: notificationData.icon,
@@ -124,6 +124,22 @@ self.addEventListener('push', (event) => {
       }).catch(err => {
         console.error('[SW] Failed to show notification:', err);
       }),
+      // Notify all clients to play sound if visible
+      (async () => {
+        try {
+          const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+          console.log(`[SW] Notifying ${clients.length} client(s) about notification`);
+
+          for (const client of clients) {
+            client.postMessage({
+              type: 'NOTIFICATION_RECEIVED',
+              payload: notificationData.data,
+            });
+          }
+        } catch (err) {
+          console.error('[SW] Failed to notify clients:', err);
+        }
+      })(),
       // Update badge
       (async () => {
         if (self.navigator && 'setAppBadge' in self.navigator) {

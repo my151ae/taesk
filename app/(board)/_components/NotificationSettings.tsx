@@ -14,6 +14,7 @@ import {
   getNotificationPermission,
   showTestNotification,
 } from '@/lib/push-notifications';
+import { unlockAudio, playNotificationSound, isAudioUnlocked } from '@/lib/notification-audio';
 import type { NotificationPreferences, QuietHoursPreference } from '@/lib/supabase';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -48,6 +49,7 @@ export default function NotificationSettings() {
 
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const applyPreferencesToForm = (prefs: NotificationPreferences) => {
     setInAppEnabled(prefs.in_app_enabled);
@@ -287,33 +289,40 @@ export default function NotificationSettings() {
     }
   };
 
-  const handleTestSound = async () => {
-    console.log('[Notification Test] Testing system notification sound...');
+  const handleUnlockAudio = async () => {
+    console.log('[Audio] User requested audio unlock...');
+    setError(null);
+    setStatusMessage(null);
 
     try {
-      // Check notification permission
-      if (Notification.permission !== 'granted') {
-        setError('Notification permission not granted. Please enable notifications first.');
-        return;
+      const success = await unlockAudio();
+      if (success) {
+        setAudioUnlocked(true);
+        setStatusMessage('✅ 音声が有効になりました！通知音が鳴るようになります。');
+      } else {
+        setError('音声の有効化に失敗しました。');
       }
-
-      // Get service worker registration
-      const registration = await navigator.serviceWorker.ready;
-
-      // Show notification with sound request (uses Notification API, not Audio API)
-      await registration.showNotification('Taesk Sound Test', {
-        body: 'Testing system notification sound with Notification API',
-        icon: '/icon?size=192',
-        badge: '/icon?size=192',
-        tag: `sound-test-${Date.now()}`, // Unique tag for each test
-        silent: false,      // Request system sound (depends on browser/OS settings)
-      });
-
-      console.log('[Notification Test] Notification shown with sound request');
-      setStatusMessage('Test notification sent with system sound request ✅ (Sound depends on Chrome/OS settings)');
     } catch (err) {
-      console.error('[Notification Test] Failed:', err);
-      setError(`Notification test failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('[Audio] Failed to unlock audio:', err);
+      setError(`音声の有効化に失敗: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleTestSound = () => {
+    console.log('[Audio] Testing notification sound...');
+    setError(null);
+    setStatusMessage(null);
+
+    if (!isAudioUnlocked()) {
+      setError('先に「音声を有効化」ボタンをクリックしてください。');
+      return;
+    }
+
+    const played = playNotificationSound();
+    if (played) {
+      setStatusMessage('✅ テスト音が再生されました！');
+    } else {
+      setError('音声の再生に失敗しました。');
     }
   };
 
@@ -492,27 +501,49 @@ export default function NotificationSettings() {
       </section>
 
       <section className="space-y-2">
+        <h3 className="text-lg font-semibold">通知音設定</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Chromeの自動再生ポリシーにより、初回クリックで音声を有効化する必要があります。
+          （Google Chat/Slackと同じ方式）
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleUnlockAudio}
+            disabled={audioUnlocked}
+            className={`px-4 py-2 rounded ${
+              audioUnlocked
+                ? 'bg-green-600 text-white cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            data-testid="unlock-audio-button"
+          >
+            {audioUnlocked ? '✅ 音声有効化済み' : '🔊 音声を有効化'}
+          </button>
+
+          <button
+            onClick={handleTestSound}
+            disabled={!audioUnlocked}
+            className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-50"
+            data-testid="test-sound-button"
+          >
+            🎵 テスト音を再生
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-2">
         <h3 className="text-lg font-semibold">Send Test Notification</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           We will create a test notification for your account to verify delivery.
         </p>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSendTestNotification}
-            disabled={testSending}
-            className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-50"
-            data-testid="send-test-notification-button"
-          >
-            {testSending ? 'Sending…' : 'Send Test Notification'}
-          </button>
-          <button
-            onClick={handleTestSound}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            data-testid="test-sound-button"
-          >
-            Test Sound Only
-          </button>
-        </div>
+        <button
+          onClick={handleSendTestNotification}
+          disabled={testSending}
+          className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-800 disabled:opacity-50"
+          data-testid="send-test-notification-button"
+        >
+          {testSending ? 'Sending…' : 'Send Test Notification'}
+        </button>
       </section>
     </div>
   );

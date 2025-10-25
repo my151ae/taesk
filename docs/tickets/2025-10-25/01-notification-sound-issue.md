@@ -388,3 +388,224 @@ Chromeは以下を記録している可能性：
 - [MDN - Notification API](https://developer.mozilla.org/en-US/docs/Web/API/Notification)
 - [Chrome - Moving to native macOS notifications](https://developer.chrome.com/blog/native-mac-os-notifications)
 - [Stack Overflow - Chrome Desktop push notifications sound not working](https://stackoverflow.com/questions/40190140/sound-does-not-work-in-service-worker-in-chrome-desktop-push-notification)
+
+GPT5tの回答
+了解。最新情報を踏まえて、添付の `01-notification-sound-issue.md` にそのまま貼れる“決定版”の回答文を用意しました👇
+（※本文中の参考リンクはすべて 2025年10月時点の内容を確認済みです）
+
+---
+
+# Chromeで「着信時に通知音」を**確実に**鳴らす2025年版ガイド
+
+**結論（TL;DR）**
+
+* ブラウザの**Notifications API だけでは音は鳴りません**。通知に**カスタム音**を指定する手段も、現状の仕様と実装にはありません。([devdoc.net][1])
+* **音を鳴らすのはページ側（メインスレッド）**で、**ユーザー操作後に解放された Web Audio** を使って再生します。着信時にタブが前面なら音再生、**背面や最小化なら OS 通知**を出す「ハイブリッド」が正解です。([Chrome for Developers][2])
+* **Service Worker から直接音は鳴らせません**（ワーカーは DOM もオーディオ出力も持たないため）。通知は出せますが音の有無は OS/ブラウザに委ねられます。([devdoc.net][3])
+* Slack/Google Chat も実質この考え方です：**タブが開いていればアプリ内サウンド**、そうでなければ**OSのデスクトップ通知**（音の制御はOS任せ）。Slack は通知音をアプリ設定で切替可能（＝ページ内で音を鳴らしている）。([Slack][4])
+
+---
+
+## なぜ Notifications API だけでは鳴らないのか
+
+* **`NotificationOptions` に「sound」はありません**（MDN上では項目が言及されるものの「ブラウザー未対応」扱い）。よって通知に音源URLを渡して鳴らすことは不可です。([devdoc.net][1])
+* 代わりに `silent`（サイレント）や `renotify`（置換時に再通知）といった**表示挙動のヒント**はありますが、**音の有無を強制する仕様ではない**です。([MDN Web Docs][5])
+* **Chromeの自動再生ポリシー**により、**ユーザー操作前の音声再生はブロック**されます。Web Audio の `AudioContext` は操作前に作ると **suspended** で開始し、**クリック等の操作後に `resume()`** が必要です。([Chrome for Developers][2])
+* **Service Worker はワーカー環境**で動作し、**DOM/オーディオ出力にアクセスできません**。SW からは `showNotification()` で通知を出すのみ。音はコントロール不可です。([devdoc.net][3])
+
+> 参考：Chrome（macOS）は通知を**ネイティブの通知センター**で表示するため、音量/サウンドの扱いは OS 側の設定に従います。([Chrome for Developers][6])
+
+---
+
+## 正しい実装パターン（Google Chat/Slack方式）
+
+### 1) 初回ユーザー操作で「鳴らせる権利」を確保
+
+```js
+// audio.js (ページ側)
+let audioCtx;
+let ringBuffer;
+let audioUnlocked = false;
+
+async function unlockAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!ringBuffer) {
+    const res = await fetch('/sounds/ring.mp3', { cache: 'force-cache' });
+    ringBuffer = await audioCtx.decodeAudioData(await res.arrayBuffer());
+  }
+  audioUnlocked = true;
+  console.log('Audio unlocked');
+}
+
+// クリック/タップ/キーボードなど最初の操作で解放
+['click','keydown','touchstart'].forEach(ev =>
+  window.addEventListener(ev, async () => { if (!audioUnlocked) await unlockAudio(); }, { once:true })
+);
+```
+
+> ポイント：**ユーザー操作後に `AudioContext.resume()`** と **音源デコードの先読み**。これで**前面タブ**時の着信音再生が安定します。([Chrome for Developers][2])
+
+### 2) 着信時の分岐（前面＝鳴らす／背面＝通知）
+
+```js
+function playRing(loop=true) {
+  if (!audioUnlocked || !ringBuffer || !audioCtx) return false;
+  const src = audioCtx.createBufferSource();
+  src.buffer = ringBuffer;
+  src.loop = loop;
+  src.connect(audioCtx.destination);
+  src.start(0);
+  // 取り回し用に参照を返す
+  return src;
+}
+
+// 例：WebSocketやSSEでサーバから「ring」イベント
+async function onIncomingCall(payload) {
+  const isVisible = document.visibilityState === 'visible';
+  if (isVisible && audioUnlocked) {
+    // タブが見えていればアプリ内で音を鳴らす
+    const ringNode = playRing(true);
+    // 応答/拒否で stop() するなどUI側で制御
+  } else {
+    // 背面なら OS 通知（音は OS 依存／カスタム不可）
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('着信中', {
+      body: payload.from ?? '不明な発信者',
+      tag: `call:${payload.callId}`,     // 後続更新で置換
+      renotify: true,                    // 置換時に再通知
+      requireInteraction: true,          // クリックまで残す
+      icon: '/icons/call.png'
+    });
+  }
+}
+```
+
+> 注意：**通知自体に音は付けられません**。音は**ページで鳴らす**、通知は**気づかせる**。役割分担がコツです。([devdoc.net][1])
+
+### 3) Service Worker は「鳴らさず知らせる」
+
+```js
+// sw.js
+self.addEventListener('push', event => {
+  const data = event.data?.json() ?? {};
+  event.waitUntil((async () => {
+    // OS通知（音制御不可）
+    await self.registration.showNotification('着信中', {
+      body: data.from ?? '不明な発信者',
+      tag: `call:${data.callId}`,
+      renotify: true,
+      requireInteraction: true,
+      icon: '/icons/call.png'
+    });
+    // 開いているクライアントに「鳴らして」と伝える
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clientsList) c.postMessage({ type: 'INCOMING_CALL', payload: data });
+  })());
+});
+
+// ページ側で SW からのメッセージを受け取って前面なら音を鳴らす
+navigator.serviceWorker.addEventListener('message', (ev) => {
+  if (ev.data?.type === 'INCOMING_CALL') onIncomingCall(ev.data.payload);
+});
+```
+
+> **SW にはオーディオ出力がない**ため、**ページへ postMessage** して再生させます。([devdoc.net][3])
+
+---
+
+## ブラウザ/OS 設定でハマりがちなポイント（必読）
+
+1. **Chrome の自動再生ポリシー**
+   ユーザー操作前の音再生はブロックされます。**初回に「サウンドを有効化する」ボタン**を用意して `AudioContext.resume()` してください。([Chrome for Developers][2])
+
+2. **サイトの「音声」許可**（Chrome）
+   企業環境やユーザー設定で **「サイトの音声をブロック」** が有効だと鳴りません。**`chrome://settings/content/sound`** またはアドレスバー左の**カギアイコン → サイトの設定 →「音声：許可」**を案内しましょう。([help.fandraft.com][7])
+
+3. **OS 側の通知／集中モード**
+   macOS の Chrome は**ネイティブ通知**を使うため、**通知音の有無・鳴り方はOS次第**です（おやすみモード等の影響を受けます）。([Chrome for Developers][6])
+
+4. **Chrome の仕様アップデートに注意**
+   2025年は、**放置サイトの通知権限を自動的に剥奪**する新機能が順次導入中。通知が出なくなった場合に**再許可**の導線を用意しておくと安全です。([The Verge][8])
+
+---
+
+## Google Chat / Slack はどうしている？
+
+* **Slack**：デスクトップ版/ブラウザ版ともに**通知音を選択**できます。これは**ページ内での音再生**を行っていることの裏付けです。背面時は OS 通知（音は OS 任せ）。([Slack][4])
+* **Google Chat（ブラウザ）**：常時通知を受けるために**タブを生かす／PWA化**しておく運用が一般的（＝ページが生きていれば自前サウンド可、背面はOS通知）。※実例として、Chatのバックグラウンドタブを維持して通知を逃しにくくする拡張が存在します。([Chromeウェブストア][9])
+
+> いずれも **「前面＝アプリ内サウンド」「背面＝OS通知」** のハイブリッド。**通知に音を直付けする方式ではありません**。
+
+---
+
+## 実装チェックリスト（そのまま使えます）
+
+* [ ] 初回クリック等で `AudioContext` を `resume()`、着信音を `decodeAudioData()` 済みにする。([Chrome for Developers][2])
+* [ ] **前面タブ**：Web Audioでループ再生、応答/拒否で stop。
+* [ ] **背面タブ**：`ServiceWorkerRegistration.showNotification()`（`requireInteraction`, `tag`, `renotify` を適宜）。([MDN Web Docs][10])
+* [ ] **SW**→ページへ `postMessage`（SWは音を鳴らさない）。([devdoc.net][3])
+* [ ] **Chrome 設定**：対象ドメインの**音声=許可**をガイド。([help.fandraft.com][7])
+* [ ] **OS通知**：macOS の通知設定・集中モードの注意書きをヘルプに記載。([Chrome for Developers][6])
+* [ ] **権限自動剥奪**への備え（通知が出なければ**再許可**を促すUI）。([The Verge][8])
+
+---
+
+## よくある誤解・アンチパターン
+
+* **「通知APIで音を指定できるのでは？」** → できません（`sound` は未実装）。([devdoc.net][1])
+* **「SWからAudioを鳴らせるのでは？」** → できません（ワーカーにはDOMもオーディオ出力もない）。([devdoc.net][3])
+* **「自動で勝手に鳴ってほしい」** → Chromeの自動再生ポリシーがあるため**必ずユーザー操作後**に解放する設計が必要です。([Chrome for Developers][2])
+
+---
+
+## 付録：ミニ実装（必要最小限）
+
+```html
+<button id="enable-sound">通知音を有効化</button>
+<script type="module">
+import { unlockAudio, onIncomingCall } from '/audio.js';
+
+navigator.serviceWorker.register('/sw.js');
+
+document.getElementById('enable-sound').addEventListener('click', unlockAudio);
+
+// ダミー：着信イベント受信
+window.mockRing = (from='caller') => onIncomingCall({ from, callId: crypto.randomUUID() });
+</script>
+```
+
+---
+
+### 参考
+
+* Chrome の自動再生ポリシー（ユーザー操作後に `AudioContext.resume()` が必要）([Chrome for Developers][2])
+* Notifications API の現状（`sound` は未実装、`silent`/`renotify` 等の動作ヒントのみ）([devdoc.net][1])
+* Service Worker は DOM/オーディオ出力なし（通知は出せるが音は不可）([devdoc.net][3])
+* macOS の Chrome はネイティブ通知を使用（音は OS に準拠）([Chrome for Developers][6])
+* Slack の通知音設定（＝アプリ内サウンド採用の証左）([Slack][4])
+* Chrome が**放置サイトの通知権限を自動剥奪**する新機能（2025年10月報道）([The Verge][8])
+
+---
+
+> 本ドキュメントは Aterrace Inc. 内の検討メモ（着信通知音の課題）に対する回答です。
+
+---
+
+**最近の関連ニュース（通知まわりの挙動変化）**
+
+* [The Verge](https://www.theverge.com/news/798122/google-chrome-website-notifications-disable-feature?utm_source=chatgpt.com)
+* [TechRadar](https://www.techradar.com/computing/chrome/google-chrome-is-fixing-its-notification-overload-problem-with-this-handy-new-feature-heres-how-it-works?utm_source=chatgpt.com)
+
+---
+
+[1]: https://www.devdoc.net/web/developer.mozilla.org/en-US/docs/Web/API/notification/Notification.html?utm_source=chatgpt.com "Notification.Notification() - Web APIs | MDN"
+[2]: https://developer.chrome.com/blog/autoplay/?utm_source=chatgpt.com "Autoplay policy in Chrome  |  Blog  |  Chrome for Developers"
+[3]: https://devdoc.net/web/developer.mozilla.org/en-US/docs/Web/API/ServiceWorker_API.html?utm_source=chatgpt.com "Service Worker API - Web APIs | MDN"
+[4]: https://slack.com/help/articles/201355156-Configure-your-Slack-notifications?utm_source=chatgpt.com "Configure your Slack notifications | Slack"
+[5]: https://developer.mozilla.org/en-US/docs/Web/API/Notification/silent?utm_source=chatgpt.com "Notification: silent property - Web APIs | MDN"
+[6]: https://developer.chrome.com/blog/native-mac-os-notifications?utm_source=chatgpt.com "Moving to the native notification system on macOS  |  Blog  |  Chrome for Developers"
+[7]: https://help.fandraft.com/article/142-no-sound-is-playing?utm_source=chatgpt.com "No Sound is Playing - FanDraft Help Center"
+[8]: https://www.theverge.com/news/798122/google-chrome-website-notifications-disable-feature?utm_source=chatgpt.com "Chrome will automatically disable web notifications you don't care about"
+[9]: https://chromewebstore.google.com/detail/google-chat-background-no/hfknjkannpafnoidganhlmplfomlifnc?utm_source=chatgpt.com "Google Chat Background Notifier - Chrome Web Store"
+[10]: https://developer.mozilla.org/en-US/docs/Web/API/Notification/renotify?utm_source=chatgpt.com "Notification: renotify property - Web APIs | MDN"
