@@ -307,7 +307,6 @@ export default function NotificationSettings() {
         badge: '/icon?size=192',
         tag: `sound-test-${Date.now()}`, // Unique tag for each test
         silent: false,      // Request system sound (depends on browser/OS settings)
-        vibrate: [200, 100, 200],
       });
 
       console.log('[Notification Test] Notification shown with sound request');
