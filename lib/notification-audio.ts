@@ -7,11 +7,7 @@
  * Reference: https://developer.chrome.com/blog/autoplay/
  */
 
-// Simple notification sound as data URL (440Hz beep for 200ms)
-const NOTIFICATION_SOUND_DATA_URL = `data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=`;
-
 let audioContext: AudioContext | null = null;
-let notificationBuffer: AudioBuffer | null = null;
 let audioUnlocked = false;
 
 /**
@@ -33,15 +29,6 @@ export async function unlockAudio(): Promise<boolean> {
       console.log('[Audio] AudioContext resumed');
     }
 
-    // Load and decode notification sound
-    if (!notificationBuffer) {
-      // Fetch sound file (using data URL for now, can be replaced with /sounds/notification.mp3)
-      const response = await fetch(NOTIFICATION_SOUND_DATA_URL);
-      const arrayBuffer = await response.arrayBuffer();
-      notificationBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      console.log('[Audio] Notification sound loaded');
-    }
-
     audioUnlocked = true;
     console.log('[Audio] Audio unlocked successfully');
     return true;
@@ -53,19 +40,36 @@ export async function unlockAudio(): Promise<boolean> {
 
 /**
  * Play notification sound
+ * Generates a simple beep using Web Audio API oscillator
  * Returns true if sound was played, false otherwise
  */
 export function playNotificationSound(): boolean {
-  if (!audioUnlocked || !audioContext || !notificationBuffer) {
+  if (!audioUnlocked || !audioContext) {
     console.warn('[Audio] Audio not unlocked yet. Call unlockAudio() first after user interaction.');
     return false;
   }
 
   try {
-    const source = audioContext.createBufferSource();
-    source.buffer = notificationBuffer;
-    source.connect(audioContext.destination);
-    source.start(0);
+    const now = audioContext.currentTime;
+
+    // Create oscillator (sine wave at 800Hz for pleasant notification sound)
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(800, now);
+
+    // Create gain node for volume control and fade
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.3, now); // Start at 30% volume
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2); // Fade out over 200ms
+
+    // Connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // Play
+    oscillator.start(now);
+    oscillator.stop(now + 0.2); // Stop after 200ms
+
     console.log('[Audio] Notification sound played');
     return true;
   } catch (error) {
