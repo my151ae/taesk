@@ -288,24 +288,34 @@ export default function NotificationSettings() {
   };
 
   const handleTestSound = async () => {
-    console.log('[Audio Test] Starting audio test...');
+    console.log('[Notification Test] Testing system notification sound...');
 
     try {
-      // Test 1: HTML5 Audio API
-      console.log('[Audio Test] Creating Audio object...');
-      const audio = new Audio('data:audio/wav;base64,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');
-      console.log('[Audio Test] Audio object created');
+      // Check notification permission
+      if (Notification.permission !== 'granted') {
+        setError('Notification permission not granted. Please enable notifications first.');
+        return;
+      }
 
-      audio.volume = 1.0;
-      console.log('[Audio Test] Volume set to:', audio.volume);
+      // Get service worker registration
+      const registration = await navigator.serviceWorker.ready;
 
-      await audio.play();
-      console.log('[Audio Test] Audio playback started successfully');
+      // Show notification with sound request (uses Notification API, not Audio API)
+      await registration.showNotification('Taesk Sound Test', {
+        body: 'Testing system notification sound with Notification API',
+        icon: '/icon?size=192',
+        badge: '/icon?size=192',
+        tag: 'sound-test',
+        renotify: true,     // Force sound even if same tag
+        silent: false,      // Request system sound (depends on browser/OS settings)
+        vibrate: [200, 100, 200],
+      });
 
-      setStatusMessage('Audio test: Sound played via Audio API ✅');
+      console.log('[Notification Test] Notification shown with sound request');
+      setStatusMessage('Test notification sent with system sound request ✅ (Sound depends on Chrome/OS settings)');
     } catch (err) {
-      console.error('[Audio Test] Failed to play audio:', err);
-      setError(`Audio test failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('[Notification Test] Failed:', err);
+      setError(`Notification test failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
