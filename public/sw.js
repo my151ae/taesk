@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.1.0';
+const SW_VERSION = '1.2.0';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -116,11 +116,9 @@ self.addEventListener('push', (event) => {
         icon: notificationData.icon,
         badge: notificationData.badge,
         tag: notificationData.tag,
-        renotify: true, // Force sound even with same tag
         requireInteraction: notificationData.requireInteraction,
         data: notificationData.data,
-        silent: false, // Enable sound
-        vibrate: [200, 100, 200], // Vibration pattern for mobile
+        silent: false, // Request system sound (depends on browser/OS settings)
       }).then(() => {
         console.log('[SW] Notification shown successfully:', notificationData.title);
       }).catch(err => {
