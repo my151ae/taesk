@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { Notification } from '@/lib/supabase';
-import { setAppBadge } from '@/lib/badge-api';
+import { setUnifiedBadge } from '@/lib/unified-badge';
 
 interface NotificationsState {
   notifications: Notification[];
@@ -35,7 +35,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   setNotifications: (notifications) => {
     const unreadCount = notifications.filter((n) => !n.read_at).length;
     set({ notifications, unreadCount });
-    setAppBadge(unreadCount);
+    void setUnifiedBadge(unreadCount);
   },
 
   addNotification: (notification) => {
@@ -43,7 +43,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     const newNotifications = [notification, ...notifications];
     const unreadCount = newNotifications.filter((n) => !n.read_at).length;
     set({ notifications: newNotifications, unreadCount });
-    setAppBadge(unreadCount);
+    void setUnifiedBadge(unreadCount);
   },
 
   markAsRead: async (notificationId) => {
@@ -56,7 +56,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       );
       const unreadCount = updatedNotifications.filter((n) => !n.read_at).length;
       set({ notifications: updatedNotifications, unreadCount });
-      setAppBadge(unreadCount);
+      void setUnifiedBadge(unreadCount);
 
       // API call
       const response = await fetch(`/api/notifications/${notificationId}`, {
@@ -84,7 +84,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
         read_at: n.read_at || new Date().toISOString(),
       }));
       set({ notifications: updatedNotifications, unreadCount: 0 });
-      setAppBadge(0);
+      void setUnifiedBadge(0);
 
       // API call
       const response = await fetch('/api/notifications/mark-all-read', {

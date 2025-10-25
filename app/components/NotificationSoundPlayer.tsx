@@ -25,6 +25,14 @@ export default function NotificationSoundPlayer() {
       if (event.data?.type === 'NOTIFICATION_RECEIVED') {
         console.log('[NotificationSound] Received notification from SW:', event.data.payload);
 
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('taesk:notification-received', {
+              detail: event.data?.payload ?? null,
+            }),
+          );
+        }
+
         // Only play sound if tab is visible and audio is unlocked
         if (document.visibilityState === 'visible' && isAudioUnlocked()) {
           console.log('[NotificationSound] Tab is visible and audio unlocked, playing sound');

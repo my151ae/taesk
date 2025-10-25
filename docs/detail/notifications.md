@@ -103,3 +103,19 @@ Chrome / Safari の Autoplay 制限を踏まえ、Taesk では **Web Audio API**
 - **Playwright E2E:** `e2e/phase3-webpush.spec.ts`
 
 Refer to `docs/setup/local-dev.md` for local testing instructions and environment setup.
+
+## Badge Sync & Favicon Fallback
+
+- **`lib/badge.ts`** – App Badging API のラッパー。PWA / Safari Web アプリで `navigator.setAppBadge` / `clearAppBadge` を安全に呼び出す。
+- **`lib/favicon-badge.ts`** – Canvas で既存 favicon を再描画し赤丸を重ねるフォールバック。App Badging 非対応ブラウザでも未読数を示せる。
+- **`lib/unified-badge.ts`** – 上記をまとめた `setUnifiedBadge(count)` を提供。App Badging が成功した場合は favicon 書き換えをスキップし、失敗時のみ fallback を実行。タイトルも `(12) Taesk` のように更新する。
+- **`app/components/NotificationBadgeListener.tsx`** – `useNotificationsStore` の `unreadCount` を購読しつつ、Service Worker からの `NOTIFICATION_RECEIVED` をリッスンして暫定バッジを更新。`visibilitychange` / `focus` でカウントを再同期し、前景に戻った瞬間に不要な赤丸を消す。
+
+挙動メモ:
+
+1. 通知を受信した直後は `NotificationBadgeListener` が pending バッジを +1 し、ストア同期前でも favicon / タイトルが即更新される。
+2. `useNotificationsStore` が Supabase Realtime / Polling で最新未読を取得すると `setUnifiedBadge(unreadCount)` が再実行され、実数値に揃う。
+3. App Badging がサポートされない Linux / Firefox などでは favicon のみが差し替わる。Service Worker から DOM を触れないため、**アプリが完全に閉じている場合は更新不可**。
+4. Web アプリ（Safari ホーム画面 / Dock, Chrome/Edge PWA）では OS バッジが優先されるため favicon 更新はスキップされる。
+
+開発時は `window.dispatchEvent(new CustomEvent('taesk:notification-received'))` で擬似通知を発火し、favicon が赤丸に変わること、タイトルが `(99+) Taesk - Kanban Board` になることを確認する。
