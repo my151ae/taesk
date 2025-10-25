@@ -32,12 +32,6 @@ export default function NotificationBadgeListener() {
       void setUnifiedBadge(pendingRef.current);
     };
 
-    const handleSwMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'NOTIFICATION_RECEIVED') {
-        bumpPendingBadge();
-      }
-    };
-
     const handleCustomEvent = () => {
       bumpPendingBadge();
     };
@@ -49,9 +43,6 @@ export default function NotificationBadgeListener() {
       }
     };
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', handleSwMessage as EventListener);
-    }
     window.addEventListener(CUSTOM_EVENT, handleCustomEvent as EventListener);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleVisibility);
@@ -59,9 +50,6 @@ export default function NotificationBadgeListener() {
     handleVisibility();
 
     return () => {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.removeEventListener('message', handleSwMessage as EventListener);
-      }
       window.removeEventListener(CUSTOM_EVENT, handleCustomEvent as EventListener);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);

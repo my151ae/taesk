@@ -130,8 +130,9 @@ function canvasToDataURL(source: HTMLCanvasElement, size: number): string {
 
 function drawBadge(ctx: CanvasRenderingContext2D, size: number, count: number) {
   const radius = Math.max(10, size * 0.28);
-  const centerX = size - radius + 4;
-  const centerY = size - radius + 4;
+  const offset = Math.max(2, size * 0.06);
+  const centerX = size - radius + offset;
+  const centerY = radius + offset;
 
   ctx.fillStyle = '#ef4444';
   ctx.beginPath();
