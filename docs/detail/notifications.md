@@ -57,6 +57,37 @@ When keys are missing the function exits early and no push is attempted (deliver
 
 `notification_delivery_logs` keeps a history for observability and rate limiting. Columns include `status` (`success`, `failure`, `retrying`), the associated notification, the subscription, and optional error text.
 
+## Foreground Sound & Audio Unlock
+
+Chrome / Safari の Autoplay 制限を踏まえ、Taesk では **Web Audio API** を使って「前景タブのみビープ音」を再生する。これにより OS 標準通知音（背景タブ）と競合せず、Google Chat 同様の体験を実現している。
+
+### 構成要素
+
+1. **`lib/notification-audio.ts`**
+   - 単一の `AudioContext` を保持し、`unlockAudio()`, `playNotificationSound()`, `isAudioUnlocked()` を提供。
+   - サイン波オシレーターを 800Hz で生成し、`GainNode` の指数フェード（0.3 → 0.01, 200ms）で柔らかいビープにする。
+   - 旧来のデータURL(WAV) 依存を完全に排除し、ブラウザ組み込みの DSP のみで音を生成。
+
+2. **`app/(board)/_components/NotificationSettings.tsx`**
+   - 「🔊 音声を有効化」ボタン：`unlockAudio()` を強制呼び出し、ユーザー操作で AudioContext を `running` 状態へ。
+   - 「🎵 テスト音を再生」ボタン：`playNotificationSound()` を直接呼び出し、ローカルでサウンド確認できるようにする。
+   - 「テスト通知を送信」ボタン：`showTestNotification()`（ブラウザ通知） + `/api/notifications/test`（in-app）を実行。
+
+3. **`app/components/NotificationSoundPlayer.tsx`**
+   - Service Worker からの `postMessage({ type: 'NOTIFICATION_RECEIVED', payload })` を監視。
+   - `document.visibilityState === 'visible'` かつ `isAudioUnlocked()` のときのみ `playNotificationSound()` を実行。
+
+4. **`public/sw.js`**
+   - Push イベントで `silent: false`, `renotify: true` を設定しつつ、前景タブへ `NOTIFICATION_RECEIVED` メッセージを送る。
+   - 背景タブではブラウザ/OS 標準の通知音に委ね、Web Audio は呼ばない。
+
+### テスト手順
+
+1. Playwright 実行後（JSON レポート出力済みであること）に chrome-devtools MCP を使ってアプリを開き、`NotificationSettings` セクションへ移動。
+2. **「音声を有効化」** → ブラウザコンソールに `[Audio] Audio unlocked successfully` が出力されることを確認。
+3. **「🎵 テスト音を再生」** → 800Hz / 200ms フェードのビープが鳴り、`[Audio] Notification sound played` がログに残ること。
+4. **「テスト通知を送信」** → 前景タブでは Web Audio ビープ、背景タブでは OS 標準通知音のみ鳴ることを確認。Service Worker ログ（`[SW] Push event received` など）も併せて確認する。
+
 ## Quiet Hours Logic
 
 - Quiet hours compares the current time in the user’s timezone against the configured window.
@@ -68,6 +99,7 @@ When keys are missing the function exits early and no push is attempted (deliver
 - **UI:** `app/(board)/_components/NotificationSettings.tsx`
 - **Server helpers:** `lib/server/notifications.ts`
 - **Edge Function:** `supabase/functions/send-push-notification/index.ts`
+- **Foreground sound:** `app/components/NotificationSoundPlayer.tsx`, `lib/notification-audio.ts`
 - **Playwright E2E:** `e2e/phase3-webpush.spec.ts`
 
 Refer to `docs/setup/local-dev.md` for local testing instructions and environment setup.
