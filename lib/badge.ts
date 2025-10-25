@@ -7,15 +7,21 @@
 
 let lastBadgeCount: number | null = null;
 
-function hasNavigator(): navigator is Navigator & {
+type BadgeNavigator = Navigator & {
   setAppBadge?: (count?: number) => Promise<void>;
   clearAppBadge?: () => Promise<void>;
-} {
-  return typeof navigator !== 'undefined';
+};
+
+function getNavigator(): BadgeNavigator | null {
+  if (typeof window === 'undefined' || typeof window.navigator === 'undefined') {
+    return null;
+  }
+  return window.navigator as BadgeNavigator;
 }
 
 export function isAppBadgeSupported(): boolean {
-  return hasNavigator() && typeof navigator.setAppBadge === 'function';
+  const nav = getNavigator();
+  return Boolean(nav?.setAppBadge);
 }
 
 /**
@@ -23,12 +29,13 @@ export function isAppBadgeSupported(): boolean {
  * Returns true when the API existed and resolved successfully.
  */
 export async function trySetAppBadge(count?: number): Promise<boolean> {
-  if (!isAppBadgeSupported()) {
+  const nav = getNavigator();
+  if (!nav?.setAppBadge) {
     return false;
   }
 
   try {
-    await navigator.setAppBadge?.(count);
+    await nav.setAppBadge(count);
     lastBadgeCount = count ?? null;
     console.debug('[Badge] App badge updated:', count ?? 'dot');
     return true;
@@ -42,12 +49,13 @@ export async function trySetAppBadge(count?: number): Promise<boolean> {
  * Clear the platform badge if the API exists.
  */
 export async function tryClearAppBadge(): Promise<boolean> {
-  if (!hasNavigator() || typeof navigator.clearAppBadge !== 'function') {
+  const nav = getNavigator();
+  if (!nav?.clearAppBadge) {
     return false;
   }
 
   try {
-    await navigator.clearAppBadge();
+    await nav.clearAppBadge();
     lastBadgeCount = null;
     console.debug('[Badge] App badge cleared');
     return true;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '@/app/contexts/AuthContext';
 import {
@@ -61,7 +61,7 @@ export default function NotificationSettings() {
     }
   };
 
-  const fetchPreferences = async () => {
+  const fetchPreferences = useCallback(async () => {
     if (!user) {
       setLoadingPreferences(false);
       return;
@@ -87,11 +87,11 @@ export default function NotificationSettings() {
     } finally {
       setLoadingPreferences(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchPreferences();
-  }, [user]);
+  }, [fetchPreferences]);
 
   useEffect(() => {
     if (!user) {
