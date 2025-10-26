@@ -67,16 +67,28 @@ test.describe('Board Permissions @feature:boards', () => {
           body: JSON.stringify({
             members: [
               {
+                board_id: testBoard?.id,
                 profile_id: TEST_USER_ID,
                 role: 'owner',
-                email: 'owner@example.com',
-                display_name: 'Test Owner',
+                created_at: new Date().toISOString(),
+                profile: {
+                  id: TEST_USER_ID,
+                  full_name: 'Test Owner',
+                  avatar_url: null,
+                  email: 'owner@example.com',
+                },
               },
               {
+                board_id: testBoard?.id,
                 profile_id: MOCK_MEMBER_ID,
                 role: 'editor',
-                email: 'editor@example.com',
-                display_name: 'Test Editor',
+                created_at: new Date().toISOString(),
+                profile: {
+                  id: MOCK_MEMBER_ID,
+                  full_name: 'Test Editor',
+                  avatar_url: null,
+                  email: 'editor@example.com',
+                },
               },
             ],
           }),
@@ -124,8 +136,8 @@ test.describe('Board Permissions @feature:boards', () => {
       // Board might have no lists yet, that's OK
     });
 
-    // Click share/settings button
-    const shareButton = page.getByRole('button', { name: /share|settings/i });
+    // Click share button
+    const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.waitFor({ state: 'visible', timeout: 10000 });
     await shareButton.click();
 
@@ -155,20 +167,16 @@ test.describe('Board Permissions @feature:boards', () => {
     });
 
     // Open ShareDialog
-    const shareButton = page.getByRole('button', { name: /share|settings/i });
+    const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
 
     // Find editor member and change role
-    const editorRow = page.locator('tr, div').filter({ hasText: 'editor@example.com' }).first();
-    const roleSelect = editorRow.locator('select, [role="combobox"]');
+    await expect(page.getByText('editor@example.com')).toBeVisible();
+    const editorRow = page.locator('div').filter({ hasText: /editor@example\.com/ }).first();
+    const roleSelect = editorRow.getByRole('combobox');
 
-    if ((await roleSelect.count()) > 0) {
-      await roleSelect.selectOption('commenter');
-      await expect.poll(() => roleUpdateCalled).toBe(true);
-    } else {
-      // If no select element, skip this assertion
-      test.skip();
-    }
+    await roleSelect.selectOption('commenter');
+    await expect.poll(() => roleUpdateCalled, { timeout: 5000 }).toBe(true);
   });
 
   test('should remove board member', async ({ page }) => {
@@ -188,27 +196,24 @@ test.describe('Board Permissions @feature:boards', () => {
     });
 
     // Open ShareDialog
-    const shareButton = page.getByRole('button', { name: /share|settings/i });
+    const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
 
     // Find editor member and click remove button
-    const editorRow = page.locator('tr, div').filter({ hasText: 'editor@example.com' }).first();
-    const removeButton = editorRow.getByRole('button', { name: /remove|delete/i });
+    await expect(page.getByText('editor@example.com')).toBeVisible();
+    const editorRow = page.locator('div').filter({ hasText: /editor@example\.com/ }).first();
+    const removeButton = editorRow.getByRole('button', { name: /remove/i });
 
-    if ((await removeButton.count()) > 0) {
-      // Handle confirmation dialog if present
-      page.once('dialog', (dialog) => dialog.accept());
-      await removeButton.click();
+    // Handle confirmation dialog if present
+    page.once('dialog', (dialog) => dialog.accept());
+    await removeButton.click();
 
-      await expect.poll(() => memberRemoveCalled).toBe(true);
-    } else {
-      test.skip();
-    }
+    await expect.poll(() => memberRemoveCalled, { timeout: 5000 }).toBe(true);
   });
 
   test('should display invite link section (Phase 3) @phase3', async ({ page }) => {
     // Open ShareDialog
-    const shareButton = page.getByRole('button', { name: /share|settings/i });
+    const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
 
     // Look for invite link section (may not be implemented yet)
@@ -227,20 +232,15 @@ test.describe('Board Permissions @feature:boards', () => {
 
   test('should prevent non-owner from changing owner role @failure:permissions', async ({ page }) => {
     // Open ShareDialog
-    const shareButton = page.getByRole('button', { name: /share|settings/i });
+    const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
 
     // Find owner member row
-    const ownerRow = page.locator('tr, div').filter({ hasText: 'owner@example.com' }).first();
-    const roleSelect = ownerRow.locator('select, [role="combobox"]');
+    await expect(page.getByText('owner@example.com')).toBeVisible();
+    const ownerRow = page.locator('div').filter({ hasText: /owner@example\.com/ }).first();
+    const roleSelect = ownerRow.getByRole('combobox');
 
-    if ((await roleSelect.count()) > 0) {
-      // Owner's role select should be disabled
-      await expect(roleSelect).toBeDisabled();
-    } else {
-      // Or role change UI should not be present for owner
-      const changeRoleButton = ownerRow.getByRole('button', { name: /change role/i });
-      await expect(changeRoleButton).toHaveCount(0);
-    }
+    // Owner's role select should be disabled
+    await expect(roleSelect).toBeDisabled();
   });
 });

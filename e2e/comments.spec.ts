@@ -245,13 +245,17 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
     await page.waitForTimeout(500);
 
-    await page.locator('div.flex.gap-3.mt-2').locator('button', { hasText: '返信' }).first().click();
+    // Click the first reply button in the comment actions
+    await page.getByRole('button', { name: '返信' }).first().click();
 
+    // Fill in the reply form
     const replyText = `Reply ${Date.now()}`;
     const replyTextarea = page.locator('textarea[placeholder*="返信を書く"]');
     await replyTextarea.waitFor({ state: 'visible', timeout: 5000 });
     await replyTextarea.fill(replyText);
-    await page.getByRole('button', { name: '返信' }).nth(1).click();
+
+    // Click the submit button within the reply form
+    await replyTextarea.locator('..').getByRole('button', { name: '返信' }).click();
 
     await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
   });
@@ -270,17 +274,17 @@ test.describe('Comments Feature @feature:comments', () => {
     const mentionDropdown = page.locator('[role="listbox"]');
     await expect(mentionDropdown).toBeVisible({ timeout: 3000 });
 
-    // Verify user email appears in suggestions
-    const userOption = page.locator('[role="option"]', { hasText: TEST_USER_EMAIL });
-    await expect(userOption).toBeVisible();
+    // Verify user appears in suggestions (by display name, not email)
+    const userOption = page.locator('[role="option"]').filter({ hasText: 'E2E Test User' });
+    await expect(userOption).toBeVisible({ timeout: 5000 });
 
     // Select mention by pressing Enter
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
 
-    // Verify mention is inserted into textarea
+    // Verify mention is inserted into textarea (format: @Display Name<@user-id>)
     const textareaValue = await commentTextarea.inputValue();
-    expect(textareaValue).toContain(TEST_USER_EMAIL);
+    expect(textareaValue).toContain('@E2E Test User');
 
     // Submit comment with mention
     const commentText = `${textareaValue} Test mention ${Date.now()}`;
@@ -290,8 +294,8 @@ test.describe('Comments Feature @feature:comments', () => {
     // Verify comment with mention is visible
     await expect(page.locator('span.whitespace-pre-wrap', { hasText: 'Test mention' })).toBeVisible({ timeout: 5000 });
 
-    // Verify mention renders as clickable element
-    const mentionElement = page.locator('span[class*="mention"]', { hasText: TEST_USER_EMAIL });
+    // Verify mention renders as clickable element (uses data-mention-id attribute)
+    const mentionElement = page.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
     await expect(mentionElement).toBeVisible();
   });
 
@@ -303,12 +307,11 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Create comment with mention via API to verify UUID format
     const commentBody = `@${TEST_USER_EMAIL} Test UUID validation`;
-    const { data: commentData, error: commentError } = await supabase
+    const { data: commentData, error: commentError} = await supabase
       .from('comments')
       .insert({
         card_id: currentCard.id,
-        board_id: currentBoard.id,
-        user_id: TEST_USER_ID,
+        author_id: TEST_USER_ID,
         body: commentBody,
         mentions: [TEST_USER_ID], // Should be UUID v4
       })

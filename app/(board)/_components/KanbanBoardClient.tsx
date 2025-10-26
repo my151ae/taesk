@@ -750,10 +750,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const suppressModalFromQueryRef = useRef(false);
   const cards = boardData.cards;
   const profilesById = useMemo(() => {
-    return boardMembers.reduce<Record<string, ProfileSummary>>((map, profile) => {
-      map[profile.id] = profile;
-      return map;
-    }, {});
+    return boardMembers
+      .filter((profile): profile is ProfileSummary => profile != null)
+      .reduce<Record<string, ProfileSummary>>((map, profile) => {
+        map[profile.id] = profile;
+        return map;
+      }, {});
   }, [boardMembers]);
 
   useEffect(() => {

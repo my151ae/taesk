@@ -1,0 +1,119 @@
+
+📊 Playwright Test Summary
+
+════════════════════════════════════════════════════════════
+
+📈 Statistics:
+   ✅ Passed:     54
+   ❌ Failed:     16
+   ⏭️  Skipped:    5
+   🔄 Flaky:      0
+   ⏱️  Duration:   309.03s
+
+❌ Failed Tests (16):
+
+────────────────────────────────────────────────────────────
+
+1. should display ShareDialog when clicking share button @e2e:essential
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:120
+   🏷️  Tags: feature:boards, e2e:essential
+   💥 Error: TimeoutError: locator.waitFor: Timeout 10000ms exceeded....
+
+2. should change member role
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:141
+   🏷️  Tags: feature:boards
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+3. should remove board member
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:174
+   🏷️  Tags: feature:boards
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+4. should display invite link section (Phase 3) @phase3
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:209
+   🏷️  Tags: feature:boards, phase3
+   💥 Error: Error: locator.click: Error: strict mode violation: getByRole('button', { name: /share|settings/i })...
+
+5. should prevent non-owner from changing owner role @failure:permissions
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:228
+   🏷️  Tags: feature:boards, failure:permissions
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+6. should edit and delete own comment
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:213
+   🏷️  Tags: feature:comments
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+7. should allow replying to comments
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:238
+   🏷️  Tags: feature:comments
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+8. should support @mentions with typeahead @e2e:essential
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:259
+   🏷️  Tags: feature:comments, mentions, e2e:essential
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in...
+
+9. should validate mention user_id as UUID v4
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:298
+   🏷️  Tags: feature:comments
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeNull[2m()[22m...
+
+10. should edit a card
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:339
+   🏷️  Tags: feature:boards
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in...
+
+11. should assign and clear card members (multi-assignee)
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:447
+   🏷️  Tags: feature:boards
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+
+12. should queue operations when offline and sync when online
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:678
+   🏷️  Tags: feature:boards
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object....
+
+13. should restore snapshot on drag error @feature:boards
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:924
+   🏷️  Tags: feature:boards, feature:boards
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m...
+
+14. should use normalized positions (1000/10 gaps) for new lists @feature:boards
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:996
+   🏷️  Tags: feature:boards, feature:boards
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3...
+
+15. sends a test notification
+   📦 notifications.spec.ts > Web Push Notifications @feature:notifications
+   📁 notifications.spec.ts:148
+   🏷️  Tags: feature:notifications
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)...
+
+16. should mark notifications as read and clear badge
+   📦 notifications.spec.ts > In-app Notifications @feature:notifications
+   📁 notifications.spec.ts:209
+   🏷️  Tags: feature:notifications
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+
+────────────────────────────────────────────────────────────
+
+📝 Report: /Users/yossydie/dev/taesk/playwright-report.json
+📄 HTML:   npx playwright show-report --host 127.0.0.1 --port 9323
+
+════════════════════════════════════════════════════════════
+
