@@ -4,111 +4,87 @@
 ════════════════════════════════════════════════════════════
 
 📈 Statistics:
-   ✅ Passed:     54
-   ❌ Failed:     16
-   ⏭️  Skipped:    5
+   ✅ Passed:     51
+   ❌ Failed:     12
+   ⏭️  Skipped:    81
    🔄 Flaky:      0
-   ⏱️  Duration:   309.03s
+   ⏱️  Duration:   255.96s
 
-❌ Failed Tests (16):
+❌ Failed Tests (12):
 
 ────────────────────────────────────────────────────────────
 
 1. should display ShareDialog when clicking share button @e2e:essential
    📦 board-permissions.spec.ts > Board Permissions @feature:boards
-   📁 board-permissions.spec.ts:120
+   📁 board-permissions.spec.ts:134
    🏷️  Tags: feature:boards, e2e:essential
-   💥 Error: TimeoutError: locator.waitFor: Timeout 10000ms exceeded....
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
 
 2. should change member role
    📦 board-permissions.spec.ts > Board Permissions @feature:boards
-   📁 board-permissions.spec.ts:141
+   📁 board-permissions.spec.ts:155
    🏷️  Tags: feature:boards
-   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+   💥 Error: Error: locator.selectOption: Error: strict mode violation: locator('div').filter({ hasText: /editor@...
 
-3. should remove board member
-   📦 board-permissions.spec.ts > Board Permissions @feature:boards
-   📁 board-permissions.spec.ts:174
-   🏷️  Tags: feature:boards
-   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
-
-4. should display invite link section (Phase 3) @phase3
-   📦 board-permissions.spec.ts > Board Permissions @feature:boards
-   📁 board-permissions.spec.ts:209
-   🏷️  Tags: feature:boards, phase3
-   💥 Error: Error: locator.click: Error: strict mode violation: getByRole('button', { name: /share|settings/i })...
-
-5. should prevent non-owner from changing owner role @failure:permissions
-   📦 board-permissions.spec.ts > Board Permissions @feature:boards
-   📁 board-permissions.spec.ts:228
-   🏷️  Tags: feature:boards, failure:permissions
-   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
-
-6. should edit and delete own comment
+3. should show Comments tab in card modal via ?card= route
    📦 comments.spec.ts > Comments Feature @feature:comments
-   📁 comments.spec.ts:213
+   📁 comments.spec.ts:179
    🏷️  Tags: feature:comments
-   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+   💥 Error: [31mTest timeout of 30000ms exceeded while running "beforeEach" hook.[39m...
 
-7. should allow replying to comments
+4. should show Comments tab in card modal via ?card= route
    📦 comments.spec.ts > Comments Feature @feature:comments
-   📁 comments.spec.ts:238
+   📁 comments.spec.ts:179
    🏷️  Tags: feature:comments
-   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
-
-8. should support @mentions with typeahead @e2e:essential
-   📦 comments.spec.ts > Comments Feature @feature:comments
-   📁 comments.spec.ts:259
-   🏷️  Tags: feature:comments, mentions, e2e:essential
    💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in...
 
-9. should validate mention user_id as UUID v4
-   📦 comments.spec.ts > Comments Feature @feature:comments
-   📁 comments.spec.ts:298
+5. should sync comments across multiple browser contexts
+   📦 comments.spec.ts > Comments Realtime @feature:comments
+   📁 comments.spec.ts:339
    🏷️  Tags: feature:comments
-   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeNull[2m()[22m...
-
-10. should edit a card
-   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
-   📁 kanban.spec.ts:339
-   🏷️  Tags: feature:boards
    💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in...
 
-11. should assign and clear card members (multi-assignee)
+6. should sync comments across multiple browser contexts
+   📦 comments.spec.ts > Comments Realtime @feature:comments
+   📁 comments.spec.ts:339
+   🏷️  Tags: feature:comments
+   💥 Error: [31mTest timeout of 90000ms exceeded.[39m...
+
+7. should load the test board (empty initially) @e2e:essential
    📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
-   📁 kanban.spec.ts:447
+   📁 kanban.spec.ts:196
+   🏷️  Tags: feature:boards, e2e:essential
+   💥 Error: [31mTest timeout of 60000ms exceeded while running "beforeEach" hook.[39m...
+
+8. should redirect legacy board query to canonical URL
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:202
    🏷️  Tags: feature:boards
-   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+   💥 Error: [31mTest timeout of 60000ms exceeded.[39m...
 
-12. should queue operations when offline and sync when online
-   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
-   📁 kanban.spec.ts:678
-   🏷️  Tags: feature:boards
-   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object....
-
-13. should restore snapshot on drag error @feature:boards
-   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
-   📁 kanban.spec.ts:924
-   🏷️  Tags: feature:boards, feature:boards
-   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m...
-
-14. should use normalized positions (1000/10 gaps) for new lists @feature:boards
-   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
-   📁 kanban.spec.ts:996
-   🏷️  Tags: feature:boards, feature:boards
-   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThanOrEqual[2m([22m[32mexpected[3...
-
-15. sends a test notification
+9. renders push notification controls
    📦 notifications.spec.ts > Web Push Notifications @feature:notifications
-   📁 notifications.spec.ts:148
+   📁 notifications.spec.ts:116
    🏷️  Tags: feature:notifications
-   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)...
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
 
-16. should mark notifications as read and clear badge
-   📦 notifications.spec.ts > In-app Notifications @feature:notifications
-   📁 notifications.spec.ts:209
+10. configures quiet hours
+   📦 notifications.spec.ts > Web Push Notifications @feature:notifications
+   📁 notifications.spec.ts:125
    🏷️  Tags: feature:notifications
-   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+   💥 Error: [31mTest timeout of 30000ms exceeded while running "beforeEach" hook.[39m...
+
+11. should display unread badge on NotificationsBell @e2e:essential
+   📦 notifications.spec.ts > In-app Notifications @feature:notifications
+   📁 notifications.spec.ts:165
+   🏷️  Tags: feature:notifications, e2e:essential
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+12. should display unread badge on NotificationsBell @e2e:essential
+   📦 notifications.spec.ts > In-app Notifications @feature:notifications
+   📁 notifications.spec.ts:165
+   🏷️  Tags: feature:notifications, e2e:essential
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
 
 ────────────────────────────────────────────────────────────
 

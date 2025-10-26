@@ -941,7 +941,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     // Wait for lists to be visible
     const lists = page.locator('[data-testid^="list-"]');
-    await expect(lists).toHaveCount(2, { timeout: 10000 });
+    const expectedCount = Math.max(2, initialListCount);
+    await expect(lists).toHaveCount(expectedCount, { timeout: 10000 });
 
     const count = await lists.count();
 

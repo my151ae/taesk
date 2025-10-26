@@ -254,8 +254,9 @@ test.describe('Comments Feature @feature:comments', () => {
     await replyTextarea.waitFor({ state: 'visible', timeout: 5000 });
     await replyTextarea.fill(replyText);
 
-    // Click the submit button within the reply form
-    await replyTextarea.locator('..').getByRole('button', { name: '返信' }).click();
+    // Click the submit button (first button in the button container after textarea)
+    const replyForm = replyTextarea.locator('..');
+    await replyForm.getByRole('button', { name: '返信' }).click();
 
     await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
   });
