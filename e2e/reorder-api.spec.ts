@@ -158,7 +158,7 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
 
   test('should reject unknown list IDs @failure:validation', async ({ request }) => {
     const updates = [
-      { id: '00000000-0000-0000-0000-000000000999', position: 1000 }, // unknown ID
+      { id: '123e4567-e89b-12d3-a456-426614174000', position: 1000 }, // valid UUID but not in board
     ];
 
     const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
@@ -178,7 +178,7 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
       data: { name: 'Other Board', is_test_board: true },
     });
     const otherBoard = await otherBoardRes.json();
-    const otherBoardId = otherBoard.boards[0].id;
+    const otherBoardId = otherBoard.board.id;
 
     // Create a list in the other board
     const otherListRes = await request.post(`${BASE_URL}/api/boards/${otherBoardId}/lists`, {
