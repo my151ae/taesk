@@ -172,8 +172,8 @@ test.describe('Board Permissions @feature:boards', () => {
 
     // Find editor member and change role
     await expect(page.getByText('editor@example.com')).toBeVisible();
-    const editorRow = page.locator('div').filter({ hasText: /editor@example\.com/ }).first();
-    const roleSelect = editorRow.getByRole('combobox');
+    const editorRow = page.locator('div').filter({ hasText: /^editor@example\.com/ }).first();
+    const roleSelect = editorRow.getByRole('combobox').first();
 
     await roleSelect.selectOption('commenter');
     await expect.poll(() => roleUpdateCalled, { timeout: 5000 }).toBe(true);
@@ -235,10 +235,17 @@ test.describe('Board Permissions @feature:boards', () => {
     const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
 
-    // Find owner member row
-    await expect(page.getByText('owner@example.com')).toBeVisible();
-    const ownerRow = page.locator('div').filter({ hasText: /owner@example\.com/ }).first();
-    const roleSelect = ownerRow.getByRole('combobox');
+    // Wait for dialog and members list to load
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('owner@example.com')).toBeVisible({ timeout: 10000 });
+
+    // Find owner member row - look for the parent container that has both name and email
+    const ownerRow = page.locator('.border').filter({ hasText: 'owner@example.com' }).first();
+    await expect(ownerRow).toBeVisible();
+
+    // Find the select within that row
+    const roleSelect = ownerRow.locator('select');
+    await expect(roleSelect).toBeVisible();
 
     // Owner's role select should be disabled
     await expect(roleSelect).toBeDisabled();

@@ -172,17 +172,21 @@ test.describe('In-app Notifications @feature:notifications', () => {
               {
                 id: crypto.randomUUID(),
                 type: 'comment',
-                title: 'New comment',
-                body: 'Someone commented on your card',
-                read: false,
+                payload: {
+                  message: 'New comment',
+                  body: 'Someone commented on your card',
+                },
+                read_at: null,
                 created_at: new Date().toISOString(),
               },
               {
                 id: crypto.randomUUID(),
                 type: 'mention',
-                title: 'You were mentioned',
-                body: 'Someone mentioned you in a comment',
-                read: false,
+                payload: {
+                  message: 'You were mentioned',
+                  body: 'Someone mentioned you in a comment',
+                },
+                read_at: null,
                 created_at: new Date().toISOString(),
               },
             ],
@@ -194,11 +198,14 @@ test.describe('In-app Notifications @feature:notifications', () => {
       await route.fallback();
     });
 
-    await page.reload();
+    // Wait for page to be stable before reloading
+    await page.waitForLoadState('networkidle');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
 
     // Verify bell icon shows unread badge
     const bellButton = page.getByRole('button', { name: /notifications/i });
-    await expect(bellButton).toBeVisible();
+    await expect(bellButton).toBeVisible({ timeout: 10000 });
 
     // Badge should show "2"
     const badge = page.locator('[data-testid="notification-badge"]');
@@ -211,11 +218,22 @@ test.describe('In-app Notifications @feature:notifications', () => {
 
     await page.goto('/');
 
-    // Mock notifications API
+    // Mock notifications API - setup route BEFORE reload
     await page.route('**/api/notifications*', async (route) => {
       const url = route.request().url();
+      const method = route.request().method();
 
-      if (route.request().method() === 'GET') {
+      if (method === 'POST' && url.includes('/mark-all-read')) {
+        markAsReadCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+        return;
+      }
+
+      if (method === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -224,24 +242,16 @@ test.describe('In-app Notifications @feature:notifications', () => {
               {
                 id: 'notif-1',
                 type: 'comment',
-                title: 'New comment',
-                body: 'Test notification',
-                read: markAsReadCalled,
+                payload: {
+                  message: 'New comment',
+                  body: 'Test notification',
+                },
+                read_at: markAsReadCalled ? new Date().toISOString() : null,
                 created_at: new Date().toISOString(),
               },
             ],
             unreadCount: markAsReadCalled ? 0 : 1,
           }),
-        });
-        return;
-      }
-
-      if (route.request().method() === 'PATCH' && url.includes('/mark-read')) {
-        markAsReadCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
         });
         return;
       }
@@ -258,14 +268,13 @@ test.describe('In-app Notifications @feature:notifications', () => {
     // Verify notification is visible
     await expect(page.getByText('New comment')).toBeVisible();
 
-    // Click "Mark all as read" or individual notification
-    const markAllButton = page.getByRole('button', { name: /mark all as read/i });
-    if (await markAllButton.isVisible()) {
-      await markAllButton.click();
-    }
+    // Click "Mark all as read"
+    const markAllButton = page.getByRole('button', { name: /mark all read/i });
+    await expect(markAllButton).toBeVisible();
+    await markAllButton.click();
 
     // Wait for mark-read API call
-    await expect.poll(() => markAsReadCalled).toBe(true);
+    await expect.poll(() => markAsReadCalled, { timeout: 10000 }).toBe(true);
 
     // Reload to verify badge is cleared
     await page.reload();

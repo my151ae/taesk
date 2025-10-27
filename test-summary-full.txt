@@ -1,0 +1,83 @@
+
+📊 Playwright Test Summary
+
+════════════════════════════════════════════════════════════
+
+📈 Statistics:
+   ✅ Passed:     60
+   ❌ Failed:     10
+   ⏭️  Skipped:    5
+   🔄 Flaky:      0
+   ⏱️  Duration:   229.93s
+
+❌ Failed Tests (10):
+
+────────────────────────────────────────────────────────────
+
+1. should change member role
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:153
+   🏷️  Tags: feature:boards
+   💥 Error: Error: locator.selectOption: Error: strict mode violation: locator('div').filter({ hasText: /editor@...
+
+2. should prevent non-owner from changing owner role @failure:permissions
+   📦 board-permissions.spec.ts > Board Permissions @feature:boards
+   📁 board-permissions.spec.ts:233
+   🏷️  Tags: feature:boards, failure:permissions
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeDisabled[2m([22m[2m)[22m failed...
+
+3. should allow replying to comments
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:238
+   🏷️  Tags: feature:comments
+   💥 Error: [31mTest timeout of 30000ms exceeded.[39m...
+
+4. should validate mention user_id as UUID v4
+   📦 comments.spec.ts > Comments Feature @feature:comments
+   📁 comments.spec.ts:303
+   🏷️  Tags: feature:comments
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeNull[2m()[22m...
+
+5. should delete a card
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:404
+   🏷️  Tags: feature:boards
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+
+6. should open card modal via short URL navigation
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:748
+   🏷️  Tags: feature:boards
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // in...
+
+7. should restore snapshot on drag error @feature:boards
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:927
+   🏷️  Tags: feature:boards, feature:boards
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m...
+
+8. should use normalized positions (1000/10 gaps) for new lists @feature:boards
+   📦 kanban.spec.ts > Taesk Kanban Board E2E Tests @feature:boards
+   📁 kanban.spec.ts:1000
+   🏷️  Tags: feature:boards, feature:boards
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m...
+
+9. sends a test notification
+   📦 notifications.spec.ts > Web Push Notifications @feature:notifications
+   📁 notifications.spec.ts:148
+   🏷️  Tags: feature:notifications
+   💥 Error: Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)...
+
+10. should mark notifications as read and clear badge
+   📦 notifications.spec.ts > In-app Notifications @feature:notifications
+   📁 notifications.spec.ts:212
+   🏷️  Tags: feature:notifications
+   💥 Error: Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed...
+
+────────────────────────────────────────────────────────────
+
+📝 Report: /Users/yossydie/dev/taesk/playwright-report.json
+📄 HTML:   npx playwright show-report --host 127.0.0.1 --port 9323
+
+════════════════════════════════════════════════════════════
+

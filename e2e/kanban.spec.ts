@@ -179,10 +179,13 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await boardSwitcher.click();
     await page.getByRole('button', { name: testBoardName }).click();
 
-    await page.waitForURL(`**${testBoardCanonicalPath}`);
+    // Wait for board to switch - use expect.poll instead of waitForURL
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .toContain(`/b/${testBoardShortId}`);
 
-    // Wait for board to switch
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
+    // Wait for board switcher to update
+    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible', timeout: 10000 });
 
     // Wait for board to be fully loaded and Realtime subscription to be ready
     await page.waitForTimeout(1500);

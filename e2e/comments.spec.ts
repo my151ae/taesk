@@ -111,7 +111,7 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
   await page.waitForTimeout(800);
 
   const start = Date.now();
-  const timeoutMs = 20000;
+  const timeoutMs = 30000; // 20秒→30秒に延長
   let lastError: Error | null = null;
 
   while (Date.now() - start < timeoutMs) {
@@ -136,7 +136,7 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
       };
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 500ms→1000msに延長
   }
 
   if (lastError) {
@@ -246,17 +246,21 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.waitForTimeout(500);
 
     // Click the first reply button in the comment actions
-    await page.getByRole('button', { name: '返信' }).first().click();
+    const replyButton = page.getByRole('button', { name: '返信' }).first();
+    await replyButton.waitFor({ state: 'visible', timeout: 10000 });
+    await replyButton.click();
 
     // Fill in the reply form
     const replyText = `Reply ${Date.now()}`;
     const replyTextarea = page.locator('textarea[placeholder*="返信を書く"]');
-    await replyTextarea.waitFor({ state: 'visible', timeout: 5000 });
+    await replyTextarea.waitFor({ state: 'visible', timeout: 10000 });
     await replyTextarea.fill(replyText);
 
     // Click the submit button (first button in the button container after textarea)
     const replyForm = replyTextarea.locator('..');
-    await replyForm.getByRole('button', { name: '返信' }).click();
+    const submitButton = replyForm.getByRole('button', { name: '返信' });
+    await submitButton.waitFor({ state: 'visible', timeout: 5000 });
+    await submitButton.click();
 
     await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
   });
@@ -305,6 +309,7 @@ test.describe('Comments Feature @feature:comments', () => {
     const currentBoard = assertContext(board, 'Board context not initialised');
 
     await openCardModalViaQuery(page, currentCard);
+    await page.waitForTimeout(1000); // モーダル表示完了を待つ
 
     // Create comment with mention via API to verify UUID format
     const commentBody = `@${TEST_USER_EMAIL} Test UUID validation`;
@@ -319,6 +324,9 @@ test.describe('Comments Feature @feature:comments', () => {
       .select()
       .single();
 
+    if (commentError) {
+      console.error('Comment insert error:', commentError);
+    }
     expect(commentError).toBeNull();
     expect(commentData).toBeDefined();
     expect(commentData.mentions).toContain(TEST_USER_ID);

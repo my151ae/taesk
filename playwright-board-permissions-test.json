@@ -1,0 +1,573 @@
+{
+  "config": {
+    "configFile": "/Users/yossydie/dev/taesk/playwright.config.ts",
+    "rootDir": "/Users/yossydie/dev/taesk/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/yossydie/dev/taesk/e2e/.setup/auth-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 4
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "core",
+        "name": "core",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "full",
+        "name": "full",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.0",
+    "workers": 4,
+    "webServer": {
+      "command": "NODE_ENV=test npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "board-permissions.spec.ts",
+      "file": "board-permissions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Board Permissions @feature:boards",
+          "file": "board-permissions.spec.ts",
+          "line": 51,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display ShareDialog when clicking share button @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 17163,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:33.399Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-b562c19c0a8e956b251d",
+              "file": "board-permissions.spec.ts",
+              "line": 132,
+              "column": 7
+            },
+            {
+              "title": "should change member role",
+              "ok": false,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "timedOut",
+                      "duration": 33123,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                            "column": 22,
+                            "line": 178
+                          },
+                          "message": "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^editor@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n\n  176 |     const roleSelect = editorRow.getByRole('combobox').first();\n  177 |\n> 178 |     await roleSelect.selectOption('commenter');\n      |                      ^\n  179 |     await expect.poll(() => roleUpdateCalled, { timeout: 5000 }).toBe(true);\n  180 |   });\n  181 |\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:178:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:33.396Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-core/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-363ebfa1eacc020beeb6",
+              "file": "board-permissions.spec.ts",
+              "line": 153,
+              "column": 7
+            },
+            {
+              "title": "should remove board member",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 14065,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:33.395Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-43d90329b383780fd05c",
+              "file": "board-permissions.spec.ts",
+              "line": 182,
+              "column": 7
+            },
+            {
+              "title": "should prevent non-owner from changing owner role @failure:permissions",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "failure:permissions"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 17616,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:244:30",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                          "column": 30,
+                          "line": 244
+                        },
+                        "snippet": "  242 |\n  243 |     // Owner's role select should be disabled\n> 244 |     await expect(roleSelect).toBeDisabled();\n      |                              ^\n  245 |   });\n  246 | });\n  247 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                            "column": 30,
+                            "line": 244
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n\n  242 |\n  243 |     // Owner's role select should be disabled\n> 244 |     await expect(roleSelect).toBeDisabled();\n      |                              ^\n  245 |   });\n  246 | });\n  247 |\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:244:30"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:33.391Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                        "column": 30,
+                        "line": 244
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-f5e6d4ada3b6fc8ffc0c",
+              "file": "board-permissions.spec.ts",
+              "line": 233,
+              "column": 7
+            },
+            {
+              "title": "should display ShareDialog when clicking share button @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 15518,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:50.940Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-a3e0dad71c736bf4a3af",
+              "file": "board-permissions.spec.ts",
+              "line": 132,
+              "column": 7
+            },
+            {
+              "title": "should change member role",
+              "ok": false,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30851,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                            "column": 22,
+                            "line": 178
+                          },
+                          "message": "Error: locator.selectOption: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^editor@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n\n  176 |     const roleSelect = editorRow.getByRole('combobox').first();\n  177 |\n> 178 |     await roleSelect.selectOption('commenter');\n      |                      ^\n  179 |     await expect.poll(() => roleUpdateCalled, { timeout: 5000 }).toBe(true);\n  180 |   });\n  181 |\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:178:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:52.999Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-full/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-full/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-0422e-s-should-change-member-role-full/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-a88472cbeb0dc0d7bc7c",
+              "file": "board-permissions.spec.ts",
+              "line": 153,
+              "column": 7
+            },
+            {
+              "title": "should remove board member",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 11158,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:21:53.663Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-c86300761af5a591c806",
+              "file": "board-permissions.spec.ts",
+              "line": 182,
+              "column": 7
+            },
+            {
+              "title": "should display invite link section (Phase 3) @phase3",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "phase3"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 8267,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:22:05.263Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-eee6ede73c82f7636ea0",
+              "file": "board-permissions.spec.ts",
+              "line": 214,
+              "column": 7
+            },
+            {
+              "title": "should prevent non-owner from changing owner role @failure:permissions",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "failure:permissions"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 13401,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:244:30",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                          "column": 30,
+                          "line": 244
+                        },
+                        "snippet": "  242 |\n  243 |     // Owner's role select should be disabled\n> 244 |     await expect(roleSelect).toBeDisabled();\n      |                              ^\n  245 |   });\n  246 | });\n  247 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                            "column": 30,
+                            "line": 244
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeDisabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\nExpected: disabled\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeDisabled\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^owner@example\\.com/ }).first().getByRole('combobox').first()\u001b[22m\n\n\n  242 |\n  243 |     // Owner's role select should be disabled\n> 244 |     await expect(roleSelect).toBeDisabled();\n      |                              ^\n  245 |   });\n  246 | });\n  247 |\n    at /Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts:244:30"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T01:22:06.894Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-full/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-full/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/board-permissions-Board-Pe-c5ec3-er-role-failure-permissions-full/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/board-permissions.spec.ts",
+                        "column": 30,
+                        "line": 244
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-acddbf3a89f531dba4ba",
+              "file": "board-permissions.spec.ts",
+              "line": 233,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-27T01:21:13.156Z",
+    "duration": 71617.224,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}
