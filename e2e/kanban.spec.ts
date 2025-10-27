@@ -168,17 +168,11 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     const boardTitleButton = getBoardTitleButton(page);
     await expect(boardTitleButton).toContainText(testBoardName, { timeout: 15000 });
 
-    // Wait for board to be fully loaded and Realtime subscription to be ready
+    // Wait for board to be fully loaded
+    // Note: Realtime is disabled in test environment (NEXT_PUBLIC_DISABLE_REALTIME=true)
+    // so no cross-test interference from Realtime events
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500);
-
-    // Ensure clean state: delete any lists that may have been created (e.g., from Realtime)
-    await supabase.from('lists').delete().eq('board_id', testBoardId);
-
-    // Reload to reflect the clean state
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(300);
   });
 
   test.afterEach(async ({ page }) => {
@@ -918,37 +912,17 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should restore snapshot on drag error @feature:boards', async ({ page }) => {
-    // Start with clean board (no lists due to is_test_board: true + beforeEach cleanup)
-    // Verify clean state
+    // Start with clean board (no lists due to is_test_board: true)
+    // Realtime is disabled in test environment, so no interference from other tests
     const lists = page.locator('[data-testid^="list-"]');
     await expect(lists).toHaveCount(0, { timeout: 5000 });
 
     // Add exactly 2 lists for testing
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1500); // Wait for sync
+    await page.waitForTimeout(1000); // Wait for sync
 
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1500); // Wait for sync
-
-    // Verify exactly 2 lists exist in DB
-    const { data: dbLists } = await supabase
-      .from('lists')
-      .select('id')
-      .eq('board_id', testBoardId);
-
-    // If more than 2 lists exist, delete extras and reload
-    if (dbLists && dbLists.length > 2) {
-      console.warn(`Expected 2 lists, found ${dbLists.length}. Cleaning up...`);
-      const listIdsToKeep = dbLists.slice(0, 2).map(l => l.id);
-      await supabase
-        .from('lists')
-        .delete()
-        .eq('board_id', testBoardId)
-        .not('id', 'in', `(${listIdsToKeep.join(',')})`);
-
-      await page.reload({ waitUntil: 'networkidle' });
-      await page.waitForTimeout(500);
-    }
+    await page.waitForTimeout(1000); // Wait for sync
 
     // Wait for exactly 2 lists to be visible
     await expect(lists).toHaveCount(2, { timeout: 10000 });
@@ -1010,36 +984,18 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should use normalized positions (1000/10 gaps) for new lists @feature:boards', async ({ page }) => {
-    // Start with clean board (no lists due to is_test_board: true + beforeEach cleanup)
+    // Start with clean board (no lists due to is_test_board: true)
+    // Realtime is disabled in test environment, so no interference from other tests
     const lists = page.locator('[data-testid^="list-"]');
     await expect(lists).toHaveCount(0, { timeout: 5000 });
 
     // Add first list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1500); // Wait for sync
+    await page.waitForTimeout(1000); // Wait for sync
 
     // Add second list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1500); // Wait for sync
-
-    // Verify exactly 2 lists exist in DB and cleanup if needed
-    const { data: dbLists } = await supabase
-      .from('lists')
-      .select('id')
-      .eq('board_id', testBoardId);
-
-    if (dbLists && dbLists.length > 2) {
-      console.warn(`Expected 2 lists, found ${dbLists.length}. Cleaning up...`);
-      const listIdsToKeep = dbLists.slice(0, 2).map(l => l.id);
-      await supabase
-        .from('lists')
-        .delete()
-        .eq('board_id', testBoardId)
-        .not('id', 'in', `(${listIdsToKeep.join(',')})`);
-
-      await page.reload({ waitUntil: 'networkidle' });
-      await page.waitForTimeout(500);
-    }
+    await page.waitForTimeout(1000); // Wait for sync
 
     // Wait for exactly 2 lists to appear in UI
     await expect(lists).toHaveCount(2, { timeout: 5000 });

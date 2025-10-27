@@ -1036,6 +1036,13 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   useEffect(() => {
     if (!currentBoardId) return;
 
+    // Disable Realtime in test environment if flag is set
+    if (process.env.NEXT_PUBLIC_DISABLE_REALTIME === 'true') {
+      console.log('[Realtime] Disabled via NEXT_PUBLIC_DISABLE_REALTIME flag');
+      setRealtimeStatus('disconnected');
+      return;
+    }
+
     console.log('[Realtime] Setting up subscription for board:', currentBoardId);
     const realtimeState = realtimeChannelRef.current;
     const token = (realtimeState.token ?? 0) + 1;
@@ -1054,7 +1061,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     setRealtimeStatus('connecting');
 
     const channel = supabase
-      .channel(`board-changes-${currentBoardId}`)
+      .channel(`board:${currentBoardId}`)
       .on(
         'postgres_changes',
         {
