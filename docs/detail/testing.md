@@ -202,14 +202,112 @@ PLAYWRIGHT_JSON_OUTPUT_NAME=custom-report.json node test-summary.js
 
 ---
 
-## 7. 運用チェックリスト
+## 7. テスト安定化のベストプラクティス（2025-10-28更新）
 
-- [ ] `playwright.config.ts` が本ガイドと整合。
-- [ ] CI が JSON レポートを保存し、`workers=1` / `retries=2` で動作。
-- [ ] ローカルは `PW_WORKERS` で並列指定可能（既定は Playwright 任せ）。
-- [ ] `.auth` を用いた正規ログインでテストが安定。
-- [ ] タグの付与ルールが PR テンプレ / lint などで周知されている。
+### ✅ 実装済みの安定化策
+
+#### 1. **一意ボードによるテスト分離**
+```typescript
+// 各テストで独立したボードを作成
+test.beforeEach(async ({ page }) => {
+  testBoardId = crypto.randomUUID();
+  testBoardName = `Test-${testBoardId.slice(0, 8)}`;
+  // ... ボード作成
+});
+
+test.afterEach(async () => {
+  // テスト後にクリーンアップ（CASCADE削除）
+  await supabase.from('boards').delete().eq('id', testBoardId);
+});
+```
+
+**効果**: テスト間のデータ競合を完全に排除。
+
+#### 2. **Realtime の無効化（テスト環境）**
+```bash
+# .env.test
+NEXT_PUBLIC_DISABLE_REALTIME=true
+```
+
+```typescript
+// KanbanBoardClient.tsx
+if (process.env.NEXT_PUBLIC_DISABLE_REALTIME === 'true') {
+  console.log('[Realtime] Disabled via NEXT_PUBLIC_DISABLE_REALTIME flag');
+  setRealtimeStatus('disconnected');
+  return;
+}
+```
+
+**効果**: クロステスト干渉を防止。
+
+#### 3. **精密なセレクタ**
+```typescript
+// ❌ 二重マッチングの危険性
+const lists = page.locator('[data-testid^="list-"]');
+// → `list-${id}` と `list-${id}-dropzone` の両方にマッチ
+
+// ✅ コンテナのみにマッチ
+const lists = page.locator('[data-type="list"]');
+```
+
+**効果**: 期待値との不一致を防止。
+
+#### 4. **Drag エラー時のロールバック**
+```typescript
+// KanbanBoardClient.tsx - handleDragEnd
+const previousData: BoardData = {
+  lists: [...boardData.lists],
+  cards: [...boardData.cards],
+};
+
+// ... D&D処理
+
+try {
+  await syncToSupabase(newData);
+} catch (error) {
+  // 失敗時に元の状態に復元
+  updateData(previousData);
+  console.error('Sync failed, rolled back:', error);
+}
+```
+
+**効果**: API失敗時に UI が壊れない。
+
+#### 5. **Position 正規化（1000/10 ルール）**
+```typescript
+// initializeDefaultLists & handleAddList
+const START_POSITION = 1000;
+const GAP = 10;
+const position = START_POSITION + (boardData.lists.length * GAP);
+// → 1000, 1010, 1020, ...
+```
+
+**効果**: 予測可能な位置値、ドラッグ＆ドロップの安定性向上。
+
+### セレクタガイドライン
+
+| 用途 | 推奨セレクタ | 理由 |
+|------|------------|------|
+| リストコンテナ | `[data-type="list"]` | dropzone を除外 |
+| 特定リスト | `[data-testid="list-${id}"]` | ID指定で一意 |
+| リストタイトル入力 | `[data-testid="list-title-input-${id}"]` | 編集中の状態を検証 |
+| カード | `[data-testid="card-${id}"]` | カード固有ID |
 
 ---
 
-最終更新: 2025-10-23
+## 8. 運用チェックリスト
+
+- [x] `playwright.config.ts` が本ガイドと整合。
+- [x] CI が JSON レポートを保存し、`workers=1` / `retries=2` で動作。
+- [x] ローカルは `PW_WORKERS` で並列指定可能（既定は Playwright 任せ）。
+- [x] `.auth` を用いた正規ログインでテストが安定。
+- [x] タグの付与ルールが PR テンプレ / lint などで周知されている。
+- [x] 一意ボード作成によりテスト分離を実現。
+- [x] Realtime 無効化でクロステスト干渉を防止。
+- [x] セレクタは `[data-type="list"]` などの精密なものを使用。
+- [x] Drag エラー時のロールバック実装済み。
+- [x] Position 正規化（1000/10）実装済み。
+
+---
+
+最終更新: 2025-10-28

@@ -1,0 +1,929 @@
+{
+  "config": {
+    "configFile": "/Users/yossydie/dev/taesk/playwright.config.ts",
+    "rootDir": "/Users/yossydie/dev/taesk/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/yossydie/dev/taesk/e2e/.setup/auth-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 4
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "core",
+        "name": "core",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "full",
+        "name": "full",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.0",
+    "workers": 4,
+    "webServer": {
+      "command": "NODE_ENV=test npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "auth.spec.ts",
+      "file": "auth.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Authentication @e2e:essential",
+          "file": "auth.spec.ts",
+          "line": 17,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should redirect to login page when not authenticated",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2084,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:19.899Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-b7251fa82477f4c647b3",
+              "file": "auth.spec.ts",
+              "line": 18,
+              "column": 7
+            },
+            {
+              "title": "should show error message on login page if error param exists",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2086,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:19.897Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-2f25e4b5165a4409eaaa",
+              "file": "auth.spec.ts",
+              "line": 31,
+              "column": 7
+            },
+            {
+              "title": "should disable login button while logging in",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 2081,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:19.901Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-9ae3f93bc9167af0544b",
+              "file": "auth.spec.ts",
+              "line": 38,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "Session Management @e2e:essential",
+          "file": "auth.spec.ts",
+          "line": 63,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should show login page after visiting any protected route",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 2037,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:19.897Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-e27fd6d8b447693bcbf8",
+              "file": "auth.spec.ts",
+              "line": 64,
+              "column": 7
+            },
+            {
+              "title": "auth callback should handle errors gracefully",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 2007,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:22.145Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-9de45b1c02c17f196f0c",
+              "file": "auth.spec.ts",
+              "line": 74,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "board-permissions.spec.ts",
+      "file": "board-permissions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Board Permissions @feature:boards",
+          "file": "board-permissions.spec.ts",
+          "line": 51,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display ShareDialog when clicking share button @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 13387,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:22.216Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-b562c19c0a8e956b251d",
+              "file": "board-permissions.spec.ts",
+              "line": 147,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "comments.spec.ts",
+      "file": "comments.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Comments Feature @feature:comments",
+          "file": "comments.spec.ts",
+          "line": 188,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should support @mentions with typeahead @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:comments",
+                "mentions",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7965,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:22.224Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-e29fed92230b51f5e233",
+              "file": "comments.spec.ts",
+              "line": 309,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "kanban.spec.ts",
+      "file": "kanban.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Taesk Kanban Board E2E Tests @feature:boards",
+          "file": "kanban.spec.ts",
+          "line": 120,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should load the test board (empty initially) @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 5863,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:22.254Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-2d9459f8fe33b539279f",
+              "file": "kanban.spec.ts",
+              "line": 186,
+              "column": 7
+            },
+            {
+              "title": "should add a new list @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 7095,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:24.215Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-0c82d419e3a5abc7fbb0",
+              "file": "kanban.spec.ts",
+              "line": 254,
+              "column": 7
+            },
+            {
+              "title": "should add a card to a list @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 6771,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:28.134Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-2d59cbcb9b155bfad2d1",
+              "file": "kanban.spec.ts",
+              "line": 316,
+              "column": 7
+            },
+            {
+              "title": "should persist data after page reload @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11140,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:30.231Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-d0e0fdb9eaac2b6a9969",
+              "file": "kanban.spec.ts",
+              "line": 607,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "notifications.spec.ts",
+      "file": "notifications.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "In-app Notifications @feature:notifications",
+          "file": "notifications.spec.ts",
+          "line": 168,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display unread badge on NotificationsBell @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:notifications",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 4382,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:31.333Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-bec45f91e7df61dbc380",
+              "file": "notifications.spec.ts",
+              "line": 169,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "rls.spec.ts",
+      "file": "rls.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "RLS Policy Verification @e2e:essential",
+          "file": "rls.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should have RLS enabled on lists table",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.923Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-f93ec188563174253c5c",
+              "file": "rls.spec.ts",
+              "line": 11,
+              "column": 7
+            },
+            {
+              "title": "should have RLS enabled on cards table",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.933Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-c6ae49e840e94a1981df",
+              "file": "rls.spec.ts",
+              "line": 35,
+              "column": 7
+            },
+            {
+              "title": "should have user_id column on lists table",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.939Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-b65beac3a9ff0780fae9",
+              "file": "rls.spec.ts",
+              "line": 58,
+              "column": 7
+            },
+            {
+              "title": "should have user_id column on cards table",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.952Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-53f51dc5969c7ba7a72c",
+              "file": "rls.spec.ts",
+              "line": 71,
+              "column": 7
+            },
+            {
+              "title": "should not allow access to data without user_id",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.966Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-fd1f4c50c8f779e477ed",
+              "file": "rls.spec.ts",
+              "line": 84,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "Database Migration Verification @e2e:essential",
+          "file": "rls.spec.ts",
+          "line": 102,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should have applied add_user_id_and_rls_policies migration",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.973Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-179b11da6dd2193cb3f8",
+              "file": "rls.spec.ts",
+              "line": 103,
+              "column": 7
+            },
+            {
+              "title": "should have applied remove_old_permissive_policies migration",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 2,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:34.985Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-5a7f411a2c4d44d999b9",
+              "file": "rls.spec.ts",
+              "line": 115,
+              "column": 7
+            },
+            {
+              "title": "should not have any data with null user_id",
+              "ok": true,
+              "tags": [
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:33:35.013Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e5f3066dd2a06c4254d4-50534b0d922bb6aa23b2",
+              "file": "rls.spec.ts",
+              "line": 127,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-27T18:33:09.315Z",
+    "duration": 32146.255,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

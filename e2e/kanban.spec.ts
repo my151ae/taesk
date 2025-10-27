@@ -1029,7 +1029,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
   test('should maintain position gaps after drag and drop @feature:boards', async ({ page }) => {
     // Ensure we have at least 3 lists
-    const listCount = await page.locator('[data-testid^="list-"]').count();
+    const listCount = await page.locator('[data-type="list"]').count();
 
     for (let i = listCount; i < 3; i++) {
       await page.getByRole('button', { name: '+ Add List' }).click();
@@ -1037,7 +1037,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     }
 
     // Get initial list order
-    const lists = page.locator('[data-testid^="list-"]');
+    const lists = page.locator('[data-type="list"]');
     const firstList = lists.first();
     const thirdList = lists.nth(2);
 
