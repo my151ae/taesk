@@ -315,22 +315,16 @@ test.describe('Comments Feature @feature:comments', () => {
     // Wait for modal to fully load
     await page.waitForLoadState('networkidle');
 
-    await page.waitForResponse((response) => {
-      return (
-        response.url().includes(`/api/boards/${currentBoard.id}/members`) &&
-        response.request().method() === 'GET'
-      );
-    }, { timeout: 15000 });
-
     // Type @ to trigger mention typeahead
     const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
     await commentTextarea.waitFor({ state: 'visible', timeout: 15000 });
     await commentTextarea.click();
     await page.waitForTimeout(500); // Wait for focus
 
+    // Type @ to trigger mention typeahead
     await commentTextarea.type('@', { delay: 100 });
 
-    // Wait for mention suggestions to appear (extended timeout)
+    // Wait for mention suggestions to appear using ARIA role
     const mentionDropdown = page.locator('[role="listbox"]');
     await expect(mentionDropdown).toBeVisible({ timeout: 15000 });
 

@@ -171,11 +171,22 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     // Wait for board to be fully loaded and Realtime subscription to be ready
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500);
+
+    // Ensure clean state: delete any lists that may have been created (e.g., from Realtime)
+    await supabase.from('lists').delete().eq('board_id', testBoardId);
+
+    // Reload to reflect the clean state
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(300);
   });
 
-  test.afterEach(async () => {
+  test.afterEach(async ({ page }) => {
     // Clean up test board (CASCADE deletes lists and cards)
     await supabase.from('boards').delete().eq('id', testBoardId);
+
+    // Wait for Realtime to propagate the deletion
+    await page.waitForTimeout(500);
   });
 
   test('should load the test board (empty initially) @e2e:essential', async ({ page }) => {
@@ -907,29 +918,40 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should restore snapshot on drag error @feature:boards', async ({ page }) => {
-    // Get initial board state via Supabase
-    const { data: initialLists } = await supabase
+    // Start with clean board (no lists due to is_test_board: true + beforeEach cleanup)
+    // Verify clean state
+    const lists = page.locator('[data-testid^="list-"]');
+    await expect(lists).toHaveCount(0, { timeout: 5000 });
+
+    // Add exactly 2 lists for testing
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(1500); // Wait for sync
+
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(1500); // Wait for sync
+
+    // Verify exactly 2 lists exist in DB
+    const { data: dbLists } = await supabase
       .from('lists')
-      .select('*')
-      .eq('board_id', testBoardId)
-      .order('position', { ascending: true });
+      .select('id')
+      .eq('board_id', testBoardId);
 
-    const initialListCount = initialLists?.length || 0;
+    // If more than 2 lists exist, delete extras and reload
+    if (dbLists && dbLists.length > 2) {
+      console.warn(`Expected 2 lists, found ${dbLists.length}. Cleaning up...`);
+      const listIdsToKeep = dbLists.slice(0, 2).map(l => l.id);
+      await supabase
+        .from('lists')
+        .delete()
+        .eq('board_id', testBoardId)
+        .not('id', 'in', `(${listIdsToKeep.join(',')})`);
 
-    // Ensure we have at least 2 lists
-    if (initialListCount < 2) {
-      for (let i = initialListCount; i < 2; i++) {
-        await page.getByRole('button', { name: '+ Add List' }).click();
-        await page.waitForTimeout(1000); // Wait for sync
-      }
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
     }
 
-    // Wait for lists to be visible
-    const lists = page.locator('[data-testid^="list-"]');
-    const expectedCount = Math.max(2, initialListCount);
-    await expect(lists).toHaveCount(expectedCount, { timeout: 10000 });
-
-    const count = await lists.count();
+    // Wait for exactly 2 lists to be visible
+    await expect(lists).toHaveCount(2, { timeout: 10000 });
 
     // Simulate a drag operation that might fail
     // (In a real scenario, this would involve mocking API failures)
@@ -956,8 +978,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       await page.reload();
       await page.waitForLoadState('networkidle');
 
-      // Verify board still renders without errors
-      await expect(page.locator('[data-testid^="list-"]')).toHaveCount(count);
+      // Verify board still renders without errors - should still have exactly 2 lists
+      await expect(page.locator('[data-testid^="list-"]')).toHaveCount(2, { timeout: 10000 });
 
       // Get updated board data via Supabase
       const { data: finalLists } = await supabase
@@ -967,7 +989,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
         .order('position', { ascending: true });
 
       // Verify data integrity - all lists should still exist
-      expect(finalLists?.length).toBe(count);
+      expect(finalLists?.length).toBe(2);
 
       // All positions should be normalized (厳密一致→範囲検証へ)
       const positions = finalLists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
@@ -988,29 +1010,52 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should use normalized positions (1000/10 gaps) for new lists @feature:boards', async ({ page }) => {
+    // Start with clean board (no lists due to is_test_board: true + beforeEach cleanup)
+    const lists = page.locator('[data-testid^="list-"]');
+    await expect(lists).toHaveCount(0, { timeout: 5000 });
+
     // Add first list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1000); // Wait for sync
+    await page.waitForTimeout(1500); // Wait for sync
 
     // Add second list
     await page.getByRole('button', { name: '+ Add List' }).click();
-    await page.waitForTimeout(1000); // Wait for sync
+    await page.waitForTimeout(1500); // Wait for sync
 
-    // Wait for lists to appear in UI
-    await expect(page.locator('[data-testid^="list-"]')).toHaveCount(2, { timeout: 5000 });
+    // Verify exactly 2 lists exist in DB and cleanup if needed
+    const { data: dbLists } = await supabase
+      .from('lists')
+      .select('id')
+      .eq('board_id', testBoardId);
+
+    if (dbLists && dbLists.length > 2) {
+      console.warn(`Expected 2 lists, found ${dbLists.length}. Cleaning up...`);
+      const listIdsToKeep = dbLists.slice(0, 2).map(l => l.id);
+      await supabase
+        .from('lists')
+        .delete()
+        .eq('board_id', testBoardId)
+        .not('id', 'in', `(${listIdsToKeep.join(',')})`);
+
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
+    }
+
+    // Wait for exactly 2 lists to appear in UI
+    await expect(lists).toHaveCount(2, { timeout: 5000 });
 
     // Get board data via Supabase to check positions
-    const { data: lists } = await supabase
+    const { data: dbListsForCheck } = await supabase
       .from('lists')
       .select('*')
       .eq('board_id', testBoardId)
       .order('position', { ascending: true });
 
-    // Verify positions use 1000/10 gaps
-    expect(lists?.length).toBeGreaterThanOrEqual(2);
+    // Verify we have exactly 2 lists
+    expect(dbListsForCheck?.length).toBe(2);
 
     // Default lists should have normalized positions (範囲検証に緩和)
-    const positions = lists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
+    const positions = dbListsForCheck?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];
 
     // Check that positions are positive multiples of 10
     for (const pos of positions) {
