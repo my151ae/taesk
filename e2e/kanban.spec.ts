@@ -914,7 +914,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   test('should restore snapshot on drag error @feature:boards', async ({ page }) => {
     // Start with clean board (no lists due to is_test_board: true)
     // Realtime is disabled in test environment, so no interference from other tests
-    const lists = page.locator('[data-testid^="list-"]');
+    const lists = page.locator('[data-type="list"]');
     await expect(lists).toHaveCount(0, { timeout: 5000 });
 
     // Add exactly 2 lists for testing
@@ -953,7 +953,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       await page.waitForLoadState('networkidle');
 
       // Verify board still renders without errors - should still have exactly 2 lists
-      await expect(page.locator('[data-testid^="list-"]')).toHaveCount(2, { timeout: 10000 });
+      await expect(page.locator('[data-type="list"]')).toHaveCount(2, { timeout: 10000 });
 
       // Get updated board data via Supabase
       const { data: finalLists } = await supabase
@@ -986,7 +986,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   test('should use normalized positions (1000/10 gaps) for new lists @feature:boards', async ({ page }) => {
     // Start with clean board (no lists due to is_test_board: true)
     // Realtime is disabled in test environment, so no interference from other tests
-    const lists = page.locator('[data-testid^="list-"]');
+    const lists = page.locator('[data-type="list"]');
     await expect(lists).toHaveCount(0, { timeout: 5000 });
 
     // Add first list

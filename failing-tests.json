@@ -1,0 +1,620 @@
+{
+  "config": {
+    "configFile": "/Users/yossydie/dev/taesk/playwright.config.ts",
+    "rootDir": "/Users/yossydie/dev/taesk/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/yossydie/dev/taesk/e2e/.setup/auth-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 4
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "core",
+        "name": "core",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "full",
+        "name": "full",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.0",
+    "workers": 4,
+    "webServer": {
+      "command": "NODE_ENV=test npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "kanban.spec.ts",
+      "file": "kanban.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Taesk Kanban Board E2E Tests @feature:boards",
+          "file": "kanban.spec.ts",
+          "line": 120,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should restore snapshot on drag error @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 19899,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:956:60",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 60,
+                          "line": 956
+                        },
+                        "snippet": "  954 |\n  955 |       // Verify board still renders without errors - should still have exactly 2 lists\n> 956 |       await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(2, { timeout: 10000 });\n      |                                                            ^\n  957 |\n  958 |       // Get updated board data via Supabase\n  959 |       const { data: finalLists } = await supabase"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 60,
+                            "line": 956
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n\n  954 |\n  955 |       // Verify board still renders without errors - should still have exactly 2 lists\n> 956 |       await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(2, { timeout: 10000 });\n      |                                                            ^\n  957 |\n  958 |       // Get updated board data via Supabase\n  959 |       const { data: finalLists } = await supabase\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:956:60"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:20:46.594Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 60,
+                        "line": 956
+                      }
+                    },
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 15700,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 25,
+                          "line": 928
+                        },
+                        "snippet": "  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 25,
+                            "line": 928
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n\n  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T18:21:07.193Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 25,
+                        "line": 928
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-3d79128b5a9c6727c57c",
+              "file": "kanban.spec.ts",
+              "line": 914,
+              "column": 7
+            },
+            {
+              "title": "should use normalized positions (1000/10 gaps) for new lists @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 6645,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1025:19",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 19,
+                          "line": 1025
+                        },
+                        "snippet": "  1023 |     for (let i = 1; i < positions.length; i++) {\n  1024 |       const gap = positions[i] - positions[i - 1];\n> 1025 |       expect(gap).toBeGreaterThanOrEqual(10);\n       |                   ^\n  1026 |       expect(gap).toBeLessThanOrEqual(1000);\n  1027 |     }\n  1028 |   });"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 19,
+                            "line": 1025
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m\n\n  1023 |     for (let i = 1; i < positions.length; i++) {\n  1024 |       const gap = positions[i] - positions[i - 1];\n> 1025 |       expect(gap).toBeGreaterThanOrEqual(10);\n       |                   ^\n  1026 |       expect(gap).toBeLessThanOrEqual(1000);\n  1027 |     }\n  1028 |   });\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1025:19"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:20:46.594Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 19,
+                        "line": 1025
+                      }
+                    },
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 11543,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1001:25",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 25,
+                          "line": 1001
+                        },
+                        "snippet": "   999 |\n  1000 |     // Wait for exactly 2 lists to appear in UI\n> 1001 |     await expect(lists).toHaveCount(2, { timeout: 5000 });\n       |                         ^\n  1002 |\n  1003 |     // Get board data via Supabase to check positions\n  1004 |     const { data: dbListsForCheck } = await supabase"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 25,
+                            "line": 1001
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n\n   999 |\n  1000 |     // Wait for exactly 2 lists to appear in UI\n> 1001 |     await expect(lists).toHaveCount(2, { timeout: 5000 });\n       |                         ^\n  1002 |\n  1003 |     // Get board data via Supabase to check positions\n  1004 |     const { data: dbListsForCheck } = await supabase\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1001:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T18:20:54.166Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 25,
+                        "line": 1001
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-4bd986408f57c57dc35c",
+              "file": "kanban.spec.ts",
+              "line": 986,
+              "column": 7
+            },
+            {
+              "title": "should restore snapshot on drag error @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 16734,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 25,
+                          "line": 928
+                        },
+                        "snippet": "  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 25,
+                            "line": 928
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n\n  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:20:46.596Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 25,
+                        "line": 928
+                      }
+                    },
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 15813,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 25,
+                          "line": 928
+                        },
+                        "snippet": "  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 25,
+                            "line": 928
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n\n  926 |\n  927 |     // Wait for exactly 2 lists to be visible\n> 928 |     await expect(lists).toHaveCount(2, { timeout: 10000 });\n      |                         ^\n  929 |\n  930 |     // Simulate a drag operation that might fail\n  931 |     // (In a real scenario, this would involve mocking API failures)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:928:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T18:21:04.049Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-full-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 25,
+                        "line": 928
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-a26491b69ab545635b32",
+              "file": "kanban.spec.ts",
+              "line": 914,
+              "column": 7
+            },
+            {
+              "title": "should use normalized positions (1000/10 gaps) for new lists @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "full",
+                  "projectName": "full",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 6359,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1025:19",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 19,
+                          "line": 1025
+                        },
+                        "snippet": "  1023 |     for (let i = 1; i < positions.length; i++) {\n  1024 |       const gap = positions[i] - positions[i - 1];\n> 1025 |       expect(gap).toBeGreaterThanOrEqual(10);\n       |                   ^\n  1026 |       expect(gap).toBeLessThanOrEqual(1000);\n  1027 |     }\n  1028 |   });"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 19,
+                            "line": 1025
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m10\u001b[39m\nReceived:    \u001b[31m0\u001b[39m\n\n  1023 |     for (let i = 1; i < positions.length; i++) {\n  1024 |       const gap = positions[i] - positions[i - 1];\n> 1025 |       expect(gap).toBeGreaterThanOrEqual(10);\n       |                   ^\n  1026 |       expect(gap).toBeLessThanOrEqual(1000);\n  1027 |     }\n  1028 |   });\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1025:19"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T18:20:46.595Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 19,
+                        "line": 1025
+                      }
+                    },
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 3,
+                      "status": "failed",
+                      "duration": 11969,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1001:25",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 25,
+                          "line": 1001
+                        },
+                        "snippet": "   999 |\n  1000 |     // Wait for exactly 2 lists to appear in UI\n> 1001 |     await expect(lists).toHaveCount(2, { timeout: 5000 });\n       |                         ^\n  1002 |\n  1003 |     // Get board data via Supabase to check positions\n  1004 |     const { data: dbListsForCheck } = await supabase"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 25,
+                            "line": 1001
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    9 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n\n   999 |\n  1000 |     // Wait for exactly 2 lists to appear in UI\n> 1001 |     await expect(lists).toHaveCount(2, { timeout: 5000 });\n       |                         ^\n  1002 |\n  1003 |     // Get board data via Supabase to check positions\n  1004 |     const { data: dbListsForCheck } = await supabase\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1001:25"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T18:20:53.687Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-full-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 25,
+                        "line": 1001
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-99b5494d3c90ac283962",
+              "file": "kanban.spec.ts",
+              "line": 986,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-27T18:20:35.940Z",
+    "duration": 47170.52,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}
