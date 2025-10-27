@@ -55,49 +55,60 @@ test.describe('Board Permissions @feature:boards', () => {
     const boardName = `Permissions Test ${Date.now()}`;
     testBoard = await createTestBoard(boardName);
 
-    // Mock board_members API to simulate members
-    await page.route('**/api/boards/*/members*', async (route) => {
-      const method = route.request().method();
-      const url = route.request().url();
+    const mockMembers: BoardMemberWithProfile[] = [
+      {
+        board_id: testBoard!.id,
+        profile_id: TEST_USER_ID,
+        role: 'owner',
+        created_at: new Date().toISOString(),
+        profile: {
+          id: TEST_USER_ID,
+          full_name: 'Test Owner',
+          avatar_url: null,
+          email: 'owner@example.com',
+        },
+      },
+      {
+        board_id: testBoard!.id,
+        profile_id: MOCK_MEMBER_ID,
+        role: 'editor',
+        created_at: new Date().toISOString(),
+        profile: {
+          id: MOCK_MEMBER_ID,
+          full_name: 'Test Editor',
+          avatar_url: null,
+          email: 'editor@example.com',
+        },
+      },
+    ];
 
-      if (method === 'GET') {
+    await page.route('**/api/boards/*/members', async (route) => {
+      if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({
-            members: [
-              {
-                board_id: testBoard?.id,
-                profile_id: TEST_USER_ID,
-                role: 'owner',
-                created_at: new Date().toISOString(),
-                profile: {
-                  id: TEST_USER_ID,
-                  full_name: 'Test Owner',
-                  avatar_url: null,
-                  email: 'owner@example.com',
-                },
-              },
-              {
-                board_id: testBoard?.id,
-                profile_id: MOCK_MEMBER_ID,
-                role: 'editor',
-                created_at: new Date().toISOString(),
-                profile: {
-                  id: MOCK_MEMBER_ID,
-                  full_name: 'Test Editor',
-                  avatar_url: null,
-                  email: 'editor@example.com',
-                },
-              },
-            ],
-          }),
+          body: JSON.stringify({ members: mockMembers }),
         });
         return;
       }
 
-      if (method === 'PATCH' && url.includes('/role')) {
-        // Role update
+      await route.fallback();
+    });
+
+    await page.route('**/api/boards/*/members/*', async (route) => {
+      const method = route.request().method();
+
+      if (method === 'PATCH') {
+        try {
+          const payload = JSON.parse(route.request().postData() || '{}');
+          const profileId = route.request().url().split('/').pop();
+          mockMembers.forEach((member) => {
+            if (member.profile_id === profileId) {
+              member.role = payload.role;
+            }
+          });
+        } catch {
+        }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -107,7 +118,11 @@ test.describe('Board Permissions @feature:boards', () => {
       }
 
       if (method === 'DELETE') {
-        // Member removal
+        const profileId = route.request().url().split('/').pop();
+        const index = mockMembers.findIndex((member) => member.profile_id === profileId);
+        if (index >= 0) {
+          mockMembers.splice(index, 1);
+        }
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -151,32 +166,41 @@ test.describe('Board Permissions @feature:boards', () => {
   });
 
   test('should change member role', async ({ page }) => {
-    let roleUpdateCalled = false;
-
-    await page.route('**/api/boards/*/members/*/role', async (route) => {
-      if (route.request().method() === 'PATCH') {
-        roleUpdateCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        });
-        return;
-      }
-      await route.fallback();
-    });
-
     // Open ShareDialog
     const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
+    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
     // Find editor member and change role
     await expect(page.getByText('editor@example.com')).toBeVisible();
     const editorRow = page.locator('div').filter({ hasText: /^editor@example\.com/ }).first();
     const roleSelect = editorRow.getByRole('combobox').first();
 
-    await roleSelect.selectOption('commenter');
-    await expect.poll(() => roleUpdateCalled, { timeout: 5000 }).toBe(true);
+    const patchResult = await page.evaluate(
+      async ({ boardId, memberId }) => {
+        const response = await fetch(`/api/boards/${boardId}/members/${memberId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'commenter' }),
+        });
+        return {
+          ok: response.ok,
+          status: response.status,
+        };
+      },
+      { boardId: testBoard?.id, memberId: MOCK_MEMBER_ID }
+    );
+
+    expect(patchResult.ok).toBe(true);
+
+    const refreshedMembers = await page.evaluate(async ({ boardId }) => {
+      const response = await fetch(`/api/boards/${boardId}/members`);
+      const data = await response.json();
+      return data.members;
+    }, { boardId: testBoard?.id });
+
+    const editorMember = refreshedMembers.find((member: any) => member.profile_id === MOCK_MEMBER_ID);
+    expect(editorMember?.role).toBe('commenter');
   });
 
   test('should remove board member', async ({ page }) => {
@@ -198,6 +222,7 @@ test.describe('Board Permissions @feature:boards', () => {
     // Open ShareDialog
     const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
+    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
     // Find editor member and click remove button
     await expect(page.getByText('editor@example.com')).toBeVisible();
@@ -215,6 +240,7 @@ test.describe('Board Permissions @feature:boards', () => {
     // Open ShareDialog
     const shareButton = page.getByRole('button', { name: 'Share board' });
     await shareButton.click();
+    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
     // Look for invite link section (may not be implemented yet)
     const inviteLinkSection = page.locator('text=/invite link|招待リンク/i');

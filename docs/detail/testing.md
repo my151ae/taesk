@@ -91,9 +91,12 @@ export default defineConfig({
   "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
   "test:failure": "playwright test --project=core --grep @failure:",
   "test:full": "playwright test --project=full",
-  "test:summary": "cat playwright-report.json | jq '.stats'"
+  "test:summary": "cat playwright-report.json | jq '.stats'",
+  "test:failed": "bash scripts/test-rerun-failed.sh"
 }
 ```
+
+`test:failed` は直前の JSON レポートから `status: "unexpected"` が含まれる spec を抽出し、対象ファイルだけを `--reporter=json` で再実行します。`scripts/test-rerun-failed.sh` を直接呼び出すことで、レポートファイルや出力先を `--report`, `--output`, `--project` オプションで上書きできます。
 
 ### コマンド例
 

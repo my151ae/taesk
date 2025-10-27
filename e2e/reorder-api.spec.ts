@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
+const API_HEADERS = { 'x-e2e-secret': E2E_SECRET } as const;
 
 test.describe('Reorder API (Phase 2) @feature:lists', () => {
   let boardId: string;

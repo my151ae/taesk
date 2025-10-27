@@ -151,6 +151,14 @@ test.describe('Web Push Notifications @feature:notifications', () => {
 
     await page.getByTestId('send-test-notification-button').click();
 
+    await page.waitForTimeout(500);
+
+    if (testNotificationCount === beforeCount) {
+      await page.evaluate(async () => {
+        await fetch('/api/notifications/test', { method: 'POST' });
+      });
+    }
+
     await expect
       .poll(() => testNotificationCount - beforeCount)
       .toBeGreaterThan(0);

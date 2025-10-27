@@ -291,7 +291,10 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
               )}
             </div>
 
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <div
+              className="text-sm text-gray-600 dark:text-gray-400 mt-1"
+              data-testid="comment-body"
+            >
               <RenderCommentBody
                 body={comment.body}
                 mentions={comment.mentions || []}
@@ -401,7 +404,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="comments-panel">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">コメント</h3>
         {commentStatus === 'loading' && <span className="text-xs text-gray-500">読み込み中...</span>}

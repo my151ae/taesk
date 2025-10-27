@@ -44,15 +44,20 @@ export async function mockServiceWorkerAndPush(page: Page) {
 
     if ('Notification' in window) {
       const originalRequestPermission = Notification.requestPermission?.bind(Notification);
+      let currentPermission: NotificationPermission = 'granted';
 
       Notification.requestPermission = async () => {
         console.log('[Mock] Notification permission granted');
+        currentPermission = 'granted';
         return 'granted';
       };
 
       Object.defineProperty(Notification, 'permission', {
         configurable: true,
-        get: () => 'default',
+        get: () => currentPermission,
+        set: (value: NotificationPermission) => {
+          currentPermission = value;
+        },
       });
 
       if (originalRequestPermission) {

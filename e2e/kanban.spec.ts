@@ -53,6 +53,10 @@ async function dragAndDrop(page: Page, source: Locator, target: Locator) {
   await page.waitForTimeout(500); // Wait for drop animation and Realtime sync
 }
 
+function getBoardTitleButton(page: Page): Locator {
+  return page.locator('.board-menu-container button').first();
+}
+
 async function waitForCardRows<T extends Record<string, unknown>>(
   boardId: string,
   selectColumns: string,
@@ -156,42 +160,17 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       avatar_url: null,
     });
 
-    let navigationSucceeded = false;
-    for (let attempt = 0; attempt < 2 && !navigationSucceeded; attempt += 1) {
-      try {
-        await page.goto('/');
-        navigationSucceeded = true;
-      } catch (error) {
-        if (attempt === 1) {
-          throw error;
-        }
-        await page.waitForTimeout(500);
-      }
-    }
-
-    // Wait for page to load and auth to initialize
-    await page.waitForLoadState('domcontentloaded');
-
-    const boardSwitcher = page.getByRole('button', { name: /Board ▼/ });
-    await boardSwitcher.waitFor({ state: 'visible', timeout: 10000 });
-
-    // Switch to test board
-    await boardSwitcher.click();
-    const testBoardButton = page.getByRole('button', { name: testBoardName });
-    await testBoardButton.waitFor({ state: 'visible', timeout: 10000 });
-    await testBoardButton.click();
-
-    // Wait for navigation to complete - wait for board switcher to update first
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible', timeout: 10000 });
-
-    // Then verify URL contains the correct short_id
+    await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });
     await expect
       .poll(() => page.url(), { timeout: 10000 })
       .toContain(`/b/${testBoardShortId}`);
 
+    const boardTitleButton = getBoardTitleButton(page);
+    await expect(boardTitleButton).toContainText(testBoardName, { timeout: 15000 });
+
     // Wait for board to be fully loaded and Realtime subscription to be ready
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
   });
 
   test.afterEach(async () => {
@@ -201,7 +180,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
   test('should load the test board (empty initially) @e2e:essential', async ({ page }) => {
     // Test board should be loaded and empty (no lists)
-    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
+    await expect(getBoardTitleButton(page)).toBeVisible();
     await expect(page.getByRole('button', { name: '+ Add List' })).toBeVisible();
   });
 
@@ -234,14 +213,14 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       ? `/b/${defaultBoard!.short_id}/${defaultBoardCanonicalTail}`
       : `/b/${defaultBoard!.short_id}`;
 
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await getBoardTitleButton(page).click();
     await page.getByRole('button', { name: defaultBoard!.name }).click();
 
     await page.waitForURL(`**${defaultBoardCanonicalPath}`);
     expect(new URL(page.url()).pathname).toBe(defaultBoardCanonicalPath);
 
     // Return to the test board for subsequent assertions
-    await page.getByRole('button', { name: `${defaultBoard!.name} ▼` }).click();
+    await getBoardTitleButton(page).click();
     await page.getByRole('button', { name: testBoardName }).click();
     await page.waitForURL(`**${testBoardCanonicalPath}`);
   });
@@ -253,14 +232,14 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
       await dialog.dismiss();
     });
 
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await getBoardTitleButton(page).click();
     await page.getByRole('button', { name: '短縮URLをコピー' }).click();
     await page.waitForTimeout(100);
 
     expect(dialogMessages.length).toBeGreaterThan(0);
     expect(dialogMessages[dialogMessages.length - 1]).toBe('URLをコピーしました');
 
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).click();
+    await getBoardTitleButton(page).click();
     await page.getByRole('button', { name: '正規URLをコピー' }).click();
     await page.waitForTimeout(100);
 
@@ -641,7 +620,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Wait for board to load and verify we're on the right board
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible', timeout: 10000 });
+    await getBoardTitleButton(page).waitFor({ state: 'visible', timeout: 10000 });
 
     // Verify data persists with extended timeout
     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible({ timeout: 10000 });
@@ -655,7 +634,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForURL(`**${testBoardCanonicalPath}`);
 
     expect(page.url()).toContain(testBoardCanonicalPath);
-    await expect(page.getByRole('button', { name: `${testBoardName} ▼` })).toBeVisible();
+    await expect(getBoardTitleButton(page)).toBeVisible();
   });
 
   test('should be mobile responsive', async ({ page }) => {
@@ -742,7 +721,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
     // Wait for board to load
-    await page.getByRole('button', { name: `${testBoardName} ▼` }).waitFor({ state: 'visible' });
+    await getBoardTitleButton(page).waitFor({ state: 'visible' });
 
     // Verify card still exists (synced to Supabase)
     await expect(page.getByText('New Card').first()).toBeVisible();

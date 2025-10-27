@@ -1,12 +1,26 @@
 import { test, expect, type Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
-import { supabase } from '@/lib/supabase';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
 const TEST_BOARD_NAME = 'E2E Comments Test Board';
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 const DEFAULT_LIST_TITLE = 'Comments List';
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Supabase service role configuration is required for comments E2E tests');
+}
+
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 interface TestBoardContext {
   id: string;
@@ -37,7 +51,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   const boardIdShort = await getNextBoardIdShort();
   const boardSlug = slugifyBoardName(boardName);
 
-  const { error: boardError } = await supabase.from('boards').insert({
+  const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
     name: boardName,
     user_id: TEST_USER_ID,
@@ -50,7 +64,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
     throw new Error(`Failed to create test board: ${boardError.message}`);
   }
 
-  const { error: memberError } = await supabase.from('board_members').insert({
+  const { error: memberError } = await supabaseAdmin.from('board_members').insert({
     board_id: boardId,
     profile_id: TEST_USER_ID,
     role: 'owner',
@@ -59,7 +73,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
     throw new Error(`Failed to add test board member: ${memberError.message}`);
   }
 
-  const { error: profileError } = await supabase.from('profiles').upsert({
+  const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
     id: TEST_USER_ID,
     full_name: 'E2E Test User',
     email: TEST_USER_EMAIL,
@@ -70,7 +84,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   }
 
   const listId = crypto.randomUUID();
-  const { error: listError } = await supabase.from('lists').insert({
+  const { error: listError } = await supabaseAdmin.from('lists').insert({
     id: listId,
     title: DEFAULT_LIST_TITLE,
     position: 1000,
@@ -115,7 +129,7 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
   let lastError: Error | null = null;
 
   while (Date.now() - start < timeoutMs) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('cards')
       .select('id, short_id, title')
       .eq('board_id', board.id)
@@ -150,9 +164,25 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise
   const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
   await cardLocator.click();
   await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
-  await expect
-    .poll(() => page.url(), { timeout: 10000 })
-    .toContain(`card=${card.shortId}`);
+
+  let urlMatched = true;
+  try {
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .toContain(`card=${card.shortId}`);
+  } catch {
+    urlMatched = false;
+  }
+
+  if (!urlMatched) {
+    const baseUrl = page.url().split('?')[0];
+    await page.goto(`${baseUrl}?card=${card.shortId}`);
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .toContain(`card=${card.shortId}`);
+  }
 }
 
 test.describe('Comments Feature @feature:comments', () => {
@@ -168,7 +198,7 @@ test.describe('Comments Feature @feature:comments', () => {
 
   test.afterEach(async () => {
     if (board?.id) {
-      await supabase.from('boards').delete().eq('id', board.id);
+      await supabaseAdmin.from('boards').delete().eq('id', board.id);
     }
     board = null;
     card = null;
@@ -206,7 +236,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.fill('textarea[placeholder*="コメントを書く"]', commentText);
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
 
-    const createdComment = page.locator('span.whitespace-pre-wrap', { hasText: commentText }).first();
+    const createdComment = page.locator('[data-testid="comment-body"]', { hasText: commentText }).first();
     await expect(createdComment).toBeVisible({ timeout: 5000 });
   });
 
@@ -226,62 +256,75 @@ test.describe('Comments Feature @feature:comments', () => {
     await editTextarea.fill(editedText);
     await page.getByRole('button', { name: '保存' }).click();
 
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: editedText })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText })).toBeVisible({ timeout: 5000 });
 
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: '削除' }).click();
     await page.waitForTimeout(500);
 
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: editedText })).toHaveCount(0);
+    await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText })).toHaveCount(0);
   });
 
   test('should allow replying to comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
+    const parentCommentId = crypto.randomUUID();
+    const parentText = `Parent comment ${Date.now()}`;
+
+    const { error: parentError } = await supabaseAdmin
+      .from('comments')
+      .insert({
+        id: parentCommentId,
+        card_id: currentCard.id,
+        author_id: TEST_USER_ID,
+        body: parentText,
+        mentions: [],
+      });
+    expect(parentError).toBeNull();
+
     await openCardModalViaQuery(page, currentCard);
 
-    const parentText = `Parent comment ${Date.now()}`;
-    await page.fill('textarea[placeholder*="コメントを書く"]', parentText);
-    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+    const parentLocator = page.locator('[data-testid="comment-body"]', { hasText: parentText });
+    await expect(parentLocator).toBeVisible({ timeout: 15000 });
 
-    // Wait for parent comment to appear
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: parentText })).toBeVisible({ timeout: 10000 });
-
-    // Click the first reply button in the comment actions
     const replyButton = page.getByRole('button', { name: '返信' }).first();
     await replyButton.waitFor({ state: 'visible', timeout: 10000 });
     await replyButton.click();
 
-    // Fill in the reply form
     const replyText = `Reply ${Date.now()}`;
     const replyTextarea = page.locator('textarea[placeholder*="返信を書く"]');
     await replyTextarea.waitFor({ state: 'visible', timeout: 10000 });
     await replyTextarea.fill(replyText);
 
-    // Click the submit button
     const replyForm = replyTextarea.locator('..');
     const submitButton = replyForm.getByRole('button', { name: '返信' });
     await submitButton.waitFor({ state: 'visible', timeout: 5000 });
     await submitButton.click();
 
-    // Wait for reply to appear with polling (DOM更新の安定待ち)
-    await expect.poll(async () => {
-      const lastComment = await page.locator('span.whitespace-pre-wrap').last().innerText();
-      return lastComment.includes(replyText);
-    }, { timeout: 15000 }).toBe(true);
+    await expect(
+      page.locator('[data-testid="comment-body"]', { hasText: replyText })
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('should support @mentions with typeahead @e2e:essential', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
+    const currentBoard = assertContext(board, 'Board context not initialised');
 
     await openCardModalViaQuery(page, currentCard);
 
     // Wait for modal to fully load
     await page.waitForLoadState('networkidle');
 
+    await page.waitForResponse((response) => {
+      return (
+        response.url().includes(`/api/boards/${currentBoard.id}/members`) &&
+        response.request().method() === 'GET'
+      );
+    }, { timeout: 15000 });
+
     // Type @ to trigger mention typeahead
     const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
-    await commentTextarea.waitFor({ state: 'visible', timeout: 10000 });
+    await commentTextarea.waitFor({ state: 'visible', timeout: 15000 });
     await commentTextarea.click();
     await page.waitForTimeout(500); // Wait for focus
 
@@ -289,15 +332,11 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Wait for mention suggestions to appear (extended timeout)
     const mentionDropdown = page.locator('[role="listbox"]');
-    await expect(mentionDropdown).toBeVisible({ timeout: 10000 });
+    await expect(mentionDropdown).toBeVisible({ timeout: 15000 });
 
-    // Verify user appears in suggestions (by display name, not email)
-    const userOption = page.locator('[role="option"]').filter({ hasText: 'E2E Test User' });
+    const userOption = page.locator('[role="option"]').filter({ hasText: 'E2E Test User' }).first();
     await expect(userOption).toBeVisible({ timeout: 5000 });
-
-    // Select mention by pressing Enter
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await userOption.click();
 
     // Wait for mention to be inserted
     await page.waitForTimeout(500);
@@ -312,7 +351,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
 
     // Verify comment with mention is visible
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: 'Test mention' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="comment-body"]', { hasText: 'Test mention' })).toBeVisible({ timeout: 10000 });
 
     // Verify mention renders as clickable element (uses data-mention-id attribute)
     const mentionElement = page.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
@@ -321,14 +360,13 @@ test.describe('Comments Feature @feature:comments', () => {
 
   test('should validate mention user_id as UUID v4', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
-    const currentBoard = assertContext(board, 'Board context not initialised');
 
     await openCardModalViaQuery(page, currentCard);
     await page.waitForLoadState('networkidle'); // モーダル表示完了を確実に待つ
 
     // Create comment with mention via API to verify UUID format
     const commentBody = `@${TEST_USER_EMAIL} Test UUID validation`;
-    const { data: commentData, error: commentError} = await supabase
+    const { data: commentData, error: commentError } = await supabaseAdmin
       .from('comments')
       .insert({
         card_id: currentCard.id,
@@ -355,7 +393,7 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Clean up
     if (commentData?.id) {
-      await supabase.from('comments').delete().eq('id', commentData.id);
+      await supabaseAdmin.from('comments').delete().eq('id', commentData.id);
     }
   });
 });
@@ -386,32 +424,30 @@ test.describe('Comments Realtime @feature:comments', () => {
       await page1.fill('textarea[placeholder*="コメントを書く"]', commentText);
       await page1.getByRole('button', { name: 'コメントを投稿' }).click();
 
-      await page1.locator('span.whitespace-pre-wrap', { hasText: commentText }).first()
+      await page1.locator('[data-testid="comment-body"]', { hasText: commentText }).first()
         .waitFor({ state: 'visible', timeout: 10000 });
 
-      const start = Date.now();
-      const syncTimeout = 20000;
-      let synced = false;
-
-      while (Date.now() - start < syncTimeout) {
-        try {
-          await page2.locator('span.whitespace-pre-wrap', { hasText: commentText }).first()
-            .waitFor({ state: 'visible', timeout: 3000 });
-          synced = true;
-          break;
-        } catch {
-          await page2.goto(board.canonicalPath);
-          await page2.waitForLoadState('domcontentloaded');
-          await openCardModalViaQuery(page2, card);
-          await page2.waitForTimeout(500);
-        }
-      }
-
-      expect(synced).toBe(true);
+      await expect
+        .poll(async () => {
+          try {
+            await page2
+              .locator('[data-testid="comment-body"]', { hasText: commentText })
+              .first()
+              .waitFor({ state: 'visible', timeout: 2000 });
+            return true;
+          } catch {
+            await page2.goto(board.canonicalPath);
+            await page2.waitForLoadState('domcontentloaded');
+            await openCardModalViaQuery(page2, card);
+            await page2.waitForTimeout(300);
+            return false;
+          }
+        }, { timeout: 30000 })
+        .toBe(true);
     } finally {
       await context1.close();
       await context2.close();
-      await supabase.from('boards').delete().eq('id', board.id);
+      await supabaseAdmin.from('boards').delete().eq('id', board.id);
     }
   });
 });

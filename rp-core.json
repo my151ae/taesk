@@ -1,0 +1,2867 @@
+[dotenv@17.2.3] injecting env (12) from .env.test -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[Global Setup] Starting authentication setup...
+[Global Setup] Ensuring test user exists: e2e.taesk.test@gmail.com
+[Global Setup] User status: already exists
+[Global Setup] Signing in...
+[Global Setup] Sign-in successful: e2e.taesk.test@gmail.com
+[Global Setup] Session stored in cookies
+[Global Setup] Storage state saved to: /Users/yossydie/dev/taesk/playwright/.auth/user.json
+[Global Setup] ✅ Authentication setup complete
+{
+  "config": {
+    "configFile": "/Users/yossydie/dev/taesk/playwright.config.ts",
+    "rootDir": "/Users/yossydie/dev/taesk/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/Users/yossydie/dev/taesk/e2e/.setup/auth-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 4
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "core",
+        "name": "core",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/yossydie/dev/taesk/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 4
+        },
+        "id": "full",
+        "name": "full",
+        "testDir": "/Users/yossydie/dev/taesk/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.0",
+    "workers": 4,
+    "webServer": {
+      "command": "NODE_ENV=test npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "board-permissions.spec.ts",
+      "file": "board-permissions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Board Permissions @feature:boards",
+          "file": "board-permissions.spec.ts",
+          "line": 51,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display ShareDialog when clicking share button @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 20456,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:22.369Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-b562c19c0a8e956b251d",
+              "file": "board-permissions.spec.ts",
+              "line": 147,
+              "column": 7
+            },
+            {
+              "title": "should change member role",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 11331,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:22.373Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-363ebfa1eacc020beeb6",
+              "file": "board-permissions.spec.ts",
+              "line": 168,
+              "column": 7
+            },
+            {
+              "title": "should remove board member",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 11350,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:22.402Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-43d90329b383780fd05c",
+              "file": "board-permissions.spec.ts",
+              "line": 206,
+              "column": 7
+            },
+            {
+              "title": "should prevent non-owner from changing owner role @failure:permissions",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "failure:permissions"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 11308,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:22.369Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ec4bfca2eb3a4126ed6-f5e6d4ada3b6fc8ffc0c",
+              "file": "board-permissions.spec.ts",
+              "line": 259,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "comments.spec.ts",
+      "file": "comments.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Comments Feature @feature:comments",
+          "file": "comments.spec.ts",
+          "line": 188,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should show Comments tab in card modal via ?card= route",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 11562,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:34.118Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-598c155cf5d80c89c27a",
+              "file": "comments.spec.ts",
+              "line": 207,
+              "column": 7
+            },
+            {
+              "title": "should preserve card modal state on reload with ?card= query",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 12246,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:34.102Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-7a0845764c25878a2339",
+              "file": "comments.spec.ts",
+              "line": 216,
+              "column": 7
+            },
+            {
+              "title": "should create a comment successfully",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 9289,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:34.116Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-504c51209f5e7aaa7728",
+              "file": "comments.spec.ts",
+              "line": 230,
+              "column": 7
+            },
+            {
+              "title": "should edit and delete own comment",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12841,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:43.233Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-9aefa5e936c28ea89b5f",
+              "file": "comments.spec.ts",
+              "line": 243,
+              "column": 7
+            },
+            {
+              "title": "should allow replying to comments",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 7519,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:43.435Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-b994b87894bec56b06fe",
+              "file": "comments.spec.ts",
+              "line": 268,
+              "column": 7
+            },
+            {
+              "title": "should support @mentions with typeahead @e2e:essential",
+              "ok": false,
+              "tags": [
+                "feature:comments",
+                "mentions",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 26406,
+                      "error": {
+                        "message": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"",
+                        "stack": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"\n    at /Users/yossydie/dev/taesk/e2e/comments.spec.ts:318:16",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                          "column": 16,
+                          "line": 318
+                        },
+                        "snippet": "  316 |     await page.waitForLoadState('networkidle');\n  317 |\n> 318 |     await page.waitForResponse((response) => {\n      |                ^\n  319 |       return (\n  320 |         response.url().includes(`/api/boards/${currentBoard.id}/members`) &&\n  321 |         response.request().method() === 'GET'"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                            "column": 16,
+                            "line": 318
+                          },
+                          "message": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"\n\n  316 |     await page.waitForLoadState('networkidle');\n  317 |\n> 318 |     await page.waitForResponse((response) => {\n      |                ^\n  319 |       return (\n  320 |         response.url().includes(`/api/boards/${currentBoard.id}/members`) &&\n  321 |         response.request().method() === 'GET'\n    at /Users/yossydie/dev/taesk/e2e/comments.spec.ts:318:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:45.711Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                        "column": 16,
+                        "line": 318
+                      }
+                    },
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 24722,
+                      "error": {
+                        "message": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"",
+                        "stack": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"\n    at /Users/yossydie/dev/taesk/e2e/comments.spec.ts:318:16",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                          "column": 16,
+                          "line": 318
+                        },
+                        "snippet": "  316 |     await page.waitForLoadState('networkidle');\n  317 |\n> 318 |     await page.waitForResponse((response) => {\n      |                ^\n  319 |       return (\n  320 |         response.url().includes(`/api/boards/${currentBoard.id}/members`) &&\n  321 |         response.request().method() === 'GET'"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                            "column": 16,
+                            "line": 318
+                          },
+                          "message": "TimeoutError: page.waitForResponse: Timeout 15000ms exceeded while waiting for event \"response\"\n\n  316 |     await page.waitForLoadState('networkidle');\n  317 |\n> 318 |     await page.waitForResponse((response) => {\n      |                ^\n  319 |       return (\n  320 |         response.url().includes(`/api/boards/${currentBoard.id}/members`) &&\n  321 |         response.request().method() === 'GET'\n    at /Users/yossydie/dev/taesk/e2e/comments.spec.ts:318:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:23:15.077Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/comments-Comments-Feature--c77de-ith-typeahead-e2e-essential-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                        "column": 16,
+                        "line": 318
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-e29fed92230b51f5e233",
+              "file": "comments.spec.ts",
+              "line": 309,
+              "column": 7
+            },
+            {
+              "title": "should validate mention user_id as UUID v4",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 10005,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:46.378Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-57e8a5faac37558c7437",
+              "file": "comments.spec.ts",
+              "line": 361,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "Comments Realtime @feature:comments",
+          "file": "comments.spec.ts",
+          "line": 401,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should sync comments across multiple browser contexts",
+              "ok": true,
+              "tags": [
+                "feature:comments"
+              ],
+              "tests": [
+                {
+                  "timeout": 270000,
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                        "line": 403,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 29114,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:50.984Z",
+                      "annotations": [
+                        {
+                          "type": "slow",
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/comments.spec.ts",
+                            "line": 403,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0dd0b076f0868dfee4c3-9d641b54e83307e9744d",
+              "file": "comments.spec.ts",
+              "line": 402,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "kanban.spec.ts",
+      "file": "kanban.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Taesk Kanban Board E2E Tests @feature:boards",
+          "file": "kanban.spec.ts",
+          "line": 120,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should load the test board (empty initially) @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8270,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:56.164Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-2d9459f8fe33b539279f",
+              "file": "kanban.spec.ts",
+              "line": 181,
+              "column": 7
+            },
+            {
+              "title": "should redirect legacy board query to canonical URL",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 8304,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:22:56.416Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-73681601ae3097e95b29",
+              "file": "kanban.spec.ts",
+              "line": 187,
+              "column": 7
+            },
+            {
+              "title": "should normalize board URL when slug mismatches",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11028,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:04.468Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-85d03f3a8f4b5eacc850",
+              "file": "kanban.spec.ts",
+              "line": 195,
+              "column": 7
+            },
+            {
+              "title": "should update URL immediately when switching boards",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 9803,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:04.747Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-47dc83e53b57314831e6",
+              "file": "kanban.spec.ts",
+              "line": 201,
+              "column": 7
+            },
+            {
+              "title": "should copy board URLs with clipboard fallback",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 7926,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:14.579Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-4737ce301bfc20c757bf",
+              "file": "kanban.spec.ts",
+              "line": 228,
+              "column": 7
+            },
+            {
+              "title": "should add a new list @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5338,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:15.534Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-0c82d419e3a5abc7fbb0",
+              "file": "kanban.spec.ts",
+              "line": 249,
+              "column": 7
+            },
+            {
+              "title": "should rename a list",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 9019,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:20.155Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-d29057b1ee7b7c2a13e0",
+              "file": "kanban.spec.ts",
+              "line": 257,
+              "column": 7
+            },
+            {
+              "title": "should delete a list",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 11680,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:20.912Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-457dd5fb76b9bf74a297",
+              "file": "kanban.spec.ts",
+              "line": 283,
+              "column": 7
+            },
+            {
+              "title": "should add a card to a list @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 6732,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:22.524Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-2d59cbcb9b155bfad2d1",
+              "file": "kanban.spec.ts",
+              "line": 311,
+              "column": 7
+            },
+            {
+              "title": "should edit a card",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 16119,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:29.214Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-a75cb9442e23b09e70af",
+              "file": "kanban.spec.ts",
+              "line": 324,
+              "column": 7
+            },
+            {
+              "title": "should delete a card",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 10158,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:29.278Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-07ffa59614289217d4e7",
+              "file": "kanban.spec.ts",
+              "line": 386,
+              "column": 7
+            },
+            {
+              "title": "should assign and clear card members (multi-assignee)",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "line": 433,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 16077,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:32.657Z",
+                      "annotations": [
+                        {
+                          "type": "slow",
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "line": 433,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-2b10bdf0e0862d72d9f0",
+              "file": "kanban.spec.ts",
+              "line": 432,
+              "column": 7
+            },
+            {
+              "title": "should drag and drop a card within the same list",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 14996,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:39.464Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-4daf22cdc69812dc3eea",
+              "file": "kanban.spec.ts",
+              "line": 546,
+              "column": 7
+            },
+            {
+              "title": "should drag and drop a card to a different list",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 12407,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:43.108Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-55bcded993346cac0bae",
+              "file": "kanban.spec.ts",
+              "line": 572,
+              "column": 7
+            },
+            {
+              "title": "should persist data after page reload @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 49902,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:45.363Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-d0e0fdb9eaac2b6a9969",
+              "file": "kanban.spec.ts",
+              "line": 602,
+              "column": 7
+            },
+            {
+              "title": "should normalize board URL when slug is incorrect",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12498,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:48.752Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-18ae1eeff24cb7e11201",
+              "file": "kanban.spec.ts",
+              "line": 630,
+              "column": 7
+            },
+            {
+              "title": "should be mobile responsive",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 10885,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:54.495Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-b6976b058e4804570e48",
+              "file": "kanban.spec.ts",
+              "line": 640,
+              "column": 7
+            },
+            {
+              "title": "should show mock user email in test mode",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 9569,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:23:55.954Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-d1bd74ad1858932a01dc",
+              "file": "kanban.spec.ts",
+              "line": 652,
+              "column": 7
+            },
+            {
+              "title": "should queue operations when offline and sync when online",
+              "ok": false,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 180000,
+                  "annotations": [
+                    {
+                      "type": "slow",
+                      "location": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "line": 664,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 13740,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\", waiting until \"domcontentloaded\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\", waiting until \"domcontentloaded\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 16,
+                          "line": 163
+                        },
+                        "snippet": "  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 16,
+                            "line": 163
+                          },
+                          "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/sG4i4w7o/1-test-06ecb32a\", waiting until \"domcontentloaded\"\u001b[22m\n\n\n  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:24:01.290Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c4d27-ffline-and-sync-when-online-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c4d27-ffline-and-sync-when-online-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 16,
+                        "line": 163
+                      }
+                    },
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 24313,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:711:28",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 28,
+                          "line": 711
+                        },
+                        "snippet": "  709 |       return queue.actions.length;\n  710 |     });\n> 711 |     expect(queueAfterSync).toBe(0);\n      |                            ^\n  712 |\n  713 |     // Verify \"queued\" indicator is gone\n  714 |     await expect(page.getByText(/queued/i)).not.toBeVisible();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 28,
+                            "line": 711
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m1\u001b[39m\n\n  709 |       return queue.actions.length;\n  710 |     });\n> 711 |     expect(queueAfterSync).toBe(0);\n      |                            ^\n  712 |\n  713 |     // Verify \"queued\" indicator is gone\n  714 |     await expect(page.getByText(/queued/i)).not.toBeVisible();\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:711:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:24:28.089Z",
+                      "annotations": [
+                        {
+                          "type": "slow",
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "line": 664,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c4d27-ffline-and-sync-when-online-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c4d27-ffline-and-sync-when-online-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c4d27-ffline-and-sync-when-online-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 28,
+                        "line": 711
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-f6e491860e64e9f59b21",
+              "file": "kanban.spec.ts",
+              "line": 663,
+              "column": 7
+            },
+            {
+              "title": "should open card modal via short URL navigation",
+              "ok": false,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 9657,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/I3IBDH7b/1-test-31074317\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/I3IBDH7b/1-test-31074317\", waiting until \"domcontentloaded\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/I3IBDH7b/1-test-31074317\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/I3IBDH7b/1-test-31074317\", waiting until \"domcontentloaded\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 16,
+                          "line": 163
+                        },
+                        "snippet": "  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 16,
+                            "line": 163
+                          },
+                          "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/I3IBDH7b/1-test-31074317\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/I3IBDH7b/1-test-31074317\", waiting until \"domcontentloaded\"\u001b[22m\n\n\n  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:24:05.437Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--9f043-al-via-short-URL-navigation-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--9f043-al-via-short-URL-navigation-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 16,
+                        "line": 163
+                      }
+                    },
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 40987,
+                      "error": {
+                        "message": "Error: Timed out waiting for cards to be persisted for board 69588933-d27b-4aed-875e-1cc23fa18dd4",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 69588933-d27b-4aed-875e-1cc23fa18dd4\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:90:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:741:19",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 9,
+                          "line": 90
+                        },
+                        "snippet": "  88 |   }\n  89 |\n> 90 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  91 | }\n  92 |\n  93 | let cachedAssigneeIdSupport: boolean | null = null;"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 9,
+                            "line": 90
+                          },
+                          "message": "Error: Timed out waiting for cards to be persisted for board 69588933-d27b-4aed-875e-1cc23fa18dd4\n\n  88 |   }\n  89 |\n> 90 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  91 | }\n  92 |\n  93 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:90:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:741:19"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:24:28.126Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--9f043-al-via-short-URL-navigation-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--9f043-al-via-short-URL-navigation-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--9f043-al-via-short-URL-navigation-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 9,
+                        "line": 90
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-aa5d86ef0a84936cbab2",
+              "file": "kanban.spec.ts",
+              "line": 730,
+              "column": 7
+            },
+            {
+              "title": "should render full card page on direct navigation",
+              "ok": false,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 9400,
+                      "error": {
+                        "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\", waiting until \"domcontentloaded\"\u001b[22m\n",
+                        "stack": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\", waiting until \"domcontentloaded\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 16,
+                          "line": 163
+                        },
+                        "snippet": "  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 16,
+                            "line": 163
+                          },
+                          "message": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/b/N2rNr6fr/1-test-05a315a6\", waiting until \"domcontentloaded\"\u001b[22m\n\n\n  161 |     });\n  162 |\n> 163 |     await page.goto(testBoardCanonicalPath, { waitUntil: 'domcontentloaded' });\n      |                ^\n  164 |     await expect\n  165 |       .poll(() => page.url(), { timeout: 10000 })\n  166 |       .toContain(`/b/${testBoardShortId}`);\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:163:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:24:05.566Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--3de94-d-page-on-direct-navigation-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--3de94-d-page-on-direct-navigation-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 16,
+                        "line": 163
+                      }
+                    },
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 40930,
+                      "error": {
+                        "message": "Error: Timed out waiting for cards to be persisted for board 25b08b28-d101-4b59-8245-b28fe3d929c9",
+                        "stack": "Error: Timed out waiting for cards to be persisted for board 25b08b28-d101-4b59-8245-b28fe3d929c9\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:90:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:776:19",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 9,
+                          "line": 90
+                        },
+                        "snippet": "  88 |   }\n  89 |\n> 90 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  91 | }\n  92 |\n  93 | let cachedAssigneeIdSupport: boolean | null = null;"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 9,
+                            "line": 90
+                          },
+                          "message": "Error: Timed out waiting for cards to be persisted for board 25b08b28-d101-4b59-8245-b28fe3d929c9\n\n  88 |   }\n  89 |\n> 90 |   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);\n     |         ^\n  91 | }\n  92 |\n  93 | let cachedAssigneeIdSupport: boolean | null = null;\n    at waitForCardRows (/Users/yossydie/dev/taesk/e2e/kanban.spec.ts:90:9)\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:776:19"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:24:28.091Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--3de94-d-page-on-direct-navigation-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--3de94-d-page-on-direct-navigation-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--3de94-d-page-on-direct-navigation-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 9,
+                        "line": 90
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-6b95f4c74c08a3013b7f",
+              "file": "kanban.spec.ts",
+              "line": 765,
+              "column": 7
+            },
+            {
+              "title": "should normalize URL when slug is incorrect",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "timedOut",
+                      "duration": 68129,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:24:35.339Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--6f6c3--URL-when-slug-is-incorrect-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--6f6c3--URL-when-slug-is-incorrect-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--6f6c3--URL-when-slug-is-incorrect-core/trace.zip"
+                        }
+                      ]
+                    },
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 23400,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:25:50.179Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-0589e38147fd53d64dba",
+              "file": "kanban.spec.ts",
+              "line": 795,
+              "column": 7
+            },
+            {
+              "title": "should handle invalid card URL gracefully without crashing",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 50867,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:25:02.808Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-db23087b115ac3c738e5",
+              "file": "kanban.spec.ts",
+              "line": 842,
+              "column": 7
+            },
+            {
+              "title": "should prevent navigation crash when card not yet synced",
+              "ok": true,
+              "tags": [
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 28745,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:25:15.590Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-e0ecf9f0bf1cdaa9d6e3",
+              "file": "kanban.spec.ts",
+              "line": 872,
+              "column": 7
+            },
+            {
+              "title": "should restore snapshot on drag error @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 11,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 50664,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    13 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    13 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:960:60",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 60,
+                          "line": 960
+                        },
+                        "snippet": "  958 |\n  959 |       // Verify board still renders without errors\n> 960 |       await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(count);\n      |                                                            ^\n  961 |\n  962 |       // Get updated board data via Supabase\n  963 |       const { data: finalLists } = await supabase"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 60,
+                            "line": 960
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    13 × locator resolved to 4 elements\u001b[22m\n\u001b[2m       - unexpected value \"4\"\u001b[22m\n\n\n  958 |\n  959 |       // Verify board still renders without errors\n> 960 |       await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(count);\n      |                                                            ^\n  961 |\n  962 |       // Get updated board data via Supabase\n  963 |       const { data: finalLists } = await supabase\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:960:60"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:25:15.673Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 60,
+                        "line": 960
+                      }
+                    },
+                    {
+                      "workerIndex": 14,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 28476,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.board-menu-container button').first()\nExpected substring: \u001b[32m\"Test-07a67b79\"\u001b[39m\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('.board-menu-container button').first()\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.board-menu-container button').first()\nExpected substring: \u001b[32m\"Test-07a67b79\"\u001b[39m\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('.board-menu-container button').first()\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:169:36",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 36,
+                          "line": 169
+                        },
+                        "snippet": "  167 |\n  168 |     const boardTitleButton = getBoardTitleButton(page);\n> 169 |     await expect(boardTitleButton).toContainText(testBoardName, { timeout: 15000 });\n      |                                    ^\n  170 |\n  171 |     // Wait for board to be fully loaded and Realtime subscription to be ready\n  172 |     await page.waitForLoadState('networkidle');"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 36,
+                            "line": 169
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoContainText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('.board-menu-container button').first()\nExpected substring: \u001b[32m\"Test-07a67b79\"\u001b[39m\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toContainText\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for locator('.board-menu-container button').first()\u001b[22m\n\n\n  167 |\n  168 |     const boardTitleButton = getBoardTitleButton(page);\n> 169 |     await expect(boardTitleButton).toContainText(testBoardName, { timeout: 15000 });\n      |                                    ^\n  170 |\n  171 |     // Wait for board to be fully loaded and Realtime subscription to be ready\n  172 |     await page.waitForLoadState('networkidle');\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:169:36"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:26:11.110Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--c2241-n-drag-error-feature-boards-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 36,
+                        "line": 169
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-3d79128b5a9c6727c57c",
+              "file": "kanban.spec.ts",
+              "line": 909,
+              "column": 7
+            },
+            {
+              "title": "should use normalized positions (1000/10 gaps) for new lists @feature:boards",
+              "ok": false,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 20048,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    8 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    8 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1000:58",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 58,
+                          "line": 1000
+                        },
+                        "snippet": "   998 |\n   999 |     // Wait for lists to appear in UI\n> 1000 |     await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(2, { timeout: 5000 });\n       |                                                          ^\n  1001 |\n  1002 |     // Get board data via Supabase to check positions\n  1003 |     const { data: lists } = await supabase"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 58,
+                            "line": 1000
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid^=\"list-\"]')\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m4\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid^=\"list-\"]')\u001b[22m\n\u001b[2m    8 × locator resolved to 4 elements\u001b[22m\n\u001b[2m      - unexpected value \"4\"\u001b[22m\n\n\n   998 |\n   999 |     // Wait for lists to appear in UI\n> 1000 |     await expect(page.locator('[data-testid^=\"list-\"]')).toHaveCount(2, { timeout: 5000 });\n       |                                                          ^\n  1001 |\n  1002 |     // Get board data via Supabase to check positions\n  1003 |     const { data: lists } = await supabase\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1000:58"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:25:45.150Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 58,
+                        "line": 1000
+                      }
+                    },
+                    {
+                      "workerIndex": 13,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 35272,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m2\u001b[39m\nReceived:    \u001b[31m1\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m2\u001b[39m\nReceived:    \u001b[31m1\u001b[39m\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1010:27",
+                        "location": {
+                          "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                          "column": 27,
+                          "line": 1010
+                        },
+                        "snippet": "  1008 |\n  1009 |     // Verify positions use 1000/10 gaps\n> 1010 |     expect(lists?.length).toBeGreaterThanOrEqual(2);\n       |                           ^\n  1011 |\n  1012 |     // Default lists should have normalized positions (範囲検証に緩和)\n  1013 |     const positions = lists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                            "column": 27,
+                            "line": 1010
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected: >= \u001b[32m2\u001b[39m\nReceived:    \u001b[31m1\u001b[39m\n\n  1008 |\n  1009 |     // Verify positions use 1000/10 gaps\n> 1010 |     expect(lists?.length).toBeGreaterThanOrEqual(2);\n       |                           ^\n  1011 |\n  1012 |     // Default lists should have normalized positions (範囲検証に緩和)\n  1013 |     const positions = lists?.map((list: any) => list.position).sort((a: number, b: number) => a - b) || [];\n    at /Users/yossydie/dev/taesk/e2e/kanban.spec.ts:1010:27"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-10-27T10:26:09.455Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/yossydie/dev/taesk/test-results/kanban-Taesk-Kanban-Board--54717-or-new-lists-feature-boards-core-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/yossydie/dev/taesk/e2e/kanban.spec.ts",
+                        "column": 27,
+                        "line": 1010
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-4bd986408f57c57dc35c",
+              "file": "kanban.spec.ts",
+              "line": 990,
+              "column": 7
+            },
+            {
+              "title": "should maintain position gaps after drag and drop @feature:boards",
+              "ok": true,
+              "tags": [
+                "feature:boards",
+                "feature:boards"
+              ],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 20727,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:25:56.335Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7a6a8de26a6a6c44d713-98285e8fe7bcb38de2e6",
+              "file": "kanban.spec.ts",
+              "line": 1029,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "notifications.spec.ts",
+      "file": "notifications.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Web Push Notifications @feature:notifications",
+          "file": "notifications.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "renders push notification controls",
+              "ok": true,
+              "tags": [
+                "feature:notifications"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 42388,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:14.348Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-e59201680ec6b35a24e2",
+              "file": "notifications.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "configures quiet hours",
+              "ok": true,
+              "tags": [
+                "feature:notifications"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 41170,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:17.186Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-6542f99f73e554a0c6de",
+              "file": "notifications.spec.ts",
+              "line": 123,
+              "column": 7
+            },
+            {
+              "title": "sends a test notification",
+              "ok": true,
+              "tags": [
+                "feature:notifications"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 21644,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:45.100Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-61733b078f71473352c1",
+              "file": "notifications.spec.ts",
+              "line": 148,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "In-app Notifications @feature:notifications",
+          "file": "notifications.spec.ts",
+          "line": 168,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should display unread badge on NotificationsBell @e2e:essential",
+              "ok": true,
+              "tags": [
+                "feature:notifications",
+                "e2e:essential"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 56186,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:58.347Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-bec45f91e7df61dbc380",
+              "file": "notifications.spec.ts",
+              "line": 169,
+              "column": 7
+            },
+            {
+              "title": "should mark notifications as read and clear badge",
+              "ok": true,
+              "tags": [
+                "feature:notifications"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 15427,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Request: GET http://localhost:3000/api/notifications\n"
+                        },
+                        {
+                          "text": "Request: GET http://localhost:3000/api/notifications\n"
+                        },
+                        {
+                          "text": "Request: POST http://localhost:3000/api/notifications/mark-all-read\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:57.035Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-4dbca3668a9a766cb464",
+              "file": "notifications.spec.ts",
+              "line": 224,
+              "column": 7
+            },
+            {
+              "title": "should handle empty notifications state @failure:notifications",
+              "ok": true,
+              "tags": [
+                "feature:notifications",
+                "failure:notifications"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 57039,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:26:58.389Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "be7d0958780d1a4666e5-b1f4fe943ba8b98a3183",
+              "file": "notifications.spec.ts",
+              "line": 294,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "reorder-api.spec.ts",
+      "file": "reorder-api.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Reorder API (Phase 2) @feature:lists",
+          "file": "reorder-api.spec.ts",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should reorder cards successfully",
+              "ok": true,
+              "tags": [
+                "feature:lists"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 1921,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:12.641Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-fc96e0eead92f975aa88",
+              "file": "reorder-api.spec.ts",
+              "line": 41,
+              "column": 7
+            },
+            {
+              "title": "should reject duplicate IDs @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 527,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:59.565Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-25e41224da9f15999a45",
+              "file": "reorder-api.spec.ts",
+              "line": 59,
+              "column": 7
+            },
+            {
+              "title": "should reject invalid UUID format @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 12,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 381,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:28:00.126Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-5d9b23af1651c2c02a4b",
+              "file": "reorder-api.spec.ts",
+              "line": 76,
+              "column": 7
+            },
+            {
+              "title": "should reject invalid schema (missing position) @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1960,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:14.441Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-29d3f82d0131d216a77a",
+              "file": "reorder-api.spec.ts",
+              "line": 91,
+              "column": 7
+            },
+            {
+              "title": "should reorder lists successfully",
+              "ok": true,
+              "tags": [
+                "feature:lists"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 5084,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:59.450Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-9249bbef16a5d69a4b54",
+              "file": "reorder-api.spec.ts",
+              "line": 106,
+              "column": 7
+            },
+            {
+              "title": "should reject duplicate positions for lists @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 15,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1011,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:28:04.569Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-82055c0b58b9bd8742f8",
+              "file": "reorder-api.spec.ts",
+              "line": 132,
+              "column": 7
+            },
+            {
+              "title": "should reject unknown list IDs @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 3248,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:54.976Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-b9e3624c11cc4c712a48",
+              "file": "reorder-api.spec.ts",
+              "line": 160,
+              "column": 7
+            },
+            {
+              "title": "should reject cross-board list updates @failure:validation",
+              "ok": true,
+              "tags": [
+                "feature:lists",
+                "failure:validation"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 3899,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:28:04.403Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-c436bd424064dd3ce5c5",
+              "file": "reorder-api.spec.ts",
+              "line": 176,
+              "column": 7
+            },
+            {
+              "title": "should renumber card positions in a list",
+              "ok": true,
+              "tags": [
+                "feature:lists"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 16,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 2403,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:28:08.325Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-dcb19d6680fbd0dd8f7d",
+              "file": "reorder-api.spec.ts",
+              "line": 218,
+              "column": 7
+            },
+            {
+              "title": "should renumber list positions in a board",
+              "ok": true,
+              "tags": [
+                "feature:lists"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2671,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:27:55.484Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-01866673ceec97b05060",
+              "file": "reorder-api.spec.ts",
+              "line": 240,
+              "column": 7
+            },
+            {
+              "title": "should handle concurrent reorders (transaction test)",
+              "ok": true,
+              "tags": [
+                "feature:lists"
+              ],
+              "tests": [
+                {
+                  "timeout": 90000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "core",
+                  "projectName": "core",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6571,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-10-27T10:28:05.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d9d40746f28a2f470bd1-e71418d6c50452f24785",
+              "file": "reorder-api.spec.ts",
+              "line": 249,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-10-27T10:22:07.620Z",
+    "duration": 364924.19,
+    "expected": 49,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 1
+  }
+}
