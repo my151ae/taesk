@@ -239,15 +239,16 @@ test.describe('Board Permissions @feature:boards', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('owner@example.com')).toBeVisible({ timeout: 10000 });
 
-    // Find owner member row - look for the parent container that has both name and email
-    const ownerRow = page.locator('.border').filter({ hasText: 'owner@example.com' }).first();
+    // Find owner member row using border class and email text
+    const ownerRow = page.locator('.border.rounded').filter({ hasText: 'owner@example.com' }).first();
     await expect(ownerRow).toBeVisible();
 
     // Find the select within that row
     const roleSelect = ownerRow.locator('select');
     await expect(roleSelect).toBeVisible();
 
-    // Owner's role select should be disabled
+    // Owner's role select should be disabled and have 'owner' value
     await expect(roleSelect).toBeDisabled();
+    await expect(roleSelect).toHaveValue('owner');
   });
 });

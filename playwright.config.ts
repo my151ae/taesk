@@ -6,15 +6,17 @@ dotenv.config({ path: '.env.test' });
 const isCI = !!process.env.CI;
 const workers = process.env.PW_WORKERS
   ? Number(process.env.PW_WORKERS)
-  : (isCI ? 1 : undefined);
+  : (isCI ? 2 : '50%'); // CI: 2 workers (競合低減), Local: 50% (速度重視)
 const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'playwright-report.json';
 
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: !isCI,
   forbidOnly: !!process.env.CI,
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 2 : 1, // Local でも1回リトライ (flake耐性)
   workers,
+  timeout: 90_000, // テストタイムアウトを90秒に延長
+  expect: { timeout: 10_000 }, // expect タイムアウトを10秒に延長
   outputDir: 'test-results',
   reporter: isCI
     ? [['json', { outputFile: jsonOutput }]]

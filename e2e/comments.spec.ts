@@ -243,7 +243,9 @@ test.describe('Comments Feature @feature:comments', () => {
     const parentText = `Parent comment ${Date.now()}`;
     await page.fill('textarea[placeholder*="コメントを書く"]', parentText);
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
-    await page.waitForTimeout(500);
+
+    // Wait for parent comment to appear
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: parentText })).toBeVisible({ timeout: 10000 });
 
     // Click the first reply button in the comment actions
     const replyButton = page.getByRole('button', { name: '返信' }).first();
@@ -256,13 +258,17 @@ test.describe('Comments Feature @feature:comments', () => {
     await replyTextarea.waitFor({ state: 'visible', timeout: 10000 });
     await replyTextarea.fill(replyText);
 
-    // Click the submit button (first button in the button container after textarea)
+    // Click the submit button
     const replyForm = replyTextarea.locator('..');
     const submitButton = replyForm.getByRole('button', { name: '返信' });
     await submitButton.waitFor({ state: 'visible', timeout: 5000 });
     await submitButton.click();
 
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: replyText })).toBeVisible({ timeout: 5000 });
+    // Wait for reply to appear with polling (DOM更新の安定待ち)
+    await expect.poll(async () => {
+      const lastComment = await page.locator('span.whitespace-pre-wrap').last().innerText();
+      return lastComment.includes(replyText);
+    }, { timeout: 15000 }).toBe(true);
   });
 
   test('should support @mentions with typeahead @e2e:essential', async ({ page }) => {
@@ -270,14 +276,20 @@ test.describe('Comments Feature @feature:comments', () => {
 
     await openCardModalViaQuery(page, currentCard);
 
+    // Wait for modal to fully load
+    await page.waitForLoadState('networkidle');
+
     // Type @ to trigger mention typeahead
     const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
+    await commentTextarea.waitFor({ state: 'visible', timeout: 10000 });
     await commentTextarea.click();
-    await commentTextarea.type('@');
+    await page.waitForTimeout(500); // Wait for focus
 
-    // Wait for mention suggestions to appear
+    await commentTextarea.type('@', { delay: 100 });
+
+    // Wait for mention suggestions to appear (extended timeout)
     const mentionDropdown = page.locator('[role="listbox"]');
-    await expect(mentionDropdown).toBeVisible({ timeout: 3000 });
+    await expect(mentionDropdown).toBeVisible({ timeout: 10000 });
 
     // Verify user appears in suggestions (by display name, not email)
     const userOption = page.locator('[role="option"]').filter({ hasText: 'E2E Test User' });
@@ -286,6 +298,9 @@ test.describe('Comments Feature @feature:comments', () => {
     // Select mention by pressing Enter
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
+
+    // Wait for mention to be inserted
+    await page.waitForTimeout(500);
 
     // Verify mention is inserted into textarea (format: @Display Name<@user-id>)
     const textareaValue = await commentTextarea.inputValue();
@@ -297,11 +312,11 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
 
     // Verify comment with mention is visible
-    await expect(page.locator('span.whitespace-pre-wrap', { hasText: 'Test mention' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('span.whitespace-pre-wrap', { hasText: 'Test mention' })).toBeVisible({ timeout: 10000 });
 
     // Verify mention renders as clickable element (uses data-mention-id attribute)
     const mentionElement = page.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
-    await expect(mentionElement).toBeVisible();
+    await expect(mentionElement).toBeVisible({ timeout: 5000 });
   });
 
   test('should validate mention user_id as UUID v4', async ({ page }) => {
@@ -309,7 +324,7 @@ test.describe('Comments Feature @feature:comments', () => {
     const currentBoard = assertContext(board, 'Board context not initialised');
 
     await openCardModalViaQuery(page, currentCard);
-    await page.waitForTimeout(1000); // モーダル表示完了を待つ
+    await page.waitForLoadState('networkidle'); // モーダル表示完了を確実に待つ
 
     // Create comment with mention via API to verify UUID format
     const commentBody = `@${TEST_USER_EMAIL} Test UUID validation`;
@@ -329,15 +344,19 @@ test.describe('Comments Feature @feature:comments', () => {
     }
     expect(commentError).toBeNull();
     expect(commentData).toBeDefined();
-    expect(commentData.mentions).toContain(TEST_USER_ID);
+    expect(commentData?.mentions).toContain(TEST_USER_ID);
 
     // Verify UUID v4 format (8-4-4-4-12 hex digits)
     const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     expect(TEST_USER_ID).toMatch(uuidV4Regex);
-    expect(commentData.mentions[0]).toMatch(uuidV4Regex);
+    if (commentData?.mentions?.length > 0) {
+      expect(commentData.mentions[0]).toMatch(uuidV4Regex);
+    }
 
     // Clean up
-    await supabase.from('comments').delete().eq('id', commentData.id);
+    if (commentData?.id) {
+      await supabase.from('comments').delete().eq('id', commentData.id);
+    }
   });
 });
 

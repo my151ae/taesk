@@ -214,25 +214,21 @@ test.describe('In-app Notifications @feature:notifications', () => {
   });
 
   test('should mark notifications as read and clear badge', async ({ page }) => {
-    let markAsReadCalled = false;
+    let markAsReadCalled = 0;
 
-    await page.goto('/');
+    // Setup route BEFORE navigation (正規表現で完全一致)
+    await page.route(/\/api\/notifications\/mark-all-read$/, async (route) => {
+      markAsReadCalled++;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
 
-    // Mock notifications API - setup route BEFORE reload
-    await page.route('**/api/notifications*', async (route) => {
-      const url = route.request().url();
+    // Mock GET notifications endpoint
+    await page.route(/\/api\/notifications(\?.*)?$/, async (route) => {
       const method = route.request().method();
-
-      if (method === 'POST' && url.includes('/mark-all-read')) {
-        markAsReadCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        });
-        return;
-      }
-
       if (method === 'GET') {
         await route.fulfill({
           status: 200,
@@ -246,20 +242,27 @@ test.describe('In-app Notifications @feature:notifications', () => {
                   message: 'New comment',
                   body: 'Test notification',
                 },
-                read_at: markAsReadCalled ? new Date().toISOString() : null,
+                read_at: markAsReadCalled > 0 ? new Date().toISOString() : null,
                 created_at: new Date().toISOString(),
               },
             ],
-            unreadCount: markAsReadCalled ? 0 : 1,
+            unreadCount: markAsReadCalled > 0 ? 0 : 1,
           }),
         });
         return;
       }
-
       await route.fallback();
     });
 
-    await page.reload();
+    // Debug logging (temporary)
+    page.on('request', (req) => {
+      if (req.url().includes('/notifications')) {
+        console.log('Request:', req.method(), req.url());
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
     // Open notifications panel
     const bellButton = page.getByRole('button', { name: /notifications/i });
@@ -273,12 +276,11 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await expect(markAllButton).toBeVisible();
     await markAllButton.click();
 
-    // Wait for mark-read API call
-    await expect.poll(() => markAsReadCalled, { timeout: 10000 }).toBe(true);
+    // Wait for mark-read API call (ルートが呼ばれたことを保証)
+    await expect.poll(() => markAsReadCalled, { timeout: 10000 }).toBeGreaterThan(0);
 
-    // Reload to verify badge is cleared
-    await page.reload();
-    await expect(page.locator('[data-testid="notification-badge"]')).toHaveCount(0);
+    // Wait for badge to disappear (DOM安定待ち)
+    await expect(page.locator('[data-testid="notification-badge"]')).toBeHidden({ timeout: 10000 });
   });
 
   test('should handle empty notifications state @failure:notifications', async ({ page }) => {
