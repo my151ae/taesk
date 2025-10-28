@@ -6,7 +6,7 @@ Taesk の Playwright テスト運用を **JSON レポート常時出力**・**�
 
 ## 1. 基本ポリシー
 
-- **JSON レポーターは常時出力**し、`PLAYWRIGHT_JSON_OUTPUT_NAME` でファイル名を切替可能。
+- **JSON レポーターは常時出力**し、`PLAYWRIGHT_JSON_OUTPUT_NAME` でファイル名を切替可能（ファイル名のみを指定した場合でも `test-results/` 配下に保存）。
 - **CI** は `workers=1` / `retries=2`。ローカルは `workers` 未指定（必要なら `PW_WORKERS`）、`retries=0`。
 - **レポーター**: CI は JSON のみ、ローカルは `list` + JSON + HTML（`open: 'never'`）。
 - **認証**: `globalSetup` で正規ログインし、`playwright/.auth/user.json` を共有。`NEXT_PUBLIC_BYPASS_AUTH` は使用しない。
@@ -19,6 +19,7 @@ Taesk の Playwright テスト運用を **JSON レポート常時出力**・**�
 ```ts
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config({ path: '.env.test' });
 
@@ -26,7 +27,8 @@ const isCI = !!process.env.CI;
 const workers = process.env.PW_WORKERS
   ? Number(process.env.PW_WORKERS)
   : (isCI ? 1 : undefined);
-const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'playwright-report.json';
+const defaultJsonOutput = path.join('test-results', 'playwright-report.json');
+const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? defaultJsonOutput;
 
 export default defineConfig({
   testDir: './e2e',
@@ -91,7 +93,7 @@ export default defineConfig({
   "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
   "test:failure": "playwright test --project=core --grep @failure:",
   "test:full": "playwright test --project=full",
-  "test:summary": "cat playwright-report.json | jq '.stats'",
+  "test:summary": "cat test-results/playwright-report.json | jq '.stats'",
   "test:failed": "bash scripts/test-rerun-failed.sh"
 }
 ```
@@ -122,13 +124,14 @@ npx playwright show-report --host 127.0.0.1 --port 9323
 テスト結果の統計と失敗詳細（`issues` 配列含む）を見やすく表示：
 
 ```bash
-# デフォルト（playwright-report.json を読み取り）
+# デフォルト（test-results/playwright-report.json を読み取り）
 npm run test:summary
 
 # カスタムレポートファイル指定
 node test-summary.js path/to/custom-report.json
 
 # 環境変数で指定
+# ファイル名のみ指定しても test-results/custom-report.json として保存・読み込みされる
 PLAYWRIGHT_JSON_OUTPUT_NAME=custom-report.json node test-summary.js
 ```
 

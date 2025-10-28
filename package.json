@@ -18,7 +18,7 @@
     "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
     "test:failure": "playwright test --project=core --grep @failure:",
     "test:full": "playwright test --project=full",
-    "test:summary": "cat playwright-report.json | jq '.stats'",
+    "test:summary": "cat test-results/playwright-report.json | jq '.stats'",
     "test:failed": "bash scripts/test-rerun-failed.sh"
   },
   "dependencies": {

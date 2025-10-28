@@ -17,7 +17,21 @@ const fs = require('fs');
 const path = require('path');
 
 // Get report path from CLI arg or env var or use default
-const reportPath = process.argv[2] || process.env.PLAYWRIGHT_JSON_OUTPUT_NAME || 'playwright-report.json';
+const defaultReportPath = path.join('test-results', 'playwright-report.json');
+
+const resolveReportPath = (input) => {
+  if (!input) return defaultReportPath;
+  if (path.isAbsolute(input)) return input;
+  if (input.includes('/') || input.includes('\\')) {
+    return input;
+  }
+  return path.join('test-results', input);
+};
+
+const envReport = resolveReportPath(process.env.PLAYWRIGHT_JSON_OUTPUT_NAME);
+const cliReport = resolveReportPath(process.argv[2]);
+
+const reportPath = cliReport || envReport;
 
 if (!fs.existsSync(reportPath)) {
   console.error(`❌ Report file not found: ${reportPath}`);

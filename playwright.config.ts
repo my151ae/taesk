@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config({ path: '.env.test' });
 
@@ -7,7 +8,18 @@ const isCI = !!process.env.CI;
 const workers = process.env.PW_WORKERS
   ? Number(process.env.PW_WORKERS)
   : (isCI ? 2 : '50%'); // CI: 2 workers (競合低減), Local: 50% (速度重視)
-const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'playwright-report.json';
+const defaultJsonOutput = path.join('test-results', 'playwright-report.json');
+
+const resolveJsonOutput = (value?: string) => {
+  if (!value) return defaultJsonOutput;
+  if (path.isAbsolute(value)) return value;
+  if (value.includes('/') || value.includes('\\')) {
+    return value;
+  }
+  return path.join('test-results', value);
+};
+
+const jsonOutput = resolveJsonOutput(process.env.PLAYWRIGHT_JSON_OUTPUT_NAME);
 
 export default defineConfig({
   testDir: './e2e',

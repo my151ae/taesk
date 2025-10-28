@@ -35,6 +35,7 @@ The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explici
 
 ## Testing Guidelines
 - Playwright (`@playwright/test`) で E2E を実行する際は、`npx playwright test --reporter=json > playwright-report.json` を必須コマンドとして使用し、常に JSON レポートを生成する。`.env.test` は `playwright.config.ts` が自動で読み込むため追加の `set -a` は不要。
+- JSON レポートは既定で `test-results/playwright-report.json` に保存される。`PLAYWRIGHT_JSON_OUTPUT_NAME` へファイル名のみを指定した場合も `test-results/` 配下に出力されるため、ルート直下にレポートを増やさないようにする。
 - サンドボックス環境でポート 3000 への listen が `EPERM` で拒否される場合は、同じコマンドを **権限昇格付き**（`with_escalated_permissions: true`）で再実行して Next.js サーバーを起動させる。昇格前後で生成された `playwright-report.json` は最新のものを残し、旧ファイルは削除してから再試行する。
 - 生成されたレポートは `cat playwright-report.json | jq '.stats'` で確認する。ファイル冒頭にセットアップのログが付く場合は `sed -n '/^{/,$p' playwright-report.json | jq '.stats'` として JSON 部分だけを jq に渡すこと。
 - `jq` が利用できない環境では `tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'` を用いて件数を抽出し、成功/失敗を明示する。
