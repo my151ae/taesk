@@ -174,6 +174,9 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
           setEditText('');
         }
       } else {
+        // Clear input immediately before submission to avoid showing duplicate content
+        setNewComment('');
+
         const mentions = parseMentions(text);
         const result = await submitComment({
           cardId,
@@ -186,8 +189,9 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
 
         if (!result.success) {
           setFormError(result.message ?? 'コメントの投稿に失敗しました');
+          // Restore input on failure
+          setNewComment(text);
         } else {
-          setNewComment('');
           setReplyTo(null);
           if (result.message) {
             setBannerMessage(result.message);
