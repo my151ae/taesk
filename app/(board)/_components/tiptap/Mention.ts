@@ -6,10 +6,11 @@
 import { mergeAttributes, Node } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion from '@tiptap/suggestion';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 export interface MentionOptions {
   HTMLAttributes: Record<string, unknown>;
-  renderText: (props: { node: { attrs: { id: string; name: string } } }) => string;
+  renderText: (props: { node: ProseMirrorNode }) => string;
   suggestion: {
     char: string;
     pluginKey: PluginKey;

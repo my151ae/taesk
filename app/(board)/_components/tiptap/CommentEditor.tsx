@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Mention } from './Mention';
 import Suggestion from '@tiptap/suggestion';
@@ -14,6 +14,7 @@ import { createMentionSuggestion } from './MentionSuggestion';
 import { fromStorage, toStorage, getCachedProfileName, cacheProfiles } from '@/lib/mention-utils';
 import { useEffect, useMemo } from 'react';
 import type { ProfileSummary } from '@/lib/supabase';
+import type { Range } from '@tiptap/core';
 
 interface CommentEditorProps {
   initialValue: string; // Storage format: "<@id>" tokens
@@ -76,7 +77,7 @@ export default function CommentEditor({
           .map(p => ({
             id: p.id,
             name: p.full_name || p.email || 'Unknown',
-            avatar_url: p.avatar_url,
+            avatar_url: p.avatar_url || undefined,
           }));
       }
 
@@ -91,7 +92,7 @@ export default function CommentEditor({
         .map(p => ({
           id: p.id,
           name: p.full_name || p.email || 'Unknown',
-          avatar_url: p.avatar_url,
+          avatar_url: p.avatar_url || undefined,
         }));
     },
     [profiles]
@@ -115,7 +116,7 @@ export default function CommentEditor({
           pluginKey: new PluginKey('mention'),
           command: ({ editor, range, props }) => {
             // Delete the trigger character (@) and insert Mention node
-            editor
+            (editor as Editor)
               .chain()
               .focus()
               .deleteRange(range)
