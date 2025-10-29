@@ -140,13 +140,16 @@ export default function CommentEditor({
         class: `prose prose-sm max-w-none focus:outline-none ${className}`,
       },
       handleKeyDown: (view, event) => {
-        // Submit on Shift+Enter (changed from Enter)
-        if (event.key === 'Enter' && event.shiftKey && onSubmit) {
+        // Allow Shift+Enter for line breaks
+        if (event.key === 'Enter' && event.shiftKey) {
+          return false; // Let default behavior insert line break
+        }
+        // Submit on Enter (without Shift)
+        if (event.key === 'Enter' && !event.shiftKey && onSubmit) {
           event.preventDefault();
           onSubmit();
           return true;
         }
-        // Let Enter work normally for mention selection and line breaks
         return false;
       },
     },

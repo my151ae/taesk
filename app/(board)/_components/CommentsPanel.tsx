@@ -399,7 +399,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
             initialValue={newComment}
             onChange={setNewComment}
             onSubmit={handleSubmit}
-            placeholder="コメントを書く...（@でメンション、Shift+Enterで送信）"
+            placeholder="コメントを書く...（@でメンション、Enterで送信）"
             profiles={members}
             boardId={boardId}
           />
