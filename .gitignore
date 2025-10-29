@@ -73,6 +73,9 @@ playwright/.auth/
 *.playwright.log
 debug-report*.json
 dev-server.log
+playwright-webserver.log
+test-*.log
+*-output.log
 
 # Temporary files
 *.tmp

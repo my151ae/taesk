@@ -12,6 +12,14 @@ echo ""
 
 # Create results directory
 mkdir -p test-results/batches
+mkdir -p test-results/logs
+
+# Output file for full log
+LOG_FILE="test-results/logs/batch-execution-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "Log file: $LOG_FILE"
+echo ""
 
 # Run each test file separately
 test_files=(
