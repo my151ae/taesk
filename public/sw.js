@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.3.0';
+const SW_VERSION = '1.3.3';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -51,31 +51,93 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
     return;
   }
 
-  // Skip Supabase and external requests
+  // Skip external requests (Supabase, CDNs, etc.)
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
+  // Skip special URLs that should not be intercepted
+  if (event.request.url.startsWith('chrome-extension://') ||
+      event.request.url.startsWith('moz-extension://') ||
+      event.request.url.startsWith('data:') ||
+      event.request.url.startsWith('blob:')) {
+    return;
+  }
+
+  // Skip Next.js internal resources
+  if (url.pathname.startsWith('/_next/webpack-hmr') ||
+      url.pathname.startsWith('/__nextjs') ||
+      url.pathname.includes('hot-update')) {
+    return;
+  }
+
+  // For font files and other static assets, use network-first strategy
+  // but don't fail loudly if network fails
+  if (url.pathname.endsWith('.woff2') ||
+      url.pathname.endsWith('.woff') ||
+      url.pathname.endsWith('.ttf') ||
+      url.pathname.endsWith('.otf')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache).catch(() => {
+                // Ignore cache errors
+              });
+            }).catch(() => {
+              // Ignore cache open errors
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // For fonts, try cache first, then fail silently
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // For other requests, use network-first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response before caching
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
+        // Only cache successful responses
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache).catch(() => {
+              // Ignore cache errors
+            });
+          }).catch(() => {
+            // Ignore cache open errors
+          });
+        }
         return response;
       })
-      .catch(() => {
+      .catch((error) => {
+        console.log('[SW] Fetch failed for:', event.request.url, error);
         // Network failed, try cache
-        return caches.match(event.request);
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Return a proper 404 response for missing resources
+          return new Response('Not found', {
+            status: 404,
+            statusText: 'Not Found',
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        });
       })
   );
 });

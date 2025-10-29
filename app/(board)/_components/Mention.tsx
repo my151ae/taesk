@@ -68,6 +68,7 @@ interface RenderCommentBodyProps {
 /**
  * Render comment body with highlighted mentions
  * Expects mentions to be stored as UUIDs in the database
+ * Handles both legacy format (@username<@uuid>) and standard format (@username)
  */
 export function RenderCommentBody({ body, mentions, profiles }: RenderCommentBodyProps) {
   if (!mentions || mentions.length === 0) {
@@ -81,20 +82,33 @@ export function RenderCommentBody({ body, mentions, profiles }: RenderCommentBod
   const parts: (string | JSX.Element)[] = [];
   let lastIndex = 0;
 
-  // Regex to match @username patterns
-  const mentionRegex = /@([\w\s]+?)(?=\s|$|[^\w\s])/g;
+  // Regex to match @username<@uuid> or @username patterns
+  // Captures: @(username)<@uuid> or @(username)
+  // Uses (?:(?!<@).)+ to match any character except the start of <@ tag
+  // Matches until we hit <@ or a boundary (space/end of string/non-word character)
+  const mentionRegex = /@((?:(?!<@).)+?)(?:<@([0-9a-f-]{36})>)/gu;
   let match;
 
   while ((match = mentionRegex.exec(body)) !== null) {
-    const mentionText = match[1];
+    const mentionText = match[1].trim();
+    const mentionUuid = match[2]; // UUID from <@uuid> if present
 
     // Try to find matching profile
-    const profile = mentions
-      .map((id) => profileMap.get(id))
-      .find((p) =>
-        p?.full_name?.toLowerCase().includes(mentionText.toLowerCase()) ||
-        p?.email?.toLowerCase().includes(mentionText.toLowerCase())
-      );
+    // First try by UUID if available, then by name
+    let profile: ProfileSummary | null | undefined = null;
+
+    if (mentionUuid) {
+      profile = profileMap.get(mentionUuid);
+    }
+
+    if (!profile) {
+      profile = mentions
+        .map((id) => profileMap.get(id))
+        .find((p) =>
+          p?.full_name?.toLowerCase().includes(mentionText.toLowerCase()) ||
+          p?.email?.toLowerCase().includes(mentionText.toLowerCase())
+        );
+    }
 
     if (profile) {
       // Add text before mention
@@ -102,7 +116,7 @@ export function RenderCommentBody({ body, mentions, profiles }: RenderCommentBod
         parts.push(body.substring(lastIndex, match.index));
       }
 
-      // Add Mention component
+      // Add Mention component (displays only @username, hiding <@uuid>)
       parts.push(
         <Mention
           key={`mention-${match.index}-${profile.id}`}

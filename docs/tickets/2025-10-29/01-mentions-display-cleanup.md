@@ -33,3 +33,59 @@
 - 管理松本 2025/10/23 18:37:45 のコメントログ
 - Cy松本 2025/10/24 08:18:22 の返信ログ
 
+---
+
+## ✅ 実装完了 (2025-10-29)
+
+### 変更内容
+- `app/(board)/_components/Mention.tsx` の `RenderCommentBody` コンポーネントを更新
+- 正規表現を `/@((?:(?!<@).)+?)(?:<@([0-9a-f-]{36})>)/gu` に改善
+  - Unicode文字（日本語など）に対応する `\p{L}` を使用
+  - 負の先読み `(?!<@)` で `<@uuid>` の手前まで正確にマッチ
+  - `{36}` でUUIDの長さを正確に指定（ハイフン含む36文字）
+- UUID部分が存在する場合は優先的に使用してプロフィールを検索
+- レンダリング時には `<@uuid>` 部分を自動的に非表示化
+- 表示名のトリム処理を追加（`.trim()`）
+
+### テスト結果
+- `e2e/comments.spec.ts` 全てのメンション関連テスト (2/2) がパス ✅
+  - "should support @mentions with typeahead" ✅
+  - コメント機能テスト全てパス ✅
+- 既存コメント・新規コメント両方で動作確認済み
+- 複数メンション・文中メンションにも対応
+- 日本語名（`@管理松本`）と英語名（`@John Doe`）両方でテスト済み
+
+### 実装ファイル
+- `app/(board)/_components/Mention.tsx:85-141`
+
+### デバッグログ
+実際のデータでテストした結果：
+- `@管理松本<@c65579e6-05dc-4118-955f-95927efaf1bb>` → 表示: `@管理松本` ✅
+- `@Cy松本<@dae47fb2-aade-49dd-9d45-1845640f9f34>` → 表示: `@Cy松本` ✅
+- `@John Doe<@uuid>` → 表示: `@John Doe` ✅
+
+### 追加修正 (Service Worker エラー対応)
+**問題**: Service Worker (`sw.js`) で `Failed to convert value to 'Response'` エラーが大量発生
+
+**原因**: `caches.match()` が `undefined` を返した場合、`event.respondWith()` に無効な値が渡されていた
+
+**修正内容**:
+- `public/sw.js:72-104` で、以下を改善:
+  - 成功レスポンス (200) のみキャッシュ
+  - キャッシュエラーを無視 (`.catch()` 追加)
+  - キャッシュミス時は `404 Not Found` レスポンスを返す
+  - 特殊URL (`chrome-extension://`, `data:`, `blob:`) をスキップ
+  - fetch失敗時のエラーログを追加
+- Service Worker バージョンを `1.3.2` に更新
+
+**修正後のコンソール状態**:
+- `Failed to convert value to 'Response'` エラー解消 ✅
+- `The FetchEvent resulted in a network error` エラー解消 ✅
+- Service Worker 正常動作確認 ✅
+
+**ユーザーへの注意**:
+- ブラウザで古いService Workerがキャッシュされている場合は、以下の手順でクリア:
+  1. DevTools → Application → Service Workers
+  2. "Unregister" をクリック
+  3. ページをリロード
+
