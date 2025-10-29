@@ -306,50 +306,188 @@ test.describe('Comments Feature @feature:comments', () => {
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test('should support @mentions with typeahead @e2e:essential', async ({ page }) => {
+  test('should support @mentions with TipTap editor @e2e:essential @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
-    const currentBoard = assertContext(board, 'Board context not initialised');
 
     await openCardModalViaQuery(page, currentCard);
-
-    // Wait for modal to fully load
     await page.waitForLoadState('networkidle');
 
-    // Type @ to trigger mention typeahead
-    const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
-    await commentTextarea.waitFor({ state: 'visible', timeout: 15000 });
-    await commentTextarea.click();
-    await page.waitForTimeout(500); // Wait for focus
-
-    // Type @ to trigger mention typeahead
-    await commentTextarea.type('@', { delay: 100 });
-
-    // Wait for mention suggestions to appear using ARIA role
-    const mentionDropdown = page.locator('[role="listbox"]');
-    await expect(mentionDropdown).toBeVisible({ timeout: 15000 });
-
-    const userOption = page.locator('[role="option"]').filter({ hasText: 'E2E Test User' }).first();
-    await expect(userOption).toBeVisible({ timeout: 5000 });
-    await userOption.click();
-
-    // Wait for mention to be inserted
+    // Find TipTap editor (ProseMirror)
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
     await page.waitForTimeout(500);
 
-    // Verify mention is inserted into textarea (format: @Display Name<@user-id>)
-    const textareaValue = await commentTextarea.inputValue();
-    expect(textareaValue).toContain('@E2E Test User');
+    // Type @ to trigger mention suggestion
+    await editor.pressSequentially('@');
+    await page.waitForTimeout(1000);
 
-    // Submit comment with mention
-    const commentText = `${textareaValue} Test mention ${Date.now()}`;
-    await commentTextarea.fill(commentText);
-    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+    // Verify suggestion popup appears
+    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
 
-    // Verify comment with mention is visible
-    await expect(page.locator('[data-testid="comment-body"]', { hasText: 'Test mention' })).toBeVisible({ timeout: 10000 });
+    // Verify user option is visible
+    const userOption = suggestionPopup.locator('button').filter({ hasText: 'E2E Test User' });
+    await expect(userOption).toBeVisible({ timeout: 5000 });
 
-    // Verify mention renders as clickable element (uses data-mention-id attribute)
-    const mentionElement = page.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
-    await expect(mentionElement).toBeVisible({ timeout: 5000 });
+    // Click to select mention
+    await userOption.click();
+    await page.waitForTimeout(500);
+
+    // Verify mention node is inserted (displays as @Display Name)
+    const mentionNode = editor.locator('span.mention').filter({ hasText: '@E2E Test User' });
+    await expect(mentionNode).toBeVisible();
+
+    // Add some text after mention
+    await editor.pressSequentially(' test mention');
+
+    // Submit with Shift+Enter
+    await page.keyboard.press('Shift+Enter');
+    await page.waitForTimeout(1000);
+
+    // Verify comment appears in list with mention displayed as @Display Name
+    const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'test mention' });
+    await expect(commentBody).toBeVisible({ timeout: 10000 });
+
+    // Verify mention renders with data-mention-id
+    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
+    await expect(mentionInList).toBeVisible();
+  });
+
+  test('should show all members when typing @ with empty query @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Type @ to trigger mention suggestion
+    await editor.pressSequentially('@');
+    await page.waitForTimeout(1000);
+
+    // Verify suggestion popup appears
+    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+
+    // Verify at least one member is shown (E2E Test User should always be there)
+    const memberOptions = suggestionPopup.locator('button');
+    await expect(memberOptions).toHaveCount(await memberOptions.count(), { timeout: 3000 });
+    expect(await memberOptions.count()).toBeGreaterThan(0);
+  });
+
+  test('should filter members by name when typing after @ @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Type @e2e to filter
+    await editor.pressSequentially('@e2e');
+    await page.waitForTimeout(1000);
+
+    // Verify suggestion popup appears
+    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+
+    // Verify E2E Test User is shown (matches "e2e")
+    const userOption = suggestionPopup.locator('button').filter({ hasText: 'E2E Test User' });
+    await expect(userOption).toBeVisible({ timeout: 3000 });
+  });
+
+  test('should use Enter to select mention and Shift+Enter to submit @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Type @ to trigger mention suggestion
+    await editor.pressSequentially('@e2e');
+    await page.waitForTimeout(1000);
+
+    // Press Enter to select first suggestion
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+
+    // Verify mention was inserted
+    const mentionNode = editor.locator('span.mention');
+    await expect(mentionNode).toBeVisible();
+
+    // Add text
+    await editor.pressSequentially(' keyboard test');
+
+    // Press Shift+Enter to submit
+    await page.keyboard.press('Shift+Enter');
+    await page.waitForTimeout(1000);
+
+    // Verify comment was submitted
+    const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'keyboard test' });
+    await expect(commentBody).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should save mentions as <@id> format but display as @name @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Insert mention
+    await editor.pressSequentially('@e2e');
+    await page.waitForTimeout(1000);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+
+    await editor.pressSequentially(' storage format test');
+    await page.keyboard.press('Shift+Enter');
+    await page.waitForTimeout(2000);
+
+    // Check database to verify storage format is <@id>
+    const { data: comments } = await supabaseAdmin
+      .from('comments')
+      .select('body, mentions')
+      .eq('card_id', currentCard.id)
+      .ilike('body', '%storage format test%')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    expect(comments).toBeDefined();
+    expect(comments?.length).toBeGreaterThan(0);
+
+    if (comments && comments.length > 0) {
+      const comment = comments[0];
+      // Verify body contains <@id> format
+      expect(comment.body).toMatch(/<@[a-f0-9-]{36}>/);
+      // Verify mentions array contains the user ID
+      expect(comment.mentions).toContain(TEST_USER_ID);
+    }
+
+    // Verify display shows @name (not <@id>)
+    const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'storage format test' });
+    await expect(commentBody).toBeVisible();
+
+    // Should show @E2E Test User, not <@uuid>
+    await expect(commentBody.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' })).toBeVisible();
+    // Should NOT show <@uuid> pattern
+    const bodyText = await commentBody.textContent();
+    expect(bodyText).not.toMatch(/<@[a-f0-9-]{36}>/);
   });
 
   test('should validate mention user_id as UUID v4', async ({ page }) => {

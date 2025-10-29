@@ -67,66 +67,41 @@ interface RenderCommentBodyProps {
 
 /**
  * Render comment body with highlighted mentions
- * Expects mentions to be stored as UUIDs in the database
- * Handles both legacy format (@username<@uuid>) and standard format (@username)
+ * Uses mention-utils to parse <@id> tokens and render @display_name
  */
 export function RenderCommentBody({ body, mentions, profiles }: RenderCommentBodyProps) {
-  if (!mentions || mentions.length === 0) {
-    return <span className="whitespace-pre-wrap">{body}</span>;
-  }
+  // Import mention-utils functions locally
+  const { MENTION_REGEX } = require('@/lib/mention-utils');
 
   // Create a map of user IDs to profiles for quick lookup
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
 
-  // Find all @mentions in the text and replace with Mention components
+  // Find all <@id> mentions and replace with Mention components
   const parts: (string | JSX.Element)[] = [];
   let lastIndex = 0;
 
-  // Regex to match @username<@uuid> or @username patterns
-  // Captures: @(username)<@uuid> or @(username)
-  // Uses (?:(?!<@).)+ to match any character except the start of <@ tag
-  // Matches until we hit <@ or a boundary (space/end of string/non-word character)
-  const mentionRegex = /@((?:(?!<@).)+?)(?:<@([0-9a-f-]{36})>)/gu;
-  let match;
+  const regex = new RegExp(MENTION_REGEX);
+  let match: RegExpExecArray | null;
 
-  while ((match = mentionRegex.exec(body)) !== null) {
-    const mentionText = match[1].trim();
-    const mentionUuid = match[2]; // UUID from <@uuid> if present
+  while ((match = regex.exec(body)) !== null) {
+    const userId = match[1]; // Extract ID from <@id>
+    const profile = profileMap.get(userId);
 
-    // Try to find matching profile
-    // First try by UUID if available, then by name
-    let profile: ProfileSummary | null | undefined = null;
-
-    if (mentionUuid) {
-      profile = profileMap.get(mentionUuid);
+    // Add text before mention
+    if (match.index > lastIndex) {
+      parts.push(body.substring(lastIndex, match.index));
     }
 
-    if (!profile) {
-      profile = mentions
-        .map((id) => profileMap.get(id))
-        .find((p) =>
-          p?.full_name?.toLowerCase().includes(mentionText.toLowerCase()) ||
-          p?.email?.toLowerCase().includes(mentionText.toLowerCase())
-        );
-    }
+    // Add Mention component (displays @display_name)
+    parts.push(
+      <Mention
+        key={`mention-${match.index}-${userId}`}
+        userId={userId}
+        profile={profile || null}
+      />
+    );
 
-    if (profile) {
-      // Add text before mention
-      if (match.index > lastIndex) {
-        parts.push(body.substring(lastIndex, match.index));
-      }
-
-      // Add Mention component (displays only @username, hiding <@uuid>)
-      parts.push(
-        <Mention
-          key={`mention-${match.index}-${profile.id}`}
-          userId={profile.id}
-          profile={profile}
-        />
-      );
-
-      lastIndex = match.index + match[0].length;
-    }
+    lastIndex = regex.lastIndex;
   }
 
   // Add remaining text

@@ -89,3 +89,36 @@
   2. "Unregister" をクリック
   3. ページをリロード
 
+---
+
+## 🎉 TipTap リッチエディタ移行完了 (2025-10-29 15:20)
+
+### 実装内容
+チケット [`01-01-inline-mention-display.md`](./01-01-inline-mention-display.md) の実装により、コメントエディタを TipTap ベースに移行しました。
+
+**主な変更**:
+- ✅ エディタ内で常に `@表示名` を表示（`<@id>` は非表示）
+- ✅ 保存形式は `<@id>` のまま維持（後方互換性確保）
+- ✅ `@` 入力時に候補リストがポップアップ表示
+- ✅ Mention は atom node として実装（Backspace 1回で削除）
+- ✅ BlockNote 移行に備えたエディタ非依存ユーティリティ（`lib/mention-utils.ts`）
+
+**実装ファイル**:
+- `lib/mention-utils.ts` - `fromStorage()` / `toStorage()` 変換ユーティリティ
+- `app/(board)/_components/tiptap/Mention.ts` - TipTap Mention 拡張
+- `app/(board)/_components/tiptap/MentionSuggestion.tsx` - @サジェストUI
+- `app/(board)/_components/tiptap/CommentEditor.tsx` - メインエディタ
+- `app/(board)/_components/CommentsPanel.tsx` - エディタ統合
+
+**検証結果** (スクリーンショット: `test-results/mention-suggestion.png`):
+- ✅ コメント一覧で `@表示名` が正しく表示
+- ✅ エディタで `@` 入力時にサジェストポップアップが表示
+- ✅ 既存メンションが `@表示名` で表示
+- ✅ 保存形式は `<@id>` のまま維持
+
+**既知の問題**:
+- ⚠️ `@` 入力時のサジェストで「候補なし」と表示されるケースがある
+  - 原因: `profiles` prop が空配列または読み込み中の可能性
+  - 影響: 新規メンション追加時のみ。既存メンションの表示には影響なし
+  - 次回改善予定
+

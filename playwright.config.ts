@@ -32,7 +32,7 @@ export default defineConfig({
   outputDir: 'test-results',
   reporter: isCI
     ? [['json', { outputFile: jsonOutput }]]
-    : [['list'], ['json', { outputFile: jsonOutput }], ['html', { open: 'never' }]],
+    : [['list'], ['json', { outputFile: jsonOutput }], ['html', { outputFolder: 'test-results/html-report', open: 'never' }]],
   globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
   use: {
     baseURL: 'http://localhost:3000',

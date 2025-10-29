@@ -85,32 +85,51 @@ export default defineConfig({
 
 ```json
 {
-  "test": "playwright test --project=core --grep @e2e:essential",
+  "test": "playwright test --project=core --grep @e2e:essential --reporter=list --reporter=json",
   "test:e2e": "playwright test",
-  "test:feature:boards": "playwright test --project=core --grep @feature:boards",
-  "test:feature:lists": "playwright test --project=core --grep @feature:lists",
-  "test:feature:comments": "playwright test --project=core --grep @feature:comments",
-  "test:feature:notifications": "playwright test --project=core --grep @feature:notifications",
-  "test:failure": "playwright test --project=core --grep @failure:",
-  "test:full": "playwright test --project=full",
+  "test:auth": "playwright test e2e/auth.spec.ts --project=core --reporter=list --reporter=json",
+  "test:kanban": "playwright test e2e/kanban.spec.ts --project=core --reporter=list --reporter=json",
+  "test:reorder": "playwright test e2e/reorder-api.spec.ts --project=core --reporter=list --reporter=json",
+  "test:comments": "playwright test e2e/comments.spec.ts --project=core --reporter=list --reporter=json",
+  "test:notifications": "playwright test e2e/notifications.spec.ts --project=core --reporter=list --reporter=json",
+  "test:permissions": "playwright test e2e/board-permissions.spec.ts --project=core --reporter=list --reporter=json",
+  "test:rls": "playwright test e2e/rls.spec.ts --project=core --reporter=list --reporter=json",
+  "test:feature:boards": "playwright test --project=core --grep @feature:boards --reporter=list --reporter=json",
+  "test:feature:lists": "playwright test --project=core --grep @feature:lists --reporter=list --reporter=json",
+  "test:feature:comments": "playwright test --project=core --grep @feature:comments --reporter=list --reporter=json",
+  "test:feature:notifications": "playwright test --project=core --grep @feature:notifications --reporter=list --reporter=json",
+  "test:failure": "playwright test --project=core --grep @failure: --reporter=list --reporter=json",
+  "test:full": "playwright test --project=full --reporter=list --reporter=json",
   "test:summary": "cat test-results/playwright-report.json | jq '.stats'",
-  "test:failed": "bash scripts/test-rerun-failed.sh"
+  "test:failed": "bash scripts/test-rerun-failed.sh",
+  "test:all-split": "bash scripts/test-all-batches.sh"
 }
 ```
 
-`test:failed` は直前の JSON レポートから `status: "unexpected"` が含まれる spec を抽出し、対象ファイルだけを `--reporter=json` で再実行します。`scripts/test-rerun-failed.sh` を直接呼び出すことで、レポートファイルや出力先を `--report`, `--output`, `--project` オプションで上書きできます。
+**新機能**:
+- **ファイル別テスト**: `test:auth`, `test:kanban`, `test:comments` など、各テストファイルを個別に実行可能
+- **バッチ実行**: `test:all-split` で全テストをファイル単位で順次実行し、結果を集約（タイムアウト対策）
+- `test:failed` は直前の JSON レポートから `status: "unexpected"` が含まれる spec を抽出し、対象ファイルだけを `--reporter=json` で再実行します。`scripts/test-rerun-failed.sh` を直接呼び出すことで、レポートファイルや出力先を `--report`, `--output`, `--project` オプションで上書きできます。
 
 ### コマンド例
 
 | モード | コマンド | 用途 |
 |---|---|---|
 | **Essential** | `npm test` | PR ゲート（CI） |
-| Feature別（boards） | `npm run test:feature:boards` | ボード機能回帰 |
-| Feature別（lists） | `npm run test:feature:lists` | リスト機能回帰 |
-| Feature別（comments） | `npm run test:feature:comments` | コメント機能回帰 |
-| Feature別（notifications） | `npm run test:feature:notifications` | 通知機能回帰 |
+| **全テスト（バッチ）** | `npm run test:all-split` | タイムアウト回避・ファイル別順次実行 |
+| ファイル別 - 認証 | `npm run test:auth` | 認証テストのみ |
+| ファイル別 - ボード | `npm run test:kanban` | ボード・リスト・カード CRUD |
+| ファイル別 - 並替API | `npm run test:reorder` | 並び替えエンドポイント |
+| ファイル別 - コメント | `npm run test:comments` | コメント・@メンション |
+| ファイル別 - 通知 | `npm run test:notifications` | 通知機能 |
+| ファイル別 - 権限 | `npm run test:permissions` | ボード権限 |
+| ファイル別 - RLS | `npm run test:rls` | RLS ポリシー |
+| Feature別（boards） | `npm run test:feature:boards` | ボード機能回帰（タグベース） |
+| Feature別（lists） | `npm run test:feature:lists` | リスト機能回帰（タグベース） |
+| Feature別（comments） | `npm run test:feature:comments` | コメント機能回帰（タグベース） |
+| Feature別（notifications） | `npm run test:feature:notifications` | 通知機能回帰（タグベース） |
 | Failure系 | `npm run test:failure` | 異常系検証 |
-| 全体回帰 | `npm run test:full` | main/nightly |
+| 全体回帰 | `npm run test:full` | main/nightly（全テスト一括） |
 | サマリー確認 | `npm run test:summary` | JSON統計表示 |
 
 ### HTML レポート（ローカル補助）
