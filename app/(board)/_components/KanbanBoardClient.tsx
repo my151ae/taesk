@@ -52,6 +52,7 @@ import { initializeCommentsStore, useCommentsStore } from "../_stores/comments-s
 import ShareDialog from "./ShareDialog";
 import NotificationsBell from "./NotificationsBell";
 import NotificationSettings from "./NotificationSettings";
+import ProfileSettings from "./ProfileSettings";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -61,6 +62,7 @@ type KanbanBoardClientProps = {
 
 type ProfileRow = {
   id: string;
+  display_name: string | null;
   full_name: string | null;
   avatar_url: string | null;
   email: string | null;
@@ -88,6 +90,23 @@ const getProfileDisplayName = (profile?: ProfileSummary | null): string | null =
     return profile.email;
   }
   return null;
+};
+
+const getUserDisplayName = (profile: ProfileRow | null, fallbackEmail?: string): string => {
+  if (profile?.display_name?.trim()) {
+    return profile.display_name.trim();
+  }
+  if (profile?.full_name?.trim()) {
+    return profile.full_name.trim();
+  }
+  if (profile?.email?.trim()) {
+    const email = profile.email.trim();
+    return email.split('@')[0]; // Show local part of email
+  }
+  if (fallbackEmail?.trim()) {
+    return fallbackEmail.split('@')[0];
+  }
+  return 'User';
 };
 
 const saveToStorage = (data: BoardData) => {
@@ -708,6 +727,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   // Phase3: Share dialog state
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+
+  // User profile state
+  const [userProfile, setUserProfile] = useState<ProfileRow | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -739,6 +762,30 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Fetch user profile
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/profiles');
+        if (response.ok) {
+          const profile: ProfileRow = await response.json();
+          setUserProfile(profile);
+        } else {
+          console.error('Failed to fetch user profile');
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   // URL からモーダル状態を復元（初回ロード時のみ）
   const hasRestoredModalFromUrl = useRef(false);
@@ -2195,7 +2242,19 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               </svg>
               Share
             </button>
-            <span className="text-sm text-gray-600">{user.email}</span>
+            <button
+              onClick={() => setShowProfileSettings(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              title="Profile settings"
+              data-testid="profile-button"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="text-gray-900 dark:text-gray-100" data-testid="user-display-name">
+                {getUserDisplayName(userProfile, user.email)}
+              </span>
+            </button>
             <button
               onClick={async () => {
                 await signOut()
@@ -2506,6 +2565,48 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                 </button>
               </div>
               <NotificationSettings />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Settings Modal */}
+      {showProfileSettings && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowProfileSettings(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Profile Settings</h2>
+                <button
+                  onClick={() => setShowProfileSettings(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <ProfileSettings
+                onProfileUpdated={async () => {
+                  // Reload user profile after update
+                  try {
+                    const response = await fetch('/api/profiles');
+                    if (response.ok) {
+                      const profile: ProfileRow = await response.json();
+                      setUserProfile(profile);
+                    }
+                  } catch (error) {
+                    console.error('Error reloading user profile:', error);
+                  }
+                }}
+              />
             </div>
           </div>
         </div>

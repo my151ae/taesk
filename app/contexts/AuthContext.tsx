@@ -67,6 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          // Force Google to show account selection screen
+          prompt: 'select_account',
+        },
       },
     })
     if (error) {
@@ -99,7 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Clear user state immediately for better UX
     setUser(null)
-    const { error } = await supabase.auth.signOut({ scope: 'local' })
+
+    // Use 'global' scope to ensure complete sign out and force account selection on next login
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) {
       console.error('Error signing out:', error.message)
       throw error
