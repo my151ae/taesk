@@ -7,6 +7,11 @@
 > - 上記方針に反するコマンド・手順は今後一切行わない。
 > - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
 
+## 現状メモ（2025-10-31 JST）
+
+- 作業ツリーには `tsconfig.tsbuildinfo` の変更が存在するが、ビルド生成物のためコミット対象外とする。
+- 保存・読み込み遅延と技術的負債の解消を目的としたチケットを作成済み: `docs/tickets/2025-10-31/01-refactor-storage-performance.md`
+
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
 
