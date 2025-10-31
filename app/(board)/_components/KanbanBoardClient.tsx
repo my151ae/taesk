@@ -49,6 +49,9 @@ import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib
 import { CardModal } from "@/app/components/CardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 import { initializeCommentsStore, useCommentsStore } from "../_stores/comments-store";
+import { createClientTrace } from "@/lib/metrics/client";
+import type { ClientTrace } from "@/lib/metrics/client";
+import type { TraceSummary } from "@/lib/metrics/types";
 import ShareDialog from "./ShareDialog";
 import NotificationsBell from "./NotificationsBell";
 import NotificationSettings from "./NotificationSettings";
@@ -68,6 +71,20 @@ type ProfileRow = {
   email: string | null;
 };
 
+type BoardLoadMetrics = {
+  source: "supabase" | "storage" | "seeded-defaults" | "error";
+  fetchDurationMs?: number;
+  parseDurationMs?: number;
+  payloadSizeBytes?: number;
+  server?: TraceSummary;
+  error?: string;
+};
+
+type BoardFetchResult = {
+  data: BoardData;
+  metrics: BoardLoadMetrics;
+};
+
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
 const CARD_CLICK_THRESHOLD = 5;
@@ -78,7 +95,13 @@ const loadFromStorage = (): BoardData => {
   if (!data) {
     return { lists: [], cards: [] };
   }
-  return JSON.parse(data);
+
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    console.warn("Failed to parse cached board data:", error);
+    return { lists: [], cards: [] };
+  }
 };
 
 const getProfileDisplayName = (profile?: ProfileSummary | null): string | null => {
@@ -109,10 +132,43 @@ const getUserDisplayName = (profile: ProfileRow | null, fallbackEmail?: string):
   return 'User';
 };
 
-const saveToStorage = (data: BoardData) => {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-};
+const saveToStorage = (() => {
+  let pendingTimer: number | null = null;
+  let latestPayload: BoardData | null = null;
+
+  const scheduleFlush = () => {
+    if (typeof window === "undefined") return;
+
+    const flush = () => {
+      if (typeof window === "undefined" || !latestPayload) {
+        pendingTimer = null;
+        return;
+      }
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(latestPayload));
+      } catch (error) {
+        console.error("Failed to persist board cache:", error);
+      } finally {
+        pendingTimer = null;
+      }
+    };
+
+    pendingTimer = window.setTimeout(flush, 120);
+  };
+
+  return (data: BoardData) => {
+    if (typeof window === "undefined") return;
+    latestPayload = data;
+
+    if (pendingTimer !== null) {
+      window.clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+
+    scheduleFlush();
+  };
+})();
 
 const copyBoardUrl = async (url: string) => {
   if (!url) return;
@@ -188,23 +244,87 @@ const buildBoardUrlForCopy = (board: Board | undefined, kind: "short" | "canonic
 };
 
 // Load board data from API route (replaces direct Supabase access)
-const loadFromSupabase = async (boardId: string): Promise<BoardData> => {
-  try {
-    const response = await fetch(`/api/boards/${boardId}/data`);
+const getHrTime = () => {
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return performance.now();
+  }
+  return Date.now();
+};
 
-    if (!response.ok) {
-      throw new Error(`Failed to load board data: ${response.statusText}`);
+const loadFromSupabase = async (boardId: string, trace?: ClientTrace): Promise<BoardFetchResult> => {
+  const fetchStartedAt = getHrTime();
+  trace?.mark("fetch:start", { boardId });
+
+  try {
+    const response = await fetch(`/api/boards/${boardId}/data`, {
+      headers: trace ? trace.buildHeaders("board-data") : undefined,
+      cache: "no-store",
+    });
+
+    const fetchCompletedAt = getHrTime();
+    trace?.mark("fetch:response", { status: response.status });
+
+    const rawBody = await response.text();
+    const parseStartedAt = getHrTime();
+    const payloadSizeBytes =
+      typeof TextEncoder !== "undefined" ? new TextEncoder().encode(rawBody).length : rawBody.length;
+
+    let payload: unknown = {};
+
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch (parseError) {
+        console.error("Failed to parse board payload:", parseError);
+        throw parseError;
+      }
     }
 
-    const { lists, cards } = await response.json();
+    const parseCompletedAt = getHrTime();
+
+    const metrics: BoardLoadMetrics = {
+      source: "supabase",
+      fetchDurationMs: fetchCompletedAt - fetchStartedAt,
+      parseDurationMs: parseCompletedAt - parseStartedAt,
+      payloadSizeBytes,
+    };
+
+    if (!response.ok || typeof payload !== "object" || payload === null) {
+      metrics.error = `Failed to load board data: ${response.statusText}`;
+      throw new Error(metrics.error);
+    }
+
+    const { lists, cards, metrics: serverMetrics } = payload as BoardData & { metrics?: TraceSummary };
+    if (serverMetrics) {
+      metrics.server = serverMetrics;
+    }
+
+    const data: BoardData = {
+      lists: Array.isArray(lists) ? lists : [],
+      cards: Array.isArray(cards) ? cards : [],
+    };
+
+    trace?.mark("fetch:parsed", { count: data.lists.length + data.cards.length });
 
     return {
-      lists: lists || [],
-      cards: cards || [],
+      data,
+      metrics,
     };
   } catch (error) {
     console.error("Error loading from Supabase:", error);
-    return loadFromStorage();
+    const fallback = loadFromStorage();
+
+    const metrics: BoardLoadMetrics = {
+      source: "storage",
+      error: error instanceof Error ? error.message : String(error),
+    };
+
+    trace?.mark("fetch:fallback", { count: fallback.lists.length + fallback.cards.length });
+
+    return {
+      data: fallback,
+      metrics,
+    };
   }
 };
 
@@ -972,27 +1092,55 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const loadData = async () => {
       if (!user || !currentBoardId) return;
 
+      const trace = createClientTrace("board-load", { boardId: currentBoardId });
+      trace.mark("load:start");
+
       const currentBoard = boards.find((board) => board.id === currentBoardId);
-      const data = await loadFromSupabase(currentBoardId);
-      if (isCancelled) return;
+      const { data, metrics } = await loadFromSupabase(currentBoardId, trace);
+      if (isCancelled) {
+        trace.finish("cancelled", { reason: "cancelled-after-fetch" });
+        return;
+      }
 
       const shouldSeedDefaults =
         data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board);
 
       if (shouldSeedDefaults) {
+        trace.mark("defaults:init");
         const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
-        if (isCancelled) return;
+        if (isCancelled) {
+          trace.finish("cancelled", { reason: "cancelled-after-defaults" });
+          return;
+        }
 
         if (defaultLists.length > 0) {
           const newData = { lists: defaultLists, cards: [] };
           setBoardData(newData);
           saveToStorage(newData);
+          trace.mark("defaults:applied", { count: defaultLists.length });
+
+          trace.finish("success", {
+            ...metrics,
+            source: "seeded-defaults",
+            listCount: newData.lists.length,
+            cardCount: newData.cards.length,
+          });
           return;
         }
       }
 
       setBoardData(data);
       saveToStorage(data);
+      trace.mark("state:committed", { count: data.lists.length + data.cards.length });
+
+      const traceStatus: "success" | "error" =
+        metrics.source === "supabase" || metrics.source === "seeded-defaults" ? "success" : "error";
+
+      trace.finish(traceStatus, {
+        ...metrics,
+        listCount: data.lists.length,
+        cardCount: data.cards.length,
+      });
     };
 
     loadData();

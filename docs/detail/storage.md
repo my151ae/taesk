@@ -25,22 +25,23 @@ syncQueue.ts (INSERT/UPDATE/DELETE)   ※ offline 時のみ
 - 関数: `loadFromStorage()` / `saveToStorage()` (`KanbanBoardClient` 内で利用)
 
 ### 3. Supabase
-- `loadFromSupabase(boardId)` で対象ボードの lists / cards を取得
+- `loadFromSupabase(boardId)` で対象ボードの lists / cards を取得し、メトリクス（トレースサマリ・payload サイズ等）を返却
 - `syncToSupabase(boardData)` で upsert（オンライン時のみ）
 - 削除は `supabase.from('cards').delete().eq('id', id)` のように個別クエリ
 
 ### 4. syncQueue.ts（オフライン同期）
-- `addToSyncQueue({ type, table, data })` で localStorage にバッファリング
-- `syncQueue()` がオンライン復帰時に順次処理
+- `addToSyncQueue({ type, table, data })` で localStorage にバッファリング（`table:type:id` ベースの冪等キーで重複を集約）
+- `syncQueue()` がオンライン復帰時に順次処理し、各アクションをトレース計測（成功/失敗・リトライ状況を集計）
 - UI には `syncQueueStats` とヘッダーのステータスバッジで表示（「Live」「Queued」など）
 
 ## 読み込みフロー
 
 1. `KanbanBoardClient` 初期化
-2. `loadFromSupabase(currentBoardId)` を実行
-3. 成功した場合: `boardData` と localStorage を更新
-4. 失敗した場合: `loadFromStorage()` の内容でレンダリング
+2. `loadFromSupabase(currentBoardId)` をトレース ID 付きで実行（API 側で Supabase クエリを計測）
+3. 成功した場合: `boardData` を更新し、localStorage へはスロットル付きで保存
+4. 失敗した場合: `loadFromStorage()` の内容でレンダリング（トレースは fallback として記録）
 5. `initializeDefaultLists()` がテストボード以外で空の場合に標準リストをシード
+6. 取得したメトリクスを `analytics.track('perf:board-load', ...)` で送出
 
 ## 書き込みフロー
 
@@ -116,4 +117,4 @@ const handleAddCard = async (listId: string) => {
 
 ---
 
-最終更新日: 2025-10-15
+最終更新日: 2025-10-31

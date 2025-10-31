@@ -1,89 +1,166 @@
+import { Buffer } from 'node:buffer';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerTrace, finalizeServerTrace, measureStep } from '@/lib/metrics/server';
 
-/**
- * GET /api/boards/[boardId]/data
- *
- * Fetch all lists and cards for a board (aggregated endpoint).
- * Replaces direct Supabase client calls to fix CORS issues.
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
+  let trace = createServerTrace(request.headers, 'board-data');
+
+  const respond = (
+    status: number,
+    body: Record<string, unknown>,
+    traceStatus: 'success' | 'error',
+    extra?: Record<string, unknown>
+  ) => {
+    const metrics = finalizeServerTrace(trace, traceStatus, extra);
+    return NextResponse.json(
+      { ...body, metrics },
+      { status, headers: { 'Cache-Control': 'no-store' } }
+    );
+  };
+
   try {
     const { boardId } = await params;
+    trace = createServerTrace(request.headers, 'board-data', { boardId });
+
     const supabase = await createServerSupabaseClient();
 
-    // 1. Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
+      return respond(
+        401,
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
-        { status: 401, headers: { 'Cache-Control': 'no-store' } }
+        'error',
+        { reason: 'unauthenticated' }
       );
     }
 
-    // 2. Verify board membership (RLS will also enforce this)
-    const { data: membership } = await supabase
-      .from('board_members')
-      .select('role')
-      .eq('board_id', boardId)
-      .eq('profile_id', user.id)
-      .maybeSingle();
+    const membershipResult = await measureStep(
+      trace,
+      'membershipQuery',
+      () =>
+        supabase
+          .from('board_members')
+          .select('role')
+          .eq('board_id', boardId)
+          .eq('profile_id', user.id)
+          .maybeSingle(),
+      {
+        countResolver: (result) => (result.data ? 1 : 0),
+      }
+    );
 
-    if (!membership) {
-      return NextResponse.json(
+    if (membershipResult.error) {
+      console.error('Error verifying membership:', membershipResult.error);
+      return respond(
+        500,
+        { error: { code: 'DB_ERROR', message: 'Failed to verify membership' } },
+        'error',
+        {
+          reason: 'membership_query_failed',
+          supabaseError: membershipResult.error.message,
+        }
+      );
+    }
+
+    if (!membershipResult.data) {
+      return respond(
+        403,
         { error: { code: 'FORBIDDEN', message: 'Not a board member' } },
-        { status: 403, headers: { 'Cache-Control': 'no-store' } }
+        'error',
+        { reason: 'membership_missing' }
       );
     }
 
-    // 3. Fetch lists and cards in parallel
-    const [listsResult, cardsResult] = await Promise.all([
-      supabase
-        .from('lists')
-        .select('id, title, position, board_id, created_at, updated_at')
-        .eq('board_id', boardId)
-        .order('position', { ascending: true }),
-      supabase
-        .from('cards')
-        .select('id, title, description, list_id, board_id, position, tags, due_date, priority, assignee_id, short_id, id_short, slug, created_at, updated_at')
-        .eq('board_id', boardId)
-        .order('position', { ascending: true }),
-    ]);
+    const listsPromise = measureStep(
+      trace,
+      'listsQuery',
+      () =>
+        supabase
+          .from('lists')
+          .select('id, title, position, board_id, created_at, updated_at')
+          .eq('board_id', boardId)
+          .order('position', { ascending: true }),
+      {
+        countResolver: (result) => result.data?.length ?? 0,
+      }
+    );
+
+    const cardsPromise = measureStep(
+      trace,
+      'cardsQuery',
+      () =>
+        supabase
+          .from('cards')
+          .select(
+            'id, title, description, list_id, board_id, position, tags, due_date, priority, assignee_id, short_id, id_short, slug, created_at, updated_at'
+          )
+          .eq('board_id', boardId)
+          .order('position', { ascending: true }),
+      {
+        countResolver: (result) => result.data?.length ?? 0,
+      }
+    );
+
+    const [listsResult, cardsResult] = await Promise.all([listsPromise, cardsPromise]);
 
     if (listsResult.error) {
       console.error('Error fetching lists:', listsResult.error);
-      return NextResponse.json(
+      return respond(
+        500,
         { error: { code: 'DB_ERROR', message: 'Failed to fetch lists' } },
-        { status: 500 }
+        'error',
+        {
+          reason: 'lists_query_failed',
+          supabaseError: listsResult.error.message,
+        }
       );
     }
 
     if (cardsResult.error) {
       console.error('Error fetching cards:', cardsResult.error);
-      return NextResponse.json(
+      return respond(
+        500,
         { error: { code: 'DB_ERROR', message: 'Failed to fetch cards' } },
-        { status: 500 }
+        'error',
+        {
+          reason: 'cards_query_failed',
+          supabaseError: cardsResult.error.message,
+        }
       );
     }
 
-    return NextResponse.json(
+    const lists = listsResult.data ?? [];
+    const cards = cardsResult.data ?? [];
+    const payload = { lists, cards };
+    const payloadSizeBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+
+    return respond(
+      200,
+      payload,
+      'success',
       {
-        lists: listsResult.data || [],
-        cards: cardsResult.data || [],
-      },
-      {
-        status: 200,
-        headers: { 'Cache-Control': 'no-store' },
+        listsCount: lists.length,
+        cardsCount: cards.length,
+        payloadSizeBytes,
       }
     );
   } catch (error) {
     console.error('Unexpected error in GET /api/boards/[boardId]/data:', error);
-    return NextResponse.json(
+    return respond(
+      500,
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
+      'error',
+      {
+        reason: 'unexpected_error',
+        error: error instanceof Error ? error.message : String(error),
+      }
     );
   }
 }

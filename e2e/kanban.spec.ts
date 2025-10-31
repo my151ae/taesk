@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 import type { Page, Locator } from '@playwright/test';
+import { dumpClientMetrics } from './utils/metrics';
 
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 
@@ -55,6 +56,32 @@ async function dragAndDrop(page: Page, source: Locator, target: Locator) {
 
 function getBoardTitleButton(page: Page): Locator {
   return page.locator('.board-menu-container button').first();
+}
+
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function resolveProfileDisplayName(
+  profile: { display_name: string | null; full_name: string | null; email: string | null } | null,
+  fallbackEmail?: string | null
+): string {
+  const pick = (value: string | null | undefined) => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    return null;
+  };
+
+  const candidates: Array<string | null> = [
+    pick(profile?.display_name),
+    pick(profile?.full_name),
+    pick(profile?.email)?.split('@')[0] ?? null,
+    pick(fallbackEmail)?.split('@')[0] ?? null,
+    'User',
+  ];
+
+  return candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)!;
 }
 
 async function waitForCardRows<T extends Record<string, unknown>>(
@@ -176,6 +203,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test.afterEach(async ({ page }) => {
+    await dumpClientMetrics(page);
+
     // Clean up test board (CASCADE deletes lists and cards)
     await supabase.from('boards').delete().eq('id', testBoardId);
 
@@ -622,7 +651,15 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForLoadState('networkidle');
 
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
-    await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
+    const { data: profileRecord } = await supabase
+      .from('profiles')
+      .select('display_name, full_name, email')
+      .eq('id', TEST_USER_ID)
+      .maybeSingle();
+
+    const expectedIdentity = resolveProfileDisplayName(profileRecord ?? null, testUserEmail);
+    const identityRegex = new RegExp(`^${escapeRegExp(expectedIdentity)}$`, 'i');
+    await page.getByRole('button', { name: identityRegex }).waitFor({ state: 'visible', timeout: 10000 });
 
     // Wait for board to load and verify we're on the right board
     await getBoardTitleButton(page).waitFor({ state: 'visible', timeout: 10000 });

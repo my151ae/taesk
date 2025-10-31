@@ -1,7 +1,32 @@
+import { createClientTrace } from './metrics/client';
 import { supabase, sanitizeCardForUpload, isAssigneeColumnMissing } from './supabase';
 import type { List, Card, CardUpsertPayload } from './supabase';
 
 let supportsAssigneeIdForQueue: boolean | null = null;
+
+const createOptionalTrace = (
+  operation: string,
+  metadata?: Record<string, unknown>
+) => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return createClientTrace(operation, metadata);
+};
+
+const makeIdempotencyKey = (action: {
+  type: SyncActionType;
+  table: SyncTableType;
+  data: { id: string };
+}): string => `${action.table}:${action.type}:${action.data.id}`;
+
+const mergeActionData = (
+  existing: Partial<List | Card> & { id: string },
+  incoming: Partial<List | Card> & { id: string }
+) => ({
+  ...existing,
+  ...incoming,
+});
 
 const prepareCardPayload = (
   data: Partial<Card> & { id: string },
@@ -77,6 +102,7 @@ export interface SyncAction {
   type: SyncActionType;
   table: SyncTableType;
   data: Partial<List | Card> & { id: string };
+  idempotencyKey: string;
   timestamp: number;
   retryCount: number;
   status: SyncActionStatus;
@@ -97,7 +123,16 @@ export const loadSyncQueue = (): SyncQueue => {
 
   try {
     const data = localStorage.getItem(SYNC_QUEUE_KEY);
-    return data ? JSON.parse(data) : { actions: [], lastSyncedAt: null };
+    const queue = (data ? JSON.parse(data) : { actions: [], lastSyncedAt: null }) as SyncQueue;
+
+    queue.actions = Array.isArray(queue.actions)
+      ? queue.actions.map((action) => ({
+          ...action,
+          idempotencyKey: action.idempotencyKey ?? makeIdempotencyKey(action),
+        }))
+      : [];
+
+    return queue;
   } catch (error) {
     console.error('Failed to load sync queue:', error);
     return { actions: [], lastSyncedAt: null };
@@ -117,21 +152,60 @@ export const saveSyncQueue = (queue: SyncQueue): void => {
 
 // Add action to sync queue
 export const addToSyncQueue = (
-  action: Omit<SyncAction, 'id' | 'timestamp' | 'retryCount' | 'status'>
+  action: Omit<SyncAction, 'id' | 'timestamp' | 'retryCount' | 'status' | 'idempotencyKey'> & {
+    idempotencyKey?: string;
+  }
 ): void => {
   const queue = loadSyncQueue();
-  const newAction: SyncAction = {
-    ...action,
-    id: crypto.randomUUID(),
-    timestamp: Date.now(),
-    retryCount: 0,
-    status: 'pending',
-  };
+  const idempotencyKey = action.idempotencyKey ?? makeIdempotencyKey(action);
+  const existingIndex = queue.actions.findIndex(
+    (existing) => existing.idempotencyKey === idempotencyKey
+  );
+  const now = Date.now();
 
-  queue.actions.push(newAction);
+  if (existingIndex >= 0) {
+    const existing = queue.actions[existingIndex];
+    queue.actions[existingIndex] = {
+      ...existing,
+      data: mergeActionData(existing.data, action.data),
+      timestamp: now,
+      retryCount: 0,
+      status: 'pending',
+      idempotencyKey,
+    };
+  } else {
+    const newAction: SyncAction = {
+      ...action,
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `sync-${now}-${Math.random().toString(16).slice(2)}`,
+      timestamp: now,
+      retryCount: 0,
+      status: 'pending',
+      idempotencyKey,
+    };
+    queue.actions.push(newAction);
+  }
+
   saveSyncQueue(queue);
 
-  console.log('Added to sync queue:', newAction);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Sync queue updated:', {
+      action: { type: action.type, table: action.table, idempotencyKey },
+      size: queue.actions.length,
+      deduped: existingIndex >= 0,
+    });
+  }
+
+  const trace = createOptionalTrace('sync-queue-update', {
+    table: action.table,
+    type: action.type,
+    id: action.data.id,
+    deduped: existingIndex >= 0,
+  });
+  trace?.finish('success', {
+    queueSize: queue.actions.length,
+  });
 };
 
 // Execute a single sync action
@@ -184,7 +258,9 @@ export const syncQueue = async (): Promise<{
   total: number;
 }> => {
   const queue = loadSyncQueue();
-  const pendingActions = queue.actions.filter(a => a.status === 'pending' || a.status === 'failed');
+  const pendingActions = queue.actions.filter(
+    (a) => a.status === 'pending' || a.status === 'failed'
+  );
 
   if (pendingActions.length === 0) {
     return { success: 0, failed: 0, total: 0 };
@@ -192,24 +268,46 @@ export const syncQueue = async (): Promise<{
 
   console.log(`同期開始: ${pendingActions.length}件`);
 
+  const trace = createOptionalTrace('sync-queue-run', {
+    total: pendingActions.length,
+  });
+  trace?.mark('run:start', { count: pendingActions.length });
+
   let successCount = 0;
   let failedCount = 0;
 
   for (const action of pendingActions) {
+    const actionTrace = createOptionalTrace('sync-action', {
+      table: action.table,
+      type: action.type,
+      id: action.data.id,
+      retryCount: action.retryCount,
+      idempotencyKey: action.idempotencyKey,
+    });
+
+    actionTrace?.mark('execute:start');
+
     try {
-      // Update status to syncing
       action.status = 'syncing';
       saveSyncQueue(queue);
 
-      // Execute sync action
       await executeSyncAction(action);
 
-      // Mark as synced
       action.status = 'synced';
+      action.retryCount = 0;
       successCount++;
       saveSyncQueue(queue);
 
-      console.log('同期成功:', action);
+      actionTrace?.finish('success', {
+        idempotencyKey: action.idempotencyKey,
+      });
+      trace?.mark('action:success', { count: 1 });
+
+      console.log('同期成功:', {
+        table: action.table,
+        type: action.type,
+        id: action.data.id,
+      });
     } catch (error) {
       console.error('同期失敗:', action, error);
       action.status = 'failed';
@@ -217,17 +315,32 @@ export const syncQueue = async (): Promise<{
       failedCount++;
       saveSyncQueue(queue);
 
-      // Give up after 3 retries
+      actionTrace?.finish('error', {
+        error: error instanceof Error ? error.message : String(error),
+        idempotencyKey: action.idempotencyKey,
+        retryCount: action.retryCount,
+      });
+      trace?.mark('action:error', { count: 1 });
+
       if (action.retryCount >= 3) {
         console.error('同期を諦めました (3回失敗):', action);
       }
     }
   }
 
-  // Remove synced actions from queue
-  queue.actions = queue.actions.filter(a => a.status !== 'synced');
+  queue.actions = queue.actions.filter((a) => a.status !== 'synced');
   queue.lastSyncedAt = Date.now();
   saveSyncQueue(queue);
+
+  trace?.mark('run:complete', {
+    successCount,
+    failedCount,
+  });
+  trace?.finish(failedCount > 0 ? 'error' : 'success', {
+    total: pendingActions.length,
+    successCount,
+    failedCount,
+  });
 
   console.log(`同期完了: 成功 ${successCount}件, 失敗 ${failedCount}件`);
 

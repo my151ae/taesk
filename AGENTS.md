@@ -11,6 +11,9 @@
 
 - 作業ツリーには `tsconfig.tsbuildinfo` の変更が存在するが、ビルド生成物のためコミット対象外とする。
 - 保存・読み込み遅延と技術的負債の解消を目的としたチケットを作成済み: `docs/tickets/2025-10-31/01-refactor-storage-performance.md`
+- ボード読み込み・API・同期キューに計測トレース (`lib/metrics/{client,server}.ts`) を導入し、同期キューに冪等キーと実行トレースを追加済み。
+- `npx playwright test e2e/kanban.spec.ts --project=core --grep "@e2e:essential" --reporter=json | tee playwright-report.json` を実行し、テスト自体は成功。`test-summary.js` で `board-load` p95=5.29s (threshold 3s) を検知し非0終了となるため、引き続きパフォーマンス改善が必要。
+- 上記結果と次アクションを `docs/tickets/2025-10-31/02-board-load-metrics-followup.md` にまとめ済み。
 
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
