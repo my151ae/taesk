@@ -63,18 +63,31 @@
 ## 根本原因
 
 ### 1. React Strict Mode の重複レンダリング
-- 開発モードで useEffect が2回実行される
+- 開発モードで useEffect が2回実行される（本番は1回）
 - cleanup 関数が適切に実装されていない可能性
+- **注意**: 本番でのパフォーマンス指標も別途測定すること
 
-### 2. 競合する複数の fetch
+### 2. 競合する複数の fetch（要詳細調査）
 - 同時に複数のコンポーネント/エフェクトから fetch が呼ばれる
 - 先行リクエストのキャンセル機構がない
+
+**発火点の特定が必要:**
+- `page.tsx` での Server Component fetch
+- `KanbanBoardClient.tsx` の useEffect
+- 認証完了時の hook
+- ボード切り替え時の state 変更
+
+→ **どれを唯一のソース・オブ・トゥルースにするか**を決定する
 
 ### 3. 状態変更による再レンダリング連鎖
 - ボードID変更 → fetch
 - ユーザー認証完了 → fetch
 - 初期化完了 → fetch
 - これらが短時間に連続発生
+
+### 4. SSR/Server Components との二重取得
+- Server Component で取得したデータを Client 側で再取得している可能性
+- Client 側 useEffect の不要な fetch が残存
 
 ## 目的
 
@@ -84,12 +97,37 @@
 
 ## 実装内容
 
+### 基本方針: データ取得責務の一元化
+
+**唯一のデータ取得責務**を Server Component（`page.tsx`）に集約する。Client 側（`KanbanBoardClient.tsx`）は受け取った props を利用するのみとし、`useEffect` での二重取得を**原則禁止**。
+
+```typescript
+// ❌ 悪い例: Client側で独自fetch
+useEffect(() => {
+  fetchBoardData(boardId);
+}, [boardId]);
+
+// ✅ 良い例: Server Componentから受け取る
+export default function KanbanBoardClient({
+  initialBoard,
+  initialData
+}: Props) {
+  // propsを使うだけ、fetchしない
+}
+```
+
 ### Phase 1: 重複fetch削減（優先度：高）
 
 #### 1.1 AbortController の導入
+
+**重要**: `fetchBoardData` は `(boardId, { signal })` を必須化し、以下を実装：
+- 各 `await` 後に `signal.aborted` をチェック
+- resolve 直前に boardId の一致を検証して古い応答を破棄
+
 ```typescript
 // KanbanBoardClient.tsx
 const abortControllerRef = useRef<AbortController | null>(null);
+const currentBoardIdRef = useRef<string>(boardId);
 
 useEffect(() => {
   // 先行リクエストをキャンセル
@@ -99,24 +137,65 @@ useEffect(() => {
 
   const controller = new AbortController();
   abortControllerRef.current = controller;
+  currentBoardIdRef.current = boardId;
 
-  fetchBoardData(boardId, { signal: controller.signal });
+  fetchBoardData(boardId, { signal: controller.signal }).then(data => {
+    // 古いboardIdの応答を破棄（レース対策）
+    if (currentBoardIdRef.current !== boardId) return;
+    if (controller.signal.aborted) return;
+
+    setBoardData(data);
+  });
 
   return () => {
     controller.abort();
     abortControllerRef.current = null;
   };
 }, [boardId]);
+
+// fetchBoardData内部での実装例
+async function fetchBoardData(boardId: string, options: { signal: AbortSignal }) {
+  const response = await fetch(`/api/boards/${boardId}/data`, {
+    signal: options.signal
+  });
+
+  // abort チェック
+  if (options.signal.aborted) {
+    throw new Error('Request aborted');
+  }
+
+  const data = await response.json();
+
+  // 再度チェック（parseの後）
+  if (options.signal.aborted) {
+    throw new Error('Request aborted');
+  }
+
+  return data;
+}
 ```
 
 #### 1.2 fetch デバウンス
+
+**方針**: trailing only（最後の呼び出しのみ実行）を明記し、UI レイテンシの影響を最小化。
+
 ```typescript
-// 短時間の連続呼び出しを防ぐ
-const debouncedFetch = useMemo(
-  () => debounce(fetchBoardData, 100),
-  []
-);
+// 短時間の連続呼び出しを防ぐ（trailing only）
+const debouncedFetch = useMemo(() => {
+  return debounce((...args: Parameters<typeof fetchBoardData>) => {
+    // 先行リクエストをキャンセル
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    fetchBoardData(...args);
+  }, 100); // 100ms: 操作レスポンスとp95のバランス
+}, []);
 ```
+
+**注意事項**:
+- 100ms デバウンスは軽いが、操作レスポンスに影響し得る
+- 代替案: スロットリング（一定時間に1回のみ実行）も検討
+- UI体感と p95 の両立観点で調整が必要
 
 #### 1.3 fetch 実行条件の厳格化
 ```typescript
@@ -134,7 +213,7 @@ const boardCacheRef = useRef<Map<string, {
   timestamp: number;
 }>>(new Map());
 
-const CACHE_TTL = 5000; // 5秒
+const CACHE_TTL = 5000; // 5秒（操作イベント発火時は該当 boardId を invalidate）
 
 const getCachedData = (boardId: string) => {
   const cached = boardCacheRef.current.get(boardId);
@@ -150,6 +229,12 @@ const getCachedData = (boardId: string) => {
 ```
 
 #### 2.2 SWR (Stale-While-Revalidate) パターン
+
+**ライブラリ検討**: TanStack Query（React Query）等の既存ライブラリ採用も候補。
+- **メリット**: de-duplication / request cancellation / cache invalidation が組み込み
+- **デメリット**: バンドルサイズ増加、運用コスト
+- **判断**: Phase 1 で目標達成できなければ検討
+
 ```typescript
 // キャッシュがあれば即座に表示、バックグラウンドで更新
 const cachedData = getCachedData(boardId);
@@ -162,6 +247,25 @@ fetchBoardData(boardId).then(freshData => {
   setBoardData(freshData);
   updateCache(boardId, freshData);
 });
+```
+
+#### 2.3 イベント駆動のキャッシュ無効化
+
+TTL だけでなく、カード追加/更新/メンバー変更時に該当 boardId のみ purge：
+
+```typescript
+// カード追加時
+const addCard = async (boardId: string, card: Card) => {
+  await apiAddCard(boardId, card);
+
+  // キャッシュ無効化
+  boardCacheRef.current.delete(boardId);
+
+  // 即座に再取得
+  const freshData = await fetchBoardData(boardId);
+  setBoardData(freshData);
+  updateCache(boardId, freshData);
+};
 ```
 
 ### Phase 3: リアルタイム更新の最適化（優先度：低）
@@ -177,8 +281,15 @@ const debouncedRealtimeHandler = useMemo(
 
 ## 受け入れ基準
 
-- [ ] **board-load p95 が 3000ms 以下**（Playwright test-summary.js で ✅）
-- [ ] 重複 fetch が 1 回に削減（cancelled traces が 0 件）
+- [ ] **board-load p95 が 3000ms 以下**
+  - Playwright 固定ネットワーク条件で測定
+  - **3回連続の測定**で達成（ブレに強い基準）
+  - 開発環境と本番環境の両方で測定
+- [ ] **重複 fetch が 1 回に削減**
+  - 計測ロガーで `cancelled:true` が **0 件**
+  - `fetchBoardData` で `signal.aborted` を検知した時に計測用ロガーへ emit
+  - 集計粒度: テスト1回あたり / ページロードあたり
+  - QA チェックリスト: 許容上限 0件
 - [ ] 既存の E2E テストがすべて pass
 - [ ] 開発モード（React Strict Mode）でも正常動作
 - [ ] オフライン → オンライン復帰時も正常動作
@@ -226,14 +337,22 @@ function debounce<T extends (...args: any[]) => any>(
 - キャッシュの TTL
 
 ### 2. E2E テスト
+
+**測定環境の標準化:**
+- Playwright で `networkConditions` を固定（例: Fast 3G）
+- 母集団サイズ: 最低20サンプル
+- 成功判定: **3回連続の測定で p95 < 3000ms**
+
+**検証項目:**
 - 既存の `@e2e:essential` テストが pass
 - メトリクス収集で p95 が閾値以下
-- 重複 fetch の発生回数
+- 重複 fetch の発生回数（cancelled traces = 0 件）
 
 ### 3. 手動テスト
 - ボード切り替え時の挙動
 - ネットワーク遅延時の挙動
 - オフライン → オンライン復帰
+- **多タブ/多インスタンス**: 同一ユーザーが別タブで同じ board を開いた場合のキャッシュ競合
 
 ## 実装優先度
 
@@ -276,8 +395,46 @@ function debounce<T extends (...args: any[]) => any>(
 
 **結論**: クライアント側の重複 fetch 削減に注力すべき
 
+## 付録: 計測ログフィールド定義
+
+重複 fetch を正確に測定するため、以下のフィールドを記録：
+
+| フィールド | 型 | 説明 | 例 |
+|---|---|---|---|
+| `requestId` | string | リクエスト固有ID（UUID） | `"9cbf81ec-..."` |
+| `boardId` | string | ボードID | `"f5d4b626-..."` |
+| `startAt` | number | 開始タイムスタンプ(ms) | `1761951962559` |
+| `endAt` | number | 終了タイムスタンプ(ms) | `1761951963163` |
+| `durationMs` | number | 所要時間(ms) | `604.2` |
+| `status` | enum | `success` / `cancelled` / `error` | `"cancelled"` |
+| `reason` | string | キャンセル/エラー理由 | `"cancelled-after-fetch"` |
+| `source` | string | データソース | `"supabase"` / `"cache"` |
+
+**ロギング実装例:**
+
+```typescript
+// lib/metrics/client.ts に追加
+export function logFetchAttempt(params: {
+  requestId: string;
+  boardId: string;
+  startAt: number;
+  endAt: number;
+  status: 'success' | 'cancelled' | 'error';
+  reason?: string;
+  source?: string;
+}) {
+  window.__TAESK_METRICS__ = window.__TAESK_METRICS__ || [];
+  window.__TAESK_METRICS__.push({
+    operation: 'fetch-attempt',
+    ...params,
+    durationMs: params.endAt - params.startAt,
+  });
+}
+```
+
 ## 参考リンク
 
 - [React useEffect cleanup](https://react.dev/learn/synchronizing-with-effects#how-to-handle-the-effect-firing-twice-in-development)
 - [AbortController MDN](https://developer.mozilla.org/en-US/docs/Web/API/AbortController)
 - [Debouncing and Throttling](https://css-tricks.com/debouncing-throttling-explained-examples/)
+- [TanStack Query](https://tanstack.com/query/latest) - データフェッチングライブラリ
