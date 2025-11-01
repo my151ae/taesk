@@ -44,8 +44,8 @@ export async function GET(
     const membershipResult = await measureStep(
       trace,
       'membershipQuery',
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('board_members')
           .select('role')
           .eq('board_id', boardId)
@@ -81,8 +81,8 @@ export async function GET(
     const listsPromise = measureStep(
       trace,
       'listsQuery',
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('lists')
           .select('id, title, position, board_id, created_at, updated_at')
           .eq('board_id', boardId)
@@ -95,8 +95,8 @@ export async function GET(
     const cardsPromise = measureStep(
       trace,
       'cardsQuery',
-      () =>
-        supabase
+      async () =>
+        await supabase
           .from('cards')
           .select(
             'id, title, description, list_id, board_id, position, tags, due_date, priority, assignee_id, short_id, id_short, slug, created_at, updated_at'
