@@ -251,7 +251,7 @@ const getHrTime = () => {
   return Date.now();
 };
 
-const loadFromSupabase = async (boardId: string, trace?: ClientTrace): Promise<BoardFetchResult> => {
+const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: AbortSignal): Promise<BoardFetchResult> => {
   const fetchStartedAt = getHrTime();
   trace?.mark("fetch:start", { boardId });
 
@@ -259,7 +259,13 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace): Promise<B
     const response = await fetch(`/api/boards/${boardId}/data`, {
       headers: trace ? trace.buildHeaders("board-data") : undefined,
       cache: "no-store",
+      signal,
     });
+
+    // Check if request was aborted after fetch
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
 
     const fetchCompletedAt = getHrTime();
     trace?.mark("fetch:response", { status: response.status });
@@ -281,6 +287,11 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace): Promise<B
     }
 
     const parseCompletedAt = getHrTime();
+
+    // Check if request was aborted after parsing
+    if (signal?.aborted) {
+      throw new Error('Request aborted');
+    }
 
     const metrics: BoardLoadMetrics = {
       source: "supabase",
@@ -840,6 +851,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const isDraggingRef = useRef(false);
   const realtimeChannelRef = useRef<{ channel: RealtimeChannel | null; token: number }>({ channel: null, token: 0 });
 
+  // Phase 1.3 execution guards - prevent duplicate fetches
+  const isFetchingRef = useRef(false);
+  const hasInitialDataRef = useRef(!!initialData);
+
   // モーダル状態管理（クライアントサイド・即時表示）
   const [selectedCardId, setSelectedCardId] = useState<string | null>(initialCardId ?? null);
   const [cardModalStatus, setCardModalStatus] = useState<'loading' | 'ready' | 'error'>(initialCardId ? 'ready' : 'loading');
@@ -1085,20 +1100,37 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
   // Load board data when currentBoardId changes
   useEffect(() => {
-    setIsClient(true);
     let isCancelled = false;
+    const abortController = new AbortController();
 
     // Load data from Supabase or localStorage
     const loadData = async () => {
+      // Phase 1.3 - Execution guards to prevent duplicate fetches
       if (!user || !currentBoardId) return;
+
+      // Skip fetch if already fetching
+      if (isFetchingRef.current) {
+        console.log('[board-load] Already fetching, skipping duplicate request');
+        return;
+      }
+
+      // Skip fetch on initial mount if we have initialData from Server Component
+      if (hasInitialDataRef.current) {
+        console.log('[board-load] Using initialData from Server Component, skipping fetch');
+        hasInitialDataRef.current = false; // Only skip once
+        setIsClient(true);
+        return;
+      }
+
+      isFetchingRef.current = true;
 
       const trace = createClientTrace("board-load", { boardId: currentBoardId });
       trace.mark("load:start");
 
       const currentBoard = boards.find((board) => board.id === currentBoardId);
-      const { data, metrics } = await loadFromSupabase(currentBoardId, trace);
-      if (isCancelled) {
-        trace.finish("cancelled", { reason: "cancelled-after-fetch" });
+      const { data, metrics } = await loadFromSupabase(currentBoardId, trace, abortController.signal);
+      if (isCancelled || abortController.signal.aborted) {
+        trace.finish("cancelled", { reason: "cancelled-after-fetch", sourceComponent: 'KanbanBoardClient' });
         return;
       }
 
@@ -1109,7 +1141,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         trace.mark("defaults:init");
         const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
         if (isCancelled) {
-          trace.finish("cancelled", { reason: "cancelled-after-defaults" });
+          trace.finish("cancelled", { reason: "cancelled-after-defaults", sourceComponent: 'KanbanBoardClient' });
           return;
         }
 
@@ -1124,6 +1156,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             source: "seeded-defaults",
             listCount: newData.lists.length,
             cardCount: newData.cards.length,
+            sourceComponent: 'KanbanBoardClient',
           });
           return;
         }
@@ -1140,13 +1173,23 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         ...metrics,
         listCount: data.lists.length,
         cardCount: data.cards.length,
+        sourceComponent: 'KanbanBoardClient',
       });
+
+      isFetchingRef.current = false;
     };
 
-    loadData();
+    loadData().catch((error) => {
+      console.error('[board-load] Unexpected error:', error);
+      isFetchingRef.current = false;
+    });
+
+    setIsClient(true);
 
     return () => {
       isCancelled = true;
+      abortController.abort();
+      isFetchingRef.current = false;
     };
   }, [user, currentBoardId, boards]);
 
