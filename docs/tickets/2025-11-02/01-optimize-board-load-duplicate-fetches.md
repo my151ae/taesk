@@ -116,6 +116,11 @@ export default function KanbanBoardClient({
 }
 ```
 
+**再発防止策:**
+- Client 側でのデータ取得は原則禁止
+- 検出は **ESLint ルール `no-client-fetch`（カスタム）** で実施
+- ユニットテストでも検知できるようにする
+
 ### Phase 1: 重複fetch削減（優先度：高）
 
 #### 1.1 AbortController の導入
@@ -196,6 +201,11 @@ const debouncedFetch = useMemo(() => {
 - 100ms デバウンスは軽いが、操作レスポンスに影響し得る
 - 代替案: スロットリング（一定時間に1回のみ実行）も検討
 - UI体感と p95 の両立観点で調整が必要
+
+**使用箇所の制限:**
+- `debouncedFetch` は**検索UI等の限定用途**にのみ使用
+- ボード初期ロードには使用しない（Server Component で取得）
+- Server-only取得に移行できたら、Client側デバウンスは不要になる
 
 #### 1.3 fetch 実行条件の厳格化
 ```typescript
@@ -395,7 +405,7 @@ function debounce<T extends (...args: any[]) => any>(
 
 **結論**: クライアント側の重複 fetch 削減に注力すべき
 
-## 付録: 計測ログフィールド定義
+## 付録A: 計測ログフィールド定義
 
 重複 fetch を正確に測定するため、以下のフィールドを記録：
 
@@ -409,6 +419,9 @@ function debounce<T extends (...args: any[]) => any>(
 | `status` | enum | `success` / `cancelled` / `error` | `"cancelled"` |
 | `reason` | string | キャンセル/エラー理由 | `"cancelled-after-fetch"` |
 | `source` | string | データソース | `"supabase"` / `"cache"` |
+| **`sourceComponent`** | string | **呼び出し元コンポーネント** | `"page.tsx"` / `"KanbanBoardClient"` |
+
+**重複の根絶をダッシュボードで即確認するため、`sourceComponent` フィールドを追加:**
 
 **ロギング実装例:**
 
@@ -422,6 +435,7 @@ export function logFetchAttempt(params: {
   status: 'success' | 'cancelled' | 'error';
   reason?: string;
   source?: string;
+  sourceComponent: string; // 追加: 呼び出し元
 }) {
   window.__TAESK_METRICS__ = window.__TAESK_METRICS__ || [];
   window.__TAESK_METRICS__.push({
@@ -430,6 +444,135 @@ export function logFetchAttempt(params: {
     durationMs: params.endAt - params.startAt,
   });
 }
+
+// 使用例
+logFetchAttempt({
+  requestId: generateUUID(),
+  boardId: 'f5d4b626-...',
+  startAt: performance.now(),
+  endAt: performance.now(),
+  status: 'success',
+  source: 'supabase',
+  sourceComponent: 'page.tsx', // 呼び出し元を記録
+});
+```
+
+## 付録B: パフォーマンスレポートテンプレート
+
+開発環境（Dev）と本番環境（Prod）の測定結果を比較するためのテンプレート：
+
+| 環境 | p95 (ms) | 閾値 | 判定 | cancelled 件数 | 許容上限 | 判定 |
+|---|---|---|---|---|---|---|
+| **Dev** (Strict Mode) | 5292.8 | 3000 | ❌ | 12 | 0 | ❌ |
+| **Prod** | - | 3000 | - | - | 0 | - |
+
+**測定条件:**
+- ネットワーク: Playwright `networkConditions` 固定（Fast 3G）
+- サンプル数: 20回
+- 連続成功: 3回連続で達成
+- 測定日時: YYYY-MM-DD HH:MM
+
+**Phase 1 完了後の目標:**
+
+| 環境 | p95 (ms) | 閾値 | 判定 | cancelled 件数 | 許容上限 | 判定 |
+|---|---|---|---|---|---|---|
+| **Dev** (Strict Mode) | < 3000 | 3000 | ✅ | 0 | 0 | ✅ |
+| **Prod** | < 3000 | 3000 | ✅ | 0 | 0 | ✅ |
+
+## 付録C: ESLint ルール設定（no-client-fetch）
+
+Client 側での不要な fetch を検出するカスタムルール：
+
+```javascript
+// .eslintrc.js または eslint.config.js に追加
+module.exports = {
+  rules: {
+    // カスタムルール（将来的に実装）
+    'taesk/no-client-fetch': 'error',
+  },
+};
+```
+
+**ルールの実装例:**
+
+```javascript
+// eslint-plugin-taesk/rules/no-client-fetch.js
+module.exports = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description: 'Disallow fetch calls in Client Components',
+      category: 'Best Practices',
+    },
+    messages: {
+      noClientFetch: 'Client Components should not fetch data. Use Server Components instead.',
+    },
+  },
+  create(context) {
+    return {
+      // useEffect 内での fetch を検出
+      CallExpression(node) {
+        if (
+          node.callee.name === 'fetch' &&
+          isInClientComponent(node, context)
+        ) {
+          context.report({
+            node,
+            messageId: 'noClientFetch',
+          });
+        }
+      },
+    };
+  },
+};
+```
+
+**ユニットテストでの検出:**
+
+```typescript
+// __tests__/no-client-fetch.test.ts
+describe('Client Component fetch detection', () => {
+  it('should not call fetch in useEffect', () => {
+    // モックして fetch 呼び出しを検出
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    render(<KanbanBoardClient initialData={mockData} />);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+```
+
+## 付録D: 多タブ時のキャッシュ整合性
+
+**前提:**
+- タブ間ではキャッシュ共有しない
+- 各タブが独立した `boardCacheRef` を保持
+
+**将来的な拡張:**
+- タブ間でキャッシュを共有する場合は **BroadcastChannel API** を検討
+- リアルタイム更新との整合性を保つため、Supabase Realtime との連携が必要
+
+```typescript
+// タブ間通信の例（将来的な実装）
+const channel = new BroadcastChannel('taesk-cache-sync');
+
+channel.onmessage = (event) => {
+  if (event.data.type === 'cache-invalidate') {
+    boardCacheRef.current.delete(event.data.boardId);
+  }
+};
+
+// カード追加時に他タブにも通知
+const addCard = async (boardId: string, card: Card) => {
+  await apiAddCard(boardId, card);
+
+  // 自タブのキャッシュ無効化
+  boardCacheRef.current.delete(boardId);
+
+  // 他タブにも通知
+  channel.postMessage({ type: 'cache-invalidate', boardId });
+};
 ```
 
 ## 参考リンク
@@ -438,3 +581,4 @@ export function logFetchAttempt(params: {
 - [AbortController MDN](https://developer.mozilla.org/en-US/docs/Web/API/AbortController)
 - [Debouncing and Throttling](https://css-tricks.com/debouncing-throttling-explained-examples/)
 - [TanStack Query](https://tanstack.com/query/latest) - データフェッチングライブラリ
+- [BroadcastChannel API](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel) - タブ間通信
