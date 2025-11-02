@@ -645,8 +645,28 @@ board-load
 
 ### 変更ファイル
 
-- `app/(board)/_components/KanbanBoardClient.tsx` - AbortController導入、実行ガード追加、sourceComponent記録
+- `app/(board)/_components/KanbanBoardClient.tsx` - AbortController導入、実行ガード追加、sourceComponent記録、try/finally安全化
 - `lib/metrics/client.ts` - (変更なし、既存のextraフィールドを活用)
+
+### 最終仕上げ（追加実装）
+
+**try/finally によるロック解放の確実化** ✅
+- `isFetchingRef.current = true` の後を try/finally で包んだ
+- 通常終了・早期return・例外のどの経路でも `finally` ブロックで確実に `false` に戻す
+- 将来のコード変更で早期returnが増えてもロックが残らない設計
+
+**AbortError コンソールログの完全抑制** ✅
+- `abortController.abort(reason)` が文字列をthrowする仕様に対応
+- `typeof error === 'string' && error.includes('Component unmounted')` でAbortエラーを判定
+- コンソールエラーが完全に消えることを chrome-devtools MCP で確認
+
+### 関連コミット
+
+- `e91c15b` - Initial AbortController & execution guards implementation
+- `c595e57` - Fix AbortError warning by adding abort reason
+- `0cbb657` - Suppress AbortError console logging for expected cancellations
+- `d224212` - Fix AbortError console logging by handling string abort reasons
+- `7585d6d` - Add try/finally to ensure isFetchingRef is always reset
 
 ## 参考リンク
 
