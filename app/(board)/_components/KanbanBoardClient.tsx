@@ -1138,56 +1138,59 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       const trace = createClientTrace("board-load", { boardId: currentBoardId });
       trace.mark("load:start");
 
-      const currentBoard = boards.find((board) => board.id === currentBoardId);
-      const { data, metrics } = await loadFromSupabase(currentBoardId, trace, abortController.signal);
-      if (isCancelled || abortController.signal.aborted) {
-        trace.finish("cancelled", { reason: "cancelled-after-fetch", sourceComponent: 'KanbanBoardClient' });
-        return;
-      }
-
-      const shouldSeedDefaults =
-        data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board);
-
-      if (shouldSeedDefaults) {
-        trace.mark("defaults:init");
-        const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
-        if (isCancelled) {
-          trace.finish("cancelled", { reason: "cancelled-after-defaults", sourceComponent: 'KanbanBoardClient' });
+      try {
+        const currentBoard = boards.find((board) => board.id === currentBoardId);
+        const { data, metrics } = await loadFromSupabase(currentBoardId, trace, abortController.signal);
+        if (isCancelled || abortController.signal.aborted) {
+          trace.finish("cancelled", { reason: "cancelled-after-fetch", sourceComponent: 'KanbanBoardClient' });
           return;
         }
 
-        if (defaultLists.length > 0) {
-          const newData = { lists: defaultLists, cards: [] };
-          setBoardData(newData);
-          saveToStorage(newData);
-          trace.mark("defaults:applied", { count: defaultLists.length });
+        const shouldSeedDefaults =
+          data.lists.length === 0 && (!currentBoard || !currentBoard.is_test_board);
 
-          trace.finish("success", {
-            ...metrics,
-            source: "seeded-defaults",
-            listCount: newData.lists.length,
-            cardCount: newData.cards.length,
-            sourceComponent: 'KanbanBoardClient',
-          });
-          return;
+        if (shouldSeedDefaults) {
+          trace.mark("defaults:init");
+          const defaultLists = await initializeDefaultLists(user.id, currentBoardId);
+          if (isCancelled) {
+            trace.finish("cancelled", { reason: "cancelled-after-defaults", sourceComponent: 'KanbanBoardClient' });
+            return;
+          }
+
+          if (defaultLists.length > 0) {
+            const newData = { lists: defaultLists, cards: [] };
+            setBoardData(newData);
+            saveToStorage(newData);
+            trace.mark("defaults:applied", { count: defaultLists.length });
+
+            trace.finish("success", {
+              ...metrics,
+              source: "seeded-defaults",
+              listCount: newData.lists.length,
+              cardCount: newData.cards.length,
+              sourceComponent: 'KanbanBoardClient',
+            });
+            return;
+          }
         }
+
+        setBoardData(data);
+        saveToStorage(data);
+        trace.mark("state:committed", { count: data.lists.length + data.cards.length });
+
+        const traceStatus: "success" | "error" =
+          metrics.source === "supabase" || metrics.source === "seeded-defaults" ? "success" : "error";
+
+        trace.finish(traceStatus, {
+          ...metrics,
+          listCount: data.lists.length,
+          cardCount: data.cards.length,
+          sourceComponent: 'KanbanBoardClient',
+        });
+      } finally {
+        // Ensure isFetchingRef is always reset, regardless of how loadData exits
+        isFetchingRef.current = false;
       }
-
-      setBoardData(data);
-      saveToStorage(data);
-      trace.mark("state:committed", { count: data.lists.length + data.cards.length });
-
-      const traceStatus: "success" | "error" =
-        metrics.source === "supabase" || metrics.source === "seeded-defaults" ? "success" : "error";
-
-      trace.finish(traceStatus, {
-        ...metrics,
-        listCount: data.lists.length,
-        cardCount: data.cards.length,
-        sourceComponent: 'KanbanBoardClient',
-      });
-
-      isFetchingRef.current = false;
     };
 
     loadData().catch((error) => {
@@ -1201,7 +1204,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       }
 
       console.error('[board-load] Unexpected error:', error);
-      isFetchingRef.current = false;
+      // Note: isFetchingRef is reset in finally block, no need to reset here
     });
 
     setIsClient(true);
