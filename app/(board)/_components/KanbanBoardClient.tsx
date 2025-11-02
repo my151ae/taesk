@@ -1188,7 +1188,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
     return () => {
       isCancelled = true;
-      abortController.abort();
+      abortController.abort('Component unmounted or dependencies changed');
       isFetchingRef.current = false;
     };
   }, [user, currentBoardId, boards]);
