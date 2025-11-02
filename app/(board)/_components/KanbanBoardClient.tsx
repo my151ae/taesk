@@ -322,6 +322,11 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: A
       metrics,
     };
   } catch (error) {
+    // Ignore AbortError - it's expected when component unmounts or dependencies change
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error; // Re-throw to be handled by caller
+    }
+
     console.error("Error loading from Supabase:", error);
     const fallback = loadFromStorage();
 
@@ -1180,6 +1185,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     };
 
     loadData().catch((error) => {
+      // Ignore AbortError - it's expected when component unmounts or dependencies change
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('[board-load] Unexpected error:', error);
       isFetchingRef.current = false;
     });
