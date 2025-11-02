@@ -264,7 +264,8 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: A
 
     // Check if request was aborted after fetch
     if (signal?.aborted) {
-      throw new Error('Request aborted');
+      const abortError = new DOMException('Request aborted', 'AbortError');
+      throw abortError;
     }
 
     const fetchCompletedAt = getHrTime();
@@ -290,7 +291,8 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: A
 
     // Check if request was aborted after parsing
     if (signal?.aborted) {
-      throw new Error('Request aborted');
+      const abortError = new DOMException('Request aborted', 'AbortError');
+      throw abortError;
     }
 
     const metrics: BoardLoadMetrics = {
@@ -323,7 +325,11 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: A
     };
   } catch (error) {
     // Ignore AbortError - it's expected when component unmounts or dependencies change
-    if (error instanceof Error && error.name === 'AbortError') {
+    const isAbort = (error instanceof DOMException && error.name === 'AbortError') ||
+                    (error instanceof Error && error.name === 'AbortError') ||
+                    (typeof error === 'string' && error.includes('Component unmounted'));
+
+    if (isAbort) {
       throw error; // Re-throw to be handled by caller
     }
 
@@ -1186,9 +1192,14 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
     loadData().catch((error) => {
       // Ignore AbortError - it's expected when component unmounts or dependencies change
-      if (error instanceof Error && error.name === 'AbortError') {
+      const isAbort = (error instanceof DOMException && error.name === 'AbortError') ||
+                      (error instanceof Error && error.name === 'AbortError') ||
+                      (typeof error === 'string' && error.includes('Component unmounted'));
+
+      if (isAbort) {
         return;
       }
+
       console.error('[board-load] Unexpected error:', error);
       isFetchingRef.current = false;
     });
