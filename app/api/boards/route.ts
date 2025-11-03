@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
 const CreateBoardSchema = z.object({
   name: z.string().min(1).max(255),
@@ -97,10 +98,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate short_id, id_short, and slug
+    const short_id = await createUniqueBoardShortId(supabase);
+    const id_short = await getNextBoardIdShort(supabase);
+    const slug = slugifyBoardName(parsed.data.name);
+
     // Create board
     const { data: board, error: boardError } = await supabase
       .from('boards')
-      .insert(parsed.data)
+      .insert({
+        ...parsed.data,
+        short_id,
+        id_short,
+        slug,
+      })
       .select()
       .single();
 

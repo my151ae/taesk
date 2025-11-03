@@ -1039,9 +1039,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   }, [isClient, pathname, cards, router]);
 
+  // Sync initialBoard.id to currentBoardId only on initial mount or when URL changes
+  const initialBoardIdRef = useRef<string | null>(initialBoard?.id ?? null);
   useEffect(() => {
-    if (initialBoard?.id && initialBoard.id !== currentBoardId) {
-      setCurrentBoardId(initialBoard.id);
+    // Only update currentBoardId if initialBoard.id actually changed (not just a re-render)
+    if (initialBoard?.id && initialBoard.id !== initialBoardIdRef.current) {
+      initialBoardIdRef.current = initialBoard.id;
+      if (initialBoard.id !== currentBoardId) {
+        setCurrentBoardId(initialBoard.id);
+      }
     }
   }, [initialBoard?.id, currentBoardId]);
 
@@ -1125,13 +1131,16 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         return;
       }
 
-      // Skip fetch on initial mount if we have initialData from Server Component
-      if (hasInitialDataRef.current) {
+      // Skip fetch on initial mount if we have initialData from Server Component AND it's for the current board
+      if (hasInitialDataRef.current && initialBoard?.id === currentBoardId) {
         console.log('[board-load] Using initialData from Server Component, skipping fetch');
         hasInitialDataRef.current = false; // Only skip once
         setIsClient(true);
         return;
       }
+
+      // Reset hasInitialDataRef when switching boards
+      hasInitialDataRef.current = false;
 
       isFetchingRef.current = true;
 
@@ -2340,9 +2349,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                     <button
                       key={board.id}
                       onClick={() => {
+                        if (board.id === currentBoardId) {
+                          setShowBoardMenu(false);
+                          return;
+                        }
                         setCurrentBoardId(board.id);
                         updateURL(board);
                         setShowBoardMenu(false);
+                        // Refresh to update Server Component props
+                        router.refresh();
                       }}
                       className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${
                         board.id === currentBoardId ? 'bg-slate-50 font-semibold' : ''

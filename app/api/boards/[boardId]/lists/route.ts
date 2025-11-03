@@ -53,11 +53,12 @@ export async function POST(
     // 3. Parse and validate request body
     const body = await request.json();
 
-    // Support both single list and array of lists
-    const isBatch = Array.isArray(body);
+    // Support both { lists: [...] } and [...] formats
+    const listsArray = body.lists || body;
+    const isBatch = Array.isArray(listsArray);
     const parsed = isBatch
-      ? CreateListsSchema.safeParse(body)
-      : CreateListSchema.safeParse(body);
+      ? CreateListsSchema.safeParse(listsArray)
+      : CreateListSchema.safeParse(listsArray);
 
     if (!parsed.success) {
       return NextResponse.json(

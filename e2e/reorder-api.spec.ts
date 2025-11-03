@@ -9,8 +9,8 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
   let listId: string;
   let cardIds: string[] = [];
 
-  test.beforeAll(async ({ request }) => {
-    // Create a test board
+  test.beforeEach(async ({ request }) => {
+    // Create a test board for each test (ensures isolation)
     const boardRes = await request.post(`${BASE_URL}/api/boards`, {
       data: { name: 'Reorder Test Board', is_test_board: true },
     });
@@ -25,6 +25,7 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
     listId = listData.lists[0].id;
 
     // Create 5 test cards
+    cardIds = [];
     for (let i = 0; i < 5; i++) {
       const cardRes = await request.post(`${BASE_URL}/api/boards/${boardId}/cards`, {
         data: {
@@ -35,6 +36,13 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
       });
       const cardData = await cardRes.json();
       cardIds.push(cardData.card.id);
+    }
+  });
+
+  test.afterEach(async ({ request }) => {
+    // Clean up test board (CASCADE will delete all associated lists and cards)
+    if (boardId) {
+      await request.delete(`${BASE_URL}/api/boards/${boardId}`);
     }
   });
 
