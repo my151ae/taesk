@@ -1042,11 +1042,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   // Sync initialBoard.id to currentBoardId only on initial mount or when URL changes
   const initialBoardIdRef = useRef<string | null>(initialBoard?.id ?? null);
   useEffect(() => {
+    const newBoardId = initialBoard?.id;
     // Only update currentBoardId if initialBoard.id actually changed (not just a re-render)
-    if (initialBoard?.id && initialBoard.id !== initialBoardIdRef.current) {
-      initialBoardIdRef.current = initialBoard.id;
-      if (initialBoard.id !== currentBoardId) {
-        setCurrentBoardId(initialBoard.id);
+    if (newBoardId && newBoardId !== initialBoardIdRef.current) {
+      initialBoardIdRef.current = newBoardId;
+      if (newBoardId !== currentBoardId) {
+        setCurrentBoardId(newBoardId);
       }
     }
   }, [initialBoard?.id, currentBoardId]);

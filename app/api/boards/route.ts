@@ -99,8 +99,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate short_id, id_short, and slug
-    const short_id = await createUniqueBoardShortId(supabase);
-    const id_short = await getNextBoardIdShort(supabase);
+    const short_id = await createUniqueBoardShortId();
+    const id_short = await getNextBoardIdShort();
     const slug = slugifyBoardName(parsed.data.name);
 
     // Create board
