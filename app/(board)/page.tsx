@@ -9,7 +9,15 @@ export const runtime = "nodejs";
 export const revalidate = 0;
 
 export default async function BoardPage() {
-  const board = await getBoardById(MAIN_BOARD_ID);
+  let board = null;
+
+  try {
+    board = await getBoardById(MAIN_BOARD_ID);
+  } catch (error) {
+    // If MAIN_BOARD_ID doesn't exist, board will be null
+    // KanbanBoardClient will handle creating/loading a board
+    console.error('[BoardPage] Error fetching MAIN_BOARD_ID:', error);
+  }
 
   const canonical = board ? buildBoardUrl(board) : "";
 

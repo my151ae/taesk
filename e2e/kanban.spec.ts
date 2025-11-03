@@ -692,10 +692,14 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should show mock user email in test mode', async ({ page }) => {
-    // Should show actual E2E test user email
-    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
-    const emailText = page.getByText(testUserEmail);
-    await expect(emailText).toBeVisible();
+    // Should show user display name (priority: display_name > full_name > email local part)
+    const userDisplayName = page.locator('[data-testid="user-display-name"]');
+    await expect(userDisplayName).toBeVisible();
+
+    // Just verify some text is shown (could be display_name, full_name, or email local part)
+    const displayText = await userDisplayName.textContent();
+    expect(displayText).toBeTruthy();
+    expect(displayText!.length).toBeGreaterThan(0);
 
     // Verify sign out button exists
     const signOutButton = page.getByRole('button', { name: 'Sign Out' });

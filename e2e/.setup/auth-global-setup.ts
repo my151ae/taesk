@@ -129,6 +129,48 @@ export default async function globalSetup(config: FullConfig) {
       throw new Error('Authentication failed - redirected to login page');
     }
 
+    // 7. Ensure MAIN_BOARD exists for tests
+    console.log('[Global Setup] Ensuring MAIN_BOARD exists...');
+
+    const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // Check if MAIN_BOARD exists
+    const { data: existingBoard } = await supabaseAdmin
+      .from('boards')
+      .select('id')
+      .eq('id', MAIN_BOARD_ID)
+      .maybeSingle();
+
+    if (!existingBoard) {
+      // Create MAIN_BOARD with deterministic values
+      const { error: insertError } = await supabaseAdmin
+        .from('boards')
+        .insert({
+          id: MAIN_BOARD_ID,
+          name: 'Main Board',
+          short_id: 'MAINBOARD',
+          id_short: '1',
+          slug: 'main-board',
+          user_id: loginResult.session.user.id,
+        });
+
+      if (insertError) {
+        console.error('[Global Setup] Warning: Failed to create MAIN_BOARD:', insertError);
+      } else {
+        console.log('[Global Setup] ✅ MAIN_BOARD created');
+      }
+    } else {
+      console.log('[Global Setup] ✅ MAIN_BOARD already exists');
+    }
+
     console.log('[Global Setup] ✅ Authentication setup complete');
   } catch (error) {
     console.error('[Global Setup] ❌ Setup failed:', error);

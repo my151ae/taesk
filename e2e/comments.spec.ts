@@ -114,8 +114,12 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
 async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
   await page.goto(board.canonicalPath);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForSelector(`text=${TEST_USER_EMAIL}`, { timeout: 10000 });
+
+  // Wait for board to be ready - use list as reliable indicator instead of email
   await page.locator(`[data-testid="list-${board.listId}"]`).waitFor({ state: 'visible', timeout: 10000 });
+
+  // Ensure network is settled
+  await page.waitForLoadState('networkidle');
 }
 
 async function createTestCard(page: Page, board: TestBoardContext): Promise<TestCardContext> {
@@ -209,8 +213,12 @@ test.describe('Comments Feature @feature:comments', () => {
 
     await openCardModalViaQuery(page, currentCard);
 
-    const commentTextarea = page.locator('textarea[placeholder*="コメントを書く"]');
-    await expect(commentTextarea).toBeVisible();
+    // Wait for Comments section to be visible (can be h3 or text)
+    await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible();
+
+    // TipTap editor uses .ProseMirror contenteditable div, not textarea
+    const commentEditor = page.locator('.ProseMirror');
+    await expect(commentEditor).toBeVisible();
   });
 
   test('should preserve card modal state on reload with ?card= query', async ({ page }) => {
@@ -233,7 +241,12 @@ test.describe('Comments Feature @feature:comments', () => {
     await openCardModalViaQuery(page, currentCard);
 
     const commentText = `Test comment ${Date.now()}`;
-    await page.fill('textarea[placeholder*="コメントを書く"]', commentText);
+
+    // TipTap uses contenteditable div, not textarea
+    const commentEditor = page.locator('.ProseMirror').first();
+    await commentEditor.click();
+    await commentEditor.fill(commentText);
+
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
 
     const createdComment = page.locator('[data-testid="comment-body"]', { hasText: commentText }).first();
@@ -246,18 +259,25 @@ test.describe('Comments Feature @feature:comments', () => {
     await openCardModalViaQuery(page, currentCard);
 
     const commentText = `Comment to edit ${Date.now()}`;
-    await page.fill('textarea[placeholder*="コメントを書く"]', commentText);
+
+    // Create comment with TipTap editor
+    const commentEditor = page.locator('.ProseMirror').first();
+    await commentEditor.click();
+    await commentEditor.fill(commentText);
     await page.getByRole('button', { name: 'コメントを投稿' }).click();
     await page.waitForTimeout(500);
 
+    // Edit comment
     await page.getByRole('button', { name: '編集' }).click();
     const editedText = `${commentText} (edited)`;
-    const editTextarea = page.locator('textarea').filter({ hasText: commentText }).first();
-    await editTextarea.fill(editedText);
+    const editEditor = page.locator('.ProseMirror').filter({ hasText: commentText }).first();
+    await editEditor.click();
+    await editEditor.fill(editedText);
     await page.getByRole('button', { name: '保存' }).click();
 
     await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText })).toBeVisible({ timeout: 5000 });
 
+    // Delete comment
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: '削除' }).click();
     await page.waitForTimeout(500);
@@ -292,12 +312,15 @@ test.describe('Comments Feature @feature:comments', () => {
     await replyButton.click();
 
     const replyText = `Reply ${Date.now()}`;
-    const replyTextarea = page.locator('textarea[placeholder*="返信を書く"]');
-    await replyTextarea.waitFor({ state: 'visible', timeout: 10000 });
-    await replyTextarea.fill(replyText);
 
-    const replyForm = replyTextarea.locator('..');
-    const submitButton = replyForm.getByRole('button', { name: '返信' });
+    // TipTap editor for reply (last editor on page after clicking reply button)
+    const replyEditor = page.locator('.ProseMirror').last();
+    await replyEditor.waitFor({ state: 'visible', timeout: 10000 });
+    await replyEditor.click();
+    await replyEditor.fill(replyText);
+
+    // Submit reply button (within the reply form that just appeared)
+    const submitButton = page.getByRole('button', { name: '返信' }).last();
     await submitButton.waitFor({ state: 'visible', timeout: 5000 });
     await submitButton.click();
 
@@ -552,8 +575,17 @@ test.describe('Comments Realtime @feature:comments', () => {
       await openCardModalViaQuery(page1, card);
       await openCardModalViaQuery(page2, card);
 
+      // Wait for Comments section in both pages
+      await page1.getByText('Comments', { exact: true }).first().waitFor({ state: 'visible', timeout: 5000 });
+      await page2.getByText('Comments', { exact: true }).first().waitFor({ state: 'visible', timeout: 5000 });
+
       const commentText = `Realtime test ${Date.now()}`;
-      await page1.fill('textarea[placeholder*="コメントを書く"]', commentText);
+
+      // Use TipTap editor
+      const commentEditor = page1.locator('.ProseMirror').first();
+      await commentEditor.waitFor({ state: 'visible', timeout: 5000 });
+      await commentEditor.click();
+      await commentEditor.fill(commentText);
       await page1.getByRole('button', { name: 'コメントを投稿' }).click();
 
       await page1.locator('[data-testid="comment-body"]', { hasText: commentText }).first()
