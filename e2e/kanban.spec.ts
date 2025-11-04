@@ -62,7 +62,7 @@ const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function resolveProfileDisplayName(
-  profile: { display_name: string | null; full_name: string | null; email: string | null } | null,
+  profile: { username: string | null; display_name: string | null; full_name: string | null; email: string | null } | null,
   fallbackEmail?: string | null
 ): string {
   const pick = (value: string | null | undefined) => {
@@ -74,6 +74,11 @@ function resolveProfileDisplayName(
   };
 
   const candidates: Array<string | null> = [
+    (() => {
+      const username = pick(profile?.username);
+      if (!username) return null;
+      return username.startsWith('@') ? username : `@${username}`;
+    })(),
     pick(profile?.display_name),
     pick(profile?.full_name),
     pick(profile?.email)?.split('@')[0] ?? null,
@@ -653,7 +658,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
     const { data: profileRecord } = await supabase
       .from('profiles')
-      .select('display_name, full_name, email')
+      .select('username, display_name, full_name, email')
       .eq('id', TEST_USER_ID)
       .maybeSingle();
 
@@ -692,7 +697,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
   });
 
   test('should show mock user email in test mode', async ({ page }) => {
-    // Should show user display name (priority: display_name > full_name > email local part)
+    // Should show user identity (priority: @username > display_name > full_name > email local part)
     const userDisplayName = page.locator('[data-testid="user-display-name"]');
     await expect(userDisplayName).toBeVisible();
 

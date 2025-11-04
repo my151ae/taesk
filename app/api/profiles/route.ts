@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import {
+  normalizeUsername,
+  isUsernameFormatValid,
+  isNormalizedUsernameValid,
+  isReservedUsername,
+} from '@/lib/usernames';
 
 /**
  * PATCH /api/profiles - Update current user's profile
@@ -21,7 +27,37 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { display_name, full_name, avatar_url } = body;
+  const { display_name, full_name, avatar_url, username } = body;
+
+  let sanitizedUsername: string | null | undefined = undefined;
+
+  if (username !== undefined) {
+    if (username === null) {
+      sanitizedUsername = null;
+    } else if (typeof username !== 'string') {
+      return NextResponse.json({ error: 'username must be a string or null' }, { status: 400 });
+    } else {
+      const trimmed = username.trim();
+
+      if (trimmed.length === 0) {
+        sanitizedUsername = null;
+      } else if (!isUsernameFormatValid(trimmed)) {
+        return NextResponse.json({ error: 'Username must be 3-20 characters (alphanumeric + underscore)' }, { status: 400 });
+      } else {
+        const normalized = normalizeUsername(trimmed);
+
+        if (!isNormalizedUsernameValid(normalized)) {
+          return NextResponse.json({ error: 'Username must be 3-20 characters (alphanumeric + underscore)' }, { status: 400 });
+        }
+
+        if (isReservedUsername(normalized)) {
+          return NextResponse.json({ error: 'This username is reserved' }, { status: 400 });
+        }
+
+        sanitizedUsername = normalized;
+      }
+    }
+  }
 
   // Validate display_name (if provided)
   if (display_name !== undefined) {
@@ -50,16 +86,43 @@ export async function PATCH(request: NextRequest) {
   if (avatar_url !== undefined) {
     updates.avatar_url = avatar_url;
   }
+  if (sanitizedUsername !== undefined) {
+    updates.username = sanitizedUsername;
+  }
+
+  if (sanitizedUsername) {
+    const { data: existingUsername, error: usernameCheckError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', sanitizedUsername)
+      .neq('id', user.id)
+      .maybeSingle();
+
+    if (usernameCheckError) {
+      console.error('Failed to check username availability:', usernameCheckError);
+      return NextResponse.json({ error: 'Failed to validate username' }, { status: 500 });
+    }
+
+    if (existingUsername) {
+      return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
+    }
+  }
 
   // Update profile
   const { data: profile, error: updateError } = await supabase
     .from('profiles')
     .update(updates)
     .eq('id', user.id)
-    .select()
+    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at')
     .single();
 
   if (updateError) {
+    if (updateError.code === '23505') {
+      return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
+    }
+    if (updateError.code === '23514') {
+      return NextResponse.json({ error: 'Username must be 3-20 characters (alphanumeric + underscore)' }, { status: 400 });
+    }
     console.error('Failed to update profile:', updateError);
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
   }
@@ -82,7 +145,7 @@ export async function GET() {
   // Get profile
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at')
     .eq('id', user.id)
     .single();
 

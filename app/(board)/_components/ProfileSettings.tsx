@@ -1,15 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 
 type Profile = {
   id: string;
+  username: string | null;
   display_name: string | null;
   full_name: string | null;
   avatar_url: string | null;
   email: string | null;
 };
+
+const OPTIONAL_USERNAME_MESSAGE = 'ユーザー名は任意です。設定すると @username で表示・メンションできます。';
 
 type ProfileSettingsProps = {
   onProfileUpdated?: () => void;
@@ -24,6 +27,11 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'reserved' | 'error'>('idle');
+  const [usernameMessage, setUsernameMessage] = useState<string | null>(OPTIONAL_USERNAME_MESSAGE);
+  const usernameCheckTimeoutRef = useRef<number | null>(null);
+  const usernameRequestAbortRef = useRef<AbortController | null>(null);
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
@@ -44,6 +52,15 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       const data: Profile = await response.json();
       setProfile(data);
       setDisplayName(data.display_name || data.full_name || '');
+      setUsername(data.username ?? '');
+
+      if (data.username) {
+        setUsernameStatus('available');
+        setUsernameMessage('現在のユーザー名が設定されています。');
+      } else {
+        setUsernameStatus('idle');
+        setUsernameMessage(OPTIONAL_USERNAME_MESSAGE);
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to load profile');
@@ -56,9 +73,163 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
     fetchProfile();
   }, [fetchProfile]);
 
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    if (usernameCheckTimeoutRef.current) {
+      window.clearTimeout(usernameCheckTimeoutRef.current);
+      usernameCheckTimeoutRef.current = null;
+    }
+
+    const trimmed = username.trim();
+
+    if (trimmed.length === 0) {
+      usernameRequestAbortRef.current?.abort();
+      usernameRequestAbortRef.current = null;
+      setUsernameStatus('idle');
+      setUsernameMessage(OPTIONAL_USERNAME_MESSAGE);
+      return;
+    }
+
+    const currentUsername = profile.username ?? '';
+    const candidate = trimmed.toLowerCase();
+
+    if (candidate === currentUsername) {
+      usernameRequestAbortRef.current?.abort();
+      usernameRequestAbortRef.current = null;
+      setUsernameStatus('available');
+      setUsernameMessage('現在のユーザー名が設定されています。');
+      return;
+    }
+
+    usernameCheckTimeoutRef.current = window.setTimeout(async () => {
+      setUsernameStatus('checking');
+      setUsernameMessage('ユーザー名を確認しています…');
+
+      usernameRequestAbortRef.current?.abort();
+      const controller = new AbortController();
+      usernameRequestAbortRef.current = controller;
+
+      try {
+        const params = new URLSearchParams({ username: candidate });
+        const response = await fetch(`/api/profiles/check-username?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (response.status === 429) {
+          setUsernameStatus('error');
+          setUsernameMessage('確認の試行が多すぎます。しばらく待ってから再試行してください。');
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Failed to check username');
+        }
+
+        const data = await response.json() as {
+          available: boolean;
+          reason: 'invalid_format' | 'reserved' | 'taken' | 'rate_limited' | null;
+          username?: string;
+        };
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (data.available) {
+          if (typeof data.username === 'string' && data.username.length > 0 && data.username !== candidate) {
+            setUsername(data.username);
+          }
+          setUsernameStatus('available');
+          setUsernameMessage('このユーザー名は利用できます。');
+          return;
+        }
+
+        switch (data.reason) {
+          case 'invalid_format':
+            setUsernameStatus('invalid');
+            setUsernameMessage('ユーザー名は3〜20文字の英数字またはアンダースコアのみ利用できます。');
+            break;
+          case 'reserved':
+            setUsernameStatus('reserved');
+            setUsernameMessage('このユーザー名は予約済みです。別の名前を選んでください。');
+            break;
+          case 'rate_limited':
+            setUsernameStatus('error');
+            setUsernameMessage('確認の試行が多すぎます。しばらく待ってから再試行してください。');
+            break;
+          case 'taken':
+          default:
+            setUsernameStatus('taken');
+            setUsernameMessage('このユーザー名は既に使用されています。');
+            break;
+        }
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to check username availability:', error);
+        setUsernameStatus('error');
+        setUsernameMessage('ユーザー名の確認に失敗しました。時間をおいて再試行してください。');
+      } finally {
+        usernameRequestAbortRef.current = null;
+      }
+    }, 350);
+
+    return () => {
+      if (usernameCheckTimeoutRef.current) {
+        window.clearTimeout(usernameCheckTimeoutRef.current);
+        usernameCheckTimeoutRef.current = null;
+      }
+    };
+  }, [profile, username]);
+
+  useEffect(() => {
+    return () => {
+      usernameRequestAbortRef.current?.abort();
+    };
+  }, []);
+
+  const usernameHelperClass = (() => {
+    switch (usernameStatus) {
+      case 'available':
+        return 'text-green-600 dark:text-green-400';
+      case 'invalid':
+      case 'reserved':
+      case 'taken':
+        return 'text-red-600 dark:text-red-400';
+      case 'checking':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'error':
+        return 'text-amber-600 dark:text-amber-400';
+      default:
+        return 'text-gray-500 dark:text-gray-400';
+    }
+  })();
+
+  const usernameHasError = usernameStatus === 'invalid' || usernameStatus === 'reserved' || usernameStatus === 'taken';
+  const isSaveDisabled = saving || !displayName.trim() || usernameStatus === 'checking';
+
   const handleSave = async () => {
-    if (!user || !displayName.trim()) {
+    const trimmedDisplayName = displayName.trim();
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!user || !trimmedDisplayName) {
       setError('Display name cannot be empty');
+      return;
+    }
+
+    if (
+      normalizedUsername &&
+      (usernameStatus === 'checking' || usernameStatus === 'invalid' || usernameStatus === 'reserved' || usernameStatus === 'taken')
+    ) {
+      setError('ユーザー名の確認が完了していません。状態を確認してから再試行してください。');
       return;
     }
 
@@ -70,7 +241,10 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       const response = await fetch('/api/profiles', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: displayName.trim() }),
+        body: JSON.stringify({
+          display_name: trimmedDisplayName,
+          username: normalizedUsername ? normalizedUsername : null,
+        }),
       });
 
       if (!response.ok) {
@@ -81,6 +255,16 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       const data: Profile = await response.json();
       setProfile(data);
       setStatusMessage('Profile updated successfully!');
+      setDisplayName(data.display_name || data.full_name || '');
+      setUsername(data.username ?? '');
+
+      if (data.username) {
+        setUsernameStatus('available');
+        setUsernameMessage('現在のユーザー名が設定されています。');
+      } else {
+        setUsernameStatus('idle');
+        setUsernameMessage(OPTIONAL_USERNAME_MESSAGE);
+      }
 
       // Call callback to update parent component
       if (onProfileUpdated) {
@@ -163,6 +347,42 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
           </p>
         </div>
 
+        {/* Username */}
+        <div>
+          <label
+            htmlFor="username"
+            className="flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            <span>Username</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">任意</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400 pointer-events-none">@</span>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => {
+                const rawValue = e.target.value.toLowerCase();
+                const sanitized = rawValue.replace(/[^a-z0-9_]/g, '');
+                setUsername(sanitized);
+              }}
+              placeholder="例: yossy"
+              maxLength={20}
+              autoComplete="off"
+              className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-gray-700 dark:text-gray-100 ${
+                usernameHasError
+                  ? 'border-red-500 focus:ring-red-500 dark:border-red-500'
+                  : 'border-gray-300 focus:ring-blue-500 dark:border-gray-600 focus:ring-blue-500'
+              }`}
+              data-testid="profile-username-input"
+            />
+          </div>
+          <p className={`mt-1 text-xs ${usernameHelperClass}`}>
+            {usernameMessage ?? OPTIONAL_USERNAME_MESSAGE}
+          </p>
+        </div>
+
         {/* Email (read-only) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -183,7 +403,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
         <div className="pt-2">
           <button
             onClick={handleSave}
-            disabled={saving || !displayName.trim()}
+            disabled={isSaveDisabled}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             data-testid="profile-save-button"
           >

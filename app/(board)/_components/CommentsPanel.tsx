@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
 import type { ProfileSummary, MemberRole } from '@/lib/supabase';
+import { resolveProfileIdentity, getProfileInitial } from '@/lib/usernames';
 import { RenderCommentBody } from './Mention';
 import { useAuth } from '@/app/contexts/AuthContext';
 import {
@@ -218,6 +219,13 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   const renderComment = (comment: CommentThread, isReply = false) => {
     const isAuthor = comment.author_id === user?.id;
     const hasError = Boolean(comment.errorMessage);
+    const authorIdentity = comment.author
+      ? resolveProfileIdentity(comment.author, comment.author.email ?? null)
+      : null;
+    const authorLabel = authorIdentity?.label ?? 'Unknown';
+    const authorInitial = comment.author
+      ? getProfileInitial(comment.author, comment.author.email ?? null)
+      : 'U';
 
     return (
       <div
@@ -226,12 +234,12 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
       >
         <div className="flex items-start gap-2">
           <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0 flex items-center justify-center text-white font-medium">
-            {comment.author?.full_name?.[0]?.toUpperCase() || comment.author?.email?.[0]?.toUpperCase() || '?'}
+            {authorInitial}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <div className="text-sm font-medium">
-                {comment.author?.full_name || comment.author?.email || 'Unknown'}
+                {authorLabel}
               </div>
               <div className="text-xs text-gray-500">
                 {new Date(comment.created_at).toLocaleString()}

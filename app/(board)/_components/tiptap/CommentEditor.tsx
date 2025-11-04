@@ -15,6 +15,7 @@ import { fromStorage, toStorage, getCachedProfileName, cacheProfiles } from '@/l
 import { useEffect, useMemo } from 'react';
 import type { ProfileSummary } from '@/lib/supabase';
 import type { Range } from '@tiptap/core';
+import { resolveProfileIdentity } from '@/lib/usernames';
 
 interface CommentEditorProps {
   initialValue: string; // Storage format: "<@id>" tokens
@@ -40,10 +41,14 @@ export default function CommentEditor({
   // Cache profiles for name resolution
   useEffect(() => {
     cacheProfiles(
-      profiles.map(p => ({
-        id: p.id,
-        name: p.full_name || p.email || 'Unknown',
-      }))
+      profiles.map(p => {
+        const identity = resolveProfileIdentity(p, p.email ?? null);
+        const label = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
+        return {
+          id: p.id,
+          name: label,
+        };
+      })
     );
   }, [profiles]);
 
@@ -55,7 +60,9 @@ export default function CommentEditor({
 
       // Fallback: search in profiles prop
       const profile = profiles.find(p => p.id === id);
-      return profile?.full_name || profile?.email || id;
+      if (!profile) return id;
+      const identity = resolveProfileIdentity(profile, profile.email ?? null);
+      return identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
     },
     [profiles]
   );
@@ -83,17 +90,28 @@ export default function CommentEditor({
 
       // Filter by query
       return profiles
-        .filter(
-          p =>
-            p.full_name?.toLowerCase().includes(normalizedQuery) ||
-            p.email?.toLowerCase().includes(normalizedQuery)
-        )
+        .filter(p => {
+          const username = p.username?.toLowerCase() ?? '';
+          const display = p.display_name?.toLowerCase() ?? '';
+          const name = p.full_name?.toLowerCase() ?? '';
+          const email = p.email?.toLowerCase() ?? '';
+          return (
+            username.includes(normalizedQuery) ||
+            display.includes(normalizedQuery) ||
+            name.includes(normalizedQuery) ||
+            email.includes(normalizedQuery)
+          );
+        })
         .slice(0, 10)
-        .map(p => ({
-          id: p.id,
-          name: p.full_name || p.email || 'Unknown',
-          avatar_url: p.avatar_url || undefined,
-        }));
+        .map(p => {
+          const identity = resolveProfileIdentity(p, p.email ?? null);
+          const label = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
+          return {
+            id: p.id,
+            name: label,
+            avatar_url: p.avatar_url || undefined,
+          };
+        });
     },
     [profiles]
   );

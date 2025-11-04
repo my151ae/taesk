@@ -4,35 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
+import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 
 const getProfileDisplayName = (profile: ProfileSummary): string => {
-  if (profile.full_name && profile.full_name.trim().length > 0) {
-    return profile.full_name.trim();
-  }
-  if (profile.email) {
-    return profile.email;
-  }
-  return 'Unknown user';
+  const identity = resolveProfileIdentity(profile, profile.email ?? null);
+  return identity.label;
 };
 
 const getProfileInitials = (profile: ProfileSummary): string => {
-  const source = profile.full_name && profile.full_name.trim().length > 0 ? profile.full_name : profile.email ?? '';
-  if (!source) return '?';
-
-  const words = source
-    .replace(/[^\p{L}\p{N}\s@.]/gu, ' ')
-    .trim()
-    .split(/\s+|@|\.|_/)
-    .filter(Boolean);
-
-  if (words.length === 0) return source.slice(0, 1).toUpperCase();
-
-  const initials = words
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join('');
-
-  return initials || source.slice(0, 1).toUpperCase();
+  return getProfileInitial(profile, profile.email ?? null);
 };
 
 interface CardModalProps {
@@ -94,9 +74,16 @@ export function CardModal({
     const base = !query
       ? profiles
       : profiles.filter((profile) => {
+        const username = profile.username?.toLowerCase() ?? '';
+        const display = profile.display_name?.toLowerCase() ?? '';
         const name = profile.full_name?.toLowerCase() ?? '';
         const email = profile.email?.toLowerCase() ?? '';
-        return name.includes(query) || email.includes(query);
+        return (
+          username.includes(query) ||
+          display.includes(query) ||
+          name.includes(query) ||
+          email.includes(query)
+        );
       });
 
     // Filter out already assigned members
@@ -417,39 +404,42 @@ export function CardModal({
             </label>
             <div className="flex flex-wrap gap-2 items-center">
               {/* Selected Members */}
-              {selectedAssignees.map((member) => (
-                <div
-                  key={member.id}
-                  className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                  title={getProfileDisplayName(member)}
-                >
-                  {member.avatar_url ? (
-                    <Image
-                      src={member.avatar_url}
-                      alt={getProfileDisplayName(member)}
-                      width={32}
-                      height={32}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                      {getProfileInitials(member)}
-                    </span>
-                  )}
-                  <span className="text-xs font-medium px-2 max-w-[100px] truncate">
-                    {getProfileDisplayName(member).split(' ')[0]}
-                  </span>
-                  <button
-                    onClick={() => handleRemoveMember(member.id)}
-                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
-                    aria-label={`Remove ${getProfileDisplayName(member)}`}
+              {selectedAssignees.map((member) => {
+                const identity = resolveProfileIdentity(member, member.email ?? null);
+                return (
+                  <div
+                    key={member.id}
+                    className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                    title={identity.label}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                    {member.avatar_url ? (
+                      <Image
+                        src={member.avatar_url}
+                        alt={identity.label}
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                        {getProfileInitials(member)}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium px-2 max-w-[120px] truncate">
+                      {identity.label}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveMember(member.id)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
+                      aria-label={`Remove ${identity.label}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
 
               {/* Add Member Button */}
               <button
@@ -478,33 +468,40 @@ export function CardModal({
                 </div>
                 <div className="max-h-48 overflow-y-auto">
                   {filteredProfiles.length > 0 ? (
-                    filteredProfiles.map((profile) => (
-                      <button
-                        key={profile.id}
-                        onClick={() => handleAddMember(profile.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
-                      >
-                        {profile.avatar_url ? (
-                          <Image
-                            src={profile.avatar_url}
-                            alt={getProfileDisplayName(profile)}
-                            width={32}
-                            height={32}
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                            {getProfileInitials(profile)}
-                          </span>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{getProfileDisplayName(profile)}</div>
-                          {profile.email && (
-                            <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{profile.email}</div>
+                    filteredProfiles.map((profile) => {
+                      const identity = resolveProfileIdentity(profile, profile.email ?? null);
+                      const secondary = identity.secondary && identity.secondary !== identity.label
+                        ? identity.secondary
+                        : (profile.email && profile.email !== identity.label ? profile.email : null);
+
+                      return (
+                        <button
+                          key={profile.id}
+                          onClick={() => handleAddMember(profile.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
+                        >
+                          {profile.avatar_url ? (
+                            <Image
+                              src={profile.avatar_url}
+                              alt={identity.label}
+                              width={32}
+                              height={32}
+                              className="h-8 w-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                              {getProfileInitials(profile)}
+                            </span>
                           )}
-                        </div>
-                      </button>
-                    ))
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{identity.label}</div>
+                            {secondary && (
+                              <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{secondary}</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
                   ) : (
                     <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-gray-400">
                       {memberSearch ? 'No members found' : 'All members assigned'}

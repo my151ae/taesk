@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
 import { MemberRole, ProfileSummary } from '@/lib/supabase';
+import { resolveProfileIdentity, getProfileInitial } from '@/lib/usernames';
 
 interface ShareDialogProps {
   boardId: string;
@@ -28,7 +29,7 @@ const ROLE_LABELS: Record<MemberRole, string> = {
 export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDialogProps) {
   const [members, setMembers] = useState<BoardMemberWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteIdentifier, setInviteIdentifier] = useState('');
   const [inviteRole, setInviteRole] = useState<MemberRole>('editor');
   const [inviting, setInviting] = useState(false);
 
@@ -56,27 +57,46 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    const rawInput = inviteIdentifier.trim();
+    if (!rawInput) return;
+
+    const isEmail = rawInput.includes('@') && !rawInput.startsWith('@');
+    const params = new URLSearchParams();
+
+    if (isEmail) {
+      params.set('email', rawInput.toLowerCase());
+    } else {
+      const queryValue = rawInput.startsWith('@') ? rawInput.slice(1) : rawInput;
+      params.set('query', queryValue);
+    }
 
     setInviting(true);
     try {
-      // 1. Search for existing user by email
-      const searchRes = await fetch(`/api/profiles/search?email=${encodeURIComponent(inviteEmail.trim())}`);
+      // 1. Search for existing user via identifier
+      const searchRes = await fetch(`/api/profiles/search?${params.toString()}`);
 
       if (!searchRes.ok) {
         if (searchRes.status === 404) {
-          alert('このメールアドレスは Taesk に登録されていません。\n先に https://taesk.vercel.app でアカウント作成してもらってください。');
+          alert('一致するユーザーが見つかりませんでした。入力したメールアドレスまたはユーザー名を確認してください。');
         } else {
           alert('ユーザー検索に失敗しました');
         }
         return;
       }
 
-      const { profile } = await searchRes.json();
+      const payload = await searchRes.json().catch(() => null);
+      const profile = payload?.profile ?? payload?.profiles?.[0];
+
+      if (!profile) {
+        alert('一致するユーザーが見つかりませんでした。');
+        return;
+      }
+
+      const identity = resolveProfileIdentity(profile, profile.email);
 
       // 2. Check if already a member
       if (members.some((m) => m.profile_id === profile.id)) {
-        alert('このユーザーは既にメンバーです。');
+        alert(`${identity.label} は既にメンバーです。`);
         return;
       }
 
@@ -96,8 +116,8 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       }
 
       // 4. Success - reload members and reset form
-      alert(`${profile.display_name || profile.full_name || profile.email} をボードに追加しました！`);
-      setInviteEmail('');
+      alert(`${identity.label} をボードに追加しました！`);
+      setInviteIdentifier('');
       setInviteRole('editor');
       await loadMembers();
 
@@ -178,10 +198,10 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
             <h3 className="text-sm font-medium mb-2">メンバーを追加</h3>
             <form onSubmit={handleInvite} className="flex gap-2">
               <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="メールアドレス（Taesk 登録済みユーザー）"
+                type="text"
+                value={inviteIdentifier}
+                onChange={(e) => setInviteIdentifier(e.target.value)}
+                placeholder="メールアドレス または @username"
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={inviting}
               />
@@ -197,7 +217,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
               </select>
               <button
                 type="submit"
-                disabled={inviting || !inviteEmail.trim()}
+                disabled={inviting || !inviteIdentifier.trim()}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 追加
@@ -214,20 +234,29 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
               <div className="text-center py-4 text-gray-500">No members yet</div>
             ) : (
               <div className="space-y-2">
-                {members.map((member) => (
-                  <div
-                    key={member.profile_id}
-                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-medium">
-                        {(member.profile?.display_name || member.profile?.full_name)?.[0]?.toUpperCase() || '?'}
+                {members.map((member) => {
+                  const identity = resolveProfileIdentity(member.profile, member.profile?.email ?? null);
+                  const avatarInitial = getProfileInitial(member.profile, member.profile?.email ?? null);
+                  const secondaryCandidate = identity.secondary && identity.secondary !== identity.label
+                    ? identity.secondary
+                    : (member.profile?.email && member.profile.email !== identity.label ? member.profile.email : null);
+
+                  return (
+                    <div
+                      key={member.profile_id}
+                      className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-medium">
+                          {avatarInitial}
+                        </div>
+                        <div>
+                          <div className="font-medium">{identity.label}</div>
+                          {secondaryCandidate && (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{secondaryCandidate}</div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium">{member.profile?.display_name || member.profile?.full_name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{member.profile?.email}</div>
-                      </div>
-                    </div>
                     <div className="flex items-center gap-2">
                       <select
                         value={member.role}
@@ -249,8 +278,9 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
                         </button>
                       )}
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

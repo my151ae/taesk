@@ -56,6 +56,7 @@ import ShareDialog from "./ShareDialog";
 import NotificationsBell from "./NotificationsBell";
 import NotificationSettings from "./NotificationSettings";
 import ProfileSettings from "./ProfileSettings";
+import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -65,6 +66,7 @@ type KanbanBoardClientProps = {
 
 type ProfileRow = {
   id: string;
+  username: string | null;
   display_name: string | null;
   full_name: string | null;
   avatar_url: string | null;
@@ -106,30 +108,36 @@ const loadFromStorage = (): BoardData => {
 
 const getProfileDisplayName = (profile?: ProfileSummary | null): string | null => {
   if (!profile) return null;
-  if (typeof profile.full_name === 'string' && profile.full_name.trim().length > 0) {
-    return profile.full_name.trim();
-  }
-  if (typeof profile.email === 'string' && profile.email.trim().length > 0) {
-    return profile.email;
-  }
-  return null;
+  const identity = resolveProfileIdentity(profile, profile.email ?? null);
+  return identity.label;
 };
 
 const getUserDisplayName = (profile: ProfileRow | null, fallbackEmail?: string): string => {
-  if (profile?.display_name?.trim()) {
-    return profile.display_name.trim();
+  if (!profile) {
+    if (fallbackEmail?.trim()) {
+      return fallbackEmail.split('@')[0];
+    }
+    return 'User';
   }
-  if (profile?.full_name?.trim()) {
-    return profile.full_name.trim();
+
+  const identity = resolveProfileIdentity(
+    {
+      id: profile.id,
+      username: profile.username,
+      display_name: profile.display_name,
+      full_name: profile.full_name,
+      avatar_url: profile.avatar_url,
+      email: profile.email,
+    },
+    fallbackEmail ?? profile.email
+  );
+
+  if (identity.source === 'email' && identity.label.includes('@')) {
+    const localPart = identity.label.split('@')[0];
+    return localPart || identity.label;
   }
-  if (profile?.email?.trim()) {
-    const email = profile.email.trim();
-    return email.split('@')[0]; // Show local part of email
-  }
-  if (fallbackEmail?.trim()) {
-    return fallbackEmail.split('@')[0];
-  }
-  return 'User';
+
+  return identity.label;
 };
 
 const saveToStorage = (() => {
@@ -436,29 +444,21 @@ function CardVisual({ card, subtle = false, withGrab = false, className = '', as
       : '🟢'
     : null;
 
-  const assigneeName = assigneeProfile
-    ? (assigneeProfile.full_name && assigneeProfile.full_name.trim().length > 0
-        ? assigneeProfile.full_name.trim()
-        : assigneeProfile.email ?? 'Unknown user')
+  const assigneeIdentity = assigneeProfile
+    ? resolveProfileIdentity(assigneeProfile, assigneeProfile.email ?? legacyAssignee ?? null)
+    : null;
+
+  const assigneeName = assigneeIdentity
+    ? assigneeIdentity.label
     : legacyAssignee;
 
   const assigneeAlt = assigneeName ?? 'Assignee avatar';
 
-  const initialsSource = assigneeProfile?.full_name
-    ?? assigneeProfile?.email
-    ?? legacyAssignee
-    ?? '';
-
-  const assigneeInitials = initialsSource
-    ? initialsSource
-        .replace(/[^\p{L}\p{N}\s@.]/gu, ' ')
-        .trim()
-        .split(/\s+|@|\.|_/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((word) => word.charAt(0).toUpperCase())
-        .join('') || initialsSource.slice(0, 1).toUpperCase()
-    : '?';
+  const assigneeInitials = assigneeProfile
+    ? getProfileInitial(assigneeProfile, assigneeProfile.email ?? legacyAssignee ?? null)
+    : legacyAssignee
+      ? legacyAssignee.charAt(0).toUpperCase()
+      : 'U';
 
   const baseClasses = `rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';

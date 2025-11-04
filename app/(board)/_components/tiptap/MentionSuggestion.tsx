@@ -104,7 +104,7 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(
                   {item.name.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <span className="font-medium text-sm">{item.name}</span>
+              <span className="font-medium text-sm">@{item.name}</span>
             </button>
           ))
         ) : (

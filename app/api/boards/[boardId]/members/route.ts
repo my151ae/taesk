@@ -29,6 +29,7 @@ export async function GET(
         created_at,
         profiles:profile_id (
           id,
+          username,
           display_name,
           full_name,
           avatar_url,
@@ -51,10 +52,15 @@ export async function GET(
       results = results.filter((member: any) => {
         const profile = member.profiles;
         if (!profile) return false;
+        const username = profile.username?.toLowerCase() ?? '';
+        const displayName = profile.display_name?.toLowerCase() ?? '';
+        const fullName = profile.full_name?.toLowerCase() ?? '';
+        const email = profile.email?.toLowerCase() ?? '';
         return (
-          profile.display_name?.toLowerCase().includes(lowerQuery) ||
-          profile.full_name?.toLowerCase().includes(lowerQuery) ||
-          profile.email?.toLowerCase().includes(lowerQuery)
+          username.includes(lowerQuery) ||
+          displayName.includes(lowerQuery) ||
+          fullName.includes(lowerQuery) ||
+          email.includes(lowerQuery)
         );
       });
     }

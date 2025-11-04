@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import type { ProfileSummary } from '@/lib/supabase';
+import { resolveProfileIdentity, getProfileInitial } from '@/lib/usernames';
 
 interface MentionProps {
   userId: string;
@@ -12,7 +13,18 @@ interface MentionProps {
 export function Mention({ userId, profile }: MentionProps) {
   const [showCard, setShowCard] = useState(false);
 
-  const displayName = profile?.full_name || profile?.email || 'Unknown User';
+  const identity = profile ? resolveProfileIdentity(profile, profile.email ?? null) : null;
+  const baseLabel = identity ? identity.label : 'Unknown User';
+  const mentionLabel = identity
+    ? identity.source === 'username' || baseLabel.startsWith('@')
+      ? baseLabel
+      : `@${baseLabel}`
+    : '@Unknown User';
+  const hoverTitle = identity ? identity.label : 'Unknown User';
+  const hoverSecondary = identity?.secondary && identity.secondary !== identity.label
+    ? identity.secondary
+    : (profile?.email && profile.email !== identity?.label ? profile.email : null);
+  const avatarInitial = profile ? getProfileInitial(profile, profile.email ?? null) : 'U';
 
   return (
     <span
@@ -24,7 +36,7 @@ export function Mention({ userId, profile }: MentionProps) {
         className="text-sky-600 dark:text-sky-400 font-medium cursor-pointer hover:underline"
         data-mention-id={userId}
       >
-        @{displayName}
+        {mentionLabel}
       </span>
 
       {/* Hover card */}
@@ -34,21 +46,21 @@ export function Mention({ userId, profile }: MentionProps) {
             {profile.avatar_url ? (
               <Image
                 src={profile.avatar_url}
-                alt={displayName}
+                alt={hoverTitle}
                 width={40}
                 height={40}
                 className="w-10 h-10 rounded-full object-cover"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-semibold">
-                {displayName.charAt(0).toUpperCase()}
+                {avatarInitial}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">{displayName}</div>
-              {profile.email && (
+              <div className="font-medium text-sm truncate">{hoverTitle}</div>
+              {hoverSecondary && (
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {profile.email}
+                  {hoverSecondary}
                 </div>
               )}
             </div>

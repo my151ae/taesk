@@ -27,6 +27,8 @@ export async function GET(
         *,
         author:author_id (
           id,
+          username,
+          display_name,
           full_name,
           avatar_url,
           email
@@ -208,6 +210,8 @@ export async function POST(
         *,
         author:author_id (
           id,
+          username,
+          display_name,
           full_name,
           avatar_url,
           email
