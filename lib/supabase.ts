@@ -165,6 +165,7 @@ export function isAssigneeColumnMissing(error: PostgrestError | null | undefined
 
 export interface ProfileSummary {
   id: string;
+  display_name: string | null;
   full_name: string | null;
   avatar_url: string | null;
   email: string | null;

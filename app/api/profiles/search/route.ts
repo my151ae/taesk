@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Search for profile by email
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, avatar_url')
+      .select('id, email, display_name, full_name, avatar_url')
       .eq('email', email.trim().toLowerCase())
       .maybeSingle();
 

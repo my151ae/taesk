@@ -29,6 +29,7 @@ export async function GET(
         created_at,
         profiles:profile_id (
           id,
+          display_name,
           full_name,
           avatar_url,
           email
@@ -51,6 +52,7 @@ export async function GET(
         const profile = member.profiles;
         if (!profile) return false;
         return (
+          profile.display_name?.toLowerCase().includes(lowerQuery) ||
           profile.full_name?.toLowerCase().includes(lowerQuery) ||
           profile.email?.toLowerCase().includes(lowerQuery)
         );

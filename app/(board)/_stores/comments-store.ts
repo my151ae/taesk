@@ -209,6 +209,7 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
       : authorProfile?.email ?? 'Unknown user';
     const fallbackAuthor: ProfileSummary = {
       id: authorId ?? 'unknown',
+      display_name: null,
       full_name: fallbackDisplayName,
       avatar_url: authorProfile?.avatar_url ?? null,
       email: authorProfile?.email ?? null,

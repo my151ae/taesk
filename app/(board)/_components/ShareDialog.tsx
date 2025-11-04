@@ -96,7 +96,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       }
 
       // 4. Success - reload members and reset form
-      alert(`${profile.full_name || profile.email} をボードに追加しました！`);
+      alert(`${profile.display_name || profile.full_name || profile.email} をボードに追加しました！`);
       setInviteEmail('');
       setInviteRole('editor');
       await loadMembers();
@@ -221,10 +221,10 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-medium">
-                        {member.profile?.full_name?.[0]?.toUpperCase() || '?'}
+                        {(member.profile?.display_name || member.profile?.full_name)?.[0]?.toUpperCase() || '?'}
                       </div>
                       <div>
-                        <div className="font-medium">{member.profile?.full_name || 'Unknown'}</div>
+                        <div className="font-medium">{member.profile?.display_name || member.profile?.full_name || 'Unknown'}</div>
                         <div className="text-sm text-gray-500">{member.profile?.email}</div>
                       </div>
                     </div>
