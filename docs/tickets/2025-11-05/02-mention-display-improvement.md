@@ -1,7 +1,7 @@
 
 # Mention UI/UX 改善チケット
 - Ticket: `docs/tickets/2025-11-05/02-mention-display-improvement.md`
-- Latest commit: `97741a02d0015e0ca7de987ef1b259d185de0125`
+- Latest commit: `f91bc744cf7be0f7f70cf176b9e4a73f7a40dddb`
 - Author: 松本Ops
 
 ## ゴール
@@ -218,14 +218,25 @@ Location: comments.spec.ts:377
 
 #### 1. `MentionSuggestion.tsx` (UI改善)
 ```tsx
-// Line 84: サジェスト項目を2行表示に変更
-<div className="flex flex-col">
+// Line 84: 1行（横並び）表示に統一（Trello風）
+<div className="flex items-center gap-2">
   <span className="font-semibold text-sm">{item.name}</span>
-  <span className="text-xs text-gray-500">@{item.handle}</span>
+  <span className="text-xs opacity-70">@{item.handle}</span>
 </div>
 
-// Line 124: 全角トリガー対応
-char: '@', // or modify suggestion.items to handle both @ and ＠
+// 全角 ＠ トリガー対応（TipTap editor 初期化時に追加）
+const editor = useEditor({
+  // ... existing config
+  onCreate: ({ editor }) => {
+    const el = editor.view.dom as HTMLElement;
+    el.addEventListener('beforeinput', (e: InputEvent) => {
+      if (e.data === '＠') {
+        e.preventDefault();
+        editor.commands.insertContent('@'); // Suggestion起動
+      }
+    });
+  },
+});
 ```
 
 #### 2. `CommentEditor.tsx` (検索ロジック改善)
