@@ -332,15 +332,22 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should support @mentions with TipTap editor @e2e:essential @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
+    // Set up the wait for members API BEFORE opening the modal
+    const membersResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
     await openCardModalViaQuery(page, currentCard);
     await page.waitForLoadState('networkidle');
+
+    // Wait for members API to complete
+    await membersResponsePromise;
+    await page.waitForTimeout(500); // Extra wait for React to update props
 
     // Find TipTap editor (ProseMirror)
     const editor = page.locator('.ProseMirror').last();
     await expect(editor).toBeVisible({ timeout: 15000 });
-
-    // Wait longer for members to load via API
-    await page.waitForTimeout(2000); // Wait for /api/boards/:id/members to complete
 
     await editor.click();
     await page.waitForTimeout(500);
