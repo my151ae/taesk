@@ -67,7 +67,7 @@ export default function CommentEditor({
     [profiles]
   );
 
-  // Search profiles for mention suggestion
+  // Search profiles for mention suggestion with scoring
   const searchProfiles = useMemo(
     () => async (query: string) => {
       // If profiles haven't loaded yet, return empty array
@@ -75,9 +75,11 @@ export default function CommentEditor({
         return [];
       }
 
-      const normalizedQuery = query.toLowerCase();
+      // NFKC normalization for consistent matching (half/full-width characters)
+      const normalize = (s: string) => s.normalize('NFKC').toLowerCase();
+      const normalizedQuery = normalize(query);
 
-      // If query is empty, show all profiles (up to 10)
+      // If query is empty, show all profiles sorted by name
       if (!query.trim()) {
         return profiles
           .slice(0, 10)
@@ -93,31 +95,55 @@ export default function CommentEditor({
           });
       }
 
-      // Filter by query
-      return profiles
-        .filter(p => {
-          const username = p.username?.toLowerCase() ?? '';
-          const display = p.display_name?.toLowerCase() ?? '';
-          const name = p.full_name?.toLowerCase() ?? '';
-          const email = p.email?.toLowerCase() ?? '';
-          return (
-            username.includes(normalizedQuery) ||
-            display.includes(normalizedQuery) ||
-            name.includes(normalizedQuery) ||
-            email.includes(normalizedQuery)
-          );
+      // Score-based search: startsWith > includes
+      const scored = profiles.map(p => {
+        const identity = resolveProfileIdentity(p, p.email ?? null);
+        const displayName = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
+        const handle = p.username || p.id.slice(0, 8);
+
+        const normName = normalize(displayName);
+        const normHandle = normalize(handle);
+        const normFullName = normalize(p.full_name || '');
+        const normEmail = normalize(p.email || '');
+
+        let score = 0;
+        // Highest priority: prefix match on username/handle
+        if (normHandle.startsWith(normalizedQuery)) score = 30;
+        // High priority: prefix match on display name
+        else if (normName.startsWith(normalizedQuery)) score = 20;
+        // Medium priority: prefix match on full name
+        else if (normFullName.startsWith(normalizedQuery)) score = 15;
+        // Lower priority: contains in handle
+        else if (normHandle.includes(normalizedQuery)) score = 10;
+        // Lower priority: contains in display name
+        else if (normName.includes(normalizedQuery)) score = 8;
+        // Lower priority: contains in full name
+        else if (normFullName.includes(normalizedQuery)) score = 5;
+        // Lowest priority: contains in email
+        else if (normEmail.includes(normalizedQuery)) score = 2;
+
+        return {
+          profile: p,
+          displayName,
+          handle,
+          score,
+        };
+      });
+
+      // Filter, sort by score (desc) then by name (asc), and take top 10
+      return scored
+        .filter(item => item.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.displayName.localeCompare(b.displayName, 'ja');
         })
         .slice(0, 10)
-        .map(p => {
-          const identity = resolveProfileIdentity(p, p.email ?? null);
-          const displayName = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
-          return {
-            id: p.id,
-            name: displayName,
-            handle: p.username || p.id.slice(0, 8),
-            avatar_url: p.avatar_url || undefined,
-          };
-        });
+        .map(item => ({
+          id: item.profile.id,
+          name: item.displayName,
+          handle: item.handle,
+          avatar_url: item.profile.avatar_url || undefined,
+        }));
     },
     [profiles]
   );
