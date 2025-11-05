@@ -81,11 +81,16 @@ export default function CommentEditor({
       if (!query.trim()) {
         return profiles
           .slice(0, 10)
-          .map(p => ({
-            id: p.id,
-            name: p.full_name || p.email || 'Unknown',
-            avatar_url: p.avatar_url || undefined,
-          }));
+          .map(p => {
+            const identity = resolveProfileIdentity(p, p.email ?? null);
+            const displayName = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
+            return {
+              id: p.id,
+              name: displayName,
+              handle: p.username || p.id.slice(0, 8),
+              avatar_url: p.avatar_url || undefined,
+            };
+          });
       }
 
       // Filter by query
@@ -105,10 +110,11 @@ export default function CommentEditor({
         .slice(0, 10)
         .map(p => {
           const identity = resolveProfileIdentity(p, p.email ?? null);
-          const label = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
+          const displayName = identity.label.startsWith('@') ? identity.label.slice(1) : identity.label;
           return {
             id: p.id,
-            name: label,
+            name: displayName,
+            handle: p.username || p.id.slice(0, 8),
             avatar_url: p.avatar_url || undefined,
           };
         });

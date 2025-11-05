@@ -19,6 +19,7 @@ import Image from 'next/image';
 interface MentionItem {
   id: string;
   name: string;
+  handle?: string; // @username or @id
   avatar_url?: string;
 }
 
@@ -86,25 +87,37 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(
           props.items.map((item, index) => (
             <button
               key={item.id}
-              className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-gray-100 ${
+              className={`w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-gray-100 ${
                 index === selectedIndex ? 'bg-blue-50' : ''
               }`}
               onClick={() => selectItem(index)}
             >
+              {/* Avatar */}
               {item.avatar_url ? (
                 <Image
                   src={item.avatar_url}
                   alt={item.name}
-                  width={24}
-                  height={24}
-                  className="w-6 h-6 rounded-full"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 rounded-full flex-shrink-0"
                 />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold text-gray-600">
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm font-semibold text-gray-600 flex-shrink-0">
                   {item.name.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <span className="font-medium text-sm">@{item.name}</span>
+
+              {/* Name and handle in vertical layout */}
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="font-medium text-sm text-gray-900 truncate">
+                  {item.name}
+                </span>
+                {item.handle && (
+                  <span className="text-xs text-gray-500 truncate">
+                    @{item.handle}
+                  </span>
+                )}
+              </div>
             </button>
           ))
         ) : (

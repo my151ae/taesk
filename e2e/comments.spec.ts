@@ -338,12 +338,16 @@ test.describe('Comments Feature @feature:comments', () => {
     // Find TipTap editor (ProseMirror)
     const editor = page.locator('.ProseMirror').last();
     await expect(editor).toBeVisible({ timeout: 15000 });
+
+    // Wait longer for members to load via API
+    await page.waitForTimeout(2000); // Wait for /api/boards/:id/members to complete
+
     await editor.click();
     await page.waitForTimeout(500);
 
     // Type @ to trigger mention suggestion
     await editor.pressSequentially('@');
-    await page.waitForTimeout(1500); // Increased wait for profiles to load
+    await page.waitForTimeout(1500); // Wait for suggestion to appear
 
     // Verify suggestion popup appears
     const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
