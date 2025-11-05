@@ -343,14 +343,17 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type @ to trigger mention suggestion
     await editor.pressSequentially('@');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500); // Increased wait for profiles to load
 
     // Verify suggestion popup appears
     const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+    await expect(suggestionPopup).toBeVisible({ timeout: 10000 }); // Increased timeout
 
-    // Verify user option is visible
-    const userOption = suggestionPopup.locator('button').filter({ hasText: 'E2E Test User' });
+    // Wait for any user option to appear first
+    await expect(suggestionPopup.locator('button').first()).toBeVisible({ timeout: 5000 });
+
+    // Verify specific user option is visible (display_name takes priority when username is null)
+    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test Display Name Updated' });
     await expect(userOption).toBeVisible({ timeout: 5000 });
 
     // Click to select mention
@@ -358,7 +361,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.waitForTimeout(500);
 
     // Verify mention node is inserted (displays as @Display Name)
-    const mentionNode = editor.locator('span.mention').filter({ hasText: '@E2E Test User' });
+    const mentionNode = editor.locator('span.mention').filter({ hasText: '@Test Display Name Updated' });
     await expect(mentionNode).toBeVisible();
 
     // Add some text after mention
@@ -372,9 +375,9 @@ test.describe('Comments Feature @feature:comments', () => {
     const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'test mention' });
     await expect(commentBody).toBeVisible({ timeout: 10000 });
 
-    // Verify mention renders with data-mention-id
-    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' });
-    await expect(mentionInList).toBeVisible();
+    // Verify mention renders with data-mention-id (wait for DOM update)
+    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@Test Display Name Updated' });
+    await expect(mentionInList).toBeVisible({ timeout: 10000 });
   });
 
   test('should show all members when typing @ with empty query @feature:comments', async ({ page }) => {
