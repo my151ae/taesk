@@ -565,6 +565,114 @@ test.describe('Comments Feature @feature:comments', () => {
       await supabaseAdmin.from('comments').delete().eq('id', commentData.id);
     }
   });
+
+  test('should support full-width ＠ trigger @e2e:essential @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    // Set up the wait for members API BEFORE opening the modal
+    const membersResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+
+    // Wait for members API to complete
+    await membersResponsePromise;
+    await page.waitForTimeout(500); // Extra wait for React to update props
+
+    // Find TipTap editor (ProseMirror)
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Type full-width ＠ to trigger mention suggestion
+    await editor.pressSequentially('＠');
+    await page.waitForTimeout(1500); // Wait for suggestion to appear
+
+    // Verify suggestion popup appears
+    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 10000 });
+
+    // Wait for any user option to appear first
+    await expect(suggestionPopup.locator('button').first()).toBeVisible({ timeout: 5000 });
+
+    // Verify specific user option is visible
+    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test Display Name Updated' });
+    await expect(userOption).toBeVisible({ timeout: 5000 });
+
+    // Click to select mention
+    await userOption.click();
+    await page.waitForTimeout(500);
+
+    // Verify mention node was inserted in editor
+    const mention = editor.locator('.mention').filter({ hasText: '@Test Display Name Updated' });
+    await expect(mention).toBeVisible({ timeout: 5000 });
+
+    // Add some text after mention
+    await editor.pressSequentially(' test full-width trigger');
+
+    // Submit comment
+    await page.getByRole('button', { name: 'コメントを投稿' }).click();
+    await page.waitForTimeout(1000);
+
+    // Verify comment appears in list with mention displayed
+    const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'test full-width trigger' });
+    await expect(commentBody).toBeVisible({ timeout: 10000 });
+
+    // Verify mention renders with data-mention-id
+    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@Test Display Name Updated' });
+    await expect(mentionInList).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should support mixed full-width and half-width triggers @feature:comments', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    // Set up the wait for members API BEFORE opening the modal
+    const membersResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
+      { timeout: 15000 }
+    );
+
+    await openCardModalViaQuery(page, currentCard);
+    await page.waitForLoadState('networkidle');
+    await membersResponsePromise;
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror').last();
+    await expect(editor).toBeVisible({ timeout: 15000 });
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Test 1: Full-width ＠
+    await editor.pressSequentially('＠');
+    await page.waitForTimeout(1000);
+
+    let suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+
+    let userOption = suggestionPopup.locator('button').first();
+    await userOption.click();
+    await page.waitForTimeout(300);
+
+    // Add space and test half-width @
+    await editor.pressSequentially(' and @');
+    await page.waitForTimeout(1000);
+
+    suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+
+    userOption = suggestionPopup.locator('button').first();
+    await userOption.click();
+    await page.waitForTimeout(300);
+
+    // Verify both mentions are in the editor
+    const mentions = editor.locator('.mention');
+    await expect(mentions).toHaveCount(2, { timeout: 5000 });
+  });
 });
 
 test.describe('Comments Realtime @feature:comments', () => {

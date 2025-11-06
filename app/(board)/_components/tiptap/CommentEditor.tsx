@@ -11,6 +11,7 @@ import { Mention } from './Mention';
 import Suggestion from '@tiptap/suggestion';
 import { PluginKey } from '@tiptap/pm/state';
 import { createMentionSuggestion } from './MentionSuggestion';
+import { ZenkakuMentionTrigger } from './ZenkakuMentionTrigger';
 import { fromStorage, toStorage, getCachedProfileName, cacheProfiles } from '@/lib/mention-utils';
 import { useEffect, useMemo } from 'react';
 import type { ProfileSummary } from '@/lib/supabase';
@@ -176,6 +177,14 @@ export default function CommentEditor({
               })
               .run();
           },
+        },
+      }),
+      // Full-width ＠ trigger support
+      ZenkakuMentionTrigger.configure({
+        searchProfiles,
+        onInsertMention: (props) => {
+          // Optional: track full-width mention insertions
+          console.debug('[ZenkakuMention] Inserted:', props);
         },
       }),
     ],
