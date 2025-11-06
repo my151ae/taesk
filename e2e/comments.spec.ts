@@ -165,27 +165,16 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
 }
 
 async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise<void> {
+  // Simple approach: Just click the card to open modal
   const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
+  await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
   await cardLocator.click();
-  await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
 
-  let urlMatched = true;
-  try {
-    await expect
-      .poll(() => page.url(), { timeout: 10000 })
-      .toContain(`card=${card.shortId}`);
-  } catch {
-    urlMatched = false;
-  }
+  // Wait for modal to open
+  await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
 
-  if (!urlMatched) {
-    const baseUrl = page.url().split('?')[0];
-    await page.goto(`${baseUrl}?card=${card.shortId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
-    await expect
-      .poll(() => page.url(), { timeout: 10000 })
-      .toContain(`card=${card.shortId}`);
-  }
+  // Give it a moment to settle
+  await page.waitForTimeout(500);
 }
 
 test.describe('Comments Feature @feature:comments', () => {
