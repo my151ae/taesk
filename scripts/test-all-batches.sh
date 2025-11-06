@@ -15,7 +15,8 @@ mkdir -p test-results/batches
 mkdir -p test-results/logs
 
 # Output file for full log
-LOG_FILE="test-results/logs/batch-execution-$(date +%Y%m%d-%H%M%S).log"
+RUN_ID=$(date +%Y%m%d-%H%M%S)
+LOG_FILE="test-results/logs/batch-execution-${RUN_ID}.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "Log file: $LOG_FILE"
@@ -40,6 +41,8 @@ for test in "${test_files[@]}"; do
   echo "Running: $test"
   echo "----------------------------------------"
 
+  export PLAYWRIGHT_JSON_OUTPUT_NAME="test-results/batches/${RUN_ID}-${test}.json"
+
   if npm run test:$test; then
     passed_tests+=("$test")
     echo "✅ $test PASSED"
@@ -50,6 +53,8 @@ for test in "${test_files[@]}"; do
 
   echo ""
 done
+
+unset PLAYWRIGHT_JSON_OUTPUT_NAME
 
 # Summary
 echo "=========================================="

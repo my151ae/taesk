@@ -737,3 +737,109 @@ test.describe('Comments Realtime @feature:comments', () => {
     }
   });
 });
+
+test.describe('Comments Performance @feature:comments', () => {
+  let board: TestBoardContext | null = null;
+  let card: TestCardContext | null = null;
+
+  test.beforeAll(async () => {
+    const boardName = `Perf Test ${Date.now()}`;
+    board = await seedTestBoard(boardName);
+  });
+
+  test.afterAll(async () => {
+    if (board) {
+      await supabaseAdmin.from('boards').delete().eq('id', board.id);
+    }
+  });
+
+  test('should load comments modal within performance budget @e2e:essential', async ({ page }) => {
+    const currentBoard = assertContext(board, 'Board context not initialized');
+
+    await page.goto(currentBoard.canonicalPath);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Create card
+    await page.getByRole('button', { name: '+ カードを追加' }).first().click();
+    await page.getByPlaceholder('カードのタイトル').fill('Performance Test Card');
+    await page.keyboard.press('Enter');
+
+    const cardElement = page.locator('[data-testid^="card-"]').first();
+    await cardElement.waitFor({ state: 'visible', timeout: 5000 });
+    const cardId = (await cardElement.getAttribute('data-testid'))?.replace('card-', '') ?? '';
+
+    card = {
+      id: cardId,
+      shortId: '', // Not needed for this test
+      title: 'Performance Test Card',
+    };
+
+    // Measure performance: Open modal and wait for comments to render
+    const startTime = Date.now();
+
+    // Open card modal
+    await cardElement.click();
+    await page.waitForURL(`**/c/${cardId}**`, { timeout: 5000 });
+
+    // Wait for modal to be visible
+    await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5000 });
+
+    // Wait for comments panel to be visible
+    await page.locator('[data-testid="comments-panel"]').waitFor({ state: 'visible', timeout: 5000 });
+
+    // Wait for comments to finish loading (no "読み込み中..." text)
+    await expect(page.getByText('読み込み中...')).not.toBeVisible({ timeout: 10000 });
+
+    const endTime = Date.now();
+    const loadTime = endTime - startTime;
+
+    console.log(`[Perf] Comments modal load time: ${loadTime}ms`);
+
+    // Performance budget: should load within 2 seconds
+    expect(loadTime).toBeLessThan(2000);
+  });
+
+  test('should not redundantly fetch members on modal reopen @e2e:essential', async ({ page }) => {
+    const currentBoard = assertContext(board, 'Board context not initialized');
+    const currentCard = assertContext(card, 'Card context not initialized');
+
+    await page.goto(currentBoard.canonicalPath);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Setup network monitoring
+    const memberRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = request.url();
+      if (url.includes('/api/boards/') && url.includes('/members')) {
+        memberRequests.push(url);
+        console.log(`[Network] Member fetch: ${url}`);
+      }
+    });
+
+    // First modal open
+    await openCardModalViaQuery(page, currentCard);
+    await page.locator('[data-testid="comments-panel"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(1000); // Allow time for any network requests
+
+    const firstOpenRequests = memberRequests.length;
+    console.log(`[Perf] First modal open: ${firstOpenRequests} member requests`);
+
+    // Close modal
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
+
+    // Clear requests array
+    memberRequests.length = 0;
+
+    // Second modal open - should use cache
+    await openCardModalViaQuery(page, currentCard);
+    await page.locator('[data-testid="comments-panel"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(1000);
+
+    const secondOpenRequests = memberRequests.length;
+    console.log(`[Perf] Second modal open: ${secondOpenRequests} member requests`);
+
+    // Should not fetch members again (cache hit)
+    expect(secondOpenRequests).toBe(0);
+  });
+});

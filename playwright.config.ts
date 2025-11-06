@@ -9,6 +9,8 @@ const workers = process.env.PW_WORKERS
   ? Number(process.env.PW_WORKERS)
   : (isCI ? 2 : '50%'); // CI: 2 workers (競合低減), Local: 50% (速度重視)
 const defaultJsonOutput = path.join('test-results', 'playwright-report.json');
+const artifactsDir = path.join('test-results', 'artifacts');
+const htmlReportDir = path.join('test-results', 'html-report');
 
 const resolveJsonOutput = (value?: string) => {
   if (!value) return defaultJsonOutput;
@@ -29,10 +31,10 @@ export default defineConfig({
   workers,
   timeout: 90_000, // テストタイムアウトを90秒に延長
   expect: { timeout: 10_000 }, // expect タイムアウトを10秒に延長
-  outputDir: 'test-results',
+  outputDir: artifactsDir,
   reporter: isCI
     ? [['json', { outputFile: jsonOutput }]]
-    : [['list'], ['json', { outputFile: jsonOutput }], ['html', { outputFolder: 'test-results/html-report', open: 'never' }]],
+    : [['json', { outputFile: jsonOutput }], ['html', { outputFolder: htmlReportDir, open: 'never' }]],
   globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
   use: {
     baseURL: 'http://localhost:3000',

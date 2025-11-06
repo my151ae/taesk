@@ -72,9 +72,11 @@
 ### During Development
 
 1. **コードを更新**し、関連ドキュメントを即時に追随させる
-2. **Playwright E2E（JSONレポート必須）で挙動を確認**  
-   - `npx playwright test --reporter=json > playwright-report.json`
-   - `cat playwright-report.json | jq '.stats'` で結果確認  
+2. **Playwright E2E（test-results/配下に保存）で挙動を確認**
+   - ⚠️ **必須**: `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/<filename>.json` を指定
+   - 例: `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/dev-test.json npx playwright test --grep @feature:comments`
+   - または: `npm run test:all-split` でバッチ分割実行（自動的に test-results/batches/ へ保存）
+   - 結果確認: `cat test-results/<filename>.json | jq '.stats'`
    - 必要に応じて `sed -n '/^{/,$p'` を挟み、JSON開始前のログを除去
 3. **chrome-devtools MCP でレンダリングとコンソールログを確認**（サーバー起動は禁止のためブラウザはMCPで確認）
 4. **通知音などブラウザ依存機能**は `NotificationSettings` の「音声を有効化」「テスト音を再生」ボタンで検証し、ログを記録
@@ -266,18 +268,47 @@ npm run test:feature:notifications  # 通知機能
 # 異常系テスト
 npm run test:failure
 
-# 全テスト実行
-npm run test:full
+# 全テスト実行（推奨: 分割実行で高速化）
+npm run test:all-split           # バッチ分割実行（約12分）
+npm run test:full                # 一括実行（時間がかかる）
+
+# 失敗テストのみ再実行
+npm run test:rerun               # 最新バッチの失敗を再実行
 
 # JSON統計確認
 npm run test:summary
 ```
 
+**⚠️ テスト成果物の配置ルール（厳守）**:
+
+**絶対ルール**: テスト成果物は **必ず `test-results/` 配下** に保存すること。**ルートディレクトリには一切配置禁止**。
+
+**ディレクトリ構成**:
+```
+test-results/
+├── batches/          # 分割実行の各バッチJSONレポート
+│   └── YYYYMMDD-HHMMSS-<batch-name>.json
+├── logs/             # バッチ実行ログ
+│   └── batch-execution-YYYYMMDD-HHMMSS.log
+├── artifacts/        # スクリーンショット・トレース
+│   └── <test-name>/
+├── archive/          # 旧レポートのアーカイブ
+│   └── YYYYMMDD-HHMMSS-root-json/
+└── <feature>-latest.json  # 機能別最新レポート
+```
+
+**Claude Code 作業時の注意**:
+- テスト実行時は **必ず** `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/<filename>.json` を指定
+- 手動実行例: `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/manual-test.json npx playwright test`
+- ルートに `.json` ファイルが生成された場合は即座に `test-results/archive/` へ移動
+- `npm run test:all-split` を使用すれば自動的に `test-results/batches/` へ保存される
+
 **テスト成果物**（すべて `.gitignore` に含まれる）:
-- `playwright-report.json` - テスト結果（JSON）
+- `test-results/batches/*.json` - バッチ別テスト結果（JSON）
+- `test-results/logs/*.log` - 実行ログ
+- `test-results/artifacts/` - 失敗時のスクリーンショット・トレース
 - `playwright/.auth/user.json` - 認証セッション
-- `test-results/` - 失敗時のスクリーンショット
-- `playwright-report/` - HTML レポート
+- `playwright-report/` - HTML レポート（`npx playwright show-report`）
 
 ### Test Coverage (83 tests)
 

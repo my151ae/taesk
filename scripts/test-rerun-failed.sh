@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPORT_PATH="playwright-report.json"
-OUTPUT_PATH="playwright-report-rerun.json"
+REPORT_PATH="test-results/playwright-report.json"
+OUTPUT_PATH="test-results/playwright-report-rerun.json"
 PROJECT="core"
 
 usage() {
   cat <<'USAGE'
 Usage: scripts/test-rerun-failed.sh [options]
-  -r, --report <path>   Source JSON reporter output (default: playwright-report.json)
-  -o, --output <path>   Destination JSON reporter output for the re-run (default: playwright-report-rerun.json)
+  -r, --report <path>   Source JSON reporter output (default: test-results/playwright-report.json)
+  -o, --output <path>   Destination JSON reporter output for the re-run (default: test-results/playwright-report-rerun.json)
   -p, --project <name>  Playwright project to run (default: core)
 USAGE
 }
