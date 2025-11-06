@@ -571,7 +571,11 @@ export function CardModal({
             <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-gray-100">
               Comments
             </h3>
-            <CommentsPanel cardId={card.id} boardId={card.board_id} />
+            <CommentsPanel
+              cardId={card.id}
+              boardId={card.board_id}
+              initialProfiles={profiles}
+            />
           </div>
         </div>
 

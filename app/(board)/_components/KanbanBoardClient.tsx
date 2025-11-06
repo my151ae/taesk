@@ -49,6 +49,7 @@ import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib
 import { CardModal } from "@/app/components/CardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 import { initializeCommentsStore, useCommentsStore } from "../_stores/comments-store";
+import { useBoardMembersStore, type BoardMember } from "../_stores/board-members-store";
 import { createClientTrace } from "@/lib/metrics/client";
 import type { ClientTrace } from "@/lib/metrics/client";
 import type { TraceSummary } from "@/lib/metrics/types";
@@ -1073,6 +1074,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     loadBoards();
   }, [user]);
 
+  const { setMembers: setStoredMembers, getMembers: getStoredMembers, shouldRefetch } = useBoardMembersStore();
+
   useEffect(() => {
     let isDisposed = false;
 
@@ -1080,6 +1083,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       if (!user || !currentBoardId) {
         if (!isDisposed) {
           setBoardMembers([]);
+        }
+        return;
+      }
+
+      // Check cache first
+      const cached = getStoredMembers(currentBoardId);
+      if (cached && !shouldRefetch(currentBoardId)) {
+        if (!isDisposed) {
+          setBoardMembers(cached.map(m => m.profile));
         }
         return;
       }
@@ -1096,10 +1108,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         }
 
         const { members } = await response.json();
-        const profiles: ProfileSummary[] = members.map((m: any) => m.profile);
+        const boardMembers: BoardMember[] = members.map((m: any) => ({
+          profile: m.profile,
+          role: m.role
+        }));
+        const profiles: ProfileSummary[] = boardMembers.map(m => m.profile);
 
         if (!isDisposed) {
           setBoardMembers(profiles);
+          setStoredMembers(currentBoardId, boardMembers); // Save to store
         }
       } catch (error) {
         console.error('Unexpected error loading board members:', error);
@@ -1114,7 +1131,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     return () => {
       isDisposed = true;
     };
-  }, [user, currentBoardId]);
+  }, [user, currentBoardId, getStoredMembers, setStoredMembers, shouldRefetch]);
 
   // Load board data when currentBoardId changes
   useEffect(() => {
@@ -2761,8 +2778,13 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
               const response = await fetch(`/api/boards/${currentBoardId}/members`);
               if (response.ok) {
                 const { members } = await response.json();
-                const profiles: ProfileSummary[] = members.map((m: any) => m.profile);
+                const boardMembers: BoardMember[] = members.map((m: any) => ({
+                  profile: m.profile,
+                  role: m.role
+                }));
+                const profiles: ProfileSummary[] = boardMembers.map(m => m.profile);
                 setBoardMembers(profiles);
+                setStoredMembers(currentBoardId, boardMembers); // Update store
               }
             } catch (error) {
               console.error('Error reloading board members:', error);

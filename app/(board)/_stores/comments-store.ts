@@ -156,8 +156,45 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
   upsertComment: (cardId, comment) => {
     set(prev => {
       const current = prev.cards[cardId] ?? getInitialCardState();
+
+      // Check if this exact comment already exists
+      const existingIndex = current.comments.findIndex(c => c.id === comment.id);
+
+      // Idempotency check: if existing comment is newer or same, skip update
+      if (existingIndex >= 0) {
+        const existing = current.comments[existingIndex];
+        const existingTime = new Date(existing.updated_at).getTime();
+        const incomingTime = new Date(comment.updated_at).getTime();
+
+        if (existingTime >= incomingTime) {
+          // Existing comment is newer or same, skip update
+          return prev;
+        }
+
+        // Update existing comment in place
+        const updatedComments = [...current.comments];
+        updatedComments[existingIndex] = {
+          ...comment,
+          optimistic: false,
+          idempotencyKey: comment.idempotency_key ?? comment.idempotencyKey
+        };
+
+        const next: CardCommentState = {
+          comments: updatedComments,
+          status: current.status === 'idle' ? 'ready' : current.status,
+          error: current.error,
+        };
+
+        return {
+          cards: {
+            ...prev.cards,
+            [cardId]: next,
+          },
+        };
+      }
+
+      // Filter out duplicates by idempotency_key
       const existing = current.comments.filter(existingComment => {
-        if (existingComment.id === comment.id) return false;
         if (comment.idempotency_key && existingComment.idempotencyKey === comment.idempotency_key) {
           return false;
         }

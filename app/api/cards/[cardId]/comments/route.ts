@@ -20,12 +20,12 @@ export async function GET(
       );
     }
 
-    // Fetch comments with author info
+    // Fetch comments with author info (using profiles!inner for better performance)
     const { data: comments, error } = await supabase
       .from('comments')
       .select(`
         *,
-        author:author_id (
+        author:profiles!author_id (
           id,
           username,
           display_name,

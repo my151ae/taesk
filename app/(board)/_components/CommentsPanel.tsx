@@ -11,11 +11,13 @@ import {
   initializeCommentsStore,
   useCommentsStore,
 } from '../_stores/comments-store';
+import { useBoardMembersStore } from '../_stores/board-members-store';
 import CommentEditor from './tiptap/CommentEditor';
 
 interface CommentsPanelProps {
   cardId: string;
   boardId: string;
+  initialProfiles?: ProfileSummary[]; // Pre-loaded profiles from parent to avoid re-fetch
 }
 
 interface CommentThread extends BoardComment {
@@ -51,9 +53,15 @@ const parseMentions = (text: string): string[] => {
   return Array.from(new Set(uuids));
 };
 
-export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
+export default function CommentsPanel({ cardId, boardId, initialProfiles }: CommentsPanelProps) {
   const { user } = useAuth();
-  const [members, setMembers] = useState<ProfileSummary[]>([]);
+  const { getMembers: getStoredMembers } = useBoardMembersStore();
+
+  // Try to get from store first, fallback to initialProfiles
+  const storedMembers = getStoredMembers(boardId);
+  const [members, setMembers] = useState<ProfileSummary[]>(
+    storedMembers?.map(m => m.profile) ?? initialProfiles ?? []
+  );
   const [userRole, setUserRole] = useState<MemberRole | null>(null);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -62,6 +70,13 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Performance measurement
+  useEffect(() => {
+    if (typeof performance !== 'undefined') {
+      performance.mark('cmt-modal-open');
+    }
+  }, []);
 
   const loadComments = useCommentsStore(state => state.loadComments);
   const submitComment = useCommentsStore(state => state.submitComment);
@@ -81,20 +96,46 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
     [members, user?.id],
   );
 
+  // Performance: first comment render
+  useEffect(() => {
+    if (comments.length > 0 && typeof performance !== 'undefined') {
+      performance.mark('cmt-first-render');
+      performance.measure('cmt_TTI', 'cmt-modal-open', 'cmt-first-render');
+    }
+  }, [comments]);
+
+  // Performance: all comments loaded
+  useEffect(() => {
+    if (commentStatus === 'ready' && typeof performance !== 'undefined') {
+      performance.mark('cmt-all-rendered');
+      performance.measure('cmt_TTC', 'cmt-modal-open', 'cmt-all-rendered');
+
+      // Log performance metrics
+      try {
+        const tti = performance.getEntriesByName('cmt_TTI')[0]?.duration;
+        const ttc = performance.getEntriesByName('cmt_TTC')[0]?.duration;
+        console.log(`[Perf] Comments TTI: ${tti?.toFixed(0)}ms, TTC: ${ttc?.toFixed(0)}ms`);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+  }, [commentStatus]);
+
   useEffect(() => {
     initializeCommentsStore();
   }, []);
 
   useEffect(() => {
-    retryPending().catch(error => {
-      console.warn('Failed to retry pending comments on mount', error);
-    });
-  }, [retryPending]);
-
-  useEffect(() => {
     if (!featureFlags.comments) return;
-    loadComments(cardId);
-  }, [cardId, loadComments]);
+
+    // Run loadComments and retryPending in parallel for faster initial load
+    Promise.all([
+      loadComments(cardId),
+      retryPending().catch(error => {
+        console.warn('Failed to retry pending comments on mount', error);
+      })
+    ]);
+  }, [cardId, loadComments, retryPending]);
 
   useEffect(() => {
     setReplyTo(null);
@@ -108,6 +149,29 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
   useEffect(() => {
     if (!featureFlags.comments) return;
 
+    // 1. Check store first (cache-first strategy)
+    const storedData = getStoredMembers(boardId);
+    if (storedData && storedData.length > 0) {
+      setMembers(storedData.map(m => m.profile));
+      // Set current user's role from stored data
+      if (user?.id) {
+        const currentMember = storedData.find(m => m.profile.id === user.id);
+        if (currentMember) {
+          setUserRole(currentMember.role);
+        }
+      }
+      return;
+    }
+
+    // 2. Skip fetch if initialProfiles are provided (performance optimization)
+    if (initialProfiles && initialProfiles.length > 0) {
+      setMembers(initialProfiles);
+      // Note: We don't have role info from initialProfiles yet
+      // This is acceptable as role is only used for UI permissions
+      return;
+    }
+
+    // 3. Fetch from API as last resort (should rarely happen if KanbanBoardClient already loaded)
     let ignore = false;
 
     const loadMembers = async () => {
@@ -139,7 +203,7 @@ export default function CommentsPanel({ cardId, boardId }: CommentsPanelProps) {
     return () => {
       ignore = true;
     };
-  }, [boardId, user?.id]);
+  }, [boardId, user?.id, initialProfiles, getStoredMembers]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
