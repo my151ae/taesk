@@ -501,8 +501,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await memberSearchInput.fill('E2E');
     await page.waitForTimeout(300);
 
-    // Click on the E2E user in the dropdown (force click to bypass overlay)
-    await page.getByRole('button', { name: /e2e\.taesk\.test@gmail\.com/i }).first().click({ force: true });
+    // Click on the E2E user in the dropdown (using text content selector)
+    await page.locator('button:has-text("e2e.taesk.test@gmail.com")').first().click();
     await page.waitForTimeout(500);
 
     // Click Save to persist changes (wait for PATCH response)

@@ -180,8 +180,7 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise
 
   if (!urlMatched) {
     const baseUrl = page.url().split('?')[0];
-    await page.goto(`${baseUrl}?card=${card.shortId}`);
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto(`${baseUrl}?card=${card.shortId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
     await expect
       .poll(() => page.url(), { timeout: 10000 })
