@@ -7,13 +7,15 @@
 > - 上記方針に反するコマンド・手順は今後一切行わない。
 > - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
 
-## 現状メモ（2025-10-31 JST）
+## 現状メモ（2025-11-10 JST）
 
-- 作業ツリーには `tsconfig.tsbuildinfo` の変更が存在するが、ビルド生成物のためコミット対象外とする。
-- 保存・読み込み遅延と技術的負債の解消を目的としたチケットを作成済み: `docs/tickets/2025-10-31/01-refactor-storage-performance.md`
-- ボード読み込み・API・同期キューに計測トレース (`lib/metrics/{client,server}.ts`) を導入し、同期キューに冪等キーと実行トレースを追加済み。
-- `npx playwright test e2e/kanban.spec.ts --project=core --grep "@e2e:essential" --reporter=json | tee playwright-report.json` を実行し、テスト自体は成功。`test-summary.js` で `board-load` p95=5.29s (threshold 3s) を検知し非0終了となるため、引き続きパフォーマンス改善が必要。
-- 上記結果と次アクションを `docs/tickets/2025-10-31/02-board-load-metrics-followup.md` にまとめ済み。
+- 作業ツリーには引き続き `tsconfig.tsbuildinfo` の変更が存在するが、ビルド生成物のためコミット対象外とする。
+- 保存・読み込み遅延と技術的負債の解消タスクは `docs/tickets/2025-10-31/01-refactor-storage-performance.md` で管理中。ボード読み込み／API／同期キューの計測トレース (`lib/metrics/{client,server}.ts`) と冪等キー追加、実行トレースは既に導入済み。
+- 2025-11-06 実行分の E2E サマリーは `docs/tickets/2025-11-06/04-test-all-split-summary.md` に集約済み（`npm run test:all-split`, log: `test-results/logs/batch-execution-20251106-163143.log`, JSON: `test-results/batches/20251106-163143-*.json`, Passed 49 / Failed 12 / Flaky 1 / Skipped 15）。主な失敗は Kanban の multi-assignee シナリオと Comments 系のクエリ遷移タイムアウト。
+- 2025-11-10 16:32 JST に `npm run test:all-split` を実行（詳細: `docs/tickets/2025-11-10/01-test-all-split-summary.md`）。ログは `test-results/logs/batch-execution-20251110-163250.log`、JSON は `test-results/batches/20251110-163250-*.json`。`auth`, `kanban`, `reorder`, `notifications`, `permissions`, `rls` は ✅。`comments` バッチのみ ❌（6 件失敗、1 件 flaky、`page.waitForResponse` タイムアウトやカードモーダル初期化失敗が原因）。skip 以外で未解決の失敗が残存。
+- `e2e/comments.spec.ts` は 2025-11-10 に単体再実行し、16 件すべて成功（`PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/20251110-170634-comments-fix.json npx playwright test e2e/comments.spec.ts --project=core --reporter=json`）。修正内容とログは同チケット末尾の「comments.spec.ts 単体再実行」に追記済み。
+- 同日 17:15 JST に `npm run test:all-split` を再実行し、全 7 バッチ通過（`test-results/logs/batch-execution-20251110-171550.log` / `test-results/batches/20251110-171550-*.json`）。`comments` バッチのみ Flaky=1（TipTap 投稿時に `/api/cards/[cardId]/comments` が一度 `Unexpected end of JSON input`）だが Failed/Skipped は 0。
+- `npx playwright test e2e/kanban.spec.ts --project=core --grep "@e2e:essential" --reporter=json | tee playwright-report.json` 実行時は `test-summary.js` で `board-load` p95=5.29s (>3s threshold) により非0終了。フォローアップは `docs/tickets/2025-10-31/02-board-load-metrics-followup.md` 参照し、パフォーマンス改善を継続する。
 
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。

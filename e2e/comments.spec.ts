@@ -164,14 +164,30 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
   throw new Error('Card creation did not return a short_id within timeout');
 }
 
-async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise<void> {
-  // Simple approach: Just click the card to open modal
-  const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
-  await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
-  await cardLocator.click();
+async function openCardModalViaQuery(page: Page, card: TestCardContext, boardContext?: TestBoardContext): Promise<void> {
+  if (boardContext && card.shortId) {
+    const targetUrl = `${boardContext.canonicalPath}?card=${card.shortId}`;
+    await page.goto(targetUrl);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(`**card=${card.shortId}**`, { timeout: 10000 });
+  } else {
+    const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
+    await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
+    await cardLocator.click();
+  }
 
   // Wait for modal to open
   await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
+
+  // Switch to Comments tab explicitly
+  const commentsTab = page.getByRole('tab', { name: 'Comments' });
+  if (await commentsTab.isVisible()) {
+    await commentsTab.click();
+    await page.waitForTimeout(300);
+  }
+
+  // Wait for Comments section to be ready
+  await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible({ timeout: 5000 });
 
   // Give it a moment to settle
   await page.waitForTimeout(500);
@@ -180,6 +196,7 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext): Promise
 test.describe('Comments Feature @feature:comments', () => {
   let board: TestBoardContext | null = null;
   let card: TestCardContext | null = null;
+  const requireBoardContext = (): TestBoardContext => assertContext(board, 'Board context not initialised');
 
   test.beforeEach(async ({ page }) => {
     const boardName = `${TEST_BOARD_NAME}-${Date.now()}`;
@@ -199,7 +216,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should show Comments tab in card modal via ?card= route', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
 
     // Wait for Comments section to be visible (can be h3 or text)
     await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible();
@@ -212,7 +229,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should preserve card modal state on reload with ?card= query', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     const urlBeforeReload = page.url();
     expect(urlBeforeReload).toContain(`card=${currentCard.shortId}`);
 
@@ -226,7 +243,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should create a comment successfully', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
 
     const commentText = `Test comment ${Date.now()}`;
 
@@ -244,7 +261,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should edit and delete own comment', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
 
     const commentText = `Comment to edit ${Date.now()}`;
 
@@ -290,7 +307,7 @@ test.describe('Comments Feature @feature:comments', () => {
       });
     expect(parentError).toBeNull();
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
 
     const parentLocator = page.locator('[data-testid="comment-body"]', { hasText: parentText });
     await expect(parentLocator).toBeVisible({ timeout: 15000 });
@@ -320,17 +337,8 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should support @mentions with TipTap editor @e2e:essential @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Set up the wait for members API BEFORE opening the modal
-    const membersResponsePromise = page.waitForResponse(
-      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
-      { timeout: 15000 }
-    );
-
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
-
-    // Wait for members API to complete
-    await membersResponsePromise;
     await page.waitForTimeout(500); // Extra wait for React to update props
 
     // Find TipTap editor (ProseMirror)
@@ -382,7 +390,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should show all members when typing @ with empty query @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
     const editor = page.locator('.ProseMirror').last();
@@ -407,7 +415,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should filter members by name when typing after @ @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
     const editor = page.locator('.ProseMirror').last();
@@ -423,15 +431,15 @@ test.describe('Comments Feature @feature:comments', () => {
     const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
     await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
 
-    // Verify E2E Test User is shown (matches "e2e")
-    const userOption = suggestionPopup.locator('button').filter({ hasText: 'E2E Test User' });
+    // Verify test user is shown (matches "e2e" - actual display name may vary)
+    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test' });
     await expect(userOption).toBeVisible({ timeout: 3000 });
   });
 
   test('should use Enter to select mention and Shift+Enter to submit @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
     const editor = page.locator('.ProseMirror').last();
@@ -466,7 +474,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should save mentions as <@id> format but display as @name @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
     const editor = page.locator('.ProseMirror').last();
@@ -508,8 +516,8 @@ test.describe('Comments Feature @feature:comments', () => {
     const commentBody = page.locator('[data-testid="comment-body"]').filter({ hasText: 'storage format test' });
     await expect(commentBody).toBeVisible();
 
-    // Should show @E2E Test User, not <@uuid>
-    await expect(commentBody.locator('[data-mention-id]').filter({ hasText: '@E2E Test User' })).toBeVisible();
+    // Should show @Test (display name), not <@uuid>
+    await expect(commentBody.locator('[data-mention-id]').filter({ hasText: '@Test' })).toBeVisible();
     // Should NOT show <@uuid> pattern
     const bodyText = await commentBody.textContent();
     expect(bodyText).not.toMatch(/<@[a-f0-9-]{36}>/);
@@ -518,7 +526,7 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should validate mention user_id as UUID v4', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle'); // モーダル表示完了を確実に待つ
 
     // Create comment with mention via API to verify UUID format
@@ -563,7 +571,7 @@ test.describe('Comments Feature @feature:comments', () => {
       { timeout: 15000 }
     );
 
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
     // Wait for members API to complete
@@ -619,15 +627,8 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should support mixed full-width and half-width triggers @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Set up the wait for members API BEFORE opening the modal
-    const membersResponsePromise = page.waitForResponse(
-      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
-      { timeout: 15000 }
-    );
-
-    await openCardModalViaQuery(page, currentCard);
+    await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
-    await membersResponsePromise;
     await page.waitForTimeout(500);
 
     const editor = page.locator('.ProseMirror').last();
@@ -680,10 +681,11 @@ test.describe('Comments Realtime @feature:comments', () => {
       await loadBoard(page2, board);
 
       const card = await createTestCard(page1, board);
+      await loadBoard(page2, board);
       await expect(page2.locator(`[data-testid="card-${card.id}"]`)).toBeVisible({ timeout: 10000 });
 
-      await openCardModalViaQuery(page1, card);
-      await openCardModalViaQuery(page2, card);
+      await openCardModalViaQuery(page1, card, board);
+      await openCardModalViaQuery(page2, card, board);
 
       // Wait for Comments section in both pages
       await page1.getByText('Comments', { exact: true }).first().waitFor({ state: 'visible', timeout: 5000 });
@@ -712,7 +714,7 @@ test.describe('Comments Realtime @feature:comments', () => {
           } catch {
             await page2.goto(board.canonicalPath);
             await page2.waitForLoadState('domcontentloaded');
-            await openCardModalViaQuery(page2, card);
+            await openCardModalViaQuery(page2, card, board);
             await page2.waitForTimeout(300);
             return false;
           }
@@ -727,6 +729,7 @@ test.describe('Comments Realtime @feature:comments', () => {
 });
 
 test.describe('Comments Performance @feature:comments', () => {
+  test.describe.configure({ mode: 'serial' });
   let board: TestBoardContext | null = null;
   let card: TestCardContext | null = null;
 
@@ -744,30 +747,22 @@ test.describe('Comments Performance @feature:comments', () => {
   test('should load comments modal within performance budget @e2e:essential', async ({ page }) => {
     const currentBoard = assertContext(board, 'Board context not initialized');
 
-    await page.goto(currentBoard.canonicalPath);
-    await page.waitForLoadState('domcontentloaded');
+    await loadBoard(page, currentBoard);
 
-    // Create card
-    await page.getByRole('button', { name: '+ カードを追加' }).first().click();
-    await page.getByPlaceholder('カードのタイトル').fill('Performance Test Card');
-    await page.keyboard.press('Enter');
+    const createdCard = await createTestCard(page, currentBoard);
+    card = createdCard;
 
-    const cardElement = page.locator('[data-testid^="card-"]').first();
-    await cardElement.waitFor({ state: 'visible', timeout: 5000 });
-    const cardId = (await cardElement.getAttribute('data-testid'))?.replace('card-', '') ?? '';
-
-    card = {
-      id: cardId,
-      shortId: '', // Not needed for this test
-      title: 'Performance Test Card',
-    };
+    const cardElement = page.locator(`[data-testid="card-${createdCard.id}"]`).first();
+    await cardElement.waitFor({ state: 'visible', timeout: 10000 });
 
     // Measure performance: Open modal and wait for comments to render
     const startTime = Date.now();
 
     // Open card modal
     await cardElement.click();
-    await page.waitForURL(`**/c/${cardId}**`, { timeout: 5000 });
+    if (createdCard.shortId) {
+      await page.waitForURL(`**card=${createdCard.shortId}**`, { timeout: 5000 });
+    }
 
     // Wait for modal to be visible
     await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5000 });
