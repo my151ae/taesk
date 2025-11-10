@@ -501,8 +501,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await memberSearchInput.fill('E2E');
     await page.waitForTimeout(300);
 
-    // Click on the E2E user in the dropdown (using text content selector)
-    await page.locator('button:has-text("e2e.taesk.test@gmail.com")').first().click();
+    // Click on the E2E user in the dropdown (matches "Test Display Name Updated" or "E2E Test User")
+    await page.locator('button:has-text("E2E Test User")').first().click();
     await page.waitForTimeout(500);
 
     // Click Save to persist changes (wait for PATCH response)
@@ -781,11 +781,12 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.goto(`/?board=${testBoardId}`);
     await page.waitForURL(`**${testBoardCanonicalPath}`);
     await page.waitForLoadState('domcontentloaded');
-    const testUserEmail = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
-    await page.waitForSelector(`text=${testUserEmail}`, { timeout: 10000 });
 
-    // Wait for board to load
+    // Wait for board to load (verify list and card persisted)
     await getBoardTitleButton(page).waitFor({ state: 'visible' });
+    await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible({ timeout: 10000 });
+    const cardsAfterReload = page.locator('[data-testid^="card-"]');
+    await expect(cardsAfterReload).toHaveCount(cardCountBefore + 1, { timeout: 10000 });
 
     // Verify card still exists (synced to Supabase)
     await expect(page.getByText('New Card').first()).toBeVisible();
