@@ -11,6 +11,7 @@ Taesk の Playwright テスト運用を **JSON レポート常時出力**・**�
 - **レポーター**: CI は JSON のみ、ローカルは `list` + JSON + HTML（`open: 'never'`）。
 - **認証**: `globalSetup` で正規ログインし、`playwright/.auth/user.json` を共有。`NEXT_PUBLIC_BYPASS_AUTH` は使用しない。
 - **タグ運用**: `@e2e:essential`（最小経路）、`@feature:*`（機能別）、`@failure:*`（異常系）、`@phase3`、`@wip`。
+- **Web サーバー**: Playwright の `webServer.command`（`NODE_ENV=test npm run dev`）のみが Next.js dev サーバーを起動してよい経路。テストを始める前にポート 3000 が空いているか確認し、孤立した `next dev` や `playwright test` プロセスは確実に停止させてから実行する。
 
 ---
 
@@ -80,6 +81,13 @@ export default defineConfig({
 ---
 
 ## 4. テスト実行パターン
+
+### 4.1 事前チェック（必須）
+
+1. `lsof -i :3000` で既存の `next dev` がいないことを確認する（出力がある場合は PID を控える）。
+2. 残っている場合は `pkill -f 'node .*next dev'` と `pkill -f 'playwright test'` で手動停止し、`lsof -i :3000` が空になるまで繰り返す。
+3. 直前の実行で `scripts/test-all-batches.sh` がハングしていた場合は、`ps -Ao pid,ppid,pgid,command | grep -E 'scripts/test-all-batches|playwright test'` で孤立プロセスを洗い出し、必要に応じて `pkill` する。
+4. 新しいバッチログ（`test-results/logs/batch-execution-*.log`）を tail し、`auth` が 60 秒以上進まない場合はすぐに上記クリーンアップをやり直して再実行する。
 
 ### package.json スクリプト（推奨）
 

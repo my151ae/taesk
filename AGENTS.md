@@ -6,6 +6,7 @@
 > - テスト結果やログ確認で停止せずに済むよう、JSON ファイルを生成したうえで内容を確認し、失敗時は解析用スクリプト（例: `python - ... json.loads`）で詳細を抽出する。
 > - 上記方針に反するコマンド・手順は今後一切行わない。
 > - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
+> - Playwright の `webServer.command` が内部で `NODE_ENV=test npm run dev` を起動する点のみ例外扱いとし、手動で `npm run dev` を叩かない。実行前にポート 3000 が空いているか確認し、孤立した `next dev`/`playwright test` プロセスは必ず停止させてからテストを開始する。
 
 ## 現状メモ（2025-11-10 JST）
 
@@ -46,6 +47,7 @@ The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explici
 ## Testing Guidelines
 - Playwright (`@playwright/test`) で E2E を実行する際は、`npx playwright test --reporter=json > playwright-report.json` を必須コマンドとして使用し、常に JSON レポートを生成する。`.env.test` は `playwright.config.ts` が自動で読み込むため追加の `set -a` は不要。
 - 全 E2E テストを走らせる際は `npm run test:all-split`（内部で `scripts/test-all-batches.sh` を実行）を必須フローとし、ファイル単位のバッチ実行でタイムアウトを避ける。スクリプトは各バッチにつき `PLAYWRIGHT_JSON_OUTPUT_NAME=batches/<timestamp>-<batch>.json` を設定するので、生成された JSON は必ず `test-results/batches/` に残る。運用手順の詳細は `docs/detail/testing.md` の「4. テスト実行パターン」を参照する。
+- `npm run test:all-split` を叩く前に `lsof -i :3000` で Next.js dev サーバーが残っていないことを必ず確認する。何らかの理由でプロセスが残っている場合は `pkill -f 'node .*next dev'` と `pkill -f 'playwright test'` で整理し、Playwright が `webServer.command` を起動できる状態に戻してから再試行する。バッチログ（`test-results/logs/batch-execution-*.log`）が 1 分以上 `auth` で停滞した場合も同じ手順でクリーンアップする。
 - JSON レポートは既定で `test-results/playwright-report.json` に保存される。`PLAYWRIGHT_JSON_OUTPUT_NAME` にファイル名のみを指定した場合も `test-results/` 配下に出力されるため、ルート直下にレポートを増やさないこと。Playwright の添付ファイルとトレースは `test-results/artifacts/` 以下に集約される。
 - ルート配下に JSON やレポートファイルを置かない。既存のテストログを参照したい場合は `test-results/archive/` へ退避してから扱うこと。
 - サンドボックス環境でポート 3000 への listen が `EPERM` で拒否される場合は、同じコマンドを **権限昇格付き**（`with_escalated_permissions: true`）で再実行して Next.js サーバーを起動させる。昇格前後で生成された `playwright-report.json` は最新のものを残し、旧ファイルは削除してから再試行する。
