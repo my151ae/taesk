@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 
 const UpdateCardSchema = z.object({
-  title: z.string().min(1).max(255).optional(),
+  title: z.string().max(255).optional(),
   description: z.string().optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
-  title: z.string().min(1).max(255),
+  title: z.string().max(255),
   description: z.string().optional(),
   list_id: z.string().uuid(),
   position: z.number().int().min(0),

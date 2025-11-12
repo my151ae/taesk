@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+import { generateShortId, slugify as slugifyCardTitle } from '@/lib/card-utils';
 
 const TEST_BOARD_NAME = 'E2E Comments Test Board';
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
@@ -122,43 +123,52 @@ async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-async function createTestCard(page: Page, board: TestBoardContext): Promise<TestCardContext> {
-  const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
-  await addCardButton.waitFor({ state: 'visible', timeout: 10000 });
-  await addCardButton.click();
-  await page.waitForTimeout(800);
+async function createTestCard(board: TestBoardContext): Promise<TestCardContext> {
+  const cardId = crypto.randomUUID();
+  const shortId = generateShortId();
+  const now = new Date().toISOString();
 
-  const start = Date.now();
-  const timeoutMs = 30000; // 20秒→30秒に延長
-  let lastError: Error | null = null;
+  const { data: lastCard } = await supabaseAdmin
+    .from('cards')
+    .select('position, id_short')
+    .eq('board_id', board.id)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  while (Date.now() - start < timeoutMs) {
-    const { data, error } = await supabaseAdmin
-      .from('cards')
-      .select('id, short_id, title')
-      .eq('board_id', board.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  const position = lastCard?.position != null ? lastCard.position + 10 : 1000;
+  const idShort = (lastCard?.id_short ?? 0) + 1;
 
-    if (error) {
-      lastError = new Error(`Failed to fetch created card: ${error.message}`);
-    } else if (data && data.short_id) {
-      return {
-        id: data.id,
-        shortId: data.short_id,
-        title: data.title,
-      };
-    }
+  const { error } = await supabaseAdmin.from('cards').insert({
+    id: cardId,
+    title: 'New Card',
+    description: '',
+    board_id: board.id,
+    list_id: board.listId,
+    user_id: TEST_USER_ID,
+    position,
+    tags: [],
+    due_date: null,
+    priority: 'medium',
+    assigned_to: null,
+    assignee_id: null,
+    assignee_ids: null,
+    short_id: shortId,
+    id_short: idShort,
+    slug: slugifyCardTitle('New Card'),
+    created_at: now,
+    updated_at: now,
+  });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // 500ms→1000msに延長
+  if (error) {
+    throw new Error(`Failed to insert test card: ${error.message}`);
   }
 
-  if (lastError) {
-    throw lastError;
-  }
-
-  throw new Error('Card creation did not return a short_id within timeout');
+  return {
+    id: cardId,
+    shortId,
+    title: 'New Card',
+  };
 }
 
 async function openCardModalViaQuery(page: Page, card: TestCardContext, boardContext?: TestBoardContext): Promise<void> {
@@ -222,8 +232,9 @@ test.describe('Comments Feature @feature:comments', () => {
   test.beforeEach(async ({ page }) => {
     const boardName = `${TEST_BOARD_NAME}-${Date.now()}`;
     board = await seedTestBoard(boardName);
+    card = await createTestCard(board);
     await loadBoard(page, board);
-    card = await createTestCard(page, board);
+    await page.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test.afterEach(async () => {
@@ -685,12 +696,11 @@ test.describe('Comments Realtime @feature:comments', () => {
     const page2 = await context2.newPage();
 
     try {
+      const card = await createTestCard(board);
       await loadBoard(page1, board);
       await loadBoard(page2, board);
-
-      const card = await createTestCard(page1, board);
-      await loadBoard(page2, board);
-      await expect(page2.locator(`[data-testid="card-${card.id}"]`)).toBeVisible({ timeout: 10000 });
+      await page1.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+      await page2.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
 
       await openCardModalViaQuery(page1, card, board);
       await openCardModalViaQuery(page2, card, board);
@@ -755,13 +765,12 @@ test.describe('Comments Performance @feature:comments', () => {
   test('should load comments modal within performance budget @e2e:essential', async ({ page }) => {
     const currentBoard = assertContext(board, 'Board context not initialized');
 
+    const createdCard = await createTestCard(currentBoard);
     await loadBoard(page, currentBoard);
 
-    const createdCard = await createTestCard(page, currentBoard);
     card = createdCard;
-
     const cardElement = page.locator(`[data-testid="card-${createdCard.id}"]`).first();
-    await cardElement.waitFor({ state: 'visible', timeout: 10000 });
+    await cardElement.waitFor({ state: 'visible', timeout: 15000 });
     const openButton = page.getByTestId(`cardOpenButton-${createdCard.id}`).first();
     await openButton.waitFor({ state: 'visible', timeout: 10000 });
 

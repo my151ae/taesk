@@ -126,6 +126,11 @@ function getCardOpenButtonById(page: Page, cardId: string): Locator {
   return page.getByTestId(`cardOpenButton-${cardId}`).first();
 }
 
+function getCardTitleInputByValue(page: Page, value: string): Locator {
+  const escaped = value.replace(/"/g, '\\"');
+  return page.locator(`input[data-testid^="card-title-input-"][value="${escaped}"]`);
+}
+
 async function openCardById(page: Page, cardId: string): Promise<void> {
   const openButton = getCardOpenButtonById(page, cardId);
   await openButton.waitFor({ state: 'visible', timeout: 10000 });
@@ -133,11 +138,18 @@ async function openCardById(page: Page, cardId: string): Promise<void> {
 }
 
 async function openCardByTitle(page: Page, title: string): Promise<void> {
-  const card = page.locator('[data-testid^="card-"]').filter({ hasText: title }).first();
-  await card.waitFor({ state: 'visible', timeout: 10000 });
-  const openButton = card.locator('button[data-testid^="cardOpenButton-"]').first();
-  await openButton.waitFor({ state: 'visible', timeout: 10000 });
-  await openButton.click();
+  const cardIdHandle = await page.waitForFunction((targetTitle) => {
+    const inputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[data-testid^="card-title-input-"]')
+    );
+    const target = inputs.find((input) => input.value === targetTitle);
+    return target?.dataset.testid?.replace('card-title-input-', '') ?? null;
+  }, title, { timeout: 10000 });
+  const cardId = await cardIdHandle.jsonValue<string | null>();
+  if (!cardId) {
+    throw new Error(`Card with title "${title}" not found`);
+  }
+  await openCardById(page, cardId);
 }
 
 let cachedAssigneeIdSupport: boolean | null = null;
@@ -375,7 +387,46 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await addCardButton.click();
 
     // Verify card appears
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(page.locator('input[data-testid^="card-title-input-"]').first()).toHaveValue('New Card');
+  });
+
+  test('should edit card inline and add new card on Enter', async ({ page }) => {
+    await page.getByRole('button', { name: '+ Add List' }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: '+ Add Card' }).first().click();
+    await page.waitForTimeout(300);
+
+    const [firstCard] = await waitForCardRows<{ id: string }>(testBoardId, 'id');
+    const firstInput = getCardTitleInputByValue(page, 'New Card').first();
+    await firstInput.fill('Inline Card A');
+    await firstInput.press('Enter');
+
+    const titleInputs = page.locator('input[data-testid^="card-title-input-"]');
+    await expect(titleInputs).toHaveCount(2, { timeout: 10000 });
+
+    await expect.poll(async () => {
+      const { data } = await supabase
+        .from('cards')
+        .select('title')
+        .eq('id', firstCard.id)
+        .maybeSingle();
+      return data?.title;
+    }, { timeout: 10000 }).toBe('Inline Card A');
+
+    const newCardInput = titleInputs.nth(1);
+    await expect(newCardInput).toBeFocused();
+    await expect(newCardInput).toHaveValue('');
+
+    await newCardInput.fill('Inline Card B');
+    await newCardInput.blur();
+
+    await expect.poll(async () => {
+      const { data } = await supabase
+        .from('cards')
+        .select('id')
+        .eq('board_id', testBoardId);
+      return data?.length ?? 0;
+    }, { timeout: 10000 }).toBeGreaterThanOrEqual(2);
   });
 
   test('should edit a card', async ({ page }) => {
@@ -425,8 +476,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(page.locator('[role="dialog"]')).toHaveCount(0, { timeout: 2000 });
 
     // Verify changes reflected on board
-    const updatedCardButton = page.getByText('Updated Card Title').first();
-    await expect(updatedCardButton).toBeVisible({ timeout: 10000 });
+    const updatedCardInput = getCardTitleInputByValue(page, 'Updated Card Title').first();
+    await expect(updatedCardInput).toBeVisible({ timeout: 10000 });
 
     // Reopen to confirm persisted values
     await openCardByTitle(page, 'Updated Card Title');
@@ -451,8 +502,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(1000); // Wait for card creation to sync
 
     // Verify card was added
-    const cardElement = page.getByText('New Card').first();
-    await expect(cardElement).toBeVisible();
+    const cardInput = getCardTitleInputByValue(page, 'New Card').first();
+    await expect(cardInput).toBeVisible();
 
     // Click the newly added card to open modal
     const [latestCard] = await waitForCardRows<{ id: string }>(testBoardId, 'id');
@@ -484,7 +535,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(modal).toHaveCount(0, { timeout: 10000 });
 
     // Verify card is removed from the board
-    await expect(cardElement).toHaveCount(0, { timeout: 10000 });
+    await expect(getCardTitleInputByValue(page, 'New Card')).toHaveCount(0, { timeout: 10000 });
   });
 
   test('should assign and clear card members (multi-assignee)', async ({ page }) => {
@@ -644,7 +695,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(1000);
 
     // Verify card appears
-    const card = page.getByText('New Card').first();
+    const [createdCard] = await waitForCardRows<{ id: string }>(testBoardId, 'id');
+    const card = page.locator(`[data-testid="card-${createdCard.id}"]`).first();
     await expect(card).toBeVisible();
 
     // Get the second list's dropzone area
@@ -654,7 +706,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await dragAndDrop(page, card, secondList);
 
     // Verify card still exists (moved, not deleted)
-    await expect(page.getByText('New Card')).toHaveCount(1);
+    await expect(getCardTitleInputByValue(page, 'New Card')).toHaveCount(1);
   });
 
   test('should persist data after page reload @e2e:essential', async ({ page }) => {
@@ -665,7 +717,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible({ timeout: 10000 });
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible({ timeout: 10000 });
 
     // Wait for sync to Supabase (important!)
     await page.waitForTimeout(2000);
@@ -690,7 +742,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     // Verify data persists with extended timeout
     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('New Card').first()).toBeVisible({ timeout: 10000 });
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should normalize board URL when slug is incorrect', async ({ page }) => {
@@ -809,7 +861,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(cardsAfterReload).toHaveCount(cardCountBefore + 1, { timeout: 10000 });
 
     // Verify card still exists (synced to Supabase)
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible();
   });
 
   test('should open card modal via short URL navigation', async ({ page }) => {
@@ -819,7 +871,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible();
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
@@ -854,7 +906,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible();
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
@@ -884,7 +936,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible();
     await page.waitForTimeout(2000); // Wait for sync to Supabase
 
     // Get the card's short_id from Supabase
@@ -961,7 +1013,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const addCardButton = page.getByRole('button', { name: '+ Add Card' }).first();
     await addCardButton.click();
-    await expect(page.getByText('New Card').first()).toBeVisible();
+    await expect(getCardTitleInputByValue(page, 'New Card').first()).toBeVisible();
 
     // DON'T wait for sync - try to open immediately
     await openCardByTitle(page, 'New Card');

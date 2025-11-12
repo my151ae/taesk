@@ -5,9 +5,9 @@ import path from 'path';
 dotenv.config({ path: '.env.test' });
 
 const isCI = !!process.env.CI;
-const workers = process.env.PW_WORKERS
-  ? Number(process.env.PW_WORKERS)
-  : (isCI ? 2 : '50%'); // CI: 2 workers (競合低減), Local: 50% (速度重視)
+const defaultWorkers = isCI ? 2 : 1;
+const parsedWorkers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : defaultWorkers;
+const workers = Number.isFinite(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : defaultWorkers;
 const defaultJsonOutput = path.join('test-results', 'playwright-report.json');
 const artifactsDir = path.join('test-results', 'artifacts');
 const htmlReportDir = path.join('test-results', 'html-report');

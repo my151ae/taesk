@@ -446,6 +446,10 @@ type CardVisualProps = React.HTMLAttributes<HTMLDivElement> & {
   onToggleChecked?: (cardId: string, nextChecked: boolean) => void;
   interactiveCheckbox?: boolean;
   onOpenCard?: (cardId: string) => void;
+  onInlineTitleChange?: (cardId: string, nextTitle: string) => void;
+  onAddCardBelow?: (cardId: string) => void;
+  autoFocusInput?: boolean;
+  onAutoFocusConsumed?: (cardId: string) => void;
 };
 
 function CardVisual({
@@ -458,6 +462,10 @@ function CardVisual({
   onToggleChecked,
   interactiveCheckbox = true,
   onOpenCard,
+  onInlineTitleChange,
+  onAddCardBelow,
+  autoFocusInput = false,
+  onAutoFocusConsumed,
   ...rest
 }: CardVisualProps) {
   const priorityIcon = card.priority && card.priority !== 'medium'
@@ -482,6 +490,8 @@ function CardVisual({
       ? legacyAssignee.charAt(0).toUpperCase()
       : 'U';
 
+  const [inlineTitle, setInlineTitle] = useState<string>(card.title ?? '');
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const isChecked = Boolean(card.checked);
   const checkboxEnabled = interactiveCheckbox && typeof onToggleChecked === 'function';
   const showDescription = Boolean(card.description);
@@ -491,6 +501,28 @@ function CardVisual({
 
   const baseClasses = `rounded-none border border-slate-200/60 bg-white px-3 py-1 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
+
+  useEffect(() => {
+    setInlineTitle(card.title ?? '');
+  }, [card.title]);
+
+  useEffect(() => {
+    if (autoFocusInput && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+      onAutoFocusConsumed?.(card.id);
+    }
+  }, [autoFocusInput, card.id, onAutoFocusConsumed]);
+
+  const commitInlineTitle = () => {
+    if (!onInlineTitleChange) return false;
+    const nextTitle = inlineTitle ?? '';
+    if (nextTitle === card.title) {
+      return false;
+    }
+    onInlineTitleChange(card.id, nextTitle);
+    return true;
+  };
 
   return (
     <div
@@ -513,9 +545,26 @@ function CardVisual({
             onPointerUp={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           />
-          <h3 className="flex flex-1 items-center text-sm font-semibold leading-4 text-slate-700 dark:text-gray-100 break-words">
-            {card.title}
-          </h3>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inlineTitle}
+            placeholder="Card title"
+            data-testid={`card-title-input-${card.id}`}
+            className="flex-1 rounded-none border-none bg-transparent text-sm font-semibold leading-4 text-slate-700 placeholder:text-slate-400 focus:outline-none"
+            onChange={(event) => setInlineTitle(event.target.value)}
+            onBlur={() => {
+              commitInlineTitle();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                commitInlineTitle();
+                onAddCardBelow?.(card.id);
+              }
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          />
         </div>
         <div className="flex items-center gap-1">
           {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
@@ -589,12 +638,20 @@ function SortableCard({
   card,
   onCardClick,
   onToggleCardCheck,
+  onInlineTitleChange,
+  onAddCardBelow,
+  autoFocus,
+  onAutoFocusConsumed,
   assigneeProfile = null,
   legacyAssignee = null,
 }: {
   card: Card;
   onCardClick: (cardId: string) => void;
   onToggleCardCheck: (cardId: string, checked: boolean) => void;
+  onInlineTitleChange: (cardId: string, nextTitle: string) => void;
+  onAddCardBelow: (cardId: string) => void;
+  autoFocus: boolean;
+  onAutoFocusConsumed: (cardId: string) => void;
   assigneeProfile?: ProfileSummary | null;
   legacyAssignee?: string | null;
 }) {
@@ -629,6 +686,10 @@ function SortableCard({
         subtle={isDragging}
         onToggleChecked={onToggleCardCheck}
         onOpenCard={onCardClick}
+        onInlineTitleChange={onInlineTitleChange}
+        onAddCardBelow={onAddCardBelow}
+        autoFocusInput={autoFocus}
+        onAutoFocusConsumed={onAutoFocusConsumed}
       />
     </div>
   );
@@ -705,6 +766,10 @@ function SortableList({
   sortBy,
   onCardClick,
   onToggleCardCheck,
+  onInlineTitleChange,
+  onQuickAddBelow,
+  focusCardId,
+  onFocusConsumed,
   isDropTarget,
   profilesById,
 }: {
@@ -719,6 +784,10 @@ function SortableList({
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
   onCardClick: (cardId: string) => void;
   onToggleCardCheck: (cardId: string, checked: boolean) => void;
+  onInlineTitleChange: (cardId: string, nextTitle: string) => void;
+  onQuickAddBelow: (cardId: string) => void;
+  focusCardId: string | null;
+  onFocusConsumed: (cardId: string) => void;
   isDropTarget: boolean;
   profilesById: Record<string, ProfileSummary>;
 }) {
@@ -851,6 +920,10 @@ function SortableList({
               card={card}
               onCardClick={onCardClick}
               onToggleCardCheck={onToggleCardCheck}
+              onInlineTitleChange={onInlineTitleChange}
+              onAddCardBelow={onQuickAddBelow}
+              autoFocus={focusCardId === card.id}
+              onAutoFocusConsumed={onFocusConsumed}
               assigneeProfile={card.assignee_id ? profilesById[card.assignee_id] ?? null : null}
               legacyAssignee={!card.assignee_id ? card.assigned_to ?? null : null}
             />
@@ -884,6 +957,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [isOnline, setIsOnline] = useState(true);
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [pendingCardFocusId, setPendingCardFocusId] = useState<string | null>(null);
 
   // ドラッグ中のクリック抑止用（Trello準拠）
   const isDraggingRef = useRef(false);
@@ -1612,7 +1686,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   };
 
-  const updateCardDetailsOnServer = async (card: Card): Promise<Error | null> => {
+  const updateCardDetailsOnServer = useCallback(async (card: Card): Promise<Error | null> => {
     if (!currentBoardId) {
       return new Error('No board selected');
     }
@@ -1648,7 +1722,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       console.error('[cards] Failed to update card:', error);
       return error as Error;
     }
-  };
+  }, [currentBoardId]);
 
   const syncListPositions = useCallback(async (lists: List[]) => {
     if (!currentBoardId || lists.length === 0) {
@@ -2310,6 +2384,141 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   };
 
+  const handleInlineTitleChange = useCallback(async (cardId: string, nextTitle: string) => {
+    const timestamp = new Date().toISOString();
+    let updatedCard: Card | null = null;
+    const newCards = boardData.cards.map((card) => {
+      if (card.id !== cardId) return card;
+      updatedCard = {
+        ...card,
+        title: nextTitle,
+        slug: slugify(nextTitle || card.slug || card.short_id || 'card'),
+        updated_at: timestamp,
+      };
+      return updatedCard;
+    });
+
+    if (!updatedCard) {
+      return;
+    }
+
+    updateData({ ...boardData, cards: newCards });
+
+    if (!isOnline) {
+      addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
+      return;
+    }
+
+    await updateCardDetailsOnServer(updatedCard);
+  }, [boardData, isOnline, updateCardDetailsOnServer]);
+
+  const handleQuickAddCardBelow = useCallback(async (cardId: string) => {
+    if (!user || !currentBoardId) {
+      return;
+    }
+
+    const sourceCard = boardData.cards.find((card) => card.id === cardId);
+    if (!sourceCard) {
+      return;
+    }
+
+    const listCards = boardData.cards
+      .filter((card) => card.list_id === sourceCard.list_id)
+      .sort((a, b) => a.position - b.position);
+    const currentIndex = listCards.findIndex((card) => card.id === cardId);
+    const nextCard = currentIndex >= 0 ? listCards[currentIndex + 1] : null;
+    const position = nextCard ? (sourceCard.position + nextCard.position) / 2 : sourceCard.position + 10;
+
+    const shortId = await createUniqueShortId();
+    const idShort = await getNextIdShort(currentBoardId);
+    const slug = slugify('New Card');
+    const tempCard: Card = {
+      id: uuidv4(),
+      title: '',
+      description: '',
+      list_id: sourceCard.list_id,
+      board_id: currentBoardId,
+      position,
+      user_id: getActualUserId(user.id),
+      tags: [],
+      due_date: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: idShort,
+      slug,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const previousData: BoardData = {
+      lists: [...boardData.lists],
+      cards: [...boardData.cards],
+    };
+
+    const optimisticData: BoardData = {
+      lists: previousData.lists,
+      cards: [...previousData.cards, tempCard],
+    };
+
+    updateData(optimisticData);
+    setPendingCardFocusId(tempCard.id);
+
+    if (!isOnline) {
+      addToSyncQueue({ type: 'INSERT', table: 'cards', data: tempCard });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/boards/${currentBoardId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: tempCard.id,
+          title: tempCard.title,
+          description: tempCard.description,
+          list_id: tempCard.list_id,
+          position: tempCard.position,
+          tags: tempCard.tags,
+          due_date: tempCard.due_date,
+          priority: tempCard.priority,
+          checked: tempCard.checked,
+          assignee_id: tempCard.assignee_id,
+          assigned_to: tempCard.assigned_to,
+          user_id: tempCard.user_id,
+          short_id: tempCard.short_id,
+          id_short: tempCard.id_short,
+          slug: tempCard.slug,
+          created_at: tempCard.created_at,
+          updated_at: tempCard.updated_at,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to create card');
+      }
+
+      const { card: createdCard } = await response.json();
+      if (createdCard) {
+        const mergedCards = optimisticData.cards.map((card) =>
+          card.id === tempCard.id ? { ...card, ...createdCard } : card
+        );
+        updateData({ lists: optimisticData.lists, cards: mergedCards });
+      }
+    } catch (error) {
+      console.error('Error creating card:', error);
+      updateData(previousData);
+    }
+  }, [boardData, currentBoardId, isOnline, user]);
+
+  const handleConsumeCardFocus = useCallback((cardId: string) => {
+    setPendingCardFocusId((current) => (current === cardId ? null : current));
+  }, []);
+
   const handleDeleteCard = async (id: string) => {
     console.log('[handleDeleteCard] Starting...', { id });
 
@@ -2721,6 +2930,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                   sortBy={sortBy}
                   onCardClick={handleOpenCardModal}
                   onToggleCardCheck={handleToggleCardChecked}
+                  onInlineTitleChange={handleInlineTitleChange}
+                  onQuickAddBelow={handleQuickAddCardBelow}
+                  focusCardId={pendingCardFocusId}
+                  onFocusConsumed={handleConsumeCardFocus}
                   isDropTarget={dragOverListId === list.id}
                   profilesById={profilesById}
                 />
