@@ -2422,12 +2422,16 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       return;
     }
 
-    const listCards = boardData.cards
-      .filter((card) => card.list_id === sourceCard.list_id)
-      .sort((a, b) => a.position - b.position);
-    const currentIndex = listCards.findIndex((card) => card.id === cardId);
-    const nextCard = currentIndex >= 0 ? listCards[currentIndex + 1] : null;
-    const position = nextCard ? (sourceCard.position + nextCard.position) / 2 : sourceCard.position + 10;
+    const timestamp = new Date().toISOString();
+    const cardsToShift = boardData.cards
+      .filter((card) => card.list_id === sourceCard.list_id && card.position > sourceCard.position)
+      .map((card) => ({
+        ...card,
+        position: card.position + 10,
+        updated_at: timestamp,
+      }));
+    const shiftedMap = new Map(cardsToShift.map((card) => [card.id, card] as const));
+    const newPosition = sourceCard.position + 10;
 
     const shortId = await createUniqueShortId();
     const idShort = await getNextIdShort(currentBoardId);
@@ -2438,7 +2442,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       description: '',
       list_id: sourceCard.list_id,
       board_id: currentBoardId,
-      position,
+      position: newPosition,
       user_id: getActualUserId(user.id),
       tags: [],
       due_date: null,
@@ -2451,7 +2455,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       id_short: idShort,
       slug,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      updated_at: timestamp,
     };
 
     const previousData: BoardData = {
@@ -2461,13 +2465,14 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
     const optimisticData: BoardData = {
       lists: previousData.lists,
-      cards: [...previousData.cards, tempCard],
+      cards: previousData.cards.map((card) => shiftedMap.get(card.id) ?? card).concat(tempCard),
     };
 
     updateData(optimisticData);
     setPendingCardFocusId(tempCard.id);
 
     if (!isOnline) {
+      cardsToShift.forEach((card) => addToSyncQueue({ type: 'UPDATE', table: 'cards', data: card }));
       addToSyncQueue({ type: 'INSERT', table: 'cards', data: tempCard });
       return;
     }
@@ -2509,11 +2514,15 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         );
         updateData({ lists: optimisticData.lists, cards: mergedCards });
       }
+
+      if (cardsToShift.length > 0) {
+        await upsertCardsWithAssigneeFallback(cardsToShift);
+      }
     } catch (error) {
       console.error('Error creating card:', error);
       updateData(previousData);
     }
-  }, [boardData, currentBoardId, isOnline, user]);
+  }, [boardData, currentBoardId, isOnline, upsertCardsWithAssigneeFallback, user]);
 
   const handleConsumeCardFocus = useCallback((cardId: string) => {
     setPendingCardFocusId((current) => (current === cardId ? null : current));

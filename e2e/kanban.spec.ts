@@ -131,6 +131,10 @@ function getCardTitleInputByValue(page: Page, value: string): Locator {
   return page.locator(`input[data-testid^="card-title-input-"][value="${escaped}"]`);
 }
 
+function getCardTitleInputById(page: Page, cardId: string): Locator {
+  return page.getByTestId(`card-title-input-${cardId}`);
+}
+
 async function openCardById(page: Page, cardId: string): Promise<void> {
   const openButton = getCardOpenButtonById(page, cardId);
   await openButton.waitFor({ state: 'visible', timeout: 10000 });
@@ -397,9 +401,11 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(300);
 
     const [firstCard] = await waitForCardRows<{ id: string }>(testBoardId, 'id');
-    const firstInput = getCardTitleInputByValue(page, 'New Card').first();
-    await firstInput.fill('Inline Card A');
-    await firstInput.press('Enter');
+    const cardInput = getCardTitleInputById(page, firstCard.id);
+    await cardInput.waitFor({ state: 'visible' });
+    await expect(cardInput).toHaveValue('New Card');
+    await cardInput.fill('Inline Card A');
+    await cardInput.press('Enter');
 
     const titleInputs = page.locator('input[data-testid^="card-title-input-"]');
     await expect(titleInputs).toHaveCount(2, { timeout: 10000 });
