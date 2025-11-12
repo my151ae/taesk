@@ -10,6 +10,7 @@ const UpdateCardSchema = z.object({
   tags: z.array(z.string()).optional(),
   due_date: z.string().datetime().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
+  checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),
   slug: z.string().max(255).optional(),

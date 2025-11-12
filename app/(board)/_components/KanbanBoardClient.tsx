@@ -100,7 +100,16 @@ const loadFromStorage = (): BoardData => {
   }
 
   try {
-    return JSON.parse(data);
+    const parsed = JSON.parse(data) as Partial<BoardData> | undefined;
+    const lists = Array.isArray(parsed?.lists) ? parsed!.lists : [];
+    const cards = Array.isArray(parsed?.cards)
+      ? (parsed!.cards as Partial<Card>[]).map((card) => ({
+          ...card,
+          checked: typeof card.checked === 'boolean' ? card.checked : false,
+        })) as Card[]
+      : [];
+
+    return { lists, cards };
   } catch (error) {
     console.warn("Failed to parse cached board data:", error);
     return { lists: [], cards: [] };
@@ -436,9 +445,21 @@ type CardVisualProps = React.HTMLAttributes<HTMLDivElement> & {
   withGrab?: boolean;
   assigneeProfile?: ProfileSummary | null;
   legacyAssignee?: string | null;
+  onToggleChecked?: (cardId: string, nextChecked: boolean) => void;
+  interactiveCheckbox?: boolean;
 };
 
-function CardVisual({ card, subtle = false, withGrab = false, className = '', assigneeProfile = null, legacyAssignee = null, ...rest }: CardVisualProps) {
+function CardVisual({
+  card,
+  subtle = false,
+  withGrab = false,
+  className = '',
+  assigneeProfile = null,
+  legacyAssignee = null,
+  onToggleChecked,
+  interactiveCheckbox = true,
+  ...rest
+}: CardVisualProps) {
   const priorityIcon = card.priority && card.priority !== 'medium'
     ? card.priority === 'high'
       ? '🔴'
@@ -461,6 +482,9 @@ function CardVisual({ card, subtle = false, withGrab = false, className = '', as
       ? legacyAssignee.charAt(0).toUpperCase()
       : 'U';
 
+  const isChecked = Boolean(card.checked);
+  const checkboxEnabled = interactiveCheckbox && typeof onToggleChecked === 'function';
+
   const baseClasses = `rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
 
@@ -470,7 +494,25 @@ function CardVisual({ card, subtle = false, withGrab = false, className = '', as
       className={`${baseClasses}${subtleClasses} ${className}`.trim()}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100">{card.title}</h3>
+        <div className="flex flex-1 items-start gap-2 min-w-0">
+          <input
+            type="checkbox"
+            className="h-4 w-4 flex-none rounded-none border border-slate-400 text-sky-600 accent-sky-500 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-none"
+            checked={isChecked}
+            disabled={!checkboxEnabled}
+            aria-label={`「${card.title}」を完了にする`}
+            onChange={(event) => {
+              if (!checkboxEnabled) return;
+              onToggleChecked?.(card.id, event.target.checked);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          />
+          <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100 break-words">
+            {card.title}
+          </h3>
+        </div>
         {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
       </div>
 
@@ -524,12 +566,14 @@ function SortableCard({
   card,
   isDraggingRef,
   onCardClick,
+  onToggleCardCheck,
   assigneeProfile = null,
   legacyAssignee = null,
 }: {
   card: Card;
   isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
+  onToggleCardCheck: (cardId: string, checked: boolean) => void;
   assigneeProfile?: ProfileSummary | null;
   legacyAssignee?: string | null;
 }) {
@@ -603,6 +647,7 @@ function SortableCard({
         legacyAssignee={legacyAssignee}
         withGrab
         subtle={isDragging}
+        onToggleChecked={onToggleCardCheck}
       />
     </div>
   );
@@ -679,6 +724,7 @@ function SortableList({
   sortBy,
   isDraggingRef,
   onCardClick,
+  onToggleCardCheck,
   isDropTarget,
   profilesById,
 }: {
@@ -693,6 +739,7 @@ function SortableList({
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
   isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
+  onToggleCardCheck: (cardId: string, checked: boolean) => void;
   isDropTarget: boolean;
   profilesById: Record<string, ProfileSummary>;
 }) {
@@ -731,14 +778,14 @@ function SortableList({
   const positionSorted = [...cards].sort((a, b) => a.position - b.position);
   const sortedCards = filterAndSortCards(positionSorted, searchQuery, selectedTags, selectedPriority, sortBy);
 
-  const containerClasses = `backdrop-blur-sm rounded-2xl p-4 w-72 md:w-80 flex-shrink-0 touch-none self-start transition-shadow transition-colors duration-150 ${
+  const containerClasses = `backdrop-blur-sm rounded-none p-4 w-72 md:w-80 flex-shrink-0 touch-none self-start transition-shadow transition-colors duration-150 ${
     isDropTarget
       ? 'bg-white/90 dark:bg-gray-800/70 border border-sky-300/70 shadow-lg ring-2 ring-sky-200/60 dark:ring-sky-600/40'
       : 'bg-white/70 dark:bg-gray-800/60 border border-slate-200/50 dark:border-gray-700/50 shadow-md'
   }`;
 
   const dropZoneClasses = `mb-4 px-1 transition-colors duration-150 ${
-    isDropTarget ? 'bg-slate-100/70 dark:bg-gray-700/40 rounded-xl py-1' : ''
+    isDropTarget ? 'bg-slate-100/70 dark:bg-gray-700/40 rounded-none py-1' : ''
   }`;
 
   return (
@@ -764,7 +811,7 @@ function SortableList({
                   setIsEditingTitle(false);
                 }
               }}
-              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              className="flex-1 px-3 py-2 border border-slate-200 rounded-none dark:bg-gray-700 dark:border-gray-600 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
               autoFocus
               aria-label="List title"
               data-testid={`list-title-input-${list.id}`}
@@ -781,12 +828,12 @@ function SortableList({
                   e.stopPropagation();
                   setShowMenu(!showMenu);
                 }}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold transition-colors w-6 h-6 flex items-center justify-center rounded-none hover:bg-slate-100"
               >
                 ⋯
               </button>
               {showMenu && (
-                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700 py-1 z-10">
+                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded-none shadow-lg border border-slate-200 dark:border-gray-700 py-1 z-10">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -825,6 +872,7 @@ function SortableList({
               card={card}
               isDraggingRef={isDraggingRef}
               onCardClick={onCardClick}
+              onToggleCardCheck={onToggleCardCheck}
               assigneeProfile={card.assignee_id ? profilesById[card.assignee_id] ?? null : null}
               legacyAssignee={!card.assignee_id ? card.assigned_to ?? null : null}
             />
@@ -834,7 +882,7 @@ function SortableList({
 
       <button
         onClick={() => onAddCard(list.id)}
-        className="w-full py-2.5 bg-sky-400 text-white rounded-lg hover:bg-sky-500 text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+        className="w-full py-2.5 bg-sky-400 text-white rounded-none hover:bg-sky-500 text-sm font-medium transition-colors shadow-sm hover:shadow-md"
       >
         + Add Card
       </button>
@@ -1600,6 +1648,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         tags: card.tags,
         due_date: card.due_date,
         priority: card.priority,
+        checked: card.checked,
         assignee_id: card.assignee_id,
         assigned_to: card.assigned_to ?? null,
         slug: card.slug ?? undefined,
@@ -1767,6 +1816,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       tags: [],
       due_date: null,
       priority: 'medium',
+      checked: false,
       assigned_to: null,
       assignee_id: null,
       assignee_ids: null,
@@ -1804,6 +1854,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             tags: tempCard.tags,
             due_date: tempCard.due_date,
             priority: tempCard.priority,
+            checked: tempCard.checked,
             assignee_id: tempCard.assignee_id,
             assigned_to: tempCard.assigned_to,
             user_id: tempCard.user_id,
@@ -2250,6 +2301,37 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
   };
 
+  const handleToggleCardChecked = async (id: string, nextChecked: boolean) => {
+    const existing = boardData.cards.find((card) => card.id === id);
+    if (!existing) return;
+
+    const previousChecked = Boolean(existing.checked);
+    if (previousChecked === nextChecked) {
+      return;
+    }
+
+    const updatedCards = boardData.cards.map((card) =>
+      card.id === id
+        ? { ...card, checked: nextChecked, updated_at: new Date().toISOString() }
+        : card
+    );
+    const newData = { ...boardData, cards: updatedCards };
+    updateData(newData);
+
+    const updatedCard = updatedCards.find((card) => card.id === id);
+    if (!updatedCard) return;
+
+    if (!isOnline) {
+      addToSyncQueue({ type: 'UPDATE', table: 'cards', data: updatedCard });
+      return;
+    }
+
+    const error = await updateCardDetailsOnServer(updatedCard);
+    if (error) {
+      console.error('[handleToggleCardChecked] Failed to sync checkbox state:', error);
+    }
+  };
+
   const handleDeleteCard = async (id: string) => {
     console.log('[handleDeleteCard] Starting...', { id });
 
@@ -2645,7 +2727,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             }, 0);
           }}
         >
-          <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 min-h-[calc(100vh-12rem)]">
+          <div className="flex gap-0 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 min-h-[calc(100vh-12rem)]">
             <SortableContext items={sortedLists.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
               {sortedLists.map((list) => (
                 <SortableList
@@ -2661,6 +2743,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                   sortBy={sortBy}
                   isDraggingRef={isDraggingRef}
                   onCardClick={handleOpenCardModal}
+                  onToggleCardCheck={handleToggleCardChecked}
                   isDropTarget={dragOverListId === list.id}
                   profilesById={profilesById}
                 />
@@ -2669,7 +2752,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
 
             <button
               onClick={handleAddList}
-              className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-2xl p-6 w-72 md:w-80 flex-shrink-0 h-fit hover:bg-white/60 dark:hover:bg-gray-800/60 border-2 border-dashed border-slate-300/60 dark:border-gray-600/50 transition-all hover:border-sky-300 dark:hover:border-sky-400 shadow-sm"
+              className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm rounded-none p-6 w-72 md:w-80 flex-shrink-0 h-fit hover:bg-white/60 dark:hover:bg-gray-800/60 border-2 border-dashed border-slate-300/60 dark:border-gray-600/50 transition-all hover:border-sky-300 dark:hover:border-sky-400 shadow-sm"
             >
               <span className="text-slate-600 dark:text-gray-400 font-medium">+ Add List</span>
             </button>
@@ -2687,7 +2770,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                 className="shadow-2xl scale-105 border-sky-300/80 ring-2 ring-sky-200/50 dark:ring-sky-600/40"
               />
             ) : activeListOverlay ? (
-              <div className="w-72 md:w-80 rounded-2xl bg-white dark:bg-gray-800 border border-slate-200/70 dark:border-gray-700/70 shadow-2xl p-4">
+              <div className="w-72 md:w-80 rounded-none bg-white dark:bg-gray-800 border border-slate-200/70 dark:border-gray-700/70 shadow-2xl p-4">
                 <h2 className="font-bold text-lg text-slate-700 dark:text-gray-100 mb-2">{activeListOverlay.title}</h2>
                 <p className="text-xs text-slate-500 dark:text-gray-400">Dragging list...</p>
               </div>

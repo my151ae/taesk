@@ -118,6 +118,7 @@ export interface Card {
   tags: string[];
   due_date: string | null;
   priority: Priority;
+  checked: boolean;
   /** @deprecated legacy text-based assignee field */
   assigned_to: string | null;
   assignee_id: string | null;
