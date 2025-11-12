@@ -144,9 +144,6 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
     if (error) {
       lastError = new Error(`Failed to fetch created card: ${error.message}`);
     } else if (data && data.short_id) {
-      const cardLocator = page.locator(`[data-testid="card-${data.id}"]`).first();
-      await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
-
       return {
         id: data.id,
         shortId: data.short_id,
@@ -165,15 +162,25 @@ async function createTestCard(page: Page, board: TestBoardContext): Promise<Test
 }
 
 async function openCardModalViaQuery(page: Page, card: TestCardContext, boardContext?: TestBoardContext): Promise<void> {
+  const waitForMembers = boardContext
+    ? page
+        .waitForResponse(
+          (response) =>
+            response.url().includes(`/api/boards/${boardContext.id}/members`) && response.status() === 200,
+          { timeout: 15000 }
+        )
+        .catch(() => null)
+    : null;
+
   if (boardContext && card.shortId) {
     const targetUrl = `${boardContext.canonicalPath}?card=${card.shortId}`;
     await page.goto(targetUrl);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForURL(`**card=${card.shortId}**`, { timeout: 10000 });
   } else {
-    const cardLocator = page.locator(`[data-testid="card-${card.id}"]`).first();
-    await cardLocator.waitFor({ state: 'visible', timeout: 10000 });
-    await cardLocator.click();
+    const openButton = page.getByTestId(`cardOpenButton-${card.id}`).first();
+    await openButton.waitFor({ state: 'visible', timeout: 10000 });
+    await openButton.click();
   }
 
   // Wait for modal to open
@@ -191,6 +198,20 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
 
   // Give it a moment to settle
   await page.waitForTimeout(500);
+
+  if (waitForMembers) {
+    await waitForMembers;
+  }
+}
+
+async function waitForMentionOptions(page: Page, filterText?: string) {
+  const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
+  await expect(suggestionPopup).toBeVisible({ timeout: 10000 });
+  const options = suggestionPopup.locator('button');
+  await expect(options.first()).toBeVisible({ timeout: 10000 });
+  if (filterText) {
+    await expect(options.filter({ hasText: filterText }).first()).toBeVisible({ timeout: 10000 });
+  }
 }
 
 test.describe('Comments Feature @feature:comments', () => {
@@ -400,16 +421,13 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type @ to trigger mention suggestion
     await editor.pressSequentially('@');
-    await page.waitForTimeout(1000);
-
-    // Verify suggestion popup appears
-    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
+    await waitForMentionOptions(page);
 
     // Verify at least one member is shown (E2E Test User should always be there)
+    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
     const memberOptions = suggestionPopup.locator('button');
-    await expect(memberOptions).toHaveCount(await memberOptions.count(), { timeout: 3000 });
-    expect(await memberOptions.count()).toBeGreaterThan(0);
+    const optionCount = await memberOptions.count();
+    expect(optionCount).toBeGreaterThan(0);
   });
 
   test('should filter members by name when typing after @ @feature:comments', async ({ page }) => {
@@ -423,17 +441,9 @@ test.describe('Comments Feature @feature:comments', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    // Type @e2e to filter
+    // Type @e2e to filter and wait for suggestion list
     await editor.pressSequentially('@e2e');
-    await page.waitForTimeout(1000);
-
-    // Verify suggestion popup appears
-    const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
-
-    // Verify test user is shown (matches "e2e" - actual display name may vary)
-    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test' });
-    await expect(userOption).toBeVisible({ timeout: 3000 });
+    await waitForMentionOptions(page, 'Test');
   });
 
   test('should use Enter to select mention and Shift+Enter to submit @feature:comments', async ({ page }) => {
@@ -449,7 +459,7 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type @ to trigger mention suggestion
     await editor.pressSequentially('@e2e');
-    await page.waitForTimeout(1000);
+    await waitForMentionOptions(page);
 
     // Press Enter to select first suggestion
     await page.keyboard.press('Enter');
@@ -484,7 +494,7 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Insert mention
     await editor.pressSequentially('@e2e');
-    await page.waitForTimeout(1000);
+    await waitForMentionOptions(page);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
 
@@ -493,6 +503,18 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.waitForTimeout(2000);
 
     // Check database to verify storage format is <@id>
+    await expect.poll(async () => {
+      const { data } = await supabaseAdmin
+        .from('comments')
+        .select('body, mentions')
+        .eq('card_id', currentCard.id)
+        .ilike('body', '%storage format test%')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      return data?.length ?? 0;
+    }, { timeout: 15000 }).toBeGreaterThan(0);
+
     const { data: comments } = await supabaseAdmin
       .from('comments')
       .select('body, mentions')
@@ -500,9 +522,6 @@ test.describe('Comments Feature @feature:comments', () => {
       .ilike('body', '%storage format test%')
       .order('created_at', { ascending: false })
       .limit(1);
-
-    expect(comments).toBeDefined();
-    expect(comments?.length).toBeGreaterThan(0);
 
     if (comments && comments.length > 0) {
       const comment = comments[0];
@@ -587,16 +606,9 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type full-width ＠ to trigger mention suggestion
     await editor.pressSequentially('＠');
-    await page.waitForTimeout(1500); // Wait for suggestion to appear
+    await waitForMentionOptions(page, 'Test Display Name Updated');
 
-    // Verify suggestion popup appears
     const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 10000 });
-
-    // Wait for any user option to appear first
-    await expect(suggestionPopup.locator('button').first()).toBeVisible({ timeout: 5000 });
-
-    // Verify specific user option is visible
     const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test Display Name Updated' });
     await expect(userOption).toBeVisible({ timeout: 5000 });
 
@@ -638,22 +650,18 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Test 1: Full-width ＠
     await editor.pressSequentially('＠');
-    await page.waitForTimeout(1000);
+    await waitForMentionOptions(page);
 
     let suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
-
     let userOption = suggestionPopup.locator('button').first();
     await userOption.click();
     await page.waitForTimeout(300);
 
     // Add space and test half-width @
     await editor.pressSequentially(' and @');
-    await page.waitForTimeout(1000);
+    await waitForMentionOptions(page);
 
     suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    await expect(suggestionPopup).toBeVisible({ timeout: 5000 });
-
     userOption = suggestionPopup.locator('button').first();
     await userOption.click();
     await page.waitForTimeout(300);
@@ -754,14 +762,16 @@ test.describe('Comments Performance @feature:comments', () => {
 
     const cardElement = page.locator(`[data-testid="card-${createdCard.id}"]`).first();
     await cardElement.waitFor({ state: 'visible', timeout: 10000 });
+    const openButton = page.getByTestId(`cardOpenButton-${createdCard.id}`).first();
+    await openButton.waitFor({ state: 'visible', timeout: 10000 });
 
     // Measure performance: Open modal and wait for comments to render
     const startTime = Date.now();
 
     // Open card modal
-    await cardElement.click();
+    await openButton.click();
     if (createdCard.shortId) {
-      await page.waitForURL(`**card=${createdCard.shortId}**`, { timeout: 5000 });
+      await page.waitForURL(`**card=${createdCard.shortId}**`, { timeout: 5000, waitUntil: 'commit' }).catch(() => {});
     }
 
     // Wait for modal to be visible

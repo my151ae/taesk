@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -90,7 +89,6 @@ type BoardFetchResult = {
 
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
-const CARD_CLICK_THRESHOLD = 5;
 
 const loadFromStorage = (): BoardData => {
   if (typeof window === "undefined") return { lists: [], cards: [] };
@@ -447,6 +445,7 @@ type CardVisualProps = React.HTMLAttributes<HTMLDivElement> & {
   legacyAssignee?: string | null;
   onToggleChecked?: (cardId: string, nextChecked: boolean) => void;
   interactiveCheckbox?: boolean;
+  onOpenCard?: (cardId: string) => void;
 };
 
 function CardVisual({
@@ -458,6 +457,7 @@ function CardVisual({
   legacyAssignee = null,
   onToggleChecked,
   interactiveCheckbox = true,
+  onOpenCard,
   ...rest
 }: CardVisualProps) {
   const priorityIcon = card.priority && card.priority !== 'medium'
@@ -484,8 +484,12 @@ function CardVisual({
 
   const isChecked = Boolean(card.checked);
   const checkboxEnabled = interactiveCheckbox && typeof onToggleChecked === 'function';
+  const showDescription = Boolean(card.description);
+  const showAssignee = Boolean(assigneeName);
+  const showBadges = Boolean(card.tags && card.tags.length > 0) || Boolean(card.due_date);
+  const hasLowerContent = showDescription || showAssignee || showBadges;
 
-  const baseClasses = `rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
+  const baseClasses = `rounded-none border border-slate-200/60 bg-white px-3 py-1 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
 
   return (
@@ -493,8 +497,8 @@ function CardVisual({
       {...rest}
       className={`${baseClasses}${subtleClasses} ${className}`.trim()}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="flex flex-1 items-start gap-2 min-w-0">
+      <div className={`${hasLowerContent ? 'mb-1' : 'mb-0'} flex items-center justify-between gap-2`}>
+        <div className="flex flex-1 items-center gap-2 min-w-0">
           <input
             type="checkbox"
             className="h-4 w-4 flex-none rounded-none border border-slate-400 text-sky-600 accent-sky-500 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-none"
@@ -509,21 +513,38 @@ function CardVisual({
             onPointerUp={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           />
-          <h3 className="flex-1 text-sm font-semibold text-slate-700 dark:text-gray-100 break-words">
+          <h3 className="flex flex-1 items-center text-sm font-semibold leading-4 text-slate-700 dark:text-gray-100 break-words">
             {card.title}
           </h3>
         </div>
-        {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
+        <div className="flex items-center gap-1">
+          {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
+          {onOpenCard ? (
+            <button
+              type="button"
+              aria-label={`カード「${card.title}」を詳細表示`}
+              className="flex h-6 w-6 items-center justify-center rounded-none border border-slate-200/80 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              data-testid={`cardOpenButton-${card.id}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenCard(card.id);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              ↗
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {card.description ? (
-        <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-gray-400">
+      {showDescription ? (
+        <p className={`${showAssignee || showBadges ? 'mb-1' : 'mb-0'} line-clamp-2 text-xs leading-snug text-slate-500 dark:text-gray-400`}>
           {card.description}
         </p>
       ) : null}
 
-      {assigneeName ? (
-        <div className="mb-2 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
+      {showAssignee ? (
+        <div className={`${showBadges ? 'mb-1' : 'mb-0'} flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400`}>
           {assigneeProfile?.avatar_url ? (
             <Image
               src={assigneeProfile.avatar_url}
@@ -541,37 +562,37 @@ function CardVisual({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-1">
-        {card.tags && card.tags.length > 0
-          ? card.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
-              >
-                {tag}
-              </span>
-            ))
-          : null}
-        {card.due_date ? (
-          <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-            📅 {new Date(card.due_date).toLocaleDateString()}
-          </span>
-        ) : null}
-      </div>
+      {showBadges ? (
+        <div className="flex flex-wrap gap-1">
+          {card.tags && card.tags.length > 0
+            ? card.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
+                >
+                  {tag}
+                </span>
+              ))
+            : null}
+          {card.due_date ? (
+            <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+              📅 {new Date(card.due_date).toLocaleDateString()}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function SortableCard({
   card,
-  isDraggingRef,
   onCardClick,
   onToggleCardCheck,
   assigneeProfile = null,
   legacyAssignee = null,
 }: {
   card: Card;
-  isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
   onToggleCardCheck: (cardId: string, checked: boolean) => void;
   assigneeProfile?: ProfileSummary | null;
@@ -591,54 +612,13 @@ function SortableCard({
     opacity: isDragging ? 0.35 : 1,
   };
 
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
-  const allowNavigationRef = useRef(true);
-
-  const registerPointerStart = (event: ReactPointerEvent<HTMLDivElement>) => {
-    pointerStartRef.current = { x: event.clientX, y: event.clientY };
-    allowNavigationRef.current = true;
-  };
-
-  const evaluatePointerDelta = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const origin = pointerStartRef.current;
-    if (!origin) return;
-    const moved = Math.hypot(event.clientX - origin.x, event.clientY - origin.y);
-    if (moved > CARD_CLICK_THRESHOLD) {
-      allowNavigationRef.current = false;
-    }
-  };
-
-  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    evaluatePointerDelta(event);
-
-    // ドラッグ中または移動があった場合はクリック無効化（Trello準拠）
-    if (!isDragging && allowNavigationRef.current && !isDraggingRef.current) {
-      // クリックとみなし、モーダルを開く
-      onCardClick(card.id);
-    }
-
-    pointerStartRef.current = null;
-  };
-
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    evaluatePointerDelta(event);
-  };
-
-  const handlePointerCancel = () => {
-    pointerStartRef.current = null;
-  };
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       data-testid={`card-${card.id}`}
-      className="mb-3 touch-none"
-      onPointerDown={registerPointerStart}
-      onPointerUp={handlePointerUp}
-      onPointerMove={handlePointerMove}
-      onPointerCancel={handlePointerCancel}
+      className="mb-0 touch-none"
     >
       <CardVisual
         {...listeners}
@@ -648,6 +628,7 @@ function SortableCard({
         withGrab
         subtle={isDragging}
         onToggleChecked={onToggleCardCheck}
+        onOpenCard={onCardClick}
       />
     </div>
   );
@@ -722,7 +703,6 @@ function SortableList({
   selectedTags,
   selectedPriority,
   sortBy,
-  isDraggingRef,
   onCardClick,
   onToggleCardCheck,
   isDropTarget,
@@ -737,7 +717,6 @@ function SortableList({
   selectedTags: string[];
   selectedPriority: Priority | 'all';
   sortBy: 'none' | 'due_date_asc' | 'due_date_desc';
-  isDraggingRef: React.RefObject<boolean>;
   onCardClick: (cardId: string) => void;
   onToggleCardCheck: (cardId: string, checked: boolean) => void;
   isDropTarget: boolean;
@@ -870,7 +849,6 @@ function SortableList({
             <SortableCard
               key={card.id}
               card={card}
-              isDraggingRef={isDraggingRef}
               onCardClick={onCardClick}
               onToggleCardCheck={onToggleCardCheck}
               assigneeProfile={card.assignee_id ? profilesById[card.assignee_id] ?? null : null}
@@ -2510,25 +2488,25 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             {/* Sync status indicator */}
             <div className="flex items-center gap-3 text-xs">
               {!isOnline && (
-                <span className="flex items-center gap-1 text-orange-600 font-medium">
+                <span data-testid="sync-status" className="flex items-center gap-1 text-orange-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-orange-600" />
                   Offline
                 </span>
               )}
               {isOnline && realtimeStatus === 'connected' && (
-                <span className="flex items-center gap-1 text-green-600 font-medium">
+                <span data-testid="sync-status" className="flex items-center gap-1 text-green-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
                   Live
                 </span>
               )}
               {isOnline && realtimeStatus === 'connecting' && (
-                <span className="flex items-center gap-1 text-yellow-600 font-medium">
+                <span data-testid="sync-status" className="flex items-center gap-1 text-yellow-600 font-medium">
                   <div className="w-2 h-2 rounded-full bg-yellow-600 animate-pulse" />
                   Connecting...
                 </span>
               )}
               {isOnline && realtimeStatus === 'disconnected' && (
-                <span className="flex items-center gap-1 text-gray-500 font-medium">
+                <span data-testid="sync-status" className="flex items-center gap-1 text-gray-500 font-medium">
                   <div className="w-2 h-2 rounded-full bg-gray-500" />
                   Disconnected
                 </span>
@@ -2741,7 +2719,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                   selectedTags={selectedTags}
                   selectedPriority={selectedPriority}
                   sortBy={sortBy}
-                  isDraggingRef={isDraggingRef}
                   onCardClick={handleOpenCardModal}
                   onToggleCardCheck={handleToggleCardChecked}
                   isDropTarget={dragOverListId === list.id}

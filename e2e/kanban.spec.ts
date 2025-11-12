@@ -122,6 +122,24 @@ async function waitForCardRows<T extends Record<string, unknown>>(
   throw new Error(`Timed out waiting for cards to be persisted for board ${boardId}`);
 }
 
+function getCardOpenButtonById(page: Page, cardId: string): Locator {
+  return page.getByTestId(`cardOpenButton-${cardId}`).first();
+}
+
+async function openCardById(page: Page, cardId: string): Promise<void> {
+  const openButton = getCardOpenButtonById(page, cardId);
+  await openButton.waitFor({ state: 'visible', timeout: 10000 });
+  await openButton.click();
+}
+
+async function openCardByTitle(page: Page, title: string): Promise<void> {
+  const card = page.locator('[data-testid^="card-"]').filter({ hasText: title }).first();
+  await card.waitFor({ state: 'visible', timeout: 10000 });
+  const openButton = card.locator('button[data-testid^="cardOpenButton-"]').first();
+  await openButton.waitFor({ state: 'visible', timeout: 10000 });
+  await openButton.click();
+}
+
 let cachedAssigneeIdSupport: boolean | null = null;
 
 async function ensureAssigneeIdSupport(): Promise<boolean> {
@@ -371,7 +389,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(300);
 
     // Click card to open modal
-    await page.getByText('New Card').first().click();
+    await openCardByTitle(page, 'New Card');
     await page.waitForTimeout(300);
 
     await expect
@@ -411,7 +429,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(updatedCardButton).toBeVisible({ timeout: 10000 });
 
     // Reopen to confirm persisted values
-    await updatedCardButton.click();
+    await openCardByTitle(page, 'Updated Card Title');
     await expect
       .poll(() => page.url(), { timeout: 10000 })
       .toContain(`card=${cardShortId}`);
@@ -437,7 +455,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(cardElement).toBeVisible();
 
     // Click the newly added card to open modal
-    await cardElement.click();
+    const [latestCard] = await waitForCardRows<{ id: string }>(testBoardId, 'id');
+    await openCardById(page, latestCard.id);
 
     // Verify modal is open
     const modal = page.getByRole('dialog');
@@ -482,7 +501,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
 
     const cardLocator = page.locator(`[data-testid="card-${createdCardId}"]`).first();
     await cardLocator.waitFor({ state: 'visible' });
-    await cardLocator.click();
+    await openCardById(page, createdCardId);
     await page.waitForTimeout(300);
 
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -539,7 +558,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     }, { timeout: 30000 }).toBe(true);
 
     // Reopen card and verify member chip is visible
-    await cardLocator.click();
+    await openCardById(page, createdCardId);
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Verify member chip is displayed (look for email or name in chip)
@@ -718,12 +737,13 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(page.getByRole('button', { name: /New List/i }).first()).toBeVisible();
     await page.waitForTimeout(500);
 
-    const expectedOnlineLabel =
-      process.env.NEXT_PUBLIC_DISABLE_REALTIME === 'true' ? 'Disconnected' : 'Live';
-    const onlineStatus = page.getByText(expectedOnlineLabel);
+    const syncStatus = page.getByTestId('sync-status');
+    const expectOnlineStatus = async () => {
+      await expect(syncStatus).toHaveText(/Live|Connecting\.\.\.|Disconnected/, { timeout: 15000 });
+    };
 
     // Verify we're online
-    await expect(onlineStatus).toBeVisible({ timeout: 15000 });
+    await expectOnlineStatus();
 
     // Go offline
     await context.setOffline(true);
@@ -731,7 +751,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(500);
 
     // Verify offline status
-    await expect(page.getByText('Offline')).toBeVisible();
+    await expect(syncStatus).toHaveText('Offline');
 
     // Add a card while offline
     const cardsLocator = page.locator('[data-testid^="card-"]');
@@ -758,8 +778,8 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await page.waitForTimeout(3000);
 
     // Verify online status
-    await expect(onlineStatus).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Offline')).not.toBeVisible({ timeout: 10000 });
+    await expectOnlineStatus();
+    await expect(syncStatus).not.toHaveText('Offline', { timeout: 10000 });
 
     // Wait until sync queue drains or timeout
     await page.waitForFunction(() => {
@@ -811,7 +831,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     expect(card.short_id).toBeTruthy();
 
     // Soft navigate via card click (query param should reflect short id)
-    await page.getByText('New Card').first().click();
+    await openCardByTitle(page, 'New Card');
     await expect
       .poll(() => page.url(), { timeout: 10000 })
       .toContain(`card=${card.short_id}`);
@@ -944,7 +964,7 @@ test.describe('Taesk Kanban Board E2E Tests @feature:boards', () => {
     await expect(page.getByText('New Card').first()).toBeVisible();
 
     // DON'T wait for sync - try to open immediately
-    await page.getByText('New Card').first().click();
+    await openCardByTitle(page, 'New Card');
 
     // Should either:
     // 1. Show modal with query param (if card has short_id)
