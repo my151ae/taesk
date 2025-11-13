@@ -1,0 +1,39 @@
+# タイムライン API / クエリ整備
+
+**Status**: 🔴 Not Started  
+**Priority**: 🔥 High  
+**Created**: 2025-11-13 14:33 JST  
+**Assignee**: Backend/Fullstack  
+**Estimated**: 2d
+
+## 概要
+Timeline UI 専用のデータ取得/更新 API を追加し、Today/Tomorrow + A/B バケットを一括して返せるようにする。Now インジケーター用のサーバ時刻も提供する。
+
+## 目的
+- 既存の `BoardData` (`lists` + `cards`) レスポンスだけでは時間軸レンダリングに必要な情報が不足するため、最小クエリでレイアウトに必要なデータを揃える。
+- 将来的な Feature Flag 切替に備え、`timeline` モードのエンドポイントを分離する。
+
+## 実装内容
+- [ ] `app/api/boards/[boardId]/timeline/route.ts`（仮）を追加し、以下を返す:
+  - `days`: Today/Tomorrow の ISO 日付、タイムゾーン、ローカル表示用メタ
+  - `events`: `card_id`, `scheduled_date`, `scheduled_start/end`, `durationMinutes`, `status`
+  - `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` のカード配列
+  - `serverNow`: サーバが返した現在時刻 (UTC + timezone offset)
+- [ ] Supabase クエリを `board_id` + `scheduled_date IN (today, tomorrow)` で絞り、`schedule_channel` に応じて振り分け。
+- [ ] キャッシュヘッダー（`s-maxage=15`）と Realtime チャンネルを設定。Realtime payload に `schedule_*` フィールドを含める。
+- [ ] 既存 `BoardData` API と `syncQueue` を流用して更新（PATCH）する共通ロジックを整理。
+
+## 技術的詳細
+- Now 判定は最終的にクライアントで `Date.now()` を使うが、UI 初期化時にサーバ基準の `serverNow` を基準化し、ローカル時計ずれを補正する。
+- A/B バケットの順序は `position` で制御。`schedule_bucket` が null のカードは `unplanned` 配列で返し、UI で折りたたむ。
+- 既存の `buildBoardCanonicalUrl` (`app/(board)/_components/KanbanBoardClient.tsx:47`) を流用して timeline への遷移 URL を生成。
+
+## 受け入れ基準
+- [ ] `GET /api/boards/:boardId/timeline` が 200 を返し、JSON 構造が仕様通り。
+- [ ] `npx ts-node scripts/diagnose-api.ts` のような既存診断スクリプトでもエラー無し（※ CLI で代替コマンドを使用）。
+- [ ] Feature Flag `enableTimeline` を false にすると、新エンドポイントを叩かない。
+
+## 関連チケット
+- [01-schedule-data-model.md](./01-schedule-data-model.md)
+- [03-timeline-ui-shell.md](./03-timeline-ui-shell.md)
+- [00- TaeskMap マスタープラン](../taeskmap/00-today-list-layout.md)
