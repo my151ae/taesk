@@ -12,6 +12,7 @@ HTML モック（`00-today_list_layout_canvas.html`）のレイアウトを Next
 ## 目的
 - デザイン基盤を整え、以降のインタラクションやデータ連携タスクが UI に接続できる状態を作る。
 - QA 期間を除き旧 Kanban レイアウトへ戻さない。`app/(board)` ルートそのものを Timeline ベースに置き換える準備をする。
+- 将来は Today/Tomorrow から 7 日間ビュー、さらには「This week」「This month」のA/Bビューへ拡張できるよう、コンポーネントの列数/データモデルを柔軟にしておく。
 
 ## 実装内容
 - [ ] `app/(board)/timeline/page.tsx`（仮）を追加し、Feature Flag でアクセス制御（Flag は QA 用に短期で保持。遺産として残さない）。
@@ -20,6 +21,7 @@ HTML モック（`00-today_list_layout_canvas.html`）のレイアウトを Next
 - [ ] スクロール連動と sticky ヘッダーを CSS で再現。`prefers-reduced-motion` 対応。
 - [ ] `NowIndicator` コンポーネントで赤ライン/ドットを計算し、`useEffect` でスクロール位置を調整。`serverNow` (JST) を初期オフセットに使用。
 - [ ] MVP はデスクトップ専用スタイルとし、モバイルでは利用不可である旨を UI 上で案内。
+- [ ] 7列表示・週間/今月A/Bビューを想定し、`DayColumn` を動的本数でレンダリングできるようにする（MVPでは2列のみ有効化）。
 
 ## 技術的詳細
 - 既存の `KanbanBoardClient` は巨大なクライアントコンポーネントのため、新 UI は分離した `useTimelineBoard` フックでデータを取得し、`Suspense` + `Loading skeleton` を持たせる。旧 UI へ依存する import を段階的に除去できる構造にする。

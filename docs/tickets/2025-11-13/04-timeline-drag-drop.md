@@ -15,11 +15,12 @@
 
 ## 実装内容
 - [ ] `TimelineDragLayer` コンポーネントを追加し、`@dnd-kit` の `MouseSensor`/`TouchSensor` を時間軸向けに調整。
-- [ ] ドラッグ開始時にカードを `timeline` / `ab-list` へ変換するロジックを追加。A/B からタイムラインへ移動する場合は `scheduled_date`/`start`/`end` を自動初期化。
-- [ ] ドロップ時は **1 分単位** でスナップしつつ、UI グリッドの 15 分ラインに吸い付く補助を実装。Shift を押しながらで 5 分刻み。
-- [ ] リサイズ（上下のグリップ）を実装し、`scheduled_end` を更新。
+- [ ] ドラッグ開始時にカードを `timeline` / `ab-list` へ変換するロジックを追加。A/B からタイムラインへ移動する場合は `due_date`/`due_start`/`due_end` を自動初期化。
+- [ ] ドロップ/リサイズは **15 分刻み** でスナップし、Shift を押しながらで 5 分刻み。カードの見た目は 15 分グリッドに従い、1 分精度は詳細編集で適用される。
+- [ ] リサイズ（上下のグリップ）を実装し、`due_end` を更新。
 - [ ] 変更内容を `syncQueue` に積んで Supabase API へ送信。Optimistic UI を維持。
-- [ ] 同時所属禁止を守るため、タイムラインへドロップした時点で `schedule_channel` を `timeline` に更新し、A/B の `schedule_bucket` をリセット。
+- [ ] 同時所属禁止を守るため、タイムラインへドロップした時点で `due_channel` を `timeline` に更新し、A/B の `due_bucket` をリセット。
+- [ ] CardModal など詳細エディタで 1 分単位を入力した場合、イベント高さを再計算する `recalculateHeightFromDuration` ヘルパーを用意し、DnD後も一貫させる。
 
 ## 技術的詳細
 - `DndContext` は既存 Kanban と競合しないよう、新 UI では独立したコンテキストを持つ。

@@ -16,19 +16,19 @@ Timeline UI 専用のデータ取得/更新 API を追加し、Today/Tomorrow + 
 ## 実装内容
 - [ ] `app/api/boards/[boardId]/timeline/route.ts`（仮）を追加し、以下を返す:
   - `days`: Today/Tomorrow の ISO 日付、タイムゾーン、ローカル表示用メタ
-  - `events`: `card_id`, `scheduled_date`, `scheduled_start/end`（分解能 1 分）, `durationMinutes`, `status`
-  - `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` のカード配列
+  - `events`: `card_id`, `due_date`, `due_start/due_end`（分解能 1 分）, `durationMinutes`, `status`
+  - `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` のカード配列（`due_bucket` ベース）
   - `serverNow`: JST の現在時刻（offset 固定）
-- [ ] Supabase クエリを `board_id` + `scheduled_date IN (today, tomorrow)` で絞り、`schedule_channel` に応じて振り分け。
+- [ ] Supabase クエリを `board_id` + `due_date IN (today, tomorrow)` で絞り、`due_channel` に応じて振り分け。
 - [ ] キャッシュヘッダー（`s-maxage=15`）と Realtime チャンネルを設定。Realtime payload に `schedule_*` フィールドを含める。
 - [ ] 既存 `BoardData` API と `syncQueue` を流用して更新（PATCH）する共通ロジックを整理。
 - [ ] MVP では Timeline API を既存 Kanban に優先させ、Feature Flag は QA 用に短期保持するのみとする。
 
 ## 技術的詳細
 - Now 判定は最終的にクライアントで `Date.now()` を使うが、UI 初期化時にサーバ基準の `serverNow` (JST) を基準化し、ローカル時計ずれを補正する。
-- A/B バケットの順序は `position` で制御。`schedule_bucket` が null のカードは `unplanned` 配列で返し、UI で折りたたむ。
+- A/B バケットの順序は `position` で制御。`due_bucket` が null のカードは `unplanned` 配列で返し、UI で折りたたむ。
 - 既存の `buildBoardCanonicalUrl` (`app/(board)/_components/KanbanBoardClient.tsx:47`) を流用して timeline への遷移 URL を生成。
-- 同時所属禁止のため、Timeline payload では `schedule_channel` の整合性を検証し、A/B 配列と重複しないようサーバ側でフィルタリングする。
+- 同時所属禁止のため、Timeline payload では `due_channel` の整合性を検証し、A/B 配列と重複しないようサーバ側でフィルタリングする。
 
 ## 受け入れ基準
 - [ ] `GET /api/boards/:boardId/timeline` が 200 を返し、JSON 構造が仕様通り。
