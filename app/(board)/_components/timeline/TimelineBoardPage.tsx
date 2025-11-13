@@ -419,7 +419,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           {meta.sections.map((section) => {
             const items = data?.abBuckets?.[section.bucket] ?? [];
             return (
-              <DroppableBucket key={section.bucket} bucketKey={section.bucket}>
+              <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={dataMode !== 'api'}>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
                   <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
                   <p className="text-[10px] text-slate-400">{section.helper}</p>
@@ -438,7 +438,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                             />
                             <button
                               type="button"
-                              onClick={() => dataMode === 'api' && openCardModalFromTimeline(item.short_id)}
+                              disabled={dataMode !== 'api'}
+                              onClick={() => openCardModalFromTimeline(item.short_id)}
                               className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                             >
                               <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
@@ -468,18 +469,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     return (
       <DroppableColumn key={day.isoDate} day={day}>
-        <div className="relative h-full border-l border-slate-100 px-2 pb-8">
+        <div className="relative h-full border-l border-slate-100 px-4 pb-8">
           <div className="pointer-events-none absolute inset-0">
             {HOURS.map((hour, idx) => (
               <div key={hour} className="absolute left-0 right-0 border-b border-dashed border-slate-100/70" style={{ top: idx * HOUR_HEIGHT }} />
             ))}
           </div>
 
-          <div className="pointer-events-none absolute left-4 right-4 top-4 z-10 drop-shadow-md">
-            {renderAbCard(day)}
+          <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
+            <div className="pointer-events-auto w-[240px] max-w-[85%]">
+              {renderAbCard(day)}
+            </div>
           </div>
 
-          <div className="relative pt-56" style={{ height: TIMELINE_HEIGHT }}>
+          <div className="relative pt-[220px]" style={{ height: TIMELINE_HEIGHT }}>
             {index === 0 && nowMinutes != null && (
               <>
                 <div className="pointer-events-none absolute left-0 right-0 h-px bg-red-400/80" style={{ top: minuteToPixels(nowMinutes) }} />
@@ -560,9 +563,9 @@ const DroppableColumn = ({ children, day }: { children: ReactNode; day: Timeline
   );
 };
 
-const DroppableBucket = ({ children, bucketKey }: { children: ReactNode; bucketKey: string }) => {
+const DroppableBucket = ({ children, bucketKey, disabled }: { children: ReactNode; bucketKey: string; disabled?: boolean }) => {
   const { setNodeRef, isOver } = useDroppable({ id: `bucket-drop:${bucketKey}`, data: { type: 'ab-bucket', bucketKey } });
-  const highlight = isOver ? 'rounded-2xl ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-50' : '';
+  const highlight = !disabled && isOver ? 'rounded-2xl ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-50' : '';
   return (
     <div ref={setNodeRef} className={highlight}>
       {children}
