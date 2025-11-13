@@ -1,0 +1,110 @@
+import { test, expect } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+import { dumpClientMetrics } from './utils/metrics';
+
+const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2';
+const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
+const TIMELINE_LIST_ID = '00000000-0000-0000-0000-000000000010';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Missing Supabase admin credentials for timeline.spec.ts');
+}
+
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false },
+});
+
+const isoDateJst = (): string => {
+  const now = Date.now();
+  const jst = new Date(now + 9 * 60 * 60 * 1000);
+  const year = jst.getUTCFullYear();
+  const month = `${jst.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${jst.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+async function ensureBoardFixtures() {
+  const now = new Date().toISOString();
+  await supabaseAdmin.from('boards').upsert({
+    id: MAIN_BOARD_ID,
+    name: 'Timeline Test Board',
+    description: 'Board used for timeline specs',
+    is_test_board: true,
+    user_id: TEST_USER_ID,
+    short_id: 'TLNBD',
+    id_short: 42,
+    slug: 'timeline-board',
+    created_at: now,
+    updated_at: now,
+  });
+
+  await supabaseAdmin.from('board_members').upsert({
+    board_id: MAIN_BOARD_ID,
+    profile_id: TEST_USER_ID,
+    role: 'owner',
+    created_at: now,
+  });
+
+  await supabaseAdmin.from('lists').upsert({
+    id: TIMELINE_LIST_ID,
+    title: 'Timeline Tasks',
+    position: 1000,
+    board_id: MAIN_BOARD_ID,
+    user_id: TEST_USER_ID,
+    created_at: now,
+    updated_at: now,
+  });
+}
+
+test.describe('@feature:timeline Timeline view', () => {
+  test.beforeAll(async () => {
+    await ensureBoardFixtures();
+  });
+
+  test('renders timeline events and emits metrics', async ({ page }) => {
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Timeline focus card',
+      description: 'Card used in timeline spec',
+      board_id: MAIN_BOARD_ID,
+      list_id: TIMELINE_LIST_ID,
+      user_id: TEST_USER_ID,
+      position: 1500,
+      tags: [],
+      due_date: `${isoDay}T00:00:00+09:00`,
+      due_start: '09:00:00',
+      due_end: '10:00:00',
+      due_channel: 'timeline',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 501,
+      slug: 'timeline-focus-card',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    await page.goto('/timeline');
+    await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
+    await expect(page.getByText('Timeline focus card')).toBeVisible();
+
+    await dumpClientMetrics(page, ['timeline']);
+
+    await supabaseAdmin.from('cards').delete().eq('id', cardId);
+  });
+});

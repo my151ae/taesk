@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
+import { createClientTrace } from "@/lib/metrics/client";
+import type { ClientTrace } from "@/lib/metrics/client";
 import {
   DndContext,
   DragEndEvent,
@@ -112,6 +114,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
   const router = useRouter();
   const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
+  const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -120,6 +123,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setStatus('loading');
     setErrorMessage(null);
     try {
+      traceRef.current?.mark('fetch:start');
       const response = await fetch(`/api/boards/${initialBoard.id}/timeline`, {
         cache: 'no-store',
       });
@@ -130,10 +134,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const payload = (await response.json()) as TimelineResponse;
       setData(payload);
       setStatus('idle');
+      const abItemCount = Object.values(payload.abBuckets || {}).reduce(
+        (sum, items) => sum + (items?.length ?? 0),
+        0
+      );
+      traceRef.current?.mark('render:complete');
+      traceRef.current?.finish('success', {
+        eventsCount: payload.events.length,
+        abItems: abItemCount,
+      });
+      traceRef.current = createClientTrace('timeline');
     } catch (error) {
       console.error('[timeline] fetch error', error);
       setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
       setStatus('error');
+      traceRef.current?.finish('error', { reason: 'fetch_failed' });
+      traceRef.current = createClientTrace('timeline');
     }
   }, [initialBoard?.id]);
 
