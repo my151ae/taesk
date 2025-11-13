@@ -20,7 +20,7 @@ Timeline UI 専用のデータ取得/更新 API を追加し、Today/Tomorrow + 
   - `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` のカード配列（`due_bucket` ベース）
   - `serverNow`: JST の現在時刻（offset 固定）
 - [ ] Supabase クエリを `board_id` + `due_date IN (today, tomorrow)` で絞り、`due_channel` に応じて振り分け。
-- [ ] キャッシュヘッダー（`s-maxage=15`）と Realtime チャンネルを設定。Realtime payload に `schedule_*` フィールドを含める。
+- [ ] キャッシュヘッダー（`s-maxage=15`）と Realtime チャンネルを設定。Realtime payload に `due_*` フィールドを含める。
 - [ ] 既存 `BoardData` API と `syncQueue` を流用して更新（PATCH）する共通ロジックを整理。
 - [ ] MVP では Timeline API を既存 Kanban に優先させ、Feature Flag は QA 用に短期保持するのみとする。
 

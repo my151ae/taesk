@@ -48,30 +48,39 @@
 ### 4.2 時間軸 & Now インジケーター
 - CSS `--hour-height` を 40px で固定。Now Dot/Line は JS で位置を算出し、初期スクロールを「Now 付近」に寄せる（HTML モックと同等のロジック）。
 - タイムラベルは 00:00〜23:00 を 1h 刻み表示。内部スケジュールは **1 分単位** を保持するが、UI グリッド/スナップは 15 分刻み。詳細編集で 1 分単位を入力すると表示高さも追随する（Google カレンダーと同様）。日付は `due_date`、時間は `due_start/due_end` を使用。
-- タイムゾーンは **JST 固定**。サーバから受け取る `serverNow` でローカル時計のズレを補正し、Now ライン/スクロール初期位置に反映する。
+- タイムゾーンは **JST 固定**（GMT+09を明示）。サーバから受け取る `serverNow` でローカル時計のズレを補正し、Now ライン/スクロール初期位置に反映する。
 
+### 4.3 日列ヘッダー & 日付ナビ
+- Today/Tomorrow ヘッダーは `calendar-header` と同期し、日付ナビ（Today ボタン、日付ピッカー）で `due_date` の基準日を切り替える。
+- 週次ビューへの拡張に備え、ヘッダー/列レンダリングは Today〜+6 日まで可変長で描画できる API を設計する。
+
+### 4.4 日列 & イベント表示
 - 各日列は `section.day` の中で時間軸に align。イベント DOM は `div.event` をカード ID で data 属性化し、クリックで `CardModal` を呼ぶ。
 - Today 列のみ「赤ライン」を重ね、Tomorrow には出さない仕様（HTML 参照）。将来的に Today〜+6 日まで 7 列を展開できる拡張性を前提にレイアウトを設計。
 - 列所属判定は `due_date` に基づき、自動で対応列へカードを配置する。
 - イベント幅は列幅 - 16px。時間重複がある場合は CSS グリッド/absolute で左右に寄せてオーバーラップを示す。
 
-### 4.4 A/B リストカード
+### 4.5 日跨ぎルール
+- MVP では **1 日内に完結するイベントのみ許容**。`due_start/due_end` は同日の範囲に収める。23:30→25:00 のような日跨ぎは非対応で、必要な場合は複数イベントへ分割する。
+- 週次/月次ビュー実装時に跨ぎ対応を再検討する。
+
+### 4.6 A/B リストカード
 - A/B モジュールは日列上部に `position:absolute` で浮かせる。MVP はデスクトップ専用、モバイルは後続対応。
 - Content: タイトル（"A/B Today" 等）、セクション A/B のラベルとチェックリスト。チェック済みは打ち消し線 + 透過 60%。
 - 3 ドットメニューは Timeline との移動導線（Convert/Move/Duplicate）に絞り、旧 Kanban リストを開く導線は削除。
 - データ源は `due_channel='ab-list'` と `due_bucket`（`today_a`, `today_b`, ...）で管理し、既存カンバン list_id とは無関係。
 
-### 4.5 インタラクション
+### 4.7 インタラクション
 - Timeline ⇄ A/B リスト間のドラッグ & ドロップが必須。既存の DnD Kit 実装（`app/(board)/_components/KanbanBoardClient.tsx:5-27`）を拡張し、`coordinatesGetter` を時間軸ベースに変更する。
-- DnD/リサイズのスナップは **15 分刻み**。CardModal の詳細フォームで 1 分単位を入力すると、その値が保存されイベント高さも更新される。
+- DnD/リサイズのスナップは **15 分刻み**。ドラッグ完了時に内部値も 15 分に丸める。CardModal の詳細フォームで 1 分単位を入力すると、その値が保存されイベント高さも更新される。
 - カードクリックは既存 `CardModal` (`app/components/CardModal.tsx`) を再利用し、`card=<shortId>` クエリもサポート。
-- キーボード操作: `↑↓` の移動刻みは 5 分、`⌘+Enter` で完了切り替え。1 分刻み編集は CardModal の入力フィールドで行う。
+- キーボード操作: `↑↓` の移動刻みも **15 分に統一**。Shift + `↑↓` で 5 分刻みの微調整を行い、1 分刻み編集は CardModal でのみ許可する。
 
-### 4.6 パフォーマンス/メトリクス
+### 4.8 パフォーマンス/メトリクス
 - ロード時に `createClientTrace`（`app/(board)/_components/KanbanBoardClient.tsx:52`）へ新しい `phase: "timeline"` を送信し、`metricsJson` に「timeline-render-ms」「timeline-events-count」を追加。
 - 既存の `test-summary.js` の `board-load` p95 監視に時間軸描画を加味する。
 
-### 4.7 アクセシビリティ/レスポンシブ
+### 4.9 アクセシビリティ/レスポンシブ
 - タブ順は時間軸→Today 列→Tomorrow 列→A/B カード。
 - スクロール連動は `aria-live="polite"` で Now 変化を読み上げ。ハイコントラスト配色も CSS カスタムプロパティで切替。
 
@@ -79,7 +88,7 @@
 1. **新フィールド**: 既存 `due_date (date)` を Timeline の基準日として継続利用しつつ、`due_start`/`due_end` (time without time zone, 分解能 1 分), `due_channel ('timeline' | 'ab-list' | 'list-only' | 'archived')`, `due_bucket ('today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b' | null)` を追加。既存 Kanban データとは独立して管理しつつ、`due_date` は UI から参照し続ける。
 2. **派生テーブル案**: 「繰り返し」や複数ボード共有が必要なら `timeline_events` (card_id, board_id, date, start_at, end_at, column, source) を検討。
 3. **API 拡張**: `app/api/boards/[boardId]/cards` 取得時に新フィールドを返し、`sanitizeCardsForUpload` (`lib/supabase.ts:137`) でも落とさないよう更新。
-4. **Migration/Backfill**: 既存カードは `due_channel='list-only'` として扱い、今回のビューでは非表示 or A/B backlog にまとめる方針をチケットで決める。
+4. **Migration/Backfill**: 既存カードは MVP では無視してよい（空ボード前提）。必要なら `due_channel='list-only'` として退避するが、初期リリースではデータ移行を行わない。
 5. **オフライン同期**: `syncQueue` (`app/(board)/_components/KanbanBoardClient.tsx:43`) の payload schema を広げ、ローカルキャッシュ (`STORAGE_KEY`) にも新フィールドを保存。
 
 ## 6. 実装チケット一覧
@@ -99,8 +108,8 @@
 - ⏸ 繰り返し/複製: 今後のスプリントで検討。
 - ✅ レスポンシブ: **デスクトップ優先**（MVP 範囲）。
 - ⏸ 通知/同期: 将来対応。Realtime 拡張はスコープ外。
-- ⚠️ `due_date` 廃止計画: いつ完全に削除するかは未確定。
 - ⚠️ 7日ビュー/週・月ビュー: 情報設計を別途検討。
+- ⚠️ 通知/繰り返し: Phase 2 以降に再検討。
 
 ## 8. MVP スコープと段階
 1. **Phase 0 (触れる状態)** — Tickets 01〜04
