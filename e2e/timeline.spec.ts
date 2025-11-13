@@ -60,12 +60,28 @@ async function ensureBoardFixtures() {
   });
 }
 
+async function supportsDueColumns(): Promise<boolean> {
+  const { error } = await supabaseAdmin
+    .from('cards')
+    .select('due_channel')
+    .limit(1);
+  if (!error) return true;
+  return !error.message?.includes('due_channel');
+}
+
+let dueColumnsAvailable = true;
+
 test.describe('@feature:timeline Timeline view', () => {
   test.beforeAll(async () => {
     await ensureBoardFixtures();
+    dueColumnsAvailable = await supportsDueColumns();
+    if (!dueColumnsAvailable) {
+      console.warn('Skipping timeline spec: cards table missing due_* columns. Run supabase/migrations/20251113090000_add_due_fields.sql');
+    }
   });
 
   test('renders timeline events and emits metrics', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     const cardId = crypto.randomUUID();
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
