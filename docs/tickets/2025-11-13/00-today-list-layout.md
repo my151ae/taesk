@@ -4,7 +4,7 @@
 **Priority**: 🔥 High  
 **Created**: 2025-11-13 14:26 JST  
 **Assignee**: 未アサイン（PM/Design 共通タスク）  
-**Related Assets**: [today_list_layout_canvas.html](./today_list_layout_canvas.html), [today_list_layout_canvas.png](./today_list_layout_canvas.png)
+**Related Assets**: [00-today_list_layout_canvas.html](./00-today_list_layout_canvas.html), [00-today_list_layout_canvas.png](./00-today_list_layout_canvas.png)
 
 ---
 
@@ -13,7 +13,20 @@
 - データモデルは `lib/supabase.ts:94` の `Board`/`List`/`Card` インターフェースに依存し、時間ベースのフィールドは `due_date` のみ。タイムライン固有の「開始/終了時刻」「所属日」「セクション種別」は存在しない。
 - 最新のテスト状況（`docs/tickets/2025-11-10/01-test-all-split-summary.md`）では `comments` バッチに Flaky が残っており、Card Modal/コメント API を弄る改修と競合する恐れがある。今後の E2E 追加は JSON レポート必須・単一ワーカーなど AGENTS ルールに従う必要がある（`AGENTS.md`）。
 - 既存のパフォーマンス/メトリクスは `createClientTrace` や `lib/metrics/{client,server}.ts` で板読み込みに特化しており、時間軸データの遅延を捉える仕組みは無い。
-- `docs/tickets/taeskmap/today_list_layout_canvas.html` と PNG が示す UI が今回の完成形。Today/Tomorrow 列、GMT 表示、赤い「Now」ライン、浮遊する A/B リストカード（今日/明日の A/B セクション）が特徴。
+- `00-today_list_layout_canvas.html/.png` が示す UI が今回の完成形。Today/Tomorrow 列、GMT 表示、赤い「Now」ライン、浮遊する A/B リストカード（今日/明日の A/B セクション）が特徴。
+- **Legacy を残さない方針**: 旧 Kanban レイアウトは最終的に廃止し、Timeline UI を正規ルートに一本化。QA/ロールアウト用の一時的な Feature Flag は許容するが、遺産として恒久運用しない。
+
+### 1.1 最新決定事項（2025-11-13）
+| 項目 | 決定内容 |
+| --- | --- |
+| スケジューリング粒度 | Google カレンダー同等の **1 分単位**。内部表現も分解能 1 分を維持する |
+| タイムゾーン | **常に GMT+09 (JST)** 固定表示。サーバ保存も JST を前提に `scheduled_date + scheduled_start/end` を扱う |
+| A/B リスト | 既存リストの流用はせず、`schedule_bucket` など **独立した A/B メタ**で管理する |
+| 所属 | **Timeline と A/B は排他**。移動時に片方へ所属させる（同時所属なし） |
+| 繰り返し・通知 | いずれも **後続対応**。今回の MVP では対象外 |
+| レスポンシブ | **デスクトップ優先**。モバイルは後続スプリントで検討 |
+
+以降のチケットと仕様はこの決定を前提に最小構成へリライト済み。
 
 ## 2. 目標体験サマリ
 1. **時間軸 + 日付列のハイブリッド**: 左に 24h の時間軸を固定表示しつつ、中央に Today、右に Tomorrow 列をスクロール。現在時刻の赤ライン/ドットで即座に「今」を把握。
@@ -32,7 +45,8 @@
 
 ### 4.2 時間軸 & Now インジケーター
 - CSS `--hour-height` を 40px で固定。Now Dot/Line は JS で位置を算出し、初期スクロールを「Now 付近」に寄せる（HTML モックと同等のロジック）。
-- タイムラベルは 00:00〜23:00 を 1h 刻み生成。将来的に 15m/30m 刻みも視野に入るよう分解ロジックを `lib/date-utils` に切り出す案。
+- タイムラベルは 00:00〜23:00 を 1h 刻み表示しつつ、**内部スケジュールは 1 分単位** を保持。将来 5/15 分グリッドを描画できるよう `lib/date-utils` に刻み計算を切り出す。
+- タイムゾーンは **JST 固定**。サーバから受け取る `serverNow` でローカル時計のズレを補正し、Now ライン/スクロール初期位置に反映する。
 
 ### 4.3 日列 & イベント表示
 - 各日列は `section.day` の中で時間軸に align。イベント DOM は `div.event` をカード ID で data 属性化し、クリックで `CardModal` を呼ぶ。
@@ -40,14 +54,16 @@
 - イベント幅は列幅 - 16px。時間重複がある場合は CSS グリッド/absolute で左右に寄せてオーバーラップを示す。
 
 ### 4.4 A/B リストカード
-- A/B モジュールは日列上部に `position:absolute` で浮かせる。モバイルでは縦積み。
+- A/B モジュールは日列上部に `position:absolute` で浮かせる。MVP はデスクトップ専用、モバイルは後続対応。
 - Content: タイトル（"A/B Today" 等）、セクション A/B のラベルとチェックリスト。チェック済みは打ち消し線 + 透過 60%。
-- 3 ドットメニューに「Open board list」「Convert to timeline block」「Duplicate to Tomorrow」を収録予定。
+- 3 ドットメニューは Timeline との移動導線（Convert/Move/Duplicate）に絞り、旧 Kanban リストを開く導線は削除。
+- データ源は `schedule_channel='ab-list'` と `schedule_bucket`（`today_a`, `today_b`, ...）で管理し、既存カンバン list_id とは無関係。
 
 ### 4.5 インタラクション
 - Timeline ⇄ A/B リスト間のドラッグ & ドロップが必須。既存の DnD Kit 実装（`app/(board)/_components/KanbanBoardClient.tsx:5-27`）を拡張し、`coordinatesGetter` を時間軸ベースに変更する。
+- MVP では 1 分単位のスケジューリングをサポートしつつ、UI メッシュは 15 分刻み。細かな微調整は CardModal で直接入力する。
 - カードクリックは既存 `CardModal` (`app/components/CardModal.tsx`) を再利用し、`card=<shortId>` クエリもサポート。
-- キーボード操作: `↑↓` で 30 分単位移動、`⌘+Enter` で完了切り替え。
+- キーボード操作: `↑↓` の移動刻みは 5 分、`⌘+Enter` で完了切り替え。1 分刻み編集は CardModal の入力フィールドで行う。
 
 ### 4.6 パフォーマンス/メトリクス
 - ロード時に `createClientTrace`（`app/(board)/_components/KanbanBoardClient.tsx:52`）へ新しい `phase: "timeline"` を送信し、`metricsJson` に「timeline-render-ms」「timeline-events-count」を追加。
@@ -58,7 +74,7 @@
 - スクロール連動は `aria-live="polite"` で Now 変化を読み上げ。ハイコントラスト配色も CSS カスタムプロパティで切替。
 
 ## 5. データ & API 要件
-1. **新フィールド**: `cards` テーブルに `scheduled_date (date)`, `scheduled_start (time)`, `scheduled_end (time)`, `schedule_channel ('timeline' | 'ab-list')`, `schedule_bucket ('today-a' | 'today-b' | ...)` を追加。型は `NOT NULL` ではなく null 可にし、既存 Kanban との互換性を確保。
+1. **新フィールド**: `cards` テーブルに `scheduled_date (date)`, `scheduled_start`/`scheduled_end` (time without time zone, 分解能 1 分), `schedule_channel ('timeline' | 'ab-list' | 'list-only' | 'archived')`, `schedule_bucket ('today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b' | null)` を追加。既存 Kanban データとは独立して管理。
 2. **派生テーブル案**: 「繰り返し」や複数ボード共有が必要なら `timeline_events` (card_id, board_id, date, start_at, end_at, column, source) を検討。
 3. **API 拡張**: `app/api/boards/[boardId]/cards` 取得時に新フィールドを返し、`sanitizeCardsForUpload` (`lib/supabase.ts:137`) でも落とさないよう更新。
 4. **Migration/Backfill**: 既存カードは `schedule_channel='list-only'` として扱い、今回のビューでは非表示 or A/B backlog にまとめる方針をチケットで決める。
@@ -74,16 +90,24 @@
 | [2025-11-13/05-floating-list-card-modal.md](../2025-11-13/05-floating-list-card-modal.md) | UX/Modal | A/B カードと CardModal の連動、チェックリスト、完了ステータス同期、コメント/通知整合を担保 |
 | [2025-11-13/06-metrics-and-tests.md](../2025-11-13/06-metrics-and-tests.md) | QA/Metrics | Timeline 用メトリクス、Playwright シナリオ、Flaky 対策、`npm run test:all-split` への組み込み |
 
-## 7. 確認が必要なポイント
-1. **スケジューリングの粒度**: 30 分単位固定か、ユーザー指定の任意分単位か。UX/実装コストに直結。
-2. **タイムゾーン**: 表示は常に `GMT+09` 固定か、ユーザー設定に応じて可変にするか。サーバ/DB 保存の基準時刻も要確認。
-3. **A/B リストのデータ源**: 既存リストをマッピングするのか、新たに `ab_sections` 的なデータを足すのか。
-4. **カード多重所属**: 1 カードがタイムラインと A/B に同時所属できるか（例: 時間ブロック + backlog チェック）。
-5. **繰り返し予定/ドラッグ複製**: 毎週の定例をどう表現するか。
-6. **モバイル対応優先度**: MVP でレスポンシブ必須か、デスクトップ優先で良いか。
-7. **通知/同期**: Timeline 変更を他メンバーへどう通知するか（Realtime チャンネルのチャネル種別拡張が必要）。
+## 7. 確認が必要なポイント → 決定済/保留一覧
+- ✅ スケジューリング粒度: **1 分単位**（Google カレンダー互換）。
+- ✅ タイムゾーン: **JST 固定**で表示・保存。
+- ✅ A/B データ源: **専用 `schedule_bucket`** で管理（既存リスト流用なし）。
+- ✅ 所属: **Timeline/A-B は排他**。
+- ⏸ 繰り返し/複製: 今後のスプリントで検討。
+- ✅ レスポンシブ: **デスクトップ優先**（MVP 範囲）。
+- ⏸ 通知/同期: 将来対応。Realtime 拡張はスコープ外。
 
-## 8. リスク & 次アクション
+## 8. MVP スコープと段階
+1. **Phase 0 (触れる状態)** — Tickets 01〜04
+   - 新フィールド/型, Timeline API, UI シェル, 基本 DnD。ここまでで Today/Tomorrow タイムライン + A/B を触れる最小構成。
+2. **Phase 1** — Ticket 05
+   - CardModal 連携とチェックリスト整備（Flaky テスト影響が無いタイミングで実装）。
+3. **Phase 2** — Ticket 06
+   - Metrics/Test 強化。将来の通知・繰り返しを見据えた計測を追加。
+
+## 9. リスク & 次アクション
 - `KanbanBoardClient` の肥大化：時間軸専用の `TaeskMapTimelineClient` を分離しないと管理不能になる恐れ。`app/(board)/b/...` ルートを分岐して A/B/Timeline の feature flag を掛ける案を検討。
 - コメント/カード API の Flaky が残存しているため（`docs/tickets/2025-11-10/01-test-all-split-summary.md`）、CardModal を触るタスク（Ticket 05）はテスト安定化後に着手。
 - Schema 変更は Supabase migration で対応し、`tsconfig.tsbuildinfo` のノイズは commit 対象から外す。
