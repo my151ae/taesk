@@ -2319,7 +2319,11 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     due_date?: string | null,
     priority?: Priority,
     assigneeIds?: string[],
-    assigneeTouched?: boolean
+    assigneeTouched?: boolean,
+    due_start?: string | null,
+    due_end?: string | null,
+    due_channel?: DueChannel,
+    due_bucket?: DueBucket | null,
   ) => {
     console.log('[handleSaveCard] Starting...', { id, title, description, assigneeIds });
 
@@ -2331,12 +2335,27 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           const nextAssigneeIds = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [];
           const nextAssigneeId = nextAssigneeIds.length > 0 ? nextAssigneeIds[0] : null;
 
+          const nextChannel: DueChannel = due_channel ?? card.due_channel ?? 'list-only';
+          const nextBucket: DueBucket | null = nextChannel === 'ab-list'
+            ? (due_bucket ?? card.due_bucket ?? null)
+            : null;
+          const nextStart = nextChannel === 'timeline'
+            ? (due_start ?? card.due_start ?? null)
+            : null;
+          const nextEnd = nextChannel === 'timeline'
+            ? (due_end ?? card.due_end ?? null)
+            : null;
+
           return {
             ...card,
             title,
             description,
             tags: tags || [],
             due_date: due_date || null,
+            due_start: nextStart,
+            due_end: nextEnd,
+            due_channel: nextChannel,
+            due_bucket: nextBucket,
             priority: priority || 'medium',
             assignee_id: nextAssigneeId, // Keep for backward compatibility
             assignee_ids: nextAssigneeIds.length > 0 ? nextAssigneeIds : null,

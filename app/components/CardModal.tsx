@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import type { Card, Board, Priority, ProfileSummary } from "@/lib/supabase";
+import type { Card, Board, Priority, ProfileSummary, DueChannel, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 
@@ -14,6 +14,14 @@ const getProfileDisplayName = (profile: ProfileSummary): string => {
 const getProfileInitials = (profile: ProfileSummary): string => {
   return getProfileInitial(profile, profile.email ?? null);
 };
+
+const DEFAULT_BUCKET: DueBucket = 'today_a';
+const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
+  { value: 'today_a', label: 'Today • A (do today)' },
+  { value: 'today_b', label: 'Today • B (if possible)' },
+  { value: 'tomorrow_a', label: 'Tomorrow • A (do tomorrow)' },
+  { value: 'tomorrow_b', label: 'Tomorrow • B (if possible)' },
+];
 
 interface CardModalProps {
   card: Card;
@@ -27,7 +35,11 @@ interface CardModalProps {
     due_date?: string | null,
     priority?: Priority,
     assigneeIds?: string[],
-    assigneeTouched?: boolean
+    assigneeTouched?: boolean,
+    due_start?: string | null,
+    due_end?: string | null,
+    due_channel?: DueChannel,
+    due_bucket?: DueBucket | null
   ) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -48,6 +60,10 @@ export function CardModal({
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [dueDate, setDueDate] = useState(card.due_date || '');
+  const [dueStart, setDueStart] = useState(card.due_start ? card.due_start.slice(0, 5) : '');
+  const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
+  const [dueChannel, setDueChannel] = useState<DueChannel>(card.due_channel ?? 'list-only');
+  const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
   // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
@@ -108,6 +124,10 @@ export function CardModal({
       setDescription(card.description);
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
+      setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
+      setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
+      setDueChannel(card.due_channel ?? 'list-only');
+      setDueBucket(card.due_bucket ?? null);
       setPriority(card.priority || 'medium');
       // Initialize assigneeIds from card
       const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
@@ -126,6 +146,10 @@ export function CardModal({
       setDescription(card.description);
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
+      setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
+      setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
+      setDueChannel(card.due_channel ?? 'list-only');
+      setDueBucket(card.due_bucket ?? null);
       setPriority(card.priority || 'medium');
       const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
         ? card.assignee_ids
@@ -212,15 +236,24 @@ export function CardModal({
   }, []); // 空配列でマウント時のみ実行
 
   const handleSave = () => {
+    const normalizedDueDate = dueDate || null;
+    const normalizedStart = dueChannel === 'timeline' && dueStart ? `${dueStart}:00` : null;
+    const normalizedEnd = dueChannel === 'timeline' && dueEnd ? `${dueEnd}:00` : null;
+    const normalizedBucket = dueChannel === 'ab-list' ? (dueBucket ?? DEFAULT_BUCKET) : null;
+
     onSave(
       card.id,
       title,
       description,
       tags,
-      dueDate || null,
+      normalizedDueDate,
       priority,
       assigneeIds.length > 0 ? assigneeIds : [],
-      assigneeTouched
+      assigneeTouched,
+      normalizedStart,
+      normalizedEnd,
+      dueChannel,
+      normalizedBucket
     );
 
     if (targetBoardId !== card.board_id) {
@@ -256,6 +289,25 @@ export function CardModal({
 
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
+  };
+
+  const handleChannelChange = (next: DueChannel) => {
+    setDueChannel(next);
+    setIsDirty(true);
+    if (next !== 'timeline') {
+      setDueStart('');
+      setDueEnd('');
+    }
+    if (next !== 'ab-list') {
+      setDueBucket(null);
+    } else if (!dueBucket) {
+      setDueBucket(DEFAULT_BUCKET);
+    }
+  };
+
+  const handleBucketChange = (next: DueBucket) => {
+    setDueBucket(next);
+    setIsDirty(true);
   };
 
   const handleDelete = () => {
@@ -368,17 +420,97 @@ export function CardModal({
             )}
           </div>
 
-          {/* Due Date */}
+          {/* Schedule */}
           <div>
             <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Due Date
+              Schedule placement
             </label>
-            <input
-              type="date"
-              value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-              onChange={(e) => setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
+            <select
+              value={dueChannel}
+              onChange={(e) => handleChannelChange(e.target.value as DueChannel)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            />
+            >
+              <option value="timeline">Timeline block</option>
+              <option value="ab-list">A/B backlog</option>
+              <option value="list-only">List only</option>
+            </select>
+
+            {(dueChannel === 'timeline' || dueChannel === 'ab-list') && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                    Day
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
+                      setIsDirty(true);
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  />
+                </div>
+
+                {dueChannel === 'timeline' ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                        Start
+                      </label>
+                      <input
+                        type="time"
+                        step={900}
+                        value={dueStart}
+                        onChange={(e) => {
+                          setDueStart(e.target.value);
+                          setIsDirty(true);
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                        End
+                      </label>
+                      <input
+                        type="time"
+                        step={900}
+                        value={dueEnd}
+                        onChange={(e) => {
+                          setDueEnd(e.target.value);
+                          setIsDirty(true);
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                      Bucket
+                    </label>
+                    <select
+                      value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
+                      onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                    >
+                      {BUCKET_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {dueChannel === 'list-only' && (
+              <p className="mt-2 text-xs text-slate-500">
+                This card stays on the board without a schedule. Use the timeline or A/B options to plan it.
+              </p>
+            )}
           </div>
 
           {/* Priority */}

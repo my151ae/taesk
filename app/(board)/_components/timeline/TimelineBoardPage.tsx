@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { Board } from "@/lib/supabase";
+import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
   DragEndEvent,
@@ -108,6 +110,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
+  const router = useRouter();
+  const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -168,11 +172,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         fetchTimeline();
       } catch (error) {
         console.error('[timeline] update error', error);
-        setErrorMessage('Failed to update card');
+      setErrorMessage('Failed to update card');
       }
     },
     [fetchTimeline, initialBoard.id]
   );
+
+  const openCardModalFromTimeline = useCallback((shortId: string | null) => {
+    if (!shortId) return;
+    if (canonicalBoardPath) {
+      router.push(`${canonicalBoardPath}?card=${shortId}`);
+    } else {
+      router.push(`/c/${shortId}`);
+    }
+  }, [canonicalBoardPath, router]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const cardId = event.active.data.current?.cardId as string | undefined;
@@ -238,13 +251,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     return (
       <DraggableCard key={event.card_id} id={`event:${event.card_id}`} data={{ kind: 'event', event, cardId: event.card_id }}>
-        <div
-          className="absolute left-2 right-2 rounded-md border border-slate-200 bg-white p-2 shadow-sm"
+        <button
+          type="button"
+          onClick={() => openCardModalFromTimeline(event.short_id)}
+          className="absolute left-2 right-2 rounded-md border border-slate-200 bg-white p-2 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
           <div className="text-xs font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</div>
           <div className="text-[10px] text-slate-500">{timeLabel(event.due_start, event.due_end)}</div>
-        </div>
+        </button>
       </DraggableCard>
     );
   };
@@ -289,10 +304,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             {items.length === 0 && <div className="text-xs text-slate-400">No cards yet</div>}
             {items.map((item) => (
               <DraggableCard key={item.card_id} id={`bucket:${item.card_id}`} data={{ kind: 'bucket', cardId: item.card_id }}>
-                <div className="rounded-md border border-slate-200 px-3 py-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => openCardModalFromTimeline(item.short_id)}
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-xs shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                >
                   <div className="font-medium text-slate-800 line-clamp-2">{item.title || 'Untitled card'}</div>
                   <div className="text-[10px] text-slate-500">{timeLabel(item.due_start, item.due_end)}</div>
-                </div>
+                </button>
               </DraggableCard>
             ))}
           </div>
