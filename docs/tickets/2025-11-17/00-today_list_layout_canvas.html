@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Time axis + Today/Tomorrow – floating A/B lists</title>
+  <style>
+    :root {
+      --bg-board: #f4f5f7;
+      --bg-list: #ffffff;
+      --bg-card: #ffffff;
+      --border-subtle: #dfe1e6;
+      --text-main: #172b4d;
+      --text-muted: #6b778c;
+      --accent: #00a8ff;
+      --radius-list: 6px;
+      --radius-card: 10px;
+      --shadow-soft: 0 1px 3px rgba(9,30,66,0.2);
+      --hour-height: 40px; /* 1h = 40px → 24h timeline */
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-board);
+      color: var(--text-main);
+    }
+
+    /* 上のメニュー（固定） */
+    .board-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px 8px;
+      font-weight: 700;
+      font-size: 20px;
+      background: var(--bg-board);
+    }
+
+    .board-header-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #33c853;
+    }
+
+    .board-main {
+      padding: 0 24px 24px;
+    }
+
+    /* カレンダー全体コンテナ */
+    .calendar-shell {
+      border-radius: var(--radius-list);
+      box-shadow: var(--shadow-soft);
+      background: var(--bg-list);
+      position: relative;
+    }
+
+    /* Today / Tomorrow のヘッダー行（タイムラインと一緒にスクロール、上部にスティッキー） */
+    .calendar-header {
+      display: grid;
+      grid-template-columns: 64px 1fr 1fr; /* 左は時間軸の幅と合わせる */
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-list);
+      z-index: 7; /* 時間軸より前面にして GMT+09 をヘッダーとして見せる */
+      position: sticky;
+      top: 0;
+    }
+
+    .calendar-header-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 8px 6px 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      border-right: 1px solid var(--border-subtle);
+      background: var(--bg-list); /* タイムラベルと重なっても見やすいよう背景を明示 */
+    }
+
+    .calendar-header-day {
+      padding: 8px 10px 6px;
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center; /* 列の中央寄せ */
+      font-size: 13px;
+      font-weight: 700;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .calendar-header-day:last-of-type {
+      border-right: none;
+    }
+
+    .day-label {
+      font-weight: 700;
+    }
+
+    .day-date {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* タイムライン部分（ヘッダー込みで縦スクロール） */
+    .calendar-body-scroll {
+      max-height: calc(9 * var(--hour-height));
+      overflow-y: scroll; /* ヘッダーの下からスクロールバーが出る */
+    }
+
+    .calendar-scroll {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    /* 左端：時間軸 */
+    .time-axis {
+      width: 64px;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-right: 1px solid var(--border-subtle);
+      position: relative;
+      z-index: 6; /* 赤丸をカラムより前面に出すためにレイヤーを上げる */
+    }
+
+    .time-axis-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      padding: 8px 6px 8px 0;
+    }
+
+    .time-label {
+      height: var(--hour-height);
+      padding-right: 2px;
+    }
+
+    /* 現在時刻マーカー（時間軸側）：赤い塗りつぶしの丸を縦ラインの上に */
+    .now-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff4b4b;
+      left: 100%;
+      transform: translate(-50%, -50%); /* 右端ラインの中心に乗るように */
+      pointer-events: none;
+      box-sizing: border-box;
+      z-index: 10; /* Today カラムの背景より前面に */
+    }
+
+    /* 右側：日カラム */
+    .board-days {
+      display: flex;
+      gap: 0;
+      flex: 1;
+    }
+
+    .day {
+      flex: 1;              /* ヘッダーと同じ 1fr:1fr 比率に */
+      min-width: 0;
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .day:last-of-type {
+      border-right: none;
+    }
+
+    .day-timeline {
+      position: relative;
+      height: calc(24 * var(--hour-height)); /* 24時間 */
+      background-color: #fdfdfd;
+      background-image: linear-gradient(to bottom, #ebecf0 1px, transparent 1px);
+      background-size: 100% var(--hour-height);
+      overflow: hidden;
+    }
+
+    /* タスク領域：右側にフローティングリスト用の余白を残す */
+    .day-timeline-events {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: calc(100% - 210px); /* フローティングリストの幅ぶん左に寄せる（少し広げた） */
+      padding: 8px 8px 8px 4px;
+    }
+
+    /* 現在時刻ライン（Today だけ） */
+    .now-line-today {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #ff4b4b;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .event {
+      position: absolute;
+      border-radius: 4px;
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 1px 2px rgba(9,30,66,0.15);
+      font-size: 11px;
+      padding: 3px 4px;
+      display: flex;
+      align-items: flex-start; /* 中身を上寄せ */
+      gap: 4px;
+    }
+
+    .event input[type="checkbox"] {
+      width: 12px;
+      height: 12px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    /* イベント位置（例） */
+    .ev-today-standup {
+      top: calc(9 * var(--hour-height)); /* 09:00 */
+      height: calc(0.5 * var(--hour-height));
+      left: 4px;
+      right: 4px;
+    }
+
+    .ev-today-spec {
+      top: calc(10 * var(--hour-height)); /* 10:00–11:00 */
+      height: calc(1 * var(--hour-height));
+      left: 4px;
+      right: 4px;
+    }
+
+    .ev-today-overlap-a {
+      top: calc(14 * var(--hour-height)); /* 14:00–15:00 */
+      height: calc(1 * var(--hour-height));
+      left: 4px;
+      right: 52%;
+    }
+
+    .ev-today-overlap-b {
+      top: calc(14 * var(--hour-height));
+      height: calc(1 * var(--hour-height));
+      left: 48%;
+      right: 4px;
+    }
+
+    .ev-tomorrow-review {
+      top: calc(10 * var(--hour-height));
+      height: calc(1 * var(--hour-height));
+      left: 4px;
+      right: 4px;
+    }
+
+    .ev-tomorrow-overlap-a {
+      top: calc(15 * var(--hour-height));
+      height: calc(1 * var(--hour-height));
+      left: 4px;
+      right: 52%;
+    }
+
+    .ev-tomorrow-overlap-b {
+      top: calc(15 * var(--hour-height));
+      height: calc(1 * var(--hour-height));
+      left: 48%;
+      right: 4px;
+    }
+
+    /* フローティング A/B リスト（画面ヘッダー直下にフロート） */
+    .floating-lists-layer {
+      position: sticky;
+      top: 120px; /* board-header + カレンダーヘッダーの下あたりに配置して、重ならないように */
+      z-index: 25;
+      padding: 0 24px;
+    }
+
+    .floating-grid {
+      display: grid;
+      grid-template-columns: 64px 1fr 1fr; /* 時間軸 + Today + Tomorrow */
+      column-gap: 0;
+    }
+
+    .floating-slot {
+      position: relative;
+    }
+
+    .floating-list {
+      position: absolute;
+      top: 24px;        /* ヘッダーより少し下に下げる */
+      right: 24px;      /* スクロールバーにかぶらないよう少し左に寄せる */
+      width: 210px;
+      min-width: 210px;
+      max-width: 210px;
+      background: var(--bg-card);
+      border-radius: var(--radius-card);
+      box-shadow: 0 4px 8px rgba(9,30,66,0.25);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 8px;
+      font-size: 12px;
+      cursor: move; /* ドラッグできそうな感じ */
+    }
+
+    .floating-list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .drag-handle {
+      font-size: 14px;
+    }
+
+    .floating-list-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .unscheduled-section-title {
+      font-weight: 600;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
+    .unscheduled-divider {
+      height: 1px;
+      background: #ebecf0;
+      margin: 4px 0;
+    }
+
+    /* カレンダートップバー（Today ボタンなど） */
+    .calendar-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-list);
+    }
+
+    .calendar-topbar-today {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .calendar-topbar-today:hover {
+      background: #f4f5f7;
+    }
+
+    /* A/B の各タスクは角のあるカード風 */
+    .unscheduled-item {
+      border: 1px solid var(--border-subtle);
+      border-radius: 0; /* 角丸ではなく角 */
+      background: #ffffff;
+      padding: 4px 6px;
+      display: flex;
+      align-items: flex-start; /* チェックボックスを上寄せ */
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .unscheduled-item input[type="checkbox"] {
+      width: 13px;
+      height: 13px;
+      margin: 0;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="board-header">
+    <span class="board-title">Main Board</span>
+    <span class="board-header-status"></span>
+    <span class="board-header-label" style="font-size:12px;color:var(--text-muted);">Live</span>
+  </header>
+
+  <!-- フローティング A/B リスト（画面上でヘッダーのすぐ下に固定） -->
+  <div class="floating-lists-layer">
+    <div class="floating-grid">
+      <div></div> <!-- 時間軸ぶんのダミー列 -->
+
+      <div class="floating-slot">
+        <section class="floating-list">
+          <div class="floating-list-header">
+            <span>A/B Today</span>
+            <span class="drag-handle">⋮⋮</span>
+          </div>
+          <div class="floating-list-body">
+            <div class="unscheduled-section">
+              <div class="unscheduled-section-title">A: do today (not scheduled)</div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Finish spec</span>
+              </div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Prepare meeting</span>
+              </div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Fix bug #123</span>
+              </div>
+            </div>
+            <div class="unscheduled-divider"></div>
+            <div class="unscheduled-section">
+              <div class="unscheduled-section-title">B: if possible today</div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Organize docs</span>
+              </div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Break down big task</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="floating-slot">
+        <section class="floating-list">
+          <div class="floating-list-header">
+            <span>A/B Tomorrow</span>
+            <span class="drag-handle">⋮⋮</span>
+          </div>
+          <div class="floating-list-body">
+            <div class="unscheduled-section">
+              <div class="unscheduled-section-title">A: do tomorrow</div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Finish review</span>
+              </div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Prepare slides</span>
+              </div>
+            </div>
+            <div class="unscheduled-divider"></div>
+            <div class="unscheduled-section">
+              <div class="unscheduled-section-title">B: if possible tomorrow</div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Refactor old code</span>
+              </div>
+              <div class="unscheduled-item">
+                <input type="checkbox" />
+                <span>Research item</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="board-main">
+    <!-- カレンダー本体 -->
+    <div class="calendar-shell">
+      <div class="calendar-topbar">
+        <button class="calendar-topbar-today">Today</button>
+      </div>
+      <!-- タイムライン（ヘッダー込みでスクロール） -->
+      <div class="calendar-body-scroll">
+        <div class="calendar-header">
+          <div class="calendar-header-time">GMT+09</div>
+          <div class="calendar-header-day">
+            <span class="day-label">Today</span>
+            <span class="day-date">11/13 Thu</span>
+          </div>
+          <div class="calendar-header-day">
+            <span class="day-label">Tomorrow</span>
+            <span class="day-date">11/14 Fri</span>
+          </div>
+        </div>
+
+        <div class="calendar-scroll">
+          <!-- 時間軸 -->
+          <aside class="time-axis">
+            <div class="time-axis-inner">
+              <div class="time-label">00:00</div>
+              <div class="time-label">01:00</div>
+              <div class="time-label">02:00</div>
+              <div class="time-label">03:00</div>
+              <div class="time-label">04:00</div>
+              <div class="time-label">05:00</div>
+              <div class="time-label">06:00</div>
+              <div class="time-label">07:00</div>
+              <div class="time-label">08:00</div>
+              <div class="time-label">09:00</div>
+              <div class="time-label">10:00</div>
+              <div class="time-label">11:00</div>
+              <div class="time-label">12:00</div>
+              <div class="time-label">13:00</div>
+              <div class="time-label">14:00</div>
+              <div class="time-label">15:00</div>
+              <div class="time-label">16:00</div>
+              <div class="time-label">17:00</div>
+              <div class="time-label">18:00</div>
+              <div class="time-label">19:00</div>
+              <div class="time-label">20:00</div>
+              <div class="time-label">21:00</div>
+              <div class="time-label">22:00</div>
+              <div class="time-label">23:00</div>
+            </div>
+            <div class="now-dot"></div>
+          </aside>
+
+          <!-- 日カラム -->
+          <main class="board-days">
+            <section class="day">
+              <div class="day-timeline">
+                <div class="now-line-today"></div>
+                <div class="day-timeline-events">
+                  <div class="event ev-today-standup">
+                    <input type="checkbox" />
+                    <span>Standup</span>
+                  </div>
+                  <div class="event ev-today-spec">
+                    <input type="checkbox" />
+                    <span>Spec writing</span>
+                  </div>
+                  <div class="event ev-today-overlap-a">
+                    <input type="checkbox" />
+                    <span>Deep work A</span>
+                  </div>
+                  <div class="event ev-today-overlap-b">
+                    <input type="checkbox" />
+                    <span>Deep work B</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="day">
+              <div class="day-timeline">
+                <!-- Tomorrow には赤ラインを出さない -->
+                <div class="day-timeline-events">
+                  <div class="event ev-tomorrow-review">
+                    <input type="checkbox" />
+                    <span>Design review</span>
+                  </div>
+                  <div class="event ev-tomorrow-overlap-a">
+                    <input type="checkbox" />
+                    <span>Client prep A</span>
+                  </div>
+                  <div class="event ev-tomorrow-overlap-b">
+                    <input type="checkbox" />
+                    <span>Client prep B</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 24h タイムラインの中で "現在時刻" の位置を決める
+    (function() {
+      var HOUR_HEIGHT = 40; // CSS の --hour-height と合わせる
+      var now = new Date();
+      var hours = now.getHours() + now.getMinutes() / 60;
+      var offset = hours * HOUR_HEIGHT;
+
+      var dot = document.querySelector('.now-dot');
+      if (dot) {
+        dot.style.top = offset + 'px';
+      }
+
+      var todayLine = document.querySelector('.now-line-today');
+      if (todayLine) {
+        todayLine.style.top = offset + 'px';
+      }
+
+      // 初期表示は「今日の赤ライン」が見える画面を基準にする（ほぼ中央にくるように）
+      var bodyScroll = document.querySelector('.calendar-body-scroll');
+      if (bodyScroll) {
+        var visible = bodyScroll.clientHeight;
+        var scrollTo = offset - visible / 2; // 赤ラインがだいたい中央に見えるように
+        if (scrollTo < 0) scrollTo = 0;
+        var maxScroll = bodyScroll.scrollHeight - visible;
+        if (scrollTo > maxScroll) scrollTo = maxScroll;
+        bodyScroll.scrollTop = scrollTo;
+      }
+    })();
+  </script>
+</body>
+</html>
