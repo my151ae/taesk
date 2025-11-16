@@ -529,7 +529,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       <DraggableCard key={event.card_id} id={`event:${event.card_id}`} data={{ kind: 'event', event, cardId: event.card_id }}>
         <button
           type="button"
-          disabled={dataMode !== 'api'}
           onClick={() => openCardModalFromTimeline(event.short_id)}
           data-testid="timeline-event"
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -576,7 +575,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                               />
                               <button
                                 type="button"
-                                disabled={dataMode !== 'api'}
                                 onClick={() => openCardModalFromTimeline(item.short_id)}
                                 className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                               >
