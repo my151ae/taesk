@@ -114,6 +114,14 @@ type ActiveDragState = {
   duration: number;
 };
 
+type PlacementMeta = {
+  target: 'timeline' | 'bucket';
+  bucketKey?: string;
+  sourceEvent?: TimelineEvent;
+  sourceBucketItem?: TimelineBucketItem;
+  defaultDuration?: number;
+};
+
 type DataMode = 'api' | 'mock';
 
 const buildMockTimeline = (): TimelineResponse => {
@@ -217,6 +225,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
   const [dataMode, setDataMode] = useState<DataMode>('api');
+  const [liveNowMinutes, setLiveNowMinutes] = useState<number | null>(null);
+  const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
@@ -241,6 +251,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setData(payload);
       setDataMode('api');
       setStatus('idle');
+      setHasAutoScrolled(false);
       const abItemCount = Object.values(payload.abBuckets || {}).reduce(
         (sum, items) => sum + (items?.length ?? 0),
         0
@@ -257,6 +268,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setData(buildMockTimeline());
       setDataMode('mock');
       setStatus('idle');
+      setHasAutoScrolled(false);
       traceRef.current?.finish('error', { reason: 'fetch_failed' });
       traceRef.current = createClientTrace('timeline');
     }
@@ -275,14 +287,25 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [data]);
 
   const nowMinutes = useMemo(() => (data ? getNowMinutesJst(data.serverNow) : null), [data]);
+  const indicatorMinutes = liveNowMinutes ?? nowMinutes;
+  const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes) : null;
 
   useEffect(() => {
-    if (!timelineScrollRef.current || nowMinutes == null) return;
+    if (!data) return;
+    const updateNow = () => setLiveNowMinutes(getNowMinutesJst(new Date().toISOString()));
+    updateNow();
+    const interval = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(interval);
+  }, [data]);
+
+  useEffect(() => {
+    if (!timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
     const container = timelineScrollRef.current;
-    const target = minuteToPixels(nowMinutes) - container.clientHeight / 2;
+    const target = minuteToPixels(indicatorMinutes) - container.clientHeight / 2;
     const clamped = Math.max(0, Math.min(target, TIMELINE_HEIGHT - container.clientHeight));
     container.scrollTop = clamped;
-  }, [nowMinutes]);
+    setHasAutoScrolled(true);
+  }, [indicatorMinutes, hasAutoScrolled]);
 
   const applyPatch = useCallback(
     async (cardId: string, payload: Record<string, unknown>) => {
@@ -300,6 +323,109 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       }
     },
     [dataMode, fetchTimeline, initialBoard.id]
+  );
+
+  const persistPlacement = useCallback(
+    (cardId: string, payload: Record<string, unknown>, meta: PlacementMeta) => {
+      if (dataMode === 'api') {
+        applyPatch(cardId, payload);
+        return;
+      }
+
+      setData((current) => {
+        if (!current) return current;
+
+        const nextEvents = [...current.events];
+        const nextBuckets = Object.entries(current.abBuckets || {}).reduce(
+          (acc, [key, items]) => {
+            acc[key] = [...(items ?? [])];
+            return acc;
+          },
+          {} as Record<string, TimelineBucketItem[]>
+        );
+
+        let removedBucketItem: TimelineBucketItem | null = null;
+        Object.values(nextBuckets).forEach((items) => {
+          const index = items.findIndex((item) => item.card_id === cardId);
+          if (index >= 0) {
+            removedBucketItem = items[index];
+            items.splice(index, 1);
+          }
+        });
+
+        let removedEvent: TimelineEvent | null = null;
+        const eventIndex = nextEvents.findIndex((event) => event.card_id === cardId);
+        if (eventIndex >= 0) {
+          removedEvent = nextEvents.splice(eventIndex, 1)[0];
+        }
+
+        const baseEvent = removedEvent ?? meta.sourceEvent ?? null;
+        const baseBucketItem = removedBucketItem ?? meta.sourceBucketItem ?? null;
+
+        if (meta.target === 'timeline') {
+          const nextStart = (payload.due_start as string | null) ?? baseEvent?.due_start ?? baseBucketItem?.due_start ?? null;
+          const nextEnd = (payload.due_end as string | null) ?? baseEvent?.due_end ?? baseBucketItem?.due_end ?? null;
+          const nextDate = (payload.due_date as string | null) ?? baseEvent?.due_date ?? baseBucketItem?.due_date ?? null;
+          const startMinutes = getMinutesFromTime(nextStart);
+          const endMinutes = getMinutesFromTime(nextEnd);
+          const durationMinutes =
+            startMinutes != null && endMinutes != null
+              ? Math.max(endMinutes - startMinutes, 15)
+              : baseEvent?.durationMinutes ?? meta.defaultDuration ?? 60;
+
+          const replacement: TimelineEvent = {
+            card_id: cardId,
+            due_date: nextDate,
+            due_start: nextStart,
+            due_end: nextEnd,
+            durationMinutes,
+            title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
+            tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+            priority: baseEvent?.priority ?? null,
+            checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
+            short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
+            slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+          };
+
+          nextEvents.push(replacement);
+          nextEvents.sort((a, b) => {
+            if (a.due_date === b.due_date) {
+              const aStart = getMinutesFromTime(a.due_start) ?? 0;
+              const bStart = getMinutesFromTime(b.due_start) ?? 0;
+              return aStart - bStart;
+            }
+            return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+          });
+
+          return { ...current, events: nextEvents, abBuckets: nextBuckets };
+        }
+
+        if (meta.target === 'bucket' && meta.bucketKey) {
+          if (!nextBuckets[meta.bucketKey]) {
+            nextBuckets[meta.bucketKey] = [];
+          }
+
+          const bucketItems = nextBuckets[meta.bucketKey];
+          const nextBucketItem: TimelineBucketItem = {
+            card_id: cardId,
+            title: baseBucketItem?.title ?? baseEvent?.title ?? 'Untitled card',
+            due_date: (payload.due_date as string | null) ?? baseBucketItem?.due_date ?? null,
+            due_start: (payload.due_start as string | null) ?? null,
+            due_end: (payload.due_end as string | null) ?? null,
+            checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
+            tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
+            short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
+            slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
+          };
+
+          bucketItems.unshift(nextBucketItem);
+          return { ...current, events: nextEvents, abBuckets: nextBuckets };
+        }
+
+        return current;
+      });
+    },
+    [applyPatch, dataMode]
   );
 
   const openCardModalFromTimeline = useCallback((shortId: string | null) => {
@@ -323,7 +449,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [data?.days]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (dataMode !== 'api') return;
     const cardId = event.active.data.current?.cardId as string | undefined;
     if (!cardId) return;
     const kind = event.active.data.current?.kind as 'event' | 'bucket';
@@ -338,16 +463,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (dataMode !== 'api') {
-      setActiveDrag(null);
-      return;
-    }
     const { active, over, delta } = event;
     setActiveDrag(null);
 
     if (!over) return;
     const cardId = active.data.current?.cardId as string | undefined;
     if (!cardId) return;
+
+    const sourceEvent = active.data.current?.event as TimelineEvent | undefined;
+    const sourceBucketItem = active.data.current?.item as TimelineBucketItem | undefined;
 
     const overType = over.data.current?.type;
 
@@ -360,12 +484,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
       const nextEnd = nextStart + activeDrag.duration;
 
-      applyPatch(cardId, {
+      const payload = {
         due_channel: 'timeline',
         due_bucket: null,
         due_date: day.isoDate,
         due_start: minutesToTime(nextStart),
         due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+      };
+      persistPlacement(cardId, payload, {
+        target: 'timeline',
+        sourceEvent,
+        sourceBucketItem,
+        defaultDuration: activeDrag.duration,
       });
       return;
     }
@@ -373,15 +503,21 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (overType === 'ab-bucket') {
       const bucketKey = over.data.current?.bucketKey as string;
       const dayIso = bucketDayMap[bucketKey] ?? null;
-      applyPatch(cardId, {
+      const payload = {
         due_channel: 'ab-list',
         due_bucket: bucketKey,
         due_date: dayIso,
         due_start: null,
         due_end: null,
+      };
+      persistPlacement(cardId, payload, {
+        target: 'bucket',
+        bucketKey,
+        sourceEvent,
+        sourceBucketItem,
       });
     }
-  };
+  }; 
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -395,6 +531,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           type="button"
           disabled={dataMode !== 'api'}
           onClick={() => openCardModalFromTimeline(event.short_id)}
+          data-testid="timeline-event"
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
@@ -410,7 +547,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (!meta) return null;
 
     return (
-      <div className="pointer-events-auto rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl ring-1 ring-black/5">
+      <div className="pointer-events-auto rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl ring-1 ring-black/5 backdrop-blur">
         <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
           <span>{meta.title}</span>
           <span>{day.isoDate}</span>
@@ -419,37 +556,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           {meta.sections.map((section) => {
             const items = data?.abBuckets?.[section.bucket] ?? [];
             return (
-              <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={dataMode !== 'api'}>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+              <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
                   <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
                   <p className="text-[10px] text-slate-400">{section.helper}</p>
                   <div className="mt-2 space-y-1">
                     {items.length === 0 ? (
                       <p className="text-[11px] text-slate-400">Drop cards here</p>
                     ) : (
-                      items.slice(0, 3).map((item) => (
-                        <div key={item.card_id} className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
-                          <label className="flex items-start gap-2 text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              readOnly
-                              className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
-                            />
-                            <button
-                              type="button"
-                              disabled={dataMode !== 'api'}
-                              onClick={() => openCardModalFromTimeline(item.short_id)}
-                              className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                            >
-                              <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
-                              {item.due_start && (
-                                <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
-                              )}
-                            </button>
-                          </label>
-                        </div>
-                      ))
+                      items.slice(0, 3).map((item) => {
+                        const content = (
+                          <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
+                            <label className="flex items-start gap-2 text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={item.checked}
+                                readOnly
+                                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
+                              />
+                              <button
+                                type="button"
+                                disabled={dataMode !== 'api'}
+                                onClick={() => openCardModalFromTimeline(item.short_id)}
+                                className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                              >
+                                <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
+                                {item.due_start && (
+                                  <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
+                                )}
+                              </button>
+                            </label>
+                          </div>
+                        );
+
+                        return (
+                          <DraggableCard
+                            key={item.card_id}
+                            id={`bucket:${item.card_id}`}
+                            data={{ kind: 'bucket', cardId: item.card_id, bucketKey: section.bucket, item }}
+                          >
+                            {content}
+                          </DraggableCard>
+                        );
+                      })
                     )}
                     {items.length > 3 && (
                       <p className="text-[10px] text-slate-400">and {items.length - 3} more…</p>
@@ -470,29 +619,42 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return (
       <DroppableColumn key={day.isoDate} day={day}>
         <div className="relative h-full border-l border-slate-100 px-4 pb-8">
-          <div className="pointer-events-none absolute inset-0">
+          <div className="pointer-events-none absolute inset-x-0" style={{ height: TIMELINE_HEIGHT }}>
             {HOURS.map((hour, idx) => (
               <div key={hour} className="absolute left-0 right-0 border-b border-dashed border-slate-100/70" style={{ top: idx * HOUR_HEIGHT }} />
             ))}
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-            <div className="pointer-events-auto w-[240px] max-w-[85%]">
-              {renderAbCard(day)}
-            </div>
-          </div>
-
-          <div className="relative pt-[220px]" style={{ height: TIMELINE_HEIGHT }}>
-            {index === 0 && nowMinutes != null && (
+          <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
+            {index === 0 && indicatorTop != null && (
               <>
-                <div className="pointer-events-none absolute left-0 right-0 h-px bg-red-400/80" style={{ top: minuteToPixels(nowMinutes) }} />
-                <div className="pointer-events-none absolute -left-1 h-2 w-2 rounded-full bg-red-500" style={{ top: minuteToPixels(nowMinutes) - 4 }} />
+                <div className="pointer-events-none absolute left-0 right-0 h-px bg-red-400/80" style={{ top: indicatorTop }} />
+                <div className="pointer-events-none absolute -left-1 h-2 w-2 rounded-full bg-red-500" style={{ top: indicatorTop - 4 }} />
               </>
             )}
             {events.map(renderEvent)}
           </div>
         </div>
       </DroppableColumn>
+    );
+  };
+
+  const renderFloatingLayer = () => {
+    if (!data?.days?.length) return null;
+    const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
+    return (
+      <div className="pointer-events-none sticky top-4 z-20 h-0 overflow-visible">
+        <div className="mt-6 grid" style={{ gridTemplateColumns: templateColumns }}>
+          <div />
+          {data.days.map((day) => (
+            <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
+              <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
+                {renderAbCard(day)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   };
 
@@ -533,16 +695,26 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-[80px_auto]">
-              <aside className="border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
-                {HOURS.map((hour) => (
-                  <div key={hour} className="h-10 pr-3 leading-10">
-                    {hour}
-                  </div>
-                ))}
-              </aside>
-              <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
-                <div className="grid grid-cols-2">
+            <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
+              <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
+                {renderFloatingLayer()}
+                <div
+                  className="grid"
+                  style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
+                >
+                  <aside className="relative border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
+                    {HOURS.map((hour) => (
+                      <div key={hour} className="h-10 pr-3 leading-10">
+                        {hour}
+                      </div>
+                    ))}
+                    {indicatorTop != null && (
+                      <div className="pointer-events-none absolute inset-x-0" style={{ top: indicatorTop }}>
+                        <div className="absolute left-0 right-0 h-px bg-red-200" />
+                        <div className="absolute right-1 h-2 w-2 -translate-y-1/2 transform rounded-full bg-red-500" />
+                      </div>
+                    )}
+                  </aside>
                   {data?.days?.map((day, index) => renderColumn(day, index))}
                 </div>
               </div>
