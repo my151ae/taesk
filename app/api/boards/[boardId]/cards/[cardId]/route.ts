@@ -13,6 +13,7 @@ const UpdateCardSchema = z.object({
   due_end: z.string().nullable().optional(),
   due_channel: z.enum(['timeline', 'ab-list', 'list-only', 'archived']).optional(),
   due_bucket: z.enum(['today_a', 'today_b', 'tomorrow_a', 'tomorrow_b']).nullable().optional(),
+  due_bucket_position: z.number().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),

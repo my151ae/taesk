@@ -69,6 +69,7 @@ interface TimelineBucketItem {
   tags: string[];
   short_id: string | null;
   slug: string | null;
+  bucketPosition: number | null;
 }
 
 interface TimelineResponse {
@@ -205,21 +206,21 @@ const buildMockTimeline = (): TimelineResponse => {
     ],
     abBuckets: {
       today_a: [
-        { card_id: 'mock-finish-spec', title: 'Finish spec', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
-        { card_id: 'mock-prepare-meeting', title: 'Prepare meeting', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
-        { card_id: 'mock-fix-bug', title: 'Fix bug #123', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
+        { card_id: 'mock-finish-spec', title: 'Finish spec', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 4000 },
+        { card_id: 'mock-prepare-meeting', title: 'Prepare meeting', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3900 },
+        { card_id: 'mock-fix-bug', title: 'Fix bug #123', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3800 },
       ],
       today_b: [
-        { card_id: 'mock-organize-docs', title: 'Organize docs', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
-        { card_id: 'mock-break-task', title: 'Break down big task', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
+        { card_id: 'mock-organize-docs', title: 'Organize docs', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3600 },
+        { card_id: 'mock-break-task', title: 'Break down big task', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3500 },
       ],
       tomorrow_a: [
-        { card_id: 'mock-finish-review', title: 'Finish review', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
-        { card_id: 'mock-prepare-slides', title: 'Prepare slides', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
+        { card_id: 'mock-finish-review', title: 'Finish review', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3400 },
+        { card_id: 'mock-prepare-slides', title: 'Prepare slides', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3300 },
       ],
       tomorrow_b: [
-        { card_id: 'mock-refactor', title: 'Refactor old code', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
-        { card_id: 'mock-research', title: 'Research item', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null },
+        { card_id: 'mock-refactor', title: 'Refactor old code', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3200 },
+        { card_id: 'mock-research', title: 'Research item', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3100 },
       ],
     },
     serverNow: new Date().toISOString(),
@@ -410,6 +411,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           }
 
           const bucketItems = nextBuckets[meta.bucketKey];
+          const bucketPosition = (payload.due_bucket_position as number | null) ?? Date.now();
           const nextBucketItem: TimelineBucketItem = {
             card_id: cardId,
             title: baseBucketItem?.title ?? baseEvent?.title ?? 'Untitled card',
@@ -420,6 +422,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
             short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
             slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
+            bucketPosition,
           };
 
           bucketItems.unshift(nextBucketItem);
@@ -492,13 +495,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
       const nextEnd = nextStart + activeDrag.duration;
 
-        const payload = {
-          due_channel: 'timeline',
-          due_bucket: null,
-          due_date: withJstMidnight(day.isoDate),
-          due_start: minutesToTime(nextStart),
-          due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
-        };
+      const payload = {
+        due_channel: 'timeline',
+        due_bucket: null,
+        due_date: withJstMidnight(day.isoDate),
+        due_start: minutesToTime(nextStart),
+        due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+        due_bucket_position: null,
+      };
         persistPlacement(cardId, payload, {
           target: 'timeline',
           sourceEvent,
@@ -509,25 +513,28 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         return;
       }
 
-      if (overType === 'ab-bucket') {
-        const bucketKey = over.data.current?.bucketKey as string;
-        const dayIso = bucketDayMap[bucketKey] ?? null;
-        const payload = {
-          due_channel: 'ab-list',
-          due_bucket: bucketKey,
-          due_date: withJstMidnight(dayIso),
-          due_start: null,
-          due_end: null,
-        };
-        persistPlacement(cardId, payload, {
-          target: 'bucket',
-          bucketKey,
-          sourceEvent,
-          sourceBucketItem,
-          localDueDate: dayIso,
-        });
-      }
-    };
+    if (overType === 'ab-bucket') {
+      const bucketKey = over.data.current?.bucketKey as string;
+      const dayIso = bucketDayMap[bucketKey] ?? null;
+      const bucketPosition = Date.now();
+      const payload = {
+        due_channel: 'ab-list',
+        due_bucket: bucketKey,
+        due_date: withJstMidnight(dayIso),
+        due_start: null,
+        due_end: null,
+        due_bucket_position: bucketPosition,
+      };
+      persistPlacement(cardId, payload, {
+        target: 'bucket',
+        bucketKey,
+        sourceEvent,
+        sourceBucketItem,
+        localDueDate: dayIso,
+        defaultDuration: activeDrag?.duration,
+      });
+    }
+  };
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;

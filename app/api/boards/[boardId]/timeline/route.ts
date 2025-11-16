@@ -14,6 +14,11 @@ const formatDateJst = (base: Date, offsetDays = 0): string => {
   return `${year}-${month}-${day}`;
 };
 
+const toJstDate = (value: string | null): string | null => {
+  if (!value) return null;
+  return formatDateJst(new Date(value));
+};
+
 const toMinutes = (time: string | null) => {
   if (!time) return null;
   const [hour, minute] = time.split(':');
@@ -60,7 +65,7 @@ export async function GET(
   const { data: cards, error } = await supabase
     .from('cards')
     .select(
-      'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, priority, checked, assignee_id, assigned_to, short_id, id_short, slug'
+      'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, due_bucket_position, priority, checked, assignee_id, assigned_to, short_id, id_short, slug'
     )
     .eq('board_id', boardId);
 
@@ -81,7 +86,7 @@ export async function GET(
   };
 
   cards?.forEach((card) => {
-    const dateOnly = card.due_date ? card.due_date.slice(0, 10) : null;
+    const dateOnly = toJstDate(card.due_date);
     const isToday = dateOnly === todayIso;
     const isTomorrow = dateOnly === tomorrowIso;
 
@@ -90,7 +95,7 @@ export async function GET(
       const end = toMinutes(card.due_end);
       events.push({
         card_id: card.id,
-        due_date: card.due_date,
+        due_date: dateOnly,
         due_start: card.due_start,
         due_end: card.due_end,
         durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
@@ -110,15 +115,27 @@ export async function GET(
       abBuckets[card.due_bucket].push({
         card_id: card.id,
         title: card.title,
-        due_date: card.due_date,
+        due_date: dateOnly,
         due_start: card.due_start,
         due_end: card.due_end,
         checked: card.checked,
         tags: card.tags ?? [],
         short_id: card.short_id,
         slug: card.slug,
+        bucketPosition: card.due_bucket_position ?? null,
       });
     }
+  });
+
+  Object.keys(abBuckets).forEach((key) => {
+    abBuckets[key].sort((a, b) => {
+      const aPos = a.bucketPosition ?? 0;
+      const bPos = b.bucketPosition ?? 0;
+      if (aPos === bPos) {
+        return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+      }
+      return bPos - aPos;
+    });
   });
 
   events.sort((a, b) => {

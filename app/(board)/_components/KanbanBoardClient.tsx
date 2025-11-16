@@ -110,6 +110,7 @@ const loadFromStorage = (): BoardData => {
           due_end: card.due_end ?? null,
           due_channel: (card.due_channel ?? 'list-only') as DueChannel,
           due_bucket: (card.due_bucket ?? null) as DueBucket | null,
+          due_bucket_position: typeof card.due_bucket_position === 'number' ? card.due_bucket_position : null,
         })) as Card[]
       : [];
 
@@ -1667,6 +1668,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         due_end: card.due_end,
         due_channel: card.due_channel,
         due_bucket: card.due_bucket,
+        due_bucket_position: card.due_bucket_position,
         priority: card.priority,
         assignee_id: card.assignee_id,
         assigned_to: card.assigned_to ?? null,
@@ -1713,6 +1715,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         due_end: card.due_end,
         due_channel: card.due_channel,
         due_bucket: card.due_bucket,
+        due_bucket_position: card.due_bucket_position,
         priority: card.priority,
         checked: card.checked,
         assignee_id: card.assignee_id,
@@ -1885,6 +1888,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_end: null,
       due_channel: 'list-only',
       due_bucket: null,
+      due_bucket_position: null,
       priority: 'medium',
       checked: false,
       assigned_to: null,
@@ -2491,6 +2495,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_end: null,
       due_channel: 'list-only',
       due_bucket: null,
+      due_bucket_position: null,
       priority: 'medium',
       checked: false,
       assigned_to: null,
