@@ -103,6 +103,12 @@ const timeLabel = (start: string | null, end: string | null) => {
   const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');
   return `${toLabel(start)} – ${toLabel(end)}`;
 };
+const withJstMidnight = (isoDate: string | null) => (isoDate ? `${isoDate}T00:00:00+09:00` : null);
+const toLocalDay = (value: string | null | undefined) => {
+  if (!value) return null;
+  const [day] = value.split('T');
+  return day ?? value;
+};
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -120,6 +126,7 @@ type PlacementMeta = {
   sourceEvent?: TimelineEvent;
   sourceBucketItem?: TimelineBucketItem;
   defaultDuration?: number;
+  localDueDate?: string | null;
 };
 
 type DataMode = 'api' | 'mock';
@@ -357,10 +364,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         const baseEvent = removedEvent ?? meta.sourceEvent ?? null;
         const baseBucketItem = removedBucketItem ?? meta.sourceBucketItem ?? null;
 
+        const payloadDueDate = (payload.due_date as string | null) ?? null;
+
         if (meta.target === 'timeline') {
           const nextStart = (payload.due_start as string | null) ?? baseEvent?.due_start ?? baseBucketItem?.due_start ?? null;
           const nextEnd = (payload.due_end as string | null) ?? baseEvent?.due_end ?? baseBucketItem?.due_end ?? null;
-          const nextDate = (payload.due_date as string | null) ?? baseEvent?.due_date ?? baseBucketItem?.due_date ?? null;
+          const nextDate = meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseEvent?.due_date ?? baseBucketItem?.due_date ?? null;
           const startMinutes = getMinutesFromTime(nextStart);
           const endMinutes = getMinutesFromTime(nextEnd);
           const durationMinutes =
@@ -404,7 +413,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const nextBucketItem: TimelineBucketItem = {
             card_id: cardId,
             title: baseBucketItem?.title ?? baseEvent?.title ?? 'Untitled card',
-            due_date: (payload.due_date as string | null) ?? baseBucketItem?.due_date ?? null,
+            due_date: meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? null,
             due_start: (payload.due_start as string | null) ?? null,
             due_end: (payload.due_end as string | null) ?? null,
             checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
@@ -483,40 +492,42 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
       const nextEnd = nextStart + activeDrag.duration;
 
-      const payload = {
-        due_channel: 'timeline',
-        due_bucket: null,
-        due_date: day.isoDate,
-        due_start: minutesToTime(nextStart),
-        due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
-      };
-      persistPlacement(cardId, payload, {
-        target: 'timeline',
-        sourceEvent,
-        sourceBucketItem,
-        defaultDuration: activeDrag.duration,
-      });
-      return;
-    }
+        const payload = {
+          due_channel: 'timeline',
+          due_bucket: null,
+          due_date: withJstMidnight(day.isoDate),
+          due_start: minutesToTime(nextStart),
+          due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+        };
+        persistPlacement(cardId, payload, {
+          target: 'timeline',
+          sourceEvent,
+          sourceBucketItem,
+          defaultDuration: activeDrag.duration,
+          localDueDate: day.isoDate,
+        });
+        return;
+      }
 
-    if (overType === 'ab-bucket') {
-      const bucketKey = over.data.current?.bucketKey as string;
-      const dayIso = bucketDayMap[bucketKey] ?? null;
-      const payload = {
-        due_channel: 'ab-list',
-        due_bucket: bucketKey,
-        due_date: dayIso,
-        due_start: null,
-        due_end: null,
-      };
-      persistPlacement(cardId, payload, {
-        target: 'bucket',
-        bucketKey,
-        sourceEvent,
-        sourceBucketItem,
-      });
-    }
-  }; 
+      if (overType === 'ab-bucket') {
+        const bucketKey = over.data.current?.bucketKey as string;
+        const dayIso = bucketDayMap[bucketKey] ?? null;
+        const payload = {
+          due_channel: 'ab-list',
+          due_bucket: bucketKey,
+          due_date: withJstMidnight(dayIso),
+          due_start: null,
+          due_end: null,
+        };
+        persistPlacement(cardId, payload, {
+          target: 'bucket',
+          bucketKey,
+          sourceEvent,
+          sourceBucketItem,
+          localDueDate: dayIso,
+        });
+      }
+    };
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
