@@ -327,11 +327,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const persistPlacement = useCallback(
     (cardId: string, payload: Record<string, unknown>, meta: PlacementMeta) => {
-      if (dataMode === 'api') {
-        applyPatch(cardId, payload);
-        return;
-      }
-
       setData((current) => {
         if (!current) return current;
 
@@ -424,6 +419,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
         return current;
       });
+
+      if (dataMode === 'api') {
+        applyPatch(cardId, payload);
+      }
     },
     [applyPatch, dataMode]
   );
