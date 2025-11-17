@@ -116,6 +116,20 @@ const toLocalDay = (value: string | null | undefined) => {
   const [day] = value.split('T');
   return day ?? value;
 };
+const pointerMinutesFromEvent = (
+  event: DragEndEvent,
+  scrollTop: number
+): number | null => {
+  const translated = event.active.rect.current?.translated;
+  const sourceInitial = event.active.rect.current?.initial;
+  const overRect = event.over?.rect;
+  const pointerTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
+  if (pointerTop == null || !overRect) return null;
+  const relativeY = pointerTop - overRect.top + scrollTop;
+  const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
+  const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
+  return Math.max(0, Math.min(23 * 60 + 45, minutes));
+};
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -595,16 +609,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       let nextEnd = nextStart + activeDrag.duration;
 
       if (active.data.current?.kind === 'bucket') {
-        const overRect = over.rect as { top: number } | undefined;
-        const activeRect = active.rect?.current?.initial;
-        if (overRect && activeRect) {
-          const pointerTop = activeRect.top + delta.y;
-          const columnTop = overRect.top;
-          const scrollOffset = timelineScrollRef.current?.scrollTop ?? 0;
-          const relativeY = pointerTop - columnTop + scrollOffset;
-          const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
-          const computedMinutes = (clamped / HOUR_HEIGHT) * 60;
-          nextStart = Math.max(0, Math.min(23 * 60 + 45, Math.round(computedMinutes / 15) * 15));
+        const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+        const pointerMinutes = pointerMinutesFromEvent(event, scrollTop);
+        if (pointerMinutes != null) {
+          nextStart = pointerMinutes;
           nextEnd = nextStart + activeDrag.duration;
         }
       }
@@ -701,16 +709,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <p className="text-xs font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
           <p className="text-[10px] text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
           <div className="mt-1 text-[10px] text-slate-400">
-            <button
-              type="button"
-              className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 hover:border-sky-300 hover:text-sky-600"
+            <span
+              role="button"
+              tabIndex={0}
+              className="inline-flex rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 hover:border-sky-300 hover:text-sky-600"
               onClick={(e) => {
                 e.stopPropagation();
                 moveEventToBucket(event);
               }}
+              onKeyDown={(native) => {
+                if (native.key === 'Enter' || native.key === ' ') {
+                  native.preventDefault();
+                  moveEventToBucket(event);
+                }
+              }}
             >
               Move to A/B
-            </button>
+            </span>
           </div>
         </button>
       </DraggableCard>
