@@ -23,7 +23,6 @@ const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 const AXIS_WIDTH = 80;
-const JST_OFFSET_MINUTES = 9 * 60;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
   today: {
@@ -129,9 +128,8 @@ const pointerMinutesFromEvent = (
   const columnTop = overRect?.top ?? sourceInitial?.top ?? 0;
   const relativeY = pointerTop - columnTop + scrollTop;
   const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
-  const minutesLocal = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
-  const minutesUtc = (minutesLocal - JST_OFFSET_MINUTES + 24 * 60) % (24 * 60);
-  return Math.max(0, Math.min(23 * 60 + 45, minutesUtc));
+  const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
+  return Math.max(0, Math.min(23 * 60 + 45, minutes));
 };
 
 type TimelineBoardPageProps = {
@@ -409,7 +407,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
           const replacement: TimelineEvent = {
             card_id: cardId,
-            due_date: nextDate,
+            due_date: nextDate ?? '',
             due_start: nextStart,
             due_end: nextEnd,
             durationMinutes,
@@ -702,10 +700,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-semibold text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
-            <p className="text-[11px] font-semibold text-slate-800 line-clamp-1 text-right">{event.title || 'Untitled card'}</p>
-          </div>
+          <p className="text-[10px] font-semibold text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
+          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
           <div className="mt-1 text-[10px] text-slate-400">
             <span
               role="button"
