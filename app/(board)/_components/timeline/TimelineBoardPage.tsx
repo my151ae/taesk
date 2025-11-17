@@ -106,7 +106,11 @@ const timeLabel = (start: string | null, end: string | null) => {
   const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');
   return `${toLabel(start)} – ${toLabel(end)}`;
 };
-const withJstMidnight = (isoDate: string | null) => (isoDate ? `${isoDate}T00:00:00+09:00` : null);
+const withJstMidnight = (isoDate: string | null) => {
+  if (!isoDate) return null;
+  const utc = new Date(`${isoDate}T00:00:00+09:00`).toISOString();
+  return utc;
+};
 const toLocalDay = (value: string | null | undefined) => {
   if (!value) return null;
   const [day] = value.split('T');
