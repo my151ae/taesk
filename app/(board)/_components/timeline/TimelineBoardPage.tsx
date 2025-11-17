@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
