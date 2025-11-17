@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import type { Board } from "@/lib/supabase";
@@ -325,7 +325,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     async (cardId: string, payload: Record<string, unknown>) => {
       if (dataMode !== 'api') return;
       try {
-        console.debug('[timeline] patch', cardId, payload);
+    console.log('[timeline] patch', cardId, payload);
         const response = await fetch(`/api/boards/${initialBoard.id}/cards/${cardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -472,11 +472,46 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [data?.days]);
 
+  const defaultBucketForDay = useCallback(
+    (isoDate: string | null): DueBucket => {
+      if (!data?.days?.length) return 'today_a';
+      if (isoDate === data.days[0]?.isoDate) return 'today_a';
+      if (isoDate === data.days[1]?.isoDate) return 'tomorrow_a';
+      return 'today_a';
+    },
+    [data?.days]
+  );
+
+  const moveEventToBucket = useCallback(
+    (event: TimelineEvent, bucketOverride?: DueBucket) => {
+      const bucketKey = bucketOverride ?? defaultBucketForDay(event.due_date ?? null);
+      const dayIso = bucketDayMap[bucketKey] ?? event.due_date ?? null;
+      persistPlacement(
+        event.card_id,
+        {
+          due_channel: 'ab-list',
+          due_bucket: bucketKey,
+          due_date: withJstMidnight(dayIso),
+          due_start: null,
+          due_end: null,
+          due_bucket_position: Date.now(),
+        },
+        {
+          target: 'bucket',
+          bucketKey,
+          sourceEvent: event,
+          localDueDate: dayIso,
+        }
+      );
+    },
+    [bucketDayMap, defaultBucketForDay, persistPlacement]
+  );
+
   const handleDragStart = (event: DragStartEvent) => {
     const cardId = event.active.data.current?.cardId as string | undefined;
     if (!cardId) return;
     const kind = event.active.data.current?.kind as 'event' | 'bucket';
-    console.debug('[timeline] drag start', { cardId, kind });
+    console.log('[timeline] drag start', { cardId, kind });
     if (kind === 'event') {
       const eventData = event.active.data.current?.event as TimelineEvent;
       const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
@@ -500,7 +535,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     const overType = over.data.current?.type;
 
-    console.debug('[timeline] drag end', {
+    console.log('[timeline] drag end', {
       cardId,
       overType,
       from: active.data.current?.kind,
@@ -617,6 +652,36 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   };
 
+  const handleEventKeyDown = (
+    event: TimelineEvent,
+    native: ReactKeyboardEvent<HTMLButtonElement>
+  ) => {
+    if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
+    native.preventDefault();
+    const direction = native.key === 'ArrowUp' ? -15 : 15;
+    const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
+    const duration = event.durationMinutes ?? 60;
+    const nextStart = Math.max(0, Math.min(23 * 60 + 45, startMinutes + direction));
+    const nextEnd = nextStart + duration;
+    persistPlacement(
+      event.card_id,
+      {
+        due_channel: 'timeline',
+        due_bucket: null,
+        due_date: withJstMidnight(event.due_date ?? null),
+        due_start: minutesToTime(nextStart),
+        due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+        due_bucket_position: null,
+      },
+      {
+        target: 'timeline',
+        sourceEvent: event,
+        defaultDuration: duration,
+        localDueDate: event.due_date ?? null,
+      }
+    );
+  };
+
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     const duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -628,12 +693,25 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         <button
           type="button"
           onClick={() => openCardModalFromTimeline(event.short_id)}
+          onKeyDown={(native) => handleEventKeyDown(event, native)}
           data-testid="timeline-event"
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
           <p className="text-xs font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
           <p className="text-[10px] text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
+          <div className="mt-1 text-[10px] text-slate-400">
+            <button
+              type="button"
+              className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 hover:border-sky-300 hover:text-sky-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveEventToBucket(event);
+              }}
+            >
+              Move to A/B
+            </button>
+          </div>
         </button>
       </DraggableCard>
     );
