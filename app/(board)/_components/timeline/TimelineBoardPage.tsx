@@ -322,11 +322,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       if (dataMode !== 'api') return;
       try {
         console.debug('[timeline] patch', cardId, payload);
-        await fetch(`/api/boards/${initialBoard.id}/cards/${cardId}`, {
+        const response = await fetch(`/api/boards/${initialBoard.id}/cards/${cardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          console.error('[timeline] patch failed', response.status, body);
+          throw new Error(body?.error?.message || 'Patch failed');
+        }
         fetchTimeline();
       } catch (error) {
         console.error('[timeline] update error', error);
