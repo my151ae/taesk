@@ -124,8 +124,9 @@ const pointerMinutesFromEvent = (
   const sourceInitial = event.active.rect.current?.initial;
   const overRect = event.over?.rect;
   const pointerTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
-  if (pointerTop == null || !overRect) return null;
-  const relativeY = pointerTop - overRect.top + scrollTop;
+  if (pointerTop == null) return null;
+  const containerTop = (overRect?.top ?? sourceInitial?.top ?? 0) - scrollTop;
+  const relativeY = pointerTop - containerTop;
   const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
   const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
   return Math.max(0, Math.min(23 * 60 + 45, minutes));
@@ -602,20 +603,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (overType === 'timeline-column' && activeDrag) {
       const day = over.data.current?.day as TimelineDay | undefined;
       if (!day) return;
-      const minutesDelta = (delta.y / HOUR_HEIGHT) * 60;
-      let nextStart = activeDrag.startMinutes + minutesDelta;
+      const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+      const pointerMinutes = pointerMinutesFromEvent(event, scrollTop);
+      const fallbackPointer = activeDrag.startMinutes + (delta.y / HOUR_HEIGHT) * 60;
+      let nextStart = pointerMinutes ?? fallbackPointer;
       nextStart = Math.round(nextStart / 15) * 15;
       nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
       let nextEnd = nextStart + activeDrag.duration;
-
-      if (active.data.current?.kind === 'bucket') {
-        const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
-        const pointerMinutes = pointerMinutesFromEvent(event, scrollTop);
-        if (pointerMinutes != null) {
-          nextStart = pointerMinutes;
-          nextEnd = nextStart + activeDrag.duration;
-        }
-      }
 
       const payload = {
         due_channel: 'timeline',
@@ -706,8 +700,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
-          <p className="text-xs font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
-          <p className="text-[10px] text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
+          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
+          <p className="text-[10px] font-semibold text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
           <div className="mt-1 text-[10px] text-slate-400">
             <span
               role="button"
