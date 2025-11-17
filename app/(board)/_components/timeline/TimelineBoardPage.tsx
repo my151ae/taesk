@@ -476,6 +476,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const cardId = event.active.data.current?.cardId as string | undefined;
     if (!cardId) return;
     const kind = event.active.data.current?.kind as 'event' | 'bucket';
+    console.debug('[timeline] drag start', { cardId, kind });
     if (kind === 'event') {
       const eventData = event.active.data.current?.event as TimelineEvent;
       const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
@@ -498,6 +499,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const sourceBucketItem = active.data.current?.item as TimelineBucketItem | undefined;
 
     const overType = over.data.current?.type;
+
+    console.debug('[timeline] drag end', {
+      cardId,
+      overType,
+      from: active.data.current?.kind,
+      data: active.data.current,
+    });
 
     if (overType === 'bucket-item') {
       const bucketKey = over.data.current?.bucketKey as string | undefined;
@@ -531,6 +539,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         due_end: null,
         due_bucket_position: bucketPosition,
       };
+      console.debug('[timeline] drop into bucket-item', { cardId, bucketKey, bucketPosition });
       persistPlacement(cardId, payload, {
         target: 'bucket',
         bucketKey,
@@ -573,6 +582,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
         due_bucket_position: null,
       };
+      console.debug('[timeline] drop into timeline', { cardId, day: day.isoDate, start: nextStart });
       persistPlacement(cardId, payload, {
         target: 'timeline',
         sourceEvent,
@@ -595,6 +605,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         due_end: null,
         due_bucket_position: bucketPosition,
       };
+      console.debug('[timeline] drop into bucket', { cardId, bucketKey, bucketPosition });
       persistPlacement(cardId, payload, {
         target: 'bucket',
         bucketKey,
