@@ -321,6 +321,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     async (cardId: string, payload: Record<string, unknown>) => {
       if (dataMode !== 'api') return;
       try {
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[timeline] patch', cardId, payload);
+        }
         await fetch(`/api/boards/${initialBoard.id}/cards/${cardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
