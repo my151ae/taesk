@@ -21,6 +21,7 @@ import type { ClientTrace } from "@/lib/metrics/client";
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
+const AXIS_WIDTH = 80;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
   today: {
@@ -746,24 +747,36 @@ const renderFloatingLayer = () => {
             <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
               <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
                 {renderFloatingLayer()}
-                <div
-                  className="grid"
-                  style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
-                >
-                  <aside className="relative border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
-                    {HOURS.map((hour) => (
-                      <div key={hour} className="h-10 pr-3 leading-10">
-                        {hour}
+                <div className="relative">
+                  {indicatorTop != null && (
+                    <>
+                      <div
+                        className="pointer-events-none absolute"
+                        style={{ top: indicatorTop, left: AXIS_WIDTH, right: 0 }}
+                      >
+                        <div className="h-px bg-red-400/80" />
                       </div>
-                    ))}
-                    {indicatorTop != null && (
-                      <div className="pointer-events-none absolute inset-x-0" style={{ top: indicatorTop }}>
-                        <div className="absolute left-0 right-0 h-px bg-red-200" />
-                        <div className="absolute right-0 h-2 w-2 translate-x-1/2 -translate-y-1/2 transform rounded-full bg-red-500" />
+                      <div
+                        className="pointer-events-none absolute"
+                        style={{ top: indicatorTop - 2, left: AXIS_WIDTH - 4 }}
+                      >
+                        <div className="h-2 w-2 rounded-full bg-red-500" />
                       </div>
-                    )}
-                  </aside>
-                  {data?.days?.map((day, index) => renderColumn(day, index))}
+                    </>
+                  )}
+                  <div
+                    className="grid"
+                    style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
+                  >
+                    <aside className="relative border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
+                      {HOURS.map((hour) => (
+                        <div key={hour} className="h-10 pr-3 leading-10">
+                          {hour}
+                        </div>
+                      ))}
+                    </aside>
+                    {data?.days?.map((day, index) => renderColumn(day, index))}
+                  </div>
                 </div>
               </div>
             </div>

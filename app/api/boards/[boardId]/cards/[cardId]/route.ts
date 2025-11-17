@@ -72,13 +72,24 @@ export async function PATCH(
       );
     }
 
-    const { data: updatedCard, error } = await supabase
-      .from('cards')
-      .update(parsed.data)
-      .eq('id', cardId)
-      .eq('board_id', boardId)
-      .select()
-      .single();
+    const performUpdate = async (body: Record<string, unknown>) => {
+      return await supabase
+        .from('cards')
+        .update(body)
+        .eq('id', cardId)
+        .eq('board_id', boardId)
+        .select()
+        .single();
+    };
+
+    let updatePayload = parsed.data;
+    let { data: updatedCard, error } = await performUpdate(updatePayload);
+
+    if (error && error.code === '42703' && 'due_bucket_position' in updatePayload) {
+      const fallbackPayload = { ...updatePayload };
+      delete fallbackPayload.due_bucket_position;
+      ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
+    }
 
     if (error) {
       console.error('Error updating card:', error);
