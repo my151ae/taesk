@@ -2328,6 +2328,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     due_end?: string | null,
     due_channel?: DueChannel,
     due_bucket?: DueBucket | null,
+    due_bucket_position?: number | null,
   ) => {
     console.log('[handleSaveCard] Starting...', { id, title, description, assigneeIds });
 
@@ -2342,6 +2343,9 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           const nextChannel: DueChannel = due_channel ?? card.due_channel ?? 'list-only';
           const nextBucket: DueBucket | null = nextChannel === 'ab-list'
             ? (due_bucket ?? card.due_bucket ?? null)
+            : null;
+          const nextBucketPosition: number | null = nextChannel === 'ab-list'
+            ? (due_bucket_position ?? card.due_bucket_position ?? Date.now())
             : null;
           const nextStart = nextChannel === 'timeline'
             ? (due_start ?? card.due_start ?? null)
@@ -2360,6 +2364,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             due_end: nextEnd,
             due_channel: nextChannel,
             due_bucket: nextBucket,
+            due_bucket_position: nextBucketPosition,
             priority: priority || 'medium',
             assignee_id: nextAssigneeId, // Keep for backward compatibility
             assignee_ids: nextAssigneeIds.length > 0 ? nextAssigneeIds : null,

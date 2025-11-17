@@ -426,6 +426,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           };
 
           bucketItems.unshift(nextBucketItem);
+          bucketItems.sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
           return { ...current, events: nextEvents, abBuckets: nextBuckets };
         }
 
@@ -486,6 +487,48 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     const overType = over.data.current?.type;
 
+    if (overType === 'bucket-item') {
+      const bucketKey = over.data.current?.bucketKey as string | undefined;
+      const targetCardId = over.data.current?.cardId as string | undefined;
+      if (!bucketKey || !targetCardId) return;
+      const bucketItems = data?.abBuckets?.[bucketKey];
+      if (!bucketItems?.length) return;
+      if (targetCardId === cardId && active.data.current?.bucketKey === bucketKey) {
+        return;
+      }
+      const targetIndex = bucketItems.findIndex((item) => item.card_id === targetCardId);
+      if (targetIndex === -1) return;
+      const targetItem = bucketItems[targetIndex];
+      const prevItem = bucketItems[targetIndex - 1];
+      let bucketPosition: number;
+      if (prevItem?.bucketPosition != null && targetItem.bucketPosition != null) {
+        bucketPosition = (prevItem.bucketPosition + targetItem.bucketPosition) / 2;
+      } else if (targetItem.bucketPosition != null) {
+        bucketPosition = targetItem.bucketPosition + 1;
+      } else if (prevItem?.bucketPosition != null) {
+        bucketPosition = prevItem.bucketPosition + 1;
+      } else {
+        bucketPosition = Date.now();
+      }
+      const dayIso = bucketDayMap[bucketKey] ?? null;
+      const payload = {
+        due_channel: 'ab-list',
+        due_bucket: bucketKey,
+        due_date: withJstMidnight(dayIso),
+        due_start: null,
+        due_end: null,
+        due_bucket_position: bucketPosition,
+      };
+      persistPlacement(cardId, payload, {
+        target: 'bucket',
+        bucketKey,
+        sourceEvent,
+        sourceBucketItem,
+        localDueDate: dayIso,
+      });
+      return;
+    }
+
     if (overType === 'timeline-column' && activeDrag) {
       const day = over.data.current?.day as TimelineDay | undefined;
       if (!day) return;
@@ -495,6 +538,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
       const nextEnd = nextStart + activeDrag.duration;
 
+      if (active.data.current?.kind === 'bucket') {
+        const overRect = over.rect as { top: number } | undefined;
+        const activeRect = active.rect?.current?.initial;
+        if (overRect && activeRect) {
+          const pointerTop = activeRect.top + delta.y;
+          const columnTop = overRect.top;
+          const scrollOffset = timelineScrollRef.current?.scrollTop ?? 0;
+          const relativeY = pointerTop - columnTop + scrollOffset;
+          const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
+          const computedMinutes = (clamped / HOUR_HEIGHT) * 60;
+          nextStart = Math.max(0, Math.min(23 * 60 + 45, Math.round(computedMinutes / 15) * 15));
+        }
+      }
+
       const payload = {
         due_channel: 'timeline',
         due_bucket: null,
@@ -503,15 +560,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
         due_bucket_position: null,
       };
-        persistPlacement(cardId, payload, {
-          target: 'timeline',
-          sourceEvent,
-          sourceBucketItem,
-          defaultDuration: activeDrag.duration,
-          localDueDate: day.isoDate,
-        });
-        return;
-      }
+      persistPlacement(cardId, payload, {
+        target: 'timeline',
+        sourceEvent,
+        sourceBucketItem,
+        defaultDuration: activeDrag.duration,
+        localDueDate: day.isoDate,
+      });
+      return;
+    }
 
     if (overType === 'ab-bucket') {
       const bucketKey = over.data.current?.bucketKey as string;
@@ -581,6 +638,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                       <p className="text-[11px] text-slate-400">Drop cards here</p>
                     ) : (
                       items.slice(0, 3).map((item) => {
+                        const { setNodeRef: setBucketItemDropRef } = useDroppable({
+                          id: `bucket-item:${section.bucket}:${item.card_id}`,
+                          data: { type: 'bucket-item', bucketKey: section.bucket, cardId: item.card_id },
+                        });
                         const content = (
                           <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
                             <label className="flex items-start gap-2 text-slate-700">
@@ -609,6 +670,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                             key={item.card_id}
                             id={`bucket:${item.card_id}`}
                             data={{ kind: 'bucket', cardId: item.card_id, bucketKey: section.bucket, item }}
+                            extraNodeRef={setBucketItemDropRef}
                           >
                             {content}
                           </DraggableCard>
@@ -760,11 +822,30 @@ const DroppableBucket = ({ children, bucketKey, disabled }: { children: ReactNod
   );
 };
 
-const DraggableCard = ({ id, data, children }: { id: string; data: Record<string, unknown>; children: ReactNode }) => {
+const DraggableCard = ({
+  id,
+  data,
+  children,
+  extraNodeRef,
+}: {
+  id: string;
+  data: Record<string, unknown>;
+  children: ReactNode;
+  extraNodeRef?: (node: HTMLElement | null) => void;
+}) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, data: { ...data, id } });
+  const combinedRef = useCallback(
+    (node: HTMLElement | null) => {
+      setNodeRef(node);
+      if (extraNodeRef) {
+        extraNodeRef(node);
+      }
+    },
+    [extraNodeRef, setNodeRef]
+  );
   return (
     <div
-      ref={setNodeRef}
+      ref={combinedRef}
       style={{ transform: CSS.Translate.toString(transform) }}
       className={isDragging ? 'z-30 opacity-80' : undefined}
       {...listeners}

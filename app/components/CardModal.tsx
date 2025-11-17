@@ -39,7 +39,8 @@ interface CardModalProps {
     due_start?: string | null,
     due_end?: string | null,
     due_channel?: DueChannel,
-    due_bucket?: DueBucket | null
+    due_bucket?: DueBucket | null,
+    due_bucket_position?: number | null
   ) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -64,6 +65,7 @@ export function CardModal({
   const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
   const [dueChannel, setDueChannel] = useState<DueChannel>(card.due_channel ?? 'list-only');
   const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
+  const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
   // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
@@ -128,6 +130,7 @@ export function CardModal({
       setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
       setDueChannel(card.due_channel ?? 'list-only');
       setDueBucket(card.due_bucket ?? null);
+      setDueBucketPosition(card.due_bucket_position ?? null);
       setPriority(card.priority || 'medium');
       // Initialize assigneeIds from card
       const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
@@ -150,6 +153,7 @@ export function CardModal({
       setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
       setDueChannel(card.due_channel ?? 'list-only');
       setDueBucket(card.due_bucket ?? null);
+      setDueBucketPosition(card.due_bucket_position ?? null);
       setPriority(card.priority || 'medium');
       const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
         ? card.assignee_ids
@@ -240,6 +244,9 @@ export function CardModal({
     const normalizedStart = dueChannel === 'timeline' && dueStart ? `${dueStart}:00` : null;
     const normalizedEnd = dueChannel === 'timeline' && dueEnd ? `${dueEnd}:00` : null;
     const normalizedBucket = dueChannel === 'ab-list' ? (dueBucket ?? DEFAULT_BUCKET) : null;
+    const normalizedBucketPosition = dueChannel === 'ab-list'
+      ? (dueBucketPosition ?? Date.now())
+      : null;
 
     onSave(
       card.id,
@@ -253,7 +260,8 @@ export function CardModal({
       normalizedStart,
       normalizedEnd,
       dueChannel,
-      normalizedBucket
+      normalizedBucket,
+      normalizedBucketPosition
     );
 
     if (targetBoardId !== card.board_id) {
@@ -300,13 +308,16 @@ export function CardModal({
     }
     if (next !== 'ab-list') {
       setDueBucket(null);
+      setDueBucketPosition(null);
     } else if (!dueBucket) {
       setDueBucket(DEFAULT_BUCKET);
+      setDueBucketPosition((prev) => prev ?? Date.now());
     }
   };
 
   const handleBucketChange = (next: DueBucket) => {
     setDueBucket(next);
+    setDueBucketPosition(Date.now());
     setIsDirty(true);
   };
 
