@@ -23,6 +23,7 @@ const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 const AXIS_WIDTH = 80;
+const JST_OFFSET_MINUTES = 9 * 60;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
   today: {
@@ -128,8 +129,9 @@ const pointerMinutesFromEvent = (
   const columnTop = overRect?.top ?? sourceInitial?.top ?? 0;
   const relativeY = pointerTop - columnTop + scrollTop;
   const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
-  const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
-  return Math.max(0, Math.min(23 * 60 + 45, minutes));
+  const minutesLocal = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
+  const minutesUtc = (minutesLocal - JST_OFFSET_MINUTES + 24 * 60) % (24 * 60);
+  return Math.max(0, Math.min(23 * 60 + 45, minutesUtc));
 };
 
 type TimelineBoardPageProps = {
