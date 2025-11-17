@@ -122,11 +122,13 @@ const pointerMinutesFromEvent = (
 ): number | null => {
   const translated = event.active.rect.current?.translated;
   const sourceInitial = event.active.rect.current?.initial;
-  const overRect = event.over?.rect;
   const pointerTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
   if (pointerTop == null) return null;
-  const columnTop = overRect?.top ?? sourceInitial?.top ?? 0;
-  const relativeY = pointerTop - columnTop + scrollTop;
+
+  const gridRect = document.querySelector<HTMLElement>('[data-timeline-grid]')?.getBoundingClientRect();
+  if (!gridRect) return null;
+
+  const relativeY = pointerTop - gridRect.top + scrollTop;
   const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
   const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
   return Math.max(0, Math.min(23 * 60 + 45, minutes));
@@ -881,6 +883,7 @@ const renderFloatingLayer = () => {
                   )}
                   <div
                     className="grid"
+                    data-timeline-grid
                     style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
                   >
                     <aside className="relative border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
