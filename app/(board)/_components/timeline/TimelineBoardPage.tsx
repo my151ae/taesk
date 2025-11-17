@@ -21,8 +21,6 @@ import type { ClientTrace } from "@/lib/metrics/client";
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
-const FLOATING_LAYER_HEIGHT = 240;
-const FLOATING_LAYER_OFFSET = 12;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
   today: {
@@ -682,33 +680,24 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     );
   };
 
-  const renderFloatingLayer = () => {
-    if (!data?.days?.length) return null;
-    const overlayColumns = `repeat(${data.days.length}, minmax(0, 1fr))`;
-    return (
-      <div
-        className="pointer-events-none absolute inset-x-0 z-20"
-        style={{ top: FLOATING_LAYER_OFFSET }}
-      >
-        <div
-          className="grid gap-4"
-          style={{
-            gridTemplateColumns: overlayColumns,
-            marginLeft: 80,
-            marginRight: 16,
-          }}
-        >
-          {data.days.map((day) => (
-            <div key={day.key} className="flex justify-end px-2 sm:px-4">
-              <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
-                {renderAbCard(day)}
-              </div>
+const renderFloatingLayer = () => {
+  if (!data?.days?.length) return null;
+  const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
+  return (
+    <div className="pointer-events-none sticky top-4 z-20 h-0 overflow-visible">
+      <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
+        <div />
+        {data.days.map((day) => (
+          <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
+            <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
+              {renderAbCard(day)}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
@@ -737,7 +726,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         </header>
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          {renderFloatingLayer()}
           <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
             <div
               className="sticky top-0 grid border-b border-slate-100 bg-white/95 text-xs font-semibold uppercase tracking-wide text-slate-500"
@@ -756,13 +744,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               ))}
             </div>
             <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
-              <div
-                className="relative"
-                style={{
-                  minHeight: TIMELINE_HEIGHT + FLOATING_LAYER_HEIGHT + FLOATING_LAYER_OFFSET,
-                  paddingTop: FLOATING_LAYER_HEIGHT + FLOATING_LAYER_OFFSET,
-                }}
-              >
+              <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
+                {renderFloatingLayer()}
                 <div
                   className="grid"
                   style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}

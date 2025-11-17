@@ -62,15 +62,36 @@ export async function GET(
   const tomorrowIso = formatDateJst(now, 1);
   const targetDates = [todayIso, tomorrowIso];
 
-  const { data: cards, error } = await supabase
+  const baseSelect =
+    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, priority, checked, assignee_id, assigned_to, short_id, id_short, slug';
+  const extendedSelect = `${baseSelect}, due_bucket_position`;
+
+  let cards = null;
+  let fetchError = null;
+
+  const initial = await supabase
     .from('cards')
-    .select(
-      'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, due_bucket_position, priority, checked, assignee_id, assigned_to, short_id, id_short, slug'
-    )
+    .select(extendedSelect)
     .eq('board_id', boardId);
 
-  if (error) {
-    console.error('[timeline] Failed to fetch cards', error);
+  if (initial.error && initial.error.code === '42703') {
+    const fallback = await supabase
+      .from('cards')
+      .select(baseSelect)
+      .eq('board_id', boardId);
+    fetchError = fallback.error;
+    cards =
+      fallback.data?.map((card) => ({
+        ...card,
+        due_bucket_position: null,
+      })) ?? null;
+  } else {
+    fetchError = initial.error;
+    cards = initial.data;
+  }
+
+  if (fetchError) {
+    console.error('[timeline] Failed to fetch cards', fetchError);
     return NextResponse.json(
       { error: { code: 'DB_ERROR', message: 'Failed to fetch timeline cards' } },
       { status: 500 }
