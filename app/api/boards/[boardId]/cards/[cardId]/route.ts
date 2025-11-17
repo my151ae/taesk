@@ -91,7 +91,12 @@ export async function PATCH(
 
     let { data: updatedCard, error } = await performUpdate(normalizedPayload);
 
-    if (error && error.code === '42703' && 'due_bucket_position' in normalizedPayload) {
+    const missingDueBucketColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('due_bucket_position')));
+
+    if (missingDueBucketColumn && 'due_bucket_position' in normalizedPayload) {
       const fallbackPayload = { ...normalizedPayload };
       delete fallbackPayload.due_bucket_position;
       ({ data: updatedCard, error } = await performUpdate(fallbackPayload));

@@ -755,7 +755,6 @@ const renderFloatingLayer = () => {
                     'px-4 py-3 text-center',
                     index > 0 && 'border-l border-slate-100'
                   )}
-                  style={{ marginLeft: index === 0 ? 0 : -1 }}
                 >
                   <p className="text-slate-800">{day.label}</p>
                   <p className="text-[10px] text-slate-400">{day.isoDate}</p>

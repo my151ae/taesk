@@ -110,11 +110,26 @@ export async function POST(
       }
     });
 
-    const { data: createdCard, error } = await supabase
-      .from('cards')
-      .insert(payload)
-      .select()
-      .single();
+    const performInsert = async (body: Record<string, unknown>) =>
+      await supabase
+        .from('cards')
+        .insert(body)
+        .select()
+        .single();
+
+    let payloadToSend = payload;
+    let { data: createdCard, error } = await performInsert(payloadToSend);
+
+    const missingDueBucketColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('due_bucket_position')));
+
+    if (missingDueBucketColumn && 'due_bucket_position' in payloadToSend) {
+      const fallbackPayload = { ...payloadToSend };
+      delete fallbackPayload.due_bucket_position;
+      ({ data: createdCard, error } = await performInsert(fallbackPayload));
+    }
 
     if (error) {
       console.error('Error creating card:', error);
