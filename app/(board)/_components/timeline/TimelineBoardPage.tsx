@@ -21,8 +21,6 @@ import type { ClientTrace } from "@/lib/metrics/client";
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
-const FLOATING_LAYER_TOP = 8;
-const FLOATING_LAYER_HEIGHT = 220;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
   today: {
@@ -111,22 +109,6 @@ const toLocalDay = (value: string | null | undefined) => {
   if (!value) return null;
   const [day] = value.split('T');
   return day ?? value;
-};
-const getPointerMinutesFromDrop = (
-  event: DragEndEvent,
-  scrollTop: number
-): number | null => {
-  const columnRect = event.over?.rect;
-  const translated = event.active.rect.current?.translated;
-  const initialTop = event.active.rect.current?.initial?.top;
-  const pointerTop = translated?.top ?? (initialTop != null ? initialTop + event.delta.y : null);
-  if (!columnRect || pointerTop == null) {
-    return null;
-  }
-  const relativeY = pointerTop - columnRect.top + scrollTop;
-  const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
-  const minutes = (clamped / HOUR_HEIGHT) * 60;
-  return Math.max(0, Math.min(23 * 60 + 45, Math.round(minutes / 15) * 15));
 };
 
 type TimelineBoardPageProps = {
@@ -557,10 +539,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       let nextEnd = nextStart + activeDrag.duration;
 
       if (active.data.current?.kind === 'bucket') {
-        const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
-        const pointerMinutes = getPointerMinutesFromDrop(event, scrollTop);
-        if (pointerMinutes != null) {
-          nextStart = pointerMinutes;
+        const overRect = over.rect as { top: number } | undefined;
+        const activeRect = active.rect?.current?.initial;
+        if (overRect && activeRect) {
+          const pointerTop = activeRect.top + delta.y;
+          const columnTop = overRect.top;
+          const scrollOffset = timelineScrollRef.current?.scrollTop ?? 0;
+          const relativeY = pointerTop - columnTop + scrollOffset;
+          const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
+          const computedMinutes = (clamped / HOUR_HEIGHT) * 60;
+          nextStart = Math.max(0, Math.min(23 * 60 + 45, Math.round(computedMinutes / 15) * 15));
           nextEnd = nextStart + activeDrag.duration;
         }
       }
@@ -702,18 +690,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (!data?.days?.length) return null;
     const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
     return (
-      <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: FLOATING_LAYER_TOP }}>
-        <div className="sticky top-4">
-          <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
-            <div />
-            {data.days.map((day) => (
-              <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
-                <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
-                  {renderAbCard(day)}
-                </div>
+      <div className="pointer-events-none sticky top-4 z-20 h-0 overflow-visible">
+        <div className="mt-4 grid" style={{ gridTemplateColumns: templateColumns }}>
+          <div />
+          {data.days.map((day) => (
+            <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
+              <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
+                {renderAbCard(day)}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -757,13 +743,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               ))}
             </div>
             <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
-              <div
-                className="relative"
-                style={{
-                  minHeight: TIMELINE_HEIGHT + FLOATING_LAYER_HEIGHT,
-                  paddingTop: FLOATING_LAYER_HEIGHT + FLOATING_LAYER_TOP,
-                }}
-              >
+              <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
                 {renderFloatingLayer()}
                 <div
                   className="grid"
