@@ -637,45 +637,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     {items.length === 0 ? (
                       <p className="text-[11px] text-slate-400">Drop cards here</p>
                     ) : (
-                      items.slice(0, 3).map((item) => {
-                        const { setNodeRef: setBucketItemDropRef } = useDroppable({
-                          id: `bucket-item:${section.bucket}:${item.card_id}`,
-                          data: { type: 'bucket-item', bucketKey: section.bucket, cardId: item.card_id },
-                        });
-                        const content = (
-                          <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
-                            <label className="flex items-start gap-2 text-slate-700">
-                              <input
-                                type="checkbox"
-                                checked={item.checked}
-                                readOnly
-                                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => openCardModalFromTimeline(item.short_id)}
-                                className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                              >
-                                <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
-                                {item.due_start && (
-                                  <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
-                                )}
-                              </button>
-                            </label>
-                          </div>
-                        );
-
-                        return (
-                          <DraggableCard
-                            key={item.card_id}
-                            id={`bucket:${item.card_id}`}
-                            data={{ kind: 'bucket', cardId: item.card_id, bucketKey: section.bucket, item }}
-                            extraNodeRef={setBucketItemDropRef}
-                          >
-                            {content}
-                          </DraggableCard>
-                        );
-                      })
+                      items.slice(0, 3).map((item) => (
+                        <AbBucketDraggableCard
+                          key={item.card_id}
+                          item={item}
+                          bucketKey={section.bucket}
+                          openCardModal={openCardModalFromTimeline}
+                        />
+                      ))
                     )}
                     {items.length > 3 && (
                       <p className="text-[10px] text-slate-400">and {items.length - 3} more…</p>
@@ -853,5 +822,49 @@ const DraggableCard = ({
     >
       {children}
     </div>
+  );
+};
+
+const AbBucketDraggableCard = ({
+  item,
+  bucketKey,
+  openCardModal,
+}: {
+  item: TimelineBucketItem;
+  bucketKey: string;
+  openCardModal: (shortId: string | null) => void;
+}) => {
+  const { setNodeRef } = useDroppable({
+    id: `bucket-item:${bucketKey}:${item.card_id}`,
+    data: { type: 'bucket-item', bucketKey, cardId: item.card_id },
+  });
+
+  return (
+    <DraggableCard
+      id={`bucket:${item.card_id}`}
+      data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
+      extraNodeRef={setNodeRef}
+    >
+      <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
+        <label className="flex items-start gap-2 text-slate-700">
+          <input
+            type="checkbox"
+            checked={item.checked}
+            readOnly
+            className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
+          />
+          <button
+            type="button"
+            onClick={() => openCardModal(item.short_id)}
+            className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          >
+            <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
+            {item.due_start && (
+              <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
+            )}
+          </button>
+        </label>
+      </div>
+    </DraggableCard>
   );
 };
