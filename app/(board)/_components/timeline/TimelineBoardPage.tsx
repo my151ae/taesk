@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
-import type { Board } from "@/lib/supabase";
+import type { Board, DueBucket } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
