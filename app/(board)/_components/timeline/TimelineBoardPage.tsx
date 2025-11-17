@@ -737,8 +737,15 @@ const renderFloatingLayer = () => {
               }}
             >
               <div className="px-3 py-3 text-right">GMT+09</div>
-              {data?.days?.map((day) => (
-                <div key={day.key} className="border-l border-slate-100 px-4 py-3 text-center">
+              {data?.days?.map((day, index) => (
+                <div
+                  key={day.key}
+                  className={clsx(
+                    'px-4 py-3 text-center',
+                    index > 0 && 'border-l border-slate-100'
+                  )}
+                  style={{ marginLeft: index === 0 ? 0 : -1 }}
+                >
                   <p className="text-slate-800">{day.label}</p>
                   <p className="text-[10px] text-slate-400">{day.isoDate}</p>
                 </div>
