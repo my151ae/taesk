@@ -8,6 +8,7 @@ import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
   DragEndEvent,
+  DragMoveEvent,
   DragStartEvent,
   PointerSensor,
   useDroppable,
@@ -82,12 +83,18 @@ interface TimelineResponse {
 }
 
 const minuteToPixels = (minutes: number) => (minutes / 60) * HOUR_HEIGHT;
+const TIMELINE_HEADER_ESTIMATE = 64;
 const getMinutesFromTime = (value: string | null) => {
   if (!value) return null;
   const [hours, minutes] = value.split(":");
   const h = Number(hours ?? "0");
   const m = Number(minutes ?? "0");
   return h * 60 + m;
+};
+const getIsoDateJst = (timestamp: string) => {
+  const current = new Date(timestamp);
+  const jst = new Date(current.getTime() + 9 * 60 * 60 * 1000);
+  return jst.toISOString().split('T')[0];
 };
 const getNowMinutesJst = (timestamp: string) => {
   const current = new Date(timestamp);
@@ -117,19 +124,28 @@ const toLocalDay = (value: string | null | undefined) => {
   return day ?? value;
 };
 const pointerMinutesFromEvent = (
-  event: DragEndEvent,
-  scrollTop: number
+  event: DragEndEvent | DragMoveEvent,
+  options?: {
+    scrollTop?: number;
+    columnRect?: { top: number; height: number };
+  }
 ): number | null => {
   const translated = event.active.rect.current?.translated;
   const sourceInitial = event.active.rect.current?.initial;
   const pointerTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
   if (pointerTop == null) return null;
-
-  const gridRect = document.querySelector<HTMLElement>('[data-timeline-grid]')?.getBoundingClientRect();
-  if (!gridRect) return null;
-
-  const relativeY = pointerTop - gridRect.top + scrollTop;
-  const clamped = Math.max(0, Math.min(relativeY, TIMELINE_HEIGHT));
+  const scrollTop = options?.scrollTop ?? 0;
+  const columnRect = options?.columnRect;
+  let relativeY: number;
+  let maxHeight: number;
+  if (columnRect) {
+    relativeY = pointerTop - columnRect.top;
+    maxHeight = columnRect.height ?? TIMELINE_HEIGHT;
+  } else {
+    relativeY = pointerTop - AXIS_WIDTH + scrollTop;
+    maxHeight = TIMELINE_HEIGHT;
+  }
+  const clamped = Math.max(0, Math.min(relativeY, maxHeight));
   const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
   return Math.max(0, Math.min(23 * 60 + 45, minutes));
 };
@@ -142,6 +158,20 @@ type ActiveDragState = {
   cardId: string;
   startMinutes: number;
   duration: number;
+};
+
+type PointerPreviewState = {
+  visible: boolean;
+  startMinutes: number;
+  durationMinutes: number;
+  dayIso: string | null;
+};
+
+const HIDDEN_POINTER_PREVIEW: PointerPreviewState = {
+  visible: false,
+  startMinutes: 0,
+  durationMinutes: 0,
+  dayIso: null,
 };
 
 type PlacementMeta = {
@@ -255,10 +285,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
+  const activeDragRef = useRef<ActiveDragState | null>(null);
+  const [pointerPreview, setPointerPreview] = useState<PointerPreviewState>(HIDDEN_POINTER_PREVIEW);
   const [dataMode, setDataMode] = useState<DataMode>('api');
   const [liveNowMinutes, setLiveNowMinutes] = useState<number | null>(null);
+  const [liveNowIsoDate, setLiveNowIsoDate] = useState<string | null>(null);
   const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
+  const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const router = useRouter();
   const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
@@ -282,7 +317,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setData(payload);
       setDataMode('api');
       setStatus('idle');
-      setHasAutoScrolled(false);
       const abItemCount = Object.values(payload.abBuckets || {}).reduce(
         (sum, items) => sum + (items?.length ?? 0),
         0
@@ -299,7 +333,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setData(buildMockTimeline());
       setDataMode('mock');
       setStatus('idle');
-      setHasAutoScrolled(false);
       traceRef.current?.finish('error', { reason: 'fetch_failed' });
       traceRef.current = createClientTrace('timeline');
     }
@@ -320,10 +353,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const nowMinutes = useMemo(() => (data ? getNowMinutesJst(data.serverNow) : null), [data]);
   const indicatorMinutes = liveNowMinutes ?? nowMinutes;
   const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes) : null;
+  const indicatorDayIso = liveNowIsoDate ?? (data ? getIsoDateJst(data.serverNow) : null);
 
   useEffect(() => {
     if (!data) return;
-    const updateNow = () => setLiveNowMinutes(getNowMinutesJst(new Date().toISOString()));
+    const updateNow = () => {
+      const nowIso = new Date().toISOString();
+      setLiveNowMinutes(getNowMinutesJst(nowIso));
+      setLiveNowIsoDate(getIsoDateJst(nowIso));
+    };
     updateNow();
     const interval = window.setInterval(updateNow, 60_000);
     return () => window.clearInterval(interval);
@@ -337,6 +375,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     container.scrollTop = clamped;
     setHasAutoScrolled(true);
   }, [indicatorMinutes, hasAutoScrolled]);
+
+  useEffect(() => {
+    const headerEl = timelineHeaderRef.current;
+    if (!headerEl) return;
+    const updateHeight = () => setTimelineHeaderHeight(headerEl.offsetHeight);
+    updateHeight();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(headerEl);
+    return () => observer.disconnect();
+  }, [data?.days?.length]);
 
   const applyPatch = useCallback(
     async (cardId: string, payload: Record<string, unknown>) => {
@@ -533,15 +585,60 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const eventData = event.active.data.current?.event as TimelineEvent;
       const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
       const duration = Math.max(eventData.durationMinutes ?? 60, 15);
-      setActiveDrag({ cardId, startMinutes, duration });
+      const dragState: ActiveDragState = { cardId, startMinutes, duration };
+      setActiveDrag(dragState);
+      activeDragRef.current = dragState;
     } else {
-      setActiveDrag({ cardId, startMinutes: 9 * 60, duration: 60 });
+      const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration: 60 };
+      setActiveDrag(dragState);
+      activeDragRef.current = dragState;
     }
+    setPointerPreview(HIDDEN_POINTER_PREVIEW);
+  };
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag) {
+      if (pointerPreview.visible) {
+        setPointerPreview(HIDDEN_POINTER_PREVIEW);
+      }
+      return;
+    }
+    const overType = event.over?.data.current?.type;
+    if (overType !== 'timeline-column') {
+      if (pointerPreview.visible) {
+        setPointerPreview(HIDDEN_POINTER_PREVIEW);
+      }
+      return;
+    }
+    const day = event.over?.data.current?.day as TimelineDay | undefined;
+    const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const pointerMinutes = pointerMinutesFromEvent(event, {
+      scrollTop,
+      columnRect: event.over?.rect
+        ? { top: event.over.rect.top, height: event.over.rect.height }
+        : undefined,
+    });
+    const fallbackPointer = currentDrag.startMinutes + (event.delta.y / HOUR_HEIGHT) * 60;
+    let nextStart = pointerMinutes ?? fallbackPointer;
+    nextStart = Math.round(nextStart / 15) * 15;
+    nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
+    const desiredEnd = nextStart + currentDrag.duration;
+    const endMinutes = Math.min(desiredEnd, 24 * 60 - 1);
+    const durationMinutes = Math.max(endMinutes - nextStart, 1);
+    setPointerPreview({
+      visible: true,
+      startMinutes: nextStart,
+      durationMinutes,
+      dayIso: day?.isoDate ?? null,
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over, delta } = event;
     setActiveDrag(null);
+    activeDragRef.current = null;
+    setPointerPreview(HIDDEN_POINTER_PREVIEW);
 
     if (!over) return;
     const cardId = active.data.current?.cardId as string | undefined;
@@ -606,7 +703,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const day = over.data.current?.day as TimelineDay | undefined;
       if (!day) return;
       const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
-      const pointerMinutes = pointerMinutesFromEvent(event, scrollTop);
+      const pointerMinutes = pointerMinutesFromEvent(event, {
+        scrollTop,
+        columnRect: over.rect ? { top: over.rect.top, height: over.rect.height } : undefined,
+      });
       const fallbackPointer = activeDrag.startMinutes + (delta.y / HOUR_HEIGHT) * 60;
       let nextStart = pointerMinutes ?? fallbackPointer;
       nextStart = Math.round(nextStart / 15) * 15;
@@ -656,6 +756,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   };
 
+  const handleDragCancel = () => {
+    setActiveDrag(null);
+    activeDragRef.current = null;
+    setPointerPreview(HIDDEN_POINTER_PREVIEW);
+  };
+
   const handleEventKeyDown = (
     event: TimelineEvent,
     native: ReactKeyboardEvent<HTMLButtonElement>
@@ -685,6 +791,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       }
     );
   };
+
+  const pointerPreviewVisible = pointerPreview.visible;
+  const pointerPreviewY = minuteToPixels(pointerPreview.startMinutes);
+  const pointerPreviewDuration = pointerPreview.durationMinutes;
+  const pointerPreviewDay = pointerPreview.dayIso;
+  const pointerPreviewStart = pointerPreviewVisible
+    ? minutesToTime(pointerPreview.startMinutes)
+    : null;
+  const pointerPreviewEnd = pointerPreviewVisible
+    ? minutesToTime(Math.min(pointerPreview.startMinutes + pointerPreview.durationMinutes, 24 * 60 - 1))
+    : null;
+  const floatingLayerTop = timelineHeaderHeight + 12;
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -774,6 +892,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const renderColumn = (day: TimelineDay, index: number) => {
     const events = eventsByDay[day.isoDate] ?? [];
+    const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
+    const indicatorPosition = indicatorTop ?? 0;
 
     return (
       <DroppableColumn key={day.isoDate} day={day}>
@@ -783,6 +903,37 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               <div key={hour} className="absolute left-0 right-0 border-b border-dashed border-slate-100/70" style={{ top: idx * HOUR_HEIGHT }} />
             ))}
           </div>
+
+          {indicatorVisibleInDay && (
+            <>
+              <div
+                className="pointer-events-none absolute left-4 right-4 z-10"
+                style={{ top: indicatorPosition }}
+              >
+                <div className="h-px bg-red-400/80" />
+              </div>
+              <div
+                className="pointer-events-none absolute left-1 z-10"
+                style={{ top: indicatorPosition - 2 }}
+              >
+                <div className="h-2 w-2 rounded-full bg-red-500" />
+              </div>
+            </>
+          )}
+
+          {activeDrag?.cardId && pointerPreviewVisible && pointerPreviewDay === day.isoDate && (
+            <div
+              className="pointer-events-none absolute left-4 right-4 z-10 border border-dashed border-sky-300 bg-sky-50/40"
+              style={{
+                top: pointerPreviewY,
+                height: minuteToPixels(pointerPreviewDuration),
+              }}
+            >
+              <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
+                {timeLabel(pointerPreviewStart, pointerPreviewEnd)}
+              </div>
+            </div>
+          )}
 
           <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
             {events.map(renderEvent)}
@@ -796,7 +947,10 @@ const renderFloatingLayer = () => {
   if (!data?.days?.length) return null;
   const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
   return (
-    <div className="pointer-events-none sticky top-4 z-20 h-0 overflow-visible">
+    <div
+      className="pointer-events-none sticky z-20 h-0 overflow-visible"
+      style={{ top: floatingLayerTop }}
+    >
       <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
         <div />
         {data.days.map((day) => (
@@ -837,50 +991,41 @@ const renderFloatingLayer = () => {
           </div>
         </header>
 
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
           <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
-            <div
-              className="sticky top-0 grid border-b border-slate-100 bg-white/95 text-xs font-semibold uppercase tracking-wide text-slate-500"
-              style={{
-                gridTemplateColumns: data?.days?.length
-                  ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
-                  : '80px',
-              }}
-            >
-              <div className="px-3 py-3 text-right">GMT+09</div>
-              {data?.days?.map((day, index) => (
-                <div
-                  key={day.key}
-                  className={clsx(
-                    'px-4 py-3 text-center',
-                    index > 0 && 'border-l border-slate-100'
-                  )}
-                >
-                  <p className="text-slate-800">{day.label}</p>
-                  <p className="text-[10px] text-slate-400">{day.isoDate}</p>
-                </div>
-              ))}
-            </div>
             <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
+              <div
+                ref={timelineHeaderRef}
+                className="sticky top-0 z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
+                style={{
+                  gridTemplateColumns: data?.days?.length
+                    ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
+                    : '80px',
+                }}
+              >
+                <div className="px-3 py-3 text-right">GMT+09</div>
+                {data?.days?.map((day, index) => (
+                  <div
+                    key={day.key}
+                    className={clsx(
+                      'px-4 py-3 text-center',
+                      index > 0 && 'border-l border-slate-100'
+                    )}
+                  >
+                    <p className="text-slate-800">{day.label}</p>
+                    <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                  </div>
+                ))}
+              </div>
               <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
                 {renderFloatingLayer()}
                 <div className="relative">
-                  {indicatorTop != null && (
-                    <>
-                      <div
-                        className="pointer-events-none absolute"
-                        style={{ top: indicatorTop, left: AXIS_WIDTH, right: 0 }}
-                      >
-                        <div className="h-px bg-red-400/80" />
-                      </div>
-                      <div
-                        className="pointer-events-none absolute"
-                        style={{ top: indicatorTop - 2, left: AXIS_WIDTH - 4 }}
-                      >
-                        <div className="h-2 w-2 rounded-full bg-red-500" />
-                      </div>
-                    </>
-                  )}
                   <div
                     className="grid"
                     data-timeline-grid
