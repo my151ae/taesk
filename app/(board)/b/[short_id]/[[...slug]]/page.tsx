@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import KanbanBoardClient from "@/app/(board)/_components/KanbanBoardClient";
+import TimelineBoardPage from "@/app/(board)/_components/timeline/TimelineBoardPage";
 import { buildBoardUrl } from "@/lib/board-url";
-import { fetchBoardInitialData, getBoardByShortId } from "@/lib/server/boards";
+import { getBoardByShortId } from "@/lib/server/boards";
 
 type PageParams = {
   short_id: string;
@@ -71,7 +71,5 @@ export default async function BoardByShortIdPage({ params }: PageProps) {
     permanentRedirect(canonical);
   }
 
-  const initialData = await fetchBoardInitialData(board.id);
-
-  return <KanbanBoardClient initialBoard={board} initialData={initialData} />;
+  return <TimelineBoardPage initialBoard={board} />;
 }

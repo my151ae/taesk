@@ -115,9 +115,11 @@ test.describe('@feature:timeline Timeline view', () => {
 
     expect(insertError).toBeNull();
 
-    await page.goto('/timeline');
+    await page.goto('/board');
     await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
-    await expect(page.getByText('Timeline focus card')).toBeVisible();
+    const focusEvent = page.getByTestId('timeline-event').filter({ hasText: 'Timeline focus card' }).first();
+    await focusEvent.scrollIntoViewIfNeeded();
+    await expect(focusEvent).toBeVisible();
 
     await dumpClientMetrics(page, ['timeline']);
 
