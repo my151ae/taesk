@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
-import { useRouter } from "next/navigation";
-import type { Board, DueBucket } from "@/lib/supabase";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Board, Card, DueBucket, Priority, ProfileSummary } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
@@ -22,6 +22,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { createClientTrace } from "@/lib/metrics/client";
 import type { ClientTrace } from "@/lib/metrics/client";
+import { CardModal } from "@/app/components/CardModal";
+import { slugify } from "@/lib/card-utils";
 
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
@@ -324,10 +326,61 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
+  const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
+  const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
+  const [modalCard, setModalCard] = useState<Card | null>(null);
+  const [cardModalState, setCardModalState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [cardModalError, setCardModalError] = useState<string | null>(null);
+  const cardModalShortIdRef = useRef<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const searchParamsString = searchParams?.toString() ?? '';
+
+  useEffect(() => {
+    setAvailableBoards((prev) => {
+      const exists = prev.some((board) => board.id === initialBoard.id);
+      if (exists) {
+        return prev.map((board) => (board.id === initialBoard.id ? initialBoard : board));
+      }
+      return [initialBoard, ...prev];
+    });
+  }, [initialBoard]);
+
+  useEffect(() => {
+    let cancel = false;
+    const loadBoards = async () => {
+      try {
+        const response = await fetch('/api/boards', { cache: 'no-store' });
+        if (!response.ok) {
+          return;
+        }
+        const body = await response.json().catch(() => null);
+        if (!body || cancel) return;
+        const boards: Board[] = Array.isArray(body.boards) ? body.boards : [];
+        if (!boards.length) return;
+        setAvailableBoards((prev) => {
+          const map = new Map(prev.map((board) => [board.id, board]));
+          boards.forEach((board) => {
+            map.set(board.id, board);
+          });
+          if (!map.has(initialBoard.id)) {
+            map.set(initialBoard.id, initialBoard);
+          }
+          return Array.from(map.values());
+        });
+      } catch (error) {
+        console.warn('[timeline] failed to load boards', error);
+      }
+    };
+    loadBoards();
+    return () => {
+      cancel = true;
+    };
+  }, [initialBoard]);
 
   const fetchTimeline = useCallback(async () => {
     if (!initialBoard?.id) return;
@@ -370,6 +423,155 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   useEffect(() => {
     fetchTimeline();
   }, [fetchTimeline]);
+
+  const closeCardModal = useCallback(() => {
+    const params = new URLSearchParams(searchParamsString);
+    if (params.has('card')) {
+      params.delete('card');
+      const query = params.toString();
+      const target = query ? `${pathname}?${query}` : pathname;
+      router.replace(target, { scroll: false });
+    }
+    cardModalShortIdRef.current = null;
+    setModalCard(null);
+    setModalProfiles([]);
+    setCardModalStatus('idle');
+    setCardModalError(null);
+  }, [pathname, router, searchParamsString]);
+
+  const handleCardModalSave = useCallback(
+    async (
+      id: string,
+      title: string,
+      description: string,
+      tags?: string[],
+      due_date?: string | null,
+      priority?: Priority,
+      assigneeIds?: string[],
+      assigneeTouched?: boolean,
+      due_start?: string | null,
+      due_end?: string | null,
+      due_channel?: DueChannel,
+      due_bucket?: DueBucket | null,
+      due_bucket_position?: number | null
+    ) => {
+      const targetCard = modalCard && modalCard.id === id ? modalCard : null;
+      if (!targetCard) return;
+      try {
+        const nextAssignee = assigneeIds && assigneeIds.length > 0 ? assigneeIds[0] : null;
+        const payload = {
+          title,
+          description,
+          tags,
+          due_date,
+          due_start,
+          due_end,
+          due_channel,
+          due_bucket,
+          due_bucket_position,
+          priority,
+          assignee_id: nextAssignee,
+          assigned_to: null,
+          slug: slugify(title),
+        };
+        const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error?.message || 'Failed to update card');
+        }
+        const body = await response.json().catch(() => null);
+        if (body?.card) {
+          setModalCard(body.card as Card);
+        }
+        await fetchTimeline();
+      } catch (error) {
+        console.error('[timeline] save card failed', error);
+        setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
+      } finally {
+        closeCardModal();
+      }
+    },
+    [modalCard, closeCardModal, fetchTimeline]
+  );
+
+  const handleCardModalDelete = useCallback(
+    async (cardId: string) => {
+      const targetCard = modalCard && modalCard.id === cardId ? modalCard : null;
+      if (!targetCard) return;
+      try {
+        const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error?.message || 'Failed to delete card');
+        }
+        await fetchTimeline();
+      } catch (error) {
+        console.error('[timeline] delete card failed', error);
+        setCardModalError(error instanceof Error ? error.message : 'Failed to delete card');
+      } finally {
+        closeCardModal();
+      }
+    },
+    [modalCard, closeCardModal, fetchTimeline]
+  );
+
+  const handleCardModalMove = useCallback((cardId: string, targetBoardId: string) => {
+    console.warn('[timeline] move card not yet supported', { cardId, targetBoardId });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsString);
+    const shortId = params.get('card');
+    if (!shortId) {
+      cardModalShortIdRef.current = null;
+      setModalCard(null);
+      setModalProfiles([]);
+      setCardModalStatus('idle');
+      setCardModalError(null);
+      return;
+    }
+    if (cardModalShortIdRef.current === shortId && cardModalState === 'ready') {
+      return;
+    }
+    cardModalShortIdRef.current = shortId;
+
+    let cancelled = false;
+    const loadCard = async () => {
+      setCardModalStatus('loading');
+      setCardModalError(null);
+      try {
+        const response = await fetch(`/api/cards/${shortId}`);
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error?.message || 'Failed to load card');
+        }
+        const body = await response.json();
+        if (cancelled) return;
+        setModalCard(body.card ?? null);
+        setModalProfiles(body.profiles ?? []);
+        setCardModalStatus(body.card ? 'ready' : 'error');
+        if (!body.card) {
+          setCardModalError('Card not found');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error('[timeline] failed to load card', error);
+        setCardModalError(error instanceof Error ? error.message : 'Failed to load card');
+        setCardModalStatus('error');
+      }
+    };
+
+    loadCard();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParamsString, cardModalState]);
 
   const eventsByDay = useMemo(() => {
     if (!data) return {} as Record<string, TimelineEvent[]>;
@@ -806,6 +1008,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     ? minutesToTime(Math.min(pointerPreview.startMinutes + pointerPreview.durationMinutes, 24 * 60 - 1))
     : null;
   const floatingLayerTop = timelineHeaderHeight + 12;
+  const modalBoards = useMemo(() => {
+    if (!availableBoards.length) {
+      return [initialBoard];
+    }
+    const filtered = availableBoards.filter((board) => board.id === initialBoard.id);
+    return filtered.length ? filtered : [initialBoard];
+  }, [availableBoards, initialBoard]);
+  const shouldShowCardModal = modalCard && cardModalState !== 'idle';
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -995,6 +1205,7 @@ const renderFloatingLayer = () => {
 };
 
   return (
+    <>
     <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <header className="flex flex-wrap items-center gap-4">
@@ -1083,6 +1294,23 @@ const renderFloatingLayer = () => {
         </DndContext>
       </div>
     </div>
+    {shouldShowCardModal && modalCard && (
+      <CardModal
+        card={modalCard}
+        boards={modalBoards}
+        profiles={modalProfiles}
+        onSave={handleCardModalSave}
+        onDelete={handleCardModalDelete}
+        onMoveToBoard={handleCardModalMove}
+        onClose={closeCardModal}
+      />
+    )}
+    {cardModalError && (
+      <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
+        {cardModalError}
+      </div>
+    )}
+    </>
   );
 }
 
