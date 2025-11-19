@@ -494,11 +494,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       if (!targetCard) return;
       try {
         const nextAssignee = assigneeIds && assigneeIds.length > 0 ? assigneeIds[0] : null;
+        const normalizedDueDate = due_date ? withJstMidnight(due_date) : null;
         const payload = {
           title,
           description,
           tags,
-          due_date,
+          due_date: normalizedDueDate,
           due_start,
           due_end,
           due_channel,
