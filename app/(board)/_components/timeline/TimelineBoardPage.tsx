@@ -495,7 +495,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       try {
         const nextAssignee = assigneeIds && assigneeIds.length > 0 ? assigneeIds[0] : null;
         const normalizedDueDate = due_date ? withJstMidnight(due_date) : null;
-        const payload = {
+        const payload: Record<string, unknown> = {
           title,
           description,
           tags,
@@ -506,10 +506,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           due_bucket,
           due_bucket_position,
           priority,
-          assignee_id: nextAssignee,
-          assigned_to: null,
           slug: slugify(title),
         };
+        if (assigneeTouched) {
+          payload.assignee_id = nextAssignee;
+          payload.assigned_to = null;
+        }
         const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
