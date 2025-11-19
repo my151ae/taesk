@@ -127,7 +127,8 @@ const timeLabel = (start: string | null, end: string | null) => {
 };
 const withJstMidnight = (isoDate: string | null) => {
   if (!isoDate) return null;
-  const utc = new Date(`${isoDate}T00:00:00+09:00`).toISOString();
+  const base = isoDate.includes('T') ? isoDate.split('T')[0] : isoDate;
+  const utc = new Date(`${base}T00:00:00+09:00`).toISOString();
   return utc;
 };
 const toLocalDay = (value: string | null | undefined) => {
@@ -494,7 +495,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       if (!targetCard) return;
       try {
         const nextAssignee = assigneeIds && assigneeIds.length > 0 ? assigneeIds[0] : null;
-        const normalizedDueDate = due_date ? withJstMidnight(due_date) : null;
+        let normalizedDueDate: string | null = null;
+        if (due_date) {
+          const parsed = new Date(due_date);
+          if (!Number.isNaN(parsed.getTime())) {
+            normalizedDueDate = parsed.toISOString();
+          }
+        }
         const payload: Record<string, unknown> = {
           title,
           description,
