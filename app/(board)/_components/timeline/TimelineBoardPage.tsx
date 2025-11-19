@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Board, Card, DueBucket, Priority, ProfileSummary } from "@/lib/supabase";
+import type { Board, Card, DueBucket, Priority, ProfileSummary, DueChannel } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
@@ -14,6 +14,7 @@ import {
   pointerWithin,
   rectIntersection,
   type CollisionDetection,
+  type UniqueIdentifier,
   useDroppable,
   useDraggable,
   useSensor,
@@ -196,13 +197,8 @@ const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
     return rectIntersection(args);
   }
 
-  const droppableFor = (id: string) => {
-    const container = args.droppableContainers.get(id);
-    if (container) {
-      return container.data.current?.type;
-    }
-    const fallback = Array.from(args.droppableContainers.values());
-    const match = fallback.find((entry) => entry.id === id);
+  const droppableFor = (id: UniqueIdentifier) => {
+    const match = args.droppableContainers.find((entry) => entry.id === id);
     return match?.data.current?.type;
   };
   const bucketCollisions = pointerCollisions.filter(({ id }) => {

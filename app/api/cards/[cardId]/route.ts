@@ -3,10 +3,10 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ shortId: string }> }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   const supabase = await createServerSupabaseClient();
-  const { shortId } = await params;
+  const { cardId } = await params;
 
   try {
     const {
@@ -23,7 +23,7 @@ export async function GET(
     const { data: card, error: cardError } = await supabase
       .from('cards')
       .select('*')
-      .eq('short_id', shortId)
+      .eq('short_id', cardId)
       .maybeSingle();
 
     if (cardError) {
@@ -90,7 +90,7 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
-    console.error('Unexpected error in GET /api/cards/[shortId]:', error);
+    console.error('Unexpected error in GET /api/cards/[cardId]:', error);
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }
