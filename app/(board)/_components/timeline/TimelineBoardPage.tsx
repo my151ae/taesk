@@ -550,9 +550,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     [applyPatch, dataMode]
   );
 
-  const openCardModalFromTimeline = useCallback((shortId: string | null) => {
+  const openCardModalFromTimeline = useCallback((shortId: string | null, debugSource?: string) => {
     if (dataMode !== 'api') return;
     if (!shortId) return;
+    console.log('[timeline] openCardModal', { shortId, source: debugSource });
     if (canonicalBoardPath) {
       router.push(`${canonicalBoardPath}?card=${shortId}`);
     } else {
@@ -760,8 +761,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const handleEventKeyDown = (
     event: TimelineEvent,
-    native: ReactKeyboardEvent<HTMLButtonElement>
+    native: ReactKeyboardEvent<HTMLElement>
   ) => {
+    if (native.key === 'Enter' || native.key === ' ') {
+      native.preventDefault();
+      openCardModalFromTimeline(event.short_id);
+      return;
+    }
+
     if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
     native.preventDefault();
     const direction = native.key === 'ArrowUp' ? -15 : 15;
@@ -813,12 +820,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         data={{ kind: 'event', event, cardId: event.card_id }}
         attachListenersToChild
       >
-        <button
-          type="button"
-          onClick={() => openCardModalFromTimeline(event.short_id)}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardModalFromTimeline(event.short_id, 'event-main')}
           onKeyDown={(native) => handleEventKeyDown(event, native)}
           data-testid="timeline-event"
-          className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+          className="absolute left-4 right-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
           <div className="flex items-start gap-2">
@@ -842,8 +850,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 {timeLabel(event.due_start, event.due_end)}
               </span>
             </div>
+            <button
+              type="button"
+              onClick={(native) => {
+                native.stopPropagation();
+                openCardModalFromTimeline(event.short_id, 'event-button');
+              }}
+              onPointerDown={(native) => {
+                native.stopPropagation();
+              }}
+              className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
+              aria-label="Open card"
+            >
+              ↗
+            </button>
           </div>
-        </button>
+        </div>
       </DraggableCard>
     );
   };
@@ -875,7 +897,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                           key={item.card_id}
                           item={item}
                           bucketKey={section.bucket}
-                          openCardModal={openCardModalFromTimeline}
+                          openCardModal={(shortId) => openCardModalFromTimeline(shortId, 'bucket-list')}
                         />
                       ))
                     )}
@@ -1158,24 +1180,40 @@ const AbBucketDraggableCard = ({
       extraNodeRef={setNodeRef}
     >
       <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
-        <label className="flex items-start gap-2 text-slate-700">
+        <div className="flex items-start gap-2 text-slate-700">
           <input
             type="checkbox"
             checked={item.checked}
             readOnly
             className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
           />
-          <button
-            type="button"
-            onClick={() => openCardModal(item.short_id)}
-            className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          >
-            <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
-            {item.due_start && (
-              <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
-            )}
-          </button>
-        </label>
+          <div className="flex min-w-0 flex-1 items-start gap-1">
+            <button
+              type="button"
+              onClick={() => openCardModal(item.short_id)}
+              className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
+              {item.due_start && (
+                <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(native) => {
+                native.stopPropagation();
+                openCardModal(item.short_id);
+              }}
+              onPointerDown={(native) => {
+                native.stopPropagation();
+              }}
+              className="flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
+              aria-label="Open card"
+            >
+              ↗
+            </button>
+          </div>
+        </div>
       </div>
     </DraggableCard>
   );
