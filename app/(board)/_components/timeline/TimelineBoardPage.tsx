@@ -25,10 +25,16 @@ import { createClientTrace } from "@/lib/metrics/client";
 import type { ClientTrace } from "@/lib/metrics/client";
 import { CardModal } from "@/app/components/CardModal";
 import { slugify } from "@/lib/card-utils";
+import ShareDialog from "@/app/(board)/_components/ShareDialog";
+import NotificationsBell from "@/app/(board)/_components/NotificationsBell";
+import NotificationSettings from "@/app/(board)/_components/NotificationSettings";
+import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
+import { useAuth } from "@/app/contexts/AuthContext";
 
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
+const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
 const AXIS_WIDTH = 80;
 
 const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
@@ -322,6 +328,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -333,6 +340,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [cardModalStatus, setCardModalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [cardModalError, setCardModalError] = useState<string | null>(null);
   const cardModalShortIdRef = useRef<string | null>(null);
+  const { user, signOut } = useAuth();
+  const [showBoardMenu, setShowBoardMenu] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const boardMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedPriority, setSelectedPriority] = useState<'all' | Priority>('all');
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const searchParamsString = searchParams?.toString() ?? '';
@@ -420,6 +437,27 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   useEffect(() => {
     fetchTimeline();
   }, [fetchTimeline]);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (!boardMenuRef.current) return;
+      if (!boardMenuRef.current.contains(event.target as Node)) {
+        setShowBoardMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const updateHeight = () => {
+      setViewportHeight(window.innerHeight);
+    };
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   const closeCardModal = useCallback(() => {
     const params = new URLSearchParams(searchParamsString);
@@ -569,14 +607,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       cancelled = true;
     };
   }, [searchParamsString, cardModalStatus]);
-
-  const eventsByDay = useMemo(() => {
-    if (!data) return {} as Record<string, TimelineEvent[]>;
-    return data.days.reduce((acc, day) => {
-      acc[day.isoDate] = data.events.filter((event) => event.due_date === day.isoDate);
-      return acc;
-    }, {} as Record<string, TimelineEvent[]>);
-  }, [data]);
 
   const nowMinutes = useMemo(() => (data ? getNowMinutesJst(data.serverNow) : null), [data]);
   const indicatorMinutes = liveNowMinutes ?? nowMinutes;
@@ -759,6 +789,93 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       router.push(`/c/${shortId}`);
     }
   }, [canonicalBoardPath, dataMode, router]);
+
+  const handleBoardNavigate = useCallback(
+    (board: Board) => {
+      const target = buildBoardUrl(board);
+      if (target) {
+        router.push(target);
+      } else if (board.short_id) {
+        router.push(`/b/${board.short_id}`);
+      } else {
+        router.push(`/board?boardId=${board.id}`);
+      }
+      setShowBoardMenu(false);
+    },
+    [router]
+  );
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    data?.events?.forEach((event) => {
+      (event.tags ?? []).forEach((tag) => tags.add(tag));
+    });
+    Object.values(data?.abBuckets ?? {}).forEach((items) => {
+      (items ?? []).forEach((item) => (item.tags ?? []).forEach((tag) => tags.add(tag)));
+    });
+    return Array.from(tags).sort();
+  }, [data?.events, data?.abBuckets]);
+
+  const filteredEvents = useMemo(() => {
+    if (!data?.events?.length) return [] as TimelineEvent[];
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const hasQuery = normalizedQuery.length > 0;
+    const hasTags = selectedTags.length > 0;
+
+    return data.events.filter((event) => {
+      if (selectedPriority !== 'all' && event.priority !== selectedPriority) {
+        return false;
+      }
+      if (hasTags) {
+        const tagSet = new Set(event.tags ?? []);
+        const matchesAll = selectedTags.every((tag) => tagSet.has(tag));
+        if (!matchesAll) return false;
+      }
+      if (hasQuery) {
+        const source = `${event.title ?? ''} ${(event.tags ?? []).join(' ')}`.toLowerCase();
+        if (!source.includes(normalizedQuery)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [data?.events, searchQuery, selectedPriority, selectedTags]);
+
+  const filteredBuckets = useMemo(() => {
+    const result: Record<string, TimelineBucketItem[]> = {};
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const hasQuery = normalizedQuery.length > 0;
+    const hasTags = selectedTags.length > 0;
+    Object.entries(data?.abBuckets ?? {}).forEach(([key, items]) => {
+      result[key] = (items ?? []).filter((item) => {
+        if (selectedPriority !== 'all') {
+          // Bucket items currently lack priority metadata; treat as non-matching when filtering by priority
+          return false;
+        }
+        if (hasTags) {
+          const tagSet = new Set(item.tags ?? []);
+          const matchesAll = selectedTags.every((tag) => tagSet.has(tag));
+          if (!matchesAll) return false;
+        }
+        if (hasQuery) {
+          const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')}`.toLowerCase();
+          if (!source.includes(normalizedQuery)) {
+            return false;
+          }
+        }
+        return true;
+      });
+    });
+    return result;
+  }, [data?.abBuckets, searchQuery, selectedPriority, selectedTags]);
+
+  const eventsByDay = useMemo(() => {
+    if (!data) return {} as Record<string, TimelineEvent[]>;
+    return data.days.reduce((acc, day) => {
+      acc[day.isoDate] = filteredEvents.filter((event) => event.due_date === day.isoDate);
+      return acc;
+    }, {} as Record<string, TimelineEvent[]>);
+  }, [data, filteredEvents]);
 
   const bucketDayMap = useMemo(() => {
     if (!data?.days?.length) return {} as Record<string, string | null>;
@@ -962,12 +1079,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     event: TimelineEvent,
     native: ReactKeyboardEvent<HTMLElement>
   ) => {
-    if (native.key === 'Enter' || native.key === ' ') {
-      native.preventDefault();
-      openCardModalFromTimeline(event.short_id);
-      return;
-    }
-
     if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
     native.preventDefault();
     const direction = native.key === 'ArrowUp' ? -15 : 15;
@@ -1005,6 +1116,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     ? minutesToTime(Math.min(pointerPreview.startMinutes + pointerPreview.durationMinutes, 24 * 60 - 1))
     : null;
   const floatingLayerTop = timelineHeaderHeight + 12;
+  const timelineViewportHeight = useMemo(() => {
+    if (viewportHeight == null) return TIMELINE_HEIGHT;
+    const chrome = timelineHeaderHeight + 160; // header + padding
+    const available = viewportHeight - chrome;
+    const clamped = Math.max(TIMELINE_MIN_VIEWPORT, available);
+    return Math.min(TIMELINE_HEIGHT, clamped);
+  }, [timelineHeaderHeight, viewportHeight]);
   const modalBoards = useMemo(() => {
     if (!availableBoards.length) {
       return [initialBoard];
@@ -1019,6 +1137,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(map.values());
   }, [availableBoards, initialBoard]);
   const shouldShowCardModal = modalCard && cardModalStatus !== 'idle';
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() || selectedTags.length > 0 || selectedPriority !== 'all'
+  );
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -1034,9 +1155,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         attachListenersToChild
       >
         <div
-          role="button"
+          role="group"
           tabIndex={0}
-          onClick={() => openCardModalFromTimeline(event.short_id, 'event-main')}
           onKeyDown={(native) => handleEventKeyDown(event, native)}
           data-testid="timeline-event"
           className="absolute left-4 right-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -1095,7 +1215,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         </div>
         <div className="mt-3 space-y-4">
           {meta.sections.map((section) => {
-            const items = data?.abBuckets?.[section.bucket] ?? [];
+            const items = filteredBuckets?.[section.bucket] ?? [];
             return (
               <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
@@ -1135,7 +1255,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     return (
       <DroppableColumn key={day.isoDate} day={day}>
-        <div className="relative h-full border-l border-slate-100 px-4 pb-8">
+        <div className="relative h-full border-l border-slate-100 px-4 pb-8" style={{ minHeight: timelineViewportHeight }}>
           <div
             className="pointer-events-none absolute"
             style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
@@ -1211,28 +1331,185 @@ const renderFloatingLayer = () => {
     <>
     <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <header className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-600 shadow-sm ring-1 ring-black/5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Live
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-900">{initialBoard.name}</h1>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span>GMT+09</span>
-            <span className="text-slate-300">•</span>
-            <span>Today focus</span>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {errorMessage && <p className="text-xs text-amber-600">{errorMessage}</p>}
-            <button
-              onClick={fetchTimeline}
-              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-              disabled={status === 'loading'}
-            >
-              {status === 'loading' ? 'Updating…' : 'Refresh'}
-            </button>
+        <header className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-600 shadow-sm ring-1 ring-black/5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Live
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+              <h1 className="text-2xl font-semibold text-slate-900 truncate">{initialBoard.name}</h1>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span>GMT+09</span>
+                <span className="text-slate-300">•</span>
+                <span>Today focus</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {errorMessage && <p className="text-xs text-amber-600">{errorMessage}</p>}
+              <button
+                onClick={fetchTimeline}
+                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                disabled={status === 'loading'}
+              >
+                {status === 'loading' ? 'Updating…' : 'Refresh'}
+              </button>
+              <div ref={boardMenuRef} className="relative">
+                <button
+                  onClick={() => setShowBoardMenu((prev) => !prev)}
+                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                  aria-haspopup="true"
+                  aria-expanded={showBoardMenu}
+                >
+                  Boards ▾
+                </button>
+                {showBoardMenu && (
+                  <div className="absolute right-0 z-40 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                    <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
+                    <div className="max-h-64 overflow-y-auto">
+                      {modalBoards.map((board) => (
+                        <button
+                          key={board.id}
+                          onClick={() => handleBoardNavigate(board)}
+                          className={clsx(
+                            'w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
+                            board.id === initialBoard.id && 'bg-slate-100 text-slate-900'
+                          )}
+                        >
+                          <div className="font-medium text-slate-800">{board.name || 'Untitled board'}</div>
+                          <p className="text-xs text-slate-500">{board.description || 'Standard board'}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowShareDialog(true)}
+                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Share
+              </button>
+              <NotificationsBell />
+              <button
+                onClick={() => setShowNotificationSettings(true)}
+                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Notify
+              </button>
+              <button
+                onClick={() => setShowProfileSettings(true)}
+                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                {user?.email ?? 'Profile'}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await signOut();
+                  } catch (error) {
+                    console.error('Failed to sign out', error);
+                  }
+                }}
+                className="rounded-full bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </header>
+
+        <section className="rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
+          <button
+            onClick={() => setShowFilters((prev) => !prev)}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <span className="flex items-center gap-2">
+              🔍 Filters
+              {hasActiveFilters && (
+                <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
+                  Active
+                </span>
+              )}
+            </span>
+            <span className={clsx('transform text-slate-400 transition', showFilters ? 'rotate-180' : '')}>▼</span>
+          </button>
+          {showFilters && (
+            <div className="space-y-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="カード名やタグ"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Priority
+                  </label>
+                  <select
+                    value={selectedPriority}
+                    onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  >
+                    <option value="all">すべて</option>
+                    <option value="low">🟢 Low</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="high">🔴 High</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {availableTags.length === 0 && (
+                    <span className="text-xs text-slate-400">タグはまだありません</span>
+                  )}
+                  {availableTags.map((tag) => {
+                    const active = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTags((prev) =>
+                            prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
+                          );
+                        }}
+                        className={clsx(
+                          'rounded-full px-3 py-1 text-xs font-semibold transition',
+                          active ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        )}
+                      >
+                        #{tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedTags([]);
+                    setSelectedPriority('all');
+                  }}
+                  className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+        </section>
 
         <DndContext
           sensors={sensors}
@@ -1243,7 +1520,11 @@ const renderFloatingLayer = () => {
           collisionDetection={bucketsFirstCollisionDetection}
         >
           <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
-            <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
+            <div
+              ref={timelineScrollRef}
+              className="relative overflow-y-auto"
+              style={{ height: timelineViewportHeight }}
+            >
               <div
                 ref={timelineHeaderRef}
                 className="sticky top-0 z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
@@ -1269,7 +1550,7 @@ const renderFloatingLayer = () => {
                   </div>
                 ))}
               </div>
-              <div className="relative" style={{ minHeight: TIMELINE_HEIGHT }}>
+              <div className="relative" style={{ minHeight: timelineViewportHeight }}>
                 {renderFloatingLayer()}
                 <div className="relative">
                   <div
@@ -1297,6 +1578,43 @@ const renderFloatingLayer = () => {
         </DndContext>
       </div>
     </div>
+    {showShareDialog && (
+      <ShareDialog boardId={initialBoard.id} onClose={() => setShowShareDialog(false)} />
+    )}
+    {showNotificationSettings && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNotificationSettings(false)}>
+        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Notification Settings</h2>
+            <button
+              onClick={() => setShowNotificationSettings(false)}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <NotificationSettings />
+        </div>
+      </div>
+    )}
+    {showProfileSettings && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowProfileSettings(false)}>
+        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Profile Settings</h2>
+            <button
+              onClick={() => setShowProfileSettings(false)}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <ProfileSettings onProfileUpdated={() => fetchTimeline()} />
+        </div>
+      </div>
+    )}
     {shouldShowCardModal && modalCard && (
       <CardModal
         card={modalCard}
@@ -1419,16 +1737,12 @@ const AbBucketDraggableCard = ({
             className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
           />
           <div className="flex min-w-0 flex-1 items-start gap-1">
-            <button
-              type="button"
-              onClick={() => openCardModal(item.short_id)}
-              className="flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-            >
+            <div className="flex-1 text-left">
               <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
               {item.due_start && (
                 <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
               )}
-            </button>
+            </div>
             <button
               type="button"
               onClick={(native) => {
