@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import type { Board, DueBucket } from "@/lib/supabase";
@@ -11,6 +11,9 @@ import {
   DragMoveEvent,
   DragStartEvent,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   useDroppable,
   useDraggable,
   useSensor,
@@ -130,21 +133,21 @@ const pointerMinutesFromEvent = (
     columnRect?: { top: number; height: number };
   }
 ): number | null => {
-  const translated = event.active.rect.current?.translated;
-  const sourceInitial = event.active.rect.current?.initial;
-  const pointerTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
-  if (pointerTop == null) return null;
   const scrollTop = options?.scrollTop ?? 0;
   const columnRect = options?.columnRect;
+  const translated = event.active.rect.current?.translated;
+  const sourceInitial = event.active.rect.current?.initial;
+  const elementTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
+  if (elementTop == null) return null;
+
   let relativeY: number;
-  let maxHeight: number;
   if (columnRect) {
-    relativeY = pointerTop - columnRect.top;
-    maxHeight = columnRect.height ?? TIMELINE_HEIGHT;
+    relativeY = elementTop - columnRect.top;
   } else {
-    relativeY = pointerTop - AXIS_WIDTH + scrollTop;
-    maxHeight = TIMELINE_HEIGHT;
+    relativeY = elementTop - AXIS_WIDTH + scrollTop;
   }
+
+  const maxHeight = columnRect?.height ?? TIMELINE_HEIGHT;
   const clamped = Math.max(0, Math.min(relativeY, maxHeight));
   const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
   return Math.max(0, Math.min(23 * 60 + 45, minutes));
@@ -184,6 +187,32 @@ type PlacementMeta = {
 };
 
 type DataMode = 'api' | 'mock';
+
+const bucketsFirstCollisionDetection: CollisionDetection = ({ droppableContainers, ...rest }) => {
+  const pointerCollisions = pointerWithin({ droppableContainers, ...rest });
+  if (!pointerCollisions.length) {
+    return rectIntersection({ droppableContainers, ...rest });
+  }
+
+  const droppableFor = (id: string) => {
+    if ('get' in droppableContainers && typeof droppableContainers.get === 'function') {
+      return droppableContainers.get(id)?.data.current?.type;
+    }
+    const containerArray = droppableContainers as unknown as Array<typeof rest.droppableContainers[number]>;
+    const match = containerArray.find((container) => container.id === id);
+    return match?.data.current?.type;
+  };
+  const bucketCollisions = pointerCollisions.filter(({ id }) => {
+    const type = droppableFor(id);
+    return type === 'bucket-item' || type === 'ab-bucket';
+  });
+
+  if (bucketCollisions.length) {
+    return bucketCollisions;
+  }
+
+  return pointerCollisions;
+};
 
 const buildMockTimeline = (): TimelineResponse => {
   const base = new Date();
@@ -541,41 +570,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [data?.days]);
 
-  const defaultBucketForDay = useCallback(
-    (isoDate: string | null): DueBucket => {
-      if (!data?.days?.length) return 'today_a';
-      if (isoDate === data.days[0]?.isoDate) return 'today_a';
-      if (isoDate === data.days[1]?.isoDate) return 'tomorrow_a';
-      return 'today_a';
-    },
-    [data?.days]
-  );
-
-  const moveEventToBucket = useCallback(
-    (event: TimelineEvent, bucketOverride?: DueBucket) => {
-      const bucketKey = bucketOverride ?? defaultBucketForDay(event.due_date ?? null);
-      const dayIso = bucketDayMap[bucketKey] ?? event.due_date ?? null;
-      persistPlacement(
-        event.card_id,
-        {
-          due_channel: 'ab-list',
-          due_bucket: bucketKey,
-          due_date: withJstMidnight(dayIso),
-          due_start: null,
-          due_end: null,
-          due_bucket_position: Date.now(),
-        },
-        {
-          target: 'bucket',
-          bucketKey,
-          sourceEvent: event,
-          localDueDate: dayIso,
-        }
-      );
-    },
-    [bucketDayMap, defaultBucketForDay, persistPlacement]
-  );
-
   const handleDragStart = (event: DragStartEvent) => {
     const cardId = event.active.data.current?.cardId as string | undefined;
     if (!cardId) return;
@@ -613,6 +607,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
     const day = event.over?.data.current?.day as TimelineDay | undefined;
     const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const pointerY = event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null;
     const pointerMinutes = pointerMinutesFromEvent(event, {
       scrollTop,
       columnRect: event.over?.rect
@@ -703,6 +698,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const day = over.data.current?.day as TimelineDay | undefined;
       if (!day) return;
       const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+      const pointerY = event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null;
       const pointerMinutes = pointerMinutesFromEvent(event, {
         scrollTop,
         columnRect: over.rect ? { top: over.rect.top, height: over.rect.height } : undefined,
@@ -811,7 +807,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const height = Math.max(minuteToPixels(duration), 32);
 
     return (
-      <DraggableCard key={event.card_id} id={`event:${event.card_id}`} data={{ kind: 'event', event, cardId: event.card_id }}>
+      <DraggableCard
+        key={event.card_id}
+        id={`event:${event.card_id}`}
+        data={{ kind: 'event', event, cardId: event.card_id }}
+        attachListenersToChild
+      >
         <button
           type="button"
           onClick={() => openCardModalFromTimeline(event.short_id)}
@@ -820,26 +821,27 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           className="absolute left-4 right-4 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
           style={{ top, height }}
         >
-          <p className="text-[10px] font-semibold text-slate-500">{timeLabel(event.due_start, event.due_end)}</p>
-          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{event.title || 'Untitled card'}</p>
-          <div className="mt-1 text-[10px] text-slate-400">
+          <div className="flex items-start gap-2">
             <span
-              role="button"
-              tabIndex={0}
-              className="inline-flex rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 hover:border-sky-300 hover:text-sky-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                moveEventToBucket(event);
-              }}
-              onKeyDown={(native) => {
-                if (native.key === 'Enter' || native.key === ' ') {
-                  native.preventDefault();
-                  moveEventToBucket(event);
-                }
-              }}
+              aria-hidden="true"
+              className={clsx(
+                'flex h-3.5 w-3.5 items-center justify-center rounded border text-[8px] font-bold',
+                event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
+              )}
             >
-              Move to A/B
+              ✓
             </span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-1 text-[11px] font-semibold text-slate-800">
+              <span className="min-w-0 flex-1 break-words leading-tight">
+                {event.title || 'Untitled card'}
+              </span>
+              <span
+                className="text-[10px] font-semibold text-slate-500 whitespace-nowrap"
+                title={timeLabel(event.due_start, event.due_end)}
+              >
+                {timeLabel(event.due_start, event.due_end)}
+              </span>
+            </div>
           </div>
         </button>
       </DraggableCard>
@@ -894,31 +896,36 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const events = eventsByDay[day.isoDate] ?? [];
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
+    const isFirstColumn = index === 0;
 
     return (
       <DroppableColumn key={day.isoDate} day={day}>
         <div className="relative h-full border-l border-slate-100 px-4 pb-8">
-          <div className="pointer-events-none absolute inset-x-0" style={{ height: TIMELINE_HEIGHT }}>
+          <div
+            className="pointer-events-none absolute"
+            style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
+          >
             {HOURS.map((hour, idx) => (
-              <div key={hour} className="absolute left-0 right-0 border-b border-dashed border-slate-100/70" style={{ top: idx * HOUR_HEIGHT }} />
+              <div
+                key={hour}
+                className={clsx(
+                  'absolute left-0 right-0 border-b border-slate-200',
+                  idx === 0 ? '' : 'border-dashed'
+                )}
+                style={{ top: idx * HOUR_HEIGHT }}
+              />
             ))}
           </div>
 
           {indicatorVisibleInDay && (
-            <>
-              <div
-                className="pointer-events-none absolute left-4 right-4 z-10"
-                style={{ top: indicatorPosition }}
-              >
-                <div className="h-px bg-red-400/80" />
+            <div
+              className="pointer-events-none absolute z-10"
+              style={{ top: indicatorPosition, left: 0, right: 0 }}
+            >
+              <div className="relative h-px bg-red-400/80">
+                <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
               </div>
-              <div
-                className="pointer-events-none absolute left-1 z-10"
-                style={{ top: indicatorPosition - 2 }}
-              >
-                <div className="h-2 w-2 rounded-full bg-red-500" />
-              </div>
-            </>
+            </div>
           )}
 
           {activeDrag?.cardId && pointerPreviewVisible && pointerPreviewDay === day.isoDate && (
@@ -997,6 +1004,7 @@ const renderFloatingLayer = () => {
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
+          collisionDetection={bucketsFirstCollisionDetection}
         >
           <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
             <div ref={timelineScrollRef} className="relative max-h-[560px] overflow-y-auto">
@@ -1009,7 +1017,9 @@ const renderFloatingLayer = () => {
                     : '80px',
                 }}
               >
-                <div className="px-3 py-3 text-right">GMT+09</div>
+                <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
+                  <span className="leading-none">GMT+09</span>
+                </div>
                 {data?.days?.map((day, index) => (
                   <div
                     key={day.key}
@@ -1031,10 +1041,14 @@ const renderFloatingLayer = () => {
                     data-timeline-grid
                     style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
                   >
-                    <aside className="relative border-r border-slate-100 bg-slate-50 text-right text-[10px] text-slate-500">
+                    <aside className="relative border-r border-slate-100 text-xs text-slate-500">
                       {HOURS.map((hour) => (
-                        <div key={hour} className="h-10 pr-3 leading-10">
-                          {hour}
+                        <div key={hour} className="flex h-10 items-start justify-end pr-3">
+                          {hour === '00:00' ? null : (
+                            <span className="-mt-1 leading-none tracking-tight text-slate-600">
+                              {hour}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </aside>
@@ -1074,11 +1088,13 @@ const DraggableCard = ({
   data,
   children,
   extraNodeRef,
+  attachListenersToChild = false,
 }: {
   id: string;
   data: Record<string, unknown>;
   children: ReactNode;
   extraNodeRef?: (node: HTMLElement | null) => void;
+  attachListenersToChild?: boolean;
 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, data: { ...data, id } });
   const combinedRef = useCallback(
@@ -1090,6 +1106,24 @@ const DraggableCard = ({
     },
     [extraNodeRef, setNodeRef]
   );
+
+  if (attachListenersToChild && isValidElement(children)) {
+    const child = children as ReactElement;
+    const mergedRef = (node: HTMLElement | null) => {
+      combinedRef(node);
+    };
+    return cloneElement(child, {
+      ref: mergedRef,
+      style: {
+        ...(child.props.style ?? {}),
+        transform: CSS.Translate.toString(transform),
+      },
+      className: [child.props.className, isDragging ? 'z-30 opacity-80' : undefined].filter(Boolean).join(' '),
+      ...listeners,
+      ...attributes,
+    });
+  }
+
   return (
     <div
       ref={combinedRef}
