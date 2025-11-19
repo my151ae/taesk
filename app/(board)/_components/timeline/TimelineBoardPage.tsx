@@ -190,18 +190,19 @@ type PlacementMeta = {
 
 type DataMode = 'api' | 'mock';
 
-const bucketsFirstCollisionDetection: CollisionDetection = ({ droppableContainers, ...rest }) => {
-  const pointerCollisions = pointerWithin({ droppableContainers, ...rest });
+const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
   if (!pointerCollisions.length) {
-    return rectIntersection({ droppableContainers, ...rest });
+    return rectIntersection(args);
   }
 
   const droppableFor = (id: string) => {
-    if ('get' in droppableContainers && typeof droppableContainers.get === 'function') {
-      return droppableContainers.get(id)?.data.current?.type;
+    const container = args.droppableContainers.get(id);
+    if (container) {
+      return container.data.current?.type;
     }
-    const containerArray = droppableContainers as unknown as Array<typeof rest.droppableContainers[number]>;
-    const match = containerArray.find((container) => container.id === id);
+    const fallback = Array.from(args.droppableContainers.values());
+    const match = fallback.find((entry) => entry.id === id);
     return match?.data.current?.type;
   };
   const bucketCollisions = pointerCollisions.filter(({ id }) => {
@@ -333,7 +334,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
   const [modalCard, setModalCard] = useState<Card | null>(null);
-  const [cardModalState, setCardModalState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [cardModalStatus, setCardModalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [cardModalError, setCardModalError] = useState<string | null>(null);
   const cardModalShortIdRef = useRef<string | null>(null);
 
@@ -536,7 +537,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setCardModalError(null);
       return;
     }
-    if (cardModalShortIdRef.current === shortId && cardModalState === 'ready') {
+    if (cardModalShortIdRef.current === shortId && cardModalStatus === 'ready') {
       return;
     }
     cardModalShortIdRef.current = shortId;
@@ -571,7 +572,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => {
       cancelled = true;
     };
-  }, [searchParamsString, cardModalState]);
+  }, [searchParamsString, cardModalStatus]);
 
   const eventsByDay = useMemo(() => {
     if (!data) return {} as Record<string, TimelineEvent[]>;
@@ -1012,10 +1013,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (!availableBoards.length) {
       return [initialBoard];
     }
-    const filtered = availableBoards.filter((board) => board.id === initialBoard.id);
-    return filtered.length ? filtered : [initialBoard];
+    const map = new Map<string, Board>();
+    availableBoards.forEach((board) => {
+      map.set(board.id, board);
+    });
+    if (!map.has(initialBoard.id)) {
+      map.set(initialBoard.id, initialBoard);
+    }
+    return Array.from(map.values());
   }, [availableBoards, initialBoard]);
-  const shouldShowCardModal = modalCard && cardModalState !== 'idle';
+  const shouldShowCardModal = modalCard && cardModalStatus !== 'idle';
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
