@@ -1373,6 +1373,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               }}
               className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
               aria-label="Open card"
+              data-testid={`cardOpenButton-${event.card_id}`}
             >
               ↗
             </button>
@@ -1524,6 +1525,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                   aria-haspopup="true"
                   aria-expanded={showBoardMenu}
+                  data-testid="board-menu-button"
                 >
                   Boards ▾
                 </button>
@@ -1551,6 +1553,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               <button
                 onClick={() => setShowShareDialog(true)}
                 className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                data-testid="share-button"
               >
                 Share
               </button>
@@ -1558,12 +1561,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               <button
                 onClick={() => setShowNotificationSettings(true)}
                 className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                data-testid="notify-button"
               >
                 Notify
               </button>
               <button
                 onClick={() => setShowProfileSettings(true)}
                 className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                data-testid="profile-button"
               >
                 {user?.email ?? 'Profile'}
               </button>
@@ -1719,6 +1724,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     <div
                       className="grid"
                       data-timeline-grid
+                      data-testid="timeline-grid"
                       style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
                     >
                       <aside className="relative border-r border-slate-100 text-xs text-slate-500">
@@ -1930,6 +1936,7 @@ const AbBucketDraggableCard = ({
               }}
               className="flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
               aria-label="Open card"
+              data-testid={`cardOpenButton-${item.card_id}`}
             >
               ↗
             </button>

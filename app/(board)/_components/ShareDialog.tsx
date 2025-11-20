@@ -257,27 +257,27 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
                           )}
                         </div>
                       </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleRoleChange(member.profile_id, e.target.value as MemberRole)}
-                        className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={member.role === 'owner'}
-                      >
-                        <option value="owner">Owner</option>
-                        <option value="editor">Editor</option>
-                        <option value="commenter">Commenter</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                      {member.role !== 'owner' && (
-                        <button
-                          onClick={() => handleRemove(member.profile_id)}
-                          className="px-3 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-sm"
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.profile_id, e.target.value as MemberRole)}
+                          className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={member.role === 'owner'}
                         >
-                          Remove
-                        </button>
-                      )}
-                    </div>
+                          <option value="owner">Owner</option>
+                          <option value="editor">Editor</option>
+                          <option value="commenter">Commenter</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        {member.role !== 'owner' && (
+                          <button
+                            onClick={() => handleRemove(member.profile_id)}
+                            className="px-3 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-sm"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

@@ -5,7 +5,7 @@ import { mockServiceWorkerAndPush } from './utils/push';
 type QuietHours = { start: string; end: string; timezone: string };
 
 async function openNotificationSettings(page: import('@playwright/test').Page) {
-  await page.getByRole('button', { name: 'Notification settings' }).click();
+  await page.getByTestId('notify-button').click();
   await expect(page.getByRole('heading', { name: 'Notification Settings' })).toBeVisible();
 }
 

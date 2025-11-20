@@ -116,8 +116,8 @@ async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
   await page.goto(board.canonicalPath);
   await page.waitForLoadState('domcontentloaded');
 
-  // Wait for board to be ready - use list as reliable indicator instead of email
-  await page.locator(`[data-testid="list-${board.listId}"]`).waitFor({ state: 'visible', timeout: 10000 });
+  // Wait for board to be ready - use timeline grid as reliable indicator
+  await page.locator('[data-testid="timeline-grid"]').waitFor({ state: 'visible', timeout: 10000 });
 
   // Ensure network is settled
   await page.waitForLoadState('networkidle');
@@ -149,6 +149,9 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
     position,
     tags: [],
     due_date: null,
+    due_channel: 'ab-list',
+    due_bucket: 'today_a',
+    due_bucket_position: 1000,
     priority: 'medium',
     assigned_to: null,
     assignee_id: null,
@@ -172,14 +175,14 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
 }
 
 async function openCardModalViaQuery(page: Page, card: TestCardContext, boardContext?: TestBoardContext): Promise<void> {
-  const waitForMembers = boardContext
+  const waitForCardDetail = boardContext
     ? page
-        .waitForResponse(
-          (response) =>
-            response.url().includes(`/api/boards/${boardContext.id}/members`) && response.status() === 200,
-          { timeout: 15000 }
-        )
-        .catch(() => null)
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/api/cards/') && response.url().includes('/detail') && response.status() === 200,
+        { timeout: 15000 }
+      )
+      .catch(() => null)
     : null;
 
   if (boardContext && card.shortId) {
@@ -209,8 +212,8 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
   // Give it a moment to settle
   await page.waitForTimeout(500);
 
-  if (waitForMembers) {
-    await waitForMembers;
+  if (waitForCardDetail) {
+    await waitForCardDetail;
   }
 }
 
@@ -234,7 +237,7 @@ test.describe('Comments Feature @feature:comments', () => {
     board = await seedTestBoard(boardName);
     card = await createTestCard(board);
     await loadBoard(page, board);
-    await page.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+    await page.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test.afterEach(async () => {
@@ -595,17 +598,11 @@ test.describe('Comments Feature @feature:comments', () => {
   test('should support full-width ＠ trigger @e2e:essential @feature:comments', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
-    // Set up the wait for members API BEFORE opening the modal
-    const membersResponsePromise = page.waitForResponse(
-      response => response.url().includes('/api/boards/') && response.url().includes('/members') && response.status() === 200,
-      { timeout: 15000 }
-    );
-
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
     await page.waitForLoadState('networkidle');
 
-    // Wait for members API to complete
-    await membersResponsePromise;
+    // Wait for members API to complete (not needed as initialProfiles are passed)
+    // await membersResponsePromise;
     await page.waitForTimeout(500); // Extra wait for React to update props
 
     // Find TipTap editor (ProseMirror)
@@ -699,8 +696,8 @@ test.describe('Comments Realtime @feature:comments', () => {
       const card = await createTestCard(board);
       await loadBoard(page1, board);
       await loadBoard(page2, board);
-      await page1.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
-      await page2.locator(`[data-testid="card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+      await page1.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+      await page2.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
 
       await openCardModalViaQuery(page1, card, board);
       await openCardModalViaQuery(page2, card, board);
@@ -769,7 +766,7 @@ test.describe('Comments Performance @feature:comments', () => {
     await loadBoard(page, currentBoard);
 
     card = createdCard;
-    const cardElement = page.locator(`[data-testid="card-${createdCard.id}"]`).first();
+    const cardElement = page.locator(`[data-testid="ab-card-${createdCard.id}"]`).first();
     await cardElement.waitFor({ state: 'visible', timeout: 15000 });
     const openButton = page.getByTestId(`cardOpenButton-${createdCard.id}`).first();
     await openButton.waitFor({ state: 'visible', timeout: 10000 });
@@ -780,7 +777,7 @@ test.describe('Comments Performance @feature:comments', () => {
     // Open card modal
     await openButton.click();
     if (createdCard.shortId) {
-      await page.waitForURL(`**card=${createdCard.shortId}**`, { timeout: 5000, waitUntil: 'commit' }).catch(() => {});
+      await page.waitForURL(`**card=${createdCard.shortId}**`, { timeout: 5000, waitUntil: 'commit' }).catch(() => { });
     }
 
     // Wait for modal to be visible
