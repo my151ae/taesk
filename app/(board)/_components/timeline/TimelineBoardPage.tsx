@@ -31,6 +31,12 @@ import NotificationSettings from "@/app/(board)/_components/NotificationSettings
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
 
+import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
+import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
+import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
+import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+
 const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
@@ -347,10 +353,125 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedPriority, setSelectedPriority] = useState<'all' | Priority>('all');
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTags,
+    setSelectedTags,
+    selectedPriority,
+    setSelectedPriority,
+    sortBy,
+    setSortBy,
+    showFilters,
+    setShowFilters,
+  } = useBoardFilters();
+
+  // Realtime & Sync
+  const { isOnline, syncQueueStats } = useSyncQueue();
+  const upsertComment = useCommentsStore((state) => state.upsertComment);
+  const removeComment = useCommentsStore((state) => state.removeComment);
+
+  const handleCardChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
+    setData((prev) => {
+      if (!prev) return prev;
+
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+      const displayData = filteredData ?? data;
+      const events = displayData?.events ?? [];
+      const abBuckets = displayData?.abBuckets ?? {};
+
+      const nextEvents = [...prev.events];
+      const nextBuckets = { ...prev.abBuckets };
+
+      // Helper to remove card from all collections
+      const removeCard = (cardId: string) => {
+        // Remove from events
+        const eventIdx = nextEvents.findIndex(e => e.card_id === cardId);
+        if (eventIdx >= 0) nextEvents.splice(eventIdx, 1);
+
+        // Remove from buckets
+        Object.keys(nextBuckets).forEach(key => {
+          nextBuckets[key] = nextBuckets[key].filter(item => item.card_id !== cardId);
+        });
+      };
+
+      if (eventType === 'DELETE') {
+        const id = oldRecord.id as string;
+        if (id) removeCard(id);
+        return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+      }
+
+      if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        const card = newRecord as Card;
+
+        // First remove existing instance to avoid duplicates/stale data
+        removeCard(card.id);
+
+        // Determine where to put the card
+        if (card.due_date) {
+          // It's a timeline event
+          const startMinutes = getMinutesFromTime(card.due_start);
+          const endMinutes = getMinutesFromTime(card.due_end);
+          const durationMinutes = startMinutes != null && endMinutes != null
+            ? Math.max(endMinutes - startMinutes, 15)
+            : 60;
+
+          nextEvents.push({
+            card_id: card.id,
+            due_date: card.due_date,
+            due_start: card.due_start,
+            due_end: card.due_end,
+            durationMinutes,
+            title: card.title,
+            tags: card.tags ?? [],
+            priority: card.priority,
+            checked: card.checked,
+            short_id: card.short_id,
+            slug: card.slug,
+          });
+
+          // Sort events
+          nextEvents.sort((a, b) => {
+            if (a.due_date === b.due_date) {
+              const aStart = getMinutesFromTime(a.due_start) ?? 0;
+              const bStart = getMinutesFromTime(b.due_start) ?? 0;
+              return aStart - bStart;
+            }
+            return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+          });
+
+        } else if (card.due_bucket) {
+          // It's a bucket item
+          const bucketKey = card.due_bucket;
+          if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
+
+          nextBuckets[bucketKey].push({
+            card_id: card.id,
+            title: card.title,
+            due_date: null,
+            due_start: card.due_start,
+            due_end: card.due_end,
+            checked: card.checked,
+            tags: card.tags ?? [],
+            short_id: card.short_id,
+            slug: card.slug,
+            bucketPosition: card.due_bucket_position,
+          });
+
+          // Sort bucket items
+          nextBuckets[bucketKey].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+        }
+      }
+
+      return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+    });
+  }, []);
+
+  const { realtimeStatus } = useRealtimeBoard(initialBoard.id, {
+    onCardChange: handleCardChange,
+    upsertComment,
+    removeComment
+  });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const searchParamsString = searchParams?.toString() ?? '';
@@ -618,6 +739,45 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [searchParamsString, cardModalStatus]);
 
+  const filteredData = useMemo(() => {
+    if (!data) return null;
+
+    // Convert TimelineEvents and BucketItems back to Cards for filtering
+    // This is a bit inefficient but reuses the shared logic.
+    // Ideally filterAndSortCards should be generic or we should adapt the data.
+    // For now, we'll filter the arrays directly using the same logic as filterAndSortCards but inline or adapted.
+
+    const filterItem = (item: { title: string; tags: string[]; priority?: string | null; checked: boolean }) => {
+      // Search
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        if (!item.title.toLowerCase().includes(query)) return false;
+      }
+      // Tags
+      if (selectedTags.length > 0) {
+        if (!selectedTags.every(tag => item.tags.includes(tag))) return false;
+      }
+      // Priority (only for events that have priority, buckets might not?)
+      if (selectedPriority !== 'all') {
+        if (item.priority !== selectedPriority) return false;
+      }
+      return true;
+    };
+
+    const filteredEvents = data.events.filter(event => filterItem(event));
+
+    const filteredBuckets = Object.entries(data.abBuckets).reduce((acc, [key, items]) => {
+      acc[key] = items.filter(item => filterItem({ ...item, priority: null })); // Bucket items don't have priority in the interface usually?
+      return acc;
+    }, {} as Record<string, TimelineBucketItem[]>);
+
+    return {
+      ...data,
+      events: filteredEvents,
+      abBuckets: filteredBuckets,
+    };
+  }, [data, searchQuery, selectedTags, selectedPriority]);
+
   const nowMinutes = useMemo(() => (data ? getNowMinutesJst(data.serverNow) : null), [data]);
   const indicatorMinutes = liveNowMinutes ?? nowMinutes;
   const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes) : null;
@@ -662,7 +822,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     async (cardId: string, payload: Record<string, unknown>) => {
       if (dataMode !== 'api') return;
       try {
-    console.log('[timeline] patch', cardId, payload);
+        console.log('[timeline] patch', cardId, payload);
         const response = await fetch(`/api/boards/${initialBoard.id}/cards/${cardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -1146,10 +1306,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
     return Array.from(map.values());
   }, [availableBoards, initialBoard]);
+
+  const displayData = filteredData ?? data;
+  const events = displayData?.events ?? [];
+  const abBuckets = displayData?.abBuckets ?? {};
+
   const shouldShowCardModal = modalCard && cardModalStatus !== 'idle';
   const hasActiveFilters = Boolean(
     searchQuery.trim() || selectedTags.length > 0 || selectedPriority !== 'all'
   );
+
+  const allTags = useMemo(() => {
+    if (!data) return [];
+    const tagsSet = new Set<string>();
+    data.events.forEach(e => e.tags.forEach(t => tagsSet.add(t)));
+    Object.values(data.abBuckets).forEach(items => items.forEach(i => i.tags.forEach(t => tagsSet.add(t))));
+    return Array.from(tagsSet).sort();
+  }, [data]);
 
   const renderEvent = (event: TimelineEvent) => {
     const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -1225,7 +1398,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         </div>
         <div className="mt-3 space-y-4">
           {meta.sections.map((section) => {
-            const items = filteredBuckets?.[section.bucket] ?? [];
+            const items = abBuckets[section.bucket] ?? [];
             return (
               <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
@@ -1315,55 +1488,139 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     );
   };
 
-const renderFloatingLayer = () => {
-  if (!data?.days?.length) return null;
-  const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
-  return (
-    <div
-      className="pointer-events-none sticky z-20 h-0 overflow-visible"
-      style={{ top: floatingLayerTop }}
-    >
-      <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
-        <div />
-        {data.days.map((day) => (
-          <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
-            <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
-              {renderAbCard(day)}
+  const renderFloatingLayer = () => {
+    if (!data?.days?.length) return null;
+    const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
+    return (
+      <div
+        className="pointer-events-none sticky z-20 h-0 overflow-visible"
+        style={{ top: floatingLayerTop }}
+      >
+        <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
+          <div />
+          {data.days.map((day) => (
+            <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
+              <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
+                {renderAbCard(day)}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
     <>
-    <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <header className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-600 shadow-sm ring-1 ring-black/5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Live
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-              <h1 className="text-2xl font-semibold text-slate-900 truncate">{initialBoard.name}</h1>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <span>GMT+09</span>
-                <span className="text-slate-300">•</span>
-                <span>Today focus</span>
+      <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6">
+          <header className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-600 shadow-sm ring-1 ring-black/5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Live
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {errorMessage && <p className="text-xs text-amber-600">{errorMessage}</p>}
-              <button
-                onClick={fetchTimeline}
-                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                disabled={status === 'loading'}
-              >
-                {status === 'loading' ? 'Updating…' : 'Refresh'}
-              </button>
+              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <h1 className="text-2xl font-semibold text-slate-900 truncate">{initialBoard.name}</h1>
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <span>GMT+09</span>
+                  <span className="text-slate-300">•</span>
+                  <span>Today focus</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search cards..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 w-48 rounded-full border border-slate-200 bg-white px-3 pl-8 text-sm text-slate-600 shadow-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                  />
+                  <svg
+                    className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={clsx(
+                      "flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium shadow-sm transition",
+                      showFilters || hasActiveFilters
+                        ? "border-sky-200 bg-sky-50 text-sky-700"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    Filters
+                    {hasActiveFilters && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-sky-200 text-[10px] font-bold text-sky-800">
+                        {(selectedTags.length > 0 ? 1 : 0) + (selectedPriority !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+
+                  {showFilters && (
+                    <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl ring-1 ring-black/5">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-500">Priority</label>
+                          <div className="flex flex-wrap gap-2">
+                            {(['all', 'high', 'medium', 'low'] as const).map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setSelectedPriority(p)}
+                                className={clsx(
+                                  "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                                  selectedPriority === p
+                                    ? "bg-slate-900 text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                )}
+                              >
+                                {p.charAt(0).toUpperCase() + p.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-500">Tags</label>
+                          <div className="flex flex-wrap gap-2">
+                            {allTags.length === 0 && <p className="text-xs text-slate-400">No tags available</p>}
+                            {allTags.map((tag) => (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  setSelectedTags(prev =>
+                                    prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                                  );
+                                }}
+                                className={clsx(
+                                  "rounded-lg px-2.5 py-1 text-xs font-medium transition",
+                                  selectedTags.includes(tag)
+                                    ? "bg-sky-100 text-sky-700 ring-1 ring-sky-200"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                )}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div ref={boardMenuRef} className="relative">
                 <button
                   onClick={() => setShowBoardMenu((prev) => !prev)}
@@ -1426,221 +1683,229 @@ const renderFloatingLayer = () => {
                 Sign out
               </button>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <section className="rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
-          <button
-            onClick={() => setShowFilters((prev) => !prev)}
-            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <span className="flex items-center gap-2">
-              🔍 Filters
-              {hasActiveFilters && (
-                <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
-                  Active
-                </span>
-              )}
-            </span>
-            <span className={clsx('transform text-slate-400 transition', showFilters ? 'rotate-180' : '')}>▼</span>
-          </button>
-          {showFilters && (
-            <div className="space-y-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="flex-1">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Search
-                  </label>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="カード名やタグ"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
-                  />
+          <section className="rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
+            <button
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-2">
+                🔍 Filters
+                {hasActiveFilters && (
+                  <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
+                    Active
+                  </span>
+                )}
+              </span>
+              <span className={clsx('transform text-slate-400 transition', showFilters ? 'rotate-180' : '')}>▼</span>
+            </button>
+            {showFilters && (
+              <div className="space-y-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Search
+                    </label>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="カード名やタグ"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Priority
+                    </label>
+                    <select
+                      value={selectedPriority}
+                      onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    >
+                      <option value="all">すべて</option>
+                      <option value="low">🟢 Low</option>
+                      <option value="medium">🟡 Medium</option>
+                      <option value="high">🔴 High</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Priority
+                    Tags
                   </label>
-                  <select
-                    value={selectedPriority}
-                    onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
-                  >
-                    <option value="all">すべて</option>
-                    <option value="low">🟢 Low</option>
-                    <option value="medium">🟡 Medium</option>
-                    <option value="high">🔴 High</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Tags
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {availableTags.length === 0 && (
-                    <span className="text-xs text-slate-400">タグはまだありません</span>
-                  )}
-                  {availableTags.map((tag) => {
-                    const active = selectedTags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTags((prev) =>
-                            prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
-                          );
-                        }}
-                        className={clsx(
-                          'rounded-full px-3 py-1 text-xs font-semibold transition',
-                          active ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                        )}
-                      >
-                        #{tag}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {hasActiveFilters && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedTags([]);
-                    setSelectedPriority('all');
-                  }}
-                  className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          )}
-        </section>
-
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-          collisionDetection={bucketsFirstCollisionDetection}
-        >
-          <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
-            <div
-              ref={timelineScrollRef}
-              className="relative overflow-y-auto"
-              style={{ height: timelineViewportHeight }}
-            >
-              <div
-                ref={timelineHeaderRef}
-                className="sticky top-0 z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
-                style={{
-                  gridTemplateColumns: data?.days?.length
-                    ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
-                    : '80px',
-                }}
-              >
-                <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
-                  <span className="leading-none">GMT+09</span>
-                </div>
-                {data?.days?.map((day, index) => (
-                  <div
-                    key={day.key}
-                    className={clsx(
-                      'px-4 py-3 text-center',
-                      index > 0 && 'border-l border-slate-100'
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags.length === 0 && (
+                      <span className="text-xs text-slate-400">タグはまだありません</span>
                     )}
-                  >
-                    <p className="text-slate-800">{day.label}</p>
-                    <p className="text-[10px] text-slate-400">{day.isoDate}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="relative" style={{ minHeight: timelineViewportHeight }}>
-                {renderFloatingLayer()}
-                <div className="relative">
-                  <div
-                    className="grid"
-                    data-timeline-grid
-                    style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
-                  >
-                    <aside className="relative border-r border-slate-100 text-xs text-slate-500">
-                      {HOURS.map((hour) => (
-                        <div key={hour} className="flex h-10 items-start justify-end pr-3">
-                          {hour === '00:00' ? null : (
-                            <span className="-mt-1 leading-none tracking-tight text-slate-600">
-                              {hour}
-                            </span>
+                    {availableTags.map((tag) => {
+                      const active = selectedTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTags((prev) =>
+                              prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
+                            );
+                          }}
+                          className={clsx(
+                            'rounded-full px-3 py-1 text-xs font-semibold transition',
+                            active ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                           )}
-                        </div>
-                      ))}
-                    </aside>
-                    {data?.days?.map((day, index) => renderColumn(day, index))}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedTags([]);
+                      setSelectedPriority('all');
+                    }}
+                    className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+            collisionDetection={bucketsFirstCollisionDetection}
+          >
+            <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
+              <div
+                ref={timelineScrollRef}
+                className="relative overflow-y-auto"
+                style={{ height: timelineViewportHeight }}
+              >
+                <div
+                  ref={timelineHeaderRef}
+                  className="sticky top-0 z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  style={{
+                    gridTemplateColumns: data?.days?.length
+                      ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
+                      : '80px',
+                  }}
+                >
+                  <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
+                    <span className="leading-none">GMT+09</span>
+                  </div>
+                  {data?.days?.map((day, index) => (
+                    <div
+                      key={day.key}
+                      className={clsx(
+                        'px-4 py-3 text-center',
+                        index > 0 && 'border-l border-slate-100'
+                      )}
+                    >
+                      <p className="text-slate-800">{day.label}</p>
+                      <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="relative" style={{ minHeight: timelineViewportHeight }}>
+                  {renderFloatingLayer()}
+                  <div className="relative">
+                    <div
+                      className="grid"
+                      data-timeline-grid
+                      style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
+                    >
+                      <aside className="relative border-r border-slate-100 text-xs text-slate-500">
+                        {HOURS.map((hour) => (
+                          <div key={hour} className="flex h-10 items-start justify-end pr-3">
+                            {hour === '00:00' ? null : (
+                              <span className="-mt-1 leading-none tracking-tight text-slate-600">
+                                {hour}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </aside>
+                      {data?.days?.map((day, index) => renderColumn(day, index))}
+                    </div>
                   </div>
                 </div>
               </div>
+            </section>
+          </DndContext>
+        </div >
+      </div >
+      {showShareDialog && (
+        <ShareDialog boardId={initialBoard.id} onClose={() => setShowShareDialog(false)} />
+      )
+      }
+      {
+        showNotificationSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNotificationSettings(false)}>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Notification Settings</h2>
+                <button
+                  onClick={() => setShowNotificationSettings(false)}
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <NotificationSettings />
             </div>
-          </section>
-        </DndContext>
-      </div>
-    </div>
-    {showShareDialog && (
-      <ShareDialog boardId={initialBoard.id} onClose={() => setShowShareDialog(false)} />
-    )}
-    {showNotificationSettings && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNotificationSettings(false)}>
-        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Notification Settings</h2>
-            <button
-              onClick={() => setShowNotificationSettings(false)}
-              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
-              aria-label="Close"
-            >
-              ✕
-            </button>
           </div>
-          <NotificationSettings />
-        </div>
-      </div>
-    )}
-    {showProfileSettings && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowProfileSettings(false)}>
-        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Profile Settings</h2>
-            <button
-              onClick={() => setShowProfileSettings(false)}
-              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
-              aria-label="Close"
-            >
-              ✕
-            </button>
+        )
+      }
+      {
+        showProfileSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowProfileSettings(false)}>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Profile Settings</h2>
+                <button
+                  onClick={() => setShowProfileSettings(false)}
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <ProfileSettings onProfileUpdated={() => fetchTimeline()} />
+            </div>
           </div>
-          <ProfileSettings onProfileUpdated={() => fetchTimeline()} />
-        </div>
-      </div>
-    )}
-    {shouldShowCardModal && modalCard && (
-      <CardModal
-        card={modalCard}
-        boards={modalBoards}
-        profiles={modalProfiles}
-        onSave={handleCardModalSave}
-        onDelete={handleCardModalDelete}
-        onMoveToBoard={handleCardModalMove}
-        onClose={closeCardModal}
-      />
-    )}
-    {cardModalError && (
-      <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
-        {cardModalError}
-      </div>
-    )}
+        )
+      }
+      {
+        shouldShowCardModal && modalCard && (
+          <CardModal
+            card={modalCard}
+            boards={modalBoards}
+            profiles={modalProfiles}
+            onSave={handleCardModalSave}
+            onDelete={handleCardModalDelete}
+            onMoveToBoard={handleCardModalMove}
+            onClose={closeCardModal}
+          />
+        )
+      }
+      {
+        cardModalError && (
+          <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
+            {cardModalError}
+          </div>
+        )
+      }
     </>
   );
 }

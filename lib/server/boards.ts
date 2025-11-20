@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient, type Board, type BoardData, type Card, type List } from "@/lib/supabase";
+import { createServerSupabaseClient, type Board, type BoardData, type Card, type List } from "@/lib/supabase";
 
 const TABLE_BOARDS = "boards";
 const TABLE_LISTS = "lists";
@@ -11,7 +11,7 @@ type BoardRecord = Board;
 export async function getBoardByShortId(shortId: string): Promise<BoardRecord | null> {
   if (!shortId) return null;
 
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from(TABLE_BOARDS)
     .select("*")
@@ -29,7 +29,7 @@ export async function getBoardByShortId(shortId: string): Promise<BoardRecord | 
 export async function getBoardById(boardId: string): Promise<BoardRecord | null> {
   if (!boardId) return null;
 
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from(TABLE_BOARDS)
     .select("*")
@@ -49,7 +49,7 @@ export async function fetchBoardInitialData(boardId: string): Promise<BoardData>
     return { lists: [], cards: [] };
   }
 
-  const supabase = createClient();
+  const supabase = await createServerSupabaseClient();
 
   const [{ data: lists, error: listsError }, { data: cards, error: cardsError }] = await Promise.all([
     supabase

@@ -910,7 +910,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [dragOverListId, setDragOverListId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const { isOnline, syncQueueStats } = useSyncQueue();
-  const { realtimeStatus } = useRealtimeBoard(currentBoardId, setBoardData, upsertComment, removeComment);
+  const { realtimeStatus } = useRealtimeBoard(currentBoardId, { setBoardData, upsertComment, removeComment });
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [pendingCardFocusId, setPendingCardFocusId] = useState<string | null>(null);
 

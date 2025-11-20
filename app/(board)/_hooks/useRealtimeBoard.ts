@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase, List, Card, CommentWithAuthor } from '@/lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 type BoardData = {
     lists: List[];
@@ -13,12 +13,18 @@ type BoardComment = CommentWithAuthor & {
     idempotencyKey?: string | null;
 };
 
+type UseRealtimeBoardOptions = {
+    setBoardData?: React.Dispatch<React.SetStateAction<BoardData>>;
+    upsertComment?: (cardId: string, comment: BoardComment) => void;
+    removeComment?: (cardId: string, commentId: string) => void;
+    onCardChange?: (payload: RealtimePostgresChangesPayload<Card>) => void;
+};
+
 export function useRealtimeBoard(
     currentBoardId: string | null,
-    setBoardData: React.Dispatch<React.SetStateAction<BoardData>>,
-    upsertComment: (cardId: string, comment: BoardComment) => void,
-    removeComment: (cardId: string, commentId: string) => void
+    options: UseRealtimeBoardOptions
 ) {
+    const { setBoardData, upsertComment, removeComment, onCardChange } = options;
     const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
     const realtimeChannelRef = useRef<{ channel: RealtimeChannel | null; token: number }>({ channel: null, token: 0 });
 
@@ -63,25 +69,27 @@ export function useRealtimeBoard(
                     if (realtimeState.token !== token) return;
                     console.log('List change detected:', payload);
 
-                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                        setBoardData((prev) => {
-                            const newList = payload.new as List;
-                            const idx = prev.lists.findIndex(list => list.id === newList.id);
+                    if (setBoardData) {
+                        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                            setBoardData((prev) => {
+                                const newList = payload.new as List;
+                                const idx = prev.lists.findIndex(list => list.id === newList.id);
 
-                            if (idx >= 0) {
-                                const updatedLists = [...prev.lists];
-                                updatedLists[idx] = newList;
-                                return { ...prev, lists: updatedLists };
-                            }
+                                if (idx >= 0) {
+                                    const updatedLists = [...prev.lists];
+                                    updatedLists[idx] = newList;
+                                    return { ...prev, lists: updatedLists };
+                                }
 
-                            return { ...prev, lists: [...prev.lists, newList] };
-                        });
-                    } else if (payload.eventType === 'DELETE') {
-                        setBoardData((prev) => ({
-                            ...prev,
-                            lists: prev.lists.filter((list) => list.id !== payload.old.id),
-                            cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
-                        }));
+                                return { ...prev, lists: [...prev.lists, newList] };
+                            });
+                        } else if (payload.eventType === 'DELETE') {
+                            setBoardData((prev) => ({
+                                ...prev,
+                                lists: prev.lists.filter((list) => list.id !== payload.old.id),
+                                cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
+                            }));
+                        }
                     }
                 }
             )
@@ -97,24 +105,30 @@ export function useRealtimeBoard(
                     if (realtimeState.token !== token) return;
                     console.log('Card change detected:', payload);
 
-                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                        setBoardData((prev) => {
-                            const newCard = payload.new as Card;
-                            const idx = prev.cards.findIndex(card => card.id === newCard.id);
+                    if (onCardChange) {
+                        onCardChange(payload as RealtimePostgresChangesPayload<Card>);
+                    }
 
-                            if (idx >= 0) {
-                                const updatedCards = [...prev.cards];
-                                updatedCards[idx] = newCard;
-                                return { ...prev, cards: updatedCards };
-                            }
+                    if (setBoardData) {
+                        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                            setBoardData((prev) => {
+                                const newCard = payload.new as Card;
+                                const idx = prev.cards.findIndex(card => card.id === newCard.id);
 
-                            return { ...prev, cards: [...prev.cards, newCard] };
-                        });
-                    } else if (payload.eventType === 'DELETE') {
-                        setBoardData((prev) => ({
-                            ...prev,
-                            cards: prev.cards.filter((card) => card.id !== payload.old.id),
-                        }));
+                                if (idx >= 0) {
+                                    const updatedCards = [...prev.cards];
+                                    updatedCards[idx] = newCard;
+                                    return { ...prev, cards: updatedCards };
+                                }
+
+                                return { ...prev, cards: [...prev.cards, newCard] };
+                            });
+                        } else if (payload.eventType === 'DELETE') {
+                            setBoardData((prev) => ({
+                                ...prev,
+                                cards: prev.cards.filter((card) => card.id !== payload.old.id),
+                            }));
+                        }
                     }
                 }
             )
@@ -131,7 +145,7 @@ export function useRealtimeBoard(
 
                     if (payload.eventType === 'DELETE') {
                         const oldRow = payload.old as { id: string; card_id: string };
-                        if (oldRow?.card_id && oldRow?.id) {
+                        if (oldRow?.card_id && oldRow?.id && removeComment) {
                             removeComment(oldRow.card_id, oldRow.id);
                         }
                         return;
@@ -140,22 +154,24 @@ export function useRealtimeBoard(
                     const newRow = payload.new as { id?: string };
                     if (!newRow?.id) return;
 
-                    const { data, error } = await supabase
-                        .from('comments')
-                        .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
-                        .eq('id', newRow.id)
-                        .single();
+                    if (upsertComment) {
+                        const { data, error } = await supabase
+                            .from('comments')
+                            .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
+                            .eq('id', newRow.id)
+                            .single();
 
-                    if (error || !data) {
-                        console.warn('[Realtime] Failed to fetch comment for update', error);
-                        return;
+                        if (error || !data) {
+                            console.warn('[Realtime] Failed to fetch comment for update', error);
+                            return;
+                        }
+
+                        const commentData = data as CommentWithAuthor;
+                        upsertComment(commentData.card_id, {
+                            ...commentData,
+                            idempotencyKey: commentData.idempotency_key ?? null,
+                        });
                     }
-
-                    const commentData = data as CommentWithAuthor;
-                    upsertComment(commentData.card_id, {
-                        ...commentData,
-                        idempotencyKey: commentData.idempotency_key ?? null,
-                    });
                 }
             );
 
@@ -181,7 +197,7 @@ export function useRealtimeBoard(
                 console.warn('[Realtime] Failed to remove channel:', error);
             });
         };
-    }, [currentBoardId, setBoardData, upsertComment, removeComment]);
+    }, [currentBoardId, setBoardData, upsertComment, removeComment, onCardChange]);
 
     return { realtimeStatus };
 }
