@@ -376,10 +376,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       if (!prev) return prev;
 
       const { eventType, new: newRecord, old: oldRecord } = payload;
-      const displayData = filteredData ?? data;
-      const events = displayData?.events ?? [];
-      const abBuckets = displayData?.abBuckets ?? {};
-
       const nextEvents = [...prev.events];
       const nextBuckets = { ...prev.abBuckets };
 
@@ -1520,106 +1516,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Live
               </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <h1 className="text-2xl font-semibold text-slate-900 truncate">{initialBoard.name}</h1>
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span>GMT+09</span>
-                  <span className="text-slate-300">•</span>
-                  <span>Today focus</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search cards..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-8 w-48 rounded-full border border-slate-200 bg-white px-3 pl-8 text-sm text-slate-600 shadow-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                  />
-                  <svg
-                    className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-
-                <div className="relative">
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={clsx(
-                      "flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium shadow-sm transition",
-                      showFilters || hasActiveFilters
-                        ? "border-sky-200 bg-sky-50 text-sky-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    )}
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                    Filters
-                    {hasActiveFilters && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-sky-200 text-[10px] font-bold text-sky-800">
-                        {(selectedTags.length > 0 ? 1 : 0) + (selectedPriority !== 'all' ? 1 : 0) + (searchQuery ? 1 : 0)}
-                      </span>
-                    )}
-                  </button>
-
-                  {showFilters && (
-                    <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl ring-1 ring-black/5">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-slate-500">Priority</label>
-                          <div className="flex flex-wrap gap-2">
-                            {(['all', 'high', 'medium', 'low'] as const).map((p) => (
-                              <button
-                                key={p}
-                                onClick={() => setSelectedPriority(p)}
-                                className={clsx(
-                                  "rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                                  selectedPriority === p
-                                    ? "bg-slate-900 text-white"
-                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                )}
-                              >
-                                {p.charAt(0).toUpperCase() + p.slice(1)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-slate-500">Tags</label>
-                          <div className="flex flex-wrap gap-2">
-                            {allTags.length === 0 && <p className="text-xs text-slate-400">No tags available</p>}
-                            {allTags.map((tag) => (
-                              <button
-                                key={tag}
-                                onClick={() => {
-                                  setSelectedTags(prev =>
-                                    prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                                  );
-                                }}
-                                className={clsx(
-                                  "rounded-lg px-2.5 py-1 text-xs font-medium transition",
-                                  selectedTags.includes(tag)
-                                    ? "bg-sky-100 text-sky-700 ring-1 ring-sky-200"
-                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                )}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <h1 className="text-2xl font-semibold text-slate-900 truncate flex-1">{initialBoard.name}</h1>
 
               <div ref={boardMenuRef} className="relative">
                 <button
