@@ -19,12 +19,10 @@ test.describe('Authentication @e2e:essential', () => {
     await page.goto('/');
 
     if (page.url().includes('/login')) {
-      // Should show login UI
       await expect(page.getByRole('heading', { name: 'Taesk' })).toBeVisible();
       await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
     } else {
-      // Auth bypass is enabled for tests, so we land on the default board
-      await expect(page).toHaveURL(/\/b\//);
+      await expect(page).toHaveURL(/\/board/);
     }
   });
 
@@ -67,7 +65,7 @@ test.describe('Session Management @e2e:essential', () => {
     if (page.url().includes('/login')) {
       await expect(page.getByRole('heading', { name: 'Taesk' })).toBeVisible();
     } else {
-      await expect(page).toHaveURL(/\/b\//);
+      await expect(page).toHaveURL(/\/board/);
     }
   });
 

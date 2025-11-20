@@ -1,120 +1,132 @@
-# Storage Strategy
+# Storage Strategy (Timeline)
 
-Taesk は **React state → localStorage → Supabase** の三層構造に、オフライン同期キューを組み合わせたハイブリッド構成を採用しています。
-
-## レイヤー構成
+Timeline ボードでは、Kanban 時代の「boardData を localStorage へ保存する」方式から転換し、以下の三層で状態を扱います。
 
 ```
-React State (KanbanBoardClient)
-    ↓  オプティミスティック更新
-localStorage (`kanban_board_data`)
-    ↓  ネットワーク状態を判定
-Supabase (lists / cards / activity_logs)
-    ↕  Supabase Realtime (postgres_changes)
-syncQueue.ts (INSERT/UPDATE/DELETE)   ※ offline 時のみ
+React state (TimelineBoardPage)
+   ↓  Optimistic updates / derived data (events + A/B buckets)
+Supabase API (GET /timeline, PATCH /cards, etc.)
+   ↕  Realtime (postgres_changes)
+localStorage-backed queues (taesk-sync-queue, comment-queue)
 ```
 
-### 1. React State
-- `boardData`（lists / cards）と各種 UI 状態を保持
-- Supabase Realtime から届いたイベントで即時更新
-- `updateData(newData)` が state + localStorage を同時に更新
+## 1. React State
 
-### 2. localStorage
-- キー: `kanban_board_data`
-- 目的: オフライン時と Supabase 障害時のフェールオーバー
-- 関数: `loadFromStorage()` / `saveToStorage()` (`KanbanBoardClient` 内で利用)
+- `TimelineResponse` (`days`, `events`, `abBuckets`, `serverNow`) を `useState` で保持。
+- `handleCardChange` が Realtime イベントを変換し、state を直接書き換える。
+- DnD などの楽観的更新は state を即更新し、失敗時は `activeDragRef.previousData` でロールバック。
+- Timeline ではボード全体の snapshot を localStorage へ書き戻さない。再読み込み時は常に API から取得する。
 
-### 3. Supabase
-- `loadFromSupabase(boardId)` で対象ボードの lists / cards を取得し、メトリクス（トレースサマリ・payload サイズ等）を返却
-- `syncToSupabase(boardData)` で upsert（オンライン時のみ）
-- 削除は `supabase.from('cards').delete().eq('id', id)` のように個別クエリ
+## 2. Supabase API
 
-### 4. syncQueue.ts（オフライン同期）
-- `addToSyncQueue({ type, table, data })` で localStorage にバッファリング（`table:type:id` ベースの冪等キーで重複を集約）
-- `syncQueue()` がオンライン復帰時に順次処理し、各アクションをトレース計測（成功/失敗・リトライ状況を集計）
-- UI には `syncQueueStats` とヘッダーのステータスバッジで表示（「Live」「Queued」など）
+- `GET /api/boards/[boardId]/timeline` が Today/Tomorrow + A/B の統合レスポンスを返す。エラーハンドリングは `status` / `errorMessage` で管理。
+- ミューテーション（カード DnD、CardModal 保存、コメント追加など）は既存の REST API (`/api/cards/*`, `/api/comments/*`) を経由。Timeline 固有パラメータ (`due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position`) を payload に含める。
+- サーバーは Supabase JS (SSR) を使用し、`board_members` 経由で認可。エラー時は JSON `{ error: { code, message } }` を返し、クライアントでトースト表示。
 
-## 読み込みフロー
+## 3. localStorage-backed Queues
 
-1. `KanbanBoardClient` 初期化
-2. `loadFromSupabase(currentBoardId)` をトレース ID 付きで実行（API 側で Supabase クエリを計測）
-3. 成功した場合: `boardData` を更新し、localStorage へはスロットル付きで保存
-4. 失敗した場合: `loadFromStorage()` の内容でレンダリング（トレースは fallback として記録）
-5. `initializeDefaultLists()` がテストボード以外で空の場合に標準リストをシード
-6. 取得したメトリクスを `analytics.track('perf:board-load', ...)` で送出
+Timeline で localStorage を使用するのは「オフライン耐性」のためのキューとコメント一時保存のみです。
 
-## 書き込みフロー
+### Sync Queue (`taesk-sync-queue`)
+
+- ファイル: `lib/syncQueue.ts`
+- 保存形式:
+
+```json
+{
+  "actions": [
+    {
+      "id": "cards:UPDATE:UUID",
+      "table": "cards",
+      "type": "UPDATE",
+      "payload": { ...card fields... },
+      "attempts": 0,
+      "lastTriedAt": null
+    }
+  ],
+  "stats": {
+    "lastSuccessAt": "2025-11-20T04:12:00.000Z"
+  }
+}
+```
+
+- `useSyncQueue()` が `enqueue(action)` / `flush()` / `stats` を提供。TimelineBoardPage のヘッダーに pending 件数と最後の成功時刻を表示。
+- `navigator.onLine` を監視し、オンライン復帰時に順次 API を叩く。失敗時は指数的に `delayMs` を増やしながら再試行。
+
+### Comment Queue (`comment-queue`)
+
+- `useCommentsStore` がコメント投稿/編集/削除を localStorage に蓄積し、接続復帰時に反映。
+- キー: `comment-queue`。カード別に pending エントリを保持する。
+
+## Realtime & Consistency
+
+- `useRealtimeBoard` が `supabase.channel('board:<id>')` を開き、`cards` / `comments` の `INSERT/UPDATE/DELETE` を購読。
+- 受信イベントは `handleCardChange` で `events`/`abBuckets` を再計算。A/B バケットは `bucketPosition` でソートし、Timeline イベントは `due_date` + `due_start` で昇順ソート。
+- コメントは `useCommentsStore.upsertComment` / `.removeComment` を通じて同期し、CardModal のコメントタブへ即反映。
+
+## Typical Write Flow
 
 ```
-ユーザー操作 (追加 / 編集 / 削除 / ドラッグ) 
+Timeline DnD / CardModal / Comments 操作
         ↓
-ハンドラで newData を作成
+React state 更新 (optimistic)
         ↓
-updateData(newData)   # React state + localStorage
+if (navigator.onLine) call API immediately
+else enqueue action to taesk-sync-queue
         ↓
-if (navigator.onLine)
-    syncToSupabase(newData)
-else
-    addToSyncQueue({...})
+Realtime event arrives → merges server state
 ```
 
-### 代表的なハンドラ
+### DnD 例
 
-```typescript
-const handleAddCard = async (listId: string) => {
-  if (!user || !currentBoardId) return;
-
-  const shortId = await createUniqueShortId();
-  const idShort = await getNextIdShort(currentBoardId);
-  const newCard: Card = {
-    id: uuidv4(),
-    title: 'New Card',
-    description: '',
-    list_id: listId,
-    board_id: currentBoardId,
-    position: boardData.cards.filter(c => c.list_id === listId).length,
-    user_id: getActualUserId(user.id),
-    tags: [],
-    due_date: null,
-    priority: 'medium',
-    assigned_to: null,
-    assignee_id: null,
-    short_id: shortId,
-    id_short: idShort,
-    slug: slugify('New Card'),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+```ts
+const applyTimelineDrop = async (cardId, targetMinutes) => {
+  const payload = {
+    id: cardId,
+    due_channel: 'timeline',
+    due_start: minutesToTime(targetMinutes),
+    due_end: minutesToTime(targetMinutes + 60),
+    due_bucket: null,
   };
 
-  const newData = { ...boardData, cards: [...boardData.cards, newCard] };
-  updateData(newData);
+  updateTimelineState(payload); // React state
 
-  if (isOnline) {
-    await syncToSupabase(newData);
-  } else {
-    addToSyncQueue({ type: 'INSERT', table: 'cards', data: newCard });
-  }
+  enqueue({
+    table: 'cards',
+    type: 'UPDATE',
+    data: payload,
+  });
 };
 ```
 
-## Supabase Realtime
+### コメント例
 
-- `postgres_changes` を `lists` / `cards` テーブルで購読
-- `realtimeChannelRef` + `token` で多重購読を防ぎ、Strict Mode 二回実行にも対応
-- `handleDragOver` / `handleDragEnd` 後の upsert で別クライアントにも即座に反映
+```ts
+await commentsStore.addComment({
+  cardId,
+  body,
+  mentions,
+  optimisticId: crypto.randomUUID(),
+});
+```
 
-## Conflicts & 冪等性
+`addComment` は `comment-queue` に optimistic entry を追加し、API 成功時に本物の ID へ置き換える。
 
-- 更新は `upsert` を使用し冪等
-- 競合が発生した場合は Realtime → `setBoardData` によって最新状態が上書きされる（最終更新勝ち）
-- 将来的には `activity_logs` を活用した差分マージやバージョン管理を検討
+## Offline Considerations
 
-## ベストプラクティス
+- Timeline UI は localStorage に完全な board snapshot を持たないため、オフライン中にページをリロードすると `fetchTimeline()` が失敗し空表示になる。再接続後に `Retry` ボタンを押して復旧する。
+- 既存の pending アクションは `taesk-sync-queue` から復帰後に一括処理されるため、ユーザーに「最後の同期時刻」を示すことで安心感を与える。
+- Comments は pending state をモーダル内にバッジ表示し、同期完了後に `pendingCount` を更新して通知する。
 
-- **オフライン時の連続操作**: `syncQueueStats.pending` が 0 に戻るまでアプリ上にバッジを表示
-- **Playwright テスト**: `await page.waitForTimeout(...)` で Realtime 同期を考慮（詳細は `docs/detail/testing.md`）
-- **localStorage 初期化**: テストで独自データを投入する際は `localStorage.removeItem('kanban_board_data')` を実施
+## Testing Tips
 
----
+- Playwright では `page.context().addCookies` などを使わず既存の認証ストレージ (`playwright/.auth/user.json`) を利用する。
+- Sync queue の挙動確認は `page.evaluate(() => localStorage.getItem('taesk-sync-queue'))` を使い JSON をダンプする。Timeline spec (`e2e/timeline.spec.ts`) ではカード作成→削除の後にクリーンアップしている。
+- Comments / Notifications など localStorage を読むテストでは `await page.waitForFunction(() => navigator.onLine)` を挟んでリトライする。
 
-最終更新日: 2025-10-31
+## Cleanup Helpers
+
+- `clearSyncQueue()`（lib/syncQueue.ts）がテスト後に queue を初期化。Playwright teardown で実行して差分を残さない。
+- コメントキュー初期化は `useCommentsStore.getState().resetQueue()` を使用。
+
+Timeline 以降のストレージ方針は **API = 唯一の真実**, **localStorage = pending actions only** を前提に設計されています。Kanban の `kanban_board_data` キャッシュは relic として残りますが、Timeline UI では参照されません。

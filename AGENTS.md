@@ -3,7 +3,7 @@
 > - Python をはじめとしたローカルでのスクリプト／コード実行を **全面禁止** します。
 > - 解析や変換、計算が必要な場合は CLI ツールや既存スクリプト、MCP ツール（例: Supabase MCP など）を優先的に利用してください。
 > - git やシェルコマンド等の通常オペレーションは従来どおり許可されますが、目的達成のために新たな Python/Node などのワンオフ実行を作らないでください。
-> - Playwright テストは **常に単一ワーカー（`PW_WORKERS=1`）** で順番に実行すること。まず失敗しているバッチを個別スクリプト (`npm run test:comments` など) で通し、その後 `npm run test:all-split` を回して最終確認する。並列実行（デフォルト workers>1）や同時多発的なテスト起動は禁止。
+> - Playwright テストは **常に単一ワーカー（`PW_WORKERS=1`）** で順番に実行すること。まず失敗しているバッチを個別スクリプト (`npm run test:timeline` など) で通し、その後 `npm run test:all-split` を回して最終確認する。並列実行（デフォルト workers>1）や同時多発的なテスト起動は禁止。
 
 # Repository Guidelines
 
@@ -15,60 +15,70 @@
 > - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
 > - Playwright の `webServer.command` が内部で `NODE_ENV=test npm run dev` を起動する点のみ例外扱いとし、手動で `npm run dev` を叩かない。実行前にポート 3000 が空いているか確認し、孤立した `next dev`/`playwright test` プロセスは必ず停止させてからテストを開始する。
 
-## 現状メモ（2025-11-10 JST）
+## 現状メモ（2025-11-20 JST）
 
-- 作業ツリーには引き続き `tsconfig.tsbuildinfo` の変更が存在するが、ビルド生成物のためコミット対象外とする。
-- 保存・読み込み遅延と技術的負債の解消タスクは `docs/tickets/2025-10-31/01-refactor-storage-performance.md` で管理中。ボード読み込み／API／同期キューの計測トレース (`lib/metrics/{client,server}.ts`) と冪等キー追加、実行トレースは既に導入済み。
-- 2025-11-06 実行分の E2E サマリーは `docs/tickets/2025-11-06/04-test-all-split-summary.md` に集約済み（`npm run test:all-split`, log: `test-results/logs/batch-execution-20251106-163143.log`, JSON: `test-results/batches/20251106-163143-*.json`, Passed 49 / Failed 12 / Flaky 1 / Skipped 15）。主な失敗は Kanban の multi-assignee シナリオと Comments 系のクエリ遷移タイムアウト。
-- 2025-11-10 16:32 JST に `npm run test:all-split` を実行（詳細: `docs/tickets/2025-11-10/01-test-all-split-summary.md`）。ログは `test-results/logs/batch-execution-20251110-163250.log`、JSON は `test-results/batches/20251110-163250-*.json`。`auth`, `kanban`, `reorder`, `notifications`, `permissions`, `rls` は ✅。`comments` バッチのみ ❌（6 件失敗、1 件 flaky、`page.waitForResponse` タイムアウトやカードモーダル初期化失敗が原因）。skip 以外で未解決の失敗が残存。
-- `e2e/comments.spec.ts` は 2025-11-10 に単体再実行し、16 件すべて成功（`PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/20251110-170634-comments-fix.json npx playwright test e2e/comments.spec.ts --project=core --reporter=json`）。修正内容とログは同チケット末尾の「comments.spec.ts 単体再実行」に追記済み。
-- 同日 17:15 JST に `npm run test:all-split` を再実行し、全 7 バッチ通過（`test-results/logs/batch-execution-20251110-171550.log` / `test-results/batches/20251110-171550-*.json`）。`comments` バッチのみ Flaky=1（TipTap 投稿時に `/api/cards/[cardId]/comments` が一度 `Unexpected end of JSON input`）だが Failed/Skipped は 0。
-- `npx playwright test e2e/kanban.spec.ts --project=core --grep "@e2e:essential" --reporter=json | tee playwright-report.json` 実行時は `test-summary.js` で `board-load` p95=5.29s (>3s threshold) により非0終了。フォローアップは `docs/tickets/2025-10-31/02-board-load-metrics-followup.md` 参照し、パフォーマンス改善を継続する。
+- ボード UI は **Timeline Board** が唯一の正史。旧 Kanban UI は `app/(board)/_components/KanbanBoardClient.tsx` に残るが参照用で、ルーティングからは呼ばれない。
+- Timeline 専用フィールド (`due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position`) を利用する Supabase migration は適用済み。カード/リスト API、CardModal、Playwright spec はすべて新フィールドを前提に動作。
+- `app/board/page.tsx` が `TimelineBoardPage` を直接レンダリングし、`getBoardById(MAIN_BOARD_ID)` でメインボードを取得する構成に切り替わっている。
+- リアルタイム更新とオフライン同期は `useRealtimeBoard` / `useSyncQueue` フックを通じて Timeline に統合済み。`useBoardFilters` でフィルター/検索も共通化。
+- テストバッチは `auth`, `timeline`, `comments`, `notifications`, `reorder`, `permissions`, `rls` の 7 セットを維持。`timeline` バッチは `e2e/timeline.spec.ts` を中心に Today/Tomorrow カラムと A/B リストの描画、メトリクス発火を確認する。
+- 最新 Playwright サマリーのログは `docs/tickets/2025-11-10/01-test-all-split-summary.md` 以降を参照。`comments` バッチに Flaky が残る場合は同ファイルの手順で個別再実行してから `npm run test:all-split` を回す。
+- `tsconfig.tsbuildinfo` はビルド生成物のため常に差分が残っている。コミット対象外とする。
 
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
 
 ## Project Structure & Module Organization
-Keep UI routes under `app/`, grouped by feature folders so components stay close to their pages. The canonical board experience lives in `app/(board)/`:
-- `app/(board)/_components/KanbanBoardClient.tsx` contains nearly all board logic (lists, cards, realtime sync, offline queue).
-- `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` wires the intercepting modal flow, rendering `app/components/CardModal.tsx` for editing.
-- `app/(board)/b/[short_id]/[[...slug]]/page.tsx` resolves canonical board URLs and hydrates data.
-
-Shared utilities such as the Supabase client, board/card helpers, and sync queue live under `lib/`. API routes for lists/cards/boards are colocated at `app/api/boards/...` and should be preferred over direct Supabase usage inside client components. End-to-end specs and Playwright setup scripts sit in `e2e/`, with persistent auth state cached in `playwright/.auth/`. Place images and static assets in `public/`, generated documentation under `docs/`, and any new automation scripts inside `scripts/`. Review the docs in `/docs` (especially architecture and tickets) before tackling feature-level work.
+- ルート `/board` は `app/board/page.tsx` を通じて `TimelineBoardPage` を描画し、Today/Tomorrow の時間軸および A/B リストを一体的に扱う。
+- Timeline UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` に集約され、以下を実装:
+  - JST 基準のスケール描画（24h×40px）、A/B カード描画、Now ライン、フィルター/検索 UI
+  - `@dnd-kit` によるイベントブロックのドラッグ移動と A/B ⇄ Timeline の所属切り替え
+  - `CardModal` や `CommentsPanel` を開くための URL シンク（`?card=SHORTID`, `/c/SHORTID`）
+  - `createClientTrace('timeline')` によるメトリクス送信
+- 共通フック/ストア:
+  - `app/(board)/_hooks/useRealtimeBoard.ts`: Supabase Realtime でカード更新を購読し、Timeline 形式に変換
+  - `app/(board)/_hooks/useSyncQueue.ts`: オフラインキューとロールバック処理
+  - `app/(board)/_hooks/useBoardFilters.ts`: タグ・優先度・文字列検索フィルター
+  - `app/(board)/_stores/comments-store.ts`: コメントパネルの状態管理
+- `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` は Timeline からのインターセプトモーダルとカード詳解を描画する。`CardModal` は `due_*` フィールド編集をサポート。
+- API ルートは `app/api/boards/[boardId]/timeline/route.ts` が Today/Tomorrow + A/B の統合レスポンスを返す。従来のリスト/カード API (`app/api/boards/...`) も Timeline から呼ばれる。
+- `lib/` では `lib/supabase.ts` が Timeline 用フィールドを含む型を定義し、`lib/metrics/{client,server}.ts` が `timeline` トレースを共通化。
 
 ### Recent Architectural Notes
-- Cards now carry `assignee_id` (linked to `profiles`) with a legacy `assigned_to` text fallback; server/API code must upsert both to keep backwards compatibility.
-- Short URLs for cards and boards rely on `short_id`, `id_short`, and `slug`; ensure these fields travel through sync endpoints when creating or reordering records.
-- Offline sync queues should continue to flow through the API routes so server-side activity logging and permissions remain consistent.
-- Cards/lists reorder API routes now validate duplicate/foreign IDs, check board ownership, and roll back to the previous snapshot on failure; send only position (and optional `list_id`) when reordering.
-- Foreground通知音は `lib/notification-audio.ts` + `app/components/NotificationSoundPlayer.tsx` で管理（800Hz/200msフェードのWeb Audioビープ）。`NotificationSettings` の「音声を有効化」「テスト音を再生」から検証する。
+- `due_channel` によって `timeline` / `ab-list` / `list-only` / `archived` の所属を排他制御。A/B カードには `due_bucket` と `due_bucket_position` を付与。
+- `TimelineBoardPage` は `useRealtimeBoard` 経由で受け取ったカード変更を `events` と `abBuckets` に反映し、`useSyncQueue` でローカル変更→API→ロールバックの流れを統合。
+- `CardModal` では `due_start`/`due_end` の 1 分単位編集、`due_bucket` 切り替え、コメントタブ、メンバー設定が可能。保存後は Timeline 側に Optimistic Update を行い、必要に応じて再フェッチ。
+- 通知音は `lib/notification-audio.ts` + `NotificationSoundPlayer.tsx` を利用し、Timeline でも「音声を有効化」→「テスト音を再生」で検証する。
 
 ## Build, Test, and Development Commands
-`npm run dev` は全面禁止。ローカルでの挙動確認やログ取得も Playwright テストなどの JSON レポート経由で実施すること。Create production bundles with `npm run build`, and serve them via `npm run start`. Run `npm run lint` to enforce import order, Tailwind usage, and strict TypeScript rules. Launch end-to-end automation with `npm run test:e2e`; add flags such as `--ui` or `--debug` for interactive runs after exporting `.env.test` credentials (`set -a && source .env.test && set +a`).
+- `npm run dev` は全面禁止。Playwright の `webServer.command` 以外で Next.js サーバーを起動しない。
+- ビルド/検証の代表コマンド:
 
-テスト結果だけ確認したい場合は `npx playwright test --reporter=json` を利用するとターミナルで完結して結果を取得できる。HTML レポートを開きたい場合は `npx playwright show-report --port=0` を推奨（または事前に `lsof -i :9323` で既存の show-report プロセスを停止してから実行）し、終了時は `Ctrl+C` でサーバーを明示的に止める。
+```bash
+npm run lint
+npm run build
+npx playwright test --reporter=json > playwright-report.json
+cat playwright-report.json | jq '.stats'
+```
 
-## Coding Style & Naming Conventions
-The repo follows strict TypeScript settings from `tsconfig.json`. Prefer explicit types on exported functions and keep indentation at two spaces. Use kebab-case for routes (`app/board-overview/page.tsx`), camelCase for variables and helpers, PascalCase for React components, and Tailwind utility classes for layout. Run `npm run lint` before sending changes to ensure consistent formatting.
+- `.env.test` は `playwright.config.ts` が自動で読み込む。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` を必ず設定。
+- JSON だけ確認したい場合も `npx playwright test --reporter=json` を徹底し、`jq` か `tail` で `expected/unexpected/skipped/flaky` を抽出。
+- HTML レポートが必要なら `npx playwright show-report --port=0` を使い、プロセス終了を忘れない。
 
 ## Testing Guidelines
-- Playwright (`@playwright/test`) で E2E を実行する際は、`npx playwright test --reporter=json > playwright-report.json` を必須コマンドとして使用し、常に JSON レポートを生成する。`.env.test` は `playwright.config.ts` が自動で読み込むため追加の `set -a` は不要。
-- 全 E2E テストを走らせる際は `npm run test:all-split`（内部で `scripts/test-all-batches.sh` を実行）を必須フローとし、ファイル単位のバッチ実行でタイムアウトを避ける。スクリプトは各バッチにつき `PLAYWRIGHT_JSON_OUTPUT_NAME=batches/<timestamp>-<batch>.json` を設定するので、生成された JSON は必ず `test-results/batches/` に残る。運用手順の詳細は `docs/detail/testing.md` の「4. テスト実行パターン」を参照する。
-- `npm run test:all-split` を叩く前に `lsof -i :3000` で Next.js dev サーバーが残っていないことを必ず確認する。何らかの理由でプロセスが残っている場合は `pkill -f 'node .*next dev'` と `pkill -f 'playwright test'` で整理し、Playwright が `webServer.command` を起動できる状態に戻してから再試行する。バッチログ（`test-results/logs/batch-execution-*.log`）が 1 分以上 `auth` で停滞した場合も同じ手順でクリーンアップする。
-- JSON レポートは既定で `test-results/playwright-report.json` に保存される。`PLAYWRIGHT_JSON_OUTPUT_NAME` にファイル名のみを指定した場合も `test-results/` 配下に出力されるため、ルート直下にレポートを増やさないこと。Playwright の添付ファイルとトレースは `test-results/artifacts/` 以下に集約される。
-- ルート配下に JSON やレポートファイルを置かない。既存のテストログを参照したい場合は `test-results/archive/` へ退避してから扱うこと。
-- サンドボックス環境でポート 3000 への listen が `EPERM` で拒否される場合は、同じコマンドを **権限昇格付き**（`with_escalated_permissions: true`）で再実行して Next.js サーバーを起動させる。昇格前後で生成された `playwright-report.json` は最新のものを残し、旧ファイルは削除してから再試行する。
-- 生成されたレポートは `cat playwright-report.json | jq '.stats'` で確認する。ファイル冒頭にセットアップのログが付く場合は `sed -n '/^{/,$p' playwright-report.json | jq '.stats'` として JSON 部分だけを jq に渡すこと。
-- `jq` が利用できない環境では `tail -20 playwright-report.json | grep -E '"(expected|unexpected|skipped|flaky)"'` を用いて件数を抽出し、成功/失敗を明示する。
-- グローバルセットアップが Supabase 認証情報を `playwright/.auth/user.json` に保存するため、バイパスせず必ずこれを利用する。トークン失効時はファイルを削除して再実行する。
-- `e2e/` の各 spec はテスト用ボードを作成して `afterEach` で削除する設計なので、シナリオ追加時もデータ分離を徹底する。ドラッグ&ドロップなど時間が掛かる操作は既存ヘルパー (`dragAndDrop` など) を活用し、`waitForURL` や適切な待機を入れて安定化させる。
-- 通知音の検証は Playwright 後に chrome-devtools MCP 経由で行い、`NotificationSettings` のボタンログ (`[Audio] Unlocking audio`, `[Audio] Notification sound played`) を確認する。データURLのサウンドは廃止済みなので混在しないこと。
+- テスト実行前に `lsof -i :3000` で Next.js dev サーバーが残っていないか確認し、残っていたら `pkill -f 'node .*next dev'` / `pkill -f 'playwright test'` を実行してから再試行する。
+- `npm run test:all-split` が必須フロー。内部で `scripts/test-all-batches.sh` が `PLAYWRIGHT_JSON_OUTPUT_NAME=batches/<timestamp>-<batch>.json` をセットし、`test-results/batches/` に JSON を保存。
+- 個別検証は `npm run test:timeline`, `npm run test:comments` などスクリプトを利用し、`PW_WORKERS=1` を守る。Timeline バッチでは Today/Tomorrow 列の表示、A/B リストの所属変更、`dumpClientMetrics`（`timeline` トレース）の呼び出しを検証。
+- JSON レポートを解析するときは `sed -n '/^{/,$p' playwright-report.json | jq '.stats'` のように余計なログを除去してから `jq` へ渡す。
+- `playwright/.auth/user.json` はグローバルセットアップで作成される。トークン失効時のみ削除してフローをやり直す。
+- `test-results/` 以外にレポートを生成しない。旧ログを参照する際は `test-results/archive/` へ退避してから扱う。
+- 通知音やカードモーダルなど UI の確認が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する（直接 `npm run dev` で確認しない）。
 
 ## Commit & Pull Request Guidelines
-Write short, imperative commit messages (English or Japanese), mirroring existing history such as `Add card modal view`. Keep each commit focused on one fix or feature. Pull requests should describe user-facing impact, summarize key changes, attach relevant screenshots or Playwright traces for UI work, and link tickets from `docs/tickets/` when applicable. Never commit or push without explicit user approval.
+短い命令形のコミットメッセージ（例: `Switch board docs to timeline`）を推奨。1コミット1トピックを守り、PR ではユーザー向け影響・主要変更点・関連チケット (`docs/tickets/...`)・必要なスクリーンショットや Playwright トレースを記載する。ユーザーの承認なしで push しない。
 
 ## Security & Configuration Tips
-Never commit real Supabase service-role keys; rely on `.env.test` copies for shared testing. Update `.env.example` whenever new variables are introduced and note authentication-sensitive changes in the global setup. Avoid destructive git commands unless explicitly requested, and leave unrelated worktree changes untouched.
+Supabase の service-role key をコミットしない。`.env.example` に新規変数を追加したら説明を添える。破壊的な git コマンド（`git reset --hard` など）はユーザー指示がある場合のみ実行。既存の作業ツリー差分は勝手に触らず、必要なファイルのみ編集する。
 
 ## Workflow Reminders
-Before starting, skim the relevant `/docs` material and check existing implementations for similar patterns. 開発中は Playwright テストの JSON レポートを継続的に確認し、必要な挙動差分はテスト結果とログ解析で把握する。Run the appropriate npm scripts before handing off work, and document notable deviations in the PR description.
+作業前に関連 `docs/` や `docs/tickets/` を読み、Timeline の仕様差分を把握する。開発中は Playwright JSON レポートを常に確認し、失敗時はログ解析・個別バッチ再実行を優先する。最終引き渡し前に必要な npm スクリプト（lint/test 等）を実行し、得られたログは `docs/tickets/` へ整理して共有する。

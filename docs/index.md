@@ -1,6 +1,6 @@
-# Taesk - Kanban Board Documentation
+# Taesk - Timeline Board Documentation
 
-> A modern, mobile-first PWA Kanban board built with Next.js, Supabase, and dnd-kit
+> Today/Tomorrow の時間軸と A/B リストをひとつのビューで計画できる Next.js + Supabase 製 Timeline ボード
 
 ## 📋 Table of Contents
 
@@ -10,18 +10,21 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Detailed Documentation](#detailed-documentation)
+- [Key Design Decisions](#key-design-decisions)
+- [Quick Links](#quick-links)
 
 ## 🚀 Quick Start
 
-> ⚠️ **最優先ルール**: `npm run dev` / `NODE_ENV=test npm run dev` を含む手動サーバー起動は禁止。検証は Playwright JSON レポートと chrome-devtools MCP で行う。
+> ⚠️ **最優先ルール**: `npm run dev` や `NODE_ENV=test npm run dev` を手動で実行しない。検証は Playwright JSON レポートと chrome-devtools MCP で行う。
 
 ```bash
 # Install dependencies
 npm install
 
-# Prepare environment variables
+# Prepare env files
 cp .env.example .env.local
-# Populate NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY など
+cp .env.example .env.test
+# NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY などを設定
 
 # Static analysis
 npm run lint
@@ -29,373 +32,251 @@ npm run lint
 # Production bundle
 npm run build
 
-# Verification (JSON必須)
-npx playwright test --reporter=json > playwright-report.json
-cat playwright-report.json | jq '.stats'
+# Verification (JSON レポート必須)
+npx playwright test --reporter=json > test-results/playwright-report.json
+cat test-results/playwright-report.json | jq '.stats'
 ```
 
-UIのレンダリング確認は chrome-devtools MCP でスナップショット/ネットワーク/コンソールを取得して行う。
+UI のレンダリング確認は chrome-devtools MCP のスクリーンショット/スナップショット/ログ取得で行う。Next.js の dev サーバーを直接起動して確認しない。
 
 ### 🔊 Notification Sound Check
 
-通知関連の検証手順:
+1. Timeline ヘッダーの `NotificationSettings` セクションで **「音声を有効化」** をクリックし、Web Audio の `AudioContext` をアンロック
+2. **「🎵 テスト音を再生」** を押し、800Hz / 200ms フェードアウトのビープ音が鳴ることを確認
+3. Service Worker 経由の通知を検証する場合は `showTestNotification()` を発火し、前景タブでは `NotificationSoundPlayer` がビープを鳴らし、背景タブでは OS 標準通知音のみ鳴ることをログで確認
 
-1. `NotificationSettings` セクションで **「音声を有効化」** ボタンを押し、Web Audio の `AudioContext` をアンロック
-2. **「🎵 テスト音を再生」** をクリックし、800Hz / 200ms フェードアウトのビープが鳴ることを確認
-3. Service Worker からの通知を確認したい場合は `showTestNotification()` を実行し、前景タブで `NotificationSoundPlayer` がサウンドを再生すること、背景タブではOS標準通知音のみ鳴ることをログで検証
-
-ビープ生成は `lib/notification-audio.ts` の Web Audio オシレーター実装に統一され、過去のデータURL(WAV)依存は排除されている。
+ビープ生成は `lib/notification-audio.ts` の Web Audio 実装に統一されている。旧 Kanban 時代の data URL 音源は使用しない。
 
 ### Running E2E Tests
 
-**前提条件**: `.env.test` ファイルが必須
+**前提**: `.env.test` に Supabase の anon key / service-role key / E2E ユーザー資格情報を設定する。Playwright 実行時は常に `PW_WORKERS=1`。
 
 ```bash
-# 1. .env.test ファイルを作成（存在しない場合）
-cp .env.example .env.test
+# 各バッチの単体実行（失敗しているバッチを優先）
+npm run test:auth
+npm run test:timeline
+npm run test:comments
+npm run test:notifications
+npm run test:permissions
+npm run test:reorder
+npm run test:rls
 
-# 2. .env.test を編集して実際の値を設定:
-#   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-#   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...  # 実際の値
-#   SUPABASE_SERVICE_ROLE_KEY=replace-with-your-supabase-service-role-key      # 実際の値
-#   E2E_ENABLED=true
-#   E2E_SECRET=redacted-e2e-secret
-#   E2E_USER_EMAIL=e2e.taesk.test@gmail.com
-#   E2E_USER_PASSWORD=replace-with-local-test-password
+# すべてのバッチを順番に実行し JSON を収集
+npm run test:all-split
 
-# 3. テストを実行（タグベース）
-# CI必須テスト（@e2e:essential）
-npm test
-
-# 機能別テスト
-npm run test:feature:boards       # ボード機能
-npm run test:feature:comments     # コメント・@メンション
-npm run test:feature:notifications  # 通知機能
-
-# 異常系テスト
-npm run test:failure
-
-# 全テスト実行
-npm run test:full
-
-# JSON統計確認
-npm run test:summary
+# JSON サマリー確認
+sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 ```
 
-**テスト成果物**（すべて `.gitignore` に含まれる）:
-- `playwright-report.json` - テスト結果（JSON形式）
-- `playwright/.auth/user.json` - 認証セッション
-- `test-results/` - 失敗時のスクリーンショット
-- `playwright-report/` - HTML レポート
+生成されるアーティファクト:
+- `test-results/batches/<timestamp>-<batch>.json` … `scripts/test-all-batches.sh` が自動で保存
+- `test-results/logs/batch-execution-*.log` … バッチごとの標準出力
+- `test-results/artifacts/` … 失敗時のスクリーンショット・トレース
+- `playwright/.auth/user.json` … Supabase 認証セッション (使い回し可)
 
-**Test Coverage (83 tests)** - ✅ **100% Stable**:
-- ✅ Auth tests (5): Login, logout, session management
-- ✅ Kanban tests (37): CRUD operations, drag & drop, multi-assignee, position normalization
-- ✅ Reorder API tests (11): Validation (DUPLICATE_POSITION, UNKNOWN_ID, CROSS_BOARD), transactions, concurrent updates
-- ✅ Comments tests (8): Threaded comments, @mentions typeahead, realtime sync, UUID validation
-- ✅ Notifications tests (6): In-app notifications, Web Push, unread badge
-- ✅ Board permissions tests (5): ShareDialog, member management, role changes
-- ✅ RLS tests (6): Security policy validation
+**バッチ構成 (2025-11-20 時点 / 計 7)**  
+| バッチ | 含まれる spec | 主な検証観点 |
+| --- | --- | --- |
+| auth | `e2e/auth.spec.ts` | Supabase OAuth, session refresh |
+| timeline | `e2e/timeline.spec.ts` | Today/Tomorrow カラム描画、A/B リスト所属、`dumpClientMetrics('timeline')` |
+| comments | `e2e/comments.spec.ts` | CardModal コメントタブ、@mentions、Realtime 反映 |
+| notifications | `e2e/notifications.spec.ts` | NotificationSettings, quiet hours, Web Push |
+| reorder | `e2e/reorder-api.spec.ts` | API レベルの position validation, ロールバック |
+| permissions | `e2e/board-permissions.spec.ts` | ShareDialog, member roles, invites |
+| rls | `e2e/rls.spec.ts` | RLS policy での強制アクセス制御 |
 
-**Test Stability Features**:
-- 🔄 Unique board per test (prevents cross-test interference)
-- 🚫 Realtime disabled in test environment (`NEXT_PUBLIC_DISABLE_REALTIME=true`)
-- 🎯 Precise selectors (`[data-type="list"]` to avoid dropzone double-matching)
-- 🔁 Drag error rollback implemented in client code (`handleDragEnd` restores `previousData` on sync failure)
-- 📏 Position normalization (1000/10 gaps) enforced in `initializeDefaultLists` and `handleAddList`
-
-**タグ体系**:
-- `@e2e:essential` - CI必須の最小セット（約20テスト）
-- `@feature:*` - 機能別（boards, lists, comments, notifications）
-- `@failure:*` - 異常系テスト（validation, permissions, notificationsなど）
-- `@phase3` - 未実装機能（スキップ対象）
-
-**詳細**: [`/docs/detail/testing.md`](./detail/testing.md) を参照
+`timeline` バッチは Timeline UI が Today/Tomorrow + A/B の 1 分粒度でレンダリングされるか、および `createClientTrace('timeline')` からメトリクスが送出されるかを確認する。タイムアウトが発生した場合は個別に `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/<timestamp>-timeline.json npx playwright test e2e/timeline.spec.ts --project=core --reporter=json` を実行し、問題を切り分けてから `npm run test:all-split` を再開する。
 
 ## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   User Interface                    │
-│              (Next.js 15 + React 18)                │
-│        PWA-enabled, Mobile-responsive UI            │
-└───────────────────┬─────────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────────┐
-│              State Management                        │
-│         (React Hooks + Local State)                 │
-│    ┌──────────────┐      ┌──────────────┐          │
-│    │ Drag & Drop  │      │  Board Data  │          │
-│    │  (dnd-kit)   │      │    (Cards,   │          │
-│    │              │      │    Lists)    │          │
-│    └──────────────┘      └──────────────┘          │
-└───────────────────┬─────────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────────┐
-│           Hybrid Storage Layer                       │
-│  ┌────────────────────┐  ┌────────────────────┐    │
-│  │   localStorage     │  │    Supabase        │    │
-│  │   (Cache/Offline)  │  │  (Cloud Sync)      │    │
-│  │                    │  │                    │    │
-│  │  • Instant reads   │  │  • Persistence     │    │
-│  │  • Offline support │  │  • Multi-device    │    │
-│  │  • Fast initial    │  │  • Real backup     │    │
-│  │    load            │  │                    │    │
-│  └────────────────────┘  └────────────────────┘    │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                   TimelineBoardPage (client)                 │
+│  - 今日/明日カラム (24h * 40px)                              │
+│  - A/B リスト (today_a/b, tomorrow_a/b)                      │
+│  - フィルター/検索バー + ヘッダー (Share/Notifications etc.) │
+│  - CardModal / CommentsPanel (parallel routes)               │
+└──────────────┬───────────────────────────────────────────────┘
+               │ suspense + optimistic updates
+┌──────────────▼───────────────────────────────────────────────┐
+│                    Timeline Hooks & Stores                    │
+│  useRealtimeBoard  useSyncQueue  useBoardFilters  comments store│
+│        │                │                │                     │
+│        └─────┬──────────┴──────────┬─────┘                     │
+└──────────────▼─────────────────────▼───────────────────────────┘
+               │ timeline response (days, events, abBuckets)
+┌──────────────▼───────────────────────────────────────────────┐
+│             API Routes & Server Utilities                     │
+│  GET /api/boards/:id/timeline  (Today/Tomorrow + A/B)         │
+│  POST /api/cards/* /lists/* /comments/* (shared CRUD)         │
+│  createClientTrace('timeline') / createServerTrace('timeline')│
+└──────────────┬───────────────────────────────────────────────┘
+               │ Supabase client (SSR + browser)
+┌──────────────▼───────────────────────────────────────────────┐
+│                       Supabase (Postgres)                     │
+│  cards.due_channel / due_start / due_end / due_bucket / ...   │
+│  board_members + RLS + realtime subscription                  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
+### Timeline Response
 
-1. **Initial Load**: Fetch from Supabase → Cache in localStorage → Render
-2. **User Action**: Update UI → Save to localStorage → Sync to Supabase
-3. **Offline Mode**: Update UI → Save to localStorage → Sync when online
-4. **Page Reload**: Load from Supabase → Update cache → Render
+`GET /api/boards/[boardId]/timeline` は以下の JSON を返す:
 
-### Notification Audio Flow
+```ts
+interface TimelineDay {
+  key: 'today' | 'tomorrow';
+  label: string;      // "Today" / "Tomorrow"
+  isoDate: string;    // JST YYYY-MM-DD
+}
 
-- `NotificationSettings` が Web Audio のアンロックとテスト再生を提供（`unlockAudio`, `playNotificationSound`）
-- `NotificationSoundPlayer` コンポーネントが Service Worker からの `NOTIFICATION_RECEIVED` メッセージを受け、タブが `visible` かつ audio unlocked の場合のみ 800Hz ビープを再生
-- Service Worker (`public/sw.js`) は引き続き `silent: false` / `renotify: true` を指定しつつ、前景タブへ postMessage することで OS 通知音 + Web Audio ビープを併用
+interface TimelineEvent {
+  card_id: string;
+  due_date: string;
+  due_start: string | null; // HH:MM:SS
+  due_end: string | null;
+  durationMinutes: number | null;
+  title: string;
+  tags: string[];
+  priority: 'low' | 'medium' | 'high' | null;
+  checked: boolean;
+  short_id: string | null;
+  slug: string | null;
+}
+
+type TimelineBuckets = Record<'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b', TimelineBucketItem[]>;
+```
+
+- `due_channel='timeline'` のカードは Today/Tomorrow の時間軸に並び、`due_start` と `due_end` の差から `durationMinutes` が算出される
+- `due_channel='ab-list'` のカードは `due_bucket` ごとに A/B 列へグルーピングされ、`due_bucket_position` で降順ソート
+- API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す
+
+### TimelineBoardPage の主な処理
+
+- `createClientTrace('timeline')` を `useEffect` で起動し、ロード時間・描画イベント数・D&D 回数などを JSON で送信
+- `@dnd-kit/core` による DragStart/DragMove/DragEnd を定義し、A/B ⇄ Timeline の移動で `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算
+- `useRealtimeBoard` が Supabase Realtime の UPDATE/INSERT/DELETE を購読し、`TimelineEvent` / `abBuckets` へ変換
+- `CardModal` / `CommentsPanel` は URL (`?card=SHORTID` や `/c/SHORTID`) からでも開閉でき、Parallel Routes 経由でモーダル表示
 
 ## ✨ Features
 
-### Authentication & Security
-- 🔐 **Google OAuth** authentication via Supabase Auth
-- 👥 **Board sharing & permissions** - owner/editor/commenter/viewer roles
-- 🛡️ **Protected routes** - automatic redirect to login
-- 🚪 **Sign out** functionality with instant feedback
-- 💾 **User tracking** - user_id stored for personal board features
-- 🔒 **Row Level Security (RLS)** - role-based access control
+### Timeline Planning
+- 🕒 **Today/Tomorrow Timeline**: 24h × 40px のスケールで 1 分単位の予定ブロックを可視化
+- 🅰️ **A/B Buckets**: `today_a/b` `tomorrow_a/b` にカードを割り当て、Now ラインより前後を切り替え
+- 🔁 **Drag & Drop**: Timeline ⇄ A/B 間の移動、時間軸上でのリサイズ/再配置を DnD Kit でサポート
+- 📍 **Live Indicator**: JST 基準の Now ラインと「Live」バッジで現在時刻を強調
+- 👓 **Filters & Search**: タグ/優先度/テキストフィルターをヘッダーに表示し、Timeline と A/B 同時に絞り込み
 
-### Core Functionality
-- ✅ **Create, Read, Update, Delete** lists and cards
-- ✅ **Drag & Drop** for cards (within/between lists) and lists
-- ✅ **Edit in-place** for card titles, descriptions, and list names
-- ✅ **Delete with confirmation** for lists and cards
-- ✅ **Auto-save** to Supabase on every change
-- ✅ **Offline-first** with localStorage cache
-- ✅ **Trello-style card URLs** with short IDs and SEO-friendly slugs
-- ✅ **Modal card view** with Intercepting Routes (board context preserved)
-- ✅ **Standalone card pages** for direct URL access and sharing
-- ✅ **308 Permanent Redirect** for canonical URL normalization
-- ✅ **Multi-assignee support** - assign multiple users to cards
+### Collaboration & Editing
+- 💬 **CardModal + CommentsPanel**: Timeline から直接モーダルを開き、詳細・チェックリスト・コメント・@mentions を編集
+- 🔔 **Notifications**: NotificationSettings + NotificationsBell で通知音、quiet hours、Web Push を制御
+- 👥 **Board Header**: ShareDialog / board picker / profile menu を Timeline ヘッダーへ統合
+- ✍️ **Due Editor**: CardModal や Timeline DnD から `due_channel`, `due_start`, `due_end`, `due_bucket` を編集
 
-### Collaboration Features (Phase 3)
-- 💬 **Comments system** - threaded comments with replies
-- 📢 **@Mentions** - mention users in comments with typeahead
-- 🔔 **In-app notifications** - real-time notifications for mentions and comments
-- 📲 **Web Push notifications** - browser push notifications with user preferences
-- 🔕 **Quiet hours** - configure notification quiet hours with timezone support
-- 👥 **Board member management** - add/remove members and manage roles
-- 🔄 **Real-time sync** - Supabase Realtime for live comment updates
+### Data Integrity & Observability
+- ⛳ **due_* Fields**: `due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position` をカードテーブルに追加し、Timeline/A/B 所属を排他制御
+- 📡 **Realtime + Offline Queue**: `useRealtimeBoard` が Supabase Realtime を購読、`useSyncQueue` が失敗時にロールバック
+- 📊 **Client Metrics**: `createClientTrace('timeline')` でロード時間・D&D 操作数を収集し、`docs/detail/architecture.md` で可視化ルールを管理
+- 🔐 **RLS**: Supabase RLS が board_id / profile_id に基づきカードアクセスを制限
 
-### UX Features
-- 📱 **Mobile-responsive** design with optimized touch interactions
-- 🎨 **Modern UI** with Tailwind CSS
-- 🌙 **Dark mode** support (system preference)
-- 📲 **PWA** installable on mobile devices
-- ⚡ **Optimistic updates** for instant feedback
-- 🔄 **Horizontal scrolling** optimized for mobile
-- 🔊 **Foreground notification beep** powered by Web Audio (800Hz / 200msフェード)
-
-### Technical Features
-- 🗄️ **PostgreSQL** database via Supabase
-- 🔐 **Row Level Security** (RLS) with strict policies
-- 📡 **RESTful API** via Supabase
-- 🧪 **E2E testing** with Playwright (auth + RLS tests)
-- 📝 **TypeScript** for type safety
-- 🚀 **Vercel** deployment ready
+### Testing & Reliability
+- 🧪 **Playwright JSON Pipeline**: `npm run test:all-split` が 7 バッチを順番に実行し、`test-results/batches/*.json` を生成
+- ⚠️ **Flaky Handling**: Comments バッチで発生しがちな `Unexpected end of JSON input` を個別再実行→集計
+- 🔂 **Rollback Paths**: `handleDragEnd` などでエラー時に前状態 (`previousState`) へ戻し、データ破壊を防止
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- **Framework**: Next.js 15 (App Router)
-- **UI Library**: React 18
-- **Styling**: Tailwind CSS 3
-- **Drag & Drop**: @dnd-kit/core + @dnd-kit/sortable
-- **State Management**: Zustand (for comments & notifications)
-- **Validation**: Zod
+- **Framework**: Next.js 15 (App Router, Parallel Routes, Server Components)
+- **UI**: React 18 + Tailwind CSS 3
+- **Timeline Rendering**: Custom components + `@dnd-kit/core`
+- **State**: React hooks + Zustand stores (comments, notifications)
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime + Edge Functions)
+- **Storage**: Supabase + localStorage + offline sync queue
 - **Language**: TypeScript 5
-
-### Backend
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth (@supabase/ssr)
-- **ORM**: Supabase Client (@supabase/supabase-js)
-- **Storage**: Hybrid (Supabase + localStorage)
-- **Edge Functions**: Supabase Edge Functions (for Web Push)
-- **Cache**: Vercel KV
-
-### DevOps
-- **Testing**: Playwright (E2E)
-- **Linting**: ESLint + eslint-config-next
-- **Deployment**: Vercel
-- **Version Control**: Git + GitHub
+- **Testing**: Playwright 1.56 (JSON reporter必須)
+- **Deployment**: Vercel (Node.js runtime, `npm run build`)
 
 ## 📁 Project Structure
 
 ```
 taesk/
 ├── app/
+│   ├── board/page.tsx                # MAIN_BOARD_ID を読み込み TimelineBoardPage を描画
 │   ├── (board)/
-│   │   ├── page.tsx                       # Redirects top-level / → canonical board URL
-│   │   ├── layout.tsx                     # Provides @modal parallel route for card modal
+│   │   ├── page.tsx                  # / → /board へ permanentRedirect
+│   │   ├── layout.tsx                # Parallel Routes (@modal) と AuthContext
 │   │   ├── _components/
-│   │   │   ├── KanbanBoardClient.tsx      # Core Kanban experience (lists/cards/realtime)
-│   │   │   ├── NotificationsBell.tsx      # Notification center UI (tabs/drawer)
-│   │   │   ├── NotificationSettings.tsx   # Notification preferences & quiet hours
-│   │   │   ├── CommentsPanel.tsx          # Comments UI with replies & editing
-│   │   │   ├── Mention.tsx                # @Mention component with typeahead
-│   │   │   └── ShareDialog.tsx            # Board member management UI
-│   │   ├── _stores/
-│   │   │   ├── comments-store.ts          # Zustand store for comments (optimistic updates)
-│   │   │   └── notifications-store.ts     # Zustand store for notifications
-│   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Intercept hook (locks scroll)
-│   │   └── b/[short_id]/[[...slug]]/page.tsx             # SSR + data hydration for boards
-│   ├── api/
-│   │   ├── boards/                        # Board CRUD & data endpoints
-│   │   ├── comments/                      # Comment CRUD & nested replies
-│   │   ├── notifications/                 # Notification preferences & mark-read
-│   │   ├── push-subscriptions/            # Web Push subscription management
-│   │   └── profiles/                      # User profile search
-│   ├── b/[short_id]/[[...slug]]/page.tsx  # Canonical board route resolver
-│   ├── c/[short_id]/[[...slug]]/page.tsx  # Standalone card detail page
-│   ├── contexts/AuthContext.tsx           # Supabase auth provider
-│   ├── components/CardModal.tsx           # Card modal with Details/Comments tabs
-│   ├── login/page.tsx                     # Supabase OAuth entry
-│   ├── auth/callback/route.ts             # OAuth callback handler
-│   ├── layout.tsx                         # Root layout, PWA setup
-│   └── icon.tsx / apple-icon.tsx          # Manifest-driven icons
+│   │   │   ├── timeline/TimelineBoardPage.tsx  # Timeline UI 本体
+│   │   │   ├── Card/Notification/Share など共通 UI
+│   │   │   └── KanbanBoardClient.tsx          # 旧 UI（参照用）
+│   │   ├── _hooks/                     # useRealtimeBoard, useSyncQueue, useBoardFilters
+│   │   ├── _stores/                    # comments-store など
+│   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Timeline からカードモーダルを開く
+│   │   └── b/[short_id]/[[...slug]]/page.tsx             # 短縮 URL / slug 解決
+│   ├── api/boards/[boardId]/timeline/route.ts  # Timeline API
+│   ├── api/cards/* / comments/* / notifications/*        # CRUD + sync API
+│   ├── components/CardModal.tsx          # 共通カードモーダル
+│   └── contexts/AuthContext.tsx          # Supabase セッション管理
 │
 ├── lib/
-│   ├── supabase.ts                    # Typed client + DB interfaces
-│   ├── board-utils.ts / card-utils.ts # Short IDs, slug generation, sequencing
-│   ├── board-url.ts / card-url.ts     # URL builders + canonical helpers
-│   ├── server/
-│   │   ├── boards.ts / cards.ts       # Server utilities for data fetch & normalize
-│   │   └── notifications.ts           # Notification creation & quiet hours logic
-│   ├── push-notifications.ts          # Web Push helper functions
-│   └── syncQueue.ts                   # Offline queue + background sync helpers
-│
-├── public/                             # Static assets (PWA manifest, icons, Service Worker)
-│   ├── manifest.json
-│   └── sw.js                           # Service Worker for push notifications
-│
-├── supabase/
-│   ├── functions/
-│   │   └── send-push-notification/    # Edge Function for Web Push delivery
-│   └── migrations/                     # Database migration files
+│   ├── supabase.ts                      # Browser/Server client + Card/Board 型定義
+│   ├── metrics/{client,server}.ts       # createClientTrace/createServerTrace
+│   ├── board-url.ts / card-url.ts       # Timeline カード URL utils
+│   ├── board-defaults.ts                # MAIN_BOARD_ID など
+│   └── server/*                         # SSR 用 fetch ヘルパー
 │
 ├── e2e/
-│   ├── .setup/auth-global-setup.ts     # Programmatic Supabase sign-in
-│   ├── auth.spec.ts                    # Authentication & session tests (@e2e:essential)
-│   ├── kanban.spec.ts                  # Board/list/card CRUD & D&D (@feature:boards)
-│   ├── reorder-api.spec.ts             # List/card reorder API tests (@feature:lists)
-│   ├── comments.spec.ts                # Comments & @mentions (@feature:comments)
-│   ├── notifications.spec.ts           # Web Push & in-app notifications (@feature:notifications)
-│   ├── board-permissions.spec.ts       # ShareDialog & member management (@feature:boards)
-│   ├── invites.spec.ts                 # Invite flow (未実装、@phase3)
-│   └── rls.spec.ts                     # RLS policy validation (@e2e:essential)
+│   ├── timeline.spec.ts                 # Timeline 表示 + メトリクス検証
+│   ├── comments.spec.ts / notifications.spec.ts / ...    # 他バッチ
+│   └── utils/metrics.ts                 # dumpClientMetrics, createTrace helpers
 │
-├── playwright/.auth/user.json          # Persisted auth state for Playwright
-├── docs/                               # Documentation hub (details below)
-├── playwright.config.ts                # Playwright configuration (dev server, auth)
-├── tailwind.config.ts
-├── tsconfig.json
-└── next.config.ts
+├── docs/                                # 本ドキュメント + detail/ + tickets/
+├── scripts/test-all-batches.sh          # PW_WORKERS=1 でバッチ実行
+├── test-results/                        # JSON レポートとログ
+└── supabase/migrations/                 # due_* フィールド等の SQL
 ```
 
 ## 📚 Detailed Documentation
 
-### Core Concepts
-- [Architecture & Design](./detail/architecture.md) - System design and patterns
-- [Database Schema](./detail/database.md) - Supabase tables and relationships
-- [Storage Strategy](./detail/storage.md) - Hybrid storage implementation
-- [Component Structure](./detail/components.md) - React components breakdown
-- [Routing & Card URLs](./detail/routing.md) - Intercepting Routes, modal views, canonical URLs
-- [Notifications](./detail/notifications.md) - Preferences, quiet hours, Web Push delivery
-
-### Development
-- [Testing Guide](./detail/testing.md) - E2E testing with Playwright, best practices
-
-### Setup
-- [Local Development](./setup/local-dev.md) - Environment variables, Service Worker & push setup
-
-### Operations
-- [Deployment Guide](./detail/deployment.md) - Vercel deployment steps
-
-### Project Management
-- [Tickets System](./tickets/README.md) - タスク管理システムの使い方
-- [Roadmap](./roadmap.md) - 最新版ロードマップ（単一ドキュメント）
+- [Architecture & Design](./detail/architecture.md)
+- [Component Breakdown](./detail/components.md)
+- [Database Schema](./detail/database.md)
+- [Storage Strategy](./detail/storage.md)
+- [Routing & Modal Flow](./detail/routing.md)
+- [Notifications & Audio](./detail/notifications.md)
+- [Testing Playbook](./detail/testing.md)
+- [Deployment Guide](./detail/deployment.md)
+- [Setup Guide](./setup/local-dev.md)
+- [Tickets Index](./tickets/README.md) / [Roadmap](./roadmap.md)
 
 ## 🎯 Key Design Decisions
 
-### 1. Hybrid Storage
-**Decision**: Use both Supabase and localStorage
+1. **Timeline-First UI**  
+   Kanban レイアウトを廃止し、Today/Tomorrow と A/B リストを 1 ページで扱う Timeline UI を唯一の正史とした。Now ラインや日付ナビを基点に最短で日次計画へアクセスできる。
 
-**Rationale**:
-- Supabase: Cloud persistence, multi-device sync
-- localStorage: Fast reads, offline support, instant UI updates
+2. **due_* Fields & Exclusive Channels**  
+   `due_channel` / `due_start` / `due_end` / `due_bucket` / `due_bucket_position` により「時間軸」「A/B」「list-only」「archived」の所属を排他制御。サーバーで検証し、重複所属を防ぐ。
 
-### 2. Optimistic UI Updates
-**Decision**: Update UI immediately, then sync to backend
+3. **JST Canonical Time**  
+   API と UI はすべて JST (+09:00) を基準に日付計算する。`GET /timeline` は Today/Tomorrow を JST で算出し、クライアントも `getIsoDateJst` を利用して一貫性を保つ。
 
-**Rationale**:
-- Better UX with instant feedback
-- localStorage ensures no data loss
-- Async Supabase sync in background
+4. **Parallel Routes for Card Modal**  
+   `/@modal/(...)c/[short_id]/[[...slug]]` を用い、Timeline でカードを開いても背後のボード状態を維持。URL 直アクセスでも同じモーダルが開く。
 
-### 3. Mobile-First Design
-**Decision**: Optimize for mobile screens first
+5. **Realtime + Offline Sync Pipeline**  
+   Timeline 操作は `useSyncQueue` でキューイング→API→ロールバックし、別タブ更新は `useRealtimeBoard` で即座に反映。`createClientTrace('timeline')` で操作回数を計測し、Flaky 原因を追跡。
 
-**Rationale**:
-- PWA target is mobile users
-- Touch interactions need special handling
-- Horizontal scrolling for multiple lists
-
-### 4. Google OAuth Authentication
-**Decision**: Use Supabase Auth with Google OAuth provider
-
-**Rationale**:
-- No password management needed
-- Secure, industry-standard OAuth flow
-- Easy UX (one-click login)
-- Supabase handles all complexity
-
-### 5. Board Sharing & Role-Based Access Control (Phase 3)
-**Decision**: Implement granular permissions with owner/editor/commenter/viewer roles
-
-**Rationale**:
-- Flexible collaboration: different permission levels for different team members
-- Privacy: boards are only visible to invited members
-- RLS policies enforce role-based access at database level
-- Future-proof for personal boards and team workspaces
-
-### 6. Zustand for Collaboration State (Phase 3)
-**Decision**: Use Zustand stores for comments and notifications
-
-**Rationale**:
-- Optimistic updates for instant UI feedback
-- Offline queue for comments and notifications
-- Real-time sync with Supabase Realtime
-- Separation of concerns: board data vs. collaboration data
-
-### 7. Web Push with Edge Functions (Phase 3)
-**Decision**: Implement Web Push notifications using Supabase Edge Functions
-
-**Rationale**:
-- Native browser notifications for better engagement
-- Edge Functions handle VAPID key management securely
-- Quiet hours and preferences respected server-side
-- Delivery logs for observability and rate limiting
+6. **JSON-Only Testing Flow**  
+   Playwright は常に `--reporter=json` で実行し、`test-results/batches/*.json` をチケットへ添付。HTML レポートは `npx playwright show-report --port=0` で必要時のみ起動し、プロセスを残さない。
 
 ## 🔗 Quick Links
 
-- [Live Demo](https://taesk.vercel.app/)
-- [GitHub Repository](https://github.com/my151ae/taesk)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Next.js Documentation](https://nextjs.org/docs)
+- [docs/detail/architecture.md](./detail/architecture.md)
+- [docs/detail/testing.md](./detail/testing.md)
+- [docs/tickets/2025-11-20](./tickets/2025-11-20) - 今日の活動ログ
+- [Supabase Docs](https://supabase.com/docs)
+- [Next.js Docs](https://nextjs.org/docs)
 
 ## 📝 License
 
-This project is private and proprietary.
+Taesk は社内用プロジェクトとして運用している。外部配布は想定していないため、利用範囲や再配布は管理者の指示に従うこと。

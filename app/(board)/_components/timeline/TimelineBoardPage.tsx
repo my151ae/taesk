@@ -1900,7 +1900,11 @@ const AbBucketDraggableCard = ({
       data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
       extraNodeRef={setNodeRef}
     >
-      <div className="rounded-md bg-white px-3 py-2 text-xs shadow-sm">
+      <div
+        className="rounded-md bg-white px-3 py-2 text-xs shadow-sm"
+        data-testid={`ab-card-${item.card_id}`}
+        data-bucket={bucketKey}
+      >
         <div className="flex items-start gap-2 text-slate-700">
           <input
             type="checkbox"

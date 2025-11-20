@@ -1,6 +1,6 @@
 # Routing & Card URLs
 
-このドキュメントでは、Taesk の Next.js 15 Intercepting Routes を使用したカードURL機能とモーダル表示について説明します。
+このドキュメントでは、Taesk の Next.js 15 Intercepting Routes を使用したカードURL機能とモーダル表示について説明します。Timeline ボードも同じ仕組みを用い、Kanban 遺産を経由せずにカードモーダルを開きます。
 
 ## 📋 概要
 
@@ -78,8 +78,9 @@ app/
 ├── (board)/
 │   ├── layout.tsx                    # @modal parallel route を提供
 │   ├── page.tsx                      # ルート / を canonical board へ permanent redirect
-│   ├── _components/KanbanBoardClient.tsx  # カードモーダルや URL 制御を担うクライアント
+│   ├── _components/timeline/TimelineBoardPage.tsx  # Timeline UI + モーダル制御
 │   └── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # body スクロール制御のみを行う hook
+├── board/page.tsx                    # MAIN_BOARD_ID を取得して TimelineBoardPage を描画
 ├── b/[short_id]/[[...slug]]/page.tsx # ボード canonical ルート (SSR)
 └── c/[short_id]/[[...slug]]/page.tsx # カードスタンドアロンページ
 ```
@@ -88,7 +89,7 @@ app/
 
 - `(...)c` パターンを使用して `/c` ルートをインターセプト
 - サーバー側では UI を描画せず、モーダル開閉時に `document.body` に `overflow-hidden` を付与/解除するだけ
-- 実際のモーダル UI は `KanbanBoardClient` → `CardModal` がクライアント側で制御
+- 実際のモーダル UI は `TimelineBoardPage` → `CardModal` がクライアント側で制御
 
 ### 動作の流れ
 
@@ -101,7 +102,7 @@ Next.js: `router.push` で `/c/<short_id>/<idShort>-<slug>` へ遷移
    ↓
 Intercepting Route にマッチし、サーバー側では body overflow をロックするのみ
    ↓
-`KanbanBoardClient` が `selectedCardId` をセット → `CardModal` をクライアントで描画
+`TimelineBoardPage` が `cardModalShortIdRef` を更新 → `CardModal` をクライアントで描画
    ↓
 結果: ボードは背景に残り、カードがモーダルで開く
 ```
@@ -152,7 +153,7 @@ Taesk では将来的な API 互換性のため 308 を使用しています。
 
 ## URL 正規化と `updateURL`
 
-- ボード切替時は `updateURL` が **一度の `router.push/replace`** で canonical URL に遷移（以前の `/b/:sid` → `/b/:sid/:tail` 二段階遷移は撤廃）
+- Timeline ヘッダーのボード切替は `buildBoardUrl` + `router.push` が **一度の遷移** で canonical URL に移動（以前の `/b/:sid` → `/b/:sid/:tail` 二段階遷移は撤廃）
 - モーダル表示時は `modalReturnPathRef` と `lastBoardPathRef` を保持し、`router.back()` で `/` に落ちた場合でも確実に元のボードへ `replace`
 - Playwright の `should update URL immediately when switching boards` も canonical URL への到達のみを確認するよう更新済み
 

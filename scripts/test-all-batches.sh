@@ -25,13 +25,17 @@ echo ""
 # Run each test file separately
 test_files=(
   "auth"
-  "kanban"
-  "reorder"
+  "timeline"
   "comments"
   "notifications"
+  "reorder"
   "permissions"
   "rls"
 )
+
+if [[ "${INCLUDE_KANBAN_BATCH:-0}" == "1" ]]; then
+  test_files+=("kanban")
+fi
 
 failed_tests=()
 passed_tests=()

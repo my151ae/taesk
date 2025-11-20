@@ -13,6 +13,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/$(date +%Y-%m-%d-%H%M%S)/report.json playwright test",
     "test:auth": "playwright test e2e/auth.spec.ts --project=core",
+    "test:timeline": "playwright test e2e/timeline.spec.ts --project=core",
     "test:kanban": "playwright test e2e/kanban.spec.ts --project=core",
     "test:reorder": "playwright test e2e/reorder-api.spec.ts --project=core",
     "test:comments": "playwright test e2e/comments.spec.ts --project=core",

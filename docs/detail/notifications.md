@@ -1,6 +1,6 @@
 # Notifications Overview
 
-This document describes how Taesk creates, stores, and delivers notifications across the product.
+This document describes how Taesk creates, stores, and delivers notifications across the product. Timeline ボードのヘッダーには `NotificationsBell` と `NotificationSettings` が常設されており、旧 Kanban と同じ通知機構を継承している。
 
 ## Notification Types
 
@@ -100,9 +100,9 @@ Chrome / Safari の Autoplay 制限を踏まえ、Taesk では **Web Audio API**
 - **Server helpers:** `lib/server/notifications.ts`
 - **Edge Function:** `supabase/functions/send-push-notification/index.ts`
 - **Foreground sound:** `app/components/NotificationSoundPlayer.tsx`, `lib/notification-audio.ts`
-- **Playwright E2E:** `e2e/phase3-webpush.spec.ts`
+- **Playwright E2E:** `e2e/notifications.spec.ts`
 
-Refer to `docs/setup/local-dev.md` for local testing instructions and environment setup.
+Playwright での検証とローカルセットアップは `docs/setup/local-dev.md` を参照。Timeline では通知トリガー用の UI（テスト通知、音声テスト）がヘッダーに統合されている。
 
 ## Badge Sync & Favicon Fallback
 
@@ -119,4 +119,4 @@ Refer to `docs/setup/local-dev.md` for local testing instructions and environmen
 4. Web アプリ（Safari ホーム画面 / Dock, Chrome/Edge PWA）では OS バッジが優先されるため favicon 更新はスキップされる。
 5. 通常のブラウザタブ（Chrome, Edge など）では App Badging API が存在しても standalone モードではない限り favicon バッジを必ず描画し、Google Chat と同じ赤丸表示を再現する。
 
-開発時は `window.dispatchEvent(new CustomEvent('taesk:notification-received'))` で擬似通知を発火し、favicon が赤丸に変わること、タイトルが `(99+) Taesk - Kanban Board` になることを確認する。
+開発時は `window.dispatchEvent(new CustomEvent('taesk:notification-received'))` で擬似通知を発火し、favicon が赤丸に変わること、タイトルが `(99+) Taesk - Timeline Board` になることを確認する。
