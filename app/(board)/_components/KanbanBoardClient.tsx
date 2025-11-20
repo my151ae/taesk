@@ -48,6 +48,10 @@ import { buildCardUrl } from "@/lib/card-url";
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from "@/lib/board-utils";
 import { buildBoardCanonicalUrl, buildBoardShortUrl, buildBoardUrl } from "@/lib/board-url";
 import { CardModal } from "@/app/components/CardModal";
+import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
+import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
+import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
+import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 import { initializeCommentsStore, useCommentsStore } from "../_stores/comments-store";
 import { useBoardMembersStore, type BoardMember } from "../_stores/board-members-store";
@@ -104,14 +108,14 @@ const loadFromStorage = (): BoardData => {
     const lists = Array.isArray(parsed?.lists) ? parsed!.lists : [];
     const cards = Array.isArray(parsed?.cards)
       ? (parsed!.cards as Partial<Card>[]).map((card) => ({
-          ...card,
-          checked: typeof card.checked === 'boolean' ? card.checked : false,
-          due_start: card.due_start ?? null,
-          due_end: card.due_end ?? null,
-          due_channel: (card.due_channel ?? 'list-only') as DueChannel,
-          due_bucket: (card.due_bucket ?? null) as DueBucket | null,
-          due_bucket_position: typeof card.due_bucket_position === 'number' ? card.due_bucket_position : null,
-        })) as Card[]
+        ...card,
+        checked: typeof card.checked === 'boolean' ? card.checked : false,
+        due_start: card.due_start ?? null,
+        due_end: card.due_end ?? null,
+        due_channel: (card.due_channel ?? 'list-only') as DueChannel,
+        due_bucket: (card.due_bucket ?? null) as DueBucket | null,
+        due_bucket_position: typeof card.due_bucket_position === 'number' ? card.due_bucket_position : null,
+      })) as Card[]
       : [];
 
     return { lists, cards };
@@ -349,8 +353,8 @@ const loadFromSupabase = async (boardId: string, trace?: ClientTrace, signal?: A
   } catch (error) {
     // Ignore AbortError - it's expected when component unmounts or dependencies change
     const isAbort = (error instanceof DOMException && error.name === 'AbortError') ||
-                    (error instanceof Error && error.name === 'AbortError') ||
-                    (typeof error === 'string' && error.includes('Component unmounted'));
+      (error instanceof Error && error.name === 'AbortError') ||
+      (typeof error === 'string' && error.includes('Component unmounted'));
 
     if (isAbort) {
       throw error; // Re-throw to be handled by caller
@@ -622,13 +626,13 @@ function CardVisual({
         <div className="flex flex-wrap gap-1">
           {card.tags && card.tags.length > 0
             ? card.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
-                >
-                  {tag}
-                </span>
-              ))
+              <span
+                key={tag}
+                className="rounded-md bg-sky-100 px-2 py-0.5 text-xs text-sky-700 dark:bg-sky-900 dark:text-sky-300"
+              >
+                {tag}
+              </span>
+            ))
             : null}
           {card.due_date ? (
             <span className="rounded text-xs bg-orange-100 px-2 py-0.5 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
@@ -702,63 +706,6 @@ function SortableCard({
   );
 }
 
-// Filter and sort helper functions
-const filterAndSortCards = (
-  cards: Card[],
-  searchQuery: string,
-  selectedTags: string[],
-  selectedPriority: Priority | 'all',
-  sortBy: 'none' | 'due_date_asc' | 'due_date_desc'
-): Card[] => {
-  let filtered = [...cards];
-
-  // Search filter (title + description)
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase();
-    filtered = filtered.filter(
-      (card) =>
-        card.title.toLowerCase().includes(query) || card.description?.toLowerCase().includes(query)
-    );
-  }
-
-  // Tag filter
-  if (selectedTags.length > 0) {
-    filtered = filtered.filter((card) =>
-      selectedTags.every((tag) => card.tags?.includes(tag))
-    );
-  }
-
-  // Priority filter
-  if (selectedPriority !== 'all') {
-    filtered = filtered.filter((card) => card.priority === selectedPriority);
-  }
-
-  // Sort by due date
-  if (sortBy === 'due_date_asc') {
-    filtered.sort((a, b) => {
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    });
-  } else if (sortBy === 'due_date_desc') {
-    filtered.sort((a, b) => {
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(b.due_date).getTime() - new Date(a.due_date).getTime();
-    });
-  }
-
-  return filtered;
-};
-
-// Get all unique tags from all cards
-const getAllTags = (cards: Card[]): string[] => {
-  const tagsSet = new Set<string>();
-  cards.forEach((card) => {
-    card.tags?.forEach((tag) => tagsSet.add(tag));
-  });
-  return Array.from(tagsSet).sort();
-};
 
 // Sortable List Component
 function SortableList({
@@ -833,15 +780,13 @@ function SortableList({
   const positionSorted = [...cards].sort((a, b) => a.position - b.position);
   const sortedCards = filterAndSortCards(positionSorted, searchQuery, selectedTags, selectedPriority, sortBy);
 
-  const containerClasses = `backdrop-blur-sm rounded-none p-4 w-72 md:w-80 flex-shrink-0 touch-none self-start transition-shadow transition-colors duration-150 ${
-    isDropTarget
-      ? 'bg-white/90 dark:bg-gray-800/70 border border-sky-300/70 shadow-lg ring-2 ring-sky-200/60 dark:ring-sky-600/40'
-      : 'bg-white/70 dark:bg-gray-800/60 border border-slate-200/50 dark:border-gray-700/50 shadow-md'
-  }`;
+  const containerClasses = `backdrop-blur-sm rounded-none p-4 w-72 md:w-80 flex-shrink-0 touch-none self-start transition-shadow transition-colors duration-150 ${isDropTarget
+    ? 'bg-white/90 dark:bg-gray-800/70 border border-sky-300/70 shadow-lg ring-2 ring-sky-200/60 dark:ring-sky-600/40'
+    : 'bg-white/70 dark:bg-gray-800/60 border border-slate-200/50 dark:border-gray-700/50 shadow-md'
+    }`;
 
-  const dropZoneClasses = `mb-4 px-1 transition-colors duration-150 ${
-    isDropTarget ? 'bg-slate-100/70 dark:bg-gray-700/40 rounded-none py-1' : ''
-  }`;
+  const dropZoneClasses = `mb-4 px-1 transition-colors duration-150 ${isDropTarget ? 'bg-slate-100/70 dark:bg-gray-700/40 rounded-none py-1' : ''
+    }`;
 
   return (
     <div
@@ -953,22 +898,24 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const upsertComment = useCommentsStore((state) => state.upsertComment);
+  const removeComment = useCommentsStore((state) => state.removeComment);
+  const { setMembers: setStoredMembers } = useBoardMembersStore();
   const initialBoardId = initialBoard?.id ?? MAIN_BOARD_ID;
   const [boards, setBoards] = useState<Board[]>(() => (initialBoard ? [initialBoard] : []));
   const [currentBoardId, setCurrentBoardId] = useState<string>(initialBoardId);
   const [boardData, setBoardData] = useState<BoardData>(() => initialData ?? { lists: [], cards: [] });
-  const [boardMembers, setBoardMembers] = useState<ProfileSummary[]>([]);
+  const { boardMembers, setBoardMembers } = useBoardMembers(currentBoardId);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dragOverListId, setDragOverListId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
-  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  const { isOnline, syncQueueStats } = useSyncQueue();
+  const { realtimeStatus } = useRealtimeBoard(currentBoardId, setBoardData, upsertComment, removeComment);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [pendingCardFocusId, setPendingCardFocusId] = useState<string | null>(null);
 
   // ドラッグ中のクリック抑止用（Trello準拠）
   const isDraggingRef = useRef(false);
-  const realtimeChannelRef = useRef<{ channel: RealtimeChannel | null; token: number }>({ channel: null, token: 0 });
 
   // Phase 1.3 execution guards - prevent duplicate fetches
   const isFetchingRef = useRef(false);
@@ -987,18 +934,22 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const [userProfile, setUserProfile] = useState<ProfileRow | null>(null);
 
   // Search & Filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
-  const [sortBy, setSortBy] = useState<'none' | 'due_date_asc' | 'due_date_desc'>('none');
-  const [showFilters, setShowFilters] = useState(false);
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTags,
+    setSelectedTags,
+    selectedPriority,
+    setSelectedPriority,
+    sortBy,
+    setSortBy,
+    showFilters,
+    setShowFilters,
+  } = useBoardFilters();
   const [showCreateBoardDialog, setShowCreateBoardDialog] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
-  const [syncQueueStats, setSyncQueueStats] = useState({ pending: 0, failed: 0, total: 0, lastSyncedAt: null as number | null });
 
-  const upsertComment = useCommentsStore((state) => state.upsertComment);
-  const removeComment = useCommentsStore((state) => state.removeComment);
 
   useEffect(() => {
     if (initialData) {
@@ -1181,64 +1132,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     loadBoards();
   }, [user]);
 
-  const { setMembers: setStoredMembers, getMembers: getStoredMembers, shouldRefetch } = useBoardMembersStore();
-
-  useEffect(() => {
-    let isDisposed = false;
-
-    const loadBoardMembers = async () => {
-      if (!user || !currentBoardId) {
-        if (!isDisposed) {
-          setBoardMembers([]);
-        }
-        return;
-      }
-
-      // Check cache first
-      const cached = getStoredMembers(currentBoardId);
-      if (cached && !shouldRefetch(currentBoardId)) {
-        if (!isDisposed) {
-          setBoardMembers(cached.map(m => m.profile));
-        }
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/boards/${currentBoardId}/members`);
-
-        if (!response.ok) {
-          console.warn('Error loading board members:', response.statusText);
-          if (!isDisposed) {
-            setBoardMembers([]);
-          }
-          return;
-        }
-
-        const { members } = await response.json();
-        const boardMembers: BoardMember[] = members.map((m: any) => ({
-          profile: m.profile,
-          role: m.role
-        }));
-        const profiles: ProfileSummary[] = boardMembers.map(m => m.profile);
-
-        if (!isDisposed) {
-          setBoardMembers(profiles);
-          setStoredMembers(currentBoardId, boardMembers); // Save to store
-        }
-      } catch (error) {
-        console.error('Unexpected error loading board members:', error);
-        if (!isDisposed) {
-          setBoardMembers([]);
-        }
-      }
-    };
-
-    loadBoardMembers();
-
-    return () => {
-      isDisposed = true;
-    };
-  }, [user, currentBoardId, getStoredMembers, setStoredMembers, shouldRefetch]);
 
   // Load board data when currentBoardId changes
   useEffect(() => {
@@ -1330,8 +1223,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     loadData().catch((error) => {
       // Ignore AbortError - it's expected when component unmounts or dependencies change
       const isAbort = (error instanceof DOMException && error.name === 'AbortError') ||
-                      (error instanceof Error && error.name === 'AbortError') ||
-                      (typeof error === 'string' && error.includes('Component unmounted'));
+        (error instanceof Error && error.name === 'AbortError') ||
+        (typeof error === 'string' && error.includes('Component unmounted'));
 
       if (isAbort) {
         return;
@@ -1350,67 +1243,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     };
   }, [user, currentBoardId, boards]);
 
-  // Online/Offline detection with auto-sync
-  useEffect(() => {
-    const handleOnline = async () => {
-      console.log('オンライン復帰 - 同期開始');
-      setIsOnline(true);
-
-      // Sync pending queue when coming back online
-      const result = await syncQueue();
-      if (result.total > 0) {
-        console.log(`同期完了: ${result.success}件成功, ${result.failed}件失敗`);
-      }
-    };
-
-    const handleOffline = () => {
-      console.log('オフライン検出');
-      setIsOnline(false);
-    };
-
-    // Set initial online state
-    setIsOnline(navigator.onLine);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Sync queue on app load if online
-  useEffect(() => {
-    const syncOnLoad = async () => {
-      if (navigator.onLine && user) {
-        console.log('アプリ起動時 - 同期キューをチェック');
-        const result = await syncQueue();
-        if (result.total > 0) {
-          console.log(`起動時同期完了: ${result.success}件成功, ${result.failed}件失敗`);
-        }
-        // Update stats after sync
-        setSyncQueueStats(getSyncQueueStats());
-      }
-    };
-
-    syncOnLoad();
-  }, [user]);
-
-  // Update sync queue stats periodically
-  useEffect(() => {
-    const updateStats = () => {
-      setSyncQueueStats(getSyncQueueStats());
-    };
-
-    // Update immediately
-    updateStats();
-
-    // Update every 2 seconds
-    const interval = setInterval(updateStats, 2000);
-
-    return () => clearInterval(interval);
-  }, [isOnline]);
 
   // Close board menu when clicking outside
   useEffect(() => {
@@ -1427,171 +1259,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showBoardMenu]);
 
-  // Realtime subscription for multi-device sync
-  useEffect(() => {
-    if (!currentBoardId) return;
-
-    // Disable Realtime in test environment if flag is set
-    if (process.env.NEXT_PUBLIC_DISABLE_REALTIME === 'true') {
-      console.log('[Realtime] Disabled via NEXT_PUBLIC_DISABLE_REALTIME flag');
-      setRealtimeStatus('disconnected');
-      return;
-    }
-
-    console.log('[Realtime] Setting up subscription for board:', currentBoardId);
-    const realtimeState = realtimeChannelRef.current;
-    const token = (realtimeState.token ?? 0) + 1;
-    realtimeState.token = token;
-    console.log('[Realtime] New token:', token);
-
-    const previousChannel = realtimeState.channel;
-    if (previousChannel) {
-      console.log('[Realtime] Unsubscribing from previous channel');
-      previousChannel.unsubscribe();
-      supabase.removeChannel(previousChannel).catch((error) => {
-        console.warn('[Realtime] Failed to remove previous channel:', error);
-      });
-    }
-
-    setRealtimeStatus('connecting');
-
-    const channel = supabase
-      .channel(`board:${currentBoardId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'lists',
-          filter: `board_id=eq.${currentBoardId}`,
-        },
-        (payload) => {
-          if (realtimeState.token !== token) return;
-          console.log('List change detected:', payload);
-
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            setBoardData((prev) => {
-              const newList = payload.new as List;
-              const idx = prev.lists.findIndex(list => list.id === newList.id);
-
-              if (idx >= 0) {
-                const updatedLists = [...prev.lists];
-                updatedLists[idx] = newList;
-                return { ...prev, lists: updatedLists };
-              }
-
-              return { ...prev, lists: [...prev.lists, newList] };
-            });
-          } else if (payload.eventType === 'DELETE') {
-            setBoardData((prev) => ({
-              ...prev,
-              lists: prev.lists.filter((list) => list.id !== payload.old.id),
-              cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
-            }));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'cards',
-          filter: `board_id=eq.${currentBoardId}`,
-        },
-        (payload) => {
-          if (realtimeState.token !== token) return;
-          console.log('Card change detected:', payload);
-
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            setBoardData((prev) => {
-              const newCard = payload.new as Card;
-              const idx = prev.cards.findIndex(card => card.id === newCard.id);
-
-              if (idx >= 0) {
-                const updatedCards = [...prev.cards];
-                updatedCards[idx] = newCard;
-                return { ...prev, cards: updatedCards };
-              }
-
-              return { ...prev, cards: [...prev.cards, newCard] };
-            });
-          } else if (payload.eventType === 'DELETE') {
-            setBoardData((prev) => ({
-              ...prev,
-              cards: prev.cards.filter((card) => card.id !== payload.old.id),
-            }));
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comments',
-          filter: `board_id=eq.${currentBoardId}`,
-        },
-        async (payload) => {
-          if (realtimeState.token !== token) return;
-
-          if (payload.eventType === 'DELETE') {
-            const oldRow = payload.old as { id: string; card_id: string };
-            if (oldRow?.card_id && oldRow?.id) {
-              removeComment(oldRow.card_id, oldRow.id);
-            }
-            return;
-          }
-
-          const newRow = payload.new as { id?: string };
-          if (!newRow?.id) return;
-
-          const { data, error } = await supabase
-            .from('comments')
-            .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
-            .eq('id', newRow.id)
-            .single();
-
-          if (error || !data) {
-            console.warn('[Realtime] Failed to fetch comment for update', error);
-            return;
-          }
-
-          const commentData = data as CommentWithAuthor;
-          upsertComment(commentData.card_id, {
-            ...commentData,
-            idempotencyKey: commentData.idempotency_key ?? null,
-          });
-        }
-      );
-
-    realtimeState.channel = channel;
-
-    channel.subscribe((status) => {
-      if (realtimeState.token !== token) return;
-      console.log('Realtime subscription status:', status);
-      if (status === 'SUBSCRIBED') {
-        setRealtimeStatus('connected');
-      } else if (status === 'CLOSED') {
-        setRealtimeStatus('disconnected');
-      }
-    });
-
-    return () => {
-      if (realtimeState.channel === channel) {
-        realtimeState.channel = null;
-      }
-
-      channel.unsubscribe();
-      supabase.removeChannel(channel).catch((error) => {
-        console.warn('[Realtime] Failed to remove channel:', error);
-      });
-
-      if (realtimeState.token === token) {
-        setRealtimeStatus('disconnected');
-      }
-    };
-  }, [currentBoardId, removeComment, upsertComment]);
 
   // PC/モバイル対応のセンサー設定（Trello準拠）
   const sensors = useSensors(
@@ -2714,9 +2381,8 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                         // Refresh to update Server Component props
                         router.refresh();
                       }}
-                      className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${
-                        board.id === currentBoardId ? 'bg-slate-50 font-semibold' : ''
-                      }`}
+                      className={`w-full text-left px-4 py-2 hover:bg-slate-100 transition-colors ${board.id === currentBoardId ? 'bg-slate-50 font-semibold' : ''
+                        }`}
                     >
                       <div className="font-medium text-slate-800">{board.name}</div>
                       {board.description && (
@@ -2906,11 +2572,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
                               setSelectedTags([...selectedTags, tag]);
                             }
                           }}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                            selectedTags.includes(tag)
-                              ? 'bg-sky-500 text-white hover:bg-sky-600'
-                              : 'bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 hover:bg-slate-300 dark:hover:bg-gray-500'
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedTags.includes(tag)
+                            ? 'bg-sky-500 text-white hover:bg-sky-600'
+                            : 'bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 hover:bg-slate-300 dark:hover:bg-gray-500'
+                            }`}
                         >
                           {tag}
                         </button>
