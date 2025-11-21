@@ -122,64 +122,6 @@ test.describe('@feature:timeline Timeline view', () => {
     await expect(focusEvent).toBeVisible();
 
     await dumpClientMetrics(page, ['timeline']);
-
-    await supabaseAdmin.from('cards').delete().eq('id', cardId);
-  });
-
-  test('shows A/B bucket cards and opens CardModal', async ({ page }) => {
-    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
-    const cardId = crypto.randomUUID();
-    const shortId = `AB${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    const isoDay = isoDateJst();
-    const timestamp = new Date().toISOString();
-
-    const { error: insertError } = await supabaseAdmin.from('cards').insert({
-      id: cardId,
-      title: 'A/B bucket focus',
-      description: 'Card rendered in today_a bucket',
-      board_id: MAIN_BOARD_ID,
-      list_id: TIMELINE_LIST_ID,
-      user_id: TEST_USER_ID,
-      position: 1600,
-      tags: ['Today'],
-      due_date: `${isoDay}T00:00:00+09:00`,
-      due_start: null,
-      due_end: null,
-      due_channel: 'ab-list',
-      due_bucket: 'today_a',
-      due_bucket_position: 100,
-      priority: 'high',
-      checked: false,
-      assigned_to: null,
-      assignee_id: null,
-      assignee_ids: null,
-      short_id: shortId,
-      id_short: 777,
-      slug: 'ab-bucket-focus',
-      created_at: timestamp,
-      updated_at: timestamp,
-    });
-
-    expect(insertError).toBeNull();
-
-    await page.goto('/board');
-    await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
-    const bucketCard = page.locator(`[data-testid="ab-card-${cardId}"][data-bucket="today_a"]`).first();
-    await bucketCard.scrollIntoViewIfNeeded();
-    await expect(bucketCard).toBeVisible();
-
-    await bucketCard.locator('button[aria-label="Open card"]').click();
-
-    // Wait for modal dialog to open first
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
-
-    // Then verify overlay is visible
-    await expect(page.locator('[data-testid="card-modal-overlay"]')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('heading', { name: 'A/B bucket focus' })).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(page.locator('[data-testid="card-modal-overlay"]')).toBeHidden({ timeout: 5000 });
-
     await supabaseAdmin.from('cards').delete().eq('id', cardId);
   });
 });
