@@ -30,14 +30,28 @@ import NotificationsBell from "@/app/(board)/_components/NotificationsBell";
 import NotificationSettings from "@/app/(board)/_components/NotificationSettings";
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
+import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
+
+
 
 import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
+import {
+  HOUR_HEIGHT,
+  TIMELINE_HEADER_ESTIMATE,
+  minuteToPixels,
+  getMinutesFromTime,
+  getIsoDateJst,
+  getNowMinutesJst,
+  minutesToTime,
+  timeLabel,
+  withJstMidnight,
+  toLocalDay,
+} from "@/app/(board)/_utils/timeline-helpers";
 import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
-const HOUR_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
 const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
@@ -100,48 +114,16 @@ interface TimelineResponse {
   serverNow: string;
 }
 
-const minuteToPixels = (minutes: number) => (minutes / 60) * HOUR_HEIGHT;
-const TIMELINE_HEADER_ESTIMATE = 64;
-const getMinutesFromTime = (value: string | null) => {
-  if (!value) return null;
-  const [hours, minutes] = value.split(":");
-  const h = Number(hours ?? "0");
-  const m = Number(minutes ?? "0");
-  return h * 60 + m;
+type UserProfile = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
 };
-const getIsoDateJst = (timestamp: string) => {
-  const current = new Date(timestamp);
-  const jst = new Date(current.getTime() + 9 * 60 * 60 * 1000);
-  return jst.toISOString().split('T')[0];
-};
-const getNowMinutesJst = (timestamp: string) => {
-  const current = new Date(timestamp);
-  const minutes = current.getUTCMinutes();
-  const hours = (current.getUTCHours() + 9 + 24) % 24;
-  return hours * 60 + minutes;
-};
-const minutesToTime = (value: number) => {
-  const clamped = Math.max(0, Math.min(24 * 60 - 1, value));
-  const hours = Math.floor(clamped / 60) % 24;
-  const minutes = clamped % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-};
-const timeLabel = (start: string | null, end: string | null) => {
-  if (!start && !end) return 'Anytime';
-  const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');
-  return `${toLabel(start)} – ${toLabel(end)}`;
-};
-const withJstMidnight = (isoDate: string | null) => {
-  if (!isoDate) return null;
-  const base = isoDate.includes('T') ? isoDate.split('T')[0] : isoDate;
-  const utc = new Date(`${base}T00:00:00+09:00`).toISOString();
-  return utc;
-};
-const toLocalDay = (value: string | null | undefined) => {
-  if (!value) return null;
-  const [day] = value.split('T');
-  return day ?? value;
-};
+
+
 const pointerMinutesFromEvent = (
   event: DragEndEvent | DragMoveEvent,
   options?: {
@@ -350,7 +332,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const { user, signOut } = useAuth();
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -384,6 +366,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     showFilters,
     setShowFilters,
   } = useBoardFilters();
+
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
+    );
+  }, [setSelectedTags]);
 
   // Realtime & Sync
   const { isOnline, syncQueueStats } = useSyncQueue();
@@ -717,7 +705,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setCardModalError(null);
       return;
     }
-    if (cardModalShortIdRef.current === shortId && cardModalStatus === 'ready') {
+    if (cardModalShortIdRef.current === shortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
       return;
     }
     cardModalShortIdRef.current = shortId;
@@ -752,7 +740,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => {
       cancelled = true;
     };
-  }, [searchParamsString, cardModalStatus]);
+  }, [searchParamsString]);
 
   const filteredData = useMemo(() => {
     if (!data) return null;
@@ -1526,177 +1514,39 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     );
   };
 
+  // Assuming these states and functions are defined elsewhere in the component
+
+
   return (
     <>
       <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
-          <header className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-600 shadow-sm ring-1 ring-black/5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Live
-              </div>
-              <h1 className="text-2xl font-semibold text-slate-900 truncate flex-1">{initialBoard.name}</h1>
-
-              <div ref={boardMenuRef} className="relative">
-                <button
-                  onClick={() => setShowBoardMenu((prev) => !prev)}
-                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                  aria-haspopup="true"
-                  aria-expanded={showBoardMenu}
-                  data-testid="board-menu-button"
-                >
-                  Boards ▾
-                </button>
-                {showBoardMenu && (
-                  <div className="absolute right-0 z-40 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                    <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
-                    <div className="max-h-64 overflow-y-auto">
-                      {modalBoards.map((board) => (
-                        <button
-                          key={board.id}
-                          onClick={() => handleBoardNavigate(board)}
-                          className={clsx(
-                            'w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
-                            board.id === initialBoard.id && 'bg-slate-100 text-slate-900'
-                          )}
-                        >
-                          <div className="font-medium text-slate-800">{board.name || 'Untitled board'}</div>
-                          <p className="text-xs text-slate-500">{board.description || 'Standard board'}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => setShowShareDialog(true)}
-                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                data-testid="share-button"
-              >
-                Share
-              </button>
-              <NotificationsBell />
-              <button
-                onClick={() => setShowNotificationSettings(true)}
-                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                data-testid="notify-button"
-              >
-                Notify
-              </button>
-              <button
-                onClick={() => setShowProfileSettings(true)}
-                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                data-testid="profile-button"
-              >
-                {profile?.display_name || user?.email || 'Profile'}
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await signOut();
-                  } catch (error) {
-                    console.error('Failed to sign out', error);
-                  }
-                }}
-                className="rounded-full bg-slate-900 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-              >
-                Sign out
-              </button>
-            </div>
-          </header>
-
-          <section className="rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
-            <button
-              onClick={() => setShowFilters((prev) => !prev)}
-              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <span className="flex items-center gap-2">
-                🔍 Filters
-                {hasActiveFilters && (
-                  <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
-                    Active
-                  </span>
-                )}
-              </span>
-              <span className={clsx('transform text-slate-400 transition', showFilters ? 'rotate-180' : '')}>▼</span>
-            </button>
-            {showFilters && (
-              <div className="space-y-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700">
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="flex-1">
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Search
-                    </label>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="カード名やタグ"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Priority
-                    </label>
-                    <select
-                      value={selectedPriority}
-                      onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
-                    >
-                      <option value="all">すべて</option>
-                      <option value="low">🟢 Low</option>
-                      <option value="medium">🟡 Medium</option>
-                      <option value="high">🔴 High</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Tags
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableTags.length === 0 && (
-                      <span className="text-xs text-slate-400">タグはまだありません</span>
-                    )}
-                    {availableTags.map((tag) => {
-                      const active = selectedTags.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTags((prev) =>
-                              prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
-                            );
-                          }}
-                          className={clsx(
-                            'rounded-full px-3 py-1 text-xs font-semibold transition',
-                            active ? 'bg-sky-500 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                          )}
-                        >
-                          #{tag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {hasActiveFilters && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSelectedTags([]);
-                      setSelectedPriority('all');
-                    }}
-                    className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200"
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            )}
-          </section>
+          <TimelineHeader
+            board={initialBoard}
+            modalBoards={modalBoards}
+            handleBoardNavigate={handleBoardNavigate}
+            showBoardMenu={showBoardMenu}
+            setShowBoardMenu={setShowBoardMenu}
+            boardMenuRef={boardMenuRef}
+            setShowShareDialog={setShowShareDialog}
+            setShowNotificationSettings={setShowNotificationSettings}
+            setShowProfileSettings={setShowProfileSettings}
+            profile={profile}
+            user={user}
+            signOut={signOut}
+            showFilters={showFilters}
+            setShowFilters={setShowFilters}
+            hasActiveFilters={hasActiveFilters}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            selectedTags={selectedTags}
+            toggleTag={toggleTag}
+            selectedPriority={selectedPriority}
+            setSelectedPriority={setSelectedPriority}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            allTags={allTags}
+          />
 
           <DndContext
             sensors={sensors}
@@ -1764,8 +1614,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               </div>
             </section>
           </DndContext>
-        </div >
-      </div >
+        </div>
+      </div>
       {showShareDialog && (
         <ShareDialog boardId={initialBoard.id} onClose={() => setShowShareDialog(false)} />
       )

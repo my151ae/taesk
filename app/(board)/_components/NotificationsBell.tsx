@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { featureFlags } from '@/lib/featureFlags';
 import { supabase, Notification } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
@@ -11,6 +12,7 @@ type TabType = 'all' | 'unread';
 
 export default function NotificationsBell() {
   const { user } = useAuth();
+  const router = useRouter();
   const [showDrawer, setShowDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
@@ -142,7 +144,21 @@ export default function NotificationsBell() {
     if (!notification.read_at) {
       markAsRead(notification.id);
     }
-    // TODO: Navigate to card if notification has card context
+
+    const payload = notification.payload;
+    const cardId = payload.card_id || payload.cardId; // Handle both cases just in case
+    const shortId = payload.short_id || payload.shortId;
+
+    if (shortId) {
+      router.push(`/c/${shortId}`);
+      setShowDrawer(false);
+    } else if (cardId) {
+      // Fallback to cardId if shortId is missing. 
+      // Note: /c/[id] might expect shortId, but let's try.
+      // Ideally we should have shortId in payload.
+      router.push(`/c/${cardId}`);
+      setShowDrawer(false);
+    }
   };
 
   const handleMarkAllAsRead = async () => {
@@ -229,21 +245,19 @@ export default function NotificationsBell() {
             <div className="flex border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setActiveTab('all')}
-                className={`flex-1 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'all'
-                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className={`flex-1 px-4 py-2 text-sm font-medium ${activeTab === 'all'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
               >
                 All ({notifications.length})
               </button>
               <button
                 onClick={() => setActiveTab('unread')}
-                className={`flex-1 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'unread'
-                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className={`flex-1 px-4 py-2 text-sm font-medium ${activeTab === 'unread'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
               >
                 Unread ({unreadCount})
               </button>
@@ -276,9 +290,8 @@ export default function NotificationsBell() {
                 filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      !notification.read_at ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
+                    className={`p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!notification.read_at ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start gap-3">

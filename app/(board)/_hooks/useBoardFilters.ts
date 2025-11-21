@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, Priority } from '@/lib/supabase';
 
-export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc';
+export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc' | 'created_desc';
 
 export function useBoardFilters() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,6 +66,10 @@ export const filterAndSortCards = (
       if (!a.due_date) return 1;
       if (!b.due_date) return -1;
       return new Date(b.due_date).getTime() - new Date(a.due_date).getTime();
+    });
+  } else if (sortBy === 'created_desc') {
+    filtered.sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }
 
