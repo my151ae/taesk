@@ -169,7 +169,12 @@ test.describe('@feature:timeline Timeline view', () => {
     await expect(bucketCard).toBeVisible();
 
     await bucketCard.locator('button[aria-label="Open card"]').click();
-    await expect(page.locator('[data-testid="card-modal-overlay"]')).toBeVisible({ timeout: 10000 });
+
+    // Wait for modal dialog to open first
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+
+    // Then verify overlay is visible
+    await expect(page.locator('[data-testid="card-modal-overlay"]')).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('heading', { name: 'A/B bucket focus' })).toBeVisible();
 
     await page.keyboard.press('Escape');

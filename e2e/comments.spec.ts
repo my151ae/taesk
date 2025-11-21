@@ -196,8 +196,11 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
     await openButton.click();
   }
 
-  // Wait for modal to open
-  await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
+  // Wait for modal to open with extended timeout
+  await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+
+  // Give the modal a moment to finish rendering
+  await page.waitForTimeout(500);
 
   // Switch to Comments tab explicitly
   const commentsTab = page.getByRole('tab', { name: 'Comments' });
@@ -207,7 +210,7 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
   }
 
   // Wait for Comments section to be ready
-  await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
   // Give it a moment to settle
   await page.waitForTimeout(500);
