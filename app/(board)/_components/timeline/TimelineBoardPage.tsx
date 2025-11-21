@@ -60,6 +60,15 @@ const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: st
   },
 };
 
+type UserProfile = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+};
+
 interface TimelineDay {
   key: string;
   label: string;
@@ -350,7 +359,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const { user, signOut } = useAuth();
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (!user) return;
