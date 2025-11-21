@@ -350,6 +350,25 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const { user, signOut } = useAuth();
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/profiles');
+        if (response.ok) {
+          const data = await response.json();
+          setProfile(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1570,7 +1589,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                 data-testid="profile-button"
               >
-                {user?.email ?? 'Profile'}
+                {profile?.display_name || user?.email || 'Profile'}
               </button>
               <button
                 onClick={async () => {

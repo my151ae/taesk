@@ -239,6 +239,7 @@ taesk/
 ## 📚 Detailed Documentation
 
 - [Architecture & Design](./detail/architecture.md)
+- [Domain Model](./detail/domain-model.md)
 - [Component Breakdown](./detail/components.md)
 - [Database Schema](./detail/database.md)
 - [Storage Strategy](./detail/storage.md)
