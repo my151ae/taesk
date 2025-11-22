@@ -10,7 +10,7 @@ import {
     rectIntersection,
     UniqueIdentifier,
 } from '@dnd-kit/core';
-import { useState, useRef, useCallback, KeyboardEvent } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent, PointerEvent } from 'react';
 import {
     TimelineEvent,
     TimelineBucketItem,
@@ -43,6 +43,14 @@ export const HIDDEN_POINTER_PREVIEW: PointerPreviewState = {
     startMinutes: 0,
     durationMinutes: 0,
     dayIso: null,
+};
+
+export type ActiveResizeState = {
+    cardId: string;
+    startMinutes: number;
+    duration: number;
+    originalDuration: number;
+    startY: number;
 };
 
 type PlacementMeta = {
@@ -96,6 +104,7 @@ export function useTimelineDragAndDrop({
     const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
     const activeDragRef = useRef<ActiveDragState | null>(null);
     const [pointerPreview, setPointerPreview] = useState<PointerPreviewState>(HIDDEN_POINTER_PREVIEW);
+    const [activeResize, setActiveResize] = useState<ActiveResizeState | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -426,14 +435,83 @@ export function useTimelineDragAndDrop({
         );
     };
 
+    const handleResizeStart = useCallback((e: PointerEvent, cardId: string, startMinutes: number, duration: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        target.setPointerCapture(e.pointerId);
+        setActiveResize({
+            cardId,
+            startMinutes,
+            duration,
+            originalDuration: duration,
+            startY: e.clientY,
+        });
+    }, []);
+
+    const handleResizeMove = useCallback((e: PointerEvent) => {
+        if (!activeResize) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const deltaY = e.clientY - activeResize.startY;
+        const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 15) * 15;
+        const newDuration = Math.max(15, activeResize.originalDuration + deltaMinutes);
+
+        const endMinutes = activeResize.startMinutes + newDuration;
+        const maxEnd = 24 * 60;
+        const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
+
+        if (cappedDuration !== activeResize.duration) {
+            setActiveResize(prev => prev ? { ...prev, duration: cappedDuration } : null);
+        }
+    }, [activeResize]);
+
+    const handleResizeEnd = useCallback((e: PointerEvent) => {
+        if (!activeResize) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        target.releasePointerCapture(e.pointerId);
+
+        if (activeResize.duration !== activeResize.originalDuration) {
+            const cardId = activeResize.cardId;
+            const newEnd = activeResize.startMinutes + activeResize.duration;
+            const payload = {
+                due_end: minutesToTime(newEnd),
+            };
+
+            setData(current => {
+                if (!current) return current;
+                const nextEvents = current.events.map(ev => {
+                    if (ev.card_id === cardId) {
+                        return { ...ev, durationMinutes: activeResize.duration, due_end: minutesToTime(newEnd) };
+                    }
+                    return ev;
+                });
+                return { ...current, events: nextEvents };
+            });
+
+            if (dataMode === 'api') {
+                applyPatch(cardId, payload);
+            }
+        }
+
+        setActiveResize(null);
+    }, [activeResize, applyPatch, dataMode, setData]);
+
     return {
         sensors,
         activeDrag,
         pointerPreview,
+        activeResize,
         handleDragStart,
         handleDragMove,
         handleDragEnd,
         handleDragCancel,
         handleEventKeyDown,
+        handleResizeStart,
+        handleResizeMove,
+        handleResizeEnd,
     };
 }

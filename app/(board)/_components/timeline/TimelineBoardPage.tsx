@@ -36,6 +36,7 @@ import {
   getIsoDateJst,
   getNowMinutesJst,
   minutesToTime,
+  withJstMidnight,
 
   type UserProfile,
   type TimelineDay,
@@ -796,15 +797,53 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [data?.days]);
 
+  const createCard = useCallback(async (payload: Partial<Card>) => {
+    if (dataMode !== 'api') return;
+    try {
+      const response = await fetch(`/api/boards/${initialBoard.id}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Failed to create card');
+      const body = await response.json();
+      await fetchTimeline();
+      if (body.card) {
+        openCardModalFromTimeline(body.card.short_id, 'create');
+      }
+    } catch (error) {
+      console.error('Create card failed', error);
+      setErrorMessage('Failed to create card');
+    }
+  }, [dataMode, initialBoard.id, fetchTimeline, openCardModalFromTimeline]);
+
+  const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
+    const start = Math.round(minutes / 15) * 15;
+    const end = start + 60;
+    const payload = {
+      title: 'New Card',
+      due_date: withJstMidnight(day.isoDate),
+      due_start: minutesToTime(start),
+      due_end: minutesToTime(end),
+      due_channel: 'timeline' as const,
+      board_id: initialBoard.id,
+    };
+    createCard(payload);
+  }, [createCard, initialBoard.id]);
+
   const {
     sensors,
     activeDrag,
     pointerPreview,
+    activeResize,
     handleDragStart,
     handleDragMove,
     handleDragEnd,
     handleDragCancel,
     handleEventKeyDown,
+    handleResizeStart,
+    handleResizeMove,
+    handleResizeEnd,
   } = useTimelineDragAndDrop({
     data,
     setData,
@@ -956,6 +995,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     pointerPreview={pointerPreview}
                     openCardModal={openCardModalFromTimeline}
                     handleEventKeyDown={handleEventKeyDown}
+                    handleColumnClick={handleColumnClick}
+                    activeResize={activeResize}
+                    handleResizeStart={handleResizeStart}
+                    handleResizeMove={handleResizeMove}
+                    handleResizeEnd={handleResizeEnd}
                   />
                 </div>
               </div>

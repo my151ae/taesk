@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
-import { ReactNode, KeyboardEvent } from 'react';
+import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -15,6 +15,7 @@ import {
     EventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { DraggableCard } from './TimelineDraggableCard';
+import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 
 type ActiveDragState = {
     cardId: string;
@@ -37,8 +38,13 @@ type TimelineGridProps = {
     timelineViewportHeight: number;
     activeDrag: ActiveDragState | null;
     pointerPreview: PointerPreviewState;
+    activeResize: ActiveResizeState | null;
     openCardModal: (shortId: string | null, source: string) => void;
     handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
+    handleColumnClick: (day: TimelineDay, minutes: number) => void;
+    handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number) => void;
+    handleResizeMove: (e: PointerEvent) => void;
+    handleResizeEnd: (e: PointerEvent) => void;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -58,12 +64,22 @@ export default function TimelineGrid({
     timelineViewportHeight,
     activeDrag,
     pointerPreview,
+    activeResize,
     openCardModal,
     handleEventKeyDown,
+    handleColumnClick,
+    handleResizeStart,
+    handleResizeMove,
+    handleResizeEnd,
 }: TimelineGridProps) {
     const renderEvent = (event: TimelineEvent, layout?: EventLayout) => {
         const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
-        const duration = Math.max(event.durationMinutes ?? 60, 30);
+        let duration = Math.max(event.durationMinutes ?? 60, 30);
+
+        if (activeResize && activeResize.cardId === event.card_id) {
+            duration = activeResize.duration;
+        }
+
         const top = minuteToPixels(start);
         const height = Math.max(minuteToPixels(duration), 32);
 
@@ -124,8 +140,15 @@ export default function TimelineGrid({
                             ↗
                         </button>
                     </div>
+
+                    <div
+                        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100"
+                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration)}
+                        onPointerMove={handleResizeMove}
+                        onPointerUp={handleResizeEnd}
+                    />
                 </div>
-            </DraggableCard>
+            </DraggableCard >
         );
     };
 
@@ -136,9 +159,20 @@ export default function TimelineGrid({
         const indicatorPosition = indicatorTop ?? 0;
         const isFirstColumn = index === 0;
 
+        const handleClick = (e: MouseEvent) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const minutes = Math.round((y / HOUR_HEIGHT) * 60);
+            handleColumnClick(day, minutes);
+        };
+
         return (
             <DroppableColumn key={day.isoDate} day={day}>
-                <div className="relative h-full border-l border-slate-100 px-4 pb-8" style={{ minHeight: timelineViewportHeight }}>
+                <div
+                    className="relative h-full border-l border-slate-100 px-4 pb-8"
+                    style={{ minHeight: timelineViewportHeight }}
+                    onClick={handleClick}
+                >
                     <div
                         className="pointer-events-none absolute"
                         style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
