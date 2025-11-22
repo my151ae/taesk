@@ -13,6 +13,7 @@ import {
   PointerSensor,
   pointerWithin,
   rectIntersection,
+  MeasuringStrategy,
   type CollisionDetection,
   type UniqueIdentifier,
   useDroppable,
@@ -31,6 +32,8 @@ import NotificationSettings from "@/app/(board)/_components/NotificationSettings
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
+import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
+import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   HOUR_HEIGHT,
   HOURS,
@@ -1294,49 +1297,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     );
   };
 
-  const renderAbCard = (day: TimelineDay) => {
-    const meta = AB_CARD_META[day.key];
-    if (!meta) return null;
-
-    return (
-      <div className="pointer-events-auto rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl ring-1 ring-black/5 backdrop-blur">
-        <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
-          <span>{meta.title}</span>
-          <span>{day.isoDate}</span>
-        </div>
-        <div className="mt-3 space-y-4">
-          {meta.sections.map((section) => {
-            const items = abBuckets[section.bucket] ?? [];
-            return (
-              <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
-                  <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
-                  <p className="text-[10px] text-slate-400">{section.helper}</p>
-                  <div className="mt-2 space-y-1">
-                    {items.length === 0 ? (
-                      <p className="text-[11px] text-slate-400">Drop cards here</p>
-                    ) : (
-                      items.slice(0, 3).map((item) => (
-                        <AbBucketDraggableCard
-                          key={item.card_id}
-                          item={item}
-                          bucketKey={section.bucket}
-                          openCardModal={(shortId) => openCardModalFromTimeline(shortId, 'bucket-list')}
-                        />
-                      ))
-                    )}
-                    {items.length > 3 && (
-                      <p className="text-[10px] text-slate-400">and {items.length - 3} more…</p>
-                    )}
-                  </div>
-                </div>
-              </DroppableBucket>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  const handleScroll = useCallback(() => {
+    // Placeholder to satisfy prop requirement
+  }, []);
 
   const renderColumn = (day: TimelineDay, index: number) => {
     const events = eventsByDay[day.isoDate] ?? [];
@@ -1374,16 +1337,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             </div>
           )}
 
-          {activeDrag?.cardId && pointerPreviewVisible && pointerPreviewDay === day.isoDate && (
+          {activeDrag?.cardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
             <div
               className="pointer-events-none absolute left-4 right-4 z-10 border border-dashed border-sky-300 bg-sky-50/40"
               style={{
-                top: pointerPreviewY,
-                height: minuteToPixels(pointerPreviewDuration),
+                top: minuteToPixels(pointerPreview.startMinutes),
+                height: minuteToPixels(pointerPreview.durationMinutes),
               }}
             >
               <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
-                {timeLabel(pointerPreviewStart, pointerPreviewEnd)}
+                {timeLabel(
+                  minutesToTime(pointerPreview.startMinutes),
+                  minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
+                )}
               </div>
             </div>
           )}
@@ -1393,28 +1359,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           </div>
         </div>
       </DroppableColumn>
-    );
-  };
-
-  const renderFloatingLayer = () => {
-    if (!data?.days?.length) return null;
-    const templateColumns = `80px repeat(${data.days.length}, minmax(0, 1fr))`;
-    return (
-      <div
-        className="pointer-events-none sticky z-20 h-0 overflow-visible"
-        style={{ top: floatingLayerTop }}
-      >
-        <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
-          <div />
-          {data.days.map((day) => (
-            <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
-              <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
-                {renderAbCard(day)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     );
   };
 
@@ -1454,12 +1398,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
             collisionDetection={bucketsFirstCollisionDetection}
+            measuring={{
+              droppable: { strategy: MeasuringStrategy.Always },
+            }}
           >
-            <section className="rounded-3xl bg-white shadow-xl ring-1 ring-black/5">
+            <div className="relative rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
               <div
                 ref={timelineScrollRef}
-                className="relative overflow-y-auto"
-                style={{ height: timelineViewportHeight }}
+                className="relative max-h-[80vh] overflow-y-auto overflow-x-hidden rounded-3xl scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                onScroll={handleScroll}
               >
                 <div
                   ref={timelineHeaderRef}
@@ -1487,7 +1434,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   ))}
                 </div>
                 <div className="relative" style={{ minHeight: timelineViewportHeight }}>
-                  {renderFloatingLayer()}
+                  <TimelineBuckets
+                    days={data?.days ?? []}
+                    abBuckets={abBuckets}
+                    floatingLayerTop={floatingLayerTop}
+                    status={status}
+                    openCardModal={openCardModalFromTimeline}
+                  />
                   <div className="relative">
                     <div
                       className="grid"
@@ -1511,7 +1464,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
           </DndContext>
         </div >
       </div >
@@ -1590,127 +1543,3 @@ const DroppableColumn = ({ children, day }: { children: ReactNode; day: Timeline
   );
 };
 
-const DroppableBucket = ({ children, bucketKey, disabled }: { children: ReactNode; bucketKey: string; disabled?: boolean }) => {
-  const { setNodeRef, isOver } = useDroppable({ id: `bucket-drop:${bucketKey}`, data: { type: 'ab-bucket', bucketKey } });
-  const highlight = !disabled && isOver ? 'rounded-2xl ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-50' : '';
-  return (
-    <div ref={setNodeRef} className={highlight}>
-      {children}
-    </div>
-  );
-};
-
-const DraggableCard = ({
-  id,
-  data,
-  children,
-  extraNodeRef,
-  attachListenersToChild = false,
-}: {
-  id: string;
-  data: Record<string, unknown>;
-  children: ReactNode;
-  extraNodeRef?: (node: HTMLElement | null) => void;
-  attachListenersToChild?: boolean;
-}) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, data: { ...data, id } });
-  const combinedRef = useCallback(
-    (node: HTMLElement | null) => {
-      setNodeRef(node);
-      if (extraNodeRef) {
-        extraNodeRef(node);
-      }
-    },
-    [extraNodeRef, setNodeRef]
-  );
-
-  if (attachListenersToChild && isValidElement(children)) {
-    const child = children as ReactElement;
-    const mergedRef = (node: HTMLElement | null) => {
-      combinedRef(node);
-    };
-    return cloneElement(child, {
-      ref: mergedRef,
-      style: {
-        ...(child.props.style ?? {}),
-        transform: CSS.Translate.toString(transform),
-      },
-      className: [child.props.className, isDragging ? 'z-30 opacity-80' : undefined].filter(Boolean).join(' '),
-      ...listeners,
-      ...attributes,
-    });
-  }
-
-  return (
-    <div
-      ref={combinedRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
-      className={isDragging ? 'z-30 opacity-80' : undefined}
-      {...listeners}
-      {...attributes}
-    >
-      {children}
-    </div>
-  );
-};
-
-const AbBucketDraggableCard = ({
-  item,
-  bucketKey,
-  openCardModal,
-}: {
-  item: TimelineBucketItem;
-  bucketKey: string;
-  openCardModal: (shortId: string | null) => void;
-}) => {
-  const { setNodeRef } = useDroppable({
-    id: `bucket-item:${bucketKey}:${item.card_id}`,
-    data: { type: 'bucket-item', bucketKey, cardId: item.card_id },
-  });
-
-  return (
-    <DraggableCard
-      id={`bucket:${item.card_id}`}
-      data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
-      extraNodeRef={setNodeRef}
-    >
-      <div
-        className="rounded-md bg-white px-3 py-2 text-xs shadow-sm"
-        data-testid={`ab-card-${item.card_id}`}
-        data-bucket={bucketKey}
-      >
-        <div className="flex items-start gap-2 text-slate-700">
-          <input
-            type="checkbox"
-            checked={item.checked}
-            readOnly
-            className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
-          />
-          <div className="flex min-w-0 flex-1 items-start gap-1">
-            <div className="flex-1 text-left">
-              <span className="block line-clamp-2">{item.title || 'Untitled card'}</span>
-              {item.due_start && (
-                <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={(native) => {
-                native.stopPropagation();
-                openCardModal(item.short_id);
-              }}
-              onPointerDown={(native) => {
-                native.stopPropagation();
-              }}
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
-              aria-label="Open card"
-              data-testid={`cardOpenButton-${item.card_id}`}
-            >
-              ↗
-            </button>
-          </div>
-        </div>
-      </div>
-    </DraggableCard>
-  );
-};
