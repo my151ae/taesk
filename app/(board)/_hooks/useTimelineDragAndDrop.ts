@@ -5,25 +5,24 @@ import {
     DragStartEvent,
     DragMoveEvent,
     DragEndEvent,
-    DragCancelEvent,
-    UniqueIdentifier,
     CollisionDetection,
     pointerWithin,
     rectIntersection,
+    UniqueIdentifier,
 } from '@dnd-kit/core';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import {
     TimelineEvent,
     TimelineBucketItem,
     TimelineDay,
+    TimelineResponse,
     HOUR_HEIGHT,
     TIMELINE_HEIGHT,
-    minuteToPixels,
-    getMinutesFromTime,
-    withJstMidnight,
-    toLocalDay,
-    AXIS_WIDTH,
     minutesToTime,
+    getMinutesFromTime,
+    pointerMinutesFromEvent,
+    toLocalDay,
+    withJstMidnight,
 } from '@/app/(board)/_utils/timeline-helpers';
 
 export type ActiveDragState = {
@@ -46,7 +45,7 @@ export const HIDDEN_POINTER_PREVIEW: PointerPreviewState = {
     dayIso: null,
 };
 
-export type PlacementMeta = {
+type PlacementMeta = {
     target: 'timeline' | 'bucket';
     bucketKey?: string;
     sourceEvent?: TimelineEvent;
@@ -55,20 +54,44 @@ export type PlacementMeta = {
     localDueDate?: string | null;
 };
 
+export const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (!pointerCollisions.length) {
+        return rectIntersection(args);
+    }
+
+    const droppableFor = (id: UniqueIdentifier) => {
+        const match = args.droppableContainers.find((entry) => entry.id === id);
+        return match?.data.current?.type;
+    };
+    const bucketCollisions = pointerCollisions.filter(({ id }) => {
+        const type = droppableFor(id);
+        return type === 'bucket-item' || type === 'ab-bucket';
+    });
+
+    if (bucketCollisions.length) {
+        return bucketCollisions;
+    }
+
+    return pointerCollisions;
+};
+
 type UseTimelineDragAndDropProps = {
-    persistPlacement: (
-        cardId: string,
-        payload: any,
-        meta: PlacementMeta
-    ) => void;
+    data: TimelineResponse | null;
+    setData: React.Dispatch<React.SetStateAction<TimelineResponse | null>>;
+    applyPatch: (cardId: string, payload: Record<string, unknown>) => Promise<void>;
     timelineScrollRef: React.RefObject<HTMLDivElement>;
     bucketDayMap: Record<string, string | null>;
+    dataMode: 'api' | 'mock';
 };
 
 export function useTimelineDragAndDrop({
-    persistPlacement,
+    data,
+    setData,
+    applyPatch,
     timelineScrollRef,
     bucketDayMap,
+    dataMode,
 }: UseTimelineDragAndDropProps) {
     const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
     const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -78,6 +101,113 @@ export function useTimelineDragAndDrop({
         useSensor(PointerSensor, {
             activationConstraint: { distance: 5 },
         })
+    );
+
+    const persistPlacement = useCallback(
+        (cardId: string, payload: Record<string, unknown>, meta: PlacementMeta) => {
+            setData((current) => {
+                if (!current) return current;
+
+                const nextEvents = [...current.events];
+                const nextBuckets = Object.entries(current.abBuckets || {}).reduce(
+                    (acc, [key, items]) => {
+                        acc[key] = [...(items ?? [])];
+                        return acc;
+                    },
+                    {} as Record<string, TimelineBucketItem[]>
+                );
+
+                let removedBucketItem: TimelineBucketItem | null = null;
+                Object.values(nextBuckets).forEach((items) => {
+                    const index = items.findIndex((item) => item.card_id === cardId);
+                    if (index >= 0) {
+                        removedBucketItem = items[index];
+                        items.splice(index, 1);
+                    }
+                });
+
+                let removedEvent: TimelineEvent | null = null;
+                const eventIndex = nextEvents.findIndex((event) => event.card_id === cardId);
+                if (eventIndex >= 0) {
+                    removedEvent = nextEvents.splice(eventIndex, 1)[0];
+                }
+
+                const baseEvent = removedEvent ?? meta.sourceEvent ?? null;
+                const baseBucketItem = removedBucketItem ?? meta.sourceBucketItem ?? null;
+
+                const payloadDueDate = (payload.due_date as string | null) ?? null;
+
+                if (meta.target === 'timeline') {
+                    const nextStart = (payload.due_start as string | null) ?? baseEvent?.due_start ?? baseBucketItem?.due_start ?? null;
+                    const nextEnd = (payload.due_end as string | null) ?? baseEvent?.due_end ?? baseBucketItem?.due_end ?? null;
+                    const nextDate = meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseEvent?.due_date ?? baseBucketItem?.due_date ?? null;
+                    const startMinutes = getMinutesFromTime(nextStart);
+                    const endMinutes = getMinutesFromTime(nextEnd);
+                    const durationMinutes =
+                        startMinutes != null && endMinutes != null
+                            ? Math.max(endMinutes - startMinutes, 15)
+                            : baseEvent?.durationMinutes ?? meta.defaultDuration ?? 60;
+
+                    const replacement: TimelineEvent = {
+                        card_id: cardId,
+                        due_date: nextDate ?? '',
+                        due_start: nextStart,
+                        due_end: nextEnd,
+                        durationMinutes,
+                        title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
+                        tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+                        priority: baseEvent?.priority ?? null,
+                        checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
+                        short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
+                        slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+                    };
+
+                    nextEvents.push(replacement);
+                    nextEvents.sort((a, b) => {
+                        if (a.due_date === b.due_date) {
+                            const aStart = getMinutesFromTime(a.due_start) ?? 0;
+                            const bStart = getMinutesFromTime(b.due_start) ?? 0;
+                            return aStart - bStart;
+                        }
+                        return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+                    });
+
+                    return { ...current, events: nextEvents, abBuckets: nextBuckets };
+                }
+
+                if (meta.target === 'bucket' && meta.bucketKey) {
+                    if (!nextBuckets[meta.bucketKey]) {
+                        nextBuckets[meta.bucketKey] = [];
+                    }
+
+                    const bucketItems = nextBuckets[meta.bucketKey];
+                    const bucketPosition = (payload.due_bucket_position as number | null) ?? Date.now();
+                    const nextBucketItem: TimelineBucketItem = {
+                        card_id: cardId,
+                        title: baseBucketItem?.title ?? baseEvent?.title ?? 'Untitled card',
+                        due_date: meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? null,
+                        due_start: (payload.due_start as string | null) ?? null,
+                        due_end: (payload.due_end as string | null) ?? null,
+                        checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
+                        tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
+                        short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
+                        slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
+                        bucketPosition,
+                    };
+
+                    bucketItems.unshift(nextBucketItem);
+                    bucketItems.sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+                    return { ...current, events: nextEvents, abBuckets: nextBuckets };
+                }
+
+                return current;
+            });
+
+            if (dataMode === 'api') {
+                applyPatch(cardId, payload);
+            }
+        },
+        [applyPatch, dataMode, setData]
     );
 
     const handleDragStart = (event: DragStartEvent) => {
@@ -98,33 +228,6 @@ export function useTimelineDragAndDrop({
             activeDragRef.current = dragState;
         }
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
-    };
-
-    const pointerMinutesFromEvent = (
-        event: DragEndEvent | DragMoveEvent,
-        options?: {
-            scrollTop?: number;
-            columnRect?: { top: number; height: number };
-        }
-    ): number | null => {
-        const scrollTop = options?.scrollTop ?? 0;
-        const columnRect = options?.columnRect;
-        const translated = event.active.rect.current?.translated;
-        const sourceInitial = event.active.rect.current?.initial;
-        const elementTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
-        if (elementTop == null) return null;
-
-        let relativeY: number;
-        if (columnRect) {
-            relativeY = elementTop - columnRect.top;
-        } else {
-            relativeY = elementTop - AXIS_WIDTH + scrollTop;
-        }
-
-        const maxHeight = columnRect?.height ?? TIMELINE_HEIGHT;
-        const clamped = Math.max(0, Math.min(relativeY, maxHeight));
-        const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
-        return Math.max(0, Math.min(23 * 60 + 45, minutes));
     };
 
     const handleDragMove = (event: DragMoveEvent) => {
@@ -184,86 +287,87 @@ export function useTimelineDragAndDrop({
             cardId,
             overType,
             from: active.data.current?.kind,
-            to: overType,
+            data: active.data.current,
         });
 
-        if (overType === 'timeline-column') {
-            const dayIso = over.data.current?.dayIso as string;
-            const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
-            const pointerMinutes = pointerMinutesFromEvent(event, {
-                scrollTop,
-                columnRect: over.rect ? { top: over.rect.top, height: over.rect.height } : undefined,
+        if (overType === 'bucket-item') {
+            const bucketKey = over.data.current?.bucketKey as string | undefined;
+            const targetCardId = over.data.current?.cardId as string | undefined;
+            if (!bucketKey || !targetCardId) return;
+            const bucketItems = data?.abBuckets?.[bucketKey];
+            if (!bucketItems?.length) return;
+            if (targetCardId === cardId && active.data.current?.bucketKey === bucketKey) {
+                return;
+            }
+            const targetIndex = bucketItems.findIndex((item) => item.card_id === targetCardId);
+            if (targetIndex === -1) return;
+            const targetItem = bucketItems[targetIndex];
+            const prevItem = bucketItems[targetIndex - 1];
+            let bucketPosition: number;
+            if (prevItem?.bucketPosition != null && targetItem.bucketPosition != null) {
+                bucketPosition = (prevItem.bucketPosition + targetItem.bucketPosition) / 2;
+            } else if (targetItem.bucketPosition != null) {
+                bucketPosition = targetItem.bucketPosition + 1;
+            } else if (prevItem?.bucketPosition != null) {
+                bucketPosition = prevItem.bucketPosition + 1;
+            } else {
+                bucketPosition = Date.now();
+            }
+            const dayIso = bucketDayMap[bucketKey] ?? null;
+            const payload = {
+                due_channel: 'ab-list',
+                due_bucket: bucketKey,
+                due_date: withJstMidnight(dayIso),
+                due_start: null,
+                due_end: null,
+                due_bucket_position: bucketPosition,
+            };
+            console.debug('[timeline] drop into bucket-item', { cardId, bucketKey, bucketPosition });
+            persistPlacement(cardId, payload, {
+                target: 'bucket',
+                bucketKey,
+                sourceEvent,
+                sourceBucketItem,
+                localDueDate: dayIso,
             });
-
-            // Fallback if pointerMinutes fails (shouldn't happen if over column)
-            // But let's use the same logic as dragMove
-            const currentDrag = activeDrag; // Note: activeDrag is null here because we set it to null above. 
-            // We should use a local var or the one from closure if we didn't set it to null yet.
-            // Actually we set it to null at start of function.
-            // We need to capture it before setting to null?
-            // Or just re-calculate.
-            // The `activeDrag` state is null, but `activeDragRef` was null too.
-            // Wait, we need the drag state to know duration.
-            // We can get duration from sourceEvent or sourceBucketItem or just calculate.
-
-            // Let's fix the ordering.
+            return;
         }
-    };
 
-    // Re-implement handleDragEnd correctly
-    const handleDragEndCorrect = (event: DragEndEvent) => {
-        const { active, over } = event;
-        const currentDrag = activeDragRef.current; // Capture before clearing
-
-        setActiveDrag(null);
-        activeDragRef.current = null;
-        setPointerPreview(HIDDEN_POINTER_PREVIEW);
-
-        if (!over || !currentDrag) return;
-        const cardId = active.data.current?.cardId as string | undefined;
-        if (!cardId) return;
-
-        const sourceEvent = active.data.current?.event as TimelineEvent | undefined;
-        const sourceBucketItem = active.data.current?.item as TimelineBucketItem | undefined;
-        const overType = over.data.current?.type;
-
-        if (overType === 'timeline-column') {
-            const dayIso = over.data.current?.dayIso as string;
+        if (overType === 'timeline-column' && activeDrag) {
+            const day = over.data.current?.day as TimelineDay | undefined;
+            if (!day) return;
             const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
             const pointerMinutes = pointerMinutesFromEvent(event, {
                 scrollTop,
                 columnRect: over.rect ? { top: over.rect.top, height: over.rect.height } : undefined,
             });
-
-            let nextStart = pointerMinutes ?? currentDrag.startMinutes;
+            const fallbackPointer = activeDrag.startMinutes + (delta.y / HOUR_HEIGHT) * 60;
+            let nextStart = pointerMinutes ?? fallbackPointer;
             nextStart = Math.round(nextStart / 15) * 15;
             nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
-
-            // Calculate end
-            const duration = currentDrag.duration;
-            const nextEnd = Math.min(nextStart + duration, 24 * 60 - 1);
+            let nextEnd = nextStart + activeDrag.duration;
 
             const payload = {
                 due_channel: 'timeline',
                 due_bucket: null,
-                due_date: withJstMidnight(dayIso),
+                due_date: withJstMidnight(day.isoDate),
                 due_start: minutesToTime(nextStart),
-                due_end: minutesToTime(nextEnd),
+                due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
                 due_bucket_position: null,
             };
-
-            console.debug('[timeline] drop onto timeline', { cardId, dayIso, nextStart, nextEnd });
+            console.debug('[timeline] drop into timeline', { cardId, day: day.isoDate, start: nextStart });
             persistPlacement(cardId, payload, {
                 target: 'timeline',
                 sourceEvent,
                 sourceBucketItem,
-                defaultDuration: duration,
-                localDueDate: dayIso,
+                defaultDuration: activeDrag.duration,
+                localDueDate: day.isoDate,
             });
-        } else if (overType === 'ab-bucket' || overType === 'bucket-item') {
-            const bucketKey = (over.data.current?.bucketKey as string) || (over.data.current?.bucketKey as string);
-            if (!bucketKey) return;
+            return;
+        }
 
+        if (overType === 'ab-bucket') {
+            const bucketKey = over.data.current?.bucketKey as string;
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const bucketPosition = Date.now();
             const payload = {
@@ -281,37 +385,45 @@ export function useTimelineDragAndDrop({
                 sourceEvent,
                 sourceBucketItem,
                 localDueDate: dayIso,
-                defaultDuration: currentDrag.duration,
+                defaultDuration: activeDrag?.duration,
             });
         }
     };
 
-    const handleDragCancel = (event: DragCancelEvent) => {
+    const handleDragCancel = () => {
         setActiveDrag(null);
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
     };
 
-    const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
-        const pointerCollisions = pointerWithin(args);
-        if (!pointerCollisions.length) {
-            return rectIntersection(args);
-        }
-
-        const droppableFor = (id: UniqueIdentifier) => {
-            const match = args.droppableContainers.find((entry) => entry.id === id);
-            return match?.data.current?.type;
-        };
-        const bucketCollisions = pointerCollisions.filter(({ id }) => {
-            const type = droppableFor(id);
-            return type === 'bucket-item' || type === 'ab-bucket';
-        });
-
-        if (bucketCollisions.length) {
-            return bucketCollisions;
-        }
-
-        return pointerCollisions;
+    const handleEventKeyDown = (
+        event: TimelineEvent,
+        native: KeyboardEvent<HTMLElement>
+    ) => {
+        if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
+        native.preventDefault();
+        const direction = native.key === 'ArrowUp' ? -15 : 15;
+        const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
+        const duration = event.durationMinutes ?? 60;
+        const nextStart = Math.max(0, Math.min(23 * 60 + 45, startMinutes + direction));
+        const nextEnd = nextStart + duration;
+        persistPlacement(
+            event.card_id,
+            {
+                due_channel: 'timeline',
+                due_bucket: null,
+                due_date: withJstMidnight(event.due_date ?? null),
+                due_start: minutesToTime(nextStart),
+                due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+                due_bucket_position: null,
+            },
+            {
+                target: 'timeline',
+                sourceEvent: event,
+                defaultDuration: duration,
+                localDueDate: event.due_date ?? null,
+            }
+        );
     };
 
     return {
@@ -320,8 +432,8 @@ export function useTimelineDragAndDrop({
         pointerPreview,
         handleDragStart,
         handleDragMove,
-        handleDragEnd: handleDragEndCorrect,
+        handleDragEnd,
         handleDragCancel,
-        bucketsFirstCollisionDetection,
+        handleEventKeyDown,
     };
 }
