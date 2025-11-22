@@ -6,8 +6,8 @@ const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().max(255),
   description: z.string().optional(),
-  list_id: z.string().uuid(),
-  position: z.number().int().min(0),
+  list_id: z.string().uuid().optional(),
+  position: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
   due_date: z.string().datetime().nullable().optional(),
   due_start: z.string().nullable().optional(),
@@ -78,13 +78,55 @@ export async function POST(
       );
     }
 
+    let listId = parsed.data.list_id;
+    let position = parsed.data.position;
+
+    if (!listId) {
+      // Fetch the first list or create one
+      const { data: lists } = await supabase
+        .from('lists')
+        .select('id')
+        .eq('board_id', boardId)
+        .order('position', { ascending: true })
+        .limit(1);
+
+      if (lists && lists.length > 0) {
+        listId = lists[0].id;
+      } else {
+        // Create a default list
+        const { data: newList, error: listError } = await supabase
+          .from('lists')
+          .insert({ board_id: boardId, title: 'To Do', position: 0 })
+          .select('id')
+          .single();
+
+        if (listError || !newList) {
+          throw new Error('Failed to create default list');
+        }
+        listId = newList.id;
+      }
+    }
+
+    if (position === undefined) {
+      // Get max position in the list
+      const { data: maxPosData } = await supabase
+        .from('cards')
+        .select('position')
+        .eq('list_id', listId)
+        .order('position', { ascending: false })
+        .limit(1);
+
+      const maxPos = maxPosData?.[0]?.position ?? -1;
+      position = maxPos + 1000; // Add gap
+    }
+
     const payload: Record<string, unknown> = {
       board_id: boardId,
       id: parsed.data.id,
       title: parsed.data.title,
       description: parsed.data.description ?? '',
-      list_id: parsed.data.list_id,
-      position: parsed.data.position,
+      list_id: listId,
+      position: position,
       tags: parsed.data.tags ?? [],
       due_date: parsed.data.due_date ?? null,
       due_start: parsed.data.due_start ?? null,

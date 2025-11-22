@@ -171,7 +171,7 @@ export default function TimelineGrid({
                 <div
                     className="relative h-full border-l border-slate-100 px-4 pb-8"
                     style={{ minHeight: timelineViewportHeight }}
-                    onClick={handleClick}
+                    onDoubleClick={handleClick}
                 >
                     <div
                         className="pointer-events-none absolute"
