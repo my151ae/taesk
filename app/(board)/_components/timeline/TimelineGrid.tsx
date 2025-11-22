@@ -1,20 +1,18 @@
-
-import React from 'react';
-import { clsx } from 'clsx';
-import { useDroppable, useDraggable } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
+import { ReactNode, KeyboardEvent } from 'react';
+import clsx from 'clsx';
 import {
+    TimelineDay,
+    TimelineEvent,
     HOUR_HEIGHT,
+    HOURS,
     TIMELINE_HEIGHT,
     minuteToPixels,
     getMinutesFromTime,
-    minutesToTime,
     timeLabel,
-    TimelineDay,
-    TimelineEvent,
+    minutesToTime
 } from '@/app/(board)/_utils/timeline-helpers';
-
-const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
-const AXIS_WIDTH = 80;
+import { DraggableCard } from './TimelineDraggableCard';
 
 type ActiveDragState = {
     cardId: string;
@@ -29,7 +27,7 @@ type PointerPreviewState = {
     dayIso: string | null;
 };
 
-interface TimelineGridProps {
+type TimelineGridProps = {
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
     indicatorTop: number | null;
@@ -37,62 +35,18 @@ interface TimelineGridProps {
     timelineViewportHeight: number;
     activeDrag: ActiveDragState | null;
     pointerPreview: PointerPreviewState;
-    handleEventKeyDown: (event: TimelineEvent, native: React.KeyboardEvent) => void;
-    openCardModalFromTimeline: (shortId: string | null, debugSource?: string) => void;
-    floatingLayerTop: number;
-}
+    openCardModal: (shortId: string | null, source: string) => void;
+    handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
+};
 
-// Sub-components for DnD
-function DroppableColumn({ day, children }: { day: TimelineDay; children: React.ReactNode }) {
-    const { setNodeRef } = useDroppable({
-        id: `column:${day.isoDate}`,
-        data: { type: 'timeline-column', dayIso: day.isoDate },
-    });
+const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
+    const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: 'timeline-column', day } });
     return (
-        <div ref={setNodeRef} className="flex-1 min-w-[200px] h-full relative z-0">
+        <div ref={setNodeRef} className="relative h-full">
             {children}
         </div>
     );
-}
-
-function DraggableCard({
-    id,
-    data,
-    children,
-    attachListenersToChild = false,
-}: {
-    id: string;
-    data: any;
-    children: React.ReactNode;
-    attachListenersToChild?: boolean;
-}) {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id,
-        data,
-    });
-
-    const style: React.CSSProperties | undefined = transform
-        ? {
-            transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-            zIndex: 50,
-            opacity: isDragging ? 0 : undefined,
-        }
-        : undefined;
-
-    if (attachListenersToChild) {
-        return (
-            <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="absolute left-0 right-0">
-                {children}
-            </div>
-        );
-    }
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            {children}
-        </div>
-    );
-}
+};
 
 export default function TimelineGrid({
     days,
@@ -102,11 +56,9 @@ export default function TimelineGrid({
     timelineViewportHeight,
     activeDrag,
     pointerPreview,
+    openCardModal,
     handleEventKeyDown,
-    openCardModalFromTimeline,
-    floatingLayerTop,
 }: TimelineGridProps) {
-
     const renderEvent = (event: TimelineEvent) => {
         const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
         const duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -153,14 +105,14 @@ export default function TimelineGrid({
                             type="button"
                             onClick={(native) => {
                                 native.stopPropagation();
-                                openCardModalFromTimeline(event.short_id, 'event-button');
+                                openCardModal(event.short_id, 'event-button');
                             }}
                             onPointerDown={(native) => {
                                 native.stopPropagation();
                             }}
                             className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
                             aria-label="Open card"
-                            data-testid={`cardOpenButton - ${event.card_id} `}
+                            data-testid={`cardOpenButton-${event.card_id}`}
                         >
                             ↗
                         </button>
@@ -175,19 +127,6 @@ export default function TimelineGrid({
         const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
         const indicatorPosition = indicatorTop ?? 0;
         const isFirstColumn = index === 0;
-
-        const pointerPreviewVisible = pointerPreview.visible;
-        const pointerPreviewDay = pointerPreview.dayIso;
-        const pointerPreviewY = minuteToPixels(pointerPreview.startMinutes);
-        const pointerPreviewDuration = pointerPreview.durationMinutes;
-        const pointerPreviewStart = timeLabel(
-            minutesToTime(pointerPreview.startMinutes),
-            minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
-        ).split(' - ')[0]; // Rough approximation for label
-        // Actually timeLabel takes (start, end) strings.
-        // We need to convert minutes to time string.
-        const startStr = minutesToTime(pointerPreview.startMinutes);
-        const endStr = minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes);
 
         return (
             <DroppableColumn key={day.isoDate} day={day}>
@@ -219,16 +158,19 @@ export default function TimelineGrid({
                         </div>
                     )}
 
-                    {activeDrag?.cardId && pointerPreviewVisible && pointerPreviewDay === day.isoDate && (
+                    {activeDrag?.cardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
                         <div
                             className="pointer-events-none absolute left-4 right-4 z-10 border border-dashed border-sky-300 bg-sky-50/40"
                             style={{
-                                top: pointerPreviewY,
-                                height: minuteToPixels(pointerPreviewDuration),
+                                top: minuteToPixels(pointerPreview.startMinutes),
+                                height: minuteToPixels(pointerPreview.durationMinutes),
                             }}
                         >
                             <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
-                                {timeLabel(startStr, endStr)}
+                                {timeLabel(
+                                    minutesToTime(pointerPreview.startMinutes),
+                                    minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
+                                )}
                             </div>
                         </div>
                     )}
@@ -241,57 +183,27 @@ export default function TimelineGrid({
         );
     };
 
-    const renderFloatingLayer = () => {
-        if (!days.length) return null;
-        const templateColumns = `80px repeat(${days.length}, minmax(0, 1fr))`;
-        return (
-            <div
-                className="pointer-events-none sticky z-20 h-0 overflow-visible"
-                style={{ top: floatingLayerTop }}
-            >
-                <div className="mx-auto max-w-6xl">
-                    <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
-                        <div /> {/* Axis spacer */}
-                        {days.map((day) => (
-                            <div key={day.isoDate} className="px-4">
-                                {/* Header content if needed, but this seems to be just for alignment or floating headers? 
-                    Actually in original code it renders the day headers sticky?
-                    Wait, the day headers are in the main flow usually.
-                    Let's check original code.
-                */}
-                                <div className="flex items-center justify-center rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur">
-                                    {day.label}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const templateColumns = `80px repeat(${days.length}, minmax(0, 1fr))`;
+    if (!days.length) return null;
 
     return (
         <div className="relative">
-            {/* Floating headers */}
-            {renderFloatingLayer()}
-
-            <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
-                {/* Time Axis */}
-                <div className="relative border-r border-slate-200 bg-slate-50/50 text-xs font-medium text-slate-400">
-                    {HOURS.map((hour, i) => (
-                        <div
-                            key={hour}
-                            className="absolute right-3 -translate-y-1/2"
-                            style={{ top: i * HOUR_HEIGHT }}
-                        >
-                            {hour}
+            <div
+                className="grid"
+                data-timeline-grid
+                data-testid="timeline-grid"
+                style={{ gridTemplateColumns: days.length ? `80px repeat(${days.length}, minmax(0, 1fr))` : '80px' }}
+            >
+                <aside className="relative border-r border-slate-100 text-xs text-slate-500">
+                    {HOURS.map((hour) => (
+                        <div key={hour} className="flex h-10 items-start justify-end pr-3">
+                            {hour === '00:00' ? null : (
+                                <span className="-mt-1 leading-none tracking-tight text-slate-600">
+                                    {hour}
+                                </span>
+                            )}
                         </div>
                     ))}
-                </div>
-
-                {/* Columns */}
+                </aside>
                 {days.map((day, index) => renderColumn(day, index))}
             </div>
         </div>

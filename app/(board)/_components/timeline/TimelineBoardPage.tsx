@@ -33,6 +33,7 @@ import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
+import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   HOUR_HEIGHT,
@@ -1234,133 +1235,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(tagsSet).sort();
   }, [data]);
 
-  const renderEvent = (event: TimelineEvent) => {
-    const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
-    const duration = Math.max(event.durationMinutes ?? 60, 30);
-    const top = minuteToPixels(start);
-    const height = Math.max(minuteToPixels(duration), 32);
-
-    return (
-      <DraggableCard
-        key={event.card_id}
-        id={`event:${event.card_id}`}
-        data={{ kind: 'event', event, cardId: event.card_id }}
-        attachListenersToChild
-      >
-        <div
-          role="group"
-          tabIndex={0}
-          onKeyDown={(native) => handleEventKeyDown(event, native)}
-          data-testid="timeline-event"
-          className="absolute left-4 right-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-          style={{ top, height }}
-        >
-          <div className="flex items-start gap-2">
-            <span
-              aria-hidden="true"
-              className={clsx(
-                'flex h-3.5 w-3.5 items-center justify-center rounded border text-[8px] font-bold',
-                event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
-              )}
-            >
-              ✓
-            </span>
-            <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-1 text-[11px] font-semibold text-slate-800">
-              <span className="min-w-0 flex-1 break-words leading-tight">
-                {event.title || 'Untitled card'}
-              </span>
-              <span
-                className="text-[10px] font-semibold text-slate-500 whitespace-nowrap"
-                title={timeLabel(event.due_start, event.due_end)}
-              >
-                {timeLabel(event.due_start, event.due_end)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={(native) => {
-                native.stopPropagation();
-                openCardModalFromTimeline(event.short_id, 'event-button');
-              }}
-              onPointerDown={(native) => {
-                native.stopPropagation();
-              }}
-              className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
-              aria-label="Open card"
-              data-testid={`cardOpenButton-${event.card_id}`}
-            >
-              ↗
-            </button>
-          </div>
-        </div>
-      </DraggableCard>
-    );
-  };
-
   const handleScroll = useCallback(() => {
     // Placeholder to satisfy prop requirement
   }, []);
-
-  const renderColumn = (day: TimelineDay, index: number) => {
-    const events = eventsByDay[day.isoDate] ?? [];
-    const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
-    const indicatorPosition = indicatorTop ?? 0;
-    const isFirstColumn = index === 0;
-
-    return (
-      <DroppableColumn key={day.isoDate} day={day}>
-        <div className="relative h-full border-l border-slate-100 px-4 pb-8" style={{ minHeight: timelineViewportHeight }}>
-          <div
-            className="pointer-events-none absolute"
-            style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
-          >
-            {HOURS.map((hour, idx) => (
-              <div
-                key={hour}
-                className={clsx(
-                  'absolute left-0 right-0 border-b border-slate-200',
-                  idx === 0 ? '' : 'border-dashed'
-                )}
-                style={{ top: idx * HOUR_HEIGHT }}
-              />
-            ))}
-          </div>
-
-          {indicatorVisibleInDay && (
-            <div
-              className="pointer-events-none absolute z-10"
-              style={{ top: indicatorPosition, left: 0, right: 0 }}
-            >
-              <div className="relative h-px bg-red-400/80">
-                <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
-              </div>
-            </div>
-          )}
-
-          {activeDrag?.cardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
-            <div
-              className="pointer-events-none absolute left-4 right-4 z-10 border border-dashed border-sky-300 bg-sky-50/40"
-              style={{
-                top: minuteToPixels(pointerPreview.startMinutes),
-                height: minuteToPixels(pointerPreview.durationMinutes),
-              }}
-            >
-              <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
-                {timeLabel(
-                  minutesToTime(pointerPreview.startMinutes),
-                  minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-            {events.map(renderEvent)}
-          </div>
-        </div>
-      </DroppableColumn>
-    );
-  };
 
   return (
     <>
@@ -1441,27 +1318,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     status={status}
                     openCardModal={openCardModalFromTimeline}
                   />
-                  <div className="relative">
-                    <div
-                      className="grid"
-                      data-timeline-grid
-                      data-testid="timeline-grid"
-                      style={{ gridTemplateColumns: data?.days?.length ? `80px repeat(${data.days.length}, minmax(0, 1fr))` : '80px' }}
-                    >
-                      <aside className="relative border-r border-slate-100 text-xs text-slate-500">
-                        {HOURS.map((hour) => (
-                          <div key={hour} className="flex h-10 items-start justify-end pr-3">
-                            {hour === '00:00' ? null : (
-                              <span className="-mt-1 leading-none tracking-tight text-slate-600">
-                                {hour}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </aside>
-                      {data?.days?.map((day, index) => renderColumn(day, index))}
-                    </div>
-                  </div>
+                  <TimelineGrid
+                    days={data?.days ?? []}
+                    eventsByDay={eventsByDay}
+                    indicatorTop={indicatorTop}
+                    indicatorDayIso={indicatorDayIso}
+                    timelineViewportHeight={timelineViewportHeight}
+                    activeDrag={activeDrag}
+                    pointerPreview={pointerPreview}
+                    openCardModal={openCardModalFromTimeline}
+                    handleEventKeyDown={handleEventKeyDown}
+                  />
                 </div>
               </div>
             </div>
@@ -1534,12 +1401,4 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   );
 }
 
-const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
-  const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: 'timeline-column', day } });
-  return (
-    <div ref={setNodeRef} className="relative h-full">
-      {children}
-    </div>
-  );
-};
 
