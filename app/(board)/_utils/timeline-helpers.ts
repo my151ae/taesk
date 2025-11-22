@@ -151,3 +151,86 @@ export const pointerMinutesFromEvent = (
     const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
     return Math.max(0, Math.min(23 * 60 + 45, minutes));
 };
+
+export type EventLayout = {
+    left: string;
+    width: string;
+};
+
+export const calculateEventLayout = (events: TimelineEvent[]): Record<string, EventLayout> => {
+    // 1. Sort events by start time, then by duration (longer first)
+    const sorted = [...events].sort((a, b) => {
+        const aStart = getMinutesFromTime(a.due_start) ?? 0;
+        const bStart = getMinutesFromTime(b.due_start) ?? 0;
+        if (aStart !== bStart) return aStart - bStart;
+        const aDur = a.durationMinutes ?? 60;
+        const bDur = b.durationMinutes ?? 60;
+        return bDur - aDur;
+    });
+
+    // 2. Group into connected components (clusters)
+    const clusters: TimelineEvent[][] = [];
+    let currentCluster: TimelineEvent[] = [];
+    let clusterEnd = -1;
+
+    sorted.forEach(event => {
+        const start = getMinutesFromTime(event.due_start) ?? 0;
+        const duration = event.durationMinutes ?? 60;
+        const end = start + duration;
+
+        if (currentCluster.length === 0) {
+            currentCluster.push(event);
+            clusterEnd = end;
+        } else {
+            if (start < clusterEnd) {
+                // Overlaps with cluster
+                currentCluster.push(event);
+                clusterEnd = Math.max(clusterEnd, end);
+            } else {
+                // New cluster
+                clusters.push(currentCluster);
+                currentCluster = [event];
+                clusterEnd = end;
+            }
+        }
+    });
+    if (currentCluster.length > 0) clusters.push(currentCluster);
+
+    // 3. Layout each cluster
+    const layout: Record<string, EventLayout> = {};
+
+    clusters.forEach(cluster => {
+        // Column packing
+        const columns: TimelineEvent[][] = [];
+        cluster.forEach(event => {
+            const start = getMinutesFromTime(event.due_start) ?? 0;
+            let placed = false;
+            for (let i = 0; i < columns.length; i++) {
+                const lastInCol = columns[i][columns[i].length - 1];
+                const lastEnd = (getMinutesFromTime(lastInCol.due_start) ?? 0) + (lastInCol.durationMinutes ?? 60);
+                if (lastEnd <= start) {
+                    columns[i].push(event);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                columns.push([event]);
+            }
+        });
+
+        const numCols = columns.length;
+        const widthPercent = 100 / numCols;
+
+        columns.forEach((col, colIndex) => {
+            col.forEach(event => {
+                layout[event.card_id] = {
+                    left: `${colIndex * widthPercent}%`,
+                    width: `${widthPercent}%`,
+                };
+            });
+        });
+    });
+
+    return layout;
+};

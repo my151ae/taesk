@@ -10,7 +10,9 @@ import {
     minuteToPixels,
     getMinutesFromTime,
     timeLabel,
-    minutesToTime
+    minutesToTime,
+    calculateEventLayout,
+    EventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { DraggableCard } from './TimelineDraggableCard';
 
@@ -59,7 +61,7 @@ export default function TimelineGrid({
     openCardModal,
     handleEventKeyDown,
 }: TimelineGridProps) {
-    const renderEvent = (event: TimelineEvent) => {
+    const renderEvent = (event: TimelineEvent, layout?: EventLayout) => {
         const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
         const duration = Math.max(event.durationMinutes ?? 60, 30);
         const top = minuteToPixels(start);
@@ -77,8 +79,13 @@ export default function TimelineGrid({
                     tabIndex={0}
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     data-testid="timeline-event"
-                    className="absolute left-4 right-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
-                    style={{ top, height }}
+                    className="absolute flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    style={{
+                        top,
+                        height,
+                        left: layout?.left ?? '0%',
+                        width: layout?.width ?? '100%',
+                    }}
                 >
                     <div className="flex items-start gap-2">
                         <span
@@ -124,6 +131,7 @@ export default function TimelineGrid({
 
     const renderColumn = (day: TimelineDay, index: number) => {
         const events = eventsByDay[day.isoDate] ?? [];
+        const layoutMap = calculateEventLayout(events);
         const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
         const indicatorPosition = indicatorTop ?? 0;
         const isFirstColumn = index === 0;
@@ -176,7 +184,7 @@ export default function TimelineGrid({
                     )}
 
                     <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-                        {events.map(renderEvent)}
+                        {events.map((event) => renderEvent(event, layoutMap[event.card_id]))}
                     </div>
                 </div>
             </DroppableColumn>
