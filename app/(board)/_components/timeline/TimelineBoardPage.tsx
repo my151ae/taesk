@@ -609,7 +609,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setCardModalError(null);
       return;
     }
-    if (cardModalShortIdRef.current === shortId && cardModalStatus === 'ready') {
+    if (cardModalShortIdRef.current === shortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
       return;
     }
     cardModalShortIdRef.current = shortId;
@@ -644,7 +644,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => {
       cancelled = true;
     };
-  }, [searchParamsString, cardModalStatus]);
+  }, [searchParamsString]);
 
   const filteredData = useMemo(() => {
     if (!data) return null;
