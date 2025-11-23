@@ -140,6 +140,9 @@ interface TimelineEvent {
   tags: string[];
   priority: 'low' | 'medium' | 'high' | null;
   checked: boolean;
+  assignee_id?: string | null;      // legacy single
+  assignee_ids?: string[] | null;   // current multi-assign
+  assigned_to?: string | null;      // legacy alias
   short_id: string | null;
   slug: string | null;
 }
@@ -149,6 +152,7 @@ type TimelineBuckets = Record<'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b
 
 - `due_channel='timeline'` のカードは Today/Tomorrow の時間軸に並び、`due_start` と `due_end` の差から `durationMinutes` が算出される
 - `due_channel='ab-list'` のカードは `due_bucket` ごとに A/B 列へグルーピングされ、`due_bucket_position` で降順ソート
+- `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
 - API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す
 
 ### TimelineBoardPage の主な処理

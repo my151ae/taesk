@@ -43,8 +43,8 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ### Timeline Response Contract
 
 - `days`: 今日/明日の JST ISO 日付 (`{ key: 'today' | 'tomorrow', label, isoDate }`)
-- `events`: `due_channel='timeline'` のカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `priority`, `short_id`, `slug` を含む
-- `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` の 4 配列。`due_bucket_position` で降順ソート
+- `events`: `due_channel='timeline'` のカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `priority`, `checked`, `assignee_id`, `assignee_ids`, `assigned_to`, `short_id`, `slug` を含む
+- `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` の 4 配列。`due_bucket_position` で降順ソートし、`assignee_ids` を含めて返却
 - `serverNow`: API 生成時刻 (UTC ISO)。クライアントは JST に変換して Now ラインを描画
 
 `GET /api/boards/[boardId]/timeline` はボードメンバーのみアクセス可能。`board_members` に存在しないユーザーは 403 を受け取り、未認証の場合は 401 となる。
@@ -95,8 +95,8 @@ app/layout.tsx
 
 4. **User interaction**  
    - Timeline での DnD → `handleDragStart` / `handleDragMove` / `handleDragEnd`  
-     `handleDragEnd` は `activeDrag` 情報をもとに `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算し、`syncQueue.enqueue` で API 更新を実行。失敗時は `activeDragRef.previousData` へロールバック。
-   - CardModal での編集 → `PATCH /api/cards/:id` を呼び、成功後 `fetchTimeline()` で最新データを取得（今後 Optimistic Update を拡充予定）。
+     `handleDragEnd` は `activeDrag` 情報をもとに `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換え、`syncQueue.enqueue` で API 更新。失敗時はロールバック。
+   - CardModal での編集 → `PATCH /api/cards/:id` を呼び、成功レスポンスをローカル状態へ反映（タイトル/タグ/期日/`assignee_ids` 等）。リアルタイム通知とも整合するため再フェッチは原則不要。
    - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、`syncQueue` を通じて API へ送信。エラー時はローカルキューへ残存。
 
 5. **Offline / retry**  
@@ -140,7 +140,7 @@ app/layout.tsx
 
 - `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` が intercepting modal と standalone page の両方を担当。
 - Timeline 上でカードをクリックすると `router.push('?card=SHORTID')` を行い、parallel route が `CardModal` を描画。URL を直接開いた場合も同じモーダルが表示される。
-- `CardModal` 内では `due_channel`, `due_start`, `due_end`, `due_bucket`, `priority`, `assignee` などを編集可能。保存後は `fetchTimeline()` で最新状態を取得。
+- `CardModal` 内では `due_channel`, `due_start`, `due_end`, `due_bucket`, `priority`, `assignee_ids` などを編集可能。保存成功時はレスポンスをローカル状態へ即時反映し、`assignee_ids` を保持したままリアルタイム通知を待つ。
 - `CommentsPanel` は `CardModal` からタブ切り替えで開き、`useCommentsStore` 経由で投稿/削除/Realtime 反映を行う。
 
 ## Metrics & Observability
@@ -148,6 +148,58 @@ app/layout.tsx
 - `createClientTrace('timeline')` … `TimelineBoardPage` の `traceRef` から `addEvent` を呼び出し、`flush()` で `POST /api/metrics` に送信。Playwright では `dumpClientMetrics(page, ['timeline'])` で抽出し、`docs/tickets/` に貼り付ける。
 - `createServerTrace('timeline')` … API ルートやサーバーユーティリティから呼び出し、Timeline API のレスポンス時間やエラー率を JSON に記録。
 - `test-summary.js` … `npx playwright test --reporter=json` の結果を解析し、バッチごとの `expected/unexpected/flaky` を Slack/Docs へ共有する。
+
+## Sequence Diagrams
+
+### CardModal Save (assignee_ids を含む)
+
+```mermaid
+sequenceDiagram
+  participant UI as CardModal
+  participant State as Timeline state
+  participant Sync as useSyncQueue
+  participant API as PATCH /api/boards/:id/cards/:id
+  participant RT as Supabase Realtime
+
+  UI->>State: Optimistic merge (title/tags/due_*/assignee_ids)
+  UI->>Sync: enqueue({payload})
+  Sync->>API: PATCH cards
+  API-->>RT: postgres_changes (card row)
+  RT-->>State: handleCardChange merges (assignee_ids preserved)
+  State-->>UI: Modal re-renders with updated card
+```
+
+### Drag & Drop (Timeline ⇄ A/B)
+
+```mermaid
+sequenceDiagram
+  participant UI as TimelineGrid
+  participant DnD as useTimelineDragAndDrop
+  participant State as Timeline state
+  participant Sync as useSyncQueue
+  participant API as PATCH /api/boards/:id/cards/:id
+  participant RT as Supabase Realtime
+
+  UI->>DnD: handleDragEnd(cardId, target)
+  DnD->>State: persistPlacement (due_channel/bucket/start/end, keep assignee_ids)
+  DnD->>Sync: enqueue({payload})
+  Sync->>API: PATCH cards
+  API-->>RT: postgres_changes
+  RT-->>State: handleCardChange (assignee_ids retained)
+```
+
+### Realtime Update (別タブで変更された場合)
+
+```mermaid
+sequenceDiagram
+  participant RT as Supabase Realtime
+  participant State as Timeline state
+  participant UI as TimelineGrid/CardModal
+
+  RT-->>State: onCardChange(payload)
+  State-->>UI: setData (events/abBuckets with assignee_ids)
+  UI-->>User: Renders updated tags/due/assignees without refetch
+```
 
 ## Error Handling & Offline Strategy
 

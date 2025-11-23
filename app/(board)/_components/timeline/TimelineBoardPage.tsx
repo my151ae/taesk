@@ -807,7 +807,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }));
 
         setStoredMembers(boardId, normalized);
-        setModalProfiles(normalized.map(member => member.profile));
+        setModalProfiles(normalized.map((member: { profile: ProfileSummary; role: any }) => member.profile));
       } catch (error) {
         if (!cancelled) {
           console.warn('[timeline] error loading board members', error);
