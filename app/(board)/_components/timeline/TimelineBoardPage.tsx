@@ -667,6 +667,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, []);
 
   useEffect(() => {
+    if (isModalClosing) return;
+
     // If there's an activeCardId (from instant open) or cardIdFromUrl, try to load it.
     const targetShortId = activeCardId || cardIdFromUrl;
 
@@ -725,7 +727,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => {
       cancelled = true;
     };
-  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCard]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCard, isModalClosing]);
 
 
   const filteredData = useMemo(() => {
@@ -1161,6 +1166,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     status={status}
                     openCardModal={openCardModalFromTimeline}
                   />
+
                   <TimelineGrid
                     days={data?.days ?? []}
                     eventsByDay={eventsByDay}

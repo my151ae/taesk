@@ -72,6 +72,8 @@ export default function TimelineGrid({
     handleResizeMove,
     handleResizeEnd,
 }: TimelineGridProps) {
+    const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
+
     const renderEvent = (event: TimelineEvent, layout?: EventLayout) => {
         const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
         let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -102,7 +104,10 @@ export default function TimelineGrid({
                         left: layout?.left ?? '0%',
                         width: layout?.width ?? '100%',
                     }}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSlot(null);
+                    }}
                 >
                     <div className="flex items-start gap-2">
                         <span
@@ -159,8 +164,6 @@ export default function TimelineGrid({
         const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
         const indicatorPosition = indicatorTop ?? 0;
         const isFirstColumn = index === 0;
-
-        const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
         const handleSingleClick = (e: React.MouseEvent, dayIso: string) => {
             const rect = e.currentTarget.getBoundingClientRect();
