@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import { useState } from 'react';
 import { Board } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
@@ -55,6 +56,62 @@ export default function TimelineHeader({
     setSelectedPriority,
     availableTags,
 }: TimelineHeaderProps) {
+    const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+    const [newBoardName, setNewBoardName] = useState('');
+    const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
+
+    const handleCreateBoard = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newBoardName.trim()) return;
+
+        try {
+            setIsSubmittingBoard(true);
+            const response = await fetch('/api/boards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newBoardName.trim() }),
+            });
+
+            if (!response.ok) throw new Error('Failed to create board');
+
+            const { board } = await response.json();
+            window.location.href = `/b/${board.short_id}`;
+        } catch (error) {
+            console.error('Failed to create board:', error);
+            alert('Failed to create board');
+        } finally {
+            setIsSubmittingBoard(false);
+            setIsCreatingBoard(false);
+            setNewBoardName('');
+        }
+    };
+
+    const handleDeleteBoard = async (boardId: string, boardName: string) => {
+        if (!confirm(`Are you sure you want to delete "${boardName}"? This cannot be undone.`)) return;
+
+        try {
+            const response = await fetch(`/api/boards/${boardId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error?.message || 'Failed to delete board');
+            }
+
+            // If deleted current board, redirect to home (which will redirect to another board or show error)
+            if (boardId === board.id) {
+                window.location.href = '/board';
+            } else {
+                // Refresh page to update list
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('Failed to delete board:', error);
+            alert(error instanceof Error ? error.message : 'Failed to delete board');
+        }
+    };
+
     return (
         <>
             <header className="space-y-3">
@@ -76,22 +133,70 @@ export default function TimelineHeader({
                             Boards ▾
                         </button>
                         {showBoardMenu && (
-                            <div className="absolute right-0 z-40 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                            <div className="absolute right-0 z-40 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                                 <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
-                                <div className="max-h-64 overflow-y-auto">
+                                <div className="max-h-64 overflow-y-auto space-y-1">
                                     {modalBoards.map((b) => (
-                                        <button
-                                            key={b.id}
-                                            onClick={() => handleBoardNavigate(b)}
-                                            className={clsx(
-                                                'w-full rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
-                                                b.id === board.id && 'bg-slate-100 text-slate-900'
-                                            )}
-                                        >
-                                            <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
-                                            <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
-                                        </button>
+                                        <div key={b.id} className="group flex items-center gap-1 pr-2">
+                                            <button
+                                                onClick={() => handleBoardNavigate(b)}
+                                                className={clsx(
+                                                    'flex-1 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
+                                                    b.id === board.id && 'bg-slate-100 text-slate-900'
+                                                )}
+                                            >
+                                                <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
+                                                <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteBoard(b.id, b.name);
+                                                }}
+                                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                title="Delete board"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
                                     ))}
+                                </div>
+                                <div className="mt-2 border-t border-slate-100 pt-2 px-2">
+                                    {isCreatingBoard ? (
+                                        <form onSubmit={handleCreateBoard} className="space-y-2">
+                                            <input
+                                                type="text"
+                                                value={newBoardName}
+                                                onChange={(e) => setNewBoardName(e.target.value)}
+                                                placeholder="New board name"
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                                autoFocus
+                                            />
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSubmittingBoard || !newBoardName.trim()}
+                                                    className="flex-1 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
+                                                >
+                                                    Create
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCreatingBoard(false)}
+                                                    className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <button
+                                            onClick={() => setIsCreatingBoard(true)}
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
+                                        >
+                                            + Create new board
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
