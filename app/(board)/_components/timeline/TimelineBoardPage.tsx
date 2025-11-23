@@ -179,6 +179,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const { user, signOut } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isModalClosing, setIsModalClosing] = useState(false);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -324,6 +325,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const cardIdFromUrl = searchParams?.get('card');
 
   const modalCard = useMemo(() => {
+    if (isModalClosing) return null;
     const targetShortId = activeCardId || cardIdFromUrl;
     if (!targetShortId || !data) return null;
 
@@ -510,6 +512,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const target = query ? `${pathname}?${query}` : pathname;
       router.replace(target, { scroll: false });
     }
+    setIsModalClosing(true);
     setActiveCardId(null); // Clear active card
     cardModalShortIdRef.current = null;
     // setModalCard(null); // No longer needed as modalCard is memoized
@@ -572,6 +575,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const body = await response.json().catch(() => null);
           throw new Error(body?.error?.message || 'Failed to update card');
         }
+        const body = await response.json().catch(() => null);
+        if (body?.card) {
+          const updatedCard = body.card;
+          setData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              events: prev.events.map((e) =>
+                e.card_id === updatedCard.id
+                  ? { ...e, title: updatedCard.title, priority: updatedCard.priority, checked: updatedCard.checked }
+                  : e
+              ),
+              // Also update buckets if needed (simplified for now)
+              abBuckets: prev.abBuckets // TODO: Update buckets if needed
+            };
+          });
+        }
         // No need to setModalCard here, as the realtime update will handle it
         // and the memoized modalCard will re-evaluate.
         // await fetchTimeline(); // Realtime should handle this
@@ -617,6 +637,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const targetShortId = activeCardId || cardIdFromUrl;
 
     if (!targetShortId) {
+      if (isModalClosing) {
+        setIsModalClosing(false);
+      }
       cardModalShortIdRef.current = null;
       // setModalCard(null); // No longer needed
       setModalProfiles([]);

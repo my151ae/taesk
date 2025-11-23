@@ -102,6 +102,7 @@ export default function TimelineGrid({
                         left: layout?.left ?? '0%',
                         width: layout?.width ?? '100%',
                     }}
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-start gap-2">
                         <span
