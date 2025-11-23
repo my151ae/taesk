@@ -667,8 +667,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, []);
 
   useEffect(() => {
-    if (isModalClosing) return;
-
     // If there's an activeCardId (from instant open) or cardIdFromUrl, try to load it.
     const targetShortId = activeCardId || cardIdFromUrl;
 
@@ -682,6 +680,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setCardModalStatus('idle');
       setCardModalError(null);
       return;
+    }
+
+    // Handle race condition where modal is closing but URL hasn't updated yet
+    if (isModalClosing) {
+      if (activeCardId) {
+        // If we have an explicit activeCardId, it means a new card was clicked.
+        // We should cancel the closing state and proceed.
+        setIsModalClosing(false);
+      } else {
+        // Otherwise, it's likely the stale URL from the card being closed.
+        // Ignore it to prevent 404s or re-opening.
+        return;
+      }
     }
 
     // Prevent re-fetching if the card is already loaded or loading
