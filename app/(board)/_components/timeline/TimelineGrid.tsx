@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
-import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent, useState } from 'react';
+import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent, useState, useEffect } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -73,6 +73,13 @@ export default function TimelineGrid({
     handleResizeEnd,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
+
+    // Clear ghost card when clicking outside
+    useEffect(() => {
+        const handleGlobalClick = () => setSelectedSlot(null);
+        window.addEventListener('click', handleGlobalClick);
+        return () => window.removeEventListener('click', handleGlobalClick);
+    }, []);
 
     const renderEvent = (event: TimelineEvent, layout?: EventLayout) => {
         const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -166,10 +173,11 @@ export default function TimelineGrid({
         const isFirstColumn = index === 0;
 
         const handleSingleClick = (e: React.MouseEvent, dayIso: string) => {
+            e.stopPropagation();
             const rect = e.currentTarget.getBoundingClientRect();
             const y = e.clientY - rect.top;
             const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
-            const snapped = Math.floor(minutes / 30) * 30;
+            const snapped = Math.round(minutes / 15) * 15;
             setSelectedSlot({ day: dayIso, minutes: snapped });
         };
 
