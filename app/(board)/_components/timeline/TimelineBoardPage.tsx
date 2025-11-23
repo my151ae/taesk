@@ -580,11 +580,29 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const updatedCard = body.card;
           setData((prev) => {
             if (!prev) return prev;
+
+            // Helper to calculate duration
+            const start = getMinutesFromTime(updatedCard.due_start);
+            const end = getMinutesFromTime(updatedCard.due_end);
+            const duration = start !== null && end !== null ? Math.max(end - start, 0) : null;
+
             return {
               ...prev,
               events: prev.events.map((e) =>
                 e.card_id === updatedCard.id
-                  ? { ...e, title: updatedCard.title, priority: updatedCard.priority, checked: updatedCard.checked }
+                  ? {
+                    ...e,
+                    title: updatedCard.title,
+                    priority: updatedCard.priority,
+                    checked: updatedCard.checked,
+                    due_date: getIsoDateJst(updatedCard.due_date ?? ''),
+                    due_start: updatedCard.due_start,
+                    due_end: updatedCard.due_end,
+                    durationMinutes: duration,
+                    tags: updatedCard.tags,
+                    assignee_id: updatedCard.assignee_id,
+                    assigned_to: updatedCard.assigned_to
+                  }
                   : e
               ),
               // Also update buckets if needed (simplified for now)
@@ -617,6 +635,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const body = await response.json().catch(() => null);
           throw new Error(body?.error?.message || 'Failed to delete card');
         }
+
+        // Optimistic delete
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.filter(e => e.card_id !== modalCard?.id),
+            abBuckets: Object.fromEntries(
+              Object.entries(prev.abBuckets).map(([key, items]) => [
+                key,
+                items.filter(item => item.card_id !== modalCard?.id)
+              ])
+            )
+          };
+        });
+
         // await fetchTimeline(); // Realtime should handle this
       } catch (error) {
         console.error('[timeline] delete card failed', error);
