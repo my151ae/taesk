@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import { generateShortId, slugify } from '@/lib/card-utils';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
@@ -120,6 +121,29 @@ export async function POST(
       position = maxPos + 1000; // Add gap
     }
 
+    let shortId = parsed.data.short_id;
+    if (!shortId) {
+      shortId = generateShortId();
+      // Simple collision check could be added here if needed
+    }
+
+    let idShort = parsed.data.id_short;
+    if (idShort === undefined || idShort === null) {
+      const { data: maxIdShortData } = await supabase
+        .from('cards')
+        .select('id_short')
+        .eq('board_id', boardId)
+        .order('id_short', { ascending: false })
+        .limit(1);
+
+      idShort = (maxIdShortData?.[0]?.id_short ?? 0) + 1;
+    }
+
+    let slug = parsed.data.slug;
+    if (!slug) {
+      slug = slugify(parsed.data.title);
+    }
+
     const payload: Record<string, unknown> = {
       board_id: boardId,
       id: parsed.data.id,
@@ -139,9 +163,9 @@ export async function POST(
       assignee_id: parsed.data.assignee_id ?? null,
       assigned_to: parsed.data.assigned_to ?? null,
       user_id: parsed.data.user_id ?? user.id,
-      short_id: parsed.data.short_id ?? null,
-      id_short: parsed.data.id_short ?? null,
-      slug: parsed.data.slug ?? null,
+      short_id: shortId,
+      id_short: idShort,
+      slug: slug,
       created_at: parsed.data.created_at,
       updated_at: parsed.data.updated_at,
     };
