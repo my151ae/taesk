@@ -122,6 +122,8 @@ export default function TimelineHeader({
                         onClick={async () => {
                             try {
                                 await signOut();
+                                // Redirect to login page after successful sign out
+                                window.location.href = '/login';
                             } catch (error) {
                                 console.error('Failed to sign out', error);
                             }
