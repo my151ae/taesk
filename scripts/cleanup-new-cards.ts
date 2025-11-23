@@ -16,12 +16,12 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function cleanup() {
-    console.log('Searching for "New Card" created today...');
+    console.log('Searching for "New Card" or cards with missing short_id...');
 
     const { data: cards, error } = await supabase
         .from('cards')
-        .select('id, title, created_at')
-        .eq('title', 'New Card');
+        .select('id, title, short_id, created_at')
+        .or('title.eq.New Card,short_id.is.null');
 
     if (error) {
         console.error('Error fetching cards:', error);
@@ -39,7 +39,7 @@ async function cleanup() {
     const { error: deleteError } = await supabase
         .from('cards')
         .delete()
-        .eq('title', 'New Card');
+        .or('title.eq.New Card,short_id.is.null');
 
     if (deleteError) {
         console.error('Error deleting cards:', deleteError);

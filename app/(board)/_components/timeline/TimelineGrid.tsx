@@ -169,7 +169,7 @@ export default function TimelineGrid({
         return (
             <DroppableColumn key={day.isoDate} day={day}>
                 <div
-                    className="relative h-full border-l border-slate-100 px-4 pb-8"
+                    className="relative h-full border-l border-slate-100 px-4 pb-8 select-none"
                     style={{ minHeight: timelineViewportHeight }}
                     onDoubleClick={handleClick}
                 >
