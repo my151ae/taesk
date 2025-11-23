@@ -127,6 +127,22 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
   }
 
+  // Sync display_name to user_metadata for immediate availability in useAuth
+  if (display_name !== undefined) {
+    const { error: authUpdateError } = await supabase.auth.updateUser({
+      data: {
+        full_name: display_name.trim(),
+        name: display_name.trim(), // Some providers use 'name'
+        display_name: display_name.trim(), // Custom field
+      }
+    });
+
+    if (authUpdateError) {
+      console.warn('Failed to sync display_name to user_metadata:', authUpdateError);
+      // Non-critical error, continue
+    }
+  }
+
   return NextResponse.json(profile, { status: 200 });
 }
 
