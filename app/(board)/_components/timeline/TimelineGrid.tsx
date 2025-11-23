@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
-import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent } from 'react';
+import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent, useState } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -159,7 +159,22 @@ export default function TimelineGrid({
         const indicatorPosition = indicatorTop ?? 0;
         const isFirstColumn = index === 0;
 
-        const handleClick = (e: MouseEvent) => {
+        const [hoveredTime, setHoveredTime] = useState<{ day: string, minutes: number } | null>(null);
+
+        const handleMouseMove = (e: React.MouseEvent, dayIso: string) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
+            // Snap to 30 mins
+            const snapped = Math.floor(minutes / 30) * 30;
+            setHoveredTime({ day: dayIso, minutes: snapped });
+        };
+
+        const handleMouseLeave = () => {
+            setHoveredTime(null);
+        };
+
+        const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const y = e.clientY - rect.top;
             const minutes = Math.round((y / HOUR_HEIGHT) * 60);
@@ -172,7 +187,27 @@ export default function TimelineGrid({
                     className="relative h-full border-l border-slate-100 px-4 pb-8 select-none"
                     style={{ minHeight: timelineViewportHeight }}
                     onDoubleClick={handleClick}
+                    onMouseMove={(e) => handleMouseMove(e, day.isoDate)}
+                    onMouseLeave={handleMouseLeave}
                 >
+                    {/* Phantom Card */}
+                    {hoveredTime?.day === day.isoDate && (
+                        <div
+                            className="absolute rounded border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
+                            style={{
+                                top: minuteToPixels(hoveredTime.minutes),
+                                height: minuteToPixels(60),
+                                left: 16,
+                                right: 16,
+                                width: 'calc(100% - 32px)'
+                            }}
+                        >
+                            <div className="p-1 text-xs text-blue-500 font-medium">
+                                {minutesToTime(hoveredTime.minutes)}
+                            </div>
+                        </div>
+                    )}
+
                     <div
                         className="pointer-events-none absolute"
                         style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}

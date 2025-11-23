@@ -834,7 +834,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           };
         });
 
-        openCardModalFromTimeline(newCard.short_id, 'create');
+        // openCardModalFromTimeline(newCard.short_id, 'create');
 
         // Fetch in background - skipped because realtime subscription will handle it
         // and it causes unnecessary load/delay
