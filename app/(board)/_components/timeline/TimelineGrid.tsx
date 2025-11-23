@@ -42,7 +42,7 @@ type TimelineGridProps = {
     openCardModal: (shortId: string | null, source: string) => void;
     handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
     handleColumnClick: (day: TimelineDay, minutes: number) => void;
-    handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number) => void;
+    handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => void;
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
 };
@@ -82,10 +82,11 @@ export default function TimelineGrid({
     }, []);
 
     const renderEvent = (event: TimelineEvent, layout?: EventLayout) => {
-        const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
+        let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
         let duration = Math.max(event.durationMinutes ?? 60, 30);
 
         if (activeResize && activeResize.cardId === event.card_id) {
+            start = activeResize.startMinutes;
             duration = activeResize.duration;
         }
 
@@ -116,18 +117,18 @@ export default function TimelineGrid({
                         setSelectedSlot(null);
                     }}
                 >
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-2 pr-6">
                         <span
                             aria-hidden="true"
                             className={clsx(
-                                'flex h-3.5 w-3.5 items-center justify-center rounded border text-[8px] font-bold',
+                                'flex h-3.5 w-3.5 items-center justify-center rounded border text-[8px] font-bold mt-0.5',
                                 event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
                             )}
                         >
                             ✓
                         </span>
-                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-1 text-[11px] font-semibold text-slate-800">
-                            <span className="min-w-0 flex-1 break-words leading-tight">
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
+                            <span className="break-words leading-tight">
                                 {event.title || 'Untitled card'}
                             </span>
                             <span
@@ -137,26 +138,33 @@ export default function TimelineGrid({
                                 {timeLabel(event.due_start, event.due_end)}
                             </span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={(native) => {
-                                native.stopPropagation();
-                                openCardModal(event.short_id, 'event-button');
-                            }}
-                            onPointerDown={(native) => {
-                                native.stopPropagation();
-                            }}
-                            className="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
-                            aria-label="Open card"
-                            data-testid={`cardOpenButton-${event.card_id}`}
-                        >
-                            ↗
-                        </button>
                     </div>
 
+                    <button
+                        type="button"
+                        onClick={(native) => {
+                            native.stopPropagation();
+                            openCardModal(event.short_id, 'event-button');
+                        }}
+                        onPointerDown={(native) => {
+                            native.stopPropagation();
+                        }}
+                        className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-semibold text-slate-500 shadow-sm hover:border-sky-300 hover:text-sky-600"
+                        aria-label="Open card"
+                        data-testid={`cardOpenButton-${event.card_id}`}
+                    >
+                        ↗
+                    </button>
+
                     <div
-                        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100"
-                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration)}
+                        className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}
+                        onPointerMove={handleResizeMove}
+                        onPointerUp={handleResizeEnd}
+                    />
+                    <div
+                        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'bottom')}
                         onPointerMove={handleResizeMove}
                         onPointerUp={handleResizeEnd}
                     />

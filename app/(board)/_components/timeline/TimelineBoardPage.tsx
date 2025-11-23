@@ -184,23 +184,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  useEffect(() => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return;
-
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch('/api/profiles');
-        if (response.ok) {
-          const data = await response.json();
-          setProfile(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
+    try {
+      const response = await fetch('/api/profiles');
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
       }
-    };
-
-    fetchProfile();
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    }
   }, [user]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
@@ -860,7 +859,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     const baseUrl = buildBoardUrl(initialBoard);
     const url = `${baseUrl}?card=${shortId}`;
-    router.push(url);
+    router.push(url, { scroll: false });
   }, [dataMode, initialBoard, router]);
 
   const handleBoardNavigate = useCallback(
@@ -1170,6 +1169,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   ))}
                 </div>
                 <div className="relative" style={{ minHeight: timelineViewportHeight }}>
+                  {(status === 'loading' || !data) && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
+                    </div>
+                  )}
                   <TimelineBuckets
                     days={data?.days ?? []}
                     abBuckets={abBuckets}
@@ -1237,7 +1241,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   ✕
                 </button>
               </div>
-              <ProfileSettings onProfileUpdated={() => fetchTimeline()} />
+              <ProfileSettings onProfileUpdated={fetchProfile} />
             </div>
           </div>
         )

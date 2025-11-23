@@ -221,7 +221,7 @@ export default function TimelineHeader({
                         className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                         data-testid="profile-button"
                     >
-                        {profile?.display_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Profile'}
+                        {profile?.display_name || 'Profile'}
                     </button>
                     <button
                         onClick={async () => {

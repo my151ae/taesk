@@ -49,8 +49,10 @@ export type ActiveResizeState = {
     cardId: string;
     startMinutes: number;
     duration: number;
+    originalStartMinutes: number;
     originalDuration: number;
     startY: number;
+    edge: 'top' | 'bottom';
 };
 
 type PlacementMeta = {
@@ -435,7 +437,7 @@ export function useTimelineDragAndDrop({
         );
     };
 
-    const handleResizeStart = useCallback((e: PointerEvent, cardId: string, startMinutes: number, duration: number) => {
+    const handleResizeStart = useCallback((e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => {
         e.preventDefault();
         e.stopPropagation();
         const target = e.currentTarget as HTMLElement;
@@ -444,8 +446,10 @@ export function useTimelineDragAndDrop({
             cardId,
             startMinutes,
             duration,
+            originalStartMinutes: startMinutes,
             originalDuration: duration,
             startY: e.clientY,
+            edge,
         });
     }, []);
 
@@ -456,14 +460,35 @@ export function useTimelineDragAndDrop({
 
         const deltaY = e.clientY - activeResize.startY;
         const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 15) * 15;
-        const newDuration = Math.max(15, activeResize.originalDuration + deltaMinutes);
 
-        const endMinutes = activeResize.startMinutes + newDuration;
-        const maxEnd = 24 * 60;
-        const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
+        if (activeResize.edge === 'bottom') {
+            const newDuration = Math.max(15, activeResize.originalDuration + deltaMinutes);
+            const endMinutes = activeResize.startMinutes + newDuration;
+            const maxEnd = 24 * 60;
+            const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
 
-        if (cappedDuration !== activeResize.duration) {
-            setActiveResize(prev => prev ? { ...prev, duration: cappedDuration } : null);
+            if (cappedDuration !== activeResize.duration) {
+                setActiveResize(prev => prev ? { ...prev, duration: cappedDuration } : null);
+            }
+        } else { // activeResize.edge === 'top'
+            let newStart = activeResize.originalStartMinutes + deltaMinutes;
+            let newDuration = activeResize.originalDuration - deltaMinutes;
+
+            // Ensure minimum duration
+            if (newDuration < 15) {
+                newDuration = 15;
+                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 15;
+            }
+
+            // Ensure start time is not negative
+            if (newStart < 0) {
+                newStart = 0;
+                newDuration = activeResize.originalStartMinutes + activeResize.originalDuration;
+            }
+
+            if (newStart !== activeResize.startMinutes || newDuration !== activeResize.duration) {
+                setActiveResize(prev => prev ? { ...prev, startMinutes: newStart, duration: newDuration } : null);
+            }
         }
     }, [activeResize]);
 
@@ -474,18 +499,26 @@ export function useTimelineDragAndDrop({
         const target = e.currentTarget as HTMLElement;
         target.releasePointerCapture(e.pointerId);
 
-        if (activeResize.duration !== activeResize.originalDuration) {
+        if (activeResize.duration !== activeResize.originalDuration || activeResize.startMinutes !== activeResize.originalStartMinutes) {
             const cardId = activeResize.cardId;
             const newEnd = activeResize.startMinutes + activeResize.duration;
-            const payload = {
+            const payload: Record<string, unknown> = {
                 due_end: minutesToTime(newEnd),
             };
+            if (activeResize.edge === 'top') {
+                payload.due_start = minutesToTime(activeResize.startMinutes);
+            }
 
             setData(current => {
                 if (!current) return current;
                 const nextEvents = current.events.map(ev => {
                     if (ev.card_id === cardId) {
-                        return { ...ev, durationMinutes: activeResize.duration, due_end: minutesToTime(newEnd) };
+                        return {
+                            ...ev,
+                            durationMinutes: activeResize.duration,
+                            due_end: minutesToTime(newEnd),
+                            due_start: minutesToTime(activeResize.startMinutes)
+                        };
                     }
                     return ev;
                 });
