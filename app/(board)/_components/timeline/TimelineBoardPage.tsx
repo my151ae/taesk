@@ -173,11 +173,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
-  const [modalCard, setModalCard] = useState<Card | null>(null);
   const [cardModalStatus, setCardModalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [cardModalError, setCardModalError] = useState<string | null>(null);
   const cardModalShortIdRef = useRef<string | null>(null);
   const { user, signOut } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -320,6 +321,81 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
 
   const searchParamsString = searchParams?.toString() ?? '';
+  const cardIdFromUrl = searchParams?.get('card');
+
+  const modalCard = useMemo(() => {
+    const targetShortId = activeCardId || cardIdFromUrl;
+    if (!targetShortId || !data) return null;
+
+    // Find in events
+    const eventCard = data.events.find(e => e.short_id === targetShortId);
+    if (eventCard) {
+      // Convert TimelineEvent back to Card (partial) for modal
+      return {
+        id: eventCard.card_id,
+        title: eventCard.title,
+        description: '', // Description is not in TimelineEvent, will be fetched
+        tags: eventCard.tags,
+        priority: eventCard.priority,
+        checked: eventCard.checked,
+        short_id: eventCard.short_id,
+        slug: eventCard.slug,
+        due_date: eventCard.due_date,
+        due_start: eventCard.due_start,
+        due_end: eventCard.due_end,
+        due_channel: 'timeline', // Assuming it's from timeline
+        due_bucket: null,
+        due_bucket_position: null,
+        board_id: initialBoard.id, // Add board_id
+        created_at: '', // Placeholder
+        updated_at: '', // Placeholder
+        assignee_id: null, // Placeholder
+        assigned_to: null, // Placeholder
+        list_id: '', // Placeholder
+        position: 0, // Placeholder
+        user_id: null, // Placeholder
+        assignee_ids: [], // Placeholder
+        id_short: null, // Placeholder
+      } as Card;
+    }
+
+    // Find in buckets
+    for (const key in data.abBuckets) {
+      const bucketItem = data.abBuckets[key].find(b => b.short_id === targetShortId);
+      if (bucketItem) {
+        // Convert TimelineBucketItem back to Card (partial) for modal
+        return {
+          id: bucketItem.card_id,
+          title: bucketItem.title,
+          description: '', // Description is not in TimelineBucketItem, will be fetched
+          tags: bucketItem.tags,
+          priority: 'medium', // Default priority
+          checked: bucketItem.checked,
+          short_id: bucketItem.short_id,
+          slug: bucketItem.slug,
+          due_date: bucketItem.due_date,
+          due_start: bucketItem.due_start,
+          due_end: bucketItem.due_end,
+          due_channel: 'ab-list', // Correct type
+          due_bucket: key as DueBucket,
+          due_bucket_position: bucketItem.bucketPosition,
+          board_id: initialBoard.id, // Add board_id
+          created_at: '', // Placeholder
+          updated_at: '', // Placeholder
+          assignee_id: null, // Placeholder
+          assigned_to: null, // Placeholder
+          list_id: '', // Placeholder
+          position: 0, // Placeholder
+          user_id: null, // Placeholder
+          assignee_ids: [], // Placeholder
+          id_short: null, // Placeholder
+        } as Card;
+      }
+    }
+
+    return null;
+  }, [data, activeCardId, cardIdFromUrl, initialBoard.id]);
+
 
   useEffect(() => {
     setAvailableBoards((prev) => {
@@ -434,8 +510,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const target = query ? `${pathname}?${query}` : pathname;
       router.replace(target, { scroll: false });
     }
+    setActiveCardId(null); // Clear active card
     cardModalShortIdRef.current = null;
-    setModalCard(null);
+    // setModalCard(null); // No longer needed as modalCard is memoized
     setModalProfiles([]);
     setCardModalStatus('idle');
     setCardModalError(null);
@@ -457,6 +534,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       due_bucket?: DueBucket | null,
       due_bucket_position?: number | null
     ) => {
+      // Use the memoized modalCard for targetCard
       const targetCard = modalCard && modalCard.id === id ? modalCard : null;
       if (!targetCard) return;
       try {
@@ -494,11 +572,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const body = await response.json().catch(() => null);
           throw new Error(body?.error?.message || 'Failed to update card');
         }
-        const body = await response.json().catch(() => null);
-        if (body?.card) {
-          setModalCard(body.card as Card);
-        }
-        await fetchTimeline();
+        // No need to setModalCard here, as the realtime update will handle it
+        // and the memoized modalCard will re-evaluate.
+        // await fetchTimeline(); // Realtime should handle this
       } catch (error) {
         console.error('[timeline] save card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
@@ -506,7 +582,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         closeCardModal();
       }
     },
-    [modalCard, closeCardModal, fetchTimeline]
+    [modalCard, closeCardModal]
   );
 
   const handleCardModalDelete = useCallback(
@@ -521,7 +597,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const body = await response.json().catch(() => null);
           throw new Error(body?.error?.message || 'Failed to delete card');
         }
-        await fetchTimeline();
+        // await fetchTimeline(); // Realtime should handle this
       } catch (error) {
         console.error('[timeline] delete card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to delete card');
@@ -529,7 +605,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         closeCardModal();
       }
     },
-    [modalCard, closeCardModal, fetchTimeline]
+    [modalCard, closeCardModal]
   );
 
   const handleCardModalMove = useCallback((cardId: string, targetBoardId: string) => {
@@ -537,34 +613,37 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParamsString);
-    const shortId = params.get('card');
-    if (!shortId) {
+    // If there's an activeCardId (from instant open) or cardIdFromUrl, try to load it.
+    const targetShortId = activeCardId || cardIdFromUrl;
+
+    if (!targetShortId) {
       cardModalShortIdRef.current = null;
-      setModalCard(null);
+      // setModalCard(null); // No longer needed
       setModalProfiles([]);
       setCardModalStatus('idle');
       setCardModalError(null);
       return;
     }
-    if (cardModalShortIdRef.current === shortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
+
+    // Prevent re-fetching if the card is already loaded or loading
+    if (cardModalShortIdRef.current === targetShortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
       return;
     }
-    cardModalShortIdRef.current = shortId;
+    cardModalShortIdRef.current = targetShortId;
 
     let cancelled = false;
     const loadCard = async () => {
       setCardModalStatus('loading');
       setCardModalError(null);
       try {
-        const response = await fetch(`/api/cards/${shortId}`);
+        const response = await fetch(`/api/cards/${targetShortId}`);
         if (!response.ok) {
           const body = await response.json().catch(() => null);
           throw new Error(body?.error?.message || 'Failed to load card');
         }
         const body = await response.json();
         if (cancelled) return;
-        setModalCard(body.card ?? null);
+        // setModalCard(body.card ?? null); // No longer needed, memoized `modalCard` will use this data
         setModalProfiles(body.profiles ?? []);
         setCardModalStatus(body.card ? 'ready' : 'error');
         if (!body.card) {
@@ -578,11 +657,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       }
     };
 
-    loadCard();
+    // Only load if the memoized modalCard is not yet available or is different
+    if (!modalCard || modalCard.short_id !== targetShortId) {
+      loadCard();
+    } else {
+      // If modalCard is already available from memoization, set status to ready
+      setCardModalStatus('ready');
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [searchParamsString]);
+  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCard]);
+
 
   const filteredData = useMemo(() => {
     if (!data) return null;
@@ -678,27 +765,30 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           console.error('[timeline] patch failed', response.status, body);
           throw new Error(body?.error?.message || 'Patch failed');
         }
-        fetchTimeline();
+        // fetchTimeline(); // Realtime should handle this
       } catch (error) {
         console.error('[timeline] update error', error);
         setErrorMessage('Failed to update card');
       }
     },
-    [dataMode, fetchTimeline, initialBoard.id]
+    [dataMode, initialBoard.id]
   );
 
 
 
   const openCardModalFromTimeline = useCallback((shortId: string | null, debugSource?: string) => {
     if (dataMode !== 'api') return;
-    if (!shortId) return;
+    if (!shortId) return; // Requires a shortId to open
+
     console.log('[timeline] openCardModal', { shortId, source: debugSource });
-    if (canonicalBoardPath) {
-      router.push(`${canonicalBoardPath}?card=${shortId}`);
-    } else {
-      router.push(`/c/${shortId}`);
-    }
-  }, [canonicalBoardPath, dataMode, router]);
+
+    // Instant open via local state
+    setActiveCardId(shortId);
+
+    const baseUrl = buildBoardUrl(initialBoard);
+    const url = `${baseUrl}?card=${shortId}`;
+    router.push(url);
+  }, [dataMode, initialBoard, router]);
 
   const handleBoardNavigate = useCallback(
     (board: Board) => {
@@ -817,7 +907,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const end = getMinutesFromTime(newCard.due_end ?? null) ?? (start + 60);
           const newEvent: TimelineEvent = {
             card_id: newCard.id,
-            due_date: newCard.due_date ?? '',
+            due_date: getIsoDateJst(newCard.due_date ?? ''),
             due_start: newCard.due_start ?? null,
             due_end: newCard.due_end ?? null,
             durationMinutes: end - start,
