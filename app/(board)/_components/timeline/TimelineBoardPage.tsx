@@ -807,9 +807,37 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       });
       if (!response.ok) throw new Error('Failed to create card');
       const body = await response.json();
-      await fetchTimeline();
+
       if (body.card) {
-        openCardModalFromTimeline(body.card.short_id, 'create');
+        // Optimistic update
+        const newCard = body.card as Card;
+        setData((prev) => {
+          if (!prev) return prev;
+          const start = getMinutesFromTime(newCard.due_start ?? null) ?? 0;
+          const end = getMinutesFromTime(newCard.due_end ?? null) ?? (start + 60);
+          const newEvent: TimelineEvent = {
+            card_id: newCard.id,
+            due_date: newCard.due_date ?? '',
+            due_start: newCard.due_start ?? null,
+            due_end: newCard.due_end ?? null,
+            durationMinutes: end - start,
+            title: newCard.title,
+            tags: newCard.tags ?? [],
+            priority: newCard.priority ?? null,
+            checked: newCard.checked ?? false,
+            short_id: newCard.short_id ?? null,
+            slug: newCard.slug ?? null,
+          };
+          return {
+            ...prev,
+            events: [...prev.events, newEvent],
+          };
+        });
+
+        openCardModalFromTimeline(newCard.short_id, 'create');
+
+        // Fetch in background
+        fetchTimeline();
       }
     } catch (error) {
       console.error('Create card failed', error);
