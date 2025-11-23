@@ -63,7 +63,7 @@ export async function GET(
   const targetDates = [todayIso, tomorrowIso];
 
   const baseSelect =
-    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, priority, checked, assignee_id, assigned_to, short_id, id_short, slug';
+    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -125,6 +125,7 @@ export async function GET(
         priority: card.priority,
         checked: card.checked,
         assignee_id: card.assignee_id,
+        assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
         short_id: card.short_id,
         slug: card.slug,
@@ -141,6 +142,9 @@ export async function GET(
         due_end: card.due_end,
         checked: card.checked,
         tags: card.tags ?? [],
+        assignee_id: card.assignee_id,
+        assignee_ids: card.assignee_ids ?? null,
+        assigned_to: card.assigned_to,
         short_id: card.short_id,
         slug: card.slug,
         bucketPosition: card.due_bucket_position ?? null,

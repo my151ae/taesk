@@ -165,13 +165,16 @@ export function useTimelineDragAndDrop({
                         due_start: nextStart,
                         due_end: nextEnd,
                         durationMinutes,
-                        title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
-                        tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
-                        priority: baseEvent?.priority ?? null,
-                        checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
-                        short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
-                        slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
-                    };
+                    title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
+                    tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+                    priority: baseEvent?.priority ?? null,
+                    checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
+                    assignee_id: baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
+                    assignee_ids: baseEvent?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
+                    assigned_to: baseEvent?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
+                    short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
+                    slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+                };
 
                     nextEvents.push(replacement);
                     nextEvents.sort((a, b) => {
@@ -201,6 +204,9 @@ export function useTimelineDragAndDrop({
                         due_end: (payload.due_end as string | null) ?? null,
                         checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
                         tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
+                        assignee_id: baseBucketItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
+                        assignee_ids: baseBucketItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
+                        assigned_to: baseBucketItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
                         short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
                         slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
                         bucketPosition,

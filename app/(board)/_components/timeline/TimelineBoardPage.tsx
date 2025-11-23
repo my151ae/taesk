@@ -50,6 +50,7 @@ import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { useTimelineDragAndDrop, bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 type TimelineBoardPageProps = {
@@ -173,6 +174,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
+  const [modalCardOverride, setModalCardOverride] = useState<Card | null>(null);
   const [cardModalStatus, setCardModalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [cardModalError, setCardModalError] = useState<string | null>(null);
   const cardModalShortIdRef = useRef<string | null>(null);
@@ -183,6 +185,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -272,6 +275,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             tags: card.tags ?? [],
             priority: card.priority,
             checked: card.checked,
+            assignee_id: card.assignee_id,
+            assignee_ids: card.assignee_ids ?? null,
+            assigned_to: card.assigned_to,
             short_id: card.short_id,
             slug: card.slug,
           });
@@ -299,6 +305,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             due_end: card.due_end,
             checked: card.checked,
             tags: card.tags ?? [],
+            assignee_id: card.assignee_id,
+            assignee_ids: card.assignee_ids ?? null,
+            assigned_to: card.assigned_to,
             short_id: card.short_id,
             slug: card.slug,
             bucketPosition: card.due_bucket_position,
@@ -323,7 +332,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const searchParamsString = searchParams?.toString() ?? '';
   const cardIdFromUrl = searchParams?.get('card');
 
-  const modalCard = useMemo(() => {
+  const modalCardFromData = useMemo(() => {
     if (isModalClosing) return null;
     const targetShortId = activeCardId || cardIdFromUrl;
     if (!targetShortId || !data) return null;
@@ -350,12 +359,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         board_id: initialBoard.id, // Add board_id
         created_at: '', // Placeholder
         updated_at: '', // Placeholder
-        assignee_id: null, // Placeholder
-        assigned_to: null, // Placeholder
+        assignee_id: eventCard.assignee_id ?? null,
+        assignee_ids: eventCard.assignee_ids ?? null,
+        assigned_to: eventCard.assigned_to ?? null,
         list_id: '', // Placeholder
         position: 0, // Placeholder
         user_id: null, // Placeholder
-        assignee_ids: [], // Placeholder
         id_short: null, // Placeholder
       } as Card;
     }
@@ -383,12 +392,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           board_id: initialBoard.id, // Add board_id
           created_at: '', // Placeholder
           updated_at: '', // Placeholder
-          assignee_id: null, // Placeholder
-          assigned_to: null, // Placeholder
+          assignee_id: bucketItem.assignee_id ?? null,
+          assignee_ids: bucketItem.assignee_ids ?? null,
+          assigned_to: bucketItem.assigned_to ?? null,
           list_id: '', // Placeholder
           position: 0, // Placeholder
           user_id: null, // Placeholder
-          assignee_ids: [], // Placeholder
           id_short: null, // Placeholder
         } as Card;
       }
@@ -396,6 +405,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     return null;
   }, [data, activeCardId, cardIdFromUrl, initialBoard.id]);
+
+  const modalCard = useMemo(
+    () => modalCardOverride ?? modalCardFromData,
+    [modalCardOverride, modalCardFromData]
+  );
 
 
   useEffect(() => {
@@ -515,6 +529,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setActiveCardId(null); // Clear active card
     cardModalShortIdRef.current = null;
     // setModalCard(null); // No longer needed as modalCard is memoized
+    setModalCardOverride(null);
     setModalProfiles([]);
     setCardModalStatus('idle');
     setCardModalError(null);
@@ -563,6 +578,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         };
         if (assigneeTouched) {
           payload.assignee_id = nextAssignee;
+          payload.assignee_ids = assigneeIds && assigneeIds.length > 0 ? assigneeIds : null;
           payload.assigned_to = null;
         }
         const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
@@ -570,13 +586,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        const body = await response.json().catch(() => null);
         if (!response.ok) {
-          const body = await response.json().catch(() => null);
+          console.error('[timeline] save card failed', {
+            status: response.status,
+            body,
+          });
           throw new Error(body?.error?.message || 'Failed to update card');
         }
-        const body = await response.json().catch(() => null);
         if (body?.card) {
-          const updatedCard = body.card;
+          const updatedCard = body.card as Card;
+          setModalCardOverride(updatedCard);
           setData((prev) => {
             if (!prev) return prev;
 
@@ -594,29 +614,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     title: updatedCard.title,
                     priority: updatedCard.priority,
                     checked: updatedCard.checked,
+                    assignee_id: updatedCard.assignee_id,
+                    assignee_ids: updatedCard.assignee_ids ?? null,
+                    assigned_to: updatedCard.assigned_to,
                     due_date: getIsoDateJst(updatedCard.due_date ?? ''),
                     due_start: updatedCard.due_start,
                     due_end: updatedCard.due_end,
                     durationMinutes: duration,
                     tags: updatedCard.tags,
-                    assignee_id: updatedCard.assignee_id,
-                    assigned_to: updatedCard.assigned_to
                   }
                   : e
               ),
-              // Also update buckets if needed (simplified for now)
-              abBuckets: prev.abBuckets // TODO: Update buckets if needed
+              abBuckets: Object.fromEntries(
+                Object.entries(prev.abBuckets).map(([key, items]) => [
+                  key,
+                  items.map(item =>
+                    item.card_id === updatedCard.id
+                      ? {
+                        ...item,
+                        title: updatedCard.title,
+                        checked: updatedCard.checked,
+                        tags: updatedCard.tags ?? [],
+                        due_date: getIsoDateJst(updatedCard.due_date ?? ''),
+                        due_start: updatedCard.due_start,
+                        due_end: updatedCard.due_end,
+                        assignee_id: updatedCard.assignee_id,
+                        assignee_ids: updatedCard.assignee_ids ?? null,
+                        assigned_to: updatedCard.assigned_to,
+                        bucketPosition: updatedCard.due_bucket_position ?? item.bucketPosition,
+                      }
+                      : item
+                  )
+                ])
+              )
             };
           });
         }
         // No need to setModalCard here, as the realtime update will handle it
         // and the memoized modalCard will re-evaluate.
         // await fetchTimeline(); // Realtime should handle this
+        closeCardModal();
       } catch (error) {
         console.error('[timeline] save card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
-      } finally {
-        closeCardModal();
       }
     },
     [modalCard, closeCardModal]
@@ -704,6 +744,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const loadCard = async () => {
       setCardModalStatus('loading');
       setCardModalError(null);
+      setModalCardOverride(null);
       try {
         const response = await fetch(`/api/cards/${targetShortId}`);
         if (!response.ok) {
@@ -712,8 +753,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }
         const body = await response.json();
         if (cancelled) return;
-        // setModalCard(body.card ?? null); // No longer needed, memoized `modalCard` will use this data
-        setModalProfiles(body.profiles ?? []);
+        setModalCardOverride(body.card ?? null);
+        if (Array.isArray(body.profiles) && body.profiles.length > 0) {
+          setModalProfiles(body.profiles);
+        }
         setCardModalStatus(body.card ? 'ready' : 'error');
         if (!body.card) {
           setCardModalError('Card not found');
@@ -726,21 +769,58 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       }
     };
 
-    // Only load if the memoized modalCard is not yet available or is different
-    if (!modalCard || modalCard.short_id !== targetShortId) {
-      loadCard();
-    } else {
-      // If modalCard is already available from memoization, set status to ready
-      setCardModalStatus('ready');
-    }
+    // Always load to ensure profiles are fetched
+    loadCard();
 
     return () => {
       cancelled = true;
     };
+  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCardFromData, isModalClosing]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const boardId = modalCard?.board_id ?? initialBoard.id;
+
+    const loadBoardMembers = async () => {
+      const cached = getStoredMembers(boardId);
+      if (cached) {
+        if (!cancelled) {
+          setModalProfiles(cached.map(member => member.profile));
+        }
+        if (!shouldRefetch(boardId)) {
+          return;
+        }
+      }
+
+      try {
+        const response = await fetch(`/api/boards/${boardId}/members`);
+        if (!response.ok) {
+          console.warn('[timeline] failed to fetch board members', { status: response.status });
+          return;
+        }
+        const { members } = await response.json();
+        if (cancelled) return;
+
+        const normalized = members.map((member: { profile: ProfileSummary; role: any }) => ({
+          profile: member.profile,
+          role: member.role,
+        }));
+
+        setStoredMembers(boardId, normalized);
+        setModalProfiles(normalized.map(member => member.profile));
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[timeline] error loading board members', error);
+        }
+      }
+    };
+
+    loadBoardMembers();
+
     return () => {
       cancelled = true;
     };
-  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCard, isModalClosing]);
+  }, [modalCard?.board_id, initialBoard.id, getStoredMembers, setStoredMembers, shouldRefetch]);
 
 
   const filteredData = useMemo(() => {
@@ -1269,5 +1349,3 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     </>
   );
 }
-
-

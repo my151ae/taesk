@@ -79,6 +79,7 @@ export function CardModal({
   });
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
@@ -86,6 +87,8 @@ export function CardModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const onCloseRef = useRef(onClose);
+  const memberButtonRef = useRef<HTMLButtonElement | null>(null);
+  const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const filteredProfiles = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
@@ -239,6 +242,28 @@ export function CardModal({
     };
   }, []); // 空配列でマウント時のみ実行
 
+  // Close dropdown on scroll or resize
+  useEffect(() => {
+    if (!showMemberDropdown) return;
+    const handleScroll = (event: Event) => {
+      if (memberDropdownRef.current && event.target instanceof Node) {
+        if (memberDropdownRef.current.contains(event.target)) {
+          return;
+        }
+      }
+      setShowMemberDropdown(false);
+    };
+    const handleResize = () => setShowMemberDropdown(false);
+
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [showMemberDropdown]);
+
   const handleSave = () => {
     const normalizedDueDate = dueDate || null;
     const normalizedStart = dueChannel === 'timeline' && dueStart ? `${dueStart}:00` : null;
@@ -363,350 +388,383 @@ export function CardModal({
         <div className="flex flex-1 overflow-hidden">
           {/* Left Column - Details */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {/* Title */}
-          <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setIsDirty(true);
-              }}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              placeholder="Card title"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setIsDirty(true);
-              }}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent resize-none"
-              placeholder="Add a description..."
-              rows={4}
-            />
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Tags
-            </label>
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              placeholder="Press Enter to add tag"
-            />
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(tag)}
-                      className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200"
-                      aria-label={`Remove tag ${tag}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Schedule */}
-          <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Schedule placement
-            </label>
-            <select
-              value={dueChannel}
-              onChange={(e) => handleChannelChange(e.target.value as DueChannel)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            >
-              <option value="timeline">Timeline block</option>
-              <option value="ab-list">A/B backlog</option>
-              <option value="list-only">List only</option>
-            </select>
-
-            {(dueChannel === 'timeline' || dueChannel === 'ab-list') && (
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                    Day
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                      setIsDirty(true);
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                  />
-                </div>
-
-                {dueChannel === 'timeline' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                        Start
-                      </label>
-                      <input
-                        type="time"
-                        step={900}
-                        value={dueStart}
-                        onChange={(e) => {
-                          setDueStart(e.target.value);
-                          setIsDirty(true);
-                        }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                        End
-                      </label>
-                      <input
-                        type="time"
-                        step={900}
-                        value={dueEnd}
-                        onChange={(e) => {
-                          setDueEnd(e.target.value);
-                          setIsDirty(true);
-                        }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                      Bucket
-                    </label>
-                    <select
-                      value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
-                      onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                    >
-                      {BUCKET_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {dueChannel === 'list-only' && (
-              <p className="mt-2 text-xs text-slate-500">
-                This card stays on the board without a schedule. Use the timeline or A/B options to plan it.
-              </p>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-              Priority
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-            >
-              <option value="low">🟢 Low</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="high">🔴 High</option>
-            </select>
-          </div>
-
-          {/* Members */}
-          <div className="relative">
-            <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
-              Members
-            </label>
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Selected Members */}
-              {selectedAssignees.map((member) => {
-                const identity = resolveProfileIdentity(member, member.email ?? null);
-                return (
-                  <div
-                    key={member.id}
-                    className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                    title={identity.label}
-                  >
-                    {member.avatar_url ? (
-                      <Image
-                        src={member.avatar_url}
-                        alt={identity.label}
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                        {getProfileInitials(member)}
-                      </span>
-                    )}
-                    <span className="text-xs font-medium px-2 max-w-[120px] truncate">
-                      {identity.label}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveMember(member.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
-                      aria-label={`Remove ${identity.label}`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-
-              {/* Add Member Button */}
-              <button
-                onClick={() => setShowMemberDropdown(!showMemberDropdown)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-300 transition-colors"
-                aria-label="Add member"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
+            {/* Title */}
+            <div>
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                Title
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setIsDirty(true);
+                }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                placeholder="Card title"
+              />
             </div>
 
-            {/* Member Dropdown */}
-            {showMemberDropdown && (
-              <div className="absolute z-10 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700">
-                <div className="p-2">
-                  <input
-                    type="text"
-                    value={memberSearch}
-                    onChange={(e) => setMemberSearch(e.target.value)}
-                    placeholder="Search members..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {filteredProfiles.length > 0 ? (
-                    filteredProfiles.map((profile) => {
-                      const identity = resolveProfileIdentity(profile, profile.email ?? null);
-                      const secondary = identity.secondary && identity.secondary !== identity.label
-                        ? identity.secondary
-                        : (profile.email && profile.email !== identity.label ? profile.email : null);
+            {/* Description */}
+            <div>
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setIsDirty(true);
+                }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent resize-none"
+                placeholder="Add a description..."
+                rows={4}
+              />
+            </div>
 
-                      return (
-                        <button
-                          key={profile.id}
-                          onClick={() => handleAddMember(profile.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
-                        >
-                          {profile.avatar_url ? (
-                            <Image
-                              src={profile.avatar_url}
-                              alt={identity.label}
-                              width={32}
-                              height={32}
-                              className="h-8 w-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                              {getProfileInitials(profile)}
-                            </span>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{identity.label}</div>
-                            {secondary && (
-                              <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{secondary}</div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-gray-400">
-                      {memberSearch ? 'No members found' : 'All members assigned'}
+            {/* Tags */}
+            <div>
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                Tags
+              </label>
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleAddTag}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                placeholder="Press Enter to add tag"
+              />
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Schedule */}
+            <div>
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                Schedule placement
+              </label>
+              <select
+                value={dueChannel}
+                onChange={(e) => handleChannelChange(e.target.value as DueChannel)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="timeline">Timeline block</option>
+                <option value="ab-list">A/B backlog</option>
+                <option value="list-only">List only</option>
+              </select>
+
+              {(dueChannel === 'timeline' || dueChannel === 'ab-list') && (
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                      Day
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
+                        setIsDirty(true);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                    />
+                  </div>
+
+                  {dueChannel === 'timeline' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                          Start
+                        </label>
+                        <input
+                          type="time"
+                          step={900}
+                          value={dueStart}
+                          onChange={(e) => {
+                            setDueStart(e.target.value);
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                          End
+                        </label>
+                        <input
+                          type="time"
+                          step={900}
+                          value={dueEnd}
+                          onChange={(e) => {
+                            setDueEnd(e.target.value);
+                            setIsDirty(true);
+                          }}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                        />
+                      </div>
                     </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                        Bucket
+                      </label>
+                      <select
+                        value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
+                        onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                      >
+                        {BUCKET_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {dueChannel === 'list-only' && (
+                <p className="mt-2 text-xs text-slate-500">
+                  This card stays on the board without a schedule. Use the timeline or A/B options to plan it.
+                </p>
+              )}
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                Priority
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as Priority)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+              >
+                <option value="low">🟢 Low</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="high">🔴 High</option>
+              </select>
+            </div>
+
+            {/* Members */}
+            <div className="relative">
+              {/* Debug Log */}
+              {/* {console.log('[CardModal] Rendering members', { profilesCount: profiles.length, assigneeIds, showMemberDropdown, dropdownPos })} */}
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
+                Members
+              </label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Selected Members */}
+                {selectedAssignees.map((member) => {
+                  const identity = resolveProfileIdentity(member, member.email ?? null);
+                  return (
+                    <div
+                      key={member.id}
+                      className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                      title={identity.label}
+                    >
+                      {member.avatar_url ? (
+                        <Image
+                          src={member.avatar_url}
+                          alt={identity.label}
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                          {getProfileInitials(member)}
+                        </span>
+                      )}
+                      <span className="text-xs font-medium px-2 max-w-[120px] truncate">
+                        {identity.label}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
+                        aria-label={`Remove ${identity.label}`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* Add Member Button */}
+                {/* Add Member Button */}
+                <button
+                  ref={(el) => {
+                    // @ts-ignore
+                    memberButtonRef.current = el;
+                  }}
+                  onClick={() => {
+                    console.log('[CardModal] Add member clicked', { showMemberDropdown, button: memberButtonRef.current });
+                    if (showMemberDropdown) {
+                      setShowMemberDropdown(false);
+                    } else {
+                      // Calculate position
+                      const button = memberButtonRef.current;
+                      if (button) {
+                        const rect = button.getBoundingClientRect();
+                        console.log('[CardModal] Button rect', rect);
+                        setDropdownPos({
+                          top: rect.bottom + 8,
+                          left: rect.left,
+                        });
+                        setShowMemberDropdown(true);
+                      } else {
+                        console.error('[CardModal] Member button ref is missing');
+                      }
+                    }
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-300 transition-colors"
+                  aria-label="Add member"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Member Dropdown - Fixed Position */}
+              {showMemberDropdown && (
+                <div
+                  ref={memberDropdownRef}
+                  className="fixed z-[60] w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700"
+                  style={{
+                    top: dropdownPos.top,
+                    left: dropdownPos.left,
+                  }}
+                >
+                  <div className="p-2">
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search members..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredProfiles.length > 0 ? (
+                      filteredProfiles.map((profile) => {
+                        const identity = resolveProfileIdentity(profile, profile.email ?? null);
+                        const secondary = identity.secondary && identity.secondary !== identity.label
+                          ? identity.secondary
+                          : (profile.email && profile.email !== identity.label ? profile.email : null);
+
+                        return (
+                          <button
+                            key={profile.id}
+                            onClick={() => handleAddMember(profile.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
+                          >
+                            {profile.avatar_url ? (
+                              <Image
+                                src={profile.avatar_url}
+                                alt={identity.label}
+                                width={32}
+                                height={32}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
+                                {getProfileInitials(profile)}
+                              </span>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{identity.label}</div>
+                              {secondary && (
+                                <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{secondary}</div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-gray-400">
+                        {memberSearch ? 'No members found' : 'All members assigned'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Move to Board */}
+            {boards.length > 1 && (
+              <div>
+                <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                  Move to Board
+                </label>
+                <select
+                  value={targetBoardId}
+                  onChange={(e) => setTargetBoardId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                >
+                  {boards.map((board) => (
+                    <option key={board.id} value={board.id}>
+                      {board.name} {board.id === card.board_id ? '(current)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Copy Links */}
+            {card.short_id && (
+              <div>
+                <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
+                  Share Link
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shortUrl = `${window.location.origin}/c/${card.short_id}`;
+                      navigator.clipboard.writeText(shortUrl);
+                    }}
+                    className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    📋 Copy Short Link
+                  </button>
+                  {card.id_short && card.slug && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const readableUrl = `${window.location.origin}/c/${card.short_id}/${card.id_short}-${card.slug}`;
+                        navigator.clipboard.writeText(readableUrl);
+                      }}
+                      className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      📋 Copy Full Link
+                    </button>
                   )}
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Move to Board */}
-          {boards.length > 1 && (
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Move to Board
-              </label>
-              <select
-                value={targetBoardId}
-                onChange={(e) => setTargetBoardId(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                {boards.map((board) => (
-                  <option key={board.id} value={board.id}>
-                    {board.name} {board.id === card.board_id ? '(current)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Copy Links */}
-          {card.short_id && (
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Share Link
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const shortUrl = `${window.location.origin}/c/${card.short_id}`;
-                    navigator.clipboard.writeText(shortUrl);
-                  }}
-                  className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  📋 Copy Short Link
-                </button>
-                {card.id_short && card.slug && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const readableUrl = `${window.location.origin}/c/${card.short_id}/${card.id_short}-${card.slug}`;
-                      navigator.clipboard.writeText(readableUrl);
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    📋 Copy Full Link
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
           </div>
 
           {/* Right Column - Comments */}

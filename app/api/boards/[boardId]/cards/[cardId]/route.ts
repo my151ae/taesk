@@ -18,6 +18,7 @@ const UpdateCardSchema = z.object({
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),
+  assignee_ids: z.array(z.string().uuid()).nullable().optional(),
   slug: z.string().max(255).optional(),
 });
 
@@ -72,7 +73,7 @@ export async function PATCH(
       );
     }
 
-    const performUpdate = async (body: Record<string, unknown>) =>
+  const performUpdate = async (body: Record<string, unknown>) =>
       await supabase
         .from('cards')
         .update(body)
@@ -99,6 +100,17 @@ export async function PATCH(
     if (missingDueBucketColumn && 'due_bucket_position' in normalizedPayload) {
       const fallbackPayload = { ...normalizedPayload };
       delete fallbackPayload.due_bucket_position;
+      ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
+    }
+
+    const missingAssigneeIdsColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('assignee_ids')));
+
+    if (missingAssigneeIdsColumn && 'assignee_ids' in normalizedPayload) {
+      const fallbackPayload = { ...normalizedPayload };
+      delete fallbackPayload.assignee_ids;
       ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
     }
 
