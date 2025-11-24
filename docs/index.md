@@ -155,6 +155,8 @@ type TimelineBuckets = Record<'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b
 - `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
 - API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す
 
+Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サーバー/ドキュメントで共通参照）
+
 ### TimelineBoardPage の主な処理
 
 - `createClientTrace('timeline')` を `useEffect` で起動し、ロード時間・描画イベント数・D&D 回数などを JSON で送信

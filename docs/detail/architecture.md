@@ -218,6 +218,8 @@ sequenceDiagram
 - `board_members` でボードアクセスを制御し、全 API ルートが RLS で保護される。
 - Realtime は `cards`, `comments`, `notifications` を購読。TimelineBoardPage では `cards` と `comments` のみ使用。
 
+Canonical type definitions: `lib/api-types/timeline.ts`（TimelineResponse/TimelineEvent/TODAY/TOMORROW の契約を統一）
+
 ## Testing Touchpoints
 
 - `e2e/timeline.spec.ts` が `TimelineBoardPage` の最重要経路を検証:
