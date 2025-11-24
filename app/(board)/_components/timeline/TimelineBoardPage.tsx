@@ -52,6 +52,7 @@ import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { useTimelineDragAndDrop, bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -173,19 +174,25 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
-  const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
-  const [modalCardOverride, setModalCardOverride] = useState<Card | null>(null);
-  const [cardModalStatus, setCardModalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [cardModalError, setCardModalError] = useState<string | null>(null);
-  const cardModalShortIdRef = useRef<string | null>(null);
-  const { user, signOut } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeCardId, setActiveCardId] = useState<string | null>(null);
-  const [isModalClosing, setIsModalClosing] = useState(false);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
+  const { user, signOut } = useAuth();
+
+  const {
+    modalCard,
+    cardModalStatus,
+    cardModalError,
+    setCardModalError,
+    isModalClosing,
+    openCardModal,
+    closeCardModal,
+    modalProfiles,
+  } = useCardModal({
+    initialBoard,
+    dataMode,
+    data,
+  });
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -330,86 +337,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
 
   const searchParamsString = searchParams?.toString() ?? '';
-  const cardIdFromUrl = searchParams?.get('card');
 
-  const modalCardFromData = useMemo(() => {
-    if (isModalClosing) return null;
-    const targetShortId = activeCardId || cardIdFromUrl;
-    if (!targetShortId || !data) return null;
-
-    // Find in events
-    const eventCard = data.events.find(e => e.short_id === targetShortId);
-    if (eventCard) {
-      // Convert TimelineEvent back to Card (partial) for modal
-      return {
-        id: eventCard.card_id,
-        title: eventCard.title,
-        description: '', // Description is not in TimelineEvent, will be fetched
-        tags: eventCard.tags,
-        priority: eventCard.priority,
-        checked: eventCard.checked,
-        short_id: eventCard.short_id,
-        slug: eventCard.slug,
-        due_date: eventCard.due_date,
-        due_start: eventCard.due_start,
-        due_end: eventCard.due_end,
-        due_channel: 'timeline', // Assuming it's from timeline
-        due_bucket: null,
-        due_bucket_position: null,
-        board_id: initialBoard.id, // Add board_id
-        created_at: '', // Placeholder
-        updated_at: '', // Placeholder
-        assignee_id: eventCard.assignee_id ?? null,
-        assignee_ids: eventCard.assignee_ids ?? null,
-        assigned_to: eventCard.assigned_to ?? null,
-        list_id: '', // Placeholder
-        position: 0, // Placeholder
-        user_id: null, // Placeholder
-        id_short: null, // Placeholder
-      } as Card;
-    }
-
-    // Find in buckets
-    for (const key in data.abBuckets) {
-      const bucketItem = data.abBuckets[key].find(b => b.short_id === targetShortId);
-      if (bucketItem) {
-        // Convert TimelineBucketItem back to Card (partial) for modal
-        return {
-          id: bucketItem.card_id,
-          title: bucketItem.title,
-          description: '', // Description is not in TimelineBucketItem, will be fetched
-          tags: bucketItem.tags,
-          priority: 'medium', // Default priority
-          checked: bucketItem.checked,
-          short_id: bucketItem.short_id,
-          slug: bucketItem.slug,
-          due_date: bucketItem.due_date,
-          due_start: bucketItem.due_start,
-          due_end: bucketItem.due_end,
-          due_channel: 'ab-list', // Correct type
-          due_bucket: key as DueBucket,
-          due_bucket_position: bucketItem.bucketPosition,
-          board_id: initialBoard.id, // Add board_id
-          created_at: '', // Placeholder
-          updated_at: '', // Placeholder
-          assignee_id: bucketItem.assignee_id ?? null,
-          assignee_ids: bucketItem.assignee_ids ?? null,
-          assigned_to: bucketItem.assigned_to ?? null,
-          list_id: '', // Placeholder
-          position: 0, // Placeholder
-          user_id: null, // Placeholder
-          id_short: null, // Placeholder
-        } as Card;
-      }
-    }
-
-    return null;
-  }, [data, activeCardId, cardIdFromUrl, initialBoard.id]);
-
-  const modalCard = useMemo(
-    () => modalCardOverride ?? modalCardFromData,
-    [modalCardOverride, modalCardFromData]
-  );
 
 
   useEffect(() => {
@@ -517,23 +445,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => window.removeEventListener('resize', updateHeight);
   }, []);
 
-  const closeCardModal = useCallback(() => {
-    const params = new URLSearchParams(searchParamsString);
-    if (params.has('card')) {
-      params.delete('card');
-      const query = params.toString();
-      const target = query ? `${pathname}?${query}` : pathname;
-      router.replace(target, { scroll: false });
-    }
-    setIsModalClosing(true);
-    setActiveCardId(null); // Clear active card
-    cardModalShortIdRef.current = null;
-    // setModalCard(null); // No longer needed as modalCard is memoized
-    setModalCardOverride(null);
-    setModalProfiles([]);
-    setCardModalStatus('idle');
-    setCardModalError(null);
-  }, [pathname, router, searchParamsString]);
+
 
   const handleCardModalSave = useCallback(
     async (
@@ -596,7 +508,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }
         if (body?.card) {
           const updatedCard = body.card as Card;
-          setModalCardOverride(updatedCard);
+          // setModalCardOverride(updatedCard); // Removed as we rely on data update
           setData((prev) => {
             if (!prev) return prev;
 
@@ -705,122 +617,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     console.warn('[timeline] move card not yet supported', { cardId, targetBoardId });
   }, []);
 
-  useEffect(() => {
-    // If there's an activeCardId (from instant open) or cardIdFromUrl, try to load it.
-    const targetShortId = activeCardId || cardIdFromUrl;
 
-    if (!targetShortId) {
-      if (isModalClosing) {
-        setIsModalClosing(false);
-      }
-      cardModalShortIdRef.current = null;
-      // setModalCard(null); // No longer needed
-      setModalProfiles([]);
-      setCardModalStatus('idle');
-      setCardModalError(null);
-      return;
-    }
-
-    // Handle race condition where modal is closing but URL hasn't updated yet
-    if (isModalClosing) {
-      if (activeCardId) {
-        // If we have an explicit activeCardId, it means a new card was clicked.
-        // We should cancel the closing state and proceed.
-        setIsModalClosing(false);
-      } else {
-        // Otherwise, it's likely the stale URL from the card being closed.
-        // Ignore it to prevent 404s or re-opening.
-        return;
-      }
-    }
-
-    // Prevent re-fetching if the card is already loaded or loading
-    if (cardModalShortIdRef.current === targetShortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
-      return;
-    }
-    cardModalShortIdRef.current = targetShortId;
-
-    let cancelled = false;
-    const loadCard = async () => {
-      setCardModalStatus('loading');
-      setCardModalError(null);
-      setModalCardOverride(null);
-      try {
-        const response = await fetch(`/api/cards/${targetShortId}`);
-        if (!response.ok) {
-          const body = await response.json().catch(() => null);
-          throw new Error(body?.error?.message || 'Failed to load card');
-        }
-        const body = await response.json();
-        if (cancelled) return;
-        setModalCardOverride(body.card ?? null);
-        if (Array.isArray(body.profiles) && body.profiles.length > 0) {
-          setModalProfiles(body.profiles);
-        }
-        setCardModalStatus(body.card ? 'ready' : 'error');
-        if (!body.card) {
-          setCardModalError('Card not found');
-        }
-      } catch (error) {
-        if (cancelled) return;
-        console.error('[timeline] failed to load card', error);
-        setCardModalError(error instanceof Error ? error.message : 'Failed to load card');
-        setCardModalStatus('error');
-      }
-    };
-
-    // Always load to ensure profiles are fetched
-    loadCard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCardId, cardIdFromUrl, cardModalStatus, modalCardFromData, isModalClosing]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const boardId = modalCard?.board_id ?? initialBoard.id;
-
-    const loadBoardMembers = async () => {
-      const cached = getStoredMembers(boardId);
-      if (cached) {
-        if (!cancelled) {
-          setModalProfiles(cached.map(member => member.profile));
-        }
-        if (!shouldRefetch(boardId)) {
-          return;
-        }
-      }
-
-      try {
-        const response = await fetch(`/api/boards/${boardId}/members`);
-        if (!response.ok) {
-          console.warn('[timeline] failed to fetch board members', { status: response.status });
-          return;
-        }
-        const { members } = await response.json();
-        if (cancelled) return;
-
-        const normalized = members.map((member: { profile: ProfileSummary; role: any }) => ({
-          profile: member.profile,
-          role: member.role,
-        }));
-
-        setStoredMembers(boardId, normalized);
-        setModalProfiles(normalized.map((member: { profile: ProfileSummary; role: any }) => member.profile));
-      } catch (error) {
-        if (!cancelled) {
-          console.warn('[timeline] error loading board members', error);
-        }
-      }
-    };
-
-    loadBoardMembers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [modalCard?.board_id, initialBoard.id, getStoredMembers, setStoredMembers, shouldRefetch]);
 
 
   const filteredData = useMemo(() => {
@@ -930,19 +727,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
 
 
-  const openCardModalFromTimeline = useCallback((shortId: string | null, debugSource?: string) => {
-    if (dataMode !== 'api') return;
-    if (!shortId) return; // Requires a shortId to open
 
-    console.log('[timeline] openCardModal', { shortId, source: debugSource });
-
-    // Instant open via local state
-    setActiveCardId(shortId);
-
-    const baseUrl = buildBoardUrl(initialBoard);
-    const url = `${baseUrl}?card=${shortId}`;
-    router.push(url, { scroll: false });
-  }, [dataMode, initialBoard, router]);
 
   const handleBoardNavigate = useCallback(
     (board: Board) => {
@@ -1038,7 +823,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       console.error('Create card failed', error);
       setErrorMessage('Failed to create card');
     }
-  }, [dataMode, initialBoard.id, fetchTimeline, openCardModalFromTimeline]);
+  }, [dataMode, initialBoard.id, fetchTimeline]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const start = Math.round(minutes / 15) * 15;
@@ -1212,7 +997,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     abBuckets={abBuckets}
                     floatingLayerTop={floatingLayerTop}
                     status={status}
-                    openCardModal={openCardModalFromTimeline}
+                    openCardModal={openCardModal}
                   />
 
                   <TimelineGrid
@@ -1223,7 +1008,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     timelineViewportHeight={timelineViewportHeight}
                     activeDrag={activeDrag}
                     pointerPreview={pointerPreview}
-                    openCardModal={openCardModalFromTimeline}
+                    openCardModal={openCardModal}
                     handleEventKeyDown={handleEventKeyDown}
                     handleColumnClick={handleColumnClick}
                     activeResize={activeResize}
