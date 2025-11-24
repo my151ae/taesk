@@ -105,7 +105,7 @@ export default function TimelineGrid({
                     tabIndex={0}
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     data-testid="timeline-event"
-                    className="absolute flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                     style={{
                         top,
                         height,
@@ -121,7 +121,7 @@ export default function TimelineGrid({
                         <span
                             aria-hidden="true"
                             className={clsx(
-                                'flex h-3.5 w-3.5 items-center justify-center rounded border text-[8px] font-bold mt-0.5',
+                                'flex h-3.5 w-3.5 items-center justify-center border text-[8px] font-bold mt-0.5',
                                 event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
                             )}
                         >
@@ -209,7 +209,7 @@ export default function TimelineGrid({
                     {/* Phantom Card */}
                     {selectedSlot?.day === day.isoDate && (
                         <div
-                            className="absolute rounded border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
+                            className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
                             style={{
                                 top: minuteToPixels(selectedSlot.minutes),
                                 height: minuteToPixels(60),

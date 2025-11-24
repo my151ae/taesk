@@ -1217,7 +1217,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               droppable: { strategy: MeasuringStrategy.Always },
             }}
           >
-            <div className="relative flex flex-col max-h-[80vh] overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
+            <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <div
                 ref={timelineHeaderRef}
                 className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"

@@ -47,7 +47,7 @@ const AbBucketDraggableCard = ({
             extraNodeRef={setNodeRef}
         >
             <div
-                className="rounded-md bg-white px-3 py-2 text-xs shadow-sm"
+                className="bg-white px-3 py-2 text-xs shadow-sm"
                 data-testid={`ab-card-${item.card_id}`}
                 data-bucket={bucketKey}
             >
@@ -56,7 +56,7 @@ const AbBucketDraggableCard = ({
                         type="checkbox"
                         checked={item.checked}
                         readOnly
-                        className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-sky-500"
+                        className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-sky-500"
                     />
                     <div className="flex min-w-0 flex-1 items-start gap-1">
                         <div className="flex-1 text-left">
@@ -115,7 +115,7 @@ export default function TimelineBuckets({
                         const items = abBuckets[section.bucket] ?? [];
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
-                                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
+                                <div className="border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
                                     <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
                                     <p className="text-[10px] text-slate-400">{section.helper}</p>
                                     <div className="mt-2 space-y-1">

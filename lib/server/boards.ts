@@ -30,18 +30,31 @@ export async function getBoardById(boardId: string): Promise<BoardRecord | null>
   if (!boardId) return null;
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from(TABLE_BOARDS)
-    .select("*")
-    .eq("id", boardId)
-    .maybeSingle();
 
-  if (error) {
-    console.error("[boards] getBoardById error:", error);
-    throw error;
+  // Simple retry logic for transient errors
+  for (let i = 0; i < 3; i++) {
+    const { data, error } = await supabase
+      .from(TABLE_BOARDS)
+      .select("*")
+      .eq("id", boardId)
+      .maybeSingle();
+
+    if (!error) {
+      return data ?? null;
+    }
+
+    // If it's the last attempt, log and throw
+    if (i === 2) {
+      console.error("[boards] getBoardById error after retries:", error);
+      // Return null instead of throwing to allow graceful handling
+      return null;
+    }
+
+    // Wait a bit before retrying (100ms, 200ms)
+    await new Promise(resolve => setTimeout(resolve, (i + 1) * 100));
   }
 
-  return data ?? null;
+  return null;
 }
 
 export async function fetchBoardInitialData(boardId: string): Promise<BoardData> {
