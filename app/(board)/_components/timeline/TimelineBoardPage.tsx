@@ -832,18 +832,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // For now, we'll filter the arrays directly using the same logic as filterAndSortCards but inline or adapted.
 
     const filterItem = (item: { title: string; tags: string[]; priority?: string | null; checked: boolean }) => {
-      // Search
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        if (!item.title.toLowerCase().includes(query)) return false;
-      }
-      // Tags
-      if (selectedTags.length > 0) {
-        if (!selectedTags.every(tag => item.tags.includes(tag))) return false;
-      }
       // Priority (only for events that have priority, buckets might not?)
       if (selectedPriority !== 'all') {
         if (item.priority !== selectedPriority) return false;
+      }
+      // Tags
+      if (selectedTags.length > 0) {
+        const tagSet = new Set(item.tags ?? []);
+        if (!selectedTags.every(tag => tagSet.has(tag))) return false;
+      }
+      // Search (Title + Tags)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')}`.toLowerCase();
+        if (!source.includes(query)) return false;
       }
       return true;
     };
@@ -968,66 +970,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(tags).sort();
   }, [data?.events, data?.abBuckets]);
 
-  const filteredEvents = useMemo(() => {
-    if (!data?.events?.length) return [] as TimelineEvent[];
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    const hasQuery = normalizedQuery.length > 0;
-    const hasTags = selectedTags.length > 0;
 
-    return data.events.filter((event) => {
-      if (selectedPriority !== 'all' && event.priority !== selectedPriority) {
-        return false;
-      }
-      if (hasTags) {
-        const tagSet = new Set(event.tags ?? []);
-        const matchesAll = selectedTags.every((tag) => tagSet.has(tag));
-        if (!matchesAll) return false;
-      }
-      if (hasQuery) {
-        const source = `${event.title ?? ''} ${(event.tags ?? []).join(' ')}`.toLowerCase();
-        if (!source.includes(normalizedQuery)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [data?.events, searchQuery, selectedPriority, selectedTags]);
-
-  const filteredBuckets = useMemo(() => {
-    const result: Record<string, TimelineBucketItem[]> = {};
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    const hasQuery = normalizedQuery.length > 0;
-    const hasTags = selectedTags.length > 0;
-    Object.entries(data?.abBuckets ?? {}).forEach(([key, items]) => {
-      result[key] = (items ?? []).filter((item) => {
-        if (selectedPriority !== 'all') {
-          // Bucket items currently lack priority metadata; treat as non-matching when filtering by priority
-          return false;
-        }
-        if (hasTags) {
-          const tagSet = new Set(item.tags ?? []);
-          const matchesAll = selectedTags.every((tag) => tagSet.has(tag));
-          if (!matchesAll) return false;
-        }
-        if (hasQuery) {
-          const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')}`.toLowerCase();
-          if (!source.includes(normalizedQuery)) {
-            return false;
-          }
-        }
-        return true;
-      });
-    });
-    return result;
-  }, [data?.abBuckets, searchQuery, selectedPriority, selectedTags]);
 
   const eventsByDay = useMemo(() => {
     if (!data) return {} as Record<string, TimelineEvent[]>;
+    const sourceEvents = filteredData?.events ?? data.events;
     return data.days.reduce((acc, day) => {
-      acc[day.isoDate] = filteredEvents.filter((event) => event.due_date === day.isoDate);
+      acc[day.isoDate] = sourceEvents.filter((event) => event.due_date === day.isoDate);
       return acc;
     }, {} as Record<string, TimelineEvent[]>);
-  }, [data, filteredEvents]);
+  }, [data, filteredData]);
 
   const bucketDayMap = useMemo(() => {
     if (!data?.days?.length) return {} as Record<string, string | null>;

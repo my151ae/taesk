@@ -1,5 +1,6 @@
 import type { DragEndEvent, DragMoveEvent } from "@dnd-kit/core";
 import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile } from '@/lib/api-types/timeline';
+export type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile };
 
 // Constants
 export const HOUR_HEIGHT = 40;
