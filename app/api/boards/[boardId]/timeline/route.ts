@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import type { TimelineResponse, TimelineEvent, TimelineBucketItem } from '@/lib/api-types/timeline';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -98,8 +99,8 @@ export async function GET(
     );
   }
 
-  const events: any[] = [];
-  const abBuckets: Record<string, any[]> = {
+  const events: TimelineEvent[] = [];
+  const abBuckets: Record<string, TimelineBucketItem[]> = {
     today_a: [],
     today_b: [],
     tomorrow_a: [],
@@ -172,7 +173,7 @@ export async function GET(
     return a.due_date.localeCompare(b.due_date);
   });
 
-  const responseBody = {
+  const responseBody: TimelineResponse = {
     days: [
       { key: 'today', label: 'Today', isoDate: todayIso },
       { key: 'tomorrow', label: 'Tomorrow', isoDate: tomorrowIso },
