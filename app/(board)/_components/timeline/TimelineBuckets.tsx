@@ -17,17 +17,15 @@ type TimelineBucketsProps = {
     openCardModal: (shortId: string | null, source: string) => void;
 };
 
-const DroppableBucket = ({ children, bucketKey, disabled }: { children: ReactNode; bucketKey: string; disabled?: boolean }) => {
+const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
     const { setNodeRef, isOver } = useDroppable({ id: `bucket-drop:${bucketKey}`, data: { type: 'ab-bucket', bucketKey } });
-    const highlight = !disabled && isOver ? 'rounded-2xl ring-2 ring-sky-300 ring-offset-2 ring-offset-slate-50' : '';
+    const highlight = !disabled && isOver ? 'bg-slate-100/50' : '';
     return (
         <div ref={setNodeRef} className={highlight}>
-            {children}
+            {children(isOver)}
         </div>
     );
 };
-
-
 
 export default function TimelineBuckets({
     days,
@@ -45,36 +43,38 @@ export default function TimelineBuckets({
 
         return (
             <div
-                className="pointer-events-auto border-l border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur overflow-y-auto"
+                className="pointer-events-auto border-l border-slate-200 bg-white/95 shadow-xl backdrop-blur overflow-y-auto overflow-x-hidden"
                 style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
             >
-                <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
-                    <span>{meta.title}</span>
-                    <span>{day.isoDate}</span>
-                </div>
-                <div className="mt-3 space-y-4">
+                <div className="space-y-0.5">
                     {meta.sections.map((section) => {
                         const items = abBuckets[section.bucket] ?? [];
+                        const isA = section.bucket.endsWith('_a');
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
-                                <div className="border border-slate-100 bg-slate-50/70 p-3 shadow-inner">
-                                    <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
-                                    <p className="text-[10px] text-slate-400">{section.helper}</p>
-                                    <div className="mt-2 space-y-1">
-                                        {items.length === 0 ? (
-                                            <p className="text-[11px] text-slate-400">Drop cards here</p>
-                                        ) : (
-                                            items.map((item) => (
-                                                <TimelineBucketCard
-                                                    key={item.card_id}
-                                                    item={item}
-                                                    bucketKey={section.bucket}
-                                                    openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
-                                                />
-                                            ))
-                                        )}
+                                {(isOver) => (
+                                    <div className={`border border-slate-100 bg-slate-50/70 p-3 shadow-inner ${isA ? 'min-h-[160px]' : ''}`}>
+                                        <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
+                                        <p className="text-[10px] text-slate-400">{section.helper}</p>
+                                        <div className="mt-2 space-y-1">
+                                            {items.length === 0 && isOver && (
+                                                <div className="mb-2 h-0.5 bg-sky-500" />
+                                            )}
+                                            {items.length === 0 && !isOver ? (
+                                                <p className="text-[11px] text-slate-400">Drop cards here</p>
+                                            ) : (
+                                                items.map((item) => (
+                                                    <TimelineBucketCard
+                                                        key={item.card_id}
+                                                        item={item}
+                                                        bucketKey={section.bucket}
+                                                        openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </DroppableBucket>
                         );
                     })}

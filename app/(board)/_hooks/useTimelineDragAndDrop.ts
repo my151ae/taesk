@@ -76,7 +76,7 @@ export const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
     };
     const bucketCollisions = pointerCollisions.filter(({ id }) => {
         const type = droppableFor(id);
-        return type === 'bucket-item' || type === 'ab-bucket';
+        return type === 'bucket-item' || type === 'bucket-item-top' || type === 'bucket-item-bottom' || type === 'ab-bucket';
     });
 
     if (bucketCollisions.length) {
@@ -165,16 +165,16 @@ export function useTimelineDragAndDrop({
                         due_start: nextStart,
                         due_end: nextEnd,
                         durationMinutes,
-                    title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
-                    tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
-                    priority: baseEvent?.priority ?? null,
-                    checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
-                    assignee_id: baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
-                    assignee_ids: baseEvent?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
-                    assigned_to: baseEvent?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
-                    short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
-                    slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
-                };
+                        title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
+                        tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+                        priority: baseEvent?.priority ?? null,
+                        checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
+                        assignee_id: baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
+                        assignee_ids: baseEvent?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
+                        assigned_to: baseEvent?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
+                        short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
+                        slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+                    };
 
                     nextEvents.push(replacement);
                     nextEvents.sort((a, b) => {
@@ -307,7 +307,7 @@ export function useTimelineDragAndDrop({
             data: active.data.current,
         });
 
-        if (overType === 'bucket-item') {
+        if (overType === 'bucket-item-top' || overType === 'bucket-item-bottom') {
             const bucketKey = over.data.current?.bucketKey as string | undefined;
             const targetCardId = over.data.current?.cardId as string | undefined;
             if (!bucketKey || !targetCardId) return;
@@ -319,17 +319,33 @@ export function useTimelineDragAndDrop({
             const targetIndex = bucketItems.findIndex((item) => item.card_id === targetCardId);
             if (targetIndex === -1) return;
             const targetItem = bucketItems[targetIndex];
-            const prevItem = bucketItems[targetIndex - 1];
+
             let bucketPosition: number;
-            if (prevItem?.bucketPosition != null && targetItem.bucketPosition != null) {
-                bucketPosition = (prevItem.bucketPosition + targetItem.bucketPosition) / 2;
-            } else if (targetItem.bucketPosition != null) {
-                bucketPosition = targetItem.bucketPosition + 1;
-            } else if (prevItem?.bucketPosition != null) {
-                bucketPosition = prevItem.bucketPosition + 1;
+
+            if (overType === 'bucket-item-top') {
+                // Insert before target (same as previous logic)
+                const prevItem = bucketItems[targetIndex - 1];
+                if (prevItem?.bucketPosition != null && targetItem.bucketPosition != null) {
+                    bucketPosition = (prevItem.bucketPosition + targetItem.bucketPosition) / 2;
+                } else if (targetItem.bucketPosition != null) {
+                    bucketPosition = targetItem.bucketPosition + 1;
+                } else if (prevItem?.bucketPosition != null) {
+                    bucketPosition = prevItem.bucketPosition + 1;
+                } else {
+                    bucketPosition = Date.now();
+                }
             } else {
-                bucketPosition = Date.now();
+                // Insert after target
+                const nextItem = bucketItems[targetIndex + 1];
+                if (targetItem.bucketPosition != null && nextItem?.bucketPosition != null) {
+                    bucketPosition = (targetItem.bucketPosition + nextItem.bucketPosition) / 2;
+                } else if (targetItem.bucketPosition != null) {
+                    bucketPosition = targetItem.bucketPosition - 1000; // Arbitrary gap
+                } else {
+                    bucketPosition = Date.now();
+                }
             }
+
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const payload = {
                 due_channel: 'ab-list',
@@ -339,7 +355,7 @@ export function useTimelineDragAndDrop({
                 due_end: null,
                 due_bucket_position: bucketPosition,
             };
-            console.debug('[timeline] drop into bucket-item', { cardId, bucketKey, bucketPosition });
+            console.debug('[timeline] drop into bucket-item', { cardId, bucketKey, bucketPosition, overType });
             persistPlacement(cardId, payload, {
                 target: 'bucket',
                 bucketKey,

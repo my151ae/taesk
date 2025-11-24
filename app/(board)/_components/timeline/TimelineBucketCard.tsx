@@ -13,22 +13,34 @@ export const TimelineBucketCard = ({
     bucketKey,
     openCardModal,
 }: TimelineBucketCardProps) => {
-    const { setNodeRef } = useDroppable({
-        id: `bucket-item:${bucketKey}:${item.card_id}`,
-        data: { type: 'bucket-item', bucketKey, cardId: item.card_id },
+    const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
+        id: `bucket-item-top:${bucketKey}:${item.card_id}`,
+        data: { type: 'bucket-item-top', bucketKey, cardId: item.card_id },
+    });
+
+    const { setNodeRef: setBottomRef, isOver: isOverBottom } = useDroppable({
+        id: `bucket-item-bottom:${bucketKey}:${item.card_id}`,
+        data: { type: 'bucket-item-bottom', bucketKey, cardId: item.card_id },
     });
 
     return (
         <DraggableCard
             id={`bucket:${item.card_id}`}
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
-            extraNodeRef={setNodeRef}
         >
             <div
-                className="bg-white px-3 py-2 text-xs shadow-sm"
+                className="bg-white px-3 py-2 text-xs shadow-sm relative"
                 data-testid={`ab-card-${item.card_id}`}
                 data-bucket={bucketKey}
             >
+                {/* Drop Zones */}
+                <div ref={setTopRef} className="absolute top-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
+                <div ref={setBottomRef} className="absolute bottom-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
+
+                {/* Indicators */}
+                {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
+                {isOverBottom && <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />}
+
                 <div className="flex items-start gap-2 text-slate-700">
                     <input
                         type="checkbox"

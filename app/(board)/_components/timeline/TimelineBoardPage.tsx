@@ -953,6 +953,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             measuring={{
               droppable: { strategy: MeasuringStrategy.Always },
             }}
+            autoScroll={{
+              enabled: true,
+              threshold: { x: 0, y: 0.2 },
+              acceleration: 10,
+            }}
           >
             <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <div
