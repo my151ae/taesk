@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { buildBoardUrl } from '@/lib/board-url';
 import { TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store';
+import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -27,6 +28,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
 
     const cardModalShortIdRef = useRef<string | null>(null);
     const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
+    const loadComments = useCommentsStore(state => state.loadComments);
 
     const openCardModal = useCallback((shortId: string | null, debugSource?: string) => {
         if (dataMode !== 'api') return;
@@ -180,7 +182,10 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                     setModalProfiles(body.profiles);
                 }
                 setCardModalStatus(body.card ? 'ready' : 'error');
-                if (!body.card) {
+                if (body.card) {
+                    // Prefetch comments
+                    loadComments(body.card.id);
+                } else {
                     setCardModalError('Card not found');
                 }
             } catch (error) {
