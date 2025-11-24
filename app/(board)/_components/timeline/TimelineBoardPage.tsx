@@ -1134,7 +1134,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const pointerPreviewEnd = pointerPreviewVisible
     ? minutesToTime(Math.min(pointerPreview.startMinutes + pointerPreview.durationMinutes, 24 * 60 - 1))
     : null;
-  const floatingLayerTop = timelineHeaderHeight + 12;
+  const floatingLayerTop = 0;
   const timelineViewportHeight = useMemo(() => {
     if (viewportHeight == null) return TIMELINE_HEIGHT;
     const chrome = timelineHeaderHeight + 160; // header + padding

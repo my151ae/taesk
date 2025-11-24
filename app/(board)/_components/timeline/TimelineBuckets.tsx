@@ -102,7 +102,10 @@ export default function TimelineBuckets({
         if (!meta) return null;
 
         return (
-            <div className="pointer-events-auto rounded-2xl border border-slate-100 bg-white/95 p-4 shadow-xl ring-1 ring-black/5 backdrop-blur">
+            <div
+                className="pointer-events-auto border-l border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur overflow-y-auto"
+                style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
+            >
                 <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
                     <span>{meta.title}</span>
                     <span>{day.isoDate}</span>
@@ -119,7 +122,7 @@ export default function TimelineBuckets({
                                         {items.length === 0 ? (
                                             <p className="text-[11px] text-slate-400">Drop cards here</p>
                                         ) : (
-                                            items.slice(0, 3).map((item) => (
+                                            items.map((item) => (
                                                 <AbBucketDraggableCard
                                                     key={item.card_id}
                                                     item={item}
@@ -127,9 +130,6 @@ export default function TimelineBuckets({
                                                     openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
                                                 />
                                             ))
-                                        )}
-                                        {items.length > 3 && (
-                                            <p className="text-[10px] text-slate-400">and {items.length - 3} more…</p>
                                         )}
                                     </div>
                                 </div>
@@ -149,7 +149,7 @@ export default function TimelineBuckets({
             <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
                 <div />
                 {days.map((day) => (
-                    <div key={day.key} className="relative flex justify-end px-2 sm:px-4">
+                    <div key={day.key} className="relative flex justify-end">
                         <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
                             {renderAbCard(day)}
                         </div>
