@@ -147,10 +147,12 @@ export const TimelineColumn = memo(function TimelineColumn({
 
                 {activeDragCardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
                     <div
-                        className="pointer-events-none absolute left-4 right-4 z-10 border border-dashed border-sky-300 bg-sky-50/40"
+                        className="pointer-events-none absolute z-10 border border-dashed border-sky-300 bg-sky-50/40"
                         style={{
                             top: minuteToPixels(pointerPreview.startMinutes),
                             height: minuteToPixels(pointerPreview.durationMinutes),
+                            left: '8px',
+                            width: 'calc(100% - 233px)', // 8px left margin + 225px right space for A/B list
                         }}
                     >
                         <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
