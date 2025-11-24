@@ -1,4 +1,5 @@
 import type { DragEndEvent, DragMoveEvent } from "@dnd-kit/core";
+import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile } from '@/lib/api-types/timeline';
 
 // Constants
 export const HOUR_HEIGHT = 40;
@@ -26,7 +27,7 @@ export const AB_CARD_META: Record<string, { title: string; sections: Array<{ buc
 };
 
 // Types
-export type { UserProfile, TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse } from '@/lib/api-types/timeline';
+
 
 // Helper functions
 export const minuteToPixels = (minutes: number) => (minutes / 60) * HOUR_HEIGHT;
