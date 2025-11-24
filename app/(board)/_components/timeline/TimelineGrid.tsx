@@ -192,14 +192,16 @@ export default function TimelineGrid({
         const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const y = e.clientY - rect.top;
-            const minutes = Math.round((y / HOUR_HEIGHT) * 60);
-            handleColumnClick(day, minutes);
+            const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
+            const snapped = Math.round(minutes / 15) * 15;
+            handleColumnClick(day, snapped);
+            setSelectedSlot(null);
         };
 
         return (
             <DroppableColumn key={day.isoDate} day={day}>
                 <div
-                    className="relative h-full border-l border-slate-100 pl-2 pr-[230px] pb-8 select-none"
+                    className="relative h-full border-l border-slate-100 pl-2 pr-[225px] pb-8 select-none"
                     style={{ minHeight: timelineViewportHeight }}
                     onDoubleClick={handleDoubleClick}
                     onClick={(e) => handleSingleClick(e, day.isoDate)}
@@ -211,13 +213,12 @@ export default function TimelineGrid({
                             style={{
                                 top: minuteToPixels(selectedSlot.minutes),
                                 height: minuteToPixels(60),
-                                left: 16,
-                                right: 16,
-                                width: 'calc(100% - 32px)'
+                                left: 8,
+                                right: 225,
                             }}
                         >
                             <div className="p-1 text-xs text-blue-500 font-medium">
-                                {minutesToTime(selectedSlot.minutes)}
+                                {minutesToTime(selectedSlot.minutes).slice(0, 5)}
                             </div>
                         </div>
                     )}
