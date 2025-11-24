@@ -17,4 +17,21 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 20px;
+    border: 4px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }

@@ -1217,37 +1217,38 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               droppable: { strategy: MeasuringStrategy.Always },
             }}
           >
-            <div className="relative rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
+            <div className="relative flex flex-col max-h-[80vh] overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
+              <div
+                ref={timelineHeaderRef}
+                className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
+                style={{
+                  gridTemplateColumns: data?.days?.length
+                    ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
+                    : '80px',
+                }}
+              >
+                <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
+                  <span className="leading-none">GMT+09</span>
+                </div>
+                {data?.days?.map((day, index) => (
+                  <div
+                    key={day.key}
+                    className={clsx(
+                      'px-4 py-3 text-center',
+                      index > 0 && 'border-l border-slate-100'
+                    )}
+                  >
+                    <p className="text-slate-800">{day.label}</p>
+                    <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                  </div>
+                ))}
+              </div>
+
               <div
                 ref={timelineScrollRef}
-                className="relative max-h-[80vh] overflow-y-auto overflow-x-hidden rounded-3xl scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                className="relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
                 onScroll={handleScroll}
               >
-                <div
-                  ref={timelineHeaderRef}
-                  className="sticky top-0 z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
-                  style={{
-                    gridTemplateColumns: data?.days?.length
-                      ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
-                      : '80px',
-                  }}
-                >
-                  <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
-                    <span className="leading-none">GMT+09</span>
-                  </div>
-                  {data?.days?.map((day, index) => (
-                    <div
-                      key={day.key}
-                      className={clsx(
-                        'px-4 py-3 text-center',
-                        index > 0 && 'border-l border-slate-100'
-                      )}
-                    >
-                      <p className="text-slate-800">{day.label}</p>
-                      <p className="text-[10px] text-slate-400">{day.isoDate}</p>
-                    </div>
-                  ))}
-                </div>
                 <div className="relative" style={{ minHeight: timelineViewportHeight }}>
                   {(status === 'loading' || !data) && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
