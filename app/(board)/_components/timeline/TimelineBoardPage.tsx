@@ -893,6 +893,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             due_bucket_position: newCard.due_bucket_position ?? null,
             priority: newCard.priority ?? null,
             checked: newCard.checked ?? false,
+            assignee_id: newCard.assignee_id ?? null,
+            assignee_ids: newCard.assignee_ids ?? null,
+            assigned_to: newCard.assigned_to ?? null,
             short_id: newCard.short_id ?? null,
             slug: newCard.slug ?? null,
           };
