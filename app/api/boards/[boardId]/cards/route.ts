@@ -14,7 +14,7 @@ const CreateCardSchema = z.object({
   due_start: z.string().nullable().optional(),
   due_end: z.string().nullable().optional(),
   due_channel: z.enum(['timeline', 'ab-list', 'list-only', 'archived']).optional(),
-  due_bucket: z.enum(['today_a', 'today_b', 'tomorrow_a', 'tomorrow_b']).nullable().optional(),
+  due_bucket: z.enum(['a', 'b']).nullable().optional(),
   due_bucket_position: z.number().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   checked: z.boolean().optional(),

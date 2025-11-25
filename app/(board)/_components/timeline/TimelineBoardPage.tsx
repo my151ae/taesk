@@ -215,6 +215,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     cardModalStatus,
     cardModalError,
     setCardModalError,
+    setModalCardOverride,
     isModalClosing,
     openCardModal,
     closeCardModal,
@@ -549,60 +550,103 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }
         if (body?.card) {
           const updatedCard = body.card as Card;
-          // setModalCardOverride(updatedCard); // Removed as we rely on data update
+          setModalCardOverride(updatedCard);
+
+          // Use the same logic as handleCardChange to properly move cards
           setData((prev) => {
             if (!prev) return prev;
 
-            // Helper to calculate duration
-            const start = getMinutesFromTime(updatedCard.due_start);
-            const end = getMinutesFromTime(updatedCard.due_end);
-            const duration = start !== null && end !== null ? Math.max(end - start, 0) : null;
+            const nextEvents = [...prev.events];
+            const nextBuckets = { ...prev.abBuckets };
 
-            return {
-              ...prev,
-              events: prev.events.map((e) =>
-                e.card_id === updatedCard.id
-                  ? {
-                    ...e,
-                    title: updatedCard.title,
-                    priority: updatedCard.priority,
-                    checked: updatedCard.checked,
-                    due_bucket: updatedCard.due_bucket ?? null,
-                    due_bucket_position: updatedCard.due_bucket_position ?? null,
-                    assignee_id: updatedCard.assignee_id,
-                    assignee_ids: updatedCard.assignee_ids ?? null,
-                    assigned_to: updatedCard.assigned_to,
-                    due_date: getIsoDateJst(updatedCard.due_date ?? ''),
-                    due_start: updatedCard.due_start,
-                    due_end: updatedCard.due_end,
-                    durationMinutes: duration,
-                    tags: updatedCard.tags,
-                  }
-                  : e
-              ),
-              abBuckets: Object.fromEntries(
-                Object.entries(prev.abBuckets).map(([key, items]) => [
-                  key,
-                  items.map(item =>
-                    item.card_id === updatedCard.id
-                      ? {
-                        ...item,
-                        title: updatedCard.title,
-                        checked: updatedCard.checked,
-                        tags: updatedCard.tags ?? [],
-                        due_date: getIsoDateJst(updatedCard.due_date ?? ''),
-                        due_start: updatedCard.due_start,
-                        due_end: updatedCard.due_end,
-                        assignee_id: updatedCard.assignee_id,
-                        assignee_ids: updatedCard.assignee_ids ?? null,
-                        assigned_to: updatedCard.assigned_to,
-                        bucketPosition: updatedCard.due_bucket_position ?? item.bucketPosition,
-                      }
-                      : item
-                  )
-                ])
-              )
+            // Helper to remove card from all collections
+            const removeCard = (cardId: string) => {
+              // Remove from events
+              const eventIdx = nextEvents.findIndex(e => e.card_id === cardId);
+              if (eventIdx >= 0) nextEvents.splice(eventIdx, 1);
+
+              // Remove from buckets
+              Object.keys(nextBuckets).forEach(key => {
+                nextBuckets[key] = nextBuckets[key].filter(item => item.card_id !== cardId);
+              });
             };
+
+            // Remove card from its current location
+            removeCard(updatedCard.id);
+
+            // Determine where to put the card
+            if (updatedCard.due_date && updatedCard.due_start && updatedCard.due_end) {
+              // It's a timeline event (has date and time)
+              const startMinutes = getMinutesFromTime(updatedCard.due_start);
+              const endMinutes = getMinutesFromTime(updatedCard.due_end);
+              const durationMinutes = startMinutes != null && endMinutes != null
+                ? Math.max(endMinutes - startMinutes, 15)
+                : 60;
+
+              nextEvents.push({
+                card_id: updatedCard.id,
+                due_date: getIsoDateJst(updatedCard.due_date ?? ''),
+                due_start: updatedCard.due_start,
+                due_end: updatedCard.due_end,
+                durationMinutes,
+                title: updatedCard.title,
+                tags: updatedCard.tags ?? [],
+                priority: updatedCard.priority,
+                checked: updatedCard.checked,
+                due_bucket: updatedCard.due_bucket ?? null,
+                due_bucket_position: updatedCard.due_bucket_position ?? null,
+                assignee_id: updatedCard.assignee_id,
+                assignee_ids: updatedCard.assignee_ids ?? null,
+                assigned_to: updatedCard.assigned_to,
+                short_id: updatedCard.short_id,
+                slug: updatedCard.slug,
+              });
+
+              // Sort events
+              nextEvents.sort((a, b) => {
+                if (a.due_date === b.due_date) {
+                  const aStart = getMinutesFromTime(a.due_start) ?? 0;
+                  const bStart = getMinutesFromTime(b.due_start) ?? 0;
+                  return aStart - bStart;
+                }
+                return (a.due_date ?? '').localeCompare(b.due_date ?? '');
+              });
+
+            } else if (updatedCard.due_bucket) {
+              // It's a bucket item (has date but no time)
+              const bucketKey = resolveBucketKey(updatedCard, prev.days);
+              if (!bucketKey) {
+                console.warn('[timeline] skip bucket item with unknown bucket', {
+                  cardId: updatedCard.id,
+                  due_bucket: updatedCard.due_bucket,
+                  due_date: updatedCard.due_date,
+                });
+                return prev;
+              }
+
+              if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
+
+              nextBuckets[bucketKey].push({
+                card_id: updatedCard.id,
+                title: updatedCard.title,
+                due_date: toLocalDay(updatedCard.due_date ?? null),
+                due_start: updatedCard.due_start,
+                due_end: updatedCard.due_end,
+                checked: updatedCard.checked,
+                tags: updatedCard.tags ?? [],
+                assignee_id: updatedCard.assignee_id,
+                assignee_ids: updatedCard.assignee_ids ?? null,
+                assigned_to: updatedCard.assigned_to,
+                short_id: updatedCard.short_id,
+                slug: updatedCard.slug,
+                bucketPosition: updatedCard.due_bucket_position,
+              });
+
+              // Sort bucket items
+              nextBuckets[bucketKey].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+            }
+
+            return { ...prev, events: nextEvents, abBuckets: nextBuckets };
           });
         }
         // No need to setModalCard here, as the realtime update will handle it
