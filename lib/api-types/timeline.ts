@@ -23,6 +23,8 @@ export interface TimelineEvent {
   tags: string[];
   priority: string | null;
   checked: boolean;
+  due_bucket?: string | null;
+  due_bucket_position?: number | null;
   assignee_id?: string | null;
   assignee_ids?: string[] | null;
   assigned_to?: string | null;

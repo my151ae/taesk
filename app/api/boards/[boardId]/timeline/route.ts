@@ -135,6 +135,8 @@ export async function GET(
         tags: card.tags ?? [],
         priority: card.priority,
         checked: card.checked,
+        due_bucket: card.due_bucket ?? null,
+        due_bucket_position: card.due_bucket_position ?? null,
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,

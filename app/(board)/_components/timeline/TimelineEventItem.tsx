@@ -103,6 +103,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     aria-label="Open card"
                     data-testid={`cardOpenButton-${event.card_id}`}
                 >
+                    <span className="text-[11px] font-bold leading-none">
+                        {(event.due_bucket ?? 'b').toUpperCase()}
+                    </span>
                     <span aria-hidden="true" className="text-[12px] leading-none">›</span>
                 </button>
 
