@@ -99,11 +99,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onPointerDown={(native) => {
                         native.stopPropagation();
                     }}
-                    className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-semibold text-slate-500 shadow-sm hover:border-sky-300 hover:text-sky-600"
+                    className="absolute top-2 right-2 flex h-7 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
                     aria-label="Open card"
                     data-testid={`cardOpenButton-${event.card_id}`}
                 >
-                    ↗
+                    <span aria-hidden="true" className="text-[12px] leading-none">›</span>
                 </button>
 
                 <div

@@ -65,17 +65,14 @@ export const TimelineBucketCard = ({
                             onPointerDown={(native) => {
                                 native.stopPropagation();
                             }}
-                            className="flex h-6 w-6 flex-shrink-0 items-center justify-center self-start rounded-full border border-slate-200 text-[10px] font-semibold text-slate-500 hover:border-sky-300 hover:text-sky-600"
+                            className="flex h-7 items-center gap-1 self-start rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
                             aria-label="Open card"
                             data-testid={`cardOpenButton-${item.card_id}`}
                         >
-                            <span className="sr-only">Open card</span>
-                            <span className="flex items-center gap-0.5">
-                                <span className="text-[11px] font-bold">
-                                    {bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                                </span>
-                                <span aria-hidden="true" className="text-[12px] leading-none">↗</span>
+                            <span className="text-[11px] font-bold leading-none">
+                                {bucketKeyToDueBucket(bucketKey).toUpperCase()}
                             </span>
+                            <span aria-hidden="true" className="text-[12px] leading-none">›</span>
                         </button>
                     </div>
                 </div>
