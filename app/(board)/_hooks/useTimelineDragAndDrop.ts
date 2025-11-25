@@ -165,6 +165,7 @@ export function useTimelineDragAndDrop({
                         due_date: nextDate ?? '',
                         due_start: nextStart,
                         due_end: nextEnd,
+                        due_bucket: (payload.due_bucket as DueBucket | null) ?? baseEvent?.due_bucket ?? null,
                         durationMinutes,
                         title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
                         tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
@@ -380,14 +381,44 @@ export function useTimelineDragAndDrop({
             nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
             let nextEnd = nextStart + activeDrag.duration;
 
+            // Preserve due_bucket from source card
+            let sourceDueBucket: DueBucket | null = null;
+
+            // Priority 1: Get bucket from source event (timeline to timeline)
+            if (sourceEvent?.due_bucket) {
+                sourceDueBucket = sourceEvent.due_bucket as DueBucket;
+                console.debug('[timeline] Preserving bucket from timeline event:', sourceDueBucket);
+            }
+            // Priority 2: Get bucket from source bucket item (A/B list to timeline)
+            else if (sourceBucketItem && active.data.current?.bucketKey) {
+                const bucketKey = active.data.current.bucketKey as string;
+                sourceDueBucket = bucketKey.split('_')[1] as DueBucket;
+                console.debug('[timeline] Extracting bucket from A/B list:', { bucketKey, extracted: sourceDueBucket });
+            }
+            // Priority 3: If still no bucket, log warning
+            else {
+                console.warn('[timeline] No source bucket found, will be set to null', {
+                    hasSourceEvent: !!sourceEvent,
+                    hasSourceBucketItem: !!sourceBucketItem,
+                    sourceEventBucket: sourceEvent?.due_bucket,
+                    bucketKey: active.data.current?.bucketKey,
+                });
+            }
+
             const payload = {
-                due_bucket: null,
+                due_bucket: sourceDueBucket,
                 due_date: withJstMidnight(day.isoDate),
                 due_start: minutesToTime(nextStart),
                 due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
-                due_bucket_position: null,
+                due_bucket_position: sourceEvent?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
             };
-            console.debug('[timeline] drop into timeline', { cardId, day: day.isoDate, start: nextStart });
+            console.debug('[timeline] drop into timeline', {
+                cardId,
+                day: day.isoDate,
+                start: nextStart,
+                preservedBucket: sourceDueBucket,
+                sourceType: sourceEvent ? 'event' : sourceBucketItem ? 'bucket-item' : 'unknown'
+            });
             persistPlacement(cardId, payload, {
                 target: 'timeline',
                 sourceEvent,
