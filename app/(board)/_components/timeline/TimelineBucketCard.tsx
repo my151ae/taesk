@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { TimelineBucketItem, timeLabel } from '@/app/(board)/_utils/timeline-helpers';
+import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 
 type TimelineBucketCardProps = {
@@ -68,7 +69,13 @@ export const TimelineBucketCard = ({
                             aria-label="Open card"
                             data-testid={`cardOpenButton-${item.card_id}`}
                         >
-                            ↗
+                            <span className="sr-only">Open card</span>
+                            <span className="flex items-center gap-0.5">
+                                <span className="text-[11px] font-bold">
+                                    {bucketKeyToDueBucket(bucketKey).toUpperCase()}
+                                </span>
+                                <span aria-hidden="true" className="text-[12px] leading-none">↗</span>
+                            </span>
                         </button>
                     </div>
                 </div>

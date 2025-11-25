@@ -264,15 +264,10 @@ export function CardModal({
     const normalizedStart = hasTime ? `${dueStart}:00` : null;
     const normalizedEnd = hasTime ? `${dueEnd}:00` : null;
 
-    // Always include bucket fields when date is set
-    let normalizedBucket: DueBucket | null = null;
-    let normalizedBucketPosition: number | null = null;
-
-    if (normalizedDueDate) {
-      // Preserve or set default bucket
-      normalizedBucket = dueBucket ?? DEFAULT_BUCKET;
-      normalizedBucketPosition = dueBucketPosition ?? Date.now();
-    }
+    // Always send bucket fields (timelineはnull、A/Bはa|bを保持)
+    const normalizedBucket: DueBucket | null = dueBucket ?? null;
+    const normalizedBucketPosition: number | null =
+      normalizedBucket != null ? dueBucketPosition ?? Date.now() : null;
 
     onSave(
       card.id,
