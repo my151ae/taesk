@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Board, Card, DueBucket, Priority, ProfileSummary, DueChannel } from "@/lib/supabase";
+import type { Board, Card, DueBucket, Priority, ProfileSummary } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
@@ -459,7 +459,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       assigneeTouched?: boolean,
       due_start?: string | null,
       due_end?: string | null,
-      due_channel?: DueChannel,
       due_bucket?: DueBucket | null,
       due_bucket_position?: number | null
     ) => {
@@ -482,7 +481,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           due_date: normalizedDueDate,
           due_start,
           due_end,
-          due_channel,
           due_bucket,
           due_bucket_position,
           priority,
@@ -493,6 +491,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           payload.assignee_ids = assigneeIds && assigneeIds.length > 0 ? assigneeIds : null;
           payload.assigned_to = null;
         }
+        console.log('[timeline] Sending card update payload:', payload);
         const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -826,15 +825,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [dataMode, initialBoard.id, fetchTimeline]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
-    const start = Math.round(minutes / 15) * 15;
-    const end = start + 60;
-    const payload = {
-      title: 'New Card',
+    const payload: Partial<Card> = {
+      title: `New card ${Date.now()}`,
+      description: '',
+      list_id: initialBoard.id,
+      position: 999999,
+      tags: [],
       due_date: withJstMidnight(day.isoDate),
-      due_start: minutesToTime(start),
-      due_end: minutesToTime(end),
-      due_channel: 'timeline' as const,
-      board_id: initialBoard.id,
+      due_start: minutesToTime(minutes),
+      due_end: minutesToTime(minutes + 60),
+      due_bucket: null,
+      due_bucket_position: null,
+      priority: 'medium',
     };
     createCard(payload);
   }, [createCard, initialBoard.id]);

@@ -64,7 +64,7 @@ export async function GET(
   const targetDates = [todayIso, tomorrowIso];
 
   const baseSelect =
-    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
+    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -107,17 +107,27 @@ export async function GET(
     tomorrow_b: [],
   };
 
+  const getDayKey = (dateIso: string | null, today: string, tomorrow: string): string | null => {
+    if (!dateIso) return null;
+    if (dateIso === today) return 'today';
+    if (dateIso === tomorrow) return 'tomorrow';
+    return null; // Only support today/tomorrow for now
+  };
+
   cards?.forEach((card) => {
     const dateOnly = toJstDate(card.due_date);
-    const isToday = dateOnly === todayIso;
-    const isTomorrow = dateOnly === tomorrowIso;
+    const dayKey = getDayKey(dateOnly, todayIso, tomorrowIso);
 
-    if (card.due_channel === 'timeline' && dateOnly && (isToday || isTomorrow)) {
+    if (!dayKey) return; // Skip cards not in today/tomorrow
+
+    const hasTime = card.due_start && card.due_end;
+
+    if (hasTime) {
       const start = toMinutes(card.due_start);
       const end = toMinutes(card.due_end);
       events.push({
         card_id: card.id,
-        due_date: dateOnly,
+        due_date: dateOnly!,
         due_start: card.due_start,
         due_end: card.due_end,
         durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
@@ -131,11 +141,16 @@ export async function GET(
         short_id: card.short_id,
         slug: card.slug,
       });
-    } else if (card.due_channel === 'ab-list' && card.due_bucket) {
-      if (!abBuckets[card.due_bucket]) {
-        abBuckets[card.due_bucket] = [];
+    } else {
+      // A/B List
+      // Default to 'b' if no bucket specified but has date
+      const bucket = card.due_bucket || 'b';
+      const key = `${dayKey}_${bucket}`;
+
+      if (!abBuckets[key]) {
+        abBuckets[key] = [];
       }
-      abBuckets[card.due_bucket].push({
+      abBuckets[key].push({
         card_id: card.id,
         title: card.title,
         due_date: dateOnly,

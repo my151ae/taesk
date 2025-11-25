@@ -106,8 +106,7 @@ export interface Board {
 }
 
 export type Priority = 'low' | 'medium' | 'high';
-export type DueChannel = 'timeline' | 'ab-list' | 'list-only' | 'archived';
-export type DueBucket = 'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b';
+export type DueBucket = 'a' | 'b';
 
 export interface Card {
   id: string;
@@ -121,7 +120,6 @@ export interface Card {
   due_date: string | null;
   due_start: string | null;
   due_end: string | null;
-  due_channel: DueChannel;
   due_bucket: DueBucket | null;
   due_bucket_position: number | null;
   priority: Priority;

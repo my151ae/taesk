@@ -63,10 +63,10 @@ async function ensureBoardFixtures() {
 async function supportsDueColumns(): Promise<boolean> {
   const { error } = await supabaseAdmin
     .from('cards')
-    .select('due_channel')
+    .select('due_bucket')
     .limit(1);
   if (!error) return true;
-  return !error.message?.includes('due_channel');
+  return !error.message?.includes('due_bucket');
 }
 
 let dueColumnsAvailable = true;
@@ -99,7 +99,6 @@ test.describe('@feature:timeline Timeline view', () => {
       due_date: `${isoDay}T00:00:00+09:00`,
       due_start: '09:00:00',
       due_end: '10:00:00',
-      due_channel: 'timeline',
       due_bucket: null,
       priority: 'medium',
       checked: false,

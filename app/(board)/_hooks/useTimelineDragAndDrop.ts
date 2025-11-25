@@ -24,6 +24,7 @@ import {
     toLocalDay,
     withJstMidnight,
 } from '@/app/(board)/_utils/timeline-helpers';
+import type { DueBucket } from '@/lib/supabase';
 
 export type ActiveDragState = {
     cardId: string;
@@ -348,8 +349,7 @@ export function useTimelineDragAndDrop({
 
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const payload = {
-                due_channel: 'ab-list',
-                due_bucket: bucketKey,
+                due_bucket: bucketKey.split('_')[1] as DueBucket, // Extract 'a' or 'b' from 'today_a', 'tomorrow_b', etc.
                 due_date: withJstMidnight(dayIso),
                 due_start: null,
                 due_end: null,
@@ -381,7 +381,6 @@ export function useTimelineDragAndDrop({
             let nextEnd = nextStart + activeDrag.duration;
 
             const payload = {
-                due_channel: 'timeline',
                 due_bucket: null,
                 due_date: withJstMidnight(day.isoDate),
                 due_start: minutesToTime(nextStart),
@@ -404,8 +403,7 @@ export function useTimelineDragAndDrop({
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const bucketPosition = Date.now();
             const payload = {
-                due_channel: 'ab-list',
-                due_bucket: bucketKey,
+                due_bucket: bucketKey.split('_')[1] as DueBucket, // Extract 'a' or 'b'
                 due_date: withJstMidnight(dayIso),
                 due_start: null,
                 due_end: null,
@@ -443,7 +441,6 @@ export function useTimelineDragAndDrop({
         persistPlacement(
             event.card_id,
             {
-                due_channel: 'timeline',
                 due_bucket: null,
                 due_date: withJstMidnight(event.due_date ?? null),
                 due_start: minutesToTime(nextStart),

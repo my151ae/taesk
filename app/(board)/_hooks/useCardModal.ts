@@ -45,16 +45,15 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
     }, [dataMode, initialBoard, router]);
 
     const closeCardModal = useCallback(() => {
-        setIsModalClosing(true);
         const baseUrl = buildBoardUrl(initialBoard);
         router.push(baseUrl, { scroll: false });
-        setTimeout(() => {
-            setModalCardOverride(null);
-            setCardModalStatus('idle');
-            setIsModalClosing(false);
-            cardModalShortIdRef.current = null;
-            setActiveCardId(null);
-        }, 300);
+
+        // Immediately clear state to prevent flash during realtime updates
+        setModalCardOverride(null);
+        setCardModalStatus('idle');
+        setIsModalClosing(false);
+        cardModalShortIdRef.current = null;
+        setActiveCardId(null);
     }, [initialBoard, router]);
 
 

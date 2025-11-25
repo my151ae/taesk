@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import type { Card, Board, Priority, ProfileSummary, DueChannel, DueBucket } from "@/lib/supabase";
+import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 
@@ -15,12 +15,10 @@ const getProfileInitials = (profile: ProfileSummary): string => {
   return getProfileInitial(profile, profile.email ?? null);
 };
 
-const DEFAULT_BUCKET: DueBucket = 'today_a';
+const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
-  { value: 'today_a', label: 'Today • A (do today)' },
-  { value: 'today_b', label: 'Today • B (if possible)' },
-  { value: 'tomorrow_a', label: 'Tomorrow • A (do tomorrow)' },
-  { value: 'tomorrow_b', label: 'Tomorrow • B (if possible)' },
+  { value: 'a', label: 'A (do today)' },
+  { value: 'b', label: 'B (if possible)' },
 ];
 
 interface CardModalProps {
@@ -38,7 +36,6 @@ interface CardModalProps {
     assigneeTouched?: boolean,
     due_start?: string | null,
     due_end?: string | null,
-    due_channel?: DueChannel,
     due_bucket?: DueBucket | null,
     due_bucket_position?: number | null
   ) => void;
@@ -63,7 +60,6 @@ export function CardModal({
   const [dueDate, setDueDate] = useState(card.due_date || '');
   const [dueStart, setDueStart] = useState(card.due_start ? card.due_start.slice(0, 5) : '');
   const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
-  const [dueChannel, setDueChannel] = useState<DueChannel>(card.due_channel ?? 'list-only');
   const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
   const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
@@ -131,7 +127,6 @@ export function CardModal({
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
       setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
-      setDueChannel(card.due_channel ?? 'list-only');
       setDueBucket(card.due_bucket ?? null);
       setDueBucketPosition(card.due_bucket_position ?? null);
       setPriority(card.priority || 'medium');
@@ -154,7 +149,6 @@ export function CardModal({
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
       setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
-      setDueChannel(card.due_channel ?? 'list-only');
       setDueBucket(card.due_bucket ?? null);
       setDueBucketPosition(card.due_bucket_position ?? null);
       setPriority(card.priority || 'medium');
@@ -266,12 +260,19 @@ export function CardModal({
 
   const handleSave = () => {
     const normalizedDueDate = dueDate || null;
-    const normalizedStart = dueChannel === 'timeline' && dueStart ? `${dueStart}:00` : null;
-    const normalizedEnd = dueChannel === 'timeline' && dueEnd ? `${dueEnd}:00` : null;
-    const normalizedBucket = dueChannel === 'ab-list' ? (dueBucket ?? DEFAULT_BUCKET) : null;
-    const normalizedBucketPosition = dueChannel === 'ab-list'
-      ? (dueBucketPosition ?? Date.now())
-      : null;
+    const hasTime = dueStart && dueEnd; // Both must be present
+    const normalizedStart = hasTime ? `${dueStart}:00` : null;
+    const normalizedEnd = hasTime ? `${dueEnd}:00` : null;
+
+    // Always include bucket fields when date is set
+    let normalizedBucket: DueBucket | null = null;
+    let normalizedBucketPosition: number | null = null;
+
+    if (normalizedDueDate) {
+      // Preserve or set default bucket
+      normalizedBucket = dueBucket ?? DEFAULT_BUCKET;
+      normalizedBucketPosition = dueBucketPosition ?? Date.now();
+    }
 
     onSave(
       card.id,
@@ -284,7 +285,6 @@ export function CardModal({
       assigneeTouched,
       normalizedStart,
       normalizedEnd,
-      dueChannel,
       normalizedBucket,
       normalizedBucketPosition
     );
@@ -324,20 +324,18 @@ export function CardModal({
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  const handleChannelChange = (next: DueChannel) => {
-    setDueChannel(next);
+  const handleTimeToggle = (enabled: boolean) => {
     setIsDirty(true);
-    if (next !== 'timeline') {
+    if (!enabled) {
       setDueStart('');
       setDueEnd('');
+      // Keep bucket - don't clear it
+      if (dueDate && !dueBucket) {
+        setDueBucket(DEFAULT_BUCKET);
+        setDueBucketPosition(Date.now());
+      }
     }
-    if (next !== 'ab-list') {
-      setDueBucket(null);
-      setDueBucketPosition(null);
-    } else if (!dueBucket) {
-      setDueBucket(DEFAULT_BUCKET);
-      setDueBucketPosition((prev) => prev ?? Date.now());
-    }
+    // Don't clear bucket when time is added - keep it for fallback
   };
 
   const handleBucketChange = (next: DueBucket) => {
@@ -459,40 +457,32 @@ export function CardModal({
             {/* Schedule */}
             <div>
               <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Schedule placement
+                Schedule
               </label>
-              <select
-                value={dueChannel}
-                onChange={(e) => handleChannelChange(e.target.value as DueChannel)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="timeline">Timeline block</option>
-                <option value="ab-list">A/B backlog</option>
-                <option value="list-only">List only</option>
-              </select>
+              <div className="space-y-3">
+                {/* Date */}
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
+                      setIsDirty(true);
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  />
+                </div>
 
-              {(dueChannel === 'timeline' || dueChannel === 'ab-list') && (
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                      Day
-                    </label>
-                    <input
-                      type="date"
-                      value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                      onChange={(e) => {
-                        setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                        setIsDirty(true);
-                      }}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                    />
-                  </div>
-
-                  {dueChannel === 'timeline' ? (
+                {dueDate && (
+                  <>
+                    {/* Time (optional) */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                          Start
+                          Start Time
                         </label>
                         <input
                           type="time"
@@ -500,6 +490,7 @@ export function CardModal({
                           value={dueStart}
                           onChange={(e) => {
                             setDueStart(e.target.value);
+                            handleTimeToggle(!!e.target.value);
                             setIsDirty(true);
                           }}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
@@ -507,7 +498,7 @@ export function CardModal({
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                          End
+                          End Time
                         </label>
                         <input
                           type="time"
@@ -521,10 +512,11 @@ export function CardModal({
                         />
                       </div>
                     </div>
-                  ) : (
+
+                    {/* Bucket */}
                     <div>
                       <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                        Bucket
+                        Priority Bucket {dueStart && dueEnd && '(Timeline takes priority)'}
                       </label>
                       <select
                         value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
@@ -537,16 +529,31 @@ export function CardModal({
                           </option>
                         ))}
                       </select>
+                      {dueStart && dueEnd && (
+                        <p className="text-xs text-slate-400 mt-1">
+                          Time is set, so this card appears in Timeline. Bucket is kept for when time is removed.
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </>
+                )}
 
-              {dueChannel === 'list-only' && (
-                <p className="mt-2 text-xs text-slate-500">
-                  This card stays on the board without a schedule. Use the timeline or A/B options to plan it.
-                </p>
-              )}
+                {!dueDate && (
+                  <p className="text-xs text-slate-500">
+                    No schedule set. This card will only appear in the Kanban list.
+                  </p>
+                )}
+                {dueDate && dueStart && dueEnd && (
+                  <p className="text-xs text-slate-500">
+                    📅 This card will appear in the Timeline view.
+                  </p>
+                )}
+                {dueDate && !dueStart && !dueEnd && (
+                  <p className="text-xs text-slate-500">
+                    📋 This card will appear in the A/B List.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Priority */}

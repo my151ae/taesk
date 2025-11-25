@@ -34,7 +34,6 @@ import {
   type Board,
   type BoardData,
   type Priority,
-  type DueChannel,
   type DueBucket,
   type ProfileSummary,
   type CommentWithAuthor,
@@ -112,7 +111,6 @@ const loadFromStorage = (): BoardData => {
         checked: typeof card.checked === 'boolean' ? card.checked : false,
         due_start: card.due_start ?? null,
         due_end: card.due_end ?? null,
-        due_channel: (card.due_channel ?? 'list-only') as DueChannel,
         due_bucket: (card.due_bucket ?? null) as DueBucket | null,
         due_bucket_position: typeof card.due_bucket_position === 'number' ? card.due_bucket_position : null,
       })) as Card[]
@@ -1333,7 +1331,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         due_date: card.due_date,
         due_start: card.due_start,
         due_end: card.due_end,
-        due_channel: card.due_channel,
         due_bucket: card.due_bucket,
         due_bucket_position: card.due_bucket_position,
         priority: card.priority,
@@ -1380,7 +1377,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         due_date: card.due_date,
         due_start: card.due_start,
         due_end: card.due_end,
-        due_channel: card.due_channel,
         due_bucket: card.due_bucket,
         due_bucket_position: card.due_bucket_position,
         priority: card.priority,
@@ -1553,7 +1549,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_date: null,
       due_start: null,
       due_end: null,
-      due_channel: 'list-only',
       due_bucket: null,
       due_bucket_position: null,
       priority: 'medium',
@@ -1596,7 +1591,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             due_date: tempCard.due_date,
             due_start: tempCard.due_start,
             due_end: tempCard.due_end,
-            due_channel: tempCard.due_channel,
             due_bucket: tempCard.due_bucket,
             priority: tempCard.priority,
             checked: tempCard.checked,
@@ -1993,7 +1987,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     assigneeTouched?: boolean,
     due_start?: string | null,
     due_end?: string | null,
-    due_channel?: DueChannel,
     due_bucket?: DueBucket | null,
     due_bucket_position?: number | null,
   ) => {
@@ -2007,19 +2000,10 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           const nextAssigneeIds = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [];
           const nextAssigneeId = nextAssigneeIds.length > 0 ? nextAssigneeIds[0] : null;
 
-          const nextChannel: DueChannel = due_channel ?? card.due_channel ?? 'list-only';
-          const nextBucket: DueBucket | null = nextChannel === 'ab-list'
-            ? (due_bucket ?? card.due_bucket ?? null)
-            : null;
-          const nextBucketPosition: number | null = nextChannel === 'ab-list'
-            ? (due_bucket_position ?? card.due_bucket_position ?? Date.now())
-            : null;
-          const nextStart = nextChannel === 'timeline'
-            ? (due_start ?? card.due_start ?? null)
-            : null;
-          const nextEnd = nextChannel === 'timeline'
-            ? (due_end ?? card.due_end ?? null)
-            : null;
+          const nextBucket: DueBucket | null = due_bucket ?? card.due_bucket ?? null;
+          const nextBucketPosition: number | null = due_bucket_position ?? card.due_bucket_position ?? null;
+          const nextStart = due_start ?? card.due_start ?? null;
+          const nextEnd = due_end ?? card.due_end ?? null;
 
           return {
             ...card,
@@ -2029,7 +2013,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             due_date: due_date || null,
             due_start: nextStart,
             due_end: nextEnd,
-            due_channel: nextChannel,
             due_bucket: nextBucket,
             due_bucket_position: nextBucketPosition,
             priority: priority || 'medium',
@@ -2165,7 +2148,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_date: null,
       due_start: null,
       due_end: null,
-      due_channel: 'list-only',
       due_bucket: null,
       due_bucket_position: null,
       priority: 'medium',
@@ -2213,7 +2195,6 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           due_date: tempCard.due_date,
           due_start: tempCard.due_start,
           due_end: tempCard.due_end,
-          due_channel: tempCard.due_channel,
           due_bucket: tempCard.due_bucket,
           priority: tempCard.priority,
           checked: tempCard.checked,
