@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { Card, Board, ProfileSummary, DueBucket } from '@/lib/supabase';
+import { Card, Board, ProfileSummary } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildBoardUrl } from '@/lib/board-url';
 import { TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store';
 import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
+import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -45,15 +46,13 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
     }, [dataMode, initialBoard, router]);
 
     const closeCardModal = useCallback(() => {
-        const baseUrl = buildBoardUrl(initialBoard);
-        router.push(baseUrl, { scroll: false });
-
-        // Immediately clear state to prevent flash during realtime updates
+        setIsModalClosing(true);
+        setActiveCardId(null);
+        cardModalShortIdRef.current = null;
         setModalCardOverride(null);
         setCardModalStatus('idle');
-        setIsModalClosing(false);
-        cardModalShortIdRef.current = null;
-        setActiveCardId(null);
+        const baseUrl = buildBoardUrl(initialBoard);
+        router.push(baseUrl, { scroll: false });
     }, [initialBoard, router]);
 
 
@@ -111,7 +110,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                     due_start: bucketItem.due_start,
                     due_end: bucketItem.due_end,
                     due_channel: 'ab-list',
-                    due_bucket: key as DueBucket,
+                    due_bucket: bucketKeyToDueBucket(key),
                     due_bucket_position: bucketItem.bucketPosition,
                     board_id: initialBoard.id,
                     created_at: '',

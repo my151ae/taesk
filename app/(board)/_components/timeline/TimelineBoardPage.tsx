@@ -37,6 +37,7 @@ import {
   getNowMinutesJst,
   minutesToTime,
   withJstMidnight,
+  toLocalDay,
 
   type UserProfile,
   type TimelineDay,
@@ -50,6 +51,7 @@ import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { useTimelineDragAndDrop, bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { normalizeDueBucket } from "@/lib/bucket-normalization";
 import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
@@ -154,6 +156,35 @@ const buildMockTimeline = (): TimelineResponse => {
     },
     serverNow: new Date().toISOString(),
   };
+};
+
+const resolveBucketKey = (card: Card, days: TimelineDay[]) => {
+  let normalizedBucket: DueBucket | null = null;
+  try {
+    normalizedBucket = normalizeDueBucket(card.due_bucket);
+  } catch (error) {
+    console.error('[timeline] invalid due_bucket received', {
+      cardId: card.id,
+      due_bucket: card.due_bucket,
+      error,
+    });
+    return null;
+  }
+
+  if (!normalizedBucket) return null;
+
+  const localDay = toLocalDay(card.due_date ?? null);
+  const matchedDay = days?.find((day) => toLocalDay(day.isoDate) === localDay);
+
+  if (matchedDay?.key) {
+    return `${matchedDay.key}_${normalizedBucket}`;
+  }
+
+  if (days?.[0]?.key) {
+    return `${days[0].key}_${normalizedBucket}`;
+  }
+
+  return null;
 };
 
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
@@ -301,13 +332,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
         } else if (card.due_bucket) {
           // It's a bucket item
-          const bucketKey = card.due_bucket;
+          const bucketKey = resolveBucketKey(card, prev.days);
+          if (!bucketKey) {
+            console.warn('[timeline] skip bucket item with unknown bucket', {
+              cardId: card.id,
+              due_bucket: card.due_bucket,
+              due_date: card.due_date,
+            });
+            return prev;
+          }
+
           if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
 
           nextBuckets[bucketKey].push({
             card_id: card.id,
             title: card.title,
-            due_date: null,
+            due_date: toLocalDay(card.due_date ?? null),
             due_start: card.due_start,
             due_end: card.due_end,
             checked: card.checked,
@@ -481,7 +521,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           due_date: normalizedDueDate,
           due_start,
           due_end,
-          due_bucket,
+          due_bucket: normalizeDueBucket(due_bucket),
           due_bucket_position,
           priority,
           slug: slugify(title),
