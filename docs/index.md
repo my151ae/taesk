@@ -245,6 +245,7 @@ taesk/
 ## 📚 Detailed Documentation
 
 - [Architecture & Design](./detail/architecture.md)
+- [Design & Responsive Guidelines](./design-guidelines.md)
 - [Domain Model](./detail/domain-model.md)
 - [Component Breakdown](./detail/components.md)
 - [Database Schema](./detail/database.md)

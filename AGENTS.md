@@ -13,7 +13,13 @@
 > - テスト結果やログ確認で停止せずに済むよう、JSON ファイルを生成したうえで内容を確認し、失敗時は解析用スクリプト（例: `python - ... json.loads`）で詳細を抽出する。
 > - 上記方針に反するコマンド・手順は今後一切行わない。
 > - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
-> - Playwright の `webServer.command` が内部で `NODE_ENV=test npm run dev` を起動する点のみ例外扱いとし、手動で `npm run dev` を叩かない。実行前にポート 3000 が空いているか確認し、孤立した `next dev`/`playwright test` プロセスは必ず停止させてからテストを開始する。
+> - `npx playwright test --reporter=list` など JSON を生成しないレポーターは **使用禁止**。
+- Playwright の `webServer.command` が内部で `NODE_ENV=test npm run dev` を起動する点のみ例外扱いとし、手動で `npm run dev` を叩かない。実行前にポート 3000 が空いているか確認し、孤立した `next dev`/`playwright test` プロセスは必ず停止させてからテストを開始する。
+
+## Design & Responsive Guidelines
+> **ハイドレーションエラー回避の鉄則**
+> - Next.js (App Router) では `window.innerWidth` による条件付きレンダリングを避け、**Tailwind CSS のユーティリティクラス (`hidden`, `md:block` 等)** で表示制御を行うこと。
+> - 詳細な実装パターンやAIへの指示テンプレートは [docs/design-guidelines.md](docs/design-guidelines.md) を参照。
 
 ## 現状メモ（2025-11-20 JST）
 
