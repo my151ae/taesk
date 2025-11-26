@@ -88,13 +88,15 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                         <span className="break-words leading-tight">
                             {event.title || 'Untitled card'}
                         </span>
-                        <span
-                            className="text-[10px] font-semibold text-slate-500 whitespace-nowrap"
-                            title={timeLabel(event.due_start, event.due_end)}
-                        >
-                            {timeLabel(event.due_start, event.due_end)}
-                        </span>
                     </div>
+                </div>
+
+                {/* Time display overlapping top border */}
+                <div
+                    className="absolute -top-px left-0 text-[10px] font-semibold text-slate-600 px-1"
+                    title={timeLabel(event.due_start, event.due_end)}
+                >
+                    {timeLabel(event.due_start, event.due_end)}
                 </div>
 
                 <button

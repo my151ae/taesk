@@ -130,7 +130,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 setSelectedSlot(null);
                             }}
                         >
-                            <div className="p-1 text-xs text-blue-500 font-medium">
+                            {/* Time display on top-left, outside the border */}
+                            <div className="absolute -top-4 left-0 text-[10px] font-semibold text-blue-600 px-1">
                                 {minutesToTime(selectedSlot.minutes).slice(0, 5)}
                             </div>
                         </div>
@@ -173,7 +174,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 right: '8px',
                             }}
                         >
-                            <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
+                            {/* Time display on top-left, outside the border */}
+                            <div className="absolute -top-4 left-0 text-[10px] font-semibold text-sky-600 px-1">
                                 {timeLabel(
                                     minutesToTime(pointerPreview.startMinutes),
                                     minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
