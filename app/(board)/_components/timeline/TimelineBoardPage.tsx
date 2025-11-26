@@ -1184,7 +1184,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   return (
     <>
-      <div className="min-h-screen bg-[#f4f5f7] px-4 pb-10 pt-8">
+      <div className="min-h-screen bg-[#f4f5f7]">
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
           <TimelineHeader
             board={initialBoard}
@@ -1343,6 +1343,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   <div className="block md:hidden h-full relative">
                     <MobileTimelineView
                       days={data?.days ?? []}
+                      activeDayIndex={activeDayIndex}
+                      onPrevDay={handlePrevDay}
+                      onNextDay={handleNextDay}
                       eventsByDay={eventsByDay}
                       abBuckets={abBuckets}
                       indicatorTop={indicatorTop}

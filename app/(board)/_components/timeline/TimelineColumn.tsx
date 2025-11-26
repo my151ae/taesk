@@ -108,7 +108,6 @@ export const TimelineColumn = memo(function TimelineColumn({
                     className="relative h-full border-l border-slate-100 border-r border-slate-200/50 pb-8 select-none bg-white"
                     style={{
                         minHeight: timelineViewportHeight,
-                        width: 'calc(50% - 3px)',
                     }}
                     onDoubleClick={handleDoubleClick}
                     onClick={(e) => handleSingleClick(e, day.isoDate)}
