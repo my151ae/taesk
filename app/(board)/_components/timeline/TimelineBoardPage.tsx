@@ -905,7 +905,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [data?.days]);
 
-  const createCard = useCallback(async (payload: Partial<Card>) => {
+  const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
     if (dataMode !== 'api') return;
     try {
       const response = await fetch(`/api/boards/${initialBoard.id}/cards`, {
@@ -917,7 +917,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const body = await response.json();
 
       if (body.card) {
-        // Optimistic update
+        // Replace temporary card with real card
         const newCard = body.card as Card;
         setData((prev) => {
           if (!prev) return prev;
@@ -941,9 +941,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             short_id: newCard.short_id ?? null,
             slug: newCard.slug ?? null,
           };
+
+          // If tempId exists, replace the temp card, otherwise just add
+          const events = tempId
+            ? prev.events.map(e => e.card_id === tempId ? newEvent : e)
+            : [...prev.events, newEvent];
+
           return {
             ...prev,
-            events: [...prev.events, newEvent],
+            events,
           };
         });
 
@@ -956,8 +962,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     } catch (error) {
       console.error('Create card failed', error);
       setErrorMessage('Failed to create card');
+
+      // Remove optimistic card on error
+      if (tempId) {
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.filter(e => e.card_id !== tempId),
+          };
+        });
+      }
     }
-  }, [dataMode, initialBoard.id, fetchTimeline]);
+  }, [dataMode, initialBoard.id, fetchTimeline, setData]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const payload: Partial<Card> = {
@@ -971,8 +988,38 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       due_bucket_position: null,
       priority: 'medium',
     };
-    createCard(payload);
-  }, [createCard, initialBoard.id]);
+
+    // Optimistic update to show card immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticEvent: TimelineEvent = {
+      card_id: tempId,
+      due_date: day.isoDate,
+      due_start: minutesToTime(minutes),
+      due_end: minutesToTime(minutes + 60),
+      durationMinutes: 60,
+      title: payload.title || 'New card',
+      tags: [],
+      due_bucket: null,
+      due_bucket_position: null,
+      priority: 'medium',
+      checked: false,
+      assignee_id: null,
+      assignee_ids: null,
+      assigned_to: null,
+      short_id: null,
+      slug: null,
+    };
+
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        events: [...prev.events, optimisticEvent],
+      };
+    });
+
+    createCard(payload, tempId);
+  }, [createCard, setData]);
 
   const {
     sensors,

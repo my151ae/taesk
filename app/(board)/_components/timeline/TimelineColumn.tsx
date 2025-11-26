@@ -87,6 +87,12 @@ export const TimelineColumn = memo(function TimelineColumn({
     };
 
     const handleDoubleClick = (e: MouseEvent<HTMLDivElement>) => {
+        // If ghost exists, it handles the double-click, so do nothing here
+        if (selectedSlot && selectedSlot.day === day.isoDate) {
+            return;
+        }
+
+        // Calculate position from double-click
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
@@ -110,12 +116,18 @@ export const TimelineColumn = memo(function TimelineColumn({
                     {/* Phantom Card */}
                     {selectedSlot && selectedSlot.day === day.isoDate && (
                         <div
-                            className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
+                            className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 z-10 cursor-pointer"
                             style={{
                                 top: minuteToPixels(selectedSlot.minutes),
                                 height: minuteToPixels(60),
                                 left: 0,
                                 right: 0,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                handleColumnClick(day, selectedSlot.minutes);
+                                setSelectedSlot(null);
                             }}
                         >
                             <div className="p-1 text-xs text-blue-500 font-medium">
