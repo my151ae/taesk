@@ -20,6 +20,7 @@ type TimelineEventItemProps = {
     handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => void;
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -30,7 +31,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     handleEventKeyDown,
     handleResizeStart,
     handleResizeMove,
-    handleResizeEnd
+    handleResizeEnd,
+    onToggleCheck,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -68,15 +70,20 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 }}
             >
                 <div className="flex items-start gap-2 pr-6">
-                    <span
-                        aria-hidden="true"
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleCheck(event.card_id, !event.checked);
+                        }}
+                        aria-label={event.checked ? "Mark as incomplete" : "Mark as complete"}
                         className={clsx(
-                            'flex h-3.5 w-3.5 items-center justify-center border text-[8px] font-bold mt-0.5',
+                            'flex h-3.5 w-3.5 items-center justify-center border text-[8px] font-bold mt-0.5 cursor-pointer hover:border-sky-400 transition-colors',
                             event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
                         )}
                     >
                         ✓
-                    </span>
+                    </button>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
                         <span className="break-words leading-tight">
                             {event.title || 'Untitled card'}

@@ -39,6 +39,7 @@ type TimelineColumnProps = {
     handleResizeStart: (e: React.PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => void;
     handleResizeMove: (e: React.PointerEvent) => void;
     handleResizeEnd: (e: React.PointerEvent) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
 };
 
@@ -68,6 +69,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     handleResizeStart,
     handleResizeMove,
     handleResizeEnd,
+    onToggleCheck,
     setSelectedSlot
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
@@ -176,6 +178,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                             handleResizeStart={handleResizeStart}
                             handleResizeMove={handleResizeMove}
                             handleResizeEnd={handleResizeEnd}
+                            onToggleCheck={onToggleCheck}
                         />
                     ))}
                 </div>

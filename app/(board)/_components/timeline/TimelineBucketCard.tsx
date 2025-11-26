@@ -7,12 +7,14 @@ type TimelineBucketCardProps = {
     item: TimelineBucketItem;
     bucketKey: string;
     openCardModal: (shortId: string | null) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
 };
 
 export const TimelineBucketCard = ({
     item,
     bucketKey,
     openCardModal,
+    onToggleCheck,
 }: TimelineBucketCardProps) => {
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -46,8 +48,11 @@ export const TimelineBucketCard = ({
                     <input
                         type="checkbox"
                         checked={item.checked}
-                        readOnly
-                        className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-sky-500"
+                        onChange={(e) => {
+                            e.stopPropagation();
+                            onToggleCheck(item.card_id, e.target.checked);
+                        }}
+                        className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-sky-500 cursor-pointer"
                     />
                     <div className="flex min-w-0 flex-1 items-start gap-1">
                         <div className="flex-1 text-left">

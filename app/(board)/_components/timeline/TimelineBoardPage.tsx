@@ -812,9 +812,51 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     [dataMode, initialBoard.id]
   );
 
+  const handleToggleCardChecked = useCallback(
+    async (cardId: string, nextChecked: boolean) => {
+      if (dataMode !== 'api') return;
 
+      try {
+        // Optimistic update
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.map((e) =>
+              e.card_id === cardId ? { ...e, checked: nextChecked } : e
+            ),
+            abBuckets: Object.fromEntries(
+              Object.entries(prev.abBuckets).map(([key, items]) => [
+                key,
+                items.map((item) =>
+                  item.card_id === cardId ? { ...item, checked: nextChecked } : item
+                ),
+              ])
+            ),
+          };
+        });
 
+        // API call
+        const response = await fetch(
+          `/api/boards/${initialBoard.id}/cards/${cardId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checked: nextChecked }),
+          }
+        );
 
+        if (!response.ok) {
+          throw new Error('Failed to update checkbox');
+        }
+      } catch (error) {
+        console.error('[timeline] toggle checkbox failed', error);
+        // Revert on error by refetching
+        fetchTimeline();
+      }
+    },
+    [dataMode, initialBoard.id, fetchTimeline]
+  );
 
   const handleBoardNavigate = useCallback(
     (board: Board) => {
@@ -1098,6 +1140,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     floatingLayerTop={floatingLayerTop}
                     status={status}
                     openCardModal={openCardModal}
+                    onToggleCheck={handleToggleCardChecked}
                   />
 
                   <TimelineGrid
@@ -1115,6 +1158,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     handleResizeStart={handleResizeStart}
                     handleResizeMove={handleResizeMove}
                     handleResizeEnd={handleResizeEnd}
+                    onToggleCheck={handleToggleCardChecked}
                   />
                 </div>
               </div>

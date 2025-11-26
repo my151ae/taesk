@@ -15,6 +15,7 @@ type TimelineBucketsProps = {
     floatingLayerTop: number;
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
 };
 
 const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
@@ -33,6 +34,7 @@ export default function TimelineBuckets({
     floatingLayerTop,
     status,
     openCardModal,
+    onToggleCheck,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
     const templateColumns = `80px repeat(${days.length}, minmax(0, 1fr))`;
@@ -69,6 +71,7 @@ export default function TimelineBuckets({
                                                         item={item}
                                                         bucketKey={section.bucket}
                                                         openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                                                        onToggleCheck={onToggleCheck}
                                                     />
                                                 ))
                                             )}
