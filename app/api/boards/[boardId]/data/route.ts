@@ -99,7 +99,7 @@ export async function GET(
         await supabase
           .from('cards')
           .select(
-            'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_channel, due_bucket, due_bucket_position, priority, checked, assignee_id, assigned_to, assignee_ids, user_id, short_id, id_short, slug, created_at, updated_at'
+            'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, due_bucket_position, priority, checked, assignee_id, assigned_to, assignee_ids, user_id, short_id, id_short, slug, created_at, updated_at'
           )
           .eq('board_id', boardId)
           .order('position', { ascending: true }),

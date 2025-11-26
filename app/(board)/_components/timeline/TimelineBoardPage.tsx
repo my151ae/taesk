@@ -963,8 +963,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const payload: Partial<Card> = {
       title: `New card ${Date.now()}`,
       description: '',
-      list_id: initialBoard.id,
-      position: 999999,
       tags: [],
       due_date: withJstMidnight(day.isoDate),
       due_start: minutesToTime(minutes),

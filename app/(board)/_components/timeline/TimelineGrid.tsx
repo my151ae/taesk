@@ -98,7 +98,10 @@ export default function TimelineGrid({
                         pointerPreview={pointerPreview}
                         activeResize={activeResize}
                         selectedSlot={selectedSlot}
-                        openCardModal={openCardModal}
+                        openCardModal={(shortId, source) => {
+                            setSelectedSlot(null);
+                            openCardModal(shortId, source);
+                        }}
                         handleEventKeyDown={handleEventKeyDown}
                         handleColumnClick={handleColumnClick}
                         handleResizeStart={handleResizeStart}
