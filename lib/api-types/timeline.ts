@@ -53,4 +53,6 @@ export interface TimelineResponse {
   events: TimelineEvent[];
   abBuckets: Record<string, TimelineBucketItem[]>;
   serverNow: string;
+  startOffset?: number;
+  range?: number;
 }

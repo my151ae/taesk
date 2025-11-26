@@ -30,10 +30,10 @@ const toMinutes = (time: string | null) => {
   return h * 60 + m;
 };
 
-const buildDays = (base: Date): TimelineDay[] => {
+const buildDays = (base: Date, startOffset: number, range: number): TimelineDay[] => {
   const todayIso = formatDateJst(base, 0);
-  return Array.from({ length: TIMELINE_DAY_RANGE }, (_, offset) => {
-    const isoDate = formatDateJst(base, offset);
+  return Array.from({ length: range }, (_, offset) => {
+    const isoDate = formatDateJst(base, startOffset + offset);
     return {
       key: isoDate,
       label: formatDayLabel(isoDate, todayIso),
@@ -72,8 +72,14 @@ export async function GET(
     );
   }
 
+  const searchParams = request.nextUrl.searchParams;
+  const parsedStart = Number.parseInt(searchParams.get('start') ?? '0', 10);
+  const parsedRange = Number.parseInt(searchParams.get('range') ?? String(TIMELINE_DAY_RANGE), 10);
+  const startOffset = Number.isFinite(parsedStart) ? parsedStart : 0;
+  const range = Math.max(2, Number.isFinite(parsedRange) ? parsedRange : TIMELINE_DAY_RANGE);
+
   const now = new Date();
-  const days = buildDays(now);
+  const days = buildDays(now, startOffset, range);
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
@@ -200,6 +206,8 @@ export async function GET(
     events,
     abBuckets,
     serverNow: new Date().toISOString(),
+    startOffset,
+    range,
   };
 
   return NextResponse.json(responseBody, { status: 200 });

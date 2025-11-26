@@ -61,6 +61,8 @@ type TimelineBoardPageProps = {
 
 type DataMode = 'api' | 'mock';
 
+const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
+
 
 const buildMockTimeline = (): TimelineResponse => {
   const base = new Date();
@@ -180,6 +182,8 @@ const buildMockTimeline = (): TimelineResponse => {
     events,
     abBuckets,
     serverNow: new Date().toISOString(),
+    startOffset: 0,
+    range: DAY_WINDOW_RANGE,
   };
 };
 
@@ -235,6 +239,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const { user, signOut } = useAuth();
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const [dayWindowStart, setDayWindowStart] = useState(0);
+  const dayWindowStartRef = useRef(0);
 
   const {
     modalCard,
@@ -451,13 +457,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [initialBoard]);
 
-  const fetchTimeline = useCallback(async () => {
-    if (!initialBoard?.id) return;
+  const fetchTimeline = useCallback(async (start?: number) => {
+    if (!initialBoard?.id) return null;
+    const effectiveStart = typeof start === 'number' ? start : dayWindowStartRef.current;
     setStatus('loading');
     setErrorMessage(null);
     try {
       traceRef.current?.mark('fetch:start');
-      const response = await fetch(`/api/boards/${initialBoard.id}/timeline`, {
+      const params = new URLSearchParams({
+        start: String(effectiveStart),
+        range: String(DAY_WINDOW_RANGE),
+      });
+      const response = await fetch(`/api/boards/${initialBoard.id}/timeline?${params.toString()}`, {
         cache: 'no-store',
       });
       if (!response.ok) {
@@ -465,8 +476,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         throw new Error(body?.error?.message || 'Failed to load timeline');
       }
       const payload = (await response.json()) as TimelineResponse;
+      const startOffset = payload.startOffset ?? effectiveStart;
       setData(payload);
       setDataMode('api');
+      setDayWindowStart(startOffset);
+      dayWindowStartRef.current = startOffset;
       setStatus('idle');
       const abItemCount = Object.values(payload.abBuckets || {}).reduce(
         (sum, items) => sum + (items?.length ?? 0),
@@ -478,14 +492,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         abItems: abItemCount,
       });
       traceRef.current = createClientTrace('timeline');
+      return payload;
     } catch (error) {
       console.warn('[timeline] fetch failed, rendering mock data', error);
       setErrorMessage('Showing sample schedule until sync succeeds');
-      setData(buildMockTimeline());
+      const fallback = buildMockTimeline();
+      setData(fallback);
+      setDayWindowStart(0);
+      dayWindowStartRef.current = 0;
       setDataMode('mock');
       setStatus('idle');
       traceRef.current?.finish('error', { reason: 'fetch_failed' });
       traceRef.current = createClientTrace('timeline');
+      return fallback;
     }
   }, [initialBoard?.id]);
 
@@ -910,6 +929,42 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(tags).sort();
   }, [data?.events, data?.abBuckets]);
 
+  const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
+    if (!nextLength) return 0;
+    const maxStart = Math.max(0, nextLength - 2);
+    if (typeof desired === 'number') {
+      return Math.min(Math.max(0, desired), maxStart);
+    }
+    return Math.min(activeDayIndex, maxStart);
+  }, [activeDayIndex]);
+
+  const handlePrevDay = useCallback(async () => {
+    if (status === 'loading') return;
+    if (activeDayIndex > 0) {
+      setActiveDayIndex((prev) => Math.max(0, prev - 1));
+      return;
+    }
+
+    const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+    const payload = await fetchTimeline(baseStart - 1);
+    const nextDaysLength = payload?.days?.length ?? 0;
+    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, 0));
+  }, [activeDayIndex, clampActiveDayIndex, data?.startOffset, fetchTimeline, status]);
+
+  const handleNextDay = useCallback(async () => {
+    if (status === 'loading' || !data?.days?.length) return;
+    const lastStartIndex = Math.max(0, data.days.length - 2);
+    if (activeDayIndex < lastStartIndex) {
+      setActiveDayIndex((prev) => Math.min(lastStartIndex, prev + 1));
+      return;
+    }
+
+    const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+    const payload = await fetchTimeline(baseStart + 1);
+    const nextDaysLength = payload?.days?.length ?? 0;
+    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - 2 : 0));
+  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status]);
+
 
 
   const eventsByDay = useMemo(() => {
@@ -929,6 +984,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       return acc;
     }, {} as Record<string, string | null>);
   }, [data?.days]);
+
+  useEffect(() => {
+    if (!data?.days?.length) return;
+    setActiveDayIndex((prev) => clampActiveDayIndex(data.days.length, prev));
+  }, [clampActiveDayIndex, data?.days?.length]);
 
   const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
     if (dataMode !== 'api') return;
@@ -1192,9 +1252,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setActiveDayIndex(prev => Math.max(0, prev - 1));
+                          handlePrevDay();
                         }}
-                        disabled={activeDayIndex === 0}
+                        disabled={status === 'loading'}
                         className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
                         aria-label="Previous day"
                         type="button"
@@ -1219,9 +1279,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setActiveDayIndex(prev => Math.min((data?.days?.length ?? 2) - 2, prev + 1));
+                          handleNextDay();
                         }}
-                        disabled={activeDayIndex >= (data?.days?.length ?? 2) - 2}
+                        disabled={status === 'loading'}
                         className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
                         aria-label="Next day"
                         type="button"
