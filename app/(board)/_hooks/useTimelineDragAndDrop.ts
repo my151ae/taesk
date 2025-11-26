@@ -249,6 +249,8 @@ export function useTimelineDragAndDrop({
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
     };
 
+    const [isOverABList, setIsOverABList] = useState(false);
+
     const handleDragMove = (event: DragMoveEvent) => {
         const currentDrag = activeDragRef.current;
         if (!currentDrag) {
@@ -258,6 +260,13 @@ export function useTimelineDragAndDrop({
             return;
         }
         const overType = event.over?.data.current?.type;
+
+        // Check if over A/B list
+        const isAB = overType === 'ab-bucket' || overType === 'bucket-item' || overType === 'bucket-item-top' || overType === 'bucket-item-bottom';
+        if (isAB !== isOverABList) {
+            setIsOverABList(isAB);
+        }
+
         if (overType !== 'timeline-column') {
             if (pointerPreview.visible) {
                 setPointerPreview(HIDDEN_POINTER_PREVIEW);
@@ -292,6 +301,7 @@ export function useTimelineDragAndDrop({
         setActiveDrag(null);
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
+        setIsOverABList(false);
 
         if (!over) return;
         const cardId = active.data.current?.cardId as string | undefined;
@@ -456,6 +466,7 @@ export function useTimelineDragAndDrop({
         setActiveDrag(null);
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
+        setIsOverABList(false);
     };
 
     const handleEventKeyDown = (
@@ -588,6 +599,7 @@ export function useTimelineDragAndDrop({
         activeDrag,
         pointerPreview,
         activeResize,
+        isOverABList,
         handleDragStart,
         handleDragMove,
         handleDragEnd,

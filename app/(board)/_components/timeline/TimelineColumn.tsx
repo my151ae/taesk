@@ -96,93 +96,98 @@ export const TimelineColumn = memo(function TimelineColumn({
     };
 
     return (
-        <DroppableColumn key={day.isoDate} day={day}>
-            <div
-                className="relative h-full border-l border-slate-100 pl-2 pr-[225px] pb-8 select-none"
-                style={{ minHeight: timelineViewportHeight }}
-                onDoubleClick={handleDoubleClick}
-                onClick={(e) => handleSingleClick(e, day.isoDate)}
-            >
-                {/* Phantom Card */}
-                {selectedSlot && selectedSlot.day === day.isoDate && (
-                    <div
-                        className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
-                        style={{
-                            top: minuteToPixels(selectedSlot.minutes),
-                            height: minuteToPixels(60),
-                            left: 8,
-                            right: 225,
-                        }}
-                    >
-                        <div className="p-1 text-xs text-blue-500 font-medium">
-                            {minutesToTime(selectedSlot.minutes).slice(0, 5)}
-                        </div>
-                    </div>
-                )}
-
+        <div className="relative h-full">
+            <DroppableColumn key={day.isoDate} day={day}>
                 <div
-                    className="pointer-events-none absolute"
-                    style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
+                    className="relative h-full border-l border-slate-100 border-r border-slate-200/50 pl-2 pb-8 select-none bg-white"
+                    style={{
+                        minHeight: timelineViewportHeight,
+                        width: 'calc(50% - 3px)',
+                    }}
+                    onDoubleClick={handleDoubleClick}
+                    onClick={(e) => handleSingleClick(e, day.isoDate)}
                 >
-                    {HOURS.map((hour, idx) => (
+                    {/* Phantom Card */}
+                    {selectedSlot && selectedSlot.day === day.isoDate && (
                         <div
-                            key={hour}
-                            className={clsx(
-                                'absolute left-0 right-0 border-b border-slate-200',
-                                idx === 0 ? '' : 'border-dashed'
-                            )}
-                            style={{ top: idx * HOUR_HEIGHT }}
-                        />
-                    ))}
-                </div>
-
-                {indicatorVisibleInDay && (
-                    <div
-                        className="pointer-events-none absolute z-10"
-                        style={{ top: indicatorPosition, left: 0, right: 0 }}
-                    >
-                        <div className="relative h-px bg-red-400/80">
-                            <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
+                            className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 pointer-events-none z-10"
+                            style={{
+                                top: minuteToPixels(selectedSlot.minutes),
+                                height: minuteToPixels(60),
+                                left: 8,
+                                right: 8,
+                            }}
+                        >
+                            <div className="p-1 text-xs text-blue-500 font-medium">
+                                {minutesToTime(selectedSlot.minutes).slice(0, 5)}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {activeDragCardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
                     <div
-                        className="pointer-events-none absolute z-10 border border-dashed border-sky-300 bg-sky-50/40"
-                        style={{
-                            top: minuteToPixels(pointerPreview.startMinutes),
-                            height: minuteToPixels(pointerPreview.durationMinutes),
-                            left: '8px',
-                            width: 'calc(100% - 233px)', // 8px left margin + 225px right space for A/B list
-                        }}
+                        className="pointer-events-none absolute"
+                        style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
                     >
-                        <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
-                            {timeLabel(
-                                minutesToTime(pointerPreview.startMinutes),
-                                minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
-                            )}
-                        </div>
+                        {HOURS.map((hour, idx) => (
+                            <div
+                                key={hour}
+                                className={clsx(
+                                    'absolute left-0 right-0 border-b border-slate-200',
+                                    idx === 0 ? '' : 'border-dashed'
+                                )}
+                                style={{ top: idx * HOUR_HEIGHT }}
+                            />
+                        ))}
                     </div>
-                )}
 
-                <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-                    {events.map((event) => (
-                        <TimelineEventItem
-                            key={event.card_id}
-                            event={event}
-                            layout={layoutMap[event.card_id]}
-                            activeResize={activeResize}
-                            openCardModal={openCardModal}
-                            handleEventKeyDown={handleEventKeyDown}
-                            handleResizeStart={handleResizeStart}
-                            handleResizeMove={handleResizeMove}
-                            handleResizeEnd={handleResizeEnd}
-                            onToggleCheck={onToggleCheck}
-                        />
-                    ))}
+                    {indicatorVisibleInDay && (
+                        <div
+                            className="pointer-events-none absolute z-10"
+                            style={{ top: indicatorPosition, left: 0, right: 0 }}
+                        >
+                            <div className="relative h-px bg-red-400/80">
+                                <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeDragCardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
+                        <div
+                            className="pointer-events-none absolute z-10 border border-dashed border-sky-300 bg-sky-50/40"
+                            style={{
+                                top: minuteToPixels(pointerPreview.startMinutes),
+                                height: minuteToPixels(pointerPreview.durationMinutes),
+                                left: '8px',
+                                right: '8px',
+                            }}
+                        >
+                            <div className="px-3 py-2 text-[10px] font-semibold text-slate-500">
+                                {timeLabel(
+                                    minutesToTime(pointerPreview.startMinutes),
+                                    minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
+                        {events.map((event) => (
+                            <TimelineEventItem
+                                key={event.card_id}
+                                event={event}
+                                layout={layoutMap[event.card_id]}
+                                activeResize={activeResize}
+                                openCardModal={openCardModal}
+                                handleEventKeyDown={handleEventKeyDown}
+                                handleResizeStart={handleResizeStart}
+                                handleResizeMove={handleResizeMove}
+                                handleResizeEnd={handleResizeEnd}
+                                onToggleCheck={onToggleCheck}
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
-        </DroppableColumn>
+            </DroppableColumn>
+        </div>
     );
 });

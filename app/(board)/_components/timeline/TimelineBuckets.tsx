@@ -45,7 +45,7 @@ export default function TimelineBuckets({
 
         return (
             <div
-                className="pointer-events-auto border-l border-slate-200 bg-white/95 shadow-xl backdrop-blur overflow-y-auto overflow-x-hidden"
+                className="pointer-events-auto border-l border-slate-200 bg-white overflow-y-auto overflow-x-hidden"
                 style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
             >
                 <div className="space-y-0.5">
@@ -95,7 +95,7 @@ export default function TimelineBuckets({
                 <div />
                 {days.map((day) => (
                     <div key={day.key} className="relative flex justify-end">
-                        <div className="pointer-events-auto w-[210px] max-w-full sm:max-w-[220px]">
+                        <div className="w-[calc(50%-3px)]">
                             {renderAbCard(day)}
                         </div>
                     </div>

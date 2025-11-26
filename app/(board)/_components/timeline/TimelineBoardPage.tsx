@@ -981,6 +981,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     activeDrag,
     pointerPreview,
     activeResize,
+    isOverABList,
     handleDragStart,
     handleDragMove,
     handleDragEnd,
@@ -1091,9 +1092,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               droppable: { strategy: MeasuringStrategy.Always },
             }}
             autoScroll={{
-              enabled: true,
+              enabled: !isOverABList,
               threshold: { x: 0, y: 0.2 },
-              acceleration: 10,
+              acceleration: 1,
             }}
           >
             <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
