@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import type { TimelineResponse, TimelineEvent, TimelineBucketItem } from '@/lib/api-types/timeline';
+import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay } from '@/lib/api-types/timeline';
+import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const TIMELINE_DAY_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
 
 const formatDateJst = (base: Date, offsetDays = 0): string => {
   const utcMs = base.getTime();
@@ -26,6 +28,18 @@ const toMinutes = (time: string | null) => {
   const h = Number(hour ?? '0');
   const m = Number(minute ?? '0');
   return h * 60 + m;
+};
+
+const buildDays = (base: Date): TimelineDay[] => {
+  const todayIso = formatDateJst(base, 0);
+  return Array.from({ length: TIMELINE_DAY_RANGE }, (_, offset) => {
+    const isoDate = formatDateJst(base, offset);
+    return {
+      key: isoDate,
+      label: formatDayLabel(isoDate, todayIso),
+      isoDate,
+    };
+  });
 };
 
 export async function GET(
@@ -59,9 +73,8 @@ export async function GET(
   }
 
   const now = new Date();
-  const todayIso = formatDateJst(now, 0);
-  const tomorrowIso = formatDateJst(now, 1);
-  const targetDates = [todayIso, tomorrowIso];
+  const days = buildDays(now);
+  const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
     'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
@@ -100,25 +113,17 @@ export async function GET(
   }
 
   const events: TimelineEvent[] = [];
-  const abBuckets: Record<string, TimelineBucketItem[]> = {
-    today_a: [],
-    today_b: [],
-    tomorrow_a: [],
-    tomorrow_b: [],
-  };
-
-  const getDayKey = (dateIso: string | null, today: string, tomorrow: string): string | null => {
-    if (!dateIso) return null;
-    if (dateIso === today) return 'today';
-    if (dateIso === tomorrow) return 'tomorrow';
-    return null; // Only support today/tomorrow for now
-  };
+  const abBuckets: Record<string, TimelineBucketItem[]> = days.reduce((acc, day) => {
+    acc[`${day.key}_a`] = [];
+    acc[`${day.key}_b`] = [];
+    return acc;
+  }, {} as Record<string, TimelineBucketItem[]>);
 
   cards?.forEach((card) => {
     const dateOnly = toJstDate(card.due_date);
-    const dayKey = getDayKey(dateOnly, todayIso, tomorrowIso);
+    const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
 
-    if (!dayKey) return; // Skip cards not in today/tomorrow
+    if (!dayKey) return; // Skip cards outside the visible range
 
     const hasTime = card.due_start && card.due_end;
 
@@ -191,10 +196,7 @@ export async function GET(
   });
 
   const responseBody: TimelineResponse = {
-    days: [
-      { key: 'today', label: 'Today', isoDate: todayIso },
-      { key: 'tomorrow', label: 'Tomorrow', isoDate: tomorrowIso },
-    ],
+    days,
     events,
     abBuckets,
     serverNow: new Date().toISOString(),

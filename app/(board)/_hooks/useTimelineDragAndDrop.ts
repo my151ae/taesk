@@ -360,7 +360,7 @@ export function useTimelineDragAndDrop({
 
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const payload = {
-                due_bucket: bucketKey.split('_')[1] as DueBucket, // Extract 'a' or 'b' from 'today_a', 'tomorrow_b', etc.
+                due_bucket: bucketKey.split('_')[1] as DueBucket, // Extract 'a' or 'b' from '<day>_a' style keys
                 due_date: withJstMidnight(dayIso),
                 due_start: null,
                 due_end: null,

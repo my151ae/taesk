@@ -9,23 +9,27 @@ export const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 export const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
 export const AXIS_WIDTH = 80;
 export const TIMELINE_HEADER_ESTIMATE = 64;
+export const DEFAULT_TIMELINE_DAY_RANGE = 7;
 
-export const AB_CARD_META: Record<string, { title: string; sections: Array<{ bucket: string; label: string; helper: string }> }> = {
-    today: {
-        title: 'A/B Today',
-        sections: [
-            { bucket: 'today_a', label: 'A: do today (not scheduled)', helper: 'Critical tasks' },
-            { bucket: 'today_b', label: 'B: if possible today', helper: 'Stretch tasks' },
-        ],
-    },
-    tomorrow: {
-        title: 'A/B Tomorrow',
-        sections: [
-            { bucket: 'tomorrow_a', label: 'A: do tomorrow', helper: 'Planned focus' },
-            { bucket: 'tomorrow_b', label: 'B: if possible tomorrow', helper: 'Backlog' },
-        ],
-    },
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export const formatDayLabel = (isoDate: string, todayIso?: string) => {
+    const [, month, day] = isoDate.split('-');
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    const weekday = WEEKDAYS[date.getUTCDay()] ?? '';
+    if (todayIso && isoDate === todayIso) {
+        return `Today ${month}/${day} (${weekday})`;
+    }
+    return `${month}/${day} (${weekday})`;
 };
+
+export const buildAbMeta = (day: TimelineDay) => ({
+    title: `A/B ${day.label}`,
+    sections: [
+        { bucket: `${day.key}_a`, label: `A: do on ${day.label}`, helper: 'Critical tasks' },
+        { bucket: `${day.key}_b`, label: `B: if possible on ${day.label}`, helper: 'Stretch tasks' },
+    ],
+});
 
 // Types
 

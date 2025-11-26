@@ -3,8 +3,7 @@ import { ReactNode } from 'react';
 import {
     TimelineDay,
     TimelineBucketItem,
-    AB_CARD_META,
-    timeLabel
+    buildAbMeta,
 } from '@/app/(board)/_utils/timeline-helpers';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineBucketCard } from './TimelineBucketCard';
@@ -42,8 +41,7 @@ export default function TimelineBuckets({
     const templateColumns = `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))`;
 
     const renderAbCard = (day: TimelineDay) => {
-        const meta = AB_CARD_META[day.key];
-        if (!meta) return null;
+        const meta = buildAbMeta(day);
 
         return (
             <div
@@ -88,6 +86,20 @@ export default function TimelineBuckets({
         );
     };
 
+    // If axisWidth is 0, render buckets directly without grid wrapper (for mobile column layout)
+    if (axisWidth === 0) {
+        return (
+            <>
+                {days.map((day) => (
+                    <div key={day.key} className="h-full">
+                        {renderAbCard(day)}
+                    </div>
+                ))}
+            </>
+        );
+    }
+
+    // Default grid layout (for PC)
     return (
         <div
             className="pointer-events-none sticky z-20 h-0 overflow-visible"

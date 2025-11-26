@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Board, Card, DueBucket, Priority, ProfileSummary } from "@/lib/supabase";
+import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import {
   DndContext,
@@ -25,13 +25,11 @@ import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
-  HOUR_HEIGHT,
-  HOURS,
   TIMELINE_HEIGHT,
   TIMELINE_MIN_VIEWPORT,
-  AXIS_WIDTH,
-  AB_CARD_META,
   TIMELINE_HEADER_ESTIMATE,
+  DEFAULT_TIMELINE_DAY_RANGE,
+  formatDayLabel,
   minuteToPixels,
   getMinutesFromTime,
   getIsoDateJst,
@@ -73,19 +71,23 @@ const buildMockTimeline = (): TimelineResponse => {
     const day = `${next.getDate()}`.padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-
   const today = format(0);
-  const tomorrow = format(1);
+  const days = Array.from({ length: DEFAULT_TIMELINE_DAY_RANGE }, (_, offset) => {
+    const isoDate = format(offset);
+    return {
+      key: isoDate,
+      label: formatDayLabel(isoDate, today),
+      isoDate,
+    };
+  });
 
-  return {
-    days: [
-      { key: 'today', label: 'Today', isoDate: today },
-      { key: 'tomorrow', label: 'Tomorrow', isoDate: tomorrow },
-    ],
-    events: [
+  const events: TimelineResponse['events'] = [];
+
+  if (days[0]) {
+    events.push(
       {
         card_id: 'mock-spec',
-        due_date: today,
+        due_date: days[0].isoDate,
         due_start: '09:30:00',
         due_end: '10:30:00',
         durationMinutes: 60,
@@ -98,7 +100,7 @@ const buildMockTimeline = (): TimelineResponse => {
       },
       {
         card_id: 'mock-deepwork-a',
-        due_date: today,
+        due_date: days[0].isoDate,
         due_start: '13:00:00',
         due_end: '14:00:00',
         durationMinutes: 60,
@@ -111,7 +113,7 @@ const buildMockTimeline = (): TimelineResponse => {
       },
       {
         card_id: 'mock-deepwork-b',
-        due_date: today,
+        due_date: days[0].isoDate,
         due_start: '13:30:00',
         due_end: '14:30:00',
         durationMinutes: 60,
@@ -122,39 +124,61 @@ const buildMockTimeline = (): TimelineResponse => {
         short_id: null,
         slug: null,
       },
-      {
-        card_id: 'mock-design-review',
-        due_date: tomorrow,
-        due_start: '10:00:00',
-        due_end: '11:00:00',
-        durationMinutes: 60,
-        title: 'Design review',
-        tags: [],
-        priority: 'medium',
-        checked: false,
-        short_id: null,
-        slug: null,
-      },
-    ],
-    abBuckets: {
-      today_a: [
-        { card_id: 'mock-finish-spec', title: 'Finish spec', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 4000 },
-        { card_id: 'mock-prepare-meeting', title: 'Prepare meeting', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3900 },
-        { card_id: 'mock-fix-bug', title: 'Fix bug #123', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3800 },
-      ],
-      today_b: [
-        { card_id: 'mock-organize-docs', title: 'Organize docs', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3600 },
-        { card_id: 'mock-break-task', title: 'Break down big task', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3500 },
-      ],
-      tomorrow_a: [
-        { card_id: 'mock-finish-review', title: 'Finish review', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3400 },
-        { card_id: 'mock-prepare-slides', title: 'Prepare slides', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3300 },
-      ],
-      tomorrow_b: [
-        { card_id: 'mock-refactor', title: 'Refactor old code', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3200 },
-        { card_id: 'mock-research', title: 'Research item', due_date: null, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3100 },
-      ],
-    },
+    );
+  }
+
+  if (days[1]) {
+    events.push({
+      card_id: 'mock-design-review',
+      due_date: days[1].isoDate,
+      due_start: '10:00:00',
+      due_end: '11:00:00',
+      durationMinutes: 60,
+      title: 'Design review',
+      tags: [],
+      priority: 'medium',
+      checked: false,
+      short_id: null,
+      slug: null,
+    });
+  }
+
+  const abBuckets = days.reduce((acc, day, index) => {
+    const aKey = `${day.key}_a`;
+    const bKey = `${day.key}_b`;
+    acc[aKey] = [];
+    acc[bKey] = [];
+
+    if (index === 0) {
+      acc[aKey].push(
+        { card_id: 'mock-finish-spec', title: 'Finish spec', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 4000 },
+        { card_id: 'mock-prepare-meeting', title: 'Prepare meeting', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3900 },
+        { card_id: 'mock-fix-bug', title: 'Fix bug #123', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3800 },
+      );
+      acc[bKey].push(
+        { card_id: 'mock-organize-docs', title: 'Organize docs', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3600 },
+        { card_id: 'mock-break-task', title: 'Break down big task', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3500 },
+      );
+    }
+
+    if (index === 1) {
+      acc[aKey].push(
+        { card_id: 'mock-finish-review', title: 'Finish review', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3400 },
+        { card_id: 'mock-prepare-slides', title: 'Prepare slides', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3300 },
+      );
+      acc[bKey].push(
+        { card_id: 'mock-refactor', title: 'Refactor old code', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3200 },
+        { card_id: 'mock-research', title: 'Research item', due_date: day.isoDate, due_start: null, due_end: null, checked: false, tags: [], short_id: null, slug: null, bucketPosition: 3100 },
+      );
+    }
+
+    return acc;
+  }, {} as Record<string, TimelineBucketItem[]>);
+
+  return {
+    days,
+    events,
+    abBuckets,
     serverNow: new Date().toISOString(),
   };
 };
@@ -210,6 +234,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const { user, signOut } = useAuth();
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
 
   const {
     modalCard,
@@ -898,12 +923,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const bucketDayMap = useMemo(() => {
     if (!data?.days?.length) return {} as Record<string, string | null>;
-    return {
-      today_a: data.days[0]?.isoDate ?? null,
-      today_b: data.days[0]?.isoDate ?? null,
-      tomorrow_a: data.days[1]?.isoDate ?? null,
-      tomorrow_b: data.days[1]?.isoDate ?? null,
-    };
+    return data.days.reduce((acc, day) => {
+      acc[`${day.key}_a`] = day.isoDate ?? null;
+      acc[`${day.key}_b`] = day.isoDate ?? null;
+      return acc;
+    }, {} as Record<string, string | null>);
   }, [data?.days]);
 
   const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
@@ -1148,32 +1172,67 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 ref={timelineHeaderRef}
                 className="z-30 hidden md:grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
                 style={{
-                  gridTemplateColumns: data?.days?.length
-                    ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
-                    : '80px',
+                  gridTemplateColumns: '80px 1fr 1fr',
                 }}
               >
                 <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
                   <span className="leading-none">GMT+09</span>
                 </div>
-                {data?.days?.map((day, index) => (
+                {data?.days?.slice(activeDayIndex, activeDayIndex + 2).map((day, index) => (
                   <div
                     key={day.key}
                     className={clsx(
-                      'px-4 py-3 text-center',
-                      index > 0 && 'border-l border-slate-100',
-                      // Mobile: only show if it matches active day logic?
-                      // Actually, for the header, we might want to keep it simple or hide it on mobile if the swipe view has its own header.
-                      // But the requirement says "Google Calendar like", which usually implies a header.
-                      // However, our MobileTimelineView handles the day switching.
-                      // Let's hide this header on mobile and let MobileTimelineView handle its own day indication if needed,
-                      // OR we keep it but it might look weird if we swipe.
-                      // For now, let's keep it visible on desktop only.
-                      'hidden md:block'
+                      'px-4 py-3 text-center flex items-center justify-between relative',
+                      'border-l border-slate-100'
                     )}
                   >
-                    <p className="text-slate-800">{day.label}</p>
-                    <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                    {/* Left arrow for first column */}
+                    {index === 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveDayIndex(prev => Math.max(0, prev - 1));
+                        }}
+                        disabled={activeDayIndex === 0}
+                        className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
+                        aria-label="Previous day"
+                        type="button"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    )}
+                    {index === 1 && <div className="w-7" />} {/* Spacer for alignment */}
+
+                    {/* Day Info */}
+                    <div className="flex-1">
+                      <p className="text-slate-800">{day.label}</p>
+                      <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                    </div>
+
+                    {/* Right arrow for second column */}
+                    {index === 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveDayIndex(prev => Math.min((data?.days?.length ?? 2) - 2, prev + 1));
+                        }}
+                        disabled={activeDayIndex >= (data?.days?.length ?? 2) - 2}
+                        className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
+                        aria-label="Next day"
+                        type="button"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    )}
+                    {index === 0 && <div className="w-7" />} {/* Spacer for alignment */}
                   </div>
                 ))}
               </div>
@@ -1193,7 +1252,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   {/* Desktop View */}
                   <div className="hidden md:block h-full relative">
                     <TimelineBuckets
-                      days={data?.days ?? []}
+                      days={data?.days?.slice(activeDayIndex, activeDayIndex + 2) ?? []}
                       abBuckets={abBuckets}
                       floatingLayerTop={floatingLayerTop}
                       status={status}
@@ -1202,7 +1261,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     />
 
                     <TimelineGrid
-                      days={data?.days ?? []}
+                      days={data?.days?.slice(activeDayIndex, activeDayIndex + 2) ?? []}
                       eventsByDay={eventsByDay}
                       indicatorTop={indicatorTop}
                       indicatorDayIso={indicatorDayIso}
