@@ -99,7 +99,7 @@ export const TimelineColumn = memo(function TimelineColumn({
         <div className="relative h-full">
             <DroppableColumn key={day.isoDate} day={day}>
                 <div
-                    className="relative h-full border-l border-slate-100 border-r border-slate-200/50 pl-2 pb-8 select-none bg-white"
+                    className="relative h-full border-l border-slate-100 border-r border-slate-200/50 pb-8 select-none bg-white"
                     style={{
                         minHeight: timelineViewportHeight,
                         width: 'calc(50% - 3px)',
@@ -114,8 +114,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                             style={{
                                 top: minuteToPixels(selectedSlot.minutes),
                                 height: minuteToPixels(60),
-                                left: 8,
-                                right: 8,
+                                left: 0,
+                                right: 0,
                             }}
                         >
                             <div className="p-1 text-xs text-blue-500 font-medium">

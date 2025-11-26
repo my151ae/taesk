@@ -55,15 +55,15 @@ export default function TimelineBuckets({
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                                 {(isOver) => (
-                                    <div className={`border border-slate-100 bg-slate-50/70 p-3 shadow-inner ${isA ? 'min-h-[160px]' : ''}`}>
-                                        <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
-                                        <p className="text-[10px] text-slate-400">{section.helper}</p>
+                                    <div className="border border-slate-100 bg-slate-50/70 py-3 shadow-inner min-h-[160px]">
+                                        <p className="text-[11px] font-semibold text-slate-600 px-3">{section.label}</p>
+                                        <p className="text-[10px] text-slate-400 px-3">{section.helper}</p>
                                         <div className="mt-2 space-y-1">
                                             {items.length === 0 && isOver && (
                                                 <div className="mb-2 h-0.5 bg-sky-500" />
                                             )}
                                             {items.length === 0 && !isOver ? (
-                                                <p className="text-[11px] text-slate-400">Drop cards here</p>
+                                                <p className="text-[11px] text-slate-400 px-3">Drop cards here</p>
                                             ) : (
                                                 items.map((item) => (
                                                     <TimelineBucketCard
