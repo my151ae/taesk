@@ -108,15 +108,17 @@ export default function MobileTimelineView({
 
     return (
         <div className="relative h-full overflow-hidden" ref={containerRef}>
-            {/* Day Indicator / Navigation Dots could go here if needed */}
-            <div className="flex justify-center gap-2 py-2">
-                {days.map((day, index) => (
-                    <div
-                        key={day.key}
-                        className={`h-2 w-2 rounded-full transition-colors ${index === activeDayIndex ? "bg-sky-500" : "bg-slate-300"
-                            }`}
-                    />
-                ))}
+            {/* Dynamic Mobile Header */}
+            <div className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500"
+                style={{ gridTemplateColumns: '40px 1fr' }}
+            >
+                <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
+                    <span className="leading-none">GMT+09</span>
+                </div>
+                <div className="px-4 py-3 text-center">
+                    <p className="text-slate-800">{activeDay.label}</p>
+                    <p className="text-[10px] text-slate-400">{activeDay.isoDate}</p>
+                </div>
             </div>
 
             <AnimatePresence initial={false} mode="wait">
@@ -138,14 +140,17 @@ export default function MobileTimelineView({
                     <div className="relative h-full">
                         {/* We render TimelineBuckets and TimelineGrid for the SINGLE active day */}
                         {/* Note: TimelineBuckets/Grid expect arrays, so we pass single-item arrays */}
-                        <TimelineBuckets
-                            days={[activeDay]}
-                            abBuckets={activeAbBuckets}
-                            floatingLayerTop={floatingLayerTop}
-                            status={status}
-                            openCardModal={openCardModal}
-                            onToggleCheck={onToggleCheck}
-                        />
+                        <div className="h-full">
+                            <TimelineBuckets
+                                days={[activeDay]}
+                                abBuckets={activeAbBuckets}
+                                floatingLayerTop={floatingLayerTop}
+                                status={status}
+                                openCardModal={openCardModal}
+                                onToggleCheck={onToggleCheck}
+                                axisWidth={40}
+                            />
+                        </div>
                         <TimelineGrid
                             days={[activeDay]}
                             eventsByDay={eventsByDay} // Grid handles filtering by day internally
@@ -162,6 +167,7 @@ export default function MobileTimelineView({
                             handleResizeMove={handleResizeMove}
                             handleResizeEnd={handleResizeEnd}
                             onToggleCheck={onToggleCheck}
+                            axisWidth={40}
                         />
                     </div>
                 </motion.div>

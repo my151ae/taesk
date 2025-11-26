@@ -16,6 +16,7 @@ type TimelineBucketsProps = {
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    axisWidth?: number;
 };
 
 const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
@@ -35,9 +36,10 @@ export default function TimelineBuckets({
     status,
     openCardModal,
     onToggleCheck,
+    axisWidth = 80,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
-    const templateColumns = `80px repeat(${days.length}, minmax(0, 1fr))`;
+    const templateColumns = `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))`;
 
     const renderAbCard = (day: TimelineDay) => {
         const meta = AB_CARD_META[day.key];
@@ -45,7 +47,7 @@ export default function TimelineBuckets({
 
         return (
             <div
-                className="pointer-events-auto border-l border-slate-200 bg-white overflow-y-auto overflow-x-hidden"
+                className="pointer-events-auto border-l border-slate-100 md:border-slate-200 bg-white overflow-y-auto overflow-x-hidden"
                 style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
             >
                 <div className="space-y-0.5">
@@ -95,7 +97,7 @@ export default function TimelineBuckets({
                 <div />
                 {days.map((day) => (
                     <div key={day.key} className="relative flex justify-end">
-                        <div className="w-full md:w-[calc(50%-3px)]">
+                        <div className="w-1/2 md:w-[calc(50%-3px)]">
                             {renderAbCard(day)}
                         </div>
                     </div>

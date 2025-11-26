@@ -36,6 +36,7 @@ type TimelineGridProps = {
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    axisWidth?: number;
 };
 
 export default function TimelineGrid({
@@ -54,6 +55,7 @@ export default function TimelineGrid({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
+    axisWidth = 80,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -72,7 +74,7 @@ export default function TimelineGrid({
                 className="grid"
                 data-timeline-grid
                 data-testid="timeline-grid"
-                style={{ gridTemplateColumns: days.length ? `80px repeat(${days.length}, minmax(0, 1fr))` : '80px' }}
+                style={{ gridTemplateColumns: days.length ? `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))` : `${axisWidth}px` }}
             >
                 <aside className="relative border-r border-slate-100 text-xs text-slate-500">
                     {HOURS.map((hour) => (

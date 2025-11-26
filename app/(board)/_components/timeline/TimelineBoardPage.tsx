@@ -1146,7 +1146,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <div
                 ref={timelineHeaderRef}
-                className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
+                className="z-30 hidden md:grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
                 style={{
                   gridTemplateColumns: data?.days?.length
                     ? `80px repeat(${data.days.length}, minmax(0, 1fr))`
@@ -1176,10 +1176,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     <p className="text-[10px] text-slate-400">{day.isoDate}</p>
                   </div>
                 ))}
-                {/* Mobile Header Placeholder if needed, or just hide the grid header on mobile entirely */}
-                <div className="block md:hidden px-4 py-3 text-center col-span-full border-l border-slate-100">
-                  <p className="text-slate-800">Timeline</p>
-                </div>
               </div>
 
               <div
