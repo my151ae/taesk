@@ -22,6 +22,7 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
 import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
+import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   HOUR_HEIGHT,
@@ -1160,13 +1161,25 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     key={day.key}
                     className={clsx(
                       'px-4 py-3 text-center',
-                      index > 0 && 'border-l border-slate-100'
+                      index > 0 && 'border-l border-slate-100',
+                      // Mobile: only show if it matches active day logic?
+                      // Actually, for the header, we might want to keep it simple or hide it on mobile if the swipe view has its own header.
+                      // But the requirement says "Google Calendar like", which usually implies a header.
+                      // However, our MobileTimelineView handles the day switching.
+                      // Let's hide this header on mobile and let MobileTimelineView handle its own day indication if needed,
+                      // OR we keep it but it might look weird if we swipe.
+                      // For now, let's keep it visible on desktop only.
+                      'hidden md:block'
                     )}
                   >
                     <p className="text-slate-800">{day.label}</p>
                     <p className="text-[10px] text-slate-400">{day.isoDate}</p>
                   </div>
                 ))}
+                {/* Mobile Header Placeholder if needed, or just hide the grid header on mobile entirely */}
+                <div className="block md:hidden px-4 py-3 text-center col-span-full border-l border-slate-100">
+                  <p className="text-slate-800">Timeline</p>
+                </div>
               </div>
 
               <div
@@ -1180,32 +1193,60 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
                     </div>
                   )}
-                  <TimelineBuckets
-                    days={data?.days ?? []}
-                    abBuckets={abBuckets}
-                    floatingLayerTop={floatingLayerTop}
-                    status={status}
-                    openCardModal={openCardModal}
-                    onToggleCheck={handleToggleCardChecked}
-                  />
 
-                  <TimelineGrid
-                    days={data?.days ?? []}
-                    eventsByDay={eventsByDay}
-                    indicatorTop={indicatorTop}
-                    indicatorDayIso={indicatorDayIso}
-                    timelineViewportHeight={timelineViewportHeight}
-                    activeDrag={activeDrag}
-                    pointerPreview={pointerPreview}
-                    openCardModal={openCardModal}
-                    handleEventKeyDown={handleEventKeyDown}
-                    handleColumnClick={handleColumnClick}
-                    activeResize={activeResize}
-                    handleResizeStart={handleResizeStart}
-                    handleResizeMove={handleResizeMove}
-                    handleResizeEnd={handleResizeEnd}
-                    onToggleCheck={handleToggleCardChecked}
-                  />
+                  {/* Desktop View */}
+                  <div className="hidden md:block h-full relative">
+                    <TimelineBuckets
+                      days={data?.days ?? []}
+                      abBuckets={abBuckets}
+                      floatingLayerTop={floatingLayerTop}
+                      status={status}
+                      openCardModal={openCardModal}
+                      onToggleCheck={handleToggleCardChecked}
+                    />
+
+                    <TimelineGrid
+                      days={data?.days ?? []}
+                      eventsByDay={eventsByDay}
+                      indicatorTop={indicatorTop}
+                      indicatorDayIso={indicatorDayIso}
+                      timelineViewportHeight={timelineViewportHeight}
+                      activeDrag={activeDrag}
+                      pointerPreview={pointerPreview}
+                      activeResize={activeResize}
+                      openCardModal={openCardModal}
+                      handleEventKeyDown={handleEventKeyDown}
+                      handleColumnClick={handleColumnClick}
+                      handleResizeStart={handleResizeStart}
+                      handleResizeMove={handleResizeMove}
+                      handleResizeEnd={handleResizeEnd}
+                      onToggleCheck={handleToggleCardChecked}
+                    />
+                  </div>
+
+                  {/* Mobile View */}
+                  <div className="block md:hidden h-full relative">
+                    <MobileTimelineView
+                      days={data?.days ?? []}
+                      eventsByDay={eventsByDay}
+                      abBuckets={abBuckets}
+                      indicatorTop={indicatorTop}
+                      indicatorDayIso={indicatorDayIso}
+                      timelineViewportHeight={timelineViewportHeight}
+                      activeDrag={activeDrag}
+                      pointerPreview={pointerPreview}
+                      activeResize={activeResize}
+                      openCardModal={openCardModal}
+                      handleEventKeyDown={handleEventKeyDown}
+                      handleColumnClick={handleColumnClick}
+                      handleResizeStart={handleResizeStart}
+                      handleResizeMove={handleResizeMove}
+                      handleResizeEnd={handleResizeEnd}
+                      onToggleCheck={handleToggleCardChecked}
+                      status={status}
+                      floatingLayerTop={floatingLayerTop}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

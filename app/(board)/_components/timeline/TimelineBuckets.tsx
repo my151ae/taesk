@@ -95,7 +95,7 @@ export default function TimelineBuckets({
                 <div />
                 {days.map((day) => (
                     <div key={day.key} className="relative flex justify-end">
-                        <div className="w-[calc(50%-3px)]">
+                        <div className="w-full md:w-[calc(50%-3px)]">
                             {renderAbCard(day)}
                         </div>
                     </div>
