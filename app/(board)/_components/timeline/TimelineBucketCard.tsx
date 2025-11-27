@@ -32,7 +32,7 @@ export const TimelineBucketCard = ({
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
         >
             <div
-                className="bg-white py-2 text-xs shadow-sm relative"
+                className="bg-white py-2 text-xs shadow-sm relative w-full max-w-full"
                 data-testid={`ab-card-${item.card_id}`}
                 data-bucket={bucketKey}
             >
@@ -55,7 +55,7 @@ export const TimelineBucketCard = ({
                         className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-sky-500 cursor-pointer"
                     />
                     <div className="flex min-w-0 flex-1 items-start gap-1">
-                        <div className="flex-1 text-left">
+                        <div className="flex-1 text-left min-w-0">
                             <span className="block truncate">{item.title || 'Untitled card'}</span>
                             {item.due_start && (
                                 <span className="text-[10px] text-slate-400">{timeLabel(item.due_start, item.due_end)}</span>
