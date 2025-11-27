@@ -46,6 +46,11 @@ export const HIDDEN_POINTER_PREVIEW: PointerPreviewState = {
     dayIso: null,
 };
 
+export type BucketIndicator = {
+    bucketKey: string;
+    cardId: string | null;
+};
+
 export type ActiveResizeState = {
     cardId: string;
     startMinutes: number;
@@ -108,6 +113,7 @@ export function useTimelineDragAndDrop({
     const activeDragRef = useRef<ActiveDragState | null>(null);
     const [pointerPreview, setPointerPreview] = useState<PointerPreviewState>(HIDDEN_POINTER_PREVIEW);
     const [activeResize, setActiveResize] = useState<ActiveResizeState | null>(null);
+    const [bucketIndicator, setBucketIndicator] = useState<BucketIndicator | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -251,6 +257,22 @@ export function useTimelineDragAndDrop({
 
     const [isOverABList, setIsOverABList] = useState(false);
 
+    const resolvePointerClientY = (event: DragMoveEvent | DragEndEvent): number | null => {
+        const activator = event.activatorEvent;
+        if (activator && 'clientY' in activator && typeof (activator as PointerEvent).clientY === 'number') {
+            return (activator as PointerEvent).clientY;
+        }
+
+        const activeRect = event.active.rect.current;
+        if (activeRect?.translated) {
+            return activeRect.translated.top + (activeRect.translated.height ?? 0) / 2;
+        }
+        if (activeRect?.initial) {
+            return activeRect.initial.top + (activeRect.initial.height ?? 0) / 2 + (event.delta?.y ?? 0);
+        }
+        return null;
+    };
+
     const handleDragMove = (event: DragMoveEvent) => {
         const currentDrag = activeDragRef.current;
         if (!currentDrag) {
@@ -265,6 +287,27 @@ export function useTimelineDragAndDrop({
         const isAB = overType === 'ab-bucket' || overType === 'bucket-item' || overType === 'bucket-item-top' || overType === 'bucket-item-bottom';
         if (isAB !== isOverABList) {
             setIsOverABList(isAB);
+        }
+
+        if (overType === 'ab-bucket') {
+            const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
+            const items = bucketKey && data?.abBuckets ? data.abBuckets[bucketKey] ?? [] : [];
+            if (bucketKey && items.length) {
+                const pointerY = resolvePointerClientY(event);
+                const bucketRect = event.over?.rect;
+                let targetIndex = 0;
+                if (bucketRect && pointerY != null) {
+                    const relativeY = pointerY - bucketRect.top;
+                    const clampedY = Math.max(0, Math.min(bucketRect.height, relativeY));
+                    const ratio = bucketRect.height > 0 ? clampedY / bucketRect.height : 0;
+                    targetIndex = Math.min(items.length - 1, Math.max(0, Math.round(ratio * (items.length - 1))));
+                }
+                setBucketIndicator({ bucketKey, cardId: items[targetIndex]?.card_id ?? null });
+            } else {
+                setBucketIndicator(null);
+            }
+        } else if (bucketIndicator) {
+            setBucketIndicator(null);
         }
 
         if (overType !== 'timeline-column') {
@@ -302,6 +345,7 @@ export function useTimelineDragAndDrop({
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
         setIsOverABList(false);
+        setBucketIndicator(null);
 
         if (!over) return;
         const cardId = active.data.current?.cardId as string | undefined;
@@ -442,7 +486,21 @@ export function useTimelineDragAndDrop({
         if (overType === 'ab-bucket') {
             const bucketKey = over.data.current?.bucketKey as string;
             const dayIso = bucketDayMap[bucketKey] ?? null;
-            const bucketPosition = Date.now();
+            const bucketItems = data?.abBuckets?.[bucketKey] ?? [];
+            const fallbackTargetCardId =
+                bucketIndicator?.bucketKey === bucketKey ? bucketIndicator.cardId : bucketItems[0]?.card_id ?? null;
+
+            let bucketPosition = Date.now();
+            if (fallbackTargetCardId && bucketItems.length) {
+                const targetIndex = bucketItems.findIndex((item) => item.card_id === fallbackTargetCardId);
+                const targetItem = targetIndex >= 0 ? bucketItems[targetIndex] : null;
+                const nextItem = targetIndex >= 0 ? bucketItems[targetIndex + 1] : null;
+                if (targetItem?.bucketPosition != null && nextItem?.bucketPosition != null) {
+                    bucketPosition = (targetItem.bucketPosition + nextItem.bucketPosition) / 2;
+                } else if (targetItem?.bucketPosition != null) {
+                    bucketPosition = targetItem.bucketPosition - 1000; // place after the target item
+                }
+            }
             const payload = {
                 due_bucket: bucketKey.split('_')[1] as DueBucket, // Extract 'a' or 'b'
                 due_date: withJstMidnight(dayIso),
@@ -467,6 +525,7 @@ export function useTimelineDragAndDrop({
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
         setIsOverABList(false);
+        setBucketIndicator(null);
     };
 
     const handleEventKeyDown = (
@@ -599,6 +658,7 @@ export function useTimelineDragAndDrop({
         activeDrag,
         pointerPreview,
         activeResize,
+        bucketIndicator,
         isOverABList,
         handleDragStart,
         handleDragMove,

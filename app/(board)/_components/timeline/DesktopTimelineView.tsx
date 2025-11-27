@@ -35,6 +35,7 @@ type DesktopTimelineViewProps = {
   activeDrag: ActiveDragState | null;
   pointerPreview: PointerPreviewState;
   activeResize: ActiveResizeState | null;
+  bucketIndicator: DragAndDropBindings["bucketIndicator"];
   openCardModal: (shortId: string | null, source: string) => void;
   handleEventKeyDown: (event: TimelineEvent, native: React.KeyboardEvent<HTMLElement>) => void;
   handleColumnClick: (day: TimelineDay, minutes: number) => void;
@@ -67,6 +68,7 @@ export function DesktopTimelineView({
   activeDrag,
   pointerPreview,
   activeResize,
+  bucketIndicator,
   openCardModal,
   handleEventKeyDown,
   handleColumnClick,
@@ -186,6 +188,7 @@ export function DesktopTimelineView({
               status={status}
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
+              bucketIndicator={bucketIndicator}
             />
 
             <TimelineGrid

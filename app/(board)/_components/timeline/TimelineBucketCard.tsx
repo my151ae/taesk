@@ -4,11 +4,14 @@ import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
 
+const DROP_ZONE_MARGIN_PX = 12;
+
 type TimelineBucketCardProps = {
     item: TimelineBucketItem;
     bucketKey: string;
     openCardModal: (shortId: string | null) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    showFallbackBottomLine?: boolean;
 };
 
 export const TimelineBucketCard = ({
@@ -16,6 +19,7 @@ export const TimelineBucketCard = ({
     bucketKey,
     openCardModal,
     onToggleCheck,
+    showFallbackBottomLine = false,
 }: TimelineBucketCardProps) => {
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -34,12 +38,22 @@ export const TimelineBucketCard = ({
         >
             <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey}>
                 {/* Drop Zones */}
-                <div ref={setTopRef} className="absolute top-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
-                <div ref={setBottomRef} className="absolute bottom-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
+                <div
+                    ref={setTopRef}
+                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                    style={{ top: -DROP_ZONE_MARGIN_PX, height: `calc(50% + ${DROP_ZONE_MARGIN_PX}px)` }}
+                />
+                <div
+                    ref={setBottomRef}
+                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                    style={{ bottom: -DROP_ZONE_MARGIN_PX, height: `calc(50% + ${DROP_ZONE_MARGIN_PX}px)` }}
+                />
 
                 {/* Indicators */}
                 {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
-                {isOverBottom && <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />}
+                {(isOverBottom || showFallbackBottomLine) && (
+                    <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />
+                )}
 
                 <TimelineCard
                     title={item.title || 'Untitled card'}

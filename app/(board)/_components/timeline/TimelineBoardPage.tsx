@@ -1096,6 +1096,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     activeDrag,
     pointerPreview,
     activeResize,
+    bucketIndicator,
     isOverABList,
     handleDragStart,
     handleDragMove,
@@ -1189,6 +1190,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               activeDrag={activeDrag}
               pointerPreview={pointerPreview}
               activeResize={activeResize}
+              bucketIndicator={bucketIndicator}
               openCardModal={openCardModal}
               handleEventKeyDown={handleEventKeyDown}
               handleColumnClick={handleColumnClick}

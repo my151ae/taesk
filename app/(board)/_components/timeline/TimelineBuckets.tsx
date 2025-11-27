@@ -5,6 +5,7 @@ import {
     TimelineBucketItem,
     buildAbMeta,
 } from '@/app/(board)/_utils/timeline-helpers';
+import { BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineBucketCard } from './TimelineBucketCard';
 
@@ -15,6 +16,7 @@ type TimelineBucketsProps = {
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    bucketIndicator: BucketIndicator | null;
     axisWidth?: number;
 };
 
@@ -35,6 +37,7 @@ export default function TimelineBuckets({
     status,
     openCardModal,
     onToggleCheck,
+    bucketIndicator,
     axisWidth = 80,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
@@ -66,17 +69,20 @@ export default function TimelineBuckets({
                                                 <p className="text-[11px] text-slate-400 px-3">Drop cards here</p>
                                             ) : (
                                                 items.map((item) => (
-                                                    <TimelineBucketCard
-                                                        key={item.card_id}
-                                                        item={item}
-                                                        bucketKey={section.bucket}
-                                                        openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
-                                                        onToggleCheck={onToggleCheck}
-                                                    />
-                                                ))
-                                            )}
-                                        </div>
+                                                <TimelineBucketCard
+                                                    key={item.card_id}
+                                                    item={item}
+                                                    bucketKey={section.bucket}
+                                                    openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                                                    onToggleCheck={onToggleCheck}
+                                                    showFallbackBottomLine={
+                                                        bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
+                                                    }
+                                                />
+                                            ))
+                                        )}
                                     </div>
+                                </div>
                                 )}
                             </DroppableBucket>
                         );
