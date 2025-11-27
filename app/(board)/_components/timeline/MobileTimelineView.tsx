@@ -129,96 +129,100 @@ export default function MobileTimelineView({
           </button>
         </div>
 
-        <div className="grid flex-1 overflow-y-auto" style={{ gridTemplateColumns: "55% 45%" }}>
-          <div className="min-w-0 overflow-hidden">
-            <div
-              className="relative border-r border-slate-100 bg-white"
-              style={{ minHeight: timelineViewportHeight }}
-            >
-              <div className="pointer-events-none absolute left-0 right-0" style={{ height: TIMELINE_HEIGHT }}>
+        <div
+          className="grid flex-1 overflow-y-auto"
+          style={{ gridTemplateColumns: "1fr 1fr", minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}
+        >
+          <div className="min-w-0 border-r border-slate-100 bg-white">
+            <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}>
+              <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
                 {HOURS.map((hour, idx) => (
-                  <div
-                    key={hour}
-                    className="absolute left-0 right-0 border-b border-slate-200"
-                    style={{ top: idx * HOUR_HEIGHT }}
-                  >
-                    {idx === 0 ? null : (
-                      <span className="absolute -left-12 -translate-y-2 text-[10px] font-semibold text-slate-500">
-                        {hour}
-                      </span>
-                    )}
+                  <div key={hour} className="flex h-10 items-start justify-end pr-2">
+                    {idx === 0 ? null : <span className="-mt-1 leading-none">{hour}</span>}
                   </div>
                 ))}
               </div>
 
-              {indicatorVisible && (
-                <div
-                  className="pointer-events-none absolute z-10"
-                  style={{ top: indicatorPosition, left: 0, right: 0 }}
-                >
-                  <div className="relative h-px bg-red-400/80">
-                    <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
-                  </div>
-                </div>
-              )}
-
-              <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-                {eventsForDay.map((event) => {
-                  const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
-                  const duration = Math.max(event.durationMinutes ?? 60, 30);
-                  const top = minuteToPixels(start);
-                  const height = Math.max(minuteToPixels(duration), 32);
-                  const layout = layoutMap[event.card_id];
-
-                  return (
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-0" style={{ height: TIMELINE_HEIGHT }}>
+                  {HOURS.map((hour, idx) => (
                     <div
-                      key={event.card_id}
-                      className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 text-left shadow-sm"
-                      style={{
-                        top,
-                        height,
-                        left: layout?.left ?? "0%",
-                        width: layout?.width ?? "100%",
-                      }}
-                      onClick={(native) => {
-                        native.stopPropagation();
-                        openCardModal(event.short_id, "mobile-timeline");
-                      }}
-                    >
-                      <div className="flex items-start gap-2 pr-6">
-                        <button
-                          type="button"
-                          onClick={(native) => {
-                            native.stopPropagation();
-                            onToggleCheck(event.card_id, !event.checked);
-                          }}
-                          aria-label={event.checked ? "未完了に戻す" : "完了にする"}
-                          className="mt-0.5 flex h-3.5 w-3.5 items-center justify-center border border-slate-300 text-[8px] font-bold text-transparent transition hover:border-sky-400"
+                      key={hour}
+                      className="absolute left-0 right-0 border-b border-slate-200"
+                      style={{ top: idx * HOUR_HEIGHT }}
+                    />
+                  ))}
+                </div>
+
+                {indicatorVisible && (
+                  <div
+                    className="pointer-events-none absolute z-10"
+                    style={{ top: indicatorPosition, left: 0, right: 0 }}
+                  >
+                    <div className="relative h-px bg-red-400/80">
+                      <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
+                  {eventsForDay.map((event) => {
+                    const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
+                    const duration = Math.max(event.durationMinutes ?? 60, 30);
+                    const top = minuteToPixels(start);
+                    const height = Math.max(minuteToPixels(duration), 32);
+                    const layout = layoutMap[event.card_id];
+
+                    return (
+                      <div
+                        key={event.card_id}
+                        className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 pt-5 text-left shadow-sm"
+                        style={{
+                          top,
+                          height,
+                          left: layout?.left ?? "0%",
+                          width: layout?.width ?? "100%",
+                        }}
+                        onClick={(native) => {
+                          native.stopPropagation();
+                          openCardModal(event.short_id, "mobile-timeline");
+                        }}
+                      >
+                        <div className="flex items-start gap-2 pr-6">
+                          <button
+                            type="button"
+                            onClick={(native) => {
+                              native.stopPropagation();
+                              onToggleCheck(event.card_id, !event.checked);
+                            }}
+                            aria-label={event.checked ? "未完了に戻す" : "完了にする"}
+                            className="mt-0.5 flex h-3.5 w-3.5 items-center justify-center border border-slate-300 text-[8px] font-bold text-transparent transition hover:border-sky-400"
+                          >
+                            {event.checked ? "✓" : ""}
+                          </button>
+                          <div className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
+                            <span className="break-words leading-tight">
+                              {event.title || "Untitled card"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div
+                          className="absolute -top-px left-0 px-1 text-[10px] font-semibold text-slate-600"
+                          title={timeLabel(event.due_start, event.due_end)}
                         >
-                          {event.checked ? "✓" : ""}
-                        </button>
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
-                          <span className="break-words leading-tight">
-                            {event.title || "Untitled card"}
+                          {timeLabel(event.due_start, event.due_end)}
+                        </div>
+
+                        <div className="absolute right-2 top-2">
+                          <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
+                            {(event.due_bucket ?? "a").toUpperCase()}
                           </span>
                         </div>
                       </div>
-
-                      <div
-                        className="absolute -top-px left-0 px-1 text-[10px] font-semibold text-slate-600"
-                        title={timeLabel(event.due_start, event.due_end)}
-                      >
-                        {timeLabel(event.due_start, event.due_end)}
-                      </div>
-
-                      <div className="absolute right-2 top-2">
-                        <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
-                          {(event.due_bucket ?? "a").toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
