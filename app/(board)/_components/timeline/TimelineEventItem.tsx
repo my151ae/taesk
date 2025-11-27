@@ -50,21 +50,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             key={event.card_id}
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
-            attachListenersToChild
         >
-            <TimelineCard
-                title={event.title || 'Untitled card'}
-                checked={event.checked}
-                onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
-                badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                timeText={timeLabel(event.due_start, event.due_end)}
-                onOpen={() => openCardModal(event.short_id, 'event-button')}
-                openButtonTestId={`cardOpenButton-${event.card_id}`}
-                dataTestId="timeline-event"
-                tabIndex={0}
-                role="group"
-                onKeyDown={(native) => handleEventKeyDown(event, native)}
-                className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 pt-5"
+            <div
+                className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 style={{
                     top,
                     height,
@@ -72,19 +60,34 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     width: layout?.width ?? '100%',
                 }}
             >
-                <div
-                    className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
-                    onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}
-                    onPointerMove={handleResizeMove}
-                    onPointerUp={handleResizeEnd}
-                />
-                <div
-                    className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
-                    onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'bottom')}
-                    onPointerMove={handleResizeMove}
-                    onPointerUp={handleResizeEnd}
-                />
-            </TimelineCard>
+                <TimelineCard
+                    title={event.title || 'Untitled card'}
+                    checked={event.checked}
+                    onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
+                    badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
+                    timeText={timeLabel(event.due_start, event.due_end)}
+                    onOpen={() => openCardModal(event.short_id, 'event-button')}
+                    openButtonTestId={`cardOpenButton-${event.card_id}`}
+                    dataTestId="timeline-event"
+                    tabIndex={0}
+                    role="group"
+                    onKeyDown={(native) => handleEventKeyDown(event, native)}
+                    className="w-full h-full pt-5"
+                >
+                    <div
+                        className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}
+                        onPointerMove={handleResizeMove}
+                        onPointerUp={handleResizeEnd}
+                    />
+                    <div
+                        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                        onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'bottom')}
+                        onPointerMove={handleResizeMove}
+                        onPointerUp={handleResizeEnd}
+                    />
+                </TimelineCard>
+            </div>
         </DraggableCard >
     );
 });
