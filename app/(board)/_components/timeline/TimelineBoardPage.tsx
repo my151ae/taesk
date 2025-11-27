@@ -1,29 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, isValidElement, cloneElement, type ReactNode, type ReactElement, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import clsx from "clsx";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
-import {
-  DndContext,
-  MeasuringStrategy,
-} from "@dnd-kit/core";
 
 import { createClientTrace } from "@/lib/metrics/client";
 import type { ClientTrace } from "@/lib/metrics/client";
 import { CardModal } from "@/app/components/CardModal";
 import { slugify } from "@/lib/card-utils";
 import ShareDialog from "@/app/(board)/_components/ShareDialog";
-import NotificationsBell from "@/app/(board)/_components/NotificationsBell";
 import NotificationSettings from "@/app/(board)/_components/NotificationSettings";
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
-import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
-import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
+import { DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
-import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   TIMELINE_HEIGHT,
   TIMELINE_MIN_VIEWPORT,
@@ -47,11 +39,10 @@ import {
 
 import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
 import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
-import { useBoardFilters, filterAndSortCards, getAllTags } from "@/app/(board)/_hooks/useBoardFilters";
+import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
-import { useTimelineDragAndDrop, bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { normalizeDueBucket } from "@/lib/bucket-normalization";
-import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 
@@ -229,9 +220,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const canonicalBoardPath = useMemo(() => buildBoardUrl(initialBoard), [initialBoard]);
   const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
@@ -409,10 +397,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     upsertComment,
     removeComment
   });
-
-
-  const searchParamsString = searchParams?.toString() ?? '';
-
 
 
   useEffect(() => {
@@ -1128,17 +1112,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     bucketDayMap,
     dataMode,
   });
-
-  const pointerPreviewVisible = pointerPreview.visible;
-  const pointerPreviewY = minuteToPixels(pointerPreview.startMinutes);
-  const pointerPreviewDuration = pointerPreview.durationMinutes;
-  const pointerPreviewDay = pointerPreview.dayIso;
-  const pointerPreviewStart = pointerPreviewVisible
-    ? minutesToTime(pointerPreview.startMinutes)
-    : null;
-  const pointerPreviewEnd = pointerPreviewVisible
-    ? minutesToTime(Math.min(pointerPreview.startMinutes + pointerPreview.durationMinutes, 24 * 60 - 1))
-    : null;
   const floatingLayerTop = 0;
   const timelineViewportHeight = useMemo(() => {
     if (viewportHeight == null) return TIMELINE_HEIGHT;
@@ -1162,25 +1135,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [availableBoards, initialBoard]);
 
   const displayData = filteredData ?? data;
-  const events = displayData?.events ?? [];
   const abBuckets = displayData?.abBuckets ?? {};
 
   const shouldShowCardModal = modalCard && cardModalStatus !== 'idle';
   const hasActiveFilters = Boolean(
     searchQuery.trim() || selectedTags.length > 0 || selectedPriority !== 'all'
   );
-
-  const allTags = useMemo(() => {
-    if (!data) return [];
-    const tagsSet = new Set<string>();
-    data.events.forEach(e => e.tags.forEach(t => tagsSet.add(t)));
-    Object.values(data.abBuckets).forEach(items => items.forEach(i => i.tags.forEach(t => tagsSet.add(t))));
-    return Array.from(tagsSet).sort();
-  }, [data]);
-
-  const handleScroll = useCallback(() => {
-    // Placeholder to satisfy prop requirement
-  }, []);
 
   return (
     <>
@@ -1211,164 +1171,58 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             availableTags={availableTags}
           />
 
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-            collisionDetection={bucketsFirstCollisionDetection}
-            measuring={{
-              droppable: { strategy: MeasuringStrategy.Always },
-            }}
-            autoScroll={{
-              enabled: !isOverABList,
-              threshold: { x: 0, y: 0.2 },
-              acceleration: 1,
-            }}
-          >
-            <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
-              <div
-                ref={timelineHeaderRef}
-                className="z-30 hidden md:grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
-                style={{
-                  gridTemplateColumns: '80px 1fr 1fr',
-                }}
-              >
-                <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
-                  <span className="leading-none">GMT+09</span>
-                </div>
-                {data?.days?.slice(activeDayIndex, activeDayIndex + 2).map((day, index) => (
-                  <div
-                    key={day.key}
-                    className={clsx(
-                      'px-4 py-3 text-center flex items-center justify-between relative',
-                      'border-l border-slate-100'
-                    )}
-                  >
-                    {/* Left arrow for first column */}
-                    {index === 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handlePrevDay();
-                        }}
-                        disabled={status === 'loading'}
-                        className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                        aria-label="Previous day"
-                        type="button"
-                        style={{ pointerEvents: 'auto' }}
-                      >
-                        <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-                    )}
-                    {index === 1 && <div className="w-7" />} {/* Spacer for alignment */}
+          <div className="hidden md:block">
+            <DesktopTimelineView
+              timelineHeaderRef={timelineHeaderRef}
+              timelineScrollRef={timelineScrollRef}
+              days={data?.days ?? []}
+              activeDayIndex={activeDayIndex}
+              status={status}
+              handlePrevDay={handlePrevDay}
+              handleNextDay={handleNextDay}
+              eventsByDay={eventsByDay}
+              abBuckets={abBuckets}
+              indicatorTop={indicatorTop}
+              indicatorDayIso={indicatorDayIso}
+              timelineViewportHeight={timelineViewportHeight}
+              activeDrag={activeDrag}
+              pointerPreview={pointerPreview}
+              activeResize={activeResize}
+              openCardModal={openCardModal}
+              handleEventKeyDown={handleEventKeyDown}
+              handleColumnClick={handleColumnClick}
+              handleResizeStart={handleResizeStart}
+              handleResizeMove={handleResizeMove}
+              handleResizeEnd={handleResizeEnd}
+              onToggleCheck={handleToggleCardChecked}
+              sensors={sensors}
+              handleDragStart={handleDragStart}
+              handleDragMove={handleDragMove}
+              handleDragEnd={handleDragEnd}
+              handleDragCancel={handleDragCancel}
+              isOverABList={isOverABList}
+              floatingLayerTop={floatingLayerTop}
+            />
+          </div>
 
-                    {/* Day Info */}
-                    <div className="flex-1">
-                      <p className="text-slate-800">{day.label}</p>
-                      <p className="text-[10px] text-slate-400">{day.isoDate}</p>
-                    </div>
-
-                    {/* Right arrow for second column */}
-                    {index === 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleNextDay();
-                        }}
-                        disabled={status === 'loading'}
-                        className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                        aria-label="Next day"
-                        type="button"
-                        style={{ pointerEvents: 'auto' }}
-                      >
-                        <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    )}
-                    {index === 0 && <div className="w-7" />} {/* Spacer for alignment */}
-                  </div>
-                ))}
-              </div>
-
-              <div
-                ref={timelineScrollRef}
-                className="relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
-                onScroll={handleScroll}
-              >
-                <div className="relative" style={{ minHeight: timelineViewportHeight }}>
-                  {(status === 'loading' || !data) && (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
-                    </div>
-                  )}
-
-                  {/* Desktop View */}
-                  <div className="hidden md:block h-full relative">
-                    <TimelineBuckets
-                      days={data?.days?.slice(activeDayIndex, activeDayIndex + 2) ?? []}
-                      abBuckets={abBuckets}
-                      floatingLayerTop={floatingLayerTop}
-                      status={status}
-                      openCardModal={openCardModal}
-                      onToggleCheck={handleToggleCardChecked}
-                    />
-
-                    <TimelineGrid
-                      days={data?.days?.slice(activeDayIndex, activeDayIndex + 2) ?? []}
-                      eventsByDay={eventsByDay}
-                      indicatorTop={indicatorTop}
-                      indicatorDayIso={indicatorDayIso}
-                      timelineViewportHeight={timelineViewportHeight}
-                      activeDrag={activeDrag}
-                      pointerPreview={pointerPreview}
-                      activeResize={activeResize}
-                      openCardModal={openCardModal}
-                      handleEventKeyDown={handleEventKeyDown}
-                      handleColumnClick={handleColumnClick}
-                      handleResizeStart={handleResizeStart}
-                      handleResizeMove={handleResizeMove}
-                      handleResizeEnd={handleResizeEnd}
-                      onToggleCheck={handleToggleCardChecked}
-                    />
-                  </div>
-
-                  {/* Mobile View */}
-                  <div className="block md:hidden h-full relative">
-                    <MobileTimelineView
-                      days={data?.days ?? []}
-                      activeDayIndex={activeDayIndex}
-                      onPrevDay={handlePrevDay}
-                      onNextDay={handleNextDay}
-                      eventsByDay={eventsByDay}
-                      abBuckets={abBuckets}
-                      indicatorTop={indicatorTop}
-                      indicatorDayIso={indicatorDayIso}
-                      timelineViewportHeight={timelineViewportHeight}
-                      activeDrag={activeDrag}
-                      pointerPreview={pointerPreview}
-                      activeResize={activeResize}
-                      openCardModal={openCardModal}
-                      handleEventKeyDown={handleEventKeyDown}
-                      handleColumnClick={handleColumnClick}
-                      handleResizeStart={handleResizeStart}
-                      handleResizeMove={handleResizeMove}
-                      handleResizeEnd={handleResizeEnd}
-                      onToggleCheck={handleToggleCardChecked}
-                      status={status}
-                      floatingLayerTop={floatingLayerTop}
-                    />
-                  </div>
-                </div>
-              </div>
+          <div className="md:hidden">
+            <div className="relative max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
+              <MobileTimelineView
+                days={data?.days ?? []}
+                activeDayIndex={activeDayIndex}
+                onPrevDay={handlePrevDay}
+                onNextDay={handleNextDay}
+                eventsByDay={eventsByDay}
+                abBuckets={abBuckets}
+                indicatorTop={indicatorTop}
+                indicatorDayIso={indicatorDayIso}
+                timelineViewportHeight={timelineViewportHeight}
+                openCardModal={openCardModal}
+                onToggleCheck={handleToggleCardChecked}
+                status={status}
+              />
             </div>
-          </DndContext>
+          </div>
         </div >
       </div >
       {showShareDialog && (
