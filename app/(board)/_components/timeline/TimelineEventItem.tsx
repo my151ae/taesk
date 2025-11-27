@@ -1,6 +1,6 @@
 import { KeyboardEvent, PointerEvent, memo } from 'react';
-import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
+import { TimelineCard } from './TimelineCard';
 import {
     TimelineEvent,
     minuteToPixels,
@@ -52,72 +52,26 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
         >
-            <div
-                role="group"
+            <TimelineCard
+                title={event.title || 'Untitled card'}
+                checked={event.checked}
+                onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
+                badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
+                timeText={timeLabel(event.due_start, event.due_end)}
+                onOpen={() => openCardModal(event.short_id, 'event-button')}
+                openButtonTestId={`cardOpenButton-${event.card_id}`}
+                dataTestId="timeline-event"
                 tabIndex={0}
+                role="group"
                 onKeyDown={(native) => handleEventKeyDown(event, native)}
-                data-testid="timeline-event"
-                className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 pt-5"
                 style={{
                     top,
                     height,
                     left: layout?.left ?? '0%',
                     width: layout?.width ?? '100%',
                 }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    // setSelectedSlot(null); // Handled by parent or global click
-                }}
             >
-                <div className="flex items-start gap-2 pr-6">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleCheck(event.card_id, !event.checked);
-                        }}
-                        aria-label={event.checked ? "Mark as incomplete" : "Mark as complete"}
-                        className={clsx(
-                            'flex h-3.5 w-3.5 items-center justify-center border text-[8px] font-bold mt-0.5 cursor-pointer hover:border-sky-400 transition-colors',
-                            event.checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white text-transparent'
-                        )}
-                    >
-                        ✓
-                    </button>
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
-                        <span className="leading-tight truncate">
-                            {event.title || 'Untitled card'}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Time display overlapping top border */}
-                <div
-                    className="absolute -top-px left-0 text-[10px] font-semibold text-slate-600 px-1"
-                    title={timeLabel(event.due_start, event.due_end)}
-                >
-                    {timeLabel(event.due_start, event.due_end)}
-                </div>
-
-                <button
-                    type="button"
-                    onClick={(native) => {
-                        native.stopPropagation();
-                        openCardModal(event.short_id, 'event-button');
-                    }}
-                    onPointerDown={(native) => {
-                        native.stopPropagation();
-                    }}
-                    className="absolute top-2 right-2 flex h-7 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
-                    aria-label="Open card"
-                    data-testid={`cardOpenButton-${event.card_id}`}
-                >
-                    <span className="text-[11px] font-bold leading-none">
-                        {(event.due_bucket ?? 'a').toUpperCase()}
-                    </span>
-                    <span aria-hidden="true" className="text-[12px] leading-none">›</span>
-                </button>
-
                 <div
                     className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
                     onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}
@@ -130,7 +84,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onPointerMove={handleResizeMove}
                     onPointerUp={handleResizeEnd}
                 />
-            </div>
+            </TimelineCard>
         </DraggableCard >
     );
 });
