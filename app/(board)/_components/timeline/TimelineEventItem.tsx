@@ -85,7 +85,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                         ✓
                     </button>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
-                        <span className="break-words leading-tight">
+                        <span className="leading-tight truncate">
                             {event.title || 'Untitled card'}
                         </span>
                     </div>
