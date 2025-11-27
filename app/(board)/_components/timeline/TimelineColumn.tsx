@@ -198,6 +198,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 handleResizeMove={handleResizeMove}
                                 handleResizeEnd={handleResizeEnd}
                                 onToggleCheck={onToggleCheck}
+                                onClearGhost={() => setSelectedSlot(null)}
                             />
                         ))}
                     </div>

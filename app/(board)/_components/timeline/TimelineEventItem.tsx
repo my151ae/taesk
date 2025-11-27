@@ -21,6 +21,7 @@ type TimelineEventItemProps = {
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onClearGhost: () => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -33,6 +34,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
+    onClearGhost,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -50,6 +52,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             key={event.card_id}
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
+            attachListenersToChild
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -58,6 +61,10 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     height,
                     left: layout?.left ?? '0%',
                     width: layout?.width ?? '100%',
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClearGhost();
                 }}
             >
                 <TimelineCard
