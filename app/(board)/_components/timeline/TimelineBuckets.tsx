@@ -48,14 +48,14 @@ export default function TimelineBuckets({
                 className="pointer-events-auto border-l border-slate-100 md:border-slate-200 bg-white overflow-y-auto overflow-x-hidden"
                 style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
             >
-                <div className="space-y-0.5">
+                <div className="flex flex-col gap-0.5 h-full">
                     {meta.sections.map((section) => {
                         const items = abBuckets[section.bucket] ?? [];
                         const isA = section.bucket.endsWith('_a');
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                                 {(isOver) => (
-                                    <div className="border border-slate-100 bg-slate-50/70 py-3 shadow-inner min-h-[160px]">
+                                    <div className={`border border-slate-100 bg-slate-50/70 py-3 shadow-inner min-h-[240px] ${!isA ? 'flex-1' : ''}`}>
                                         <p className="text-[11px] font-semibold text-slate-600 px-3">{section.label}</p>
                                         <p className="text-[10px] text-slate-400 px-3">{section.helper}</p>
                                         <div className="mt-2 space-y-1">

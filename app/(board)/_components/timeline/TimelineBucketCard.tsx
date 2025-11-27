@@ -32,11 +32,7 @@ export const TimelineBucketCard = ({
             id={`bucket:${item.card_id}`}
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
         >
-            <div
-                className="bg-white text-xs shadow-sm relative w-full max-w-full"
-                data-testid={`ab-card-${item.card_id}`}
-                data-bucket={bucketKey}
-            >
+            <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey}>
                 {/* Drop Zones */}
                 <div ref={setTopRef} className="absolute top-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
                 <div ref={setBottomRef} className="absolute bottom-0 left-0 right-0 h-1/2 z-20 pointer-events-none" />
@@ -45,17 +41,16 @@ export const TimelineBucketCard = ({
                 {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
                 {isOverBottom && <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />}
 
-
                 <TimelineCard
                     title={item.title || 'Untitled card'}
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-                    timePlacement="inline"
+                    timePlacement="top"
                     onOpen={() => openCardModal(item.short_id)}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className="border-none shadow-none px-3 py-2 text-xs"
+                    className="h-10"
                 />
             </div>
         </DraggableCard>
