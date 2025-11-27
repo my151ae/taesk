@@ -311,6 +311,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
       if (eventType === 'INSERT' || eventType === 'UPDATE') {
         const card = newRecord as Card;
+        console.log('[handleCardChange] UPDATE', { cardId: card.id, checked: card.checked, eventType });
 
         // First remove existing instance to avoid duplicates/stale data
         removeCard(card.id);

@@ -57,7 +57,10 @@ export function TimelineCard({
                     }}
                     aria-label={checked ? '未完了に戻す' : '完了にする'}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="mt-0.5 flex h-3.5 w-3.5 items-center justify-center border border-slate-300 text-[8px] font-bold text-transparent transition hover:border-sky-400"
+                    className={clsx(
+                        "mt-0.5 flex h-4 w-4 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400",
+                        checked ? "text-slate-800" : "text-transparent"
+                    )}
                 >
                     {checked ? '✓' : ''}
                 </button>

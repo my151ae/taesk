@@ -45,19 +45,18 @@ export const TimelineBucketCard = ({
                 {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
                 {isOverBottom && <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />}
 
-                <div className="px-3 py-2">
-                    <TimelineCard
-                        title={item.title || 'Untitled card'}
-                        checked={item.checked}
-                        onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
-                        badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                        timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-                        timePlacement="inline"
-                        onOpen={() => openCardModal(item.short_id)}
-                        openButtonTestId={`cardOpenButton-${item.card_id}`}
-                        className="border-none shadow-none p-0 text-xs"
-                    />
-                </div>
+
+                <TimelineCard
+                    title={item.title || 'Untitled card'}
+                    checked={item.checked}
+                    onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
+                    badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
+                    timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                    timePlacement="inline"
+                    onOpen={() => openCardModal(item.short_id)}
+                    openButtonTestId={`cardOpenButton-${item.card_id}`}
+                    className="border-none shadow-none px-3 py-2 text-xs"
+                />
             </div>
         </DraggableCard>
     );
