@@ -40,6 +40,7 @@ type TimelineColumnProps = {
     handleResizeMove: (e: React.PointerEvent) => void;
     handleResizeEnd: (e: React.PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    shrinkToHalf?: boolean;
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
 };
 
@@ -70,6 +71,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
+    shrinkToHalf = false,
     setSelectedSlot
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
@@ -102,7 +104,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     };
 
     return (
-        <div className="relative h-full">
+        <div className="relative h-full" style={shrinkToHalf ? { width: '50%' } : undefined}>
             <DroppableColumn key={day.isoDate} day={day}>
                 <div
                     className="relative h-full border-l border-slate-100 border-r border-slate-200/50 pb-8 select-none bg-white"

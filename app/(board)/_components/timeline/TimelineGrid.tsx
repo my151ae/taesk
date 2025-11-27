@@ -37,6 +37,7 @@ type TimelineGridProps = {
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     axisWidth?: number;
+    shrinkDaysToHalf?: boolean;
 };
 
 export default function TimelineGrid({
@@ -56,6 +57,7 @@ export default function TimelineGrid({
     handleResizeEnd,
     onToggleCheck,
     axisWidth = 80,
+    shrinkDaysToHalf = false,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -110,6 +112,7 @@ export default function TimelineGrid({
                         handleResizeMove={handleResizeMove}
                         handleResizeEnd={handleResizeEnd}
                         onToggleCheck={onToggleCheck}
+                        shrinkToHalf={shrinkDaysToHalf}
                         setSelectedSlot={setSelectedSlot}
                     />
                 ))}

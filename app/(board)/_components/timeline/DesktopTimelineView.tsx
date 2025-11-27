@@ -11,10 +11,10 @@ import type {
   useTimelineDragAndDrop,
 } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import type {
-  TimelineBucketItem,
-  TimelineDay,
-  TimelineEvent,
+import {
+  type TimelineBucketItem,
+  type TimelineDay,
+  type TimelineEvent,
 } from "@/app/(board)/_utils/timeline-helpers";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -106,7 +106,7 @@ export function DesktopTimelineView({
           ref={timelineHeaderRef}
           className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
           style={{
-            gridTemplateColumns: "80px 1fr 1fr",
+            gridTemplateColumns: "80px repeat(2, minmax(0, 1fr))",
           }}
         >
           <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
@@ -179,34 +179,33 @@ export function DesktopTimelineView({
               </div>
             )}
 
-            <div className="h-full relative">
-              <TimelineBuckets
-                days={visibleDays}
-                abBuckets={abBuckets}
-                floatingLayerTop={floatingLayerTop}
-                status={status}
-                openCardModal={openCardModal}
-                onToggleCheck={onToggleCheck}
-              />
+            <TimelineBuckets
+              days={visibleDays}
+              abBuckets={abBuckets}
+              floatingLayerTop={floatingLayerTop}
+              status={status}
+              openCardModal={openCardModal}
+              onToggleCheck={onToggleCheck}
+            />
 
-              <TimelineGrid
-                days={visibleDays}
-                eventsByDay={eventsByDay}
-                indicatorTop={indicatorTop}
-                indicatorDayIso={indicatorDayIso}
-                timelineViewportHeight={timelineViewportHeight}
-                activeDrag={activeDrag}
-                pointerPreview={pointerPreview}
-                activeResize={activeResize}
-                openCardModal={openCardModal}
-                handleEventKeyDown={handleEventKeyDown}
-                handleColumnClick={handleColumnClick}
-                handleResizeStart={handleResizeStart}
-                handleResizeMove={handleResizeMove}
-                handleResizeEnd={handleResizeEnd}
-                onToggleCheck={onToggleCheck}
-              />
-            </div>
+            <TimelineGrid
+              days={visibleDays}
+              eventsByDay={eventsByDay}
+              indicatorTop={indicatorTop}
+              indicatorDayIso={indicatorDayIso}
+              timelineViewportHeight={timelineViewportHeight}
+              activeDrag={activeDrag}
+              pointerPreview={pointerPreview}
+              activeResize={activeResize}
+              openCardModal={openCardModal}
+              handleEventKeyDown={handleEventKeyDown}
+              handleColumnClick={handleColumnClick}
+              handleResizeStart={handleResizeStart}
+              handleResizeMove={handleResizeMove}
+              handleResizeEnd={handleResizeEnd}
+              onToggleCheck={onToggleCheck}
+              shrinkDaysToHalf
+            />
           </div>
         </div>
       </div>
