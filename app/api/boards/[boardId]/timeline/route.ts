@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay } from '@/lib/api-types/timeline';
 import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
+import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -83,7 +84,7 @@ export async function GET(
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, description, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
+    'id, title, checklist, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -95,14 +96,16 @@ export async function GET(
     .eq('board_id', boardId);
 
   if (initial.error && initial.error.code === '42703') {
+    const fallbackSelect = baseSelect.replace('checklist, ', '');
     const fallback = await supabase
       .from('cards')
-      .select(baseSelect)
+      .select(fallbackSelect)
       .eq('board_id', boardId);
     fetchError = fallback.error;
     cards =
       fallback.data?.map((card) => ({
         ...card,
+        checklist: EMPTY_CHECKLIST,
         due_bucket_position: null,
       })) ?? null;
   } else {
@@ -126,6 +129,7 @@ export async function GET(
   }, {} as Record<string, TimelineBucketItem[]>);
 
   cards?.forEach((card) => {
+    const checklist = normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST);
     const dateOnly = toJstDate(card.due_date);
     const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
 
@@ -146,6 +150,7 @@ export async function GET(
         tags: card.tags ?? [],
         priority: card.priority,
         checked: card.checked,
+        checklist,
         due_bucket: card.due_bucket ?? null,
         due_bucket_position: card.due_bucket_position ?? null,
         assignee_id: card.assignee_id,
@@ -170,6 +175,7 @@ export async function GET(
         due_start: card.due_start,
         due_end: card.due_end,
         checked: card.checked,
+        checklist,
         tags: card.tags ?? [],
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,

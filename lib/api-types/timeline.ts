@@ -1,3 +1,5 @@
+import type { Checklist } from '@/lib/checklist';
+
 export interface UserProfile {
   id: string;
   username: string | null;
@@ -23,6 +25,7 @@ export interface TimelineEvent {
   tags: string[];
   priority: string | null;
   checked: boolean;
+  checklist?: Checklist | null;
   due_bucket?: string | null;
   due_bucket_position?: number | null;
   assignee_id?: string | null;
@@ -39,6 +42,7 @@ export interface TimelineBucketItem {
   due_start: string | null;
   due_end: string | null;
   checked: boolean;
+  checklist?: Checklist | null;
   tags: string[];
   assignee_id?: string | null;
   assignee_ids?: string[] | null;

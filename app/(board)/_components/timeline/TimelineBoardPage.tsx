@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
+import type { Checklist } from "@/lib/checklist";
+import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText } from "@/lib/checklist";
+import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 import { buildBoardUrl } from "@/lib/board-url";
 
 import { createClientTrace } from "@/lib/metrics/client";
@@ -229,6 +232,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
 
   const {
     modalCard,
@@ -524,7 +528,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     async (
       id: string,
       title: string,
-      description: string,
+      checklist: Checklist,
       tags?: string[],
       due_date?: string | null,
       priority?: Priority,
@@ -547,11 +551,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             normalizedDueDate = parsed.toISOString();
           }
         }
-        const payload: Record<string, unknown> = {
-          title,
-          description,
-          tags,
-          due_date: normalizedDueDate,
+      const payload: Record<string, unknown> = {
+        title,
+        checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
+        tags,
+        due_date: normalizedDueDate,
           due_start,
           due_end,
           due_bucket: normalizeDueBucket(due_bucket),
@@ -623,6 +627,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 tags: updatedCard.tags ?? [],
                 priority: updatedCard.priority,
                 checked: updatedCard.checked,
+                checklist: normalizeChecklist(updatedCard.checklist ?? EMPTY_CHECKLIST),
                 due_bucket: updatedCard.due_bucket ?? null,
                 due_bucket_position: updatedCard.due_bucket_position ?? null,
                 assignee_id: updatedCard.assignee_id,
@@ -663,6 +668,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 due_start: updatedCard.due_start,
                 due_end: updatedCard.due_end,
                 checked: updatedCard.checked,
+                checklist: normalizeChecklist(updatedCard.checklist ?? EMPTY_CHECKLIST),
                 tags: updatedCard.tags ?? [],
                 assignee_id: updatedCard.assignee_id,
                 assignee_ids: updatedCard.assignee_ids ?? null,
@@ -745,7 +751,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // Ideally filterAndSortCards should be generic or we should adapt the data.
     // For now, we'll filter the arrays directly using the same logic as filterAndSortCards but inline or adapted.
 
-    const filterItem = (item: { title: string; tags: string[]; priority?: string | null; checked: boolean }) => {
+    const filterItem = (item: { title: string; tags: string[]; priority?: string | null; checked: boolean; checklist?: Checklist | null }) => {
       // Priority (only for events that have priority, buckets might not?)
       if (selectedPriority !== 'all') {
         if (item.priority !== selectedPriority) return false;
@@ -758,7 +764,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       // Search (Title + Tags)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')}`.toLowerCase();
+        const checklistText = flattenChecklistText(item.checklist ?? null);
+        const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')} ${checklistText}`.toLowerCase();
         if (!source.includes(query)) return false;
       }
       return true;
@@ -888,6 +895,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     [dataMode, initialBoard.id, fetchTimeline]
   );
 
+  const applyChecklistLocally = useCallback((cardId: string, checklist: Checklist) => {
+    const normalized = normalizeChecklist(checklist ?? EMPTY_CHECKLIST);
+    setData((prev) => {
+      if (!prev) return prev;
+      const events = prev.events.map((event) =>
+        event.card_id === cardId ? { ...event, checklist: normalized } : event
+      );
+      const abBuckets = Object.fromEntries(
+        Object.entries(prev.abBuckets).map(([key, items]) => [
+          key,
+          items.map((item) => (item.card_id === cardId ? { ...item, checklist: normalized } : item)),
+        ])
+      );
+      return { ...prev, events, abBuckets };
+    });
+
+    setModalCardOverride((current) => {
+      if (current && current.id === cardId) {
+        return { ...current, checklist: normalized } as Card;
+      }
+      return current;
+    });
+  }, [setData, setModalCardOverride]);
+
+  const handleChecklistCommit = useCallback(async (cardId: string, checklist: Checklist, _trigger: ChecklistSaveTrigger) => {
+    applyChecklistLocally(cardId, checklist);
+    if (dataMode !== 'api') return;
+    try {
+      await applyPatch(cardId, { checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST) });
+    } catch (error) {
+      console.error('[timeline] checklist save failed', error);
+      setErrorMessage('Failed to save checklist');
+    }
+  }, [applyChecklistLocally, applyPatch, dataMode]);
+
+  const handleChecklistEditingChange = useCallback((cardId: string, isEditing: boolean) => {
+    setEditingCardId((current) => {
+      if (isEditing) return cardId;
+      if (current === cardId) return null;
+      return current;
+    });
+  }, []);
+
   const handleBoardNavigate = useCallback(
     (board: Board) => {
       const target = buildBoardUrl(board);
@@ -1001,6 +1051,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             durationMinutes: end - start,
             title: newCard.title,
             tags: newCard.tags ?? [],
+            checklist: normalizeChecklist(newCard.checklist ?? EMPTY_CHECKLIST),
             due_bucket: newCard.due_bucket ?? null,
             due_bucket_position: newCard.due_bucket_position ?? null,
             priority: newCard.priority ?? null,
@@ -1049,7 +1100,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const payload: Partial<Card> = {
       title: `New card ${Date.now()}`,
-      description: '',
+      checklist: EMPTY_CHECKLIST,
       tags: [],
       due_date: withJstMidnight(day.isoDate),
       due_start: minutesToTime(minutes),
@@ -1068,6 +1119,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       due_end: minutesToTime(minutes + 60),
       durationMinutes: 60,
       title: payload.title || 'New card',
+      checklist: EMPTY_CHECKLIST,
       tags: [],
       due_bucket: null,
       due_bucket_position: null,
@@ -1113,6 +1165,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     timelineScrollRef,
     bucketDayMap,
     dataMode,
+    editingCardId,
   });
   const floatingLayerTop = 0;
   const timelineViewportHeight = useMemo(() => {
@@ -1198,6 +1251,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               handleResizeMove={handleResizeMove}
               handleResizeEnd={handleResizeEnd}
               onToggleCheck={handleToggleCardChecked}
+              onChecklistCommit={handleChecklistCommit}
+              onChecklistEditingChange={handleChecklistEditingChange}
+              editingCardId={editingCardId}
               sensors={sensors}
               handleDragStart={handleDragStart}
               handleDragMove={handleDragMove}
@@ -1222,6 +1278,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 timelineViewportHeight={timelineViewportHeight}
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
+                onChecklistCommit={handleChecklistCommit}
+                onChecklistEditingChange={handleChecklistEditingChange}
+                editingCardId={editingCardId}
                 status={status}
               />
             </div>

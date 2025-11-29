@@ -1,8 +1,12 @@
 import { useDroppable } from '@dnd-kit/core';
+import { useEffect, useState } from 'react';
 import { TimelineBucketItem, timeLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
+import { ChecklistEditor, ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
+import { ChecklistPreview } from '@/app/(board)/_components/checklist/ChecklistPreview';
+import { Checklist, normalizeChecklist, countNonEmptyLines, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 const DROP_ZONE_MARGIN_PX = 12;
 
@@ -11,6 +15,9 @@ type TimelineBucketCardProps = {
     bucketKey: string;
     openCardModal: (shortId: string | null) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+    onChecklistEditingChange: (cardId: string, isEditing: boolean) => void;
+    editingCardId: string | null;
     showFallbackBottomLine?: boolean;
 };
 
@@ -19,6 +26,9 @@ export const TimelineBucketCard = ({
     bucketKey,
     openCardModal,
     onToggleCheck,
+    onChecklistCommit,
+    onChecklistEditingChange,
+    editingCardId,
     showFallbackBottomLine = false,
 }: TimelineBucketCardProps) => {
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
@@ -31,10 +41,20 @@ export const TimelineBucketCard = ({
         data: { type: 'bucket-item-bottom', bucketKey, cardId: item.card_id },
     });
 
+    const [draftChecklist, setDraftChecklist] = useState<Checklist>(normalizeChecklist(item.checklist ?? EMPTY_CHECKLIST));
+
+    useEffect(() => {
+        setDraftChecklist(normalizeChecklist(item.checklist ?? EMPTY_CHECKLIST));
+    }, [item.checklist]);
+
+    const isEditing = editingCardId === item.card_id;
+    const lineCount = countNonEmptyLines(draftChecklist);
+
     return (
         <DraggableCard
             id={`bucket:${item.card_id}`}
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
+            disabled={isEditing}
         >
             <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey}>
                 {/* Drop Zones */}
@@ -64,8 +84,49 @@ export const TimelineBucketCard = ({
                     timePlacement="top"
                     onOpen={() => openCardModal(item.short_id)}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className="h-10"
-                />
+                    className={isEditing ? 'min-h-[120px]' : 'min-h-[72px]'}
+                >
+                    <div className="mt-1 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                            <span>☑︎ {lineCount}</span>
+                            {!isEditing && (
+                                <button
+                                    type="button"
+                                    className="rounded px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onChecklistEditingChange(item.card_id, true);
+                                    }}
+                                >
+                                    編集
+                                </button>
+                            )}
+                        </div>
+                        {isEditing ? (
+                            <ChecklistEditor
+                                value={draftChecklist}
+                                onChange={(next) => setDraftChecklist(next)}
+                                onCommit={async (next, trigger) => {
+                                    const normalized = normalizeChecklist(next);
+                                    await onChecklistCommit(item.card_id, normalized, trigger);
+                                }}
+                                onEditingChange={(editing) => onChecklistEditingChange(item.card_id, editing)}
+                                autoSaveDelayMs={1500}
+                                placeholder="- [ ] タスクを書く"
+                            />
+                        ) : (
+                            <ChecklistPreview
+                                checklist={draftChecklist}
+                                maxLines={3}
+                                className="mt-0.5"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onChecklistEditingChange(item.card_id, true);
+                                }}
+                            />
+                        )}
+                    </div>
+                </TimelineCard>
             </div>
         </DraggableCard>
     );

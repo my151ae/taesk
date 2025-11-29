@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
-  description: z.string().optional(),
+  checklist: z.any().optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
@@ -93,12 +94,21 @@ export async function PATCH(
       normalizedPayload.due_bucket_position = Number(normalizedPayload.due_bucket_position);
     }
 
+    if ('checklist' in normalizedPayload) {
+      normalizedPayload.checklist = clampChecklist(normalizedPayload.checklist ?? EMPTY_CHECKLIST);
+    }
+
     let { data: updatedCard, error } = await performUpdate(normalizedPayload);
 
     const missingDueBucketColumn =
       !!error &&
       (error.code === '42703' ||
         (typeof error.message === 'string' && error.message.includes('due_bucket_position')));
+
+    const missingChecklistColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('checklist')));
 
     if (missingDueBucketColumn && 'due_bucket_position' in normalizedPayload) {
       const fallbackPayload = { ...normalizedPayload };
@@ -114,6 +124,12 @@ export async function PATCH(
     if (missingAssigneeIdsColumn && 'assignee_ids' in normalizedPayload) {
       const fallbackPayload = { ...normalizedPayload };
       delete fallbackPayload.assignee_ids;
+      ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
+    }
+
+    if (missingChecklistColumn && 'checklist' in normalizedPayload) {
+      const fallbackPayload = { ...normalizedPayload };
+      delete fallbackPayload.checklist;
       ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
     }
 

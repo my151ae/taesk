@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
+import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().max(255),
-  description: z.string().optional(),
+  checklist: z.any().optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
@@ -147,7 +148,7 @@ export async function POST(
       board_id: boardId,
       id: parsed.data.id,
       title: parsed.data.title,
-      description: parsed.data.description ?? '',
+      checklist: clampChecklist(parsed.data.checklist ?? EMPTY_CHECKLIST),
       list_id: listId,
       position: position,
       tags: parsed.data.tags ?? [],
@@ -189,9 +190,20 @@ export async function POST(
       (error.code === '42703' ||
         (typeof error.message === 'string' && error.message.includes('due_bucket_position')));
 
+    const missingChecklistColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('checklist')));
+
     if (missingDueBucketColumn && 'due_bucket_position' in payloadToSend) {
       const fallbackPayload = { ...payloadToSend };
       delete fallbackPayload.due_bucket_position;
+      ({ data: createdCard, error } = await performInsert(fallbackPayload));
+    }
+
+    if (missingChecklistColumn && 'checklist' in payloadToSend) {
+      const fallbackPayload = { ...payloadToSend };
+      delete fallbackPayload.checklist;
       ({ data: createdCard, error } = await performInsert(fallbackPayload));
     }
 

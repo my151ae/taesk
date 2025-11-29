@@ -3,6 +3,8 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 
 import { buildReadableTail, toSlugBase } from './slug';
+import type { Checklist } from './checklist';
+import { normalizeChecklist, EMPTY_CHECKLIST } from './checklist';
 
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,7 +34,7 @@ type CardRow = {
   slug: string | null;
   board_id: string;
   list_id: string;
-  description: string | null;
+  checklist: Checklist | null;
   tags: string[] | null;
   due_date: string | null;
   priority: CardDetail['priority'] | null;
@@ -50,7 +52,7 @@ export type CardDetail = {
   slug: string;
   boardId: string;
   listId: string;
-  description: string | null;
+  checklist: Checklist | null;
   tags: string[];
   dueDate: string | null;
   priority: 'low' | 'medium' | 'high';
@@ -77,7 +79,7 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
         'slug',
         'board_id',
         'list_id',
-        'description',
+        'checklist',
         'tags',
         'due_date',
         'priority',
@@ -110,7 +112,7 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
     slug: normalizedSlug,
     boardId: data.board_id,
     listId: data.list_id,
-    description: data.description ?? null,
+    checklist: normalizeChecklist(data.checklist ?? EMPTY_CHECKLIST),
     tags: Array.isArray(data.tags) ? data.tags : [],
     dueDate: data.due_date ?? null,
     priority: (data.priority ?? 'medium') as CardDetail['priority'],

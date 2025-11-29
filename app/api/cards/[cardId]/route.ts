@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +23,13 @@ export async function GET(
 
     const { data: card, error: cardError } = await supabase
       .from('cards')
-      .select('*')
+      .select(`
+        id, short_id, id_short, slug, title, checklist, tags,
+        list_id, board_id, position, user_id,
+        due_date, due_start, due_end, due_bucket, due_bucket_position,
+        priority, checked, assignee_id, assignee_ids, assigned_to,
+        created_at, updated_at
+      `)
       .eq('short_id', cardId)
       .maybeSingle();
 
@@ -81,14 +88,11 @@ export async function GET(
       .map((member) => member.profiles)
       .filter(Boolean);
 
-    return NextResponse.json(
-      {
-        card,
-        board,
-        profiles,
-      },
-      { status: 200 }
-    );
+    const normalizedCard = card
+      ? { ...card, checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST) }
+      : null;
+
+    return NextResponse.json({ card: normalizedCard, board, profiles }, { status: 200 });
   } catch (error) {
     console.error('Unexpected error in GET /api/cards/[cardId]:', error);
     return NextResponse.json(

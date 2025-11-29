@@ -99,6 +99,7 @@ type UseTimelineDragAndDropProps = {
     timelineScrollRef: React.RefObject<HTMLDivElement>;
     bucketDayMap: Record<string, string | null>;
     dataMode: 'api' | 'mock';
+    editingCardId?: string | null;
 };
 
 export function useTimelineDragAndDrop({
@@ -108,6 +109,7 @@ export function useTimelineDragAndDrop({
     timelineScrollRef,
     bucketDayMap,
     dataMode,
+    editingCardId,
 }: UseTimelineDragAndDropProps) {
     const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
     const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -175,6 +177,7 @@ export function useTimelineDragAndDrop({
                         durationMinutes,
                         title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
                         tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+                        checklist: baseEvent?.checklist ?? baseBucketItem?.checklist ?? null,
                         priority: baseEvent?.priority ?? null,
                         checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
                         assignee_id: baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
@@ -211,6 +214,7 @@ export function useTimelineDragAndDrop({
                         due_start: (payload.due_start as string | null) ?? null,
                         due_end: (payload.due_end as string | null) ?? null,
                         checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
+                        checklist: baseBucketItem?.checklist ?? baseEvent?.checklist ?? null,
                         tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
                         assignee_id: baseBucketItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
                         assignee_ids: baseBucketItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
@@ -238,6 +242,7 @@ export function useTimelineDragAndDrop({
     const handleDragStart = (event: DragStartEvent) => {
         const cardId = event.active.data.current?.cardId as string | undefined;
         if (!cardId) return;
+        if (editingCardId && editingCardId === cardId) return;
         const kind = event.active.data.current?.kind as 'event' | 'bucket';
         console.log('[timeline] drag start', { cardId, kind });
         if (kind === 'event') {

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { buildBoardUrl } from "@/lib/board-url";
 import { normalizeCardSlugOrRedirect } from "@/lib/server/cards";
+import { normalizeChecklist } from "@/lib/checklist";
 
 export const revalidate = 0;
 
@@ -24,6 +25,7 @@ export default async function CardFullPage({
   const createdAt = new Date(card.created_at);
   const updatedAt = new Date(card.updated_at);
   const tags = Array.isArray(card.tags) ? card.tags : [];
+  const checklist = normalizeChecklist(card.checklist ?? null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50">
@@ -96,10 +98,23 @@ export default async function CardFullPage({
 
           <div className="mt-8 space-y-6">
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Description</h2>
-              <p className="mt-2 whitespace-pre-wrap text-base leading-7 text-slate-800">
-                {card.description || "No description"}
-              </p>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Checklist</h2>
+              {checklist.lines.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">No checklist</p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {checklist.lines.map((line) => (
+                    <li key={line.id} className="flex items-start gap-2 text-base leading-6 text-slate-800">
+                      <span className="mt-1 inline-flex h-4 w-4 items-center justify-center rounded border border-slate-300 text-[10px] font-bold text-slate-700">
+                        {line.checked ? "✓" : ""}
+                      </span>
+                      <span className="flex-1 whitespace-pre-wrap">
+                        {`${"  ".repeat(Math.max(0, line.level))}${line.text}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section>

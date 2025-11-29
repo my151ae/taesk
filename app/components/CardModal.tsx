@@ -5,6 +5,8 @@ import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
+import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
+import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 
 const getProfileDisplayName = (profile: ProfileSummary): string => {
   const identity = resolveProfileIdentity(profile, profile.email ?? null);
@@ -28,7 +30,7 @@ interface CardModalProps {
   onSave: (
     id: string,
     title: string,
-    description: string,
+    checklist: Checklist,
     tags?: string[],
     due_date?: string | null,
     priority?: Priority,
@@ -54,7 +56,7 @@ export function CardModal({
   onClose,
 }: CardModalProps) {
   const [title, setTitle] = useState(card.title);
-  const [description, setDescription] = useState(card.description);
+  const [checklist, setChecklist] = useState<Checklist>(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [dueDate, setDueDate] = useState(card.due_date || '');
@@ -122,7 +124,7 @@ export function CardModal({
     if (card.id !== cardIdRef.current) {
       cardIdRef.current = card.id;
       setTitle(card.title);
-      setDescription(card.description);
+      setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -144,7 +146,7 @@ export function CardModal({
     } else if (!isDirty) {
       // 同じカードで編集していない場合のみ、外部の変更を反映
       setTitle(card.title);
-      setDescription(card.description);
+      setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -272,7 +274,7 @@ export function CardModal({
     onSave(
       card.id,
       title,
-      description,
+      normalizeChecklist(checklist),
       tags,
       normalizedDueDate,
       priority,
@@ -398,20 +400,27 @@ export function CardModal({
               />
             </div>
 
-            {/* Description */}
+            {/* Checklist */}
             <div>
               <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Description
+                Checklist
               </label>
-              <textarea
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
+              <ChecklistEditor
+                value={checklist}
+                onChange={(next) => {
+                  setChecklist(next);
                   setIsDirty(true);
                 }}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent resize-none"
-                placeholder="Add a description..."
-                rows={4}
+                onCommit={(next) => {
+                  setChecklist(next);
+                  setIsDirty(true);
+                }}
+                onCancel={() => {
+                  setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
+                  setIsDirty(false);
+                }}
+                placeholder="- [ ] タスクを書く"
+                minRows={4}
               />
             </div>
 

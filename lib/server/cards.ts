@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient, type Card } from "@/lib/supabase";
 import { buildCanonicalPath, toSlugBase } from "@/lib/slug";
 import { getBoardById } from "./boards";
+import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
 
 const TABLE_CARDS = "cards";
 
@@ -39,7 +40,9 @@ export async function getCardByShortId(shortId: string): Promise<Card | null> {
     throw error;
   }
 
-  return (data as Card | null) ?? null;
+  if (!data) return null;
+  const card = data as Card;
+  return { ...card, checklist: normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST) };
 }
 
 export async function getCardWithBoard(shortId: string): Promise<CardWithBoard | null> {

@@ -8,13 +8,23 @@ export const DraggableCard = ({
     children,
     extraNodeRef,
     attachListenersToChild = false,
+    disabled = false,
 }: {
     id: string;
     data: Record<string, unknown>;
     children: ReactNode;
     extraNodeRef?: (node: HTMLElement | null) => void;
     attachListenersToChild?: boolean;
+    disabled?: boolean;
 }) => {
+    if (disabled) {
+        return (
+            <div ref={extraNodeRef ?? undefined}>
+                {children}
+            </div>
+        );
+    }
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, data: { ...data, id } });
     const combinedRef = useCallback(
         (node: HTMLElement | null) => {

@@ -100,3 +100,11 @@
 
 ## 運用メモ
 - 本書をそのまま実装チケットとして扱って問題なし。追加チケットが必要ならテスト追加やリファクタ単位で切り出す。
+
+## 進捗ログ（2025-11-29）
+- DB/型: `supabase/migrations/20251129090000_add_checklist_to_cards.sql` で `checklist jsonb` 追加＆旧 `description` 廃止。`lib/supabase.ts`/API/サーバー型を checklist ベースに更新。
+- UI: `ChecklistEditor`/`ChecklistPreview` を追加し、Timeline（デスクトップ/モバイル）と A/B カードにインライン編集＋省略表示を実装。編集中は DnD をカード単位で無効化。
+- CardModal: checklist 編集に置き換え（共通エディタ使用）。Kanban 旧UIも checklist 参照に差し替え。
+- API: カード CRUD/TIMELINE API を checklist 入出力に統一。Playwright テストデータを checklist 付きに修正。
+- 残課題: メトリクス埋め込み、オートセーブの in-flight/失敗ハンドリングの細部検証、Playwright 追加シナリオ（未実行）、UI 微調整（タイムライン編集時の高さ上限/内部スクロール確認）。
+- 2025-11-29 2nd pass: ChecklistEditor を Notion 風ブロックUIに刷新（行ごとにcheckbox＋テキスト、Enterで新行、Tab/Shift+Tabでインデント）。編集中はローカルのみ更新し、保存は onCommit で API PATCH。既存環境に checklist カラムが無い場合は API 側で checklist を落として再送するフォールバックを追加。

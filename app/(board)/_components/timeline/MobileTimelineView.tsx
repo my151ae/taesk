@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useAnimationControls, type PanInfo } from "framer-motion";
 import {
   HOUR_HEIGHT,
@@ -16,6 +16,63 @@ import {
   getMinutesFromTime,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
+import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
+import { ChecklistPreview } from "@/app/(board)/_components/checklist/ChecklistPreview";
+import { Checklist, normalizeChecklist, EMPTY_CHECKLIST, countNonEmptyLines } from "@/lib/checklist";
+
+function MobileInlineChecklist({
+  cardId,
+  checklist,
+  editingCardId,
+  onChecklistEditingChange,
+  onChecklistCommit,
+  showCount = false,
+}: {
+  cardId: string;
+  checklist: Checklist | null;
+  editingCardId: string | null;
+  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
+  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+  showCount?: boolean;
+}) {
+  const [draft, setDraft] = useState<Checklist>(normalizeChecklist(checklist ?? EMPTY_CHECKLIST));
+
+  useEffect(() => {
+    if (editingCardId === cardId) return;
+    setDraft(normalizeChecklist(checklist ?? EMPTY_CHECKLIST));
+  }, [checklist, cardId, editingCardId]);
+
+  const isEditing = editingCardId === cardId;
+  const lineCount = countNonEmptyLines(draft);
+
+  return (
+    <div className="mt-2 space-y-1">
+      {showCount ? <div className="text-[10px] text-slate-500">☑︎ {lineCount}</div> : null}
+      {isEditing ? (
+        <ChecklistEditor
+          value={draft}
+          onChange={(next) => setDraft(next)}
+          onCommit={async (next, trigger) => {
+            const normalized = normalizeChecklist(next);
+            await onChecklistCommit(cardId, normalized, trigger);
+          }}
+          onEditingChange={(editing) => onChecklistEditingChange(cardId, editing)}
+          autoSaveDelayMs={1500}
+          placeholder="- [ ] タスクを書く"
+        />
+      ) : (
+        <ChecklistPreview
+          checklist={draft}
+          maxLines={3}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChecklistEditingChange(cardId, true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 type MobileTimelineViewProps = {
   days: TimelineDay[];
@@ -29,6 +86,9 @@ type MobileTimelineViewProps = {
   timelineViewportHeight: number;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
+  editingCardId: string | null;
   status: string;
 };
 
@@ -44,6 +104,9 @@ export default function MobileTimelineView({
   timelineViewportHeight,
   openCardModal,
   onToggleCheck,
+  onChecklistCommit,
+  onChecklistEditingChange,
+  editingCardId,
   status,
 }: MobileTimelineViewProps) {
   const controls = useAnimationControls();
@@ -219,6 +282,14 @@ export default function MobileTimelineView({
                             {(event.due_bucket ?? "a").toUpperCase()}
                           </span>
                         </div>
+
+                        <MobileInlineChecklist
+                          cardId={event.card_id}
+                          checklist={event.checklist ?? null}
+                          editingCardId={editingCardId}
+                          onChecklistEditingChange={onChecklistEditingChange}
+                          onChecklistCommit={onChecklistCommit}
+                        />
                       </div>
                     );
                   })}
@@ -251,34 +322,56 @@ export default function MobileTimelineView({
                         <p className="px-3 py-3 text-[11px] text-slate-400">カードがありません</p>
                       ) : (
                         items.map((item) => (
-                          <button
+                          <div
                             key={item.card_id}
-                            type="button"
+                            className="flex w-full flex-col gap-1 px-3 py-3"
                             onClick={(native) => {
                               native.stopPropagation();
                               openCardModal(item.short_id, "mobile-ab");
                             }}
-                            className="flex w-full items-start gap-2 px-3 py-3 text-left"
                           >
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                onToggleCheck(item.card_id, e.target.checked);
-                              }}
-                              className="mt-0.5 h-3.5 w-3.5 cursor-pointer border-slate-300 text-sky-500"
-                            />
-                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                              <span className="text-[12px] font-semibold text-slate-800 line-clamp-2">{item.title || "Untitled card"}</span>
-                              {item.due_start && (
-                                <span className="text-[10px] text-slate-500">{timeLabel(item.due_start, item.due_end)}</span>
-                              )}
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                checked={item.checked}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  onToggleCheck(item.card_id, e.target.checked);
+                                }}
+                                className="mt-0.5 h-3.5 w-3.5 cursor-pointer border-slate-300 text-sky-500"
+                              />
+                              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-[12px] font-semibold text-slate-800 line-clamp-2">{item.title || "Untitled card"}</span>
+                                  <span className="self-start rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
+                                    {bucketKeyToDueBucket(section.bucket).toUpperCase()}
+                                  </span>
+                                </div>
+                                {item.due_start && (
+                                  <span className="text-[10px] text-slate-500">{timeLabel(item.due_start, item.due_end)}</span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                className="rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCardModal(item.short_id, "mobile-ab");
+                                }}
+                              >
+                                開く
+                              </button>
                             </div>
-                            <span className="self-start rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
-                              {bucketKeyToDueBucket(section.bucket).toUpperCase()}
-                            </span>
-                          </button>
+
+                            <MobileInlineChecklist
+                              cardId={item.card_id}
+                              checklist={item.checklist ?? null}
+                              editingCardId={editingCardId}
+                              onChecklistEditingChange={onChecklistEditingChange}
+                              onChecklistCommit={onChecklistCommit}
+                              showCount
+                            />
+                          </div>
                         ))
                       )}
                     </div>

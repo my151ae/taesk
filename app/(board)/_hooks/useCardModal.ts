@@ -6,6 +6,7 @@ import { TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store';
 import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
+import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -68,7 +69,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             return {
                 id: eventCard.card_id,
                 title: eventCard.title,
-                description: '',
+                checklist: normalizeChecklist(eventCard.checklist ?? EMPTY_CHECKLIST),
                 tags: eventCard.tags,
                 priority: eventCard.priority,
                 checked: eventCard.checked,
@@ -98,9 +99,9 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             if (bucketItem) {
                 return {
                     id: bucketItem.card_id,
-                    title: bucketItem.title,
-                    description: '',
-                    tags: bucketItem.tags,
+                title: bucketItem.title,
+                checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
+                tags: bucketItem.tags,
                     priority: 'medium',
                     checked: bucketItem.checked,
                     short_id: bucketItem.short_id,

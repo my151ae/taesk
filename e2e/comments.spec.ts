@@ -142,7 +142,7 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
   const { error } = await supabaseAdmin.from('cards').insert({
     id: cardId,
     title: 'New Card',
-    description: '',
+    checklist: { version: 1, lines: [] },
     board_id: board.id,
     list_id: board.listId,
     user_id: TEST_USER_ID,

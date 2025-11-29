@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, Priority } from '@/lib/supabase';
+import { flattenChecklistText } from '@/lib/checklist';
 
 export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc';
 
@@ -33,12 +34,13 @@ export const filterAndSortCards = (
 ): Card[] => {
   let filtered = [...cards];
 
-  // Search filter (title + description)
+  // Search filter (title + checklist text)
   if (searchQuery.trim()) {
     const query = searchQuery.toLowerCase();
     filtered = filtered.filter(
       (card) =>
-        card.title.toLowerCase().includes(query) || card.description?.toLowerCase().includes(query)
+        card.title.toLowerCase().includes(query) ||
+        flattenChecklistText(card.checklist).toLowerCase().includes(query)
     );
   }
 

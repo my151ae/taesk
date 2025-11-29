@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase, List, Card, CommentWithAuthor } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 type BoardData = {
     lists: List[];
@@ -112,7 +113,10 @@ export function useRealtimeBoard(
                     if (setBoardData) {
                         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                             setBoardData((prev) => {
-                                const newCard = payload.new as Card;
+                                const newCard = {
+                                    ...(payload.new as Card),
+                                    checklist: normalizeChecklist((payload.new as any).checklist ?? EMPTY_CHECKLIST),
+                                } as Card;
                                 const idx = prev.cards.findIndex(card => card.id === newCard.id);
 
                                 if (idx >= 0) {

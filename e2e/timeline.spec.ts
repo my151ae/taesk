@@ -90,7 +90,7 @@ test.describe('@feature:timeline Timeline view', () => {
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,
       title: 'Timeline focus card',
-      description: 'Card used in timeline spec',
+      checklist: { version: 1, lines: [] },
       board_id: MAIN_BOARD_ID,
       list_id: TIMELINE_LIST_ID,
       user_id: TEST_USER_ID,

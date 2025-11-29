@@ -1,4 +1,4 @@
-import { KeyboardEvent, PointerEvent, memo } from 'react';
+import { KeyboardEvent, PointerEvent, memo, useEffect, useState } from 'react';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
 import {
@@ -10,6 +10,9 @@ import {
     EventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
+import { ChecklistEditor, ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
+import { ChecklistPreview } from '@/app/(board)/_components/checklist/ChecklistPreview';
+import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 
 type TimelineEventItemProps = {
     event: TimelineEvent;
@@ -22,6 +25,9 @@ type TimelineEventItemProps = {
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onClearGhost: () => void;
+    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+    onChecklistEditingChange: (cardId: string, editing: boolean) => void;
+    editingCardId: string | null;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -35,6 +41,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     handleResizeEnd,
     onToggleCheck,
     onClearGhost,
+    onChecklistCommit,
+    onChecklistEditingChange,
+    editingCardId,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -46,6 +55,13 @@ export const TimelineEventItem = memo(function TimelineEventItem({
 
     const top = minuteToPixels(start);
     const height = Math.max(minuteToPixels(duration), 32);
+    const [draftChecklist, setDraftChecklist] = useState<Checklist>(normalizeChecklist(event.checklist ?? EMPTY_CHECKLIST));
+
+    useEffect(() => {
+        setDraftChecklist(normalizeChecklist(event.checklist ?? EMPTY_CHECKLIST));
+    }, [event.checklist]);
+
+    const isEditing = editingCardId === event.card_id;
 
     return (
         <DraggableCard
@@ -53,6 +69,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
+            disabled={isEditing}
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -81,6 +98,30 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     className="w-full h-full pt-5"
                 >
+                    <div className="mt-1">
+                        {isEditing ? (
+                            <ChecklistEditor
+                                value={draftChecklist}
+                                onChange={(next) => setDraftChecklist(next)}
+                                onCommit={async (next, trigger) => {
+                                    const normalized = normalizeChecklist(next);
+                                    await onChecklistCommit(event.card_id, normalized, trigger);
+                                }}
+                                onEditingChange={(editing) => onChecklistEditingChange(event.card_id, editing)}
+                                autoSaveDelayMs={1500}
+                                placeholder="- [ ] タスクを書く"
+                            />
+                        ) : (
+                            <ChecklistPreview
+                                checklist={draftChecklist}
+                                maxLines={3}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onChecklistEditingChange(event.card_id, true);
+                                }}
+                            />
+                        )}
+                    </div>
                     <div
                         className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
                         onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}

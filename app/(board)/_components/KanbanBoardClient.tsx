@@ -62,6 +62,7 @@ import NotificationsBell from "./NotificationsBell";
 import NotificationSettings from "./NotificationSettings";
 import ProfileSettings from "./ProfileSettings";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
+import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText, type Checklist } from "@/lib/checklist";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -95,6 +96,8 @@ type BoardFetchResult = {
 // LocalStorage helper - Supabase同期のキャッシュとして使用
 const STORAGE_KEY = "kanban_board_data";
 
+const getChecklistText = (card: Pick<Card, 'checklist'>) => flattenChecklistText(card.checklist ?? null);
+
 const loadFromStorage = (): BoardData => {
   if (typeof window === "undefined") return { lists: [], cards: [] };
   const data = localStorage.getItem(STORAGE_KEY);
@@ -113,6 +116,7 @@ const loadFromStorage = (): BoardData => {
         due_end: card.due_end ?? null,
         due_bucket: (card.due_bucket ?? null) as DueBucket | null,
         due_bucket_position: typeof card.due_bucket_position === 'number' ? card.due_bucket_position : null,
+        checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST),
       })) as Card[]
       : [];
 
@@ -503,7 +507,8 @@ function CardVisual({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isChecked = Boolean(card.checked);
   const checkboxEnabled = interactiveCheckbox && typeof onToggleChecked === 'function';
-  const showDescription = Boolean(card.description);
+  const checklistText = getChecklistText(card);
+  const showDescription = Boolean(checklistText);
   const showAssignee = Boolean(assigneeName);
   const showBadges = Boolean(card.tags && card.tags.length > 0) || Boolean(card.due_date);
   const hasLowerContent = showDescription || showAssignee || showBadges;
@@ -597,7 +602,7 @@ function CardVisual({
 
       {showDescription ? (
         <p className={`${showAssignee || showBadges ? 'mb-1' : 'mb-0'} line-clamp-2 text-xs leading-snug text-slate-500 dark:text-gray-400`}>
-          {card.description}
+          {checklistText || 'No checklist'}
         </p>
       ) : null}
 
@@ -1326,7 +1331,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         list_id: card.list_id,
         position: card.position,
         title: card.title,
-        description: card.description,
+        checklist: card.checklist ?? EMPTY_CHECKLIST,
         tags: card.tags,
         due_date: card.due_date,
         due_start: card.due_start,
@@ -1370,7 +1375,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     try {
       const payload = {
         title: card.title,
-        description: card.description,
+        checklist: card.checklist ?? EMPTY_CHECKLIST,
         list_id: card.list_id,
         position: card.position,
         tags: card.tags,
@@ -1540,7 +1545,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const tempCard: Card = {
       id: uuidv4(),
       title,
-      description: "",
+      checklist: EMPTY_CHECKLIST,
       list_id: listId,
       board_id: currentBoardId,
       position,
@@ -1584,7 +1589,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           body: JSON.stringify({
             id: tempCard.id,
             title,
-            description: "",
+            checklist: tempCard.checklist ?? EMPTY_CHECKLIST,
             list_id: listId,
             position,
             tags: tempCard.tags,
@@ -1592,6 +1597,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             due_start: tempCard.due_start,
             due_end: tempCard.due_end,
             due_bucket: tempCard.due_bucket,
+            due_bucket_position: tempCard.due_bucket_position,
             priority: tempCard.priority,
             checked: tempCard.checked,
             assignee_id: tempCard.assignee_id,
@@ -1979,7 +1985,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const handleSaveCard = async (
     id: string,
     title: string,
-    description: string,
+    checklist: Checklist,
     tags?: string[],
     due_date?: string | null,
     priority?: Priority,
@@ -1990,7 +1996,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     due_bucket?: DueBucket | null,
     due_bucket_position?: number | null,
   ) => {
-    console.log('[handleSaveCard] Starting...', { id, title, description, assigneeIds });
+    console.log('[handleSaveCard] Starting...', { id, title, checklist, assigneeIds });
 
     try {
       const slug = slugify(title);
@@ -2008,7 +2014,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           return {
             ...card,
             title,
-            description,
+            checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
             tags: tags || [],
             due_date: due_date || null,
             due_start: nextStart,
@@ -2139,7 +2145,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     const tempCard: Card = {
       id: uuidv4(),
       title: '',
-      description: '',
+      checklist: EMPTY_CHECKLIST,
       list_id: sourceCard.list_id,
       board_id: currentBoardId,
       position: newPosition,
@@ -2188,7 +2194,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         body: JSON.stringify({
           id: tempCard.id,
           title: tempCard.title,
-          description: tempCard.description,
+          checklist: tempCard.checklist ?? EMPTY_CHECKLIST,
           list_id: tempCard.list_id,
           position: tempCard.position,
           tags: tempCard.tags,
@@ -2196,6 +2202,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
           due_start: tempCard.due_start,
           due_end: tempCard.due_end,
           due_bucket: tempCard.due_bucket,
+          due_bucket_position: tempCard.due_bucket_position,
           priority: tempCard.priority,
           checked: tempCard.checked,
           assignee_id: tempCard.assignee_id,

@@ -16,6 +16,8 @@ import {
   type TimelineDay,
   type TimelineEvent,
 } from "@/app/(board)/_utils/timeline-helpers";
+import type { Checklist } from "@/lib/checklist";
+import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -43,6 +45,9 @@ type DesktopTimelineViewProps = {
   handleResizeMove: (e: React.PointerEvent) => void;
   handleResizeEnd: (e: React.PointerEvent) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
+  editingCardId: string | null;
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -76,6 +81,9 @@ export function DesktopTimelineView({
   handleResizeMove,
   handleResizeEnd,
   onToggleCheck,
+  onChecklistCommit,
+  onChecklistEditingChange,
+  editingCardId,
   sensors,
   handleDragStart,
   handleDragMove,
@@ -188,6 +196,9 @@ export function DesktopTimelineView({
               status={status}
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
+              onChecklistCommit={onChecklistCommit}
+              onChecklistEditingChange={onChecklistEditingChange}
+              editingCardId={editingCardId}
               bucketIndicator={bucketIndicator}
             />
 
@@ -207,6 +218,9 @@ export function DesktopTimelineView({
               handleResizeMove={handleResizeMove}
               handleResizeEnd={handleResizeEnd}
               onToggleCheck={onToggleCheck}
+              onChecklistCommit={onChecklistCommit}
+              onChecklistEditingChange={onChecklistEditingChange}
+              editingCardId={editingCardId}
               shrinkDaysToHalf
             />
           </div>

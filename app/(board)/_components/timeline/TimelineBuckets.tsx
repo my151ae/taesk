@@ -6,8 +6,9 @@ import {
     buildAbMeta,
 } from '@/app/(board)/_utils/timeline-helpers';
 import { BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
-import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineBucketCard } from './TimelineBucketCard';
+import { Checklist } from '@/lib/checklist';
+import { ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
 
 type TimelineBucketsProps = {
     days: TimelineDay[];
@@ -16,6 +17,9 @@ type TimelineBucketsProps = {
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
+    onChecklistEditingChange: (cardId: string, editing: boolean) => void;
+    editingCardId: string | null;
     bucketIndicator: BucketIndicator | null;
     axisWidth?: number;
 };
@@ -37,6 +41,9 @@ export default function TimelineBuckets({
     status,
     openCardModal,
     onToggleCheck,
+    onChecklistCommit,
+    onChecklistEditingChange,
+    editingCardId,
     bucketIndicator,
     axisWidth = 80,
 }: TimelineBucketsProps) {
@@ -75,6 +82,9 @@ export default function TimelineBuckets({
                                                     bucketKey={section.bucket}
                                                     openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
                                                     onToggleCheck={onToggleCheck}
+                                                    onChecklistCommit={onChecklistCommit}
+                                                    onChecklistEditingChange={onChecklistEditingChange}
+                                                    editingCardId={editingCardId}
                                                     showFallbackBottomLine={
                                                         bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
                                                     }

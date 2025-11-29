@@ -1,6 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { createServerClient } from '@supabase/ssr';
 import { type PostgrestError } from '@supabase/supabase-js';
+import type { Checklist } from './checklist';
+import { normalizeChecklist } from './checklist';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -111,7 +113,7 @@ export type DueBucket = 'a' | 'b';
 export interface Card {
   id: string;
   title: string;
-  description: string;
+  checklist: Checklist | null;
   list_id: string;
   board_id: string;
   position: number;
@@ -143,6 +145,7 @@ export function sanitizeCardForUpload(card: Card, includeAssigneeId: boolean): C
   const { assignee_id, ...rest } = card;
   const payload: CardUpsertPayload = {
     ...rest,
+    checklist: normalizeChecklist(card.checklist ?? null),
     assigned_to: card.assigned_to ?? null,
   };
 
