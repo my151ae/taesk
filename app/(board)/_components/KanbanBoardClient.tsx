@@ -1244,7 +1244,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       abortController.abort('Component unmounted or dependencies changed');
       isFetchingRef.current = false;
     };
-  }, [user, currentBoardId, boards]);
+  }, [user, currentBoardId, boards, initialBoard?.id]);
 
 
   // Close board menu when clicking outside
@@ -1320,7 +1320,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     navigate(nextPath, { scroll: false });
   };
 
-  const upsertCardsWithAssigneeFallback = async (cardsToSync: Card[]): Promise<Error | null> => {
+  const upsertCardsWithAssigneeFallback = useCallback(async (cardsToSync: Card[]): Promise<Error | null> => {
     if (cardsToSync.length === 0 || !currentBoardId) {
       return null;
     }
@@ -1365,7 +1365,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       console.error('[cards] Failed to sync cards:', error);
       return error as Error;
     }
-  };
+  }, [currentBoardId]);
 
   const updateCardDetailsOnServer = useCallback(async (card: Card): Promise<Error | null> => {
     if (!currentBoardId) {

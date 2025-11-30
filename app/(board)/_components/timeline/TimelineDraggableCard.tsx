@@ -17,15 +17,11 @@ export const DraggableCard = ({
     attachListenersToChild?: boolean;
     disabled?: boolean;
 }) => {
-    if (disabled) {
-        return (
-            <div ref={extraNodeRef ?? undefined}>
-                {children}
-            </div>
-        );
-    }
-
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id, data: { ...data, id } });
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id,
+        data: { ...data, id },
+        disabled,
+    });
     const combinedRef = useCallback(
         (node: HTMLElement | null) => {
             setNodeRef(node);
@@ -47,9 +43,9 @@ export const DraggableCard = ({
                 ...(child.props.style ?? {}),
                 transform: CSS.Translate.toString(transform),
             },
-            className: [child.props.className, isDragging ? 'z-30 opacity-80' : undefined].filter(Boolean).join(' '),
-            ...listeners,
-            ...attributes,
+            className: [child.props.className, !disabled && isDragging ? 'z-30 opacity-80' : undefined].filter(Boolean).join(' '),
+            ...(disabled ? {} : listeners),
+            ...(disabled ? {} : attributes),
         });
     }
 
@@ -57,9 +53,9 @@ export const DraggableCard = ({
         <div
             ref={combinedRef}
             style={{ transform: CSS.Translate.toString(transform) }}
-            className={isDragging ? 'z-30 opacity-80' : undefined}
-            {...listeners}
-            {...attributes}
+            className={!disabled && isDragging ? 'z-30 opacity-80' : undefined}
+            {...(disabled ? {} : listeners)}
+            {...(disabled ? {} : attributes)}
         >
             {children}
         </div>

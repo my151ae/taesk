@@ -694,7 +694,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
       }
     },
-    [modalCard, closeCardModal]
+    [modalCard, closeCardModal, setCardModalError]
   );
 
   const handleCardModalDelete = useCallback(
@@ -733,7 +733,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         closeCardModal();
       }
     },
-    [modalCard, closeCardModal]
+    [modalCard, closeCardModal, setCardModalError]
   );
 
   const handleCardModalMove = useCallback((cardId: string, targetBoardId: string) => {
@@ -1095,7 +1095,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         });
       }
     }
-  }, [dataMode, initialBoard.id, fetchTimeline, setData]);
+  }, [dataMode, initialBoard.id, setData]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const payload: Partial<Card> = {

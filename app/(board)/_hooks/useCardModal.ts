@@ -198,7 +198,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         return () => {
             cancelled = true;
         };
-    }, [activeCardId, cardIdFromUrl, cardModalStatus, isModalClosing]);
+    }, [activeCardId, cardIdFromUrl, cardModalStatus, isModalClosing, loadComments]);
 
     // Load Board Members
     useEffect(() => {
