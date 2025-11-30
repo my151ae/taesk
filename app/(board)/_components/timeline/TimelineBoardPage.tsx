@@ -694,7 +694,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
       }
     },
-    [modalCard, closeCardModal, setCardModalError]
+    [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData]
   );
 
   const handleCardModalDelete = useCallback(
@@ -924,11 +924,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (dataMode !== 'api') return;
     try {
       await applyPatch(cardId, { checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST) });
+      setModalCardOverride((current) => current && current.id === cardId ? { ...current, checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST) } as Card : current);
     } catch (error) {
       console.error('[timeline] checklist save failed', error);
       setErrorMessage('Failed to save checklist');
     }
-  }, [applyChecklistLocally, applyPatch, dataMode]);
+  }, [applyChecklistLocally, applyPatch, dataMode, setModalCardOverride]);
 
   const handleChecklistEditingChange = useCallback((cardId: string, isEditing: boolean) => {
     setEditingCardId((current) => {

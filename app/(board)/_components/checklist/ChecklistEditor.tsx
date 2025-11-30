@@ -265,7 +265,6 @@ export function ChecklistEditor({
       const reset = ensureLines(initialValueRef.current);
       setLines(reset);
       setDirty(false);
-      emitChange(reset);
       onCancel?.();
       return;
     }
