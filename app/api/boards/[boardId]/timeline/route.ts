@@ -103,11 +103,13 @@ export async function GET(
       .eq('board_id', boardId);
     fetchError = fallback.error;
     cards =
-      fallback.data?.map((card) => ({
-        ...card,
-        checklist: EMPTY_CHECKLIST,
-        due_bucket_position: null,
-      })) ?? null;
+      fallback.data
+        ? (fallback.data as any[]).map((card) => ({
+          ...card,
+          checklist: EMPTY_CHECKLIST,
+          due_bucket_position: null,
+        }))
+        : null;
   } else {
     fetchError = initial.error;
     cards = initial.data;
