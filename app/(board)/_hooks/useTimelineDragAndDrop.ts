@@ -263,9 +263,12 @@ export function useTimelineDragAndDrop({
     const [isOverABList, setIsOverABList] = useState(false);
 
     const resolvePointerClientY = (event: DragMoveEvent | DragEndEvent): number | null => {
-        const activator = event.activatorEvent;
-        if (activator && 'clientY' in activator && typeof (activator as PointerEvent).clientY === 'number') {
-            return (activator as PointerEvent).clientY;
+        const activator = event.activatorEvent as unknown;
+        if (activator && typeof activator === 'object' && 'clientY' in activator) {
+            const val = (activator as { clientY?: unknown }).clientY;
+            if (typeof val === 'number') {
+                return val;
+            }
         }
 
         const activeRect = event.active.rect.current;

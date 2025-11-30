@@ -6,7 +6,7 @@ type ChecklistPreviewProps = {
   checklist: Checklist | null;
   maxLines?: number;
   className?: string;
-  onClick?: (event: MouseEvent<HTMLDivElement>) => void;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
   onLineFocusRequest?: (lineId: string, caretPos?: number) => void;
 };
 
