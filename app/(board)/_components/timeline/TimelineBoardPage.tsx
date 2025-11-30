@@ -843,7 +843,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         // fetchTimeline(); // Realtime should handle this
       } catch (error) {
         console.error('[timeline] update error', error);
-        setErrorMessage('Failed to update card');
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to update card');
       }
     },
     [dataMode, initialBoard.id]

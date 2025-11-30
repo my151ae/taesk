@@ -119,6 +119,19 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                                     e.stopPropagation();
                                     onChecklistEditingChange(event.card_id, true);
                                 }}
+                                onLineFocusRequest={(lineId, caretPos) => {
+                                    onChecklistEditingChange(event.card_id, true);
+                                    setTimeout(() => {
+                                        const input = document.querySelector<HTMLInputElement>(`[data-checklist-line=\"${lineId}\"]`);
+                                        if (input) {
+                                            input.focus();
+                                            if (typeof caretPos === 'number') {
+                                                const pos = Math.min(Math.max(caretPos, 0), input.value.length);
+                                                input.selectionStart = input.selectionEnd = pos;
+                                            }
+                                        }
+                                    }, 0);
+                                }}
                             />
                         )}
                     </div>

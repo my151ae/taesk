@@ -49,6 +49,20 @@ const ensureLines = (checklist: Checklist | null): ChecklistLine[] => {
   return normalized.lines;
 };
 
+const areLinesEqual = (a: ChecklistLine[], b: ChecklistLine[]) => {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i];
+    const right = b[i];
+    if (!left || !right) return false;
+    if (left.id !== right.id || left.level !== right.level || left.checked !== right.checked || left.text !== right.text) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export function ChecklistEditor({
   value,
   onCommit,
@@ -71,18 +85,17 @@ export function ChecklistEditor({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lineRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const initialValueRef = useRef<Checklist>(normalizedValue);
+  const hasAutoFocusedRef = useRef(false);
+  const onChangeRef = useRef<ChecklistEditorProps['onChange']>();
+  const lastEmittedRef = useRef<string>('');
 
   useEffect(() => {
     initialValueRef.current = normalizedValue;
-    if (!dirty && !isFocused) {
-      setLines(ensureLines(normalizedValue));
-    }
+    if (dirty || isFocused) return;
+    if (!normalizedValue.lines.length) return; // 空の場合は既存プレースホルダーを維持
+    const nextLines = ensureLines(normalizedValue);
+    setLines((prev) => (areLinesEqual(prev, nextLines) ? prev : nextLines));
   }, [normalizedValue, dirty, isFocused]);
-
-  const emitChange = useCallback((nextLines: ChecklistLine[]) => {
-    const next = normalizeChecklist({ version: CHECKLIST_VERSION, lines: nextLines });
-    onChange?.(next);
-  }, [onChange]);
 
   const clampText = (text: string) => text.slice(0, MAX_CHECKLIST_TEXT_LENGTH);
 
@@ -91,7 +104,6 @@ export function ChecklistEditor({
       const next = prev.map((line) => line.id === id ? { ...line, ...patch, text: clampText(patch.text ?? line.text) } : line);
       setDirty(true);
       setError(null);
-      emitChange(next);
       return next;
     });
   };
@@ -103,7 +115,6 @@ export function ChecklistEditor({
       const next = [...prev.slice(0, index), nextLine, ...prev.slice(index)];
       setDirty(true);
       setError(null);
-      emitChange(next);
       return next;
     });
   };
@@ -112,11 +123,9 @@ export function ChecklistEditor({
     setLines((prev) => {
       if (prev.length === 1) {
         const only = { ...prev[0], text: '', checked: false };
-        emitChange([only]);
         return [only];
       }
       const next = [...prev.slice(0, index), ...prev.slice(index + 1)];
-      emitChange(next);
       setDirty(true);
       setError(null);
       return next;
@@ -133,6 +142,30 @@ export function ChecklistEditor({
       }
     });
   };
+
+  // 初期表示で最初の行にフォーカスを当て、クリック後すぐ入力できるようにする
+  useEffect(() => {
+    if (hasAutoFocusedRef.current) return;
+    const firstLineId = lines[0]?.id;
+    if (firstLineId) {
+      focusLine(firstLineId);
+      hasAutoFocusedRef.current = true;
+    }
+  }, [lines]);
+
+  // 親への同期はレンダー後に行い、セットステート警告を回避する
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!onChangeRef.current) return;
+    const next = normalizeChecklist({ version: CHECKLIST_VERSION, lines });
+    const serialized = JSON.stringify(next.lines);
+    if (serialized === lastEmittedRef.current) return;
+    lastEmittedRef.current = serialized;
+    onChangeRef.current(next);
+  }, [lines]);
 
   const commit = useCallback(async (trigger: ChecklistSaveTrigger) => {
     if (!dirty && trigger === 'auto') return;
@@ -191,6 +224,42 @@ export function ChecklistEditor({
       commit('shortcut');
       return;
     }
+    const target = lineRefs.current[line.id];
+    const caret = target?.selectionStart ?? 0;
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const prevLine = lines[index - 1];
+      if (prevLine) {
+        const pos = Math.min(caret, prevLine.text.length);
+        focusLine(prevLine.id, pos);
+      }
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const nextLine = lines[index + 1];
+      if (nextLine) {
+        const pos = Math.min(caret, nextLine.text.length);
+        focusLine(nextLine.id, pos);
+      }
+      return;
+    }
+    if (event.key === 'ArrowLeft' && caret === 0) {
+      event.preventDefault();
+      const prevLine = lines[index - 1];
+      if (prevLine) {
+        focusLine(prevLine.id, prevLine.text.length);
+      }
+      return;
+    }
+    if (event.key === 'ArrowRight' && caret === line.text.length) {
+      event.preventDefault();
+      const nextLine = lines[index + 1];
+      if (nextLine) {
+        focusLine(nextLine.id, 0);
+      }
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       const reset = ensureLines(initialValueRef.current);
@@ -208,9 +277,32 @@ export function ChecklistEditor({
     }
     if (event.key === 'Enter') {
       event.preventDefault();
-      const base: ChecklistLine = { id: createLineId(), level: line.level, checked: false, text: '' };
-      insertLine(index + 1, base);
-      focusLine(base.id, 0);
+      let newLineId: string | null = null;
+      setLines((prev) => {
+        if (prev.length >= MAX_CHECKLIST_LINES) return prev;
+        const current = prev[index];
+        if (!current) return prev;
+        const target = lineRefs.current[line.id];
+        const start = target?.selectionStart ?? current.text.length;
+        const end = target?.selectionEnd ?? start;
+        const before = clampText(current.text.slice(0, start));
+        const after = clampText(current.text.slice(end));
+        newLineId = createLineId();
+        const next = [...prev];
+        next[index] = { ...current, text: before };
+        next.splice(index + 1, 0, {
+          id: newLineId,
+          level: current.level,
+          checked: current.checked,
+          text: after,
+        });
+        setDirty(true);
+        setError(null);
+        return next;
+      });
+      if (newLineId) {
+        focusLine(newLineId, 0);
+      }
       return;
     }
     if (event.key === 'Backspace') {
@@ -233,16 +325,16 @@ export function ChecklistEditor({
       onFocus={handleContainerFocus}
       onBlur={handleContainerBlur}
     >
-      <div className="space-y-2">
+      <div className="space-y-1">
         {lines.map((line, index) => (
           <div
             key={line.id}
-            className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1 hover:border-slate-200 focus-within:border-sky-300 focus-within:ring-1 focus-within:ring-sky-200"
-            style={{ paddingLeft: Math.min(line.level, 8) * 16 + 8 }}
+            className="flex items-center gap-1.5 rounded px-1 py-0.5"
+            style={{ paddingLeft: Math.min(line.level, 8) * 20 }}
           >
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 cursor-pointer"
+              className="h-4 w-4 cursor-pointer"
               checked={line.checked}
               onChange={(e) => updateLine(line.id, { checked: e.target.checked })}
               onPointerDown={(e) => e.stopPropagation()}
@@ -252,12 +344,14 @@ export function ChecklistEditor({
               type="text"
               value={line.text}
               maxLength={MAX_CHECKLIST_TEXT_LENGTH}
-              placeholder={index === 0 ? (placeholder ?? 'タスクを入力') : ''}
-              className="flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+              placeholder={index === 0 ? (placeholder ?? 'タスクを書く') : ''}
+              className="flex-1 bg-transparent text-xs leading-tight text-slate-800 placeholder:text-slate-400 focus:outline-none"
               onChange={(e) => updateLine(line.id, { text: e.target.value })}
               onKeyDown={(e) => handleLineKeyDown(e, index, line)}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
+              autoFocus={index === 0}
+              data-checklist-line={line.id}
               data-testid="checklist-editor"
             />
           </div>

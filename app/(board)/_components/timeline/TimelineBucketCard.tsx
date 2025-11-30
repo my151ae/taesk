@@ -123,6 +123,19 @@ export const TimelineBucketCard = ({
                                     e.stopPropagation();
                                     onChecklistEditingChange(item.card_id, true);
                                 }}
+                                onLineFocusRequest={(lineId, caretPos) => {
+                                    onChecklistEditingChange(item.card_id, true);
+                                    setTimeout(() => {
+                                        const input = document.querySelector<HTMLInputElement>(`[data-checklist-line=\"${lineId}\"]`);
+                                        if (input) {
+                                            input.focus();
+                                            if (typeof caretPos === 'number') {
+                                                const pos = Math.min(Math.max(caretPos, 0), input.value.length);
+                                                input.selectionStart = input.selectionEnd = pos;
+                                            }
+                                        }
+                                    }, 0);
+                                }}
                             />
                         )}
                     </div>

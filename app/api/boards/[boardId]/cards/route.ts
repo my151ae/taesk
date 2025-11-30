@@ -202,9 +202,11 @@ export async function POST(
     }
 
     if (missingChecklistColumn && 'checklist' in payloadToSend) {
-      const fallbackPayload = { ...payloadToSend };
-      delete fallbackPayload.checklist;
-      ({ data: createdCard, error } = await performInsert(fallbackPayload));
+      console.error('[cards POST] checklist column missing. Please apply migration 20251129090000_add_checklist_to_cards.sql');
+      return NextResponse.json(
+        { error: { code: 'MISSING_CHECKLIST_COLUMN', message: 'Checklist column is missing. Apply migration 20251129090000_add_checklist_to_cards.sql' } },
+        { status: 500 }
+      );
     }
 
     if (error) {

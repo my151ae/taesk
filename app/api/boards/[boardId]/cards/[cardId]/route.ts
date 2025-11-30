@@ -84,7 +84,8 @@ export async function PATCH(
         .eq('id', cardId)
         .eq('board_id', boardId)
         .select()
-        .single();
+        .limit(1)
+        .maybeSingle();
 
     const normalizedPayload = { ...parsed.data };
     if (
@@ -128,9 +129,11 @@ export async function PATCH(
     }
 
     if (missingChecklistColumn && 'checklist' in normalizedPayload) {
-      const fallbackPayload = { ...normalizedPayload };
-      delete fallbackPayload.checklist;
-      ({ data: updatedCard, error } = await performUpdate(fallbackPayload));
+      console.error('[cards PATCH] checklist column missing. Please apply migration 20251129090000_add_checklist_to_cards.sql');
+      return NextResponse.json(
+        { error: { code: 'MISSING_CHECKLIST_COLUMN', message: 'Checklist column is missing. Apply migration 20251129090000_add_checklist_to_cards.sql' } },
+        { status: 500 }
+      );
     }
 
     if (error) {
@@ -141,27 +144,44 @@ export async function PATCH(
       );
     }
 
-    if (!updatedCard) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Card not found' } },
-        { status: 404 }
-      );
+    let ensuredCard = updatedCard ?? null;
+
+    // If Supabase didn't return the row (e.g., due to returning settings), refetch once
+    if (!ensuredCard) {
+      const { data: refetched, error: refetchError } = await supabase
+        .from('cards')
+        .select('*')
+        .eq('id', cardId)
+        .eq('board_id', boardId)
+        .maybeSingle();
+
+      if (refetchError) {
+        console.error('[cards PATCH] refetch after update failed', refetchError);
+        return NextResponse.json(
+          { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+          { status: 404 }
+        );
+      }
+
+      ensuredCard = refetched ?? null;
     }
 
-    // Log activity
-    const action = parsed.data.list_id ? 'moved' : 'updated';
-    supabase.from('activity_logs').insert({
-      board_id: boardId,
-      user_id: user.id,
-      action,
-      entity_type: 'card',
-      entity_id: cardId,
-      entity_title: updatedCard.title,
-    }).then(({ error: logError }) => {
-      if (logError) console.error('Activity log failed:', logError);
-    });
+    // Log activity (only if we have a card to reference)
+    if (ensuredCard) {
+      const action = parsed.data.list_id ? 'moved' : 'updated';
+      supabase.from('activity_logs').insert({
+        board_id: boardId,
+        user_id: user.id,
+        action,
+        entity_type: 'card',
+        entity_id: cardId,
+        entity_title: ensuredCard?.title ?? parsed.data.title ?? null,
+      }).then(({ error: logError }) => {
+        if (logError) console.error('Activity log failed:', logError);
+      });
+    }
 
-    return NextResponse.json({ card: updatedCard }, { status: 200 });
+    return NextResponse.json({ card: ensuredCard }, { status: 200 });
   } catch (error) {
     console.error('Unexpected error in PATCH /api/boards/[boardId]/cards/[cardId]:', error);
     return NextResponse.json(
