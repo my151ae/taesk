@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import type { MouseEvent } from "react";
-import { Checklist, normalizeChecklist } from "@/lib/checklist";
+import { Checklist, ChecklistLine, normalizeChecklist } from "@/lib/checklist";
 
 type ChecklistPreviewProps = {
   checklist: Checklist | null;
@@ -13,8 +13,8 @@ type ChecklistPreviewProps = {
 export function ChecklistPreview({ checklist, maxLines = 3, className, onClick, onLineFocusRequest }: ChecklistPreviewProps) {
   const normalized = normalizeChecklist(checklist ?? null);
   const isEmpty = normalized.lines.length === 0;
-  const lines = isEmpty
-    ? [{ id: '__placeholder', checked: false, text: '' }]
+  const lines: ChecklistLine[] = isEmpty
+    ? [{ id: '__placeholder', level: 0, checked: false, text: '' }]
     : normalized.lines.slice(0, maxLines);
   const truncated = !isEmpty && normalized.lines.length > lines.length;
 
