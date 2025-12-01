@@ -15,6 +15,7 @@ import { slugify } from "@/lib/card-utils";
 import ShareDialog from "@/app/(board)/_components/ShareDialog";
 import NotificationSettings from "@/app/(board)/_components/NotificationSettings";
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
+import BoardSettings from "@/app/(board)/_components/BoardSettings";
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 import { DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
@@ -268,6 +269,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [fetchProfile]);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showBoardSettings, setShowBoardSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const {
     searchQuery,
@@ -455,7 +457,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       traceRef.current?.mark('fetch:start');
       const params = new URLSearchParams({
         start: String(effectiveStart),
-        range: String(DAY_WINDOW_RANGE),
+        range: String(initialBoard.day_range ?? DAY_WINDOW_RANGE),
       });
       const response = await fetch(`/api/boards/${initialBoard.id}/timeline?${params.toString()}`, {
         cache: 'no-store',
@@ -551,11 +553,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             normalizedDueDate = parsed.toISOString();
           }
         }
-      const payload: Record<string, unknown> = {
-        title,
-        checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
-        tags,
-        due_date: normalizedDueDate,
+        const payload: Record<string, unknown> = {
+          title,
+          checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
+          tags,
+          due_date: normalizedDueDate,
           due_start,
           due_end,
           due_bucket: normalizeDueBucket(due_bucket),
@@ -1212,6 +1214,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setShowShareDialog={setShowShareDialog}
             setShowNotificationSettings={setShowNotificationSettings}
             setShowProfileSettings={setShowProfileSettings}
+            setShowBoardSettings={setShowBoardSettings}
             profile={profile}
             user={user}
             signOut={signOut}
@@ -1326,6 +1329,58 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 </button>
               </div>
               <ProfileSettings onProfileUpdated={fetchProfile} />
+            </div>
+          </div>
+        )
+      }
+      {
+        showBoardSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowBoardSettings(false)}>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Board Settings</h2>
+                <button
+                  onClick={() => setShowBoardSettings(false)}
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <BoardSettings
+                board={initialBoard}
+                onUpdate={async (updates) => {
+                  try {
+                    const response = await fetch(`/api/boards/${initialBoard.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(updates),
+                    });
+                    if (!response.ok) throw new Error('Failed to update board');
+                    const { board: updatedBoard } = await response.json();
+
+                    // Update initialBoard with new values
+                    Object.assign(initialBoard, updatedBoard);
+
+                    // Update availableBoards to reflect the change in Switch Board menu
+                    setAvailableBoards(prev =>
+                      prev.map(b => b.id === updatedBoard.id ? updatedBoard : b)
+                    );
+
+                    // Close settings dialog
+                    setShowBoardSettings(false);
+
+                    // Reset active day index to 0
+                    setActiveDayIndex(0);
+
+                    // Refetch timeline with new day_range
+                    await fetchTimeline();
+                  } catch (error) {
+                    console.error('Failed to update board', error);
+                    alert('Failed to update board');
+                  }
+                }}
+              />
             </div>
           </div>
         )

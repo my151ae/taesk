@@ -103,6 +103,7 @@ export interface Board {
   short_id?: string | null;
   id_short?: number | null;
   slug?: string | null;
+  day_range?: number;
   created_at: string;
   updated_at: string;
 }

@@ -30,6 +30,7 @@ type TimelineHeaderProps = {
     selectedPriority: 'all' | Priority;
     setSelectedPriority: (priority: 'all' | Priority) => void;
     availableTags: string[];
+    setShowBoardSettings: (show: boolean) => void;
 };
 
 export default function TimelineHeader({
@@ -55,6 +56,7 @@ export default function TimelineHeader({
     selectedPriority,
     setSelectedPriority,
     availableTags,
+    setShowBoardSettings,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -157,7 +159,9 @@ export default function TimelineHeader({
                                                 )}
                                             >
                                                 <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
-                                                <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {b.description || 'Standard board'} • {b.day_range ?? 2} days
+                                                </p>
                                             </button>
                                             <button
                                                 onClick={(e) => {
@@ -219,6 +223,14 @@ export default function TimelineHeader({
                             data-testid="share-button"
                         >
                             Share
+                        </button>
+                    </div>
+                    <div className="hidden md:block">
+                        <button
+                            onClick={() => setShowBoardSettings(true)}
+                            className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        >
+                            Settings
                         </button>
                     </div>
                     <NotificationsBell />
@@ -325,6 +337,15 @@ export default function TimelineHeader({
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                                     >
                                         <span>🔔</span> Notifications
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowBoardSettings(true);
+                                            setShowMobileMenu(false);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        <span>⚙️</span> Board Settings
                                     </button>
                                 </div>
                             </div>

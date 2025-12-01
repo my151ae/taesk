@@ -92,7 +92,9 @@ export function DesktopTimelineView({
   isOverABList,
   floatingLayerTop,
 }: DesktopTimelineViewProps) {
-  const visibleDays = days.slice(activeDayIndex, activeDayIndex + 2);
+  // Calculate how many days to show (typically 1-3 based on board settings)
+  const dayCount = Math.min(days.length - activeDayIndex, days.length);
+  const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
 
   return (
     <DndContext
@@ -116,7 +118,7 @@ export function DesktopTimelineView({
           ref={timelineHeaderRef}
           className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
           style={{
-            gridTemplateColumns: "80px repeat(2, minmax(0, 1fr))",
+            gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
           }}
         >
           <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
@@ -148,14 +150,14 @@ export function DesktopTimelineView({
                   </svg>
                 </button>
               )}
-              {index === 1 && <div className="w-7" />}
+              {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-7" />}
 
               <div className="flex-1">
                 <p className="text-slate-800">{day.label}</p>
                 <p className="text-[10px] text-slate-400">{day.isoDate}</p>
               </div>
 
-              {index === 1 && (
+              {index === (visibleDays.length - 1) && (
                 <button
                   onClick={(e) => {
                     e.preventDefault();

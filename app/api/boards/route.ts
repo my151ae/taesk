@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     const { data: boards, error } = await supabase
       .from('boards')
-      .select('id, name, description, short_id, id_short, slug, is_test_board, created_at, updated_at')
+      .select('id, name, description, short_id, id_short, slug, is_test_board, day_range, created_at, updated_at')
       .in('id', boardIds)
       .order('created_at', { ascending: false });
 

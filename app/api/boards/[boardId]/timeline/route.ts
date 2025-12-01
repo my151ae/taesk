@@ -77,7 +77,7 @@ export async function GET(
   const parsedStart = Number.parseInt(searchParams.get('start') ?? '0', 10);
   const parsedRange = Number.parseInt(searchParams.get('range') ?? String(TIMELINE_DAY_RANGE), 10);
   const startOffset = Number.isFinite(parsedStart) ? parsedStart : 0;
-  const range = Math.max(2, Number.isFinite(parsedRange) ? parsedRange : TIMELINE_DAY_RANGE);
+  const range = Math.max(1, Number.isFinite(parsedRange) ? parsedRange : TIMELINE_DAY_RANGE);
 
   const now = new Date();
   const days = buildDays(now, startOffset, range);
