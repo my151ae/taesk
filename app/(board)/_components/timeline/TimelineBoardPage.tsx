@@ -1203,7 +1203,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   return (
     <>
       <div className="min-h-screen bg-[#f4f5f7]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 pt-6">
           <TimelineHeader
             board={initialBoard}
             modalBoards={modalBoards}

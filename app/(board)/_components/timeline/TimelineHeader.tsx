@@ -117,7 +117,7 @@ export default function TimelineHeader({
 
     return (
         <>
-            <header className="space-y-3">
+            <header className="space-y-6">
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Burger Menu Button (Mobile Only) */}
                     <button
@@ -418,7 +418,7 @@ export default function TimelineHeader({
             <section className="hidden md:block rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
                 <button
                     onClick={() => setShowFilters((prev) => !prev)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-3xl"
                 >
                     <span className="flex items-center gap-2">
                         🔍 Filters
@@ -432,7 +432,7 @@ export default function TimelineHeader({
                 </button>
                 {
                     showFilters && (
-                        <div className="space-y-4 border-t border-slate-100 px-4 py-4 text-sm text-slate-700">
+                        <div className="space-y-3 border-t border-slate-100 px-4 py-2 mx-2 text-sm text-slate-700">
                             <div className="flex flex-col gap-3 sm:flex-row">
                                 <div className="flex-1">
                                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -443,7 +443,7 @@ export default function TimelineHeader({
                                         value={searchQuery}
                                         onChange={(event) => setSearchQuery(event.target.value)}
                                         placeholder="カード名やタグ"
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                                     />
                                 </div>
                                 <div>
@@ -453,7 +453,7 @@ export default function TimelineHeader({
                                     <select
                                         value={selectedPriority}
                                         onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
-                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                        className="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                                     >
                                         <option value="all">すべて</option>
                                         <option value="low">🟢 Low</option>
