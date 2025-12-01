@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useEffect, useState } from 'react';
+import clsx from 'clsx';
 import { TimelineBucketItem, timeLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
@@ -80,28 +81,23 @@ export const TimelineBucketCard = ({
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                    timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                    timeText={
+                        <span className="flex items-center gap-1">
+                            {item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                            {lineCount > 0 && (
+                                <span className="text-[9px] text-slate-400 font-normal">
+                                    ☑︎ {lineCount}
+                                </span>
+                            )}
+                        </span>
+                    }
                     timePlacement="top"
                     onOpen={() => openCardModal(item.short_id)}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className={isEditing ? 'min-h-[120px]' : 'min-h-[72px]'}
+                    className={clsx(isEditing ? 'min-h-[120px]' : 'min-h-[72px]', 'pt-4')}
+                    childrenPosition="top"
                 >
-                    <div className="mt-1 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500">
-                            <span>☑︎ {lineCount}</span>
-                            {!isEditing && (
-                                <button
-                                    type="button"
-                                    className="rounded px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onChecklistEditingChange(item.card_id, true);
-                                    }}
-                                >
-                                    編集
-                                </button>
-                            )}
-                        </div>
+                    <div className="space-y-1">
                         {isEditing ? (
                             <ChecklistEditor
                                 value={draftChecklist}

@@ -12,7 +12,7 @@ import {
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import { ChecklistEditor, ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
 import { ChecklistPreview } from '@/app/(board)/_components/checklist/ChecklistPreview';
-import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { Checklist, normalizeChecklist, EMPTY_CHECKLIST, countNonEmptyLines } from '@/lib/checklist';
 
 type TimelineEventItemProps = {
     event: TimelineEvent;
@@ -89,16 +89,26 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    timeText={timeLabel(event.due_start, event.due_end)}
+                    timeText={
+                        <span className="flex items-center gap-1">
+                            {timeLabel(event.due_start, event.due_end)}
+                            {countNonEmptyLines(draftChecklist) > 0 && (
+                                <span className="text-[9px] text-slate-400 font-normal">
+                                    ☑︎ {countNonEmptyLines(draftChecklist)}
+                                </span>
+                            )}
+                        </span>
+                    }
                     onOpen={() => openCardModal(event.short_id, 'event-button')}
                     openButtonTestId={`cardOpenButton-${event.card_id}`}
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
-                    className="w-full h-full pt-5"
+                    className="w-full h-full pt-4"
+                    childrenPosition="top"
                 >
-                    <div className="mt-1">
+                    <div className="">
                         {isEditing ? (
                             <ChecklistEditor
                                 value={draftChecklist}

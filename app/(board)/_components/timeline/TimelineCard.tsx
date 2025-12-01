@@ -6,7 +6,7 @@ type TimelineCardProps = {
     checked: boolean;
     onToggleCheck: (checked: boolean) => void;
     badgeLabel?: string | null;
-    timeText?: string | null;
+    timeText?: ReactNode;
     timePlacement?: 'top' | 'inline';
     onOpen: () => void;
     className?: string;
@@ -17,6 +17,7 @@ type TimelineCardProps = {
     tabIndex?: number;
     role?: string;
     onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+    childrenPosition?: 'top' | 'bottom';
 };
 
 export function TimelineCard({
@@ -35,6 +36,7 @@ export function TimelineCard({
     tabIndex,
     role,
     onKeyDown,
+    childrenPosition = 'bottom',
 }: TimelineCardProps) {
     return (
         <div
@@ -48,6 +50,8 @@ export function TimelineCard({
             role={role}
             onKeyDown={onKeyDown}
         >
+            {childrenPosition === 'top' && children}
+
             <div className="flex items-start gap-2 pr-6">
                 <button
                     type="button"
@@ -73,7 +77,7 @@ export function TimelineCard({
             </div>
 
             {timePlacement === 'top' && timeText ? (
-                <div className="absolute -top-px left-0 px-1 text-[10px] font-semibold text-slate-600">
+                <div className="absolute top-0.5 left-0 px-1 text-[10px] font-semibold text-slate-600">
                     {timeText}
                 </div>
             ) : null}
@@ -97,7 +101,7 @@ export function TimelineCard({
                 </button>
             ) : null}
 
-            {children}
+            {childrenPosition === 'bottom' && children}
         </div>
     );
 }

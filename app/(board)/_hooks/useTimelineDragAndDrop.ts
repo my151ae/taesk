@@ -540,29 +540,30 @@ export function useTimelineDragAndDrop({
         event: TimelineEvent,
         native: KeyboardEvent<HTMLElement>
     ) => {
-        if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
-        native.preventDefault();
-        const direction = native.key === 'ArrowUp' ? -15 : 15;
-        const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
-        const duration = event.durationMinutes ?? 60;
-        const nextStart = Math.max(0, Math.min(23 * 60 + 45, startMinutes + direction));
-        const nextEnd = nextStart + duration;
-        persistPlacement(
-            event.card_id,
-            {
-                due_bucket: null,
-                due_date: withJstMidnight(event.due_date ?? null),
-                due_start: minutesToTime(nextStart),
-                due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
-                due_bucket_position: null,
-            },
-            {
-                target: 'timeline',
-                sourceEvent: event,
-                defaultDuration: duration,
-                localDueDate: event.due_date ?? null,
-            }
-        );
+        // Disabled to prevent conflict with checklist navigation
+        // if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
+        // native.preventDefault();
+        // const direction = native.key === 'ArrowUp' ? -15 : 15;
+        // const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
+        // const duration = event.durationMinutes ?? 60;
+        // const nextStart = Math.max(0, Math.min(23 * 60 + 45, startMinutes + direction));
+        // const nextEnd = nextStart + duration;
+        // persistPlacement(
+        //     event.card_id,
+        //     {
+        //         due_bucket: null,
+        //         due_date: withJstMidnight(event.due_date ?? null),
+        //         due_start: minutesToTime(nextStart),
+        //         due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+        //         due_bucket_position: null,
+        //     },
+        //     {
+        //         target: 'timeline',
+        //         sourceEvent: event,
+        //         defaultDuration: duration,
+        //         localDueDate: event.due_date ?? null,
+        //     }
+        // );
     };
 
     const handleResizeStart = useCallback((e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => {
