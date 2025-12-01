@@ -969,12 +969,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
     if (!nextLength) return 0;
-    const maxStart = Math.max(0, nextLength - 2);
+    const dayRange = initialBoard.day_range ?? 2;
+    const maxStart = Math.max(0, nextLength - dayRange);
     if (typeof desired === 'number') {
       return Math.min(Math.max(0, desired), maxStart);
     }
     return Math.min(activeDayIndex, maxStart);
-  }, [activeDayIndex]);
+  }, [activeDayIndex, initialBoard.day_range]);
 
   const handlePrevDay = useCallback(async () => {
     if (status === 'loading') return;
@@ -991,7 +992,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const handleNextDay = useCallback(async () => {
     if (status === 'loading' || !data?.days?.length) return;
-    const lastStartIndex = Math.max(0, data.days.length - 2);
+    const dayRange = initialBoard.day_range ?? 2;
+    const lastStartIndex = Math.max(0, data.days.length - dayRange);
     if (activeDayIndex < lastStartIndex) {
       setActiveDayIndex((prev) => Math.min(lastStartIndex, prev + 1));
       return;
@@ -1000,8 +1002,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
     const payload = await fetchTimeline(baseStart + 1);
     const nextDaysLength = payload?.days?.length ?? 0;
-    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - 2 : 0));
-  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status]);
+    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0));
+  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status, initialBoard.day_range]);
 
 
 
@@ -1228,6 +1230,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             selectedPriority={selectedPriority}
             setSelectedPriority={setSelectedPriority}
             availableTags={availableTags}
+            onTodayClick={async () => {
+              await fetchTimeline(0);
+              setActiveDayIndex(0);
+            }}
           />
 
           <div className="hidden md:block">

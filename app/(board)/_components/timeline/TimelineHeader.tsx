@@ -31,6 +31,7 @@ type TimelineHeaderProps = {
     setSelectedPriority: (priority: 'all' | Priority) => void;
     availableTags: string[];
     setShowBoardSettings: (show: boolean) => void;
+    onTodayClick: () => void;
 };
 
 export default function TimelineHeader({
@@ -57,6 +58,7 @@ export default function TimelineHeader({
     setSelectedPriority,
     availableTags,
     setShowBoardSettings,
+    onTodayClick,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -118,7 +120,7 @@ export default function TimelineHeader({
     return (
         <>
             <header className="space-y-6">
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 relative">
                     {/* Burger Menu Button (Mobile Only) */}
                     <button
                         onClick={() => setShowMobileMenu(true)}
@@ -134,6 +136,16 @@ export default function TimelineHeader({
                         Live
                     </div>
                     <h1 className="text-2xl font-semibold text-slate-900 truncate flex-1">{board.name}</h1>
+
+                    {/* Today button - centered */}
+                    <div className="absolute left-1/2 transform -translate-x-1/2">
+                        <button
+                            onClick={onTodayClick}
+                            className="hidden md:block rounded-full bg-white px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        >
+                            Today
+                        </button>
+                    </div>
 
                     <div ref={boardMenuRef} className="relative hidden md:block">
                         <button
