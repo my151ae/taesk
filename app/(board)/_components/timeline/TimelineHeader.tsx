@@ -66,7 +66,6 @@ export default function TimelineHeader({
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
-    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showDayRangeDropdown, setShowDayRangeDropdown] = useState(false);
     const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
@@ -133,472 +132,317 @@ export default function TimelineHeader({
 
     return (
         <>
-            <header className="space-y-6">
-                <div className="flex flex-wrap items-center gap-3 relative">
-                    {/* Burger Menu Button (Mobile Only) */}
-                    <button
-                        onClick={() => setShowMobileMenu(true)}
-                        className="md:hidden rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-                    >
-                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-
-                    <div ref={boardMenuRef} className="relative hidden md:block">
-                        <button
-                            onClick={() => setShowBoardMenu((prev) => !prev)}
-                            className="flex items-center justify-center rounded-full bg-white p-2 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                            aria-haspopup="true"
-                            aria-expanded={showBoardMenu}
-                            data-testid="board-menu-button"
-                            title="Switch Board"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                            </svg>
-                        </button>
-                        {showBoardMenu && (
-                            <div className="absolute left-0 z-40 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
-                                <div className="max-h-64 overflow-y-auto space-y-1">
-                                    {modalBoards.map((b) => (
-                                        <div key={b.id} className="group flex items-center gap-1 pr-2">
-                                            <button
-                                                onClick={() => handleBoardNavigate(b)}
-                                                className={clsx(
-                                                    'flex-1 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
-                                                    b.id === board.id && 'bg-slate-100 text-slate-900'
-                                                )}
-                                            >
-                                                <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
-                                                <p className="text-xs text-slate-500">
-                                                    {b.description || 'Standard board'} • {b.day_range ?? 2} days
-                                                </p>
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteBoard(b.id, b.name);
-                                                }}
-                                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                                title="Delete board"
-                                            >
-                                                🗑️
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-2 border-t border-slate-100 pt-2 px-2">
-                                    {isCreatingBoard ? (
-                                        <form onSubmit={handleCreateBoard} className="space-y-2">
-                                            <input
-                                                type="text"
-                                                value={newBoardName}
-                                                onChange={(e) => setNewBoardName(e.target.value)}
-                                                placeholder="New board name"
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                                autoFocus
-                                            />
-                                            <div className="flex gap-2">
+            <header className="space-y-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:flex-wrap">
+                    <div className="flex items-center gap-2 md:gap-3 relative flex-1 min-w-0">
+                        <div ref={boardMenuRef} className="relative">
+                            <button
+                                onClick={() => setShowBoardMenu((prev) => !prev)}
+                                className="flex items-center justify-center rounded-full bg-white p-2 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                                aria-haspopup="true"
+                                aria-expanded={showBoardMenu}
+                                data-testid="board-menu-button"
+                                title="Switch Board"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                                </svg>
+                            </button>
+                            {showBoardMenu && (
+                                <div className="absolute left-0 z-40 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                    <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
+                                    <div className="max-h-64 overflow-y-auto space-y-1">
+                                        {modalBoards.map((b) => (
+                                            <div key={b.id} className="group flex items-center gap-1 pr-2">
                                                 <button
-                                                    type="submit"
-                                                    disabled={isSubmittingBoard || !newBoardName.trim()}
-                                                    className="flex-1 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
+                                                    onClick={() => handleBoardNavigate(b)}
+                                                    className={clsx(
+                                                        'flex-1 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
+                                                        b.id === board.id && 'bg-slate-100 text-slate-900'
+                                                    )}
                                                 >
-                                                    Create
+                                                    <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
+                                                    <p className="text-xs text-slate-500">
+                                                        {b.description || 'Standard board'} • {b.day_range ?? 2} days
+                                                    </p>
                                                 </button>
                                                 <button
-                                                    type="button"
-                                                    onClick={() => setIsCreatingBoard(false)}
-                                                    className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteBoard(b.id, b.name);
+                                                    }}
+                                                    className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                    title="Delete board"
                                                 >
-                                                    Cancel
+                                                    🗑️
                                                 </button>
                                             </div>
-                                        </form>
-                                    ) : (
-                                        <button
-                                            onClick={() => setIsCreatingBoard(true)}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
-                                        >
-                                            + Create new board
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <h1 className="text-2xl font-semibold text-slate-900 truncate flex-1">{board.name}</h1>
-
-
-
-
-
-                    <button
-                        onClick={onTodayClick}
-                        className="hidden md:block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                    >
-                        Today
-                    </button>
-                    <div ref={dayRangeDropdownRef} className="hidden md:flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 relative">
-                        <button
-                            onClick={() => onUpdateBoard({ day_range: Math.max(1, (board.day_range ?? 2) - 1) })}
-                            disabled={(board.day_range ?? 2) <= 1}
-                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                        >
-                            -
-                        </button>
-                        <button
-                            onClick={() => setShowDayRangeDropdown((prev) => !prev)}
-                            className="min-w-[3rem] flex items-center justify-center gap-1 text-center text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
-                        >
-                            <span>{board.day_range ?? 2} days</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
-                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                        {showDayRangeDropdown && (
-                            <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-50 w-32 origin-top rounded-lg border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
-                                {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                                    <button
-                                        key={days}
-                                        onClick={() => {
-                                            onUpdateBoard({ day_range: days });
-                                            setShowDayRangeDropdown(false);
-                                        }}
-                                        className={clsx(
-                                            "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
-                                            (board.day_range ?? 2) === days
-                                                ? "bg-sky-50 text-sky-700"
-                                                : "text-slate-700 hover:bg-slate-50"
-                                        )}
-                                    >
-                                        {days} {days === 1 ? 'day' : 'days'}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        <button
-                            onClick={() => onUpdateBoard({ day_range: Math.min(7, (board.day_range ?? 2) + 1) })}
-                            disabled={(board.day_range ?? 2) >= 7}
-                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                        >
-                            +
-                        </button>
-                    </div>
-                    <NotificationsBell />
-
-                    <div ref={filtersDropdownRef} className="relative">
-                        <button
-                            onClick={() => setShowFilters((prev) => !prev)}
-                            className={clsx(
-                                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-slate-200 transition-colors",
-                                hasActiveFilters ? "bg-sky-50 text-sky-700 ring-sky-200" : "bg-white text-slate-700 hover:bg-slate-50"
-                            )}
-                            title="Filters"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                            </svg>
-                            <span>Filters</span>
-                            {hasActiveFilters && (
-                                <span className="flex h-2 w-2 rounded-full bg-sky-500" />
-                            )}
-                        </button>
-
-                        {showFilters && (
-                            <div className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-xl border border-slate-100 bg-white p-3 shadow-lg ring-1 ring-black/5 focus:outline-none">
-                                <div className="space-y-3">
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <input
-                                                type="text"
-                                                value={searchQuery}
-                                                onChange={(event) => setSearchQuery(event.target.value)}
-                                                placeholder="Search..."
-                                                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                            />
-                                        </div>
-                                        <div className="w-24">
-                                            <select
-                                                value={selectedPriority}
-                                                onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
-                                                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                            >
-                                                <option value="all">Priority</option>
-                                                <option value="low">Low</option>
-                                                <option value="medium">Medium</option>
-                                                <option value="high">High</option>
-                                            </select>
-                                        </div>
+                                        ))}
                                     </div>
-
-                                    <div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {availableTags.length === 0 && (
-                                                <span className="text-xs text-slate-400">No tags available</span>
-                                            )}
-                                            {availableTags.map((tag) => {
-                                                const active = selectedTags.includes(tag);
-                                                return (
+                                    <div className="mt-2 border-t border-slate-100 pt-2 px-2">
+                                        {isCreatingBoard ? (
+                                            <form onSubmit={handleCreateBoard} className="space-y-2">
+                                                <input
+                                                    type="text"
+                                                    value={newBoardName}
+                                                    onChange={(e) => setNewBoardName(e.target.value)}
+                                                    placeholder="New board name"
+                                                    className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2">
                                                     <button
-                                                        key={tag}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedTags((prev) =>
-                                                                prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
-                                                            );
-                                                        }}
-                                                        className={clsx(
-                                                            'rounded-full px-2 py-0.5 text-[10px] font-medium transition border',
-                                                            active ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                        )}
+                                                        type="submit"
+                                                        disabled={isSubmittingBoard || !newBoardName.trim()}
+                                                        className="flex-1 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
                                                     >
-                                                        #{tag}
+                                                        Create
                                                     </button>
-                                                );
-                                            })}
-                                        </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsCreatingBoard(false)}
+                                                        className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        ) : (
+                                            <button
+                                                onClick={() => setIsCreatingBoard(true)}
+                                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
+                                            >
+                                                + Create new board
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <h1 className="text-base font-medium text-slate-900 truncate flex-1 md:text-2xl md:font-semibold">{board.name}</h1>
+                        <NotificationsBell />
+
+                        <div ref={profileMenuRef} className="relative">
+                            <button
+                                onClick={() => setShowProfileMenu((prev) => !prev)}
+                                className="flex items-center gap-2 rounded-full bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 md:px-3 md:text-sm"
+                                data-testid="profile-menu-button"
+                            >
+                                <div className="h-5 w-5 rounded-full bg-sky-100 text-xs flex items-center justify-center text-sky-600 font-bold">
+                                    {profile?.display_name?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                <span className="hidden sm:inline">{profile?.display_name || 'Profile'}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-slate-400">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+
+                            {showProfileMenu && (
+                                <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                                    <div className="px-4 py-3 border-b border-slate-100">
+                                        <p className="text-sm font-medium text-slate-900">{profile?.display_name || 'User'}</p>
+                                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                                     </div>
 
-                                    {hasActiveFilters && (
-                                        <div className="border-t border-slate-100 pt-2 flex justify-end">
-                                            <button
-                                                onClick={() => {
-                                                    setSearchQuery('');
-                                                    setSelectedTags([]);
-                                                    setSelectedPriority('all');
-                                                }}
-                                                className="text-xs font-medium text-slate-500 hover:text-slate-700"
-                                            >
-                                                Clear all
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div className="p-1">
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileSettings(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                        >
+                                            <span>👤</span> Profile Settings
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowShareDialog(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                        >
+                                            <span>📤</span> Share Board
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowNotificationSettings(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                        >
+                                            <span>🔔</span> Notifications
+                                        </button>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 p-1">
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    await signOut();
+                                                    window.location.href = '/login';
+                                                } catch (error) {
+                                                    console.error('Failed to sign out', error);
+                                                }
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        >
+                                            <span>🚪</span> Sign out
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
-                    <div ref={profileMenuRef} className="relative">
+                    <div className="flex items-center gap-2 md:gap-3 md:justify-end md:flex-1">
                         <button
-                            onClick={() => setShowProfileMenu((prev) => !prev)}
-                            className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                            data-testid="profile-menu-button"
+                            onClick={onTodayClick}
+                            className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 md:text-sm"
                         >
-                            <div className="h-5 w-5 rounded-full bg-sky-100 text-xs flex items-center justify-center text-sky-600 font-bold">
-                                {profile?.display_name?.[0]?.toUpperCase() || 'U'}
-                            </div>
-                            <span className="hidden sm:inline">{profile?.display_name || 'Profile'}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-slate-400">
-                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                            </svg>
+                            Today
                         </button>
 
-                        {showProfileMenu && (
-                            <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
-                                <div className="px-4 py-3 border-b border-slate-100">
-                                    <p className="text-sm font-medium text-slate-900">{profile?.display_name || 'User'}</p>
-                                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                        <div ref={dayRangeDropdownRef} className="flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 relative text-xs md:text-sm">
+                            <button
+                                onClick={() => onUpdateBoard({ day_range: Math.max(1, (board.day_range ?? 2) - 1) })}
+                                disabled={(board.day_range ?? 2) <= 1}
+                                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                            >
+                                -
+                            </button>
+                            <button
+                                onClick={() => setShowDayRangeDropdown((prev) => !prev)}
+                                className="min-w-[3rem] flex items-center justify-center gap-1 text-center font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                            >
+                                <span>{board.day_range ?? 2} days</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                                </svg>
+                            </button>
+                            {showDayRangeDropdown && (
+                                <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-50 w-32 origin-top rounded-lg border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
+                                    {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                                        <button
+                                            key={days}
+                                            onClick={() => {
+                                                onUpdateBoard({ day_range: days });
+                                                setShowDayRangeDropdown(false);
+                                            }}
+                                            className={clsx(
+                                                "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
+                                                (board.day_range ?? 2) === days
+                                                    ? "bg-sky-50 text-sky-700"
+                                                    : "text-slate-700 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            {days} {days === 1 ? 'day' : 'days'}
+                                        </button>
+                                    ))}
                                 </div>
+                            )}
+                            <button
+                                onClick={() => onUpdateBoard({ day_range: Math.min(7, (board.day_range ?? 2) + 1) })}
+                                disabled={(board.day_range ?? 2) >= 7}
+                                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                            >
+                                +
+                            </button>
+                        </div>
 
-                                <div className="p-1">
-                                    <button
-                                        onClick={() => {
-                                            setShowProfileSettings(true);
-                                            setShowProfileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>👤</span> Profile Settings
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowShareDialog(true);
-                                            setShowProfileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>📤</span> Share Board
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowNotificationSettings(true);
-                                            setShowProfileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>🔔</span> Notifications
-                                    </button>
-                                </div>
+                        <div ref={filtersDropdownRef} className="relative">
+                            <button
+                                onClick={() => setShowFilters((prev) => !prev)}
+                                className={clsx(
+                                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm ring-1 ring-slate-200 transition-colors md:text-sm",
+                                    hasActiveFilters ? "bg-sky-50 text-sky-700 ring-sky-200" : "bg-white text-slate-700 hover:bg-slate-50"
+                                )}
+                                title="Filters"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                                <span>Filters</span>
+                                {hasActiveFilters && (
+                                    <span className="flex h-2 w-2 rounded-full bg-sky-500" />
+                                )}
+                            </button>
 
-                                <div className="border-t border-slate-100 p-1">
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                await signOut();
-                                                window.location.href = '/login';
-                                            } catch (error) {
-                                                console.error('Failed to sign out', error);
-                                            }
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                    >
-                                        <span>🚪</span> Sign out
-                                    </button>
+                            {showFilters && (
+                                <div className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-xl border border-slate-100 bg-white p-3 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                                    <div className="space-y-3">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={searchQuery}
+                                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                                    placeholder="Search..."
+                                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                                />
+                                            </div>
+                                            <div className="w-24">
+                                                <select
+                                                    value={selectedPriority}
+                                                    onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
+                                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                                >
+                                                    <option value="all">Priority</option>
+                                                    <option value="low">Low</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="high">High</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {availableTags.length === 0 && (
+                                                    <span className="text-xs text-slate-400">No tags available</span>
+                                                )}
+                                                {availableTags.map((tag) => {
+                                                    const active = selectedTags.includes(tag);
+                                                    return (
+                                                        <button
+                                                            key={tag}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedTags((prev) =>
+                                                                    prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
+                                                                );
+                                                            }}
+                                                            className={clsx(
+                                                                'rounded-full px-2 py-0.5 text-[10px] font-medium transition border',
+                                                                active ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                            )}
+                                                        >
+                                                            #{tag}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {hasActiveFilters && (
+                                            <div className="border-t border-slate-100 pt-2 flex justify-end">
+                                                <button
+                                                    onClick={() => {
+                                                        setSearchQuery('');
+                                                        setSelectedTags([]);
+                                                        setSelectedPriority('all');
+                                                    }}
+                                                    className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                                                >
+                                                    Clear all
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Mobile Menu Overlay */}
-                {showMobileMenu && (
-                    <div className="fixed inset-0 z-50 flex flex-col bg-white md:hidden">
-                        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                            <h2 className="text-lg font-semibold text-slate-900">Menu</h2>
-                            <button
-                                onClick={() => setShowMobileMenu(false)}
-                                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                            >
-                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                            {/* Boards Section */}
-                            <div>
-                                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Boards</h3>
-                                <div className="space-y-1">
-                                    {modalBoards.map((b) => (
-                                        <button
-                                            key={b.id}
-                                            onClick={() => {
-                                                handleBoardNavigate(b);
-                                                setShowMobileMenu(false);
-                                            }}
-                                            className={clsx(
-                                                'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition',
-                                                b.id === board.id ? 'bg-sky-50 text-sky-700' : 'text-slate-700 hover:bg-slate-50'
-                                            )}
-                                        >
-                                            {b.name}
-                                        </button>
-                                    ))}
-                                    <button
-                                        onClick={() => {
-                                            setShowBoardMenu(true); // Re-use existing logic or show simple input here
-                                            // For simplicity in this menu, let's just close and open the main board menu if needed,
-                                            // OR implement simple create here.
-                                            // Let's just use the existing board menu logic but maybe it's hidden.
-                                            // Actually, let's just show the create input here if we want full mobile support.
-                                            // For now, let's just keep it simple.
-                                        }}
-                                        className="w-full rounded-lg border border-dashed border-slate-300 px-3 py-2 text-left text-sm font-medium text-slate-500"
-                                    >
-                                        + Create new board (Use PC)
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Actions Section */}
-                            <div>
-                                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Actions</h3>
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={() => {
-                                            setShowShareDialog(true);
-                                            setShowMobileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>📤</span> Share Board
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowNotificationSettings(true);
-                                            setShowMobileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>🔔</span> Notifications
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowBoardSettings(true);
-                                            setShowMobileMenu(false);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                                    >
-                                        <span>⚙️</span> Board Settings
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Filters Section (Embedded) */}
-                            <div>
-                                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Filters</h3>
-                                <div className="space-y-4 rounded-xl border border-slate-100 p-4">
-                                    <div>
-                                        <label className="mb-1 block text-xs font-medium text-slate-500">Search</label>
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                            placeholder="Search cards..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="mb-1 block text-xs font-medium text-slate-500">Priority</label>
-                                        <select
-                                            value={selectedPriority}
-                                            onChange={(e) => setSelectedPriority(e.target.value as any)}
-                                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                                        >
-                                            <option value="all">All</option>
-                                            <option value="low">Low</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="mb-1 block text-xs font-medium text-slate-500">Tags</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {availableTags.map((tag) => (
-                                                <button
-                                                    key={tag}
-                                                    onClick={() => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
-                                                    className={clsx(
-                                                        'rounded-full px-2 py-1 text-xs font-medium',
-                                                        selectedTags.includes(tag) ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600'
-                                                    )}
-                                                >
-                                                    #{tag}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sign Out */}
-                            <div className="pt-4 border-t border-slate-100">
-                                <button
-                                    onClick={async () => {
-                                        await signOut();
-                                        window.location.href = '/login';
-                                    }}
-                                    className="w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
-                                >
-                                    Sign out
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </header>
 
 
