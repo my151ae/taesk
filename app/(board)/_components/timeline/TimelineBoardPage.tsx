@@ -1303,7 +1303,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           </div>
 
           <div className="md:hidden">
-            <div className="relative max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
+            <div className="relative h-[calc(100vh-140px)] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <MobileTimelineView
                 timelineScrollRef={timelineScrollRef}
                 days={data?.days ?? []}

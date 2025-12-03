@@ -1,7 +1,8 @@
 import {
     useSensor,
     useSensors,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     DragStartEvent,
     DragMoveEvent,
     DragEndEvent,
@@ -118,8 +119,11 @@ export function useTimelineDragAndDrop({
     const [bucketIndicator, setBucketIndicator] = useState<BucketIndicator | null>(null);
 
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: { distance: 5 },
+        useSensor(MouseSensor, {
+            activationConstraint: { distance: 10 },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: { delay: 150, tolerance: 10 },
         })
     );
 

@@ -172,7 +172,7 @@ function MobileTimelineColumn({
               disabled={isEditing}
             >
               <div
-                className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 pt-5 text-left shadow-sm touch-none"
+                className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 pt-5 text-left shadow-sm select-none"
                 style={{
                   top,
                   height,
@@ -415,7 +415,6 @@ export default function MobileTimelineView({
         droppable: { strategy: MeasuringStrategy.Always },
       }}
       autoScroll={{
-        enabled: !isOverABList,
         threshold: { x: 0, y: 0.2 },
         acceleration: 1,
       }}
@@ -464,11 +463,13 @@ export default function MobileTimelineView({
           </div>
 
           <div
-            ref={timelineScrollRef}
-            className="grid flex-1 overflow-y-auto"
-            style={{ gridTemplateColumns: "1fr 1fr", minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}
+            className="grid flex-1 overflow-hidden"
+            style={{ gridTemplateColumns: "1fr 1fr" }}
           >
-            <div className="min-w-0 border-r border-slate-100 bg-white">
+            <div
+              ref={timelineScrollRef}
+              className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
+            >
               <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}>
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
                   {HOURS.map((hour, idx) => (
@@ -495,7 +496,7 @@ export default function MobileTimelineView({
               </div>
             </div>
 
-            <div className="min-w-0 overflow-hidden border-l border-slate-100">
+            <div className="min-w-0 overflow-y-auto border-l border-slate-100">
               <div className="space-y-3 px-3 pb-4">
                 {abMeta?.sections.map((section) => {
                   const items = activeBuckets[section.bucket] ?? [];
@@ -574,7 +575,7 @@ function MobileBucketCard({
       disabled={isEditing}
     >
       <div
-        className="relative flex w-full flex-col gap-1 px-3 py-3 touch-none"
+        className="relative flex w-full flex-col gap-1 px-3 py-3 select-none"
       >
         <div className="absolute right-2 top-2">
           <button

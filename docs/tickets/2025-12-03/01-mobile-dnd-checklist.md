@@ -15,25 +15,25 @@
 ## 進捗トラッカー（更新用）
 - [x] Step1: ジェスチャー整理（スワイプ廃止、Prev/Next ボタンのみ）
 - [x] Step2: DnD 基盤導入（Mobile に `DndContext` + PC 同等センサー/ハンドラ）
-- [ ] Step3: 長押し開始しきい値チューニング（PointerSensor `distance` ベース）※視認性調整後に着手
-- [ ] Step4: スタイル・視認性統一（A/B 角丸撤廃 + ゴースト/ドロップライン表示 + `line-clamp`/`break-words`）
+- [x] Step3: 長押し開始しきい値チューニング（PointerSensor `distance` ベース）※視認性調整後に着手
+- [x] Step4: スタイル・視認性統一（A/B 角丸撤廃 + ゴースト/ドロップライン表示 + `line-clamp`/`break-words`）
 - [ ] Step5: オートスクロールとドロップ範囲確認（Timeline 縦スクロール、A/B セクションスクロール）
 
 ## 実装ロードマップ（MVP 順 + ブラウザ確認）
 
 ### Step1: ジェスチャー整理（スワイプ廃止）
 - 実装 TODO
-  - [ ] `MobileTimelineView` の横スワイプ（`framer-motion` `drag="x"`）を撤去し、Prev/Next ボタンのみで日付遷移。
-  - [ ] スワイプ削除後も日付の状態管理が破綻しないことを確認（state 更新経路の見直し）。
+  - [x] `MobileTimelineView` の横スワイプ（`framer-motion` `drag="x"`）を撤去し、Prev/Next ボタンのみで日付遷移。
+  - [x] スワイプ削除後も日付の状態管理が破綻しないことを確認（state 更新経路の見直し）。
 - ブラウザ確認（モバイル幅）
   - [ ] Prev/Next ボタンのみで日付が切り替わる。
   - [ ] 横スワイプで日付が動かない（DnD とジェスチャーが競合しない）。
 
 ### Step2: DnD 基盤導入（Mobile 版に PC 同等の土台）
 - 実装 TODO
-  - [ ] `MobileTimelineView` を `DndContext` 配下に置き、`TimelineBoardPage` から PC と同じ `sensors`/handlers を注入。
-  - [ ] Timeline イベントと A/B バケットに droppable を設置し、既存の PC 向け処理（`useTimelineDragAndDrop`）を再利用。
-  - [ ] ドラッグゴーストは PC のスタイルを流用し、指先より少し上にオフセットして表示。
+  - [x] `MobileTimelineView` を `DndContext` 配下に置き、`TimelineBoardPage` から PC と同じ `sensors`/handlers を注入。
+  - [x] Timeline イベントと A/B バケットに droppable を設置し、既存の PC 向け処理（`useTimelineDragAndDrop`）を再利用。
+  - [x] ドラッグゴーストは PC のスタイルを流用し、指先より少し上にオフセットして表示。
 - ブラウザ確認（モバイル幅）
   - [ ] 長押しでドラッグ開始できる（まだ最終値調整前で OK）。
   - [ ] Timeline → A/B、A/B → Timeline の移動が一通り成立する。
@@ -41,18 +41,18 @@
 
 ### Step3: 長押し開始しきい値チューニング（順番入れ替え後に実施）
 - 実装 TODO
-  - [ ] `PointerSensor` の `activationConstraint` を `distance` ベース（例: 8px）で設定し、誤発火と反応速度のバランスを取る。
-  - [ ] 必要なら `delay` を併用し、押下中スクロールとの干渉を抑制。
+  - [x] `PointerSensor` の `activationConstraint` を `distance` ベース（例: 8px）で設定し、誤発火と反応速度のバランスを取る。
+  - [x] 必要なら `delay` を併用し、押下中スクロールとの干渉を抑制。
 - ブラウザ確認（モバイル幅）
   - [ ] 軽いタップではドラッグしないが、短い長押しで確実にドラッグ開始する。
   - [ ] 連続操作でも誤発火や意図しないスクロールが発生しない。
 
 ### Step4: スタイル・視認性統一（順番繰り上げ、先に実施）
 - 実装 TODO
-  - [ ] A/B リストを PC と同じフラット（角丸無し）スタイルに統一し、余白/境界線を合わせる。
-  - [ ] ゴースト/ドロップラインの表示を PC に揃える（A/B→Timeline でもプレビューが見える、A/B 内ドロップラインが明確）。
-  - [ ] チェックリスト項目に `line-clamp`（2–3 行）+ `break-words` + `overflow-hidden` を付与し、はみ出しを防止（PC/モバイル共通）。
-  - [ ] 日付切替ボタンをヘッダー 2 行目右側に固定し、モバイルは `text-xs` を維持。
+  - [x] A/B リストを PC と同じフラット（角丸無し）スタイルに統一し、余白/境界線を合わせる。
+  - [x] ゴースト/ドロップラインの表示を PC に揃える（A/B→Timeline でもプレビューが見える、A/B 内ドロップラインが明確）。
+  - [x] チェックリスト項目に `line-clamp`（2–3 行）+ `break-words` + `overflow-hidden` を付与し、はみ出しを防止（PC/モバイル共通）。
+  - [x] 日付切替ボタンをヘッダー 2 行目右側に固定し、モバイルは `text-xs` を維持。
 - ブラウザ確認（モバイル幅）
   - [ ] A/B リストの角丸が無く、PC と同じ見た目に揃う。
   - [ ] 長文チェックリストが枠をはみ出さず、指定行数で折りたたまれる。
