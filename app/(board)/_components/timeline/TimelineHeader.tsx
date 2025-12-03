@@ -32,6 +32,7 @@ type TimelineHeaderProps = {
     availableTags: string[];
     setShowBoardSettings: (show: boolean) => void;
     onTodayClick: () => void;
+    onUpdateBoard: (updates: Partial<Board>) => Promise<void>;
 };
 
 export default function TimelineHeader({
@@ -59,6 +60,7 @@ export default function TimelineHeader({
     availableTags,
     setShowBoardSettings,
     onTodayClick,
+    onUpdateBoard,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -237,12 +239,23 @@ export default function TimelineHeader({
                             Share
                         </button>
                     </div>
-                    <div className="hidden md:block">
+                    <div className="hidden md:flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200">
                         <button
-                            onClick={() => setShowBoardSettings(true)}
-                            className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                            onClick={() => onUpdateBoard({ day_range: Math.max(1, (board.day_range ?? 2) - 1) })}
+                            disabled={(board.day_range ?? 2) <= 1}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                         >
-                            Settings
+                            -
+                        </button>
+                        <span className="min-w-[3rem] text-center text-xs font-medium text-slate-600">
+                            {board.day_range ?? 2} days
+                        </span>
+                        <button
+                            onClick={() => onUpdateBoard({ day_range: Math.min(7, (board.day_range ?? 2) + 1) })}
+                            disabled={(board.day_range ?? 2) >= 7}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                        >
+                            +
                         </button>
                     </div>
                     <NotificationsBell />

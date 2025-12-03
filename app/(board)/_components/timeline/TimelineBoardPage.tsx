@@ -497,7 +497,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       traceRef.current = createClientTrace('timeline');
       return fallback;
     }
-  }, [initialBoard?.id]);
+  }, [initialBoard?.id, initialBoard.day_range]);
 
   useEffect(() => {
     fetchTimeline();
@@ -1233,6 +1233,34 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             onTodayClick={async () => {
               await fetchTimeline(0);
               setActiveDayIndex(0);
+            }}
+            onUpdateBoard={async (updates) => {
+              try {
+                const response = await fetch(`/api/boards/${initialBoard.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updates),
+                });
+                if (!response.ok) throw new Error('Failed to update board');
+                const { board: updatedBoard } = await response.json();
+
+                // Update initialBoard with new values
+                Object.assign(initialBoard, updatedBoard);
+
+                // Update availableBoards to reflect the change in Switch Board menu
+                setAvailableBoards(prev =>
+                  prev.map(b => b.id === updatedBoard.id ? updatedBoard : b)
+                );
+
+                // Reset active day index to 0
+                setActiveDayIndex(0);
+
+                // Refetch timeline with new day_range
+                await fetchTimeline();
+              } catch (error) {
+                console.error('Failed to update board', error);
+                alert('Failed to update board');
+              }
             }}
           />
 
