@@ -1305,6 +1305,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <div className="md:hidden">
             <div className="relative max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <MobileTimelineView
+                timelineScrollRef={timelineScrollRef}
                 days={data?.days ?? []}
                 activeDayIndex={activeDayIndex}
                 onPrevDay={handlePrevDay}
@@ -1320,6 +1321,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onChecklistEditingChange={handleChecklistEditingChange}
                 editingCardId={editingCardId}
                 status={status}
+                sensors={sensors}
+                handleDragStart={handleDragStart}
+                handleDragMove={handleDragMove}
+                handleDragEnd={handleDragEnd}
+                handleDragCancel={handleDragCancel}
+                bucketIndicator={bucketIndicator}
+                isOverABList={isOverABList}
               />
             </div>
           </div>
