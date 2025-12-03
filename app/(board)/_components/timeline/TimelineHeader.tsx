@@ -32,6 +32,8 @@ type TimelineHeaderProps = {
     setSelectedPriority: (priority: 'all' | Priority) => void;
     availableTags: string[];
     setShowBoardSettings: (show: boolean) => void;
+    dayRange: number;
+    onDayRangeChange: (days: number) => void;
     onTodayClick: () => void;
     onUpdateBoard: (updates: Partial<Board>) => Promise<void>;
 };
@@ -60,6 +62,8 @@ export default function TimelineHeader({
     setSelectedPriority,
     availableTags,
     setShowBoardSettings,
+    dayRange,
+    onDayRangeChange,
     onTodayClick,
     onUpdateBoard,
 }: TimelineHeaderProps) {
@@ -284,7 +288,7 @@ export default function TimelineHeader({
                                                     console.error('Failed to sign out', error);
                                                 }
                                             }}
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
                                         >
                                             <span>🚪</span> Sign out
                                         </button>
@@ -304,8 +308,8 @@ export default function TimelineHeader({
 
                         <div ref={dayRangeDropdownRef} className="flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 relative text-xs md:text-sm">
                             <button
-                                onClick={() => onUpdateBoard({ day_range: Math.max(1, (board.day_range ?? 2) - 1) })}
-                                disabled={(board.day_range ?? 2) <= 1}
+                                onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
+                                disabled={dayRange <= 1}
                                 className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                             >
                                 -
@@ -314,7 +318,7 @@ export default function TimelineHeader({
                                 onClick={() => setShowDayRangeDropdown((prev) => !prev)}
                                 className="min-w-[3rem] flex items-center justify-center gap-1 text-center font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                             >
-                                <span>{board.day_range ?? 2} days</span>
+                                <span>{dayRange} days</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
                                     <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                                 </svg>
@@ -325,12 +329,12 @@ export default function TimelineHeader({
                                         <button
                                             key={days}
                                             onClick={() => {
-                                                onUpdateBoard({ day_range: days });
+                                                onDayRangeChange(days);
                                                 setShowDayRangeDropdown(false);
                                             }}
                                             className={clsx(
                                                 "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
-                                                (board.day_range ?? 2) === days
+                                                dayRange === days
                                                     ? "bg-sky-50 text-sky-700"
                                                     : "text-slate-700 hover:bg-slate-50"
                                             )}
@@ -341,8 +345,8 @@ export default function TimelineHeader({
                                 </div>
                             )}
                             <button
-                                onClick={() => onUpdateBoard({ day_range: Math.min(7, (board.day_range ?? 2) + 1) })}
-                                disabled={(board.day_range ?? 2) >= 7}
+                                onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
+                                disabled={dayRange >= 7}
                                 className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
                             >
                                 +

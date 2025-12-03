@@ -26,6 +26,7 @@ type DesktopTimelineViewProps = {
   timelineScrollRef: React.RefObject<HTMLDivElement>;
   days: TimelineDay[];
   activeDayIndex: number;
+  dayRange: number;
   status: string;
   handlePrevDay: () => void;
   handleNextDay: () => void;
@@ -62,6 +63,7 @@ export function DesktopTimelineView({
   timelineScrollRef,
   days,
   activeDayIndex,
+  dayRange,
   status,
   handlePrevDay,
   handleNextDay,
@@ -92,8 +94,8 @@ export function DesktopTimelineView({
   isOverABList,
   floatingLayerTop,
 }: DesktopTimelineViewProps) {
-  // Calculate how many days to show (typically 1-3 based on board settings)
-  const dayCount = Math.min(days.length - activeDayIndex, days.length);
+  // Calculate how many days to show based on dayRange setting
+  const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
 
   return (

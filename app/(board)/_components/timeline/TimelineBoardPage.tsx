@@ -234,6 +234,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [dayRange, setDayRange] = useState(initialBoard.day_range ?? 2);
 
   const {
     modalCard,
@@ -457,7 +458,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       traceRef.current?.mark('fetch:start');
       const params = new URLSearchParams({
         start: String(effectiveStart),
-        range: String(initialBoard.day_range ?? DAY_WINDOW_RANGE),
+        range: String(dayRange),
       });
       const response = await fetch(`/api/boards/${initialBoard.id}/timeline?${params.toString()}`, {
         cache: 'no-store',
@@ -497,7 +498,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       traceRef.current = createClientTrace('timeline');
       return fallback;
     }
-  }, [initialBoard?.id, initialBoard.day_range]);
+  }, [initialBoard?.id, dayRange]);
 
   useEffect(() => {
     fetchTimeline();
@@ -967,15 +968,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(tags).sort();
   }, [data?.events, data?.abBuckets]);
 
+
+
   const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
     if (!nextLength) return 0;
-    const dayRange = initialBoard.day_range ?? 2;
     const maxStart = Math.max(0, nextLength - dayRange);
     if (typeof desired === 'number') {
       return Math.min(Math.max(0, desired), maxStart);
     }
     return Math.min(activeDayIndex, maxStart);
-  }, [activeDayIndex, initialBoard.day_range]);
+  }, [activeDayIndex, dayRange]);
 
   const handlePrevDay = useCallback(async () => {
     if (status === 'loading') return;
@@ -992,7 +994,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const handleNextDay = useCallback(async () => {
     if (status === 'loading' || !data?.days?.length) return;
-    const dayRange = initialBoard.day_range ?? 2;
     const lastStartIndex = Math.max(0, data.days.length - dayRange);
     if (activeDayIndex < lastStartIndex) {
       setActiveDayIndex((prev) => Math.min(lastStartIndex, prev + 1));
@@ -1003,150 +1004,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const payload = await fetchTimeline(baseStart + 1);
     const nextDaysLength = payload?.days?.length ?? 0;
     setActiveDayIndex(clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0));
-  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status, initialBoard.day_range]);
-
-
-
-  const eventsByDay = useMemo(() => {
-    if (!data) return {} as Record<string, TimelineEvent[]>;
-    const sourceEvents = filteredData?.events ?? data.events;
-    return data.days.reduce((acc, day) => {
-      acc[day.isoDate] = sourceEvents.filter((event) => event.due_date === day.isoDate);
-      return acc;
-    }, {} as Record<string, TimelineEvent[]>);
-  }, [data, filteredData]);
+  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status, dayRange]);
 
   const bucketDayMap = useMemo(() => {
-    if (!data?.days?.length) return {} as Record<string, string | null>;
-    return data.days.reduce((acc, day) => {
-      acc[`${day.key}_a`] = day.isoDate ?? null;
-      acc[`${day.key}_b`] = day.isoDate ?? null;
-      return acc;
-    }, {} as Record<string, string | null>);
-  }, [data?.days]);
-
-  useEffect(() => {
-    if (!data?.days?.length) return;
-    setActiveDayIndex((prev) => clampActiveDayIndex(data.days.length, prev));
-  }, [clampActiveDayIndex, data?.days?.length]);
-
-  const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
-    if (dataMode !== 'api') return;
-    try {
-      const response = await fetch(`/api/boards/${initialBoard.id}/cards`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error('Failed to create card');
-      const body = await response.json();
-
-      if (body.card) {
-        // Replace temporary card with real card
-        const newCard = body.card as Card;
-        setData((prev) => {
-          if (!prev) return prev;
-          const start = getMinutesFromTime(newCard.due_start ?? null) ?? 0;
-          const end = getMinutesFromTime(newCard.due_end ?? null) ?? (start + 60);
-          const newEvent: TimelineEvent = {
-            card_id: newCard.id,
-            due_date: getIsoDateJst(newCard.due_date ?? ''),
-            due_start: newCard.due_start ?? null,
-            due_end: newCard.due_end ?? null,
-            durationMinutes: end - start,
-            title: newCard.title,
-            tags: newCard.tags ?? [],
-            checklist: normalizeChecklist(newCard.checklist ?? EMPTY_CHECKLIST),
-            due_bucket: newCard.due_bucket ?? null,
-            due_bucket_position: newCard.due_bucket_position ?? null,
-            priority: newCard.priority ?? null,
-            checked: newCard.checked ?? false,
-            assignee_id: newCard.assignee_id ?? null,
-            assignee_ids: newCard.assignee_ids ?? null,
-            assigned_to: newCard.assigned_to ?? null,
-            short_id: newCard.short_id ?? null,
-            slug: newCard.slug ?? null,
-          };
-
-          // If tempId exists, replace the temp card, otherwise just add
-          const events = tempId
-            ? prev.events.map(e => e.card_id === tempId ? newEvent : e)
-            : [...prev.events, newEvent];
-
-          return {
-            ...prev,
-            events,
-          };
-        });
-
-        // openCardModalFromTimeline(newCard.short_id, 'create');
-
-        // Fetch in background - skipped because realtime subscription will handle it
-        // and it causes unnecessary load/delay
-        // fetchTimeline();
-      }
-    } catch (error) {
-      console.error('Create card failed', error);
-      setErrorMessage('Failed to create card');
-
-      // Remove optimistic card on error
-      if (tempId) {
-        setData((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            events: prev.events.filter(e => e.card_id !== tempId),
-          };
-        });
-      }
-    }
-  }, [dataMode, initialBoard.id, setData]);
-
-  const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
-    const payload: Partial<Card> = {
-      title: `New card ${Date.now()}`,
-      checklist: EMPTY_CHECKLIST,
-      tags: [],
-      due_date: withJstMidnight(day.isoDate),
-      due_start: minutesToTime(minutes),
-      due_end: minutesToTime(minutes + 60),
-      due_bucket: null,
-      due_bucket_position: null,
-      priority: 'medium',
-    };
-
-    // Optimistic update to show card immediately
-    const tempId = `temp-${Date.now()}`;
-    const optimisticEvent: TimelineEvent = {
-      card_id: tempId,
-      due_date: day.isoDate,
-      due_start: minutesToTime(minutes),
-      due_end: minutesToTime(minutes + 60),
-      durationMinutes: 60,
-      title: payload.title || 'New card',
-      checklist: EMPTY_CHECKLIST,
-      tags: [],
-      due_bucket: null,
-      due_bucket_position: null,
-      priority: 'medium',
-      checked: false,
-      assignee_id: null,
-      assignee_ids: null,
-      assigned_to: null,
-      short_id: null,
-      slug: null,
-    };
-
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        events: [...prev.events, optimisticEvent],
-      };
+    const result: Record<string, string | null> = {};
+    data?.days?.forEach((day) => {
+      result[`${day.key}_a`] = day.isoDate;
+      result[`${day.key}_b`] = day.isoDate;
     });
-
-    createCard(payload, tempId);
-  }, [createCard, setData]);
+    return result;
+  }, [data?.days]);
 
   const {
     sensors,
@@ -1164,7 +1031,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleResizeMove,
     handleResizeEnd,
   } = useTimelineDragAndDrop({
-    data,
+    data: filteredData,
     setData,
     applyPatch,
     timelineScrollRef,
@@ -1172,35 +1039,37 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     dataMode,
     editingCardId,
   });
-  const floatingLayerTop = 0;
-  const timelineViewportHeight = useMemo(() => {
-    if (viewportHeight == null) return TIMELINE_HEIGHT;
-    const chrome = timelineHeaderHeight + 160; // header + padding
-    const available = viewportHeight - chrome;
-    const clamped = Math.max(TIMELINE_MIN_VIEWPORT, available);
-    return Math.min(TIMELINE_HEIGHT, clamped);
-  }, [timelineHeaderHeight, viewportHeight]);
-  const modalBoards = useMemo(() => {
-    if (!availableBoards.length) {
-      return [initialBoard];
-    }
-    const map = new Map<string, Board>();
-    availableBoards.forEach((board) => {
-      map.set(board.id, board);
+
+  const eventsByDay = useMemo(() => {
+    const result: Record<string, TimelineEvent[]> = {};
+    filteredData?.events?.forEach((event) => {
+      const isoDate = event.due_date ?? '';
+      if (!result[isoDate]) result[isoDate] = [];
+      result[isoDate].push(event);
     });
-    if (!map.has(initialBoard.id)) {
-      map.set(initialBoard.id, initialBoard);
-    }
-    return Array.from(map.values());
-  }, [availableBoards, initialBoard]);
+    return result;
+  }, [filteredData?.events]);
 
-  const displayData = filteredData ?? data;
-  const abBuckets = displayData?.abBuckets ?? {};
+  const abBuckets = filteredData?.abBuckets ?? {};
 
-  const shouldShowCardModal = modalCard && cardModalStatus !== 'idle';
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() || selectedTags.length > 0 || selectedPriority !== 'all'
+  const timelineViewportHeight = useMemo(() => {
+    if (viewportHeight == null) return TIMELINE_MIN_VIEWPORT;
+    const usedHeight = timelineHeaderHeight;
+    const available = viewportHeight - usedHeight;
+    return Math.max(available, TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
+  }, [viewportHeight, timelineHeaderHeight]);
+
+  const handleColumnClick = useCallback(
+    (day: TimelineDay, minutes: number) => {
+      console.debug('[timeline] column click', { day, minutes });
+    },
+    []
   );
+
+  const shouldShowCardModal = cardModalStatus === 'ready';
+  const modalBoards = availableBoards;
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedTags.length > 0 || selectedPriority !== 'all';
+  const floatingLayerTop = timelineHeaderHeight;
 
   return (
     <>
@@ -1230,6 +1099,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             selectedPriority={selectedPriority}
             setSelectedPriority={setSelectedPriority}
             availableTags={availableTags}
+            dayRange={dayRange}
+            onDayRangeChange={setDayRange}
             onTodayClick={async () => {
               await fetchTimeline(0);
               setActiveDayIndex(0);
@@ -1252,11 +1123,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   prev.map(b => b.id === updatedBoard.id ? updatedBoard : b)
                 );
 
-                // Reset active day index to 0
-                setActiveDayIndex(0);
-
-                // Refetch timeline with new day_range
-                await fetchTimeline();
+                // If day_range was updated (though we use local state now, we might still want to sync if possible or just ignore)
+                // For now, we keep this generic handler for other board updates (name, etc.)
               } catch (error) {
                 console.error('Failed to update board', error);
                 alert('Failed to update board');
@@ -1270,6 +1138,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               timelineScrollRef={timelineScrollRef}
               days={data?.days ?? []}
               activeDayIndex={activeDayIndex}
+              dayRange={dayRange}
               status={status}
               handlePrevDay={handlePrevDay}
               handleNextDay={handleNextDay}
