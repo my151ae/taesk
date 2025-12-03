@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, useAnimationControls, type PanInfo } from "framer-motion";
 import {
   HOUR_HEIGHT,
   HOURS,
@@ -109,7 +108,6 @@ export default function MobileTimelineView({
   editingCardId,
   status,
 }: MobileTimelineViewProps) {
-  const controls = useAnimationControls();
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
   const eventsForDay = useMemo(() => {
@@ -119,16 +117,6 @@ export default function MobileTimelineView({
 
   const layoutMap = useMemo(() => calculateEventLayout(eventsForDay), [eventsForDay]);
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
-
-  const handleDragEnd = (_event: PointerEvent, info: PanInfo) => {
-    if (info.offset.x > 80) {
-      onPrevDay();
-    } else if (info.offset.x < -80) {
-      onNextDay();
-    }
-
-    controls.start({ x: 0, transition: { type: "spring", stiffness: 280, damping: 30 } });
-  };
 
   const activeDayIso = activeDay?.isoDate ?? null;
   const indicatorVisible = indicatorTop != null && activeDayIso && indicatorDayIso === activeDayIso;
@@ -142,21 +130,14 @@ export default function MobileTimelineView({
   if (!activeDay) return null;
 
   return (
-    <div className="relative flex h-full flex-col bg-white">
+    <div className="relative flex h-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y">
       {(status === "loading" || !days.length) && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
         </div>
       )}
 
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.2}
-        onDragEnd={handleDragEnd}
-        animate={controls}
-        className="flex h-full flex-col"
-      >
+      <div className="flex h-full flex-col">
         <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <button
             type="button"
@@ -381,7 +362,7 @@ export default function MobileTimelineView({
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

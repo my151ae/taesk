@@ -13,7 +13,7 @@
 - チェックリストは長文で枠をはみ出す報告あり（両プラットフォーム共通の課題の可能性）。
 
 ## 進捗トラッカー（更新用）
-- [ ] Step1: ジェスチャー整理（スワイプ廃止、Prev/Next ボタンのみ）
+- [x] Step1: ジェスチャー整理（スワイプ廃止、Prev/Next ボタンのみ）
 - [ ] Step2: DnD 基盤導入（Mobile に `DndContext` + PC 同等センサー/ハンドラ）
 - [ ] Step3: 長押し開始しきい値チューニング（PointerSensor `distance` ベース）
 - [ ] Step4: スタイル統一＆チェックリスト折返し（A/B 角丸撤廃 + `line-clamp`/`break-words`）
