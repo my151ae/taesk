@@ -219,8 +219,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [liveNowMinutes, setLiveNowMinutes] = useState<number | null>(null);
   const [liveNowIsoDate, setLiveNowIsoDate] = useState<string | null>(null);
   const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
-  const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
-  const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -235,7 +234,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [isMobileLayout, setIsMobileLayout] = useState(false);
 
   const {
     modalCard,
@@ -252,15 +250,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     dataMode,
     data,
   });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mql = window.matchMedia('(min-width: 768px)');
-    const handleLayoutChange = () => setIsMobileLayout(!mql.matches);
-    handleLayoutChange();
-    mql.addEventListener('change', handleLayoutChange);
-    return () => mql.removeEventListener('change', handleLayoutChange);
-  }, []);
 
   const fetchProfile = useCallback(async () => {
     if (!user) return;
@@ -1035,7 +1024,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       return acc;
     }, {} as Record<string, string | null>);
   }, [data?.days]);
-  const timelineScrollRef = isMobileLayout ? mobileTimelineScrollRef : desktopTimelineScrollRef;
 
   useEffect(() => {
     if (!data?.days?.length) return;
@@ -1279,7 +1267,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <div className="hidden md:block">
             <DesktopTimelineView
               timelineHeaderRef={timelineHeaderRef}
-              timelineScrollRef={desktopTimelineScrollRef}
+              timelineScrollRef={timelineScrollRef}
               days={data?.days ?? []}
               activeDayIndex={activeDayIndex}
               status={status}
@@ -1317,7 +1305,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <div className="md:hidden">
             <div className="relative max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <MobileTimelineView
-                timelineScrollRef={mobileTimelineScrollRef}
                 days={data?.days ?? []}
                 activeDayIndex={activeDayIndex}
                 onPrevDay={handlePrevDay}
@@ -1333,21 +1320,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onChecklistEditingChange={handleChecklistEditingChange}
                 editingCardId={editingCardId}
                 status={status}
-                sensors={sensors}
-                handleDragStart={handleDragStart}
-                handleDragMove={handleDragMove}
-                handleDragEnd={handleDragEnd}
-                handleDragCancel={handleDragCancel}
-                activeDrag={activeDrag}
-                pointerPreview={pointerPreview}
-                activeResize={activeResize}
-                bucketIndicator={bucketIndicator}
-                isOverABList={isOverABList}
-                handleEventKeyDown={handleEventKeyDown}
-                handleColumnClick={handleColumnClick}
-                handleResizeStart={handleResizeStart}
-                handleResizeMove={handleResizeMove}
-                handleResizeEnd={handleResizeEnd}
               />
             </div>
           </div>
