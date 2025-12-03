@@ -14,7 +14,7 @@
 
 ## 進捗トラッカー（更新用）
 - [x] Step1: ジェスチャー整理（スワイプ廃止、Prev/Next ボタンのみ）
-- [ ] Step2: DnD 基盤導入（Mobile に `DndContext` + PC 同等センサー/ハンドラ）
+- [x] Step2: DnD 基盤導入（Mobile に `DndContext` + PC 同等センサー/ハンドラ）
 - [ ] Step3: 長押し開始しきい値チューニング（PointerSensor `distance` ベース）
 - [ ] Step4: スタイル統一＆チェックリスト折返し（A/B 角丸撤廃 + `line-clamp`/`break-words`）
 - [ ] Step5: オートスクロールとドロップ範囲確認（Timeline 縦スクロール、A/B セクションスクロール）
