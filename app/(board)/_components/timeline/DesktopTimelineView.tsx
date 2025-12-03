@@ -121,7 +121,7 @@ export function DesktopTimelineView({
             gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
           }}
         >
-          <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
+          <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
             <span className="leading-none text-[10px] text-slate-400">GMT+09</span>
           </div>
           {visibleDays.map((day, index) => (

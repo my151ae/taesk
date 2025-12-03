@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
@@ -238,27 +239,8 @@ export function CardModal({
     };
   }, []); // 空配列でマウント時のみ実行
 
-  // Close dropdown on scroll or resize
-  useEffect(() => {
-    if (!showMemberDropdown) return;
-    const handleScroll = (event: Event) => {
-      if (memberDropdownRef.current && event.target instanceof Node) {
-        if (memberDropdownRef.current.contains(event.target)) {
-          return;
-        }
-      }
-      setShowMemberDropdown(false);
-    };
-    const handleResize = () => setShowMemberDropdown(false);
-
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [showMemberDropdown]);
+  // Close member dropdown when clicking outside
+  useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
 
   const handleSave = () => {
     const normalizedDueDate = dueDate || null;

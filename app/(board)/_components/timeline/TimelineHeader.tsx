@@ -1,5 +1,6 @@
 import { clsx } from 'clsx';
 import { useState, useRef, useEffect } from 'react';
+import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { Board } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
@@ -124,61 +125,11 @@ export default function TimelineHeader({
         }
     };
 
-    // Close day range dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dayRangeDropdownRef.current && !dayRangeDropdownRef.current.contains(event.target as Node)) {
-                setShowDayRangeDropdown(false);
-            }
-        };
-
-        if (showDayRangeDropdown) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [showDayRangeDropdown]);
-
-    // Close filters dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (filtersDropdownRef.current && !filtersDropdownRef.current.contains(event.target as Node)) {
-                setShowFilters(false);
-            }
-        };
-
-        if (showFilters) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [showFilters]);
-
-    // Close profile menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-                setShowProfileMenu(false);
-            }
-        };
-
-        if (showProfileMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [showProfileMenu]);
-
-    // Close board menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (boardMenuRef.current && !boardMenuRef.current.contains(event.target as Node)) {
-                setShowBoardMenu(false);
-            }
-        };
-
-        if (showBoardMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [showBoardMenu]);
+    // Click outside handlers for dropdowns
+    useClickOutside(dayRangeDropdownRef, () => setShowDayRangeDropdown(false));
+    useClickOutside(filtersDropdownRef, () => setShowFilters(false));
+    useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
+    useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
 
     return (
         <>
