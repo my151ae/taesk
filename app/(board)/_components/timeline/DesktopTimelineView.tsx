@@ -55,6 +55,7 @@ type DesktopTimelineViewProps = {
   handleDragCancel: DragAndDropBindings["handleDragCancel"];
   isOverABList: boolean;
   floatingLayerTop: number;
+  onTodayClick: () => void;
 };
 
 export function DesktopTimelineView({
@@ -91,6 +92,7 @@ export function DesktopTimelineView({
   handleDragCancel,
   isOverABList,
   floatingLayerTop,
+  onTodayClick,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show (typically 1-3 based on board settings)
   const dayCount = Math.min(days.length - activeDayIndex, days.length);
@@ -121,8 +123,14 @@ export function DesktopTimelineView({
             gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
           }}
         >
-          <div className="flex items-end justify-start border-r border-slate-100 px-3 py-3 text-left">
-            <span className="leading-none">GMT+09</span>
+          <div className="flex flex-col items-center justify-center border-r border-slate-100 px-1 py-2 gap-1">
+            <button
+              onClick={onTodayClick}
+              className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Today
+            </button>
+            <span className="leading-none text-[10px] text-slate-400">GMT+09</span>
           </div>
           {visibleDays.map((day, index) => (
             <div

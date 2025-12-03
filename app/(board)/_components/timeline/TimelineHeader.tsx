@@ -139,15 +139,7 @@ export default function TimelineHeader({
                     </div>
                     <h1 className="text-2xl font-semibold text-slate-900 truncate flex-1">{board.name}</h1>
 
-                    {/* Today button - centered */}
-                    <div className="absolute left-1/2 transform -translate-x-1/2">
-                        <button
-                            onClick={onTodayClick}
-                            className="hidden md:block rounded-full bg-white px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                        >
-                            Today
-                        </button>
-                    </div>
+
 
                     <div ref={boardMenuRef} className="relative hidden md:block">
                         <button
