@@ -1328,6 +1328,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 handleDragCancel={handleDragCancel}
                 bucketIndicator={bucketIndicator}
                 isOverABList={isOverABList}
+                pointerPreview={pointerPreview}
               />
             </div>
           </div>

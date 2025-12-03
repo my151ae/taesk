@@ -9,6 +9,7 @@ import {
   calculateEventLayout,
   minuteToPixels,
   timeLabel,
+  minutesToTime,
   EventLayout,
   TimelineBucketItem,
   TimelineDay,
@@ -32,6 +33,7 @@ function MobileInlineChecklist({
   onChecklistEditingChange,
   onChecklistCommit,
   showCount = false,
+  previewClassName,
 }: {
   cardId: string;
   checklist: Checklist | null;
@@ -39,6 +41,7 @@ function MobileInlineChecklist({
   onChecklistEditingChange: (cardId: string, editing: boolean) => void;
   onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
   showCount?: boolean;
+  previewClassName?: string;
 }) {
   const [draft, setDraft] = useState<Checklist>(normalizeChecklist(checklist ?? EMPTY_CHECKLIST));
 
@@ -69,6 +72,7 @@ function MobileInlineChecklist({
         <ChecklistPreview
           checklist={draft}
           maxLines={3}
+          className={previewClassName}
           onClick={(e) => {
             e.stopPropagation();
             onChecklistEditingChange(cardId, true);
@@ -90,6 +94,7 @@ function MobileTimelineColumn({
   onChecklistEditingChange,
   onChecklistCommit,
   editingCardId,
+  pointerPreview,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -101,6 +106,7 @@ function MobileTimelineColumn({
   onChecklistEditingChange: (cardId: string, editing: boolean) => void;
   onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
   editingCardId: string | null;
+  pointerPreview: DragAndDropBindings["pointerPreview"];
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
 
@@ -128,6 +134,25 @@ function MobileTimelineColumn({
       )}
 
       <div ref={setNodeRef} className="relative" style={{ height: TIMELINE_HEIGHT }}>
+        {pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
+          <div
+            className="pointer-events-none absolute z-10 border border-dashed border-sky-400 bg-sky-50/60"
+            style={{
+              top: minuteToPixels(pointerPreview.startMinutes),
+              height: minuteToPixels(pointerPreview.durationMinutes),
+              left: "6px",
+              right: "6px",
+            }}
+          >
+            <div className="absolute -top-4 left-0 text-[10px] font-semibold text-sky-600 px-1">
+              {timeLabel(
+                minutesToTime(pointerPreview.startMinutes),
+                minutesToTime(pointerPreview.startMinutes + pointerPreview.durationMinutes)
+              )}
+            </div>
+          </div>
+        )}
+
         {events.map((event) => {
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -170,7 +195,7 @@ function MobileTimelineColumn({
                     {event.checked ? "✓" : ""}
                   </button>
                   <div className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
-                    <span className="break-words leading-tight">
+                    <span className="break-words leading-tight line-clamp-2">
                       {event.title || "Untitled card"}
                     </span>
                   </div>
@@ -195,6 +220,7 @@ function MobileTimelineColumn({
                   editingCardId={editingCardId}
                   onChecklistEditingChange={onChecklistEditingChange}
                   onChecklistCommit={onChecklistCommit}
+                  previewClassName="break-words line-clamp-3"
                 />
               </div>
             </DraggableCard>
@@ -236,7 +262,7 @@ function MobileAbBucket({
   return (
     <div
       ref={setBucketRef}
-      className="rounded-xl border border-slate-200 bg-slate-50/70 shadow-inner"
+      className={`border border-slate-200 bg-slate-50/70 shadow-inner ${isOver ? "ring-1 ring-sky-200 bg-slate-50" : ""}`}
     >
       <div className="border-b border-slate-200 px-3 py-2">
         <p className="text-[11px] font-semibold text-slate-700">{sectionLabel}</p>
@@ -289,6 +315,7 @@ type MobileTimelineViewProps = {
   handleDragCancel: DragAndDropBindings["handleDragCancel"];
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
   isOverABList: boolean;
+  pointerPreview: DragAndDropBindings["pointerPreview"];
 };
 
 export default function MobileTimelineView({
@@ -315,6 +342,7 @@ export default function MobileTimelineView({
   handleDragCancel,
   bucketIndicator,
   isOverABList,
+  pointerPreview,
 }: MobileTimelineViewProps) {
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -423,6 +451,7 @@ export default function MobileTimelineView({
                   onChecklistEditingChange={onChecklistEditingChange}
                   onChecklistCommit={onChecklistCommit}
                   editingCardId={editingCardId}
+                  pointerPreview={pointerPreview}
                 />
               </div>
             </div>
@@ -566,6 +595,7 @@ function MobileBucketCard({
           onChecklistEditingChange={onChecklistEditingChange}
           onChecklistCommit={onChecklistCommit}
           showCount
+          previewClassName="break-words line-clamp-3"
         />
       </div>
     </DraggableCard>
