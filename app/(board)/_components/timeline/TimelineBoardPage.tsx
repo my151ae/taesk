@@ -1321,6 +1321,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onChecklistEditingChange={handleChecklistEditingChange}
                 editingCardId={editingCardId}
                 status={status}
+                activeDrag={activeDrag}
                 sensors={sensors}
                 handleDragStart={handleDragStart}
                 handleDragMove={handleDragMove}

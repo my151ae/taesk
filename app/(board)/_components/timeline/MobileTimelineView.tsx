@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DndContext, MeasuringStrategy, useDroppable } from "@dnd-kit/core";
+import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   HOUR_HEIGHT,
   HOURS,
@@ -95,6 +95,7 @@ function MobileTimelineColumn({
   onChecklistCommit,
   editingCardId,
   pointerPreview,
+  activeDragCardId,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -107,6 +108,7 @@ function MobileTimelineColumn({
   onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
   editingCardId: string | null;
   pointerPreview: DragAndDropBindings["pointerPreview"];
+  activeDragCardId: string | null;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
 
@@ -177,10 +179,6 @@ function MobileTimelineColumn({
                   left: layout?.left ?? "0%",
                   width: layout?.width ?? "100%",
                 }}
-                onClick={(native) => {
-                  native.stopPropagation();
-                  openCardModal(event.short_id, "mobile-timeline");
-                }}
               >
                 <div className="flex items-start gap-2 pr-6">
                   <button
@@ -209,9 +207,16 @@ function MobileTimelineColumn({
                 </div>
 
                 <div className="absolute right-2 top-2">
-                  <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCardModal(event.short_id, "mobile-timeline");
+                    }}
+                    className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-sky-300 hover:text-sky-700"
+                  >
                     {(event.due_bucket ?? "a").toUpperCase()}
-                  </span>
+                  </button>
                 </div>
 
                 <MobileInlineChecklist
@@ -308,6 +313,7 @@ type MobileTimelineViewProps = {
   onChecklistEditingChange: (cardId: string, editing: boolean) => void;
   editingCardId: string | null;
   status: string;
+  activeDrag: DragAndDropBindings["activeDrag"];
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -343,6 +349,7 @@ export default function MobileTimelineView({
   bucketIndicator,
   isOverABList,
   pointerPreview,
+  activeDrag,
 }: MobileTimelineViewProps) {
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -355,13 +362,44 @@ export default function MobileTimelineView({
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
 
   const activeDayIso = activeDay?.isoDate ?? null;
-  const indicatorVisible = indicatorTop != null && activeDayIso && indicatorDayIso === activeDayIso;
+  const indicatorVisible = indicatorTop != null && !!activeDayIso && indicatorDayIso === activeDayIso;
   const indicatorPosition = indicatorTop ?? 0;
   const activeBuckets = useMemo(() => {
     if (!activeDay) return {} as Record<string, TimelineBucketItem[]>;
     const entries = Object.entries(abBuckets || {}).filter(([key]) => key.startsWith(activeDay.key));
     return Object.fromEntries(entries);
   }, [abBuckets, activeDay]);
+  const activeDragCardId = activeDrag?.cardId ?? null;
+  const overlayBucketEntry = useMemo(() => {
+    const entries = Object.entries(activeBuckets);
+    for (const [key, items] of entries) {
+      const found = items.find((item) => item.card_id === activeDragCardId);
+      if (found) return { key, item: found };
+    }
+    return null;
+  }, [activeBuckets, activeDragCardId]);
+  const overlayBucketCard = overlayBucketEntry?.item ?? null;
+  const overlayBucketKey = overlayBucketEntry?.key ?? null;
+  const overlayTimelineEvent = eventsForDay.find((event) => event.card_id === activeDragCardId);
+  const overlayCardData = useMemo(() => {
+    if (overlayTimelineEvent) {
+      return {
+        title: overlayTimelineEvent.title || "Untitled card",
+        badge: overlayTimelineEvent.due_bucket ?? "a",
+        timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
+        checklistCount: countNonEmptyLines(normalizeChecklist(overlayTimelineEvent.checklist ?? EMPTY_CHECKLIST)),
+      };
+    }
+    if (overlayBucketCard) {
+      return {
+        title: overlayBucketCard.title || "Untitled card",
+        badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
+        timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
+        checklistCount: countNonEmptyLines(normalizeChecklist(overlayBucketCard.checklist ?? EMPTY_CHECKLIST)),
+      };
+    }
+    return null;
+  }, [overlayBucketCard, overlayBucketKey, overlayTimelineEvent]);
 
   if (!activeDay) return null;
 
@@ -452,20 +490,12 @@ export default function MobileTimelineView({
                   onChecklistCommit={onChecklistCommit}
                   editingCardId={editingCardId}
                   pointerPreview={pointerPreview}
+                  activeDragCardId={activeDragCardId}
                 />
               </div>
             </div>
 
             <div className="min-w-0 overflow-hidden border-l border-slate-100">
-              <div className="px-3 py-2">
-                {abMeta?.sections?.length ? (
-                  <>
-                    <p className="text-[11px] font-semibold text-slate-700">{abMeta.sections[0]?.label}</p>
-                    <p className="text-[10px] text-slate-400">{abMeta.sections[0]?.helper}</p>
-                  </>
-                ) : null}
-              </div>
-
               <div className="space-y-3 px-3 pb-4">
                 {abMeta?.sections.map((section) => {
                   const items = activeBuckets[section.bucket] ?? [];
@@ -490,6 +520,17 @@ export default function MobileTimelineView({
           </div>
         </div>
       </div>
+
+      <DragOverlay dropAnimation={null}>
+        {overlayCardData ? (
+          <MobileDragOverlayCard
+            title={overlayCardData.title}
+            badge={overlayCardData.badge}
+            timeText={overlayCardData.timeText}
+            checklistCount={overlayCardData.checklistCount}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -534,11 +575,21 @@ function MobileBucketCard({
     >
       <div
         className="relative flex w-full flex-col gap-1 px-3 py-3 touch-none"
-        onClick={(native) => {
-          native.stopPropagation();
-          openCardModal(item.short_id, "mobile-ab");
-        }}
       >
+        <div className="absolute right-2 top-2">
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-sky-300 hover:text-sky-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              openCardModal(item.short_id, "mobile-ab");
+            }}
+            aria-label="カード詳細を開く"
+          >
+            {bucketKeyToDueBucket(bucketKey).toUpperCase()}
+          </button>
+        </div>
+
         <div
           ref={setTopRef}
           className="pointer-events-none absolute left-0 right-0 z-20"
@@ -555,6 +606,16 @@ function MobileBucketCard({
           <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />
         )}
 
+        <MobileInlineChecklist
+          cardId={item.card_id}
+          checklist={item.checklist ?? null}
+          editingCardId={editingCardId}
+          onChecklistEditingChange={onChecklistEditingChange}
+          onChecklistCommit={onChecklistCommit}
+          showCount
+          previewClassName="break-words line-clamp-3"
+        />
+
         <div className="flex items-start gap-2">
           <input
             type="checkbox"
@@ -565,39 +626,43 @@ function MobileBucketCard({
             }}
             className="mt-0.5 h-3.5 w-3.5 cursor-pointer border-slate-300 text-sky-500"
           />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-[12px] font-semibold text-slate-800 line-clamp-2">{item.title || "Untitled card"}</span>
-              <span className="self-start rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
-                {bucketKeyToDueBucket(bucketKey).toUpperCase()}
-              </span>
-            </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
+              {item.title || "Untitled card"}
+            </span>
             {item.due_start && (
-              <span className="text-[10px] text-slate-500">{timeLabel(item.due_start, item.due_end)}</span>
+              <span className="text-[10px] text-slate-500 leading-tight">{timeLabel(item.due_start, item.due_end)}</span>
             )}
           </div>
-          <button
-            type="button"
-            className="rounded border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
-            onClick={(e) => {
-              e.stopPropagation();
-              openCardModal(item.short_id, "mobile-ab");
-            }}
-          >
-            開く
-          </button>
         </div>
-
-        <MobileInlineChecklist
-          cardId={item.card_id}
-          checklist={item.checklist ?? null}
-          editingCardId={editingCardId}
-          onChecklistEditingChange={onChecklistEditingChange}
-          onChecklistCommit={onChecklistCommit}
-          showCount
-          previewClassName="break-words line-clamp-3"
-        />
       </div>
     </DraggableCard>
+  );
+}
+
+function MobileDragOverlayCard({
+  title,
+  badge,
+  timeText,
+  checklistCount,
+}: {
+  title: string;
+  badge: string;
+  timeText: string | null;
+  checklistCount: number;
+}) {
+  return (
+    <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+      <div className="flex items-start gap-2">
+        <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
+          {badge.toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1 text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
+          {title || "Untitled card"}
+        </div>
+      </div>
+      {timeText ? <div className="mt-1 text-[11px] text-slate-600">{timeText}</div> : null}
+      {checklistCount > 0 ? <div className="mt-1 text-[11px] text-slate-400">☑︎ {checklistCount}</div> : null}
+    </div>
   );
 }
