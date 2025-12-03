@@ -1299,10 +1299,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               handleDragCancel={handleDragCancel}
               isOverABList={isOverABList}
               floatingLayerTop={floatingLayerTop}
-              onTodayClick={async () => {
-                await fetchTimeline(0);
-                setActiveDayIndex(0);
-              }}
             />
           </div>
 

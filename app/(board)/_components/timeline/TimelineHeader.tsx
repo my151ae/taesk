@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Board } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
@@ -67,6 +67,10 @@ export default function TimelineHeader({
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showDayRangeDropdown, setShowDayRangeDropdown] = useState(false);
+    const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
+    const filtersDropdownRef = useRef<HTMLDivElement>(null);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -119,6 +123,62 @@ export default function TimelineHeader({
             alert(error instanceof Error ? error.message : 'Failed to delete board');
         }
     };
+
+    // Close day range dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dayRangeDropdownRef.current && !dayRangeDropdownRef.current.contains(event.target as Node)) {
+                setShowDayRangeDropdown(false);
+            }
+        };
+
+        if (showDayRangeDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showDayRangeDropdown]);
+
+    // Close filters dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filtersDropdownRef.current && !filtersDropdownRef.current.contains(event.target as Node)) {
+                setShowFilters(false);
+            }
+        };
+
+        if (showFilters) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showFilters]);
+
+    // Close profile menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+                setShowProfileMenu(false);
+            }
+        };
+
+        if (showProfileMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showProfileMenu]);
+
+    // Close board menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (boardMenuRef.current && !boardMenuRef.current.contains(event.target as Node)) {
+                setShowBoardMenu(false);
+            }
+        };
+
+        if (showBoardMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showBoardMenu]);
 
     return (
         <>
@@ -224,7 +284,13 @@ export default function TimelineHeader({
 
 
 
-                    <div className="hidden md:flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200">
+                    <button
+                        onClick={onTodayClick}
+                        className="hidden md:block rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                    >
+                        Today
+                    </button>
+                    <div ref={dayRangeDropdownRef} className="hidden md:flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 relative">
                         <button
                             onClick={() => onUpdateBoard({ day_range: Math.max(1, (board.day_range ?? 2) - 1) })}
                             disabled={(board.day_range ?? 2) <= 1}
@@ -232,9 +298,36 @@ export default function TimelineHeader({
                         >
                             -
                         </button>
-                        <span className="min-w-[3rem] text-center text-xs font-medium text-slate-600">
-                            {board.day_range ?? 2} days
-                        </span>
+                        <button
+                            onClick={() => setShowDayRangeDropdown((prev) => !prev)}
+                            className="min-w-[3rem] flex items-center justify-center gap-1 text-center text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                        >
+                            <span>{board.day_range ?? 2} days</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                        {showDayRangeDropdown && (
+                            <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-50 w-32 origin-top rounded-lg border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
+                                {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                                    <button
+                                        key={days}
+                                        onClick={() => {
+                                            onUpdateBoard({ day_range: days });
+                                            setShowDayRangeDropdown(false);
+                                        }}
+                                        className={clsx(
+                                            "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
+                                            (board.day_range ?? 2) === days
+                                                ? "bg-sky-50 text-sky-700"
+                                                : "text-slate-700 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {days} {days === 1 ? 'day' : 'days'}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <button
                             onClick={() => onUpdateBoard({ day_range: Math.min(7, (board.day_range ?? 2) + 1) })}
                             disabled={(board.day_range ?? 2) >= 7}
@@ -245,7 +338,7 @@ export default function TimelineHeader({
                     </div>
                     <NotificationsBell />
 
-                    <div className="relative">
+                    <div ref={filtersDropdownRef} className="relative">
                         <button
                             onClick={() => setShowFilters((prev) => !prev)}
                             className={clsx(
@@ -337,7 +430,7 @@ export default function TimelineHeader({
                         )}
                     </div>
 
-                    <div className="relative">
+                    <div ref={profileMenuRef} className="relative">
                         <button
                             onClick={() => setShowProfileMenu((prev) => !prev)}
                             className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
