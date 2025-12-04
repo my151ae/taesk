@@ -90,9 +90,7 @@ export async function GET(request: NextRequest) {
 
     const expiresAt = tokens.expiry_date
       ? new Date(tokens.expiry_date).toISOString()
-      : tokenInfo.expires_in
-        ? new Date(Date.now() + tokenInfo.expires_in * 1000).toISOString()
-        : new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      : new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
     const scope = tokens.scope ?? tokenInfo.scope ?? GOOGLE_CALENDAR_SCOPE;
     const email = tokenInfo.email ?? user.email ?? "unknown";

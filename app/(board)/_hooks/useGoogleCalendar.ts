@@ -12,8 +12,15 @@ type CacheEntry = {
 };
 
 export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null) {
-  const startIso = useMemo(() => (startDate ? startDate.toISOString() : null), [startDate?.getTime()]);
-  const endIso = useMemo(() => (endDate ? endDate.toISOString() : null), [endDate?.getTime()]);
+  const startIso = useMemo(() => {
+    if (!startDate) return null;
+    return startDate.toISOString();
+  }, [startDate]);
+
+  const endIso = useMemo(() => {
+    if (!endDate) return null;
+    return endDate.toISOString();
+  }, [endDate]);
 
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
   const [status, setStatus] = useState<GoogleCalendarStatus>("idle");

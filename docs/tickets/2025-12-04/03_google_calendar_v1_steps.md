@@ -19,6 +19,12 @@
 - データ保存: `google_calendar_accounts` テーブルに資格情報を保存（トークンは DB で暗号化する運用）。
 
 ## ステップ1: OAuth 接続と資格情報保存
+- [x] `google_calendar_accounts` テーブル作成（マイグレーション適用済み）
+- [x] `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を env に追加（`.env.example` 反映済み）
+- [x] `/api/integrations/google-calendar/connect` で state 付き認可 URL を返却
+- [x] `/api/integrations/google-calendar/callback` で token 交換・refresh_token 温存・upsert
+- [x] リダイレクトを絶対 URL 化・onConflict 指定・エラー詳細ログ
+- [x] 実機で接続 → DB 保存 → 予定取得まで確認
 - 必須決定
   - スコープは `https://www.googleapis.com/auth/calendar.readonly`
   - リダイレクト URI（例）: `https://<app-domain>/api/integrations/google-calendar/callback`
@@ -36,6 +42,11 @@
   - 401/403（権限取り消し・refresh 無効・refresh が返らない等）が発生したときは DB のトークンを無効化し、「未接続」扱いで再接続を促す。
 
 ## ステップ2: サーバークライアントとイベント取得 API
+- [x] サーバー専用クライアント `lib/googleCalendarServer.ts` 実装（refresh 対応）
+- [x] `GET /api/calendar/events?start&end` 実装（未接続=connected:false、429/503/401/403 のハンドリング）
+- [x] 31 日以内のバリデーション、start/end チェック
+- [x] JST終日処理（date のみは 0:00〜24:00 として返却）
+- [ ] バリデーション系のテスト追加（任意）
 - 必須決定
   - サーバー専用クライアント `lib/googleCalendarServer.ts` を Node.js runtime で実行。
   - 期限切れなら refresh_token で再取得→DB 更新。
@@ -50,6 +61,11 @@
   - ログイン状態で `/api/calendar/events?start=<今週月曜>&end=<今週日曜>` を叩き、イベント配列が返ること（401/403 の挙動も確認）。
 
 ## ステップ3: フロント統合と表示
+- [x] `useGoogleCalendar` フックで可視範囲に合わせて取得・簡易キャッシュ
+- [x] タイムラインに読み取り専用レイヤーを追加（緑/Gバッジ、タイトル・時間表示）
+- [x] 未接続/エラー/ローディングのバナー表示と再接続導線
+- [x] 期間プリセット UI（表示範囲/今週/来週）を追加
+- [x] 再接続後のトースト表示を追加
 - 必須決定
   - 表示は「読み取り専用レイヤー」としてカードと区別する（色/透明度など）。
   - 再フェッチは期間が変わったときのみ（簡易キャッシュで可）。

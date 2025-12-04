@@ -238,6 +238,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const dayWindowStartRef = useRef(0);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [dayRange, setDayRange] = useState(initialBoard.day_range ?? 2);
+  const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
+  const prevGoogleStatusRef = useRef<string | null>(null);
+  const [googleToast, setGoogleToast] = useState<string | null>(null);
 
   const {
     modalCard,
@@ -311,12 +314,39 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return end;
   }, [visibleDays]);
 
+  const startOfWeekJst = useCallback((base: Date) => {
+    const jstMs = base.getTime() + 9 * 60 * 60 * 1000;
+    const jst = new Date(jstMs);
+    const day = jst.getUTCDay();
+    const diff = (day + 6) % 7; // Monday start
+    const mondayUtc = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() - diff, 0, 0, 0);
+    return new Date(mondayUtc - 9 * 60 * 60 * 1000);
+  }, []);
+
+  const presetRange = useMemo(() => {
+    const now = new Date();
+    if (calendarPreset === 'this-week') {
+      const start = startOfWeekJst(now);
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 7);
+      return { start, end };
+    }
+    if (calendarPreset === 'next-week') {
+      const start = startOfWeekJst(now);
+      start.setUTCDate(start.getUTCDate() + 7);
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 7);
+      return { start, end };
+    }
+    return { start: calendarRangeStart, end: calendarRangeEnd };
+  }, [calendarPreset, calendarRangeEnd, calendarRangeStart, startOfWeekJst]);
+
   const {
     events: googleCalendarEvents,
     status: googleCalendarStatus,
     error: googleCalendarError,
     refresh: refreshGoogleCalendar,
-  } = useGoogleCalendar(calendarRangeStart, calendarRangeEnd);
+  } = useGoogleCalendar(presetRange.start, presetRange.end);
 
   const calendarEventsByDay = useMemo(() => {
     if (!googleCalendarEvents.length || !(data?.days?.length)) return {} as Record<string, ExternalCalendarEntry[]>;
@@ -1066,6 +1096,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return 'Google予定の同期を準備中...';
   }, [googleCalendarEvents.length, googleCalendarStatus]);
 
+  useEffect(() => {
+    if (prevGoogleStatusRef.current && prevGoogleStatusRef.current !== 'success' && googleCalendarStatus === 'success') {
+      setGoogleToast('Googleカレンダーを再接続しました');
+      const timer = window.setTimeout(() => setGoogleToast(null), 4000);
+      return () => window.clearTimeout(timer);
+    }
+    prevGoogleStatusRef.current = googleCalendarStatus;
+  }, [googleCalendarStatus]);
+
   const handleGoogleConnect = useCallback(() => {
     if (typeof window === 'undefined') return;
     const redirect = `${window.location.pathname}${window.location.search}`;
@@ -1247,6 +1286,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 {googleStatusText}
                 {googleCalendarError && googleCalendarStatus === 'error' ? ` (${googleCalendarError})` : ''}
               </span>
+              <div className="flex items-center gap-1 text-xs md:text-sm">
+                <label className="text-emerald-700">期間:</label>
+                <select
+                  value={calendarPreset}
+                  onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}
+                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                >
+                  <option value="visible">表示範囲</option>
+                  <option value="this-week">今週</option>
+                  <option value="next-week">来週</option>
+                </select>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -1267,6 +1318,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               </button>
             </div>
           </div>
+          {googleToast && (
+            <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">
+              {googleToast}
+            </div>
+          )}
 
           <div className="hidden md:block">
             <DesktopTimelineView

@@ -119,7 +119,7 @@ export default function TimelineBuckets({
     return (
         <div
             className="pointer-events-none sticky z-20 h-0 overflow-visible"
-            style={{ top: floatingLayerTop }}
+            style={{ top: 0 }}
         >
             <div className="grid" style={{ gridTemplateColumns: templateColumns }}>
                 <div />
