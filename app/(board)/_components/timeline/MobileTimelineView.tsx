@@ -16,6 +16,7 @@ import {
   TimelineEvent,
   buildAbMeta,
   getMinutesFromTime,
+  ExternalCalendarEntry,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
@@ -96,6 +97,7 @@ function MobileTimelineColumn({
   editingCardId,
   pointerPreview,
   activeDragCardId,
+  calendarEvents,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -109,8 +111,24 @@ function MobileTimelineColumn({
   editingCardId: string | null;
   pointerPreview: DragAndDropBindings["pointerPreview"];
   activeDragCardId: string | null;
+  calendarEvents: ExternalCalendarEntry[];
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
+  const calendarLayout = calculateEventLayout(
+    calendarEvents.map((entry) => ({
+      card_id: entry.id,
+      due_date: day.isoDate,
+      due_start: minutesToTime(entry.startMinutes),
+      due_end: minutesToTime(entry.startMinutes + entry.durationMinutes),
+      durationMinutes: entry.durationMinutes,
+      title: entry.title,
+      tags: [],
+      priority: null,
+      checked: false,
+      short_id: null,
+      slug: null,
+    }))
+  );
 
   return (
     <div className="relative">
@@ -154,6 +172,37 @@ function MobileTimelineColumn({
             </div>
           </div>
         )}
+
+        {calendarEvents.map((calendarEvent) => {
+          const layout = calendarLayout[calendarEvent.id];
+          return (
+            <div
+              key={calendarEvent.id}
+              className="pointer-events-none absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)]"
+              style={{
+                top: minuteToPixels(calendarEvent.startMinutes),
+                height: Math.max(minuteToPixels(calendarEvent.durationMinutes), 18),
+                left: layout?.left ?? "0%",
+                width: layout?.width ?? "100%",
+              }}
+            >
+              <div className="flex items-center gap-1">
+                <span className="truncate font-semibold">{calendarEvent.title || "Google予定"}</span>
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                  G
+                </span>
+              </div>
+              <p className="text-[9px] text-emerald-600">
+                {calendarEvent.isAllDay
+                  ? "終日"
+                  : timeLabel(
+                    minutesToTime(calendarEvent.startMinutes),
+                    minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                  )}
+              </p>
+            </div>
+          );
+        })}
 
         {events.map((event) => {
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -304,6 +353,7 @@ type MobileTimelineViewProps = {
   onNextDay: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
+  calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   indicatorTop: number | null;
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
@@ -332,6 +382,7 @@ export default function MobileTimelineView({
   onNextDay,
   eventsByDay,
   abBuckets,
+  calendarEventsByDay,
   indicatorTop,
   indicatorDayIso,
   timelineViewportHeight,
@@ -357,6 +408,11 @@ export default function MobileTimelineView({
     if (!activeDay) return [] as TimelineEvent[];
     return eventsByDay[activeDay.isoDate] ?? [];
   }, [activeDay, eventsByDay]);
+
+  const calendarEventsForDay = useMemo(() => {
+    if (!activeDay) return [] as ExternalCalendarEntry[];
+    return calendarEventsByDay[activeDay.isoDate] ?? [];
+  }, [activeDay, calendarEventsByDay]);
 
   const layoutMap = useMemo(() => calculateEventLayout(eventsForDay), [eventsForDay]);
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
@@ -492,6 +548,7 @@ export default function MobileTimelineView({
                   editingCardId={editingCardId}
                   pointerPreview={pointerPreview}
                   activeDragCardId={activeDragCardId}
+                  calendarEvents={calendarEventsForDay}
                 />
               </div>
             </div>

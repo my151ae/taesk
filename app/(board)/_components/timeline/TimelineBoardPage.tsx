@@ -30,6 +30,7 @@ import {
   getMinutesFromTime,
   getIsoDateJst,
   getNowMinutesJst,
+  getMinutesJstFromIso,
   minutesToTime,
   withJstMidnight,
   toLocalDay,
@@ -39,6 +40,7 @@ import {
   type TimelineEvent,
   type TimelineBucketItem,
   type TimelineResponse,
+  type ExternalCalendarEntry,
 } from "@/app/(board)/_utils/timeline-helpers";
 
 import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
@@ -46,6 +48,7 @@ import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { normalizeDueBucket } from "@/lib/bucket-normalization";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
@@ -284,6 +287,90 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     showFilters,
     setShowFilters,
   } = useBoardFilters();
+
+  const visibleDays = useMemo(() => {
+    const days = data?.days ?? [];
+    if (!days.length) return [] as TimelineDay[];
+    const startIndex = Math.min(activeDayIndex, Math.max(0, days.length - 1));
+    const count = Math.min(dayRange, Math.max(days.length - startIndex, 0));
+    return days.slice(startIndex, startIndex + Math.max(count, 0));
+  }, [activeDayIndex, data?.days, dayRange]);
+
+  const calendarRangeStart = useMemo(() => {
+    if (!visibleDays.length) return null;
+    const startIso = withJstMidnight(visibleDays[0]?.isoDate ?? null);
+    return startIso ? new Date(startIso) : null;
+  }, [visibleDays]);
+
+  const calendarRangeEnd = useMemo(() => {
+    if (!visibleDays.length) return null;
+    const endIso = withJstMidnight(visibleDays[visibleDays.length - 1]?.isoDate ?? null);
+    if (!endIso) return null;
+    const end = new Date(endIso);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return end;
+  }, [visibleDays]);
+
+  const {
+    events: googleCalendarEvents,
+    status: googleCalendarStatus,
+    error: googleCalendarError,
+    refresh: refreshGoogleCalendar,
+  } = useGoogleCalendar(calendarRangeStart, calendarRangeEnd);
+
+  const calendarEventsByDay = useMemo(() => {
+    if (!googleCalendarEvents.length || !(data?.days?.length)) return {} as Record<string, ExternalCalendarEntry[]>;
+    const daySet = new Set((data?.days ?? []).map((day) => day.isoDate));
+    const result: Record<string, ExternalCalendarEntry[]> = {};
+
+    googleCalendarEvents.forEach((event) => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+
+      const startMs = start.getTime();
+      const endMs = end.getTime();
+      let cursorMs = startMs;
+      const baseId = event.id || `gcal-${startMs}`;
+
+      while (cursorMs < endMs) {
+        const cursor = new Date(cursorMs);
+        const dayIso = getIsoDateJst(cursor.toISOString());
+        const nextDay = new Date(cursor);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        const nextDayMs = nextDay.getTime();
+
+        const isFirstDay = cursorMs === startMs;
+        const isLastDay = nextDayMs >= endMs;
+
+        const startMinutes = isFirstDay ? getMinutesJstFromIso(event.start) : 0;
+        let endMinutes = isLastDay ? getMinutesJstFromIso(event.end) : 24 * 60;
+        if (isLastDay && endMinutes === 0) endMinutes = 24 * 60;
+
+        const duration = Math.max(15, endMinutes - startMinutes);
+
+        if (daySet.has(dayIso)) {
+          if (!result[dayIso]) result[dayIso] = [];
+          result[dayIso].push({
+            id: `${baseId}-${dayIso}`,
+            title: event.title,
+            startMinutes,
+            durationMinutes: duration,
+            isAllDay: event.isAllDay,
+            source: event.source,
+          });
+        }
+
+        cursorMs = nextDayMs;
+      }
+    });
+
+    Object.values(result).forEach((entries) => {
+      entries.sort((a, b) => a.startMinutes - b.startMinutes);
+    });
+
+    return result;
+  }, [googleCalendarEvents, data?.days]);
 
   // Realtime & Sync
   const { isOnline, syncQueueStats } = useSyncQueue();
@@ -968,6 +1055,27 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Array.from(tags).sort();
   }, [data?.events, data?.abBuckets]);
 
+  const googleStatusText = useMemo(() => {
+    if (googleCalendarStatus === 'loading') return 'Google予定を同期中...';
+    if (googleCalendarStatus === 'success') {
+      const count = googleCalendarEvents.length;
+      return count > 0 ? `Google予定を表示中（${count}件）` : 'Google連携済み（予定はありません）';
+    }
+    if (googleCalendarStatus === 'disconnected') return 'Google連携が切れています。接続してください。';
+    if (googleCalendarStatus === 'error') return 'Google予定の取得に失敗しました。';
+    return 'Google予定の同期を準備中...';
+  }, [googleCalendarEvents.length, googleCalendarStatus]);
+
+  const handleGoogleConnect = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const redirect = `${window.location.pathname}${window.location.search}`;
+    const target = `/api/integrations/google-calendar/connect?redirect=${encodeURIComponent(redirect || '/board')}`;
+    window.location.href = target;
+  }, []);
+
+  const isGoogleLoading = googleCalendarStatus === 'loading';
+  const isCalendarRangeReady = Boolean(calendarRangeStart && calendarRangeEnd);
+
 
 
   const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
@@ -1132,6 +1240,34 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             }}
           />
 
+          <div className="flex flex-col gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Google Calendar</span>
+              <span className="text-xs md:text-sm">
+                {googleStatusText}
+                {googleCalendarError && googleCalendarStatus === 'error' ? ` (${googleCalendarError})` : ''}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => refreshGoogleCalendar()}
+                disabled={isGoogleLoading || !isCalendarRangeReady}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                再取得
+              </button>
+              <button
+                type="button"
+                onClick={handleGoogleConnect}
+                disabled={isGoogleLoading}
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {googleCalendarStatus === 'disconnected' ? '接続する' : '再接続'}
+              </button>
+            </div>
+          </div>
+
           <div className="hidden md:block">
             <DesktopTimelineView
               timelineHeaderRef={timelineHeaderRef}
@@ -1168,6 +1304,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               handleDragCancel={handleDragCancel}
               isOverABList={isOverABList}
               floatingLayerTop={floatingLayerTop}
+              calendarEventsByDay={calendarEventsByDay}
             />
           </div>
 
@@ -1199,6 +1336,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 bucketIndicator={bucketIndicator}
                 isOverABList={isOverABList}
                 pointerPreview={pointerPreview}
+                calendarEventsByDay={calendarEventsByDay}
               />
             </div>
           </div>

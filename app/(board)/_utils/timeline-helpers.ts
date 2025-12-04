@@ -1,6 +1,14 @@
 import type { DragEndEvent, DragMoveEvent } from "@dnd-kit/core";
 import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile } from '@/lib/api-types/timeline';
 export type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile };
+export type ExternalCalendarEntry = {
+    id: string;
+    title: string;
+    startMinutes: number;
+    durationMinutes: number;
+    isAllDay: boolean;
+    source: 'google_calendar';
+};
 
 // Constants
 export const HOUR_HEIGHT = 40;
@@ -57,6 +65,8 @@ export const getNowMinutesJst = (timestamp: string) => {
     const hours = (current.getUTCHours() + 9 + 24) % 24;
     return hours * 60 + minutes;
 };
+
+export const getMinutesJstFromIso = (timestamp: string) => getNowMinutesJst(timestamp);
 
 export const minutesToTime = (value: number) => {
     const clamped = Math.max(0, Math.min(24 * 60 - 1, value));

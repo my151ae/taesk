@@ -10,7 +10,8 @@ import {
     minuteToPixels,
     minutesToTime,
     calculateEventLayout,
-    timeLabel
+    timeLabel,
+    ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -47,6 +48,7 @@ type TimelineColumnProps = {
     editingCardId: string | null;
     shrinkToHalf?: boolean;
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
+    calendarEvents: ExternalCalendarEntry[];
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -80,9 +82,25 @@ export const TimelineColumn = memo(function TimelineColumn({
     onChecklistEditingChange,
     editingCardId,
     shrinkToHalf = false,
-    setSelectedSlot
+    setSelectedSlot,
+    calendarEvents,
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
+    const calendarLayout = calculateEventLayout(
+        calendarEvents.map((entry) => ({
+            card_id: entry.id,
+            due_date: day.isoDate,
+            due_start: minutesToTime(entry.startMinutes),
+            due_end: minutesToTime(entry.startMinutes + entry.durationMinutes),
+            durationMinutes: entry.durationMinutes,
+            title: entry.title,
+            tags: [],
+            priority: null,
+            checked: false,
+            short_id: null,
+            slug: null,
+        }))
+    );
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
@@ -194,6 +212,37 @@ export const TimelineColumn = memo(function TimelineColumn({
                     )}
 
                     <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
+                        {calendarEvents.map((calendarEvent) => {
+                            const layout = calendarLayout[calendarEvent.id];
+                            return (
+                                <div
+                                    key={calendarEvent.id}
+                                    className="pointer-events-none absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)]"
+                                    style={{
+                                        top: minuteToPixels(calendarEvent.startMinutes),
+                                        height: Math.max(minuteToPixels(calendarEvent.durationMinutes), 18),
+                                        left: layout?.left ?? '0%',
+                                        width: layout?.width ?? '100%',
+                                    }}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        <span className="truncate font-semibold">{calendarEvent.title || 'Google予定'}</span>
+                                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                                            G
+                                        </span>
+                                    </div>
+                                    <p className="text-[9px] text-emerald-600">
+                                        {calendarEvent.isAllDay
+                                            ? '終日'
+                                            : timeLabel(
+                                                minutesToTime(calendarEvent.startMinutes),
+                                                minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                                            )
+                                        }
+                                    </p>
+                                </div>
+                            );
+                        })}
                         {events.map((event) => (
                         <TimelineEventItem
                             key={event.card_id}

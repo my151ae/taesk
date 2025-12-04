@@ -15,6 +15,7 @@ import {
   type TimelineBucketItem,
   type TimelineDay,
   type TimelineEvent,
+  type ExternalCalendarEntry,
 } from "@/app/(board)/_utils/timeline-helpers";
 import type { Checklist } from "@/lib/checklist";
 import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
@@ -56,6 +57,7 @@ type DesktopTimelineViewProps = {
   handleDragCancel: DragAndDropBindings["handleDragCancel"];
   isOverABList: boolean;
   floatingLayerTop: number;
+  calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
 };
 
 export function DesktopTimelineView({
@@ -93,6 +95,7 @@ export function DesktopTimelineView({
   handleDragCancel,
   isOverABList,
   floatingLayerTop,
+  calendarEventsByDay,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -226,6 +229,7 @@ export function DesktopTimelineView({
               onChecklistEditingChange={onChecklistEditingChange}
               editingCardId={editingCardId}
               shrinkDaysToHalf
+              calendarEventsByDay={calendarEventsByDay}
             />
           </div>
         </div>

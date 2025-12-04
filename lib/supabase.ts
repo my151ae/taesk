@@ -289,3 +289,16 @@ export interface NotificationPreferences {
   created_at: string;
   updated_at: string;
 }
+
+export interface GoogleCalendarAccount {
+  id: string;
+  user_id: string;
+  google_sub: string;
+  email: string;
+  access_token: string;
+  refresh_token: string;
+  scope: string;
+  token_expires_at: string;
+  created_at: string;
+  updated_at: string;
+}

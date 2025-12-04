@@ -3,6 +3,7 @@ import {
     TimelineDay,
     TimelineEvent,
     HOURS,
+    ExternalCalendarEntry,
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import { TimelineColumn } from './TimelineColumn';
@@ -43,6 +44,7 @@ type TimelineGridProps = {
     editingCardId: string | null;
     axisWidth?: number;
     shrinkDaysToHalf?: boolean;
+    calendarEventsByDay?: Record<string, ExternalCalendarEntry[]>;
 };
 
 export default function TimelineGrid({
@@ -66,6 +68,7 @@ export default function TimelineGrid({
     editingCardId,
     axisWidth = 80,
     shrinkDaysToHalf = false,
+    calendarEventsByDay,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -125,6 +128,7 @@ export default function TimelineGrid({
                         editingCardId={editingCardId}
                         shrinkToHalf={shrinkDaysToHalf}
                         setSelectedSlot={setSelectedSlot}
+                        calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
                     />
                 ))}
             </div>
