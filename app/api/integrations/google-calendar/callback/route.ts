@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
       ? new Date(tokens.expiry_date).toISOString()
       : new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    const scope = tokens.scope ?? tokenInfo.scope ?? GOOGLE_CALENDAR_SCOPE;
+    const scope = tokens.scope ?? (Array.isArray(tokenInfo.scopes) ? tokenInfo.scopes.join(" ") : GOOGLE_CALENDAR_SCOPE);
     const email = tokenInfo.email ?? user.email ?? "unknown";
 
     const { error: upsertError } = await supabase
