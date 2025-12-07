@@ -4,6 +4,8 @@ import {
   GoogleCalendarNotConnectedError,
   listEventsForRange,
   disconnectGoogleCalendarAccount,
+  getGoogleCalendarClientForUser,
+  hasCalendarWritePermission,
 } from "@/lib/googleCalendarServer";
 
 export const runtime = "nodejs";
@@ -30,6 +32,26 @@ export async function GET(request: NextRequest) {
   const startParam = request.nextUrl.searchParams.get("start");
   const endParam = request.nextUrl.searchParams.get("end");
 
+  // MODE 1: Permission Check Only (No dates provided)
+  if (!startParam && !endParam) {
+    try {
+      const { account } = await getGoogleCalendarClientForUser(user.id, { supabase });
+      const canWrite = hasCalendarWritePermission(account.scope);
+      return NextResponse.json({ connected: true, canWrite, events: [] }, { status: 200 });
+    } catch (error: any) {
+      if (error instanceof GoogleCalendarNotConnectedError) {
+        return NextResponse.json({ connected: false, events: [] }, { status: 200 });
+      }
+      // For other errors during simple check, return internal error or specific status
+      console.error("[googleCalendar/check] failed to check connection", error);
+      return NextResponse.json(
+        { error: { code: "GOOGLE_CALENDAR_CHECK_FAILED", message: "Failed to check Google Calendar connection" } },
+        { status: 500 }
+      );
+    }
+  }
+
+  // MODE 2: Event Fetching
   const start = parseDateParam(startParam);
   const end = parseDateParam(endParam);
 
@@ -56,8 +78,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const events = await listEventsForRange(user.id, start, end, { supabase });
-    return NextResponse.json({ connected: true, events }, { status: 200 });
+    const { events, canWrite } = await listEventsForRange(user.id, start, end, { supabase });
+    return NextResponse.json({ connected: true, canWrite, events }, { status: 200 });
   } catch (error: any) {
     if (error instanceof GoogleCalendarNotConnectedError) {
       return NextResponse.json({ connected: false, events: [] }, { status: 200 });

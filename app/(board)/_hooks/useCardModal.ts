@@ -168,28 +168,42 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             setModalCardOverride(null);
             try {
                 const response = await fetch(`/api/cards/${targetShortId}`);
+                const body = await response.json().catch(() => null);
                 if (!response.ok) {
-                    const body = await response.json().catch(() => null);
-                    throw new Error(body?.error?.message || 'Failed to load card');
+                    throw new Error(body?.error?.message || `Failed to load card (status ${response.status})`);
                 }
-                const body = await response.json();
                 if (cancelled) return;
-                setModalCardOverride(body.card ?? null);
-                if (Array.isArray(body.profiles) && body.profiles.length > 0) {
+                const nextCard = body?.card ?? null;
+                setModalCardOverride(nextCard);
+                if (Array.isArray(body?.profiles) && body.profiles.length > 0) {
                     setModalProfiles(body.profiles);
                 }
-                setCardModalStatus(body.card ? 'ready' : 'error');
-                if (body.card) {
+                if (nextCard) {
+                    setCardModalStatus('ready');
                     // Prefetch comments
-                    loadComments(body.card.id);
+                    loadComments(nextCard.id);
                 } else {
                     setCardModalError('Card not found');
+                    // Fallback: if timeline data already has the card, still show the modal
+                    if (modalCardFromData) {
+                        setModalCardOverride(modalCardFromData);
+                        setCardModalStatus('ready');
+                    } else {
+                        setCardModalStatus('error');
+                    }
                 }
             } catch (error) {
                 if (cancelled) return;
                 console.error('[timeline] failed to load card', error);
-                setCardModalError(error instanceof Error ? error.message : 'Failed to load card');
-                setCardModalStatus('error');
+                const message = error instanceof Error ? error.message : 'Failed to load card';
+                setCardModalError(message);
+                // If we already have data in timeline state, allow opening with that as a fallback
+                if (modalCardFromData) {
+                    setModalCardOverride(modalCardFromData);
+                    setCardModalStatus('ready');
+                } else {
+                    setCardModalStatus('error');
+                }
             }
         };
 
@@ -198,7 +212,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         return () => {
             cancelled = true;
         };
-    }, [activeCardId, cardIdFromUrl, cardModalStatus, isModalClosing, loadComments]);
+    }, [activeCardId, cardIdFromUrl, cardModalStatus, isModalClosing, loadComments, modalCardFromData]);
 
     // Load Board Members
     useEffect(() => {

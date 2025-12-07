@@ -4,12 +4,15 @@ import { google, type calendar_v3 } from "googleapis";
 import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
-export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+export const GOOGLE_CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 const TOKEN_EXPIRY_BUFFER_MS = 60_000;
+
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 type GoogleAccountRow = {
+  id: string;
   user_id: string;
   google_sub: string;
   email: string;
@@ -18,6 +21,10 @@ type GoogleAccountRow = {
   scope: string;
   token_expires_at: string;
 };
+
+export function hasCalendarWritePermission(scope: string): boolean {
+  return scope.includes("calendar.events") || scope.includes("https://www.googleapis.com/auth/calendar") || scope.includes("https://www.googleapis.com/auth/calendar.events");
+}
 
 export class GoogleCalendarNotConnectedError extends Error {
   code = "GOOGLE_CALENDAR_NOT_CONNECTED";
@@ -63,7 +70,7 @@ async function fetchAccount(supabase: SupabaseClient, userId: string): Promise<G
   const { data, error } = await supabase
     .from("google_calendar_accounts")
     .select(
-      "user_id, google_sub, email, access_token, refresh_token, scope, token_expires_at"
+      "id, user_id, google_sub, email, access_token, refresh_token, scope, token_expires_at"
     )
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
@@ -192,8 +199,8 @@ export async function listEventsForRange(
   start: Date,
   end: Date,
   options?: { calendarId?: string; supabase?: SupabaseClient; redirectUri?: string }
-): Promise<GoogleCalendarEvent[]> {
-  const { calendar } = await getGoogleCalendarClientForUser(userId, {
+): Promise<{ events: GoogleCalendarEvent[]; canWrite: boolean }> {
+  const { calendar, account } = await getGoogleCalendarClientForUser(userId, {
     supabase: options?.supabase,
     redirectUri: options?.redirectUri,
   });
@@ -213,7 +220,9 @@ export async function listEventsForRange(
     .map((item) => mapGoogleEvent(item, calendarId))
     .filter((event): event is GoogleCalendarEvent => Boolean(event));
 
-  return events;
+  const canWrite = hasCalendarWritePermission(account.scope);
+
+  return { events, canWrite };
 }
 
 export async function disconnectGoogleCalendarAccount(userId: string, supabase?: SupabaseClient) {

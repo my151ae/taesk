@@ -8,6 +8,8 @@ import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
 import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
+import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
+import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 
 const getProfileDisplayName = (profile: ProfileSummary): string => {
   const identity = resolveProfileIdentity(profile, profile.email ?? null);
@@ -323,6 +325,12 @@ export function CardModal({
     setIsDirty(true);
   };
 
+  // Google Calendar Integration
+  const { connected: googleConnected, canWrite: googleCanWrite } = useGoogleCalendar();
+  // Handle calendar_sync possibly being an array or object due to Supabase join
+  const syncData = (card as any).calendar_sync;
+  const syncStatus = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
+
   const handleDelete = () => {
     if (confirm('Delete this card?')) {
       onDelete(card.id);
@@ -538,6 +546,21 @@ export function CardModal({
                   <p className="text-xs text-slate-500">
                     📋 This card will appear in the A/B List.
                   </p>
+                )}
+
+                {/* Google Calendar Sync Toggle */}
+                {dueDate && dueStart && dueEnd && (
+                  <GoogleSyncToggle
+                    cardId={card.id}
+                    initialStatus={syncStatus}
+                    connected={googleConnected}
+                    canWrite={googleCanWrite}
+                  />
+                )}
+                {dueDate && (!dueStart || !dueEnd) && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-200">
+                    Google Calendar 連携は開始・終了時刻があるタイムラインカードのみ有効です。時間を設定するとトグルが有効になります。
+                  </div>
                 )}
               </div>
             </div>

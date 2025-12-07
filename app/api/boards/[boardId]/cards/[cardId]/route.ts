@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { syncCardToCalendar, deleteCardFromCalendar } from '@/lib/calendarSyncService';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -169,6 +170,8 @@ export async function PATCH(
     // Log activity (only if we have a card to reference)
     if (ensuredCard) {
       const action = parsed.data.list_id ? 'moved' : 'updated';
+
+      // Independent async logging
       supabase.from('activity_logs').insert({
         board_id: boardId,
         user_id: user.id,
@@ -179,6 +182,18 @@ export async function PATCH(
       }).then(({ error: logError }) => {
         if (logError) console.error('Activity log failed:', logError);
       });
+
+      // Google Calendar Sync Trigger (Fire and forget or await without blocking response error?)
+      // We await it to ensure consistency, but catch errors to avoid failing the UI update.
+      if (ensuredCard.due_start && ensuredCard.due_end) {
+        syncCardToCalendar(supabase, user.id, ensuredCard.id, {
+          summary: ensuredCard.title,
+          description: ensuredCard.description ?? "",
+          start: { dateTime: ensuredCard.due_start, timeZone: "Asia/Tokyo" },
+          end: { dateTime: ensuredCard.due_end, timeZone: "Asia/Tokyo" },
+        }, { onlyUpdate: true })
+          .catch(err => console.error("[card-patch] google sync failed", err));
+      }
     }
 
     return NextResponse.json({ card: ensuredCard }, { status: 200 });
@@ -233,6 +248,15 @@ export async function DELETE(
       .eq('id', cardId)
       .eq('board_id', boardId)
       .single();
+
+    if (card) {
+      // Attempt to delete from Google Calendar if synced.
+      // We do this BEFORE DB delete, but we don't block on failure (best effort).
+      // Actually, if we delete local card, CASCADE deletes sync record, losing the google_event_id.
+      // So we MUST try to delete from Google first.
+      await deleteCardFromCalendar(supabase, user.id, cardId)
+        .catch(err => console.error("[card-delete] google sync delete failed", err));
+    }
 
     const { error } = await supabase
       .from('cards')

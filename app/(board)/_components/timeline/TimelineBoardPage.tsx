@@ -1206,14 +1206,127 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Math.max(available, TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
   }, [viewportHeight, timelineHeaderHeight]);
 
-  const handleColumnClick = useCallback(
-    (day: TimelineDay, minutes: number) => {
-      console.debug('[timeline] column click', { day, minutes });
-    },
-    []
-  );
+  const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
+    if (dataMode !== 'api') return;
+    try {
+      const response = await fetch(`/api/boards/${initialBoard.id}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Failed to create card');
+      const body = await response.json();
 
-  const shouldShowCardModal = cardModalStatus === 'ready';
+      if (body.card) {
+        // Replace temporary card with real card
+        const newCard = body.card as Card;
+        setData((prev) => {
+          if (!prev) return prev;
+          const start = getMinutesFromTime(newCard.due_start ?? null) ?? 0;
+          const end = getMinutesFromTime(newCard.due_end ?? null) ?? (start + 60);
+          const newEvent: TimelineEvent = {
+            card_id: newCard.id,
+            due_date: getIsoDateJst(newCard.due_date ?? ''),
+            due_start: newCard.due_start ?? null,
+            due_end: newCard.due_end ?? null,
+            durationMinutes: end - start,
+            title: newCard.title,
+            tags: newCard.tags ?? [],
+            checklist: normalizeChecklist(newCard.checklist ?? EMPTY_CHECKLIST),
+            due_bucket: newCard.due_bucket ?? null,
+            due_bucket_position: newCard.due_bucket_position ?? null,
+            priority: newCard.priority ?? null,
+            checked: newCard.checked ?? false,
+            assignee_id: newCard.assignee_id ?? null,
+            assignee_ids: newCard.assignee_ids ?? null,
+            assigned_to: newCard.assigned_to ?? null,
+            short_id: newCard.short_id ?? null,
+            slug: newCard.slug ?? null,
+          };
+
+          // If tempId exists, replace the temp card, otherwise just add
+          const events = tempId
+            ? prev.events.map(e => e.card_id === tempId ? newEvent : e)
+            : [...prev.events, newEvent];
+
+          return {
+            ...prev,
+            events,
+          };
+        });
+
+        // Auto-open modal for the new card
+        if (newCard.short_id) {
+          openCardModal(newCard.short_id, 'create-card');
+        }
+      }
+    } catch (error) {
+      console.error('Create card failed', error);
+      setErrorMessage('Failed to create card');
+
+      // Remove optimistic card on error
+      if (tempId) {
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            events: prev.events.filter(e => e.card_id !== tempId),
+          };
+        });
+      }
+    }
+  }, [dataMode, initialBoard.id, setData]);
+
+  const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
+    console.debug('[timeline] column click', { day, minutes });
+
+    const payload: Partial<Card> = {
+      title: `New card ${Date.now()}`,
+      checklist: EMPTY_CHECKLIST,
+      tags: [],
+      due_date: withJstMidnight(day.isoDate),
+      due_start: minutesToTime(minutes),
+      due_end: minutesToTime(minutes + 60),
+      due_bucket: null,
+      due_bucket_position: null,
+      priority: 'medium',
+    };
+
+    // Optimistic update to show card immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticEvent: TimelineEvent = {
+      card_id: tempId,
+      due_date: day.isoDate,
+      due_start: minutesToTime(minutes),
+      due_end: minutesToTime(minutes + 60),
+      durationMinutes: 60,
+      title: payload.title || 'New card',
+      checklist: EMPTY_CHECKLIST,
+      tags: [],
+      due_bucket: null,
+      due_bucket_position: null,
+      priority: 'medium',
+      checked: false,
+      assignee_id: null,
+      assignee_ids: null,
+      assigned_to: null,
+      short_id: null,
+      slug: null,
+    };
+
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        events: [...prev.events, optimisticEvent],
+      };
+    });
+
+    createCard(payload, tempId);
+  }, [createCard, setData]);
+
+  // Show modal as soon as we have a card (e.g., from timeline data), even while the API is still loading.
+  const shouldShowCardModal = Boolean(modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading'));
   const modalBoards = availableBoards;
   const hasActiveFilters = searchQuery.trim() !== '' || selectedTags.length > 0 || selectedPriority !== 'all';
   const floatingLayerTop = timelineHeaderHeight;

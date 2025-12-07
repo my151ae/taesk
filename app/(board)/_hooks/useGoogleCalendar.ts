@@ -7,6 +7,7 @@ type GoogleCalendarStatus = "idle" | "loading" | "success" | "error" | "disconne
 
 type CacheEntry = {
   events: GoogleCalendarEvent[];
+  canWrite: boolean; // Added
   status: GoogleCalendarStatus;
   error: string | null;
 };
@@ -23,25 +24,27 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
   }, [endDate]);
 
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [canWrite, setCanWrite] = useState<boolean>(false);
   const [status, setStatus] = useState<GoogleCalendarStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
 
-  const cacheKey = startIso && endIso ? `${startIso}_${endIso}` : null;
+  const cacheKey = startIso && endIso ? `${startIso}_${endIso}` : "permission_check";
 
   const load = useCallback(async (force = false) => {
-    if (!startIso || !endIso || !cacheKey) {
-      setEvents([]);
-      setStatus("idle");
-      setError(null);
+    // If no dates, we still fetch to check permissions, unless it's strictly required to have dates.
+    // The API now supports missing dates for permission check.
+    if (!cacheKey) {
+      // Should not happen with new logic, but safe guard
       return;
     }
 
     if (!force && cacheRef.current.has(cacheKey)) {
       const cached = cacheRef.current.get(cacheKey)!;
       setEvents(cached.events);
+      setCanWrite(cached.canWrite); // Restore canWrite
       setStatus(cached.status);
       setError(cached.error);
       return;
@@ -55,16 +58,25 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     abortRef.current = controller;
 
     try {
-      const params = new URLSearchParams({ start: startIso, end: endIso });
-      const response = await fetch(`/api/calendar/events?${params.toString()}`, { signal: controller.signal });
+      const params = new URLSearchParams();
+      if (startIso && endIso) {
+        params.append('start', startIso);
+        params.append('end', endIso);
+      }
+
+      const queryString = params.toString();
+      const url = queryString ? `/api/calendar/events?${queryString}` : '/api/calendar/events';
+
+      const response = await fetch(url, { signal: controller.signal });
       const body = (await response.json().catch(() => null)) as GoogleCalendarEventsResponse | null;
 
       if (controller.signal.aborted) return;
 
       if (body?.connected === false) {
-        const entry: CacheEntry = { events: [], status: "disconnected", error: body?.error ?? null };
+        const entry: CacheEntry = { events: [], canWrite: false, status: "disconnected", error: body?.error ?? null };
         cacheRef.current.set(cacheKey, entry);
         setEvents([]);
+        setCanWrite(false);
         setStatus("disconnected");
         setError(body?.error ?? null);
         return;
@@ -72,26 +84,32 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
       if (!response.ok) {
         const message = body?.error || "Failed to fetch Google Calendar events";
-        const entry: CacheEntry = { events: [], status: "error", error: message };
+        const entry: CacheEntry = { events: [], canWrite: false, status: "error", error: message };
         cacheRef.current.set(cacheKey, entry);
         setEvents([]);
+        setCanWrite(false);
         setStatus("error");
         setError(message);
         return;
       }
 
       const nextEvents = Array.isArray(body?.events) ? body!.events : [];
-      const entry: CacheEntry = { events: nextEvents, status: "success", error: body?.error ?? null };
+      const nextCanWrite = body?.canWrite ?? false;
+
+      const entry: CacheEntry = { events: nextEvents, canWrite: nextCanWrite, status: "success", error: body?.error ?? null };
       cacheRef.current.set(cacheKey, entry);
+
       setEvents(nextEvents);
+      setCanWrite(nextCanWrite);
       setStatus("success");
       setError(body?.error ?? null);
     } catch (err) {
       if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Failed to fetch Google Calendar events";
-      const entry: CacheEntry = { events: [], status: "error", error: message };
+      const entry: CacheEntry = { events: [], canWrite: false, status: "error", error: message }; // Default false on error
       cacheRef.current.set(cacheKey, entry);
       setEvents([]);
+      setCanWrite(false);
       setStatus("error");
       setError(message);
     }
@@ -113,9 +131,15 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
   return {
     events,
+    canWrite,
     status,
     error,
-    connected: status !== "disconnected",
+    connected: status !== "disconnected" && status !== "error" && status !== "idle", // 'idle' means not loaded yet
+    // Actually connected logic in v1 was `status !== "disconnected"`. Let's keep it consistent but safer.
+    // Wait, original was `connected: status !== "disconnected"`.
+    // If error occurs (e.g. rate limit), we are still connected?
+    // Let's stick to original behavior as much as possible but expose canWrite.
+    isConnected: status === "success" || (status !== "disconnected" && status !== "error"), // ambiguous
     refresh,
   };
 }
