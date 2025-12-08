@@ -1294,7 +1294,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         });
       }
     }
-  }, [dataMode, initialBoard.id, setData]);
+  }, [dataMode, initialBoard.id, setData, openCardModal]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     console.debug('[timeline] column click', { day, minutes });

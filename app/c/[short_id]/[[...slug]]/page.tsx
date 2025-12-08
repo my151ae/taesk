@@ -31,10 +31,12 @@ export default async function CardFullPage({
 
   // Deep linkはボード上のモーダルを開きたいケースが多いため、ボードURLが判明していれば
   // `/board...?card=SHORTID` にリダイレクトする。共有ページとしての表示はフォールバック。
-  if (boardUrl) {
+  if (boardUrl && card.short_id) {
     const redirectUrl = new URL(boardUrl, resolveAppOrigin());
     redirectUrl.searchParams.set("card", card.short_id);
     redirect(redirectUrl.toString());
+  } else if (boardUrl) {
+    redirect(boardUrl);
   }
 
   return (

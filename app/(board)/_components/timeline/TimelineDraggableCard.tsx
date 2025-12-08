@@ -44,7 +44,7 @@ export const DraggableCard = ({
                 transform: CSS.Translate.toString(transform),
                 touchAction: 'manipulation',
             },
-            className: [child.props.className, !disabled && isDragging ? 'z-30 opacity-80' : undefined].filter(Boolean).join(' '),
+            className: [child.props.className, !disabled && isDragging ? 'z-40 opacity-90' : undefined].filter(Boolean).join(' '),
             ...(disabled ? {} : listeners),
             ...(disabled ? {} : attributes),
         });
@@ -54,7 +54,7 @@ export const DraggableCard = ({
         <div
             ref={combinedRef}
             style={{ transform: CSS.Translate.toString(transform), touchAction: 'manipulation' }}
-            className={!disabled && isDragging ? 'z-30 opacity-80' : undefined}
+            className={!disabled && isDragging ? 'z-40 opacity-90' : undefined}
             {...(disabled ? {} : listeners)}
             {...(disabled ? {} : attributes)}
         >
