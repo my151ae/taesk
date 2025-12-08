@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";

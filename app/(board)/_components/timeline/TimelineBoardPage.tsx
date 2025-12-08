@@ -52,6 +52,7 @@ import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { normalizeDueBucket } from "@/lib/bucket-normalization";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
+import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
