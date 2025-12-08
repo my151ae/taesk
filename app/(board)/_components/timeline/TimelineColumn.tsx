@@ -97,7 +97,7 @@ export const TimelineColumn = memo(function TimelineColumn({
             tags: [],
             priority: null,
             checked: false,
-            short_id: null,
+            short_id: entry.eventId ?? entry.id,
             slug: null,
         }))
     );
