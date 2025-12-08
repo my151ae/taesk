@@ -1108,7 +1108,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (googleCalendarStatus === 'loading') return 'Google予定を同期中...';
     if (googleCalendarStatus === 'success') {
       const count = googleCalendarEvents.length;
-      return count > 0 ? `Google予定を表示中（${count}件）` : 'Google連携済み（予定はありません）';
+      return count > 0 ? `${count}件のGoogle予定を表示中` : 'Google連携済み（予定なし）';
     }
     if (googleCalendarStatus === 'disconnected') return 'Google連携が切れています。接続してください。';
     if (googleCalendarStatus === 'error') return 'Google予定の取得に失敗しました。';
@@ -1409,47 +1409,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 alert('Failed to update board');
               }
             }}
+            googleStatusText={googleStatusText}
+            googleCalendarStatus={googleCalendarStatus}
+            googleCalendarError={googleCalendarError}
+            calendarPreset={calendarPreset}
+            setCalendarPreset={setCalendarPreset}
+            refreshGoogleCalendar={refreshGoogleCalendar}
+            handleGoogleConnect={handleGoogleConnect}
+            isGoogleLoading={isGoogleLoading}
+            isCalendarRangeReady={isCalendarRangeReady}
           />
 
-          <div className="flex flex-col gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Google Calendar</span>
-              <span className="text-xs md:text-sm">
-                {googleStatusText}
-                {googleCalendarError && googleCalendarStatus === 'error' ? ` (${googleCalendarError})` : ''}
-              </span>
-              <div className="flex items-center gap-1 text-xs md:text-sm">
-                <label className="text-emerald-700">期間:</label>
-                <select
-                  value={calendarPreset}
-                  onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}
-                  className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                >
-                  <option value="visible">表示範囲</option>
-                  <option value="this-week">今週</option>
-                  <option value="next-week">来週</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => refreshGoogleCalendar()}
-                disabled={isGoogleLoading || !isCalendarRangeReady}
-                className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                再取得
-              </button>
-              <button
-                type="button"
-                onClick={handleGoogleConnect}
-                disabled={isGoogleLoading}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {googleCalendarStatus === 'disconnected' ? '接続する' : '再接続'}
-              </button>
-            </div>
-          </div>
+          {/* Google Calendar controls moved to header */}
           {googleToast && (
             <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">
               {googleToast}
