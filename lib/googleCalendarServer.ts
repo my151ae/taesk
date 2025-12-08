@@ -41,6 +41,8 @@ type NormalizedGoogleEvent = GoogleCalendarEvent & {
   originalStartTime: string | null;
   description: string | null;
   updatedAtGoogle: string | null;
+  taeskCardId?: string | null;
+  taeskUpdatedAt?: string | null;
 };
 
 type GoogleCalendarSyncStateRow = {
@@ -258,6 +260,10 @@ function mapGoogleEvent(item: calendar_v3.Schema$Event, calendarId: string): Nor
   const id = item.id ?? item.iCalUID ?? `${start.iso}-${end.iso}`;
   const title = item.summary ?? "Untitled event";
 
+  const privateProps = item.extendedProperties?.private ?? {};
+  const taeskCardId = typeof privateProps === "object" ? (privateProps as any).taeskCardId ?? (privateProps as any).taeskCardID ?? null : null;
+  const taeskUpdatedAt = typeof privateProps === "object" ? (privateProps as any).taeskUpdatedAt ?? null : null;
+
   return {
     id,
     title,
@@ -281,6 +287,8 @@ function mapGoogleEvent(item: calendar_v3.Schema$Event, calendarId: string): Nor
     originalStartTime: item.originalStartTime?.dateTime ?? item.originalStartTime?.date ?? null,
     description: item.description ?? null,
     updatedAtGoogle: item.updated ? new Date(item.updated).toISOString() : null,
+    taeskCardId,
+    taeskUpdatedAt: taeskUpdatedAt ? new Date(taeskUpdatedAt).toISOString() : null,
   };
 }
 
@@ -347,6 +355,15 @@ async function removeCancelledEvents(
   if (error) {
     console.error("[googleCalendar] failed to delete cancelled events", error);
   }
+}
+
+function shouldSkipSelfUpdate(event: NormalizedGoogleEvent): boolean {
+  if (!event.taeskUpdatedAt) return false;
+  const updatedMs = new Date(event.taeskUpdatedAt).getTime();
+  if (!Number.isFinite(updatedMs)) return false;
+  const ageMs = Date.now() - updatedMs;
+  // Skip events we just wrote within the last 30s
+  return ageMs >= 0 && ageMs <= 30_000;
 }
 
 async function pruneCacheWindow(
@@ -610,7 +627,8 @@ async function fetchAndCacheRange(
   const normalizedEvents = items
     .map((item) => mapGoogleEvent(item, calendarId))
     .filter((event): event is NormalizedGoogleEvent => Boolean(event))
-    .filter((event) => event.status !== "cancelled");
+    .filter((event) => event.status !== "cancelled")
+    .filter((event) => !shouldSkipSelfUpdate(event));
 
   if (normalizedEvents.length) {
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
@@ -652,7 +670,8 @@ async function fetchWithSyncToken(
   const normalizedEvents = items
     .map((item) => mapGoogleEvent(item, calendarId))
     .filter((event): event is NormalizedGoogleEvent => Boolean(event))
-    .filter((event) => event.status !== "cancelled");
+    .filter((event) => event.status !== "cancelled")
+    .filter((event) => !shouldSkipSelfUpdate(event));
 
   if (normalizedEvents.length) {
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
