@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   GoogleCalendarNotConnectedError,
   listEventsForRange,
+  listCachedEventsForRange,
   disconnectGoogleCalendarAccount,
   getGoogleCalendarClientForUser,
   hasCalendarWritePermission,
@@ -108,6 +109,14 @@ export async function GET(request: NextRequest) {
         { connected: true, events: [], error: "SERVICE_UNAVAILABLE" },
         { status: 503 }
       );
+    }
+
+    // Fallback: serve cached events if available
+    try {
+      const { events, canWrite } = await listCachedEventsForRange(user.id, start, end, { supabase });
+      return NextResponse.json({ connected: true, canWrite, events, error: "STALE_CACHE" }, { status: 200 });
+    } catch (cacheError) {
+      console.error("[googleCalendar/events] cache fallback failed", cacheError);
     }
 
     console.error("[googleCalendar/events] failed to fetch events", error);

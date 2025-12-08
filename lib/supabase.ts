@@ -302,3 +302,65 @@ export interface GoogleCalendarAccount {
   created_at: string;
   updated_at: string;
 }
+
+export interface GoogleCalendarEventRecord {
+  id: string;
+  google_account_id: string;
+  calendar_id: string;
+  google_event_id: string;
+  recurring_event_id: string | null;
+  original_start_time: string | null;
+  summary: string | null;
+  description: string | null;
+  location: string | null;
+  status: string | null;
+  is_all_day: boolean;
+  display_tz: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  start_utc: string;
+  end_utc: string;
+  html_link: string | null;
+  conference_data: Record<string, unknown> | null;
+  attendees: Record<string, unknown>[] | null;
+  raw: Record<string, unknown> | null;
+  etag: string | null;
+  updated_at_google: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoogleCalendarSyncState {
+  id: string;
+  google_account_id: string;
+  calendar_id: string;
+  sync_token: string | null;
+  last_full_sync_at: string | null;
+  last_synced_at: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  watch_channel_id: string | null;
+  watch_resource_id: string | null;
+  watch_expiration: string | null;
+  watch_status: string;
+  polling_disabled_until: string | null;
+  p95_ingest_latency_ms: number | null;
+  last_watch_at: string | null;
+  watch_checked_at: string | null;
+  watch_ttl_seconds: number | null;
+  last_poll_started_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoogleCalendarSyncLog {
+  id: string;
+  google_account_id: string;
+  calendar_id: string | null;
+  google_event_id: string | null;
+  action: string;
+  detail: Record<string, unknown> | null;
+  channel_id?: string | null;
+  message_number?: string | null;
+  created_at: string;
+}
