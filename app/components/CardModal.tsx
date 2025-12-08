@@ -330,6 +330,7 @@ export function CardModal({
   // Handle calendar_sync possibly being an array or object due to Supabase join
   const syncData = (card as any).calendar_sync;
   const syncStatus = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
+  const lastGoogleEventId = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
 
   const handleDelete = () => {
     if (confirm('Delete this card?')) {
@@ -555,6 +556,8 @@ export function CardModal({
                     initialStatus={syncStatus}
                     connected={googleConnected}
                     canWrite={googleCanWrite}
+                    hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
+                    onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
                   />
                 )}
                 {dueDate && (!dueStart || !dueEnd) && (
@@ -821,3 +824,26 @@ export function CardModal({
     </div>
   );
 }
+  const [resyncCandidates, setResyncCandidates] = useState<any[]>([]);
+  const [resyncLoading, setResyncLoading] = useState(false);
+
+  const handleResyncRequest = useCallback(async () => {
+    if (!title) return;
+    setResyncLoading(true);
+    try {
+      const searchParams: { title: string; start?: string; end?: string } = { title };
+      if (dueDate) {
+        searchParams.start = dueDate;
+        searchParams.end = dueDate;
+      }
+      const res = await fetch(`/api/calendar/resync-candidates?title=${encodeURIComponent(searchParams.title)}${searchParams.start ? `&start=${encodeURIComponent(searchParams.start)}` : ""}${searchParams.end ? `&end=${encodeURIComponent(searchParams.end)}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch candidates");
+      const body = await res.json().catch(() => null);
+      setResyncCandidates(body?.candidates ?? []);
+    } catch (error) {
+      console.error("resync candidates error", error);
+      setResyncCandidates([]);
+    } finally {
+      setResyncLoading(false);
+    }
+  }, [title, dueDate]);

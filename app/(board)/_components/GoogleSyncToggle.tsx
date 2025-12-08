@@ -8,9 +8,11 @@ interface GoogleSyncToggleProps {
     initialStatus?: "active" | "unlinked" | "deleted";
     connected: boolean;
     canWrite: boolean;
+    onResyncRequest?: () => void;
+    hasResyncCandidate?: boolean;
 }
 
-export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite }: GoogleSyncToggleProps) {
+export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, onResyncRequest, hasResyncCandidate }: GoogleSyncToggleProps) {
     const [status, setStatus] = useState<"active" | "unlinked" | "deleted" | undefined>(initialStatus);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -21,6 +23,7 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite }:
         if (!connected) return "未接続";
         if (status === "active") return "Google接続";
         if (status === "deleted") return "同期エラー";
+        if (status === "unlinked" && hasResyncCandidate) return "再接続候補あり";
         return "未接続";
     })();
 
