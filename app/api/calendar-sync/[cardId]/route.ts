@@ -115,6 +115,14 @@ export async function POST(
             // location: ...
         });
 
+        if (result?.eventId) {
+            // Update last_google_event_id for resync candidates
+            await supabase
+                .from("calendar_sync")
+                .update({ last_google_event_id: result.eventId })
+                .eq("card_id", card.id);
+        }
+
         return NextResponse.json({ success: true, result });
     } catch (error: any) {
         if (error instanceof GoogleCalendarNotConnectedError) {

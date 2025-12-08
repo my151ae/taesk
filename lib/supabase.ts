@@ -138,6 +138,20 @@ export interface Card {
   updated_at: string;
 }
 
+export interface CalendarSync {
+  id: string;
+  card_id: string;
+  google_account_id: string;
+  google_event_id: string | null;
+  last_google_event_id: string | null;
+  calendar_id: string;
+  etag: string | null;
+  status: "active" | "unlinked" | "deleted";
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type CardUpsertPayload = Omit<Card, 'assignee_id'> & {
   assignee_id?: string | null;
 };

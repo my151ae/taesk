@@ -227,14 +227,19 @@ export async function syncCardToCalendar(
 
             const existingEvent = listRes.data.items?.[0];
 
-            if (existingEvent?.id) {
-                // Found existing: Link and Update
-                googleEventId = existingEvent.id;
-                // Proceed to update flow
-            } else {
-                // Create New
-                const insertRes = await calendar.events.insert({
-                    calendarId,
+                if (existingEvent?.id) {
+                    // Found existing: Link and Update
+                    googleEventId = existingEvent.id;
+                    // Store last_google_event_id for resync history
+                    await supabase
+                        .from("calendar_sync")
+                        .update({ last_google_event_id: existingEvent.id })
+                        .eq("card_id", cardId);
+                    // Proceed to update flow
+                } else {
+                    // Create New
+                    const insertRes = await calendar.events.insert({
+                        calendarId,
                     requestBody,
                 });
 
@@ -251,6 +256,7 @@ export async function syncCardToCalendar(
                             etag: insertRes.data.etag,
                             last_synced_at: new Date().toISOString(),
                             calendar_id: calendarId, // ensure calendarId is current
+                            last_google_event_id: insertRes.data.id,
                         })
                         .eq("id", syncRecord.id);
                 } else {
