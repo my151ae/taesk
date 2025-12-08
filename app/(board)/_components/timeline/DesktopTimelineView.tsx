@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
+import { useMemo } from "react";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
 import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
 import type {
@@ -58,6 +59,7 @@ type DesktopTimelineViewProps = {
   isOverABList: boolean;
   floatingLayerTop: number;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
+  calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
 };
 
 export function DesktopTimelineView({
@@ -96,10 +98,68 @@ export function DesktopTimelineView({
   isOverABList,
   floatingLayerTop,
   calendarEventsByDay,
+  calendarAllDayByDay,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
+  const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
+  const allDayLayout = useMemo(() => {
+    if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number }[], rows: 0 };
+
+    type Segment = { id: string; title: string; start: number; end: number };
+    const segments: Segment[] = [];
+    const ongoing = new Map<string, Segment>();
+
+    visibleDays.forEach((day, idx) => {
+      const items = calendarAllDayByDay[day.isoDate] ?? [];
+      const present = new Set<string>();
+
+      items.forEach((item) => {
+        const key = item.eventId ?? item.id;
+        present.add(key);
+        const existing = ongoing.get(key);
+        if (existing) {
+          if (idx === existing.end + 1) {
+            existing.end = idx;
+          } else {
+            segments.push(existing);
+            ongoing.set(key, { id: key, title: item.title || "Google予定", start: idx, end: idx });
+          }
+        } else {
+          ongoing.set(key, { id: key, title: item.title || "Google予定", start: idx, end: idx });
+        }
+      });
+
+      // close segments that ended before this day
+      const toClose: string[] = [];
+      ongoing.forEach((seg, key) => {
+        if (!present.has(key)) {
+          segments.push(seg);
+          toClose.push(key);
+        }
+      });
+      toClose.forEach((key) => ongoing.delete(key));
+    });
+
+    ongoing.forEach((seg) => segments.push(seg));
+
+    // pack rows so spans don't overlap on the same row
+    segments.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+    const rowEnds: number[] = [];
+    const placed = segments.map((seg) => {
+      let row = rowEnds.findIndex((end) => seg.start > end);
+      if (row === -1) {
+        row = rowEnds.length;
+        rowEnds.push(seg.end);
+      } else {
+        rowEnds[row] = seg.end;
+      }
+      return { ...seg, row };
+    });
+
+    return { segments: placed, rows: rowEnds.length };
+  }, [calendarAllDayByDay, hasAllDayEvents, visibleDays]);
 
   return (
     <DndContext
@@ -119,70 +179,120 @@ export function DesktopTimelineView({
       }}
     >
       <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
-        <div
-          ref={timelineHeaderRef}
-          className="z-30 grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
-          style={{
-            gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
-          }}
-        >
-          <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
-            <span className="leading-none text-[10px] text-slate-400">GMT+09</span>
-          </div>
-          {visibleDays.map((day, index) => (
-            <div
-              key={day.key}
-              className={clsx(
-                "px-4 py-3 text-center flex items-center justify-between relative",
-                "border-l border-slate-100"
-              )}
-            >
-              {index === 0 && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePrevDay();
-                  }}
-                  disabled={status === "loading"}
-                  className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                  aria-label="Previous day"
-                  type="button"
-                  style={{ pointerEvents: "auto" }}
-                >
-                  <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-              )}
-              {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-7" />}
-
-              <div className="flex-1">
-                <p className="text-slate-800">{day.label}</p>
-                <p className="text-[10px] text-slate-400">{day.isoDate}</p>
-              </div>
-
-              {index === (visibleDays.length - 1) && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleNextDay();
-                  }}
-                  disabled={status === "loading"}
-                  className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                  aria-label="Next day"
-                  type="button"
-                  style={{ pointerEvents: "auto" }}
-                >
-                  <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              )}
-              {index === 0 && <div className="w-7" />}
+        <div ref={timelineHeaderRef} className="z-30">
+          <div
+            className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
+            style={{
+              gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+            }}
+          >
+            <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
+              <span className="leading-none text-[10px] text-slate-400">GMT+09</span>
             </div>
-          ))}
+            {visibleDays.map((day, index) => (
+              <div
+                key={day.key}
+                className={clsx(
+                  "px-4 py-3 text-center flex items-center justify-between relative",
+                  "border-l border-slate-100"
+                )}
+              >
+                {index === 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePrevDay();
+                    }}
+                    disabled={status === "loading"}
+                    className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
+                    aria-label="Previous day"
+                    type="button"
+                    style={{ pointerEvents: "auto" }}
+                  >
+                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+                {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-7" />}
+
+                <div className="flex-1">
+                  <p className="text-slate-800">{day.label}</p>
+                  <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                </div>
+
+                {index === (visibleDays.length - 1) && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNextDay();
+                    }}
+                    disabled={status === "loading"}
+                    className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
+                    aria-label="Next day"
+                    type="button"
+                    style={{ pointerEvents: "auto" }}
+                  >
+                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+                {index === 0 && <div className="w-7" />}
+              </div>
+            ))}
+          </div>
+
+          {hasAllDayEvents && (
+            <div
+              className="grid border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
+              style={{
+                gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+              }}
+            >
+              <div
+                className="flex items-start justify-end border-r border-emerald-100/70 px-3 py-2 text-[10px] uppercase tracking-wide text-emerald-700"
+                style={{
+                  minHeight: Math.max(36, allDayLayout.rows * 28 + 8),
+                }}
+              >
+                終日
+              </div>
+              <div
+                className="relative px-2 py-2"
+                style={{
+                  gridColumn: `2 / span ${visibleDays.length}`,
+                  minHeight: Math.max(36, allDayLayout.rows * 28 + 8),
+                }}
+              >
+                {allDayLayout.segments.map((item) => {
+                  const span = item.end - item.start + 1;
+                  const dayWidth = 100 / visibleDays.length;
+                  const left = dayWidth * item.start;
+                  const width = dayWidth * span;
+                  return (
+                    <div
+                      key={`${item.id}-${item.start}-${item.end}`}
+                      className="absolute flex items-center gap-1 rounded-md border border-emerald-200 bg-white/90 px-2 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm"
+                      style={{
+                        top: 4 + item.row * 28,
+                        left: `calc(${left}% + 2px)`,
+                        width: `calc(${width}% - 4px)`,
+                      }}
+                      title={item.title || "Google予定"}
+                    >
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                        G
+                      </span>
+                      <span className="truncate">{item.title || "Google予定"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div

@@ -354,6 +354,7 @@ type MobileTimelineViewProps = {
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
+  calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
   indicatorTop: number | null;
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
@@ -383,6 +384,7 @@ export default function MobileTimelineView({
   eventsByDay,
   abBuckets,
   calendarEventsByDay,
+  calendarAllDayByDay,
   indicatorTop,
   indicatorDayIso,
   timelineViewportHeight,
@@ -409,10 +411,15 @@ export default function MobileTimelineView({
     return eventsByDay[activeDay.isoDate] ?? [];
   }, [activeDay, eventsByDay]);
 
-  const calendarEventsForDay = useMemo(() => {
+  const calendarTimedEventsForDay = useMemo(() => {
     if (!activeDay) return [] as ExternalCalendarEntry[];
     return calendarEventsByDay[activeDay.isoDate] ?? [];
   }, [activeDay, calendarEventsByDay]);
+
+  const calendarAllDayForDay = useMemo(() => {
+    if (!activeDay) return [] as ExternalCalendarEntry[];
+    return calendarAllDayByDay[activeDay.isoDate] ?? [];
+  }, [activeDay, calendarAllDayByDay]);
 
   const layoutMap = useMemo(() => calculateEventLayout(eventsForDay), [eventsForDay]);
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
@@ -518,6 +525,28 @@ export default function MobileTimelineView({
             </button>
           </div>
 
+          {calendarAllDayForDay.length > 0 && (
+            <div className="border-b border-emerald-100 bg-emerald-50/80 px-3 py-2">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                終日（Google）
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {calendarAllDayForDay.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm"
+                    title={item.title || "Google予定"}
+                  >
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                      G
+                    </span>
+                    <span className="truncate max-w-[180px]">{item.title || "Google予定"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div
             className="grid flex-1 overflow-hidden"
             style={{ gridTemplateColumns: "1fr 1fr" }}
@@ -548,7 +577,7 @@ export default function MobileTimelineView({
                   editingCardId={editingCardId}
                   pointerPreview={pointerPreview}
                   activeDragCardId={activeDragCardId}
-                  calendarEvents={calendarEventsForDay}
+                  calendarEvents={calendarTimedEventsForDay}
                 />
               </div>
             </div>

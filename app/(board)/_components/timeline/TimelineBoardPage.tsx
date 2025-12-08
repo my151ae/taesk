@@ -348,10 +348,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     refresh: refreshGoogleCalendar,
   } = useGoogleCalendar(presetRange.start, presetRange.end);
 
-  const calendarEventsByDay = useMemo(() => {
-    if (!googleCalendarEvents.length || !(data?.days?.length)) return {} as Record<string, ExternalCalendarEntry[]>;
+  const { calendarEventsByDay, calendarAllDayEventsByDay } = useMemo(() => {
+    if (!googleCalendarEvents.length || !(data?.days?.length)) {
+      return {
+        calendarEventsByDay: {} as Record<string, ExternalCalendarEntry[]>,
+        calendarAllDayEventsByDay: {} as Record<string, ExternalCalendarEntry[]>,
+      };
+    }
+
     const daySet = new Set((data?.days ?? []).map((day) => day.isoDate));
-    const result: Record<string, ExternalCalendarEntry[]> = {};
+    const timedResult: Record<string, ExternalCalendarEntry[]> = {};
+    const allDayResult: Record<string, ExternalCalendarEntry[]> = {};
 
     googleCalendarEvents.forEach((event) => {
       const start = new Date(event.start);
@@ -380,26 +387,38 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         const duration = Math.max(15, endMinutes - startMinutes);
 
         if (daySet.has(dayIso)) {
-          if (!result[dayIso]) result[dayIso] = [];
-          result[dayIso].push({
+          const entry: ExternalCalendarEntry = {
             id: `${baseId}-${dayIso}`,
+            eventId: event.id || baseId,
+            dayIso,
             title: event.title,
             startMinutes,
             durationMinutes: duration,
             isAllDay: event.isAllDay,
             source: event.source,
-          });
+          };
+
+          const target = event.isAllDay ? allDayResult : timedResult;
+          if (!target[dayIso]) target[dayIso] = [];
+          target[dayIso].push(entry);
         }
 
         cursorMs = nextDayMs;
       }
     });
 
-    Object.values(result).forEach((entries) => {
+    Object.values(timedResult).forEach((entries) => {
       entries.sort((a, b) => a.startMinutes - b.startMinutes);
     });
 
-    return result;
+    Object.values(allDayResult).forEach((entries) => {
+      entries.sort((a, b) => a.title.localeCompare(b.title));
+    });
+
+    return {
+      calendarEventsByDay: timedResult,
+      calendarAllDayEventsByDay: allDayResult,
+    };
   }, [googleCalendarEvents, data?.days]);
 
   // Realtime & Sync
@@ -1474,6 +1493,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               isOverABList={isOverABList}
               floatingLayerTop={floatingLayerTop}
               calendarEventsByDay={calendarEventsByDay}
+              calendarAllDayByDay={calendarAllDayEventsByDay}
             />
           </div>
 
@@ -1506,6 +1526,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 isOverABList={isOverABList}
                 pointerPreview={pointerPreview}
                 calendarEventsByDay={calendarEventsByDay}
+                calendarAllDayByDay={calendarAllDayEventsByDay}
               />
             </div>
           </div>

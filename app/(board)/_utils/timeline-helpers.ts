@@ -3,6 +3,8 @@ import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, 
 export type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile };
 export type ExternalCalendarEntry = {
     id: string;
+    eventId?: string;
+    dayIso?: string;
     title: string;
     startMinutes: number;
     durationMinutes: number;
