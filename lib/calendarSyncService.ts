@@ -203,6 +203,7 @@ export async function syncCardToCalendar(
             private: {
                 taeskCardId: cardId,
                 taeskUpdatedAt: new Date().toISOString(),
+                idempotency_key: `taesk:${cardId}`,
             },
         },
     };
@@ -267,17 +268,12 @@ export async function syncCardToCalendar(
 
         // --- UPDATE FLOW ---
         if (googleEventId) {
-            // Optimistic Locking with ETag is tricky with Google API client directly?
-            // Google API Node client handles headers? 
-            // We can pass headers in request options if needed, but 'If-Match' might be aggressive.
-            // Let's just try patch. 412 handling is robust but start simple.
-
             try {
                 const patchRes = await calendar.events.patch({
                     calendarId,
                     eventId: googleEventId,
                     requestBody,
-                });
+                }, syncRecord?.etag ? { headers: { "If-Match": syncRecord.etag } } : undefined);
 
                 await supabase
                     .from("calendar_sync")
@@ -305,6 +301,30 @@ export async function syncCardToCalendar(
                     // Recursive retry (one level deep ideally)
                     // simplified: throw specific error to trigger retry logic up stack or just recurse
                     return syncCardToCalendar(supabase, userId, cardId, eventParams);
+                }
+                if (err.code === 412) {
+                    // ETag mismatch: fetch latest etag then retry once without If-Match
+                    try {
+                        const latest = await calendar.events.get({ calendarId, eventId: googleEventId });
+                        const latestEtag = latest.data.etag;
+                        const retry = await calendar.events.patch({
+                            calendarId,
+                            eventId: googleEventId,
+                            requestBody,
+                        }, latestEtag ? { headers: { "If-Match": latestEtag } } : undefined);
+
+                        await supabase
+                            .from("calendar_sync")
+                            .update({
+                                etag: retry.data.etag,
+                                last_synced_at: new Date().toISOString(),
+                            })
+                            .eq("card_id", cardId);
+
+                        return { action: "updated", eventId: googleEventId };
+                    } catch (retryErr) {
+                        throw retryErr;
+                    }
                 }
                 throw err; // 403, 412, etc.
             }
