@@ -9,6 +9,8 @@ export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.e
 export const GOOGLE_CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 const TOKEN_EXPIRY_BUFFER_MS = 60_000;
 const DEFAULT_DISPLAY_TZ = "Asia/Tokyo";
+const PAST_WINDOW_DAYS = 28;   // 4 weeks
+const FUTURE_WINDOW_DAYS = 84; // 12 weeks
 
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
@@ -347,6 +349,27 @@ async function removeCancelledEvents(
   }
 }
 
+async function pruneCacheWindow(
+  supabase: SupabaseClient,
+  accountId: string,
+  calendarId: string,
+  now: Date
+) {
+  const minDate = new Date(now.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const maxDate = new Date(now.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase
+    .from("google_calendar_events")
+    .delete()
+    .eq("google_account_id", accountId)
+    .eq("calendar_id", calendarId)
+    .lt("end_utc", minDate)
+    .or(`start_utc.gt.${maxDate}`);
+
+  if (error) {
+    console.error("[googleCalendar] failed to prune cache window", error);
+  }
+}
+
 function rowToGoogleCalendarEvent(row: any): GoogleCalendarEvent {
   return {
     id: row.google_event_id,
@@ -569,10 +592,14 @@ async function fetchAndCacheRange(
   start: Date,
   end: Date
 ): Promise<NormalizedGoogleEvent[]> {
+  const now = new Date();
+  const expandedStart = new Date(Math.min(start.getTime(), now.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+  const expandedEnd = new Date(Math.max(end.getTime(), now.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+
   const response = await calendar.events.list({
     calendarId,
-    timeMin: start.toISOString(),
-    timeMax: end.toISOString(),
+    timeMin: expandedStart.toISOString(),
+    timeMax: expandedEnd.toISOString(),
     singleEvents: true,
     showDeleted: true,
     orderBy: "startTime",
@@ -595,10 +622,12 @@ async function fetchAndCacheRange(
   if (nextSyncToken) {
     await persistSyncState(supabase, accountId, calendarId, {
       syncToken: nextSyncToken,
-      windowStart: start,
-      windowEnd: end,
+      windowStart: expandedStart,
+      windowEnd: expandedEnd,
     });
   }
+
+  await pruneCacheWindow(supabase, accountId, calendarId, now);
 
   return normalizedEvents;
 }
@@ -610,6 +639,7 @@ async function fetchWithSyncToken(
   calendarId: string,
   syncToken: string
 ) {
+  const now = new Date();
   const response = await calendar.events.list({
     calendarId,
     syncToken,
@@ -636,6 +666,8 @@ async function fetchWithSyncToken(
       syncToken: nextSyncToken,
     });
   }
+
+  await pruneCacheWindow(supabase, accountId, calendarId, now);
 }
 
 function needsWatchRenewal(state: GoogleCalendarSyncStateRow | null): boolean {
