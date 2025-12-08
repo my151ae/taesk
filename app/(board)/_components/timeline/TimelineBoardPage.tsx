@@ -53,6 +53,7 @@ import { normalizeDueBucket } from "@/lib/bucket-normalization";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
+import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -1466,6 +1467,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               floatingLayerTop={floatingLayerTop}
               calendarEventsByDay={calendarEventsByDay}
               calendarAllDayByDay={calendarAllDayEventsByDay}
+              onExternalEventClick={handleExternalEventClick}
             />
           </div>
 
@@ -1621,3 +1623,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     </>
   );
 }
+  const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
+    try {
+      const googleEventId = entry.eventId ?? entry.id;
+      const res = await fetch('/api/calendar/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_event_id: googleEventId }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.error?.message || 'Failed to sync Google event');
+      }
+      await fetchTimeline(0);
+      refreshGoogleCalendar();
+      setGoogleToast('GoogleイベントをTaeskカードに変換しました');
+    } catch (error) {
+      console.error('convert failed', error);
+      alert(error instanceof Error ? error.message : 'Failed to sync Google event');
+    }
+  }, [fetchTimeline, refreshGoogleCalendar]);
