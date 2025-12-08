@@ -107,13 +107,15 @@ export async function POST(
             description: card.description ?? "",
         }, resolveAppOrigin());
 
+        const googleEventIdOverride = request.nextUrl.searchParams.get("google_event_id");
+
         const result = await syncCardToCalendar(supabase, user.id, card.id, {
             summary: card.title,
             description,
             start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
             end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
             // location: ...
-        });
+        }, googleEventIdOverride ? { onlyUpdate: true, googleEventId: googleEventIdOverride } : {});
 
         if (result?.eventId) {
             // Update last_google_event_id for resync candidates
