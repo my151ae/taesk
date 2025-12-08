@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
+import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
 import { useMemo } from "react";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
 import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
@@ -17,7 +17,10 @@ import {
   type TimelineDay,
   type TimelineEvent,
   type ExternalCalendarEntry,
+  timeLabel,
 } from "@/app/(board)/_utils/timeline-helpers";
+import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
+import { countNonEmptyLines, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
 import type { Checklist } from "@/lib/checklist";
 import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 
@@ -104,6 +107,43 @@ export function DesktopTimelineView({
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
+
+  // Build overlay card data for DragOverlay
+  const activeDragCardId = activeDrag?.cardId ?? null;
+  const overlayBucketEntry = useMemo(() => {
+    const entries = Object.entries(abBuckets);
+    for (const [key, items] of entries) {
+      const found = items.find((item) => item.card_id === activeDragCardId);
+      if (found) return { key, item: found };
+    }
+    return null;
+  }, [abBuckets, activeDragCardId]);
+  const overlayBucketCard = overlayBucketEntry?.item ?? null;
+  const overlayBucketKey = overlayBucketEntry?.key ?? null;
+
+  const allEvents = useMemo(() => Object.values(eventsByDay).flat(), [eventsByDay]);
+  const overlayTimelineEvent = allEvents.find((event) => event.card_id === activeDragCardId);
+
+  const overlayCardData = useMemo(() => {
+    if (overlayTimelineEvent) {
+      return {
+        title: overlayTimelineEvent.title || "Untitled card",
+        badge: overlayTimelineEvent.due_bucket ?? "a",
+        timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
+        checklistCount: countNonEmptyLines(normalizeChecklist(overlayTimelineEvent.checklist ?? EMPTY_CHECKLIST)),
+      };
+    }
+    if (overlayBucketCard) {
+      return {
+        title: overlayBucketCard.title || "Untitled card",
+        badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
+        timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
+        checklistCount: countNonEmptyLines(normalizeChecklist(overlayBucketCard.checklist ?? EMPTY_CHECKLIST)),
+      };
+    }
+    return null;
+  }, [overlayBucketCard, overlayBucketKey, overlayTimelineEvent]);
+
   const allDayLayout = useMemo(() => {
     if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number }[], rows: 0 };
 
@@ -344,6 +384,44 @@ export function DesktopTimelineView({
           </div>
         </div>
       </div>
+
+      <DragOverlay dropAnimation={null}>
+        {overlayCardData ? (
+          <DesktopDragOverlayCard
+            title={overlayCardData.title}
+            badge={overlayCardData.badge}
+            timeText={overlayCardData.timeText}
+            checklistCount={overlayCardData.checklistCount}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
+  );
+}
+
+function DesktopDragOverlayCard({
+  title,
+  badge,
+  timeText,
+  checklistCount,
+}: {
+  title: string;
+  badge: string;
+  timeText: string | null;
+  checklistCount: number;
+}) {
+  return (
+    <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+      <div className="flex items-start gap-2">
+        <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
+          {badge.toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1 text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
+          {title || "Untitled card"}
+        </div>
+      </div>
+      {timeText ? <div className="mt-1 text-[11px] text-slate-600">{timeText}</div> : null}
+      {checklistCount > 0 ? <div className="mt-1 text-[11px] text-slate-400">☑︎ {checklistCount}</div> : null}
+    </div>
   );
 }
