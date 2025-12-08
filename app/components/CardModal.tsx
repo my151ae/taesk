@@ -847,3 +847,4 @@ export function CardModal({
       </div>
     </div>
   );
+}
