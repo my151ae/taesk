@@ -1636,10 +1636,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         throw new Error(body?.error?.message || 'Failed to sync Google event');
       }
       await fetchTimeline(0);
-      refreshGoogleCalendar();
+      await refreshGoogleCalendar();
       setGoogleToast('GoogleイベントをTaeskカードに変換しました');
     } catch (error) {
       console.error('convert failed', error);
       alert(error instanceof Error ? error.message : 'Failed to sync Google event');
     }
-  }, [fetchTimeline, refreshGoogleCalendar]);
+  }, [refreshGoogleCalendar]);
