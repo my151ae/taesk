@@ -15,9 +15,14 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite }:
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    if (!connected) return null;
-
     const isSyncOn = status === "active";
+
+    const statusLabel = (() => {
+        if (!connected) return "未接続";
+        if (status === "active") return "Google接続";
+        if (status === "deleted") return "同期エラー";
+        return "未接続";
+    })();
 
     const handleToggle = async () => {
         setLoading(true);
@@ -47,6 +52,14 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite }:
         }
     };
 
+    if (!connected) {
+        return (
+            <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-600 dark:bg-gray-800/60 dark:border-gray-700 dark:text-gray-200">
+                Google連携が無効です。タイムラインに同期するには再接続してください。
+            </div>
+        );
+    }
+
     if (!canWrite) {
         return (
             <div className="mt-4 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg border border-orange-200 dark:border-orange-800">
@@ -69,9 +82,9 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite }:
                 <label className="text-sm font-medium text-slate-600 dark:text-gray-400">
                     Google Calendar Sync
                 </label>
-                {isSyncOn && (
-                    <span className="text-xs text-slate-400">Sync is active</span>
-                )}
+                <span className={`text-xs ${isSyncOn ? "text-emerald-600" : "text-slate-400"}`}>
+                    {statusLabel}
+                </span>
             </div>
             <button
                 onClick={handleToggle}
