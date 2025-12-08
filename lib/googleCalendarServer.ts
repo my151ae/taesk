@@ -324,6 +324,29 @@ async function persistGoogleEvents(
   }
 }
 
+async function removeCancelledEvents(
+  supabase: SupabaseClient,
+  accountId: string,
+  calendarId: string,
+  events: NormalizedGoogleEvent[]
+) {
+  const cancelledIds = events
+    .filter((e) => e.status === "cancelled")
+    .map((e) => e.id);
+  if (!cancelledIds.length) return;
+
+  const { error } = await supabase
+    .from("google_calendar_events")
+    .delete()
+    .eq("google_account_id", accountId)
+    .eq("calendar_id", calendarId)
+    .in("google_event_id", cancelledIds);
+
+  if (error) {
+    console.error("[googleCalendar] failed to delete cancelled events", error);
+  }
+}
+
 function rowToGoogleCalendarEvent(row: any): GoogleCalendarEvent {
   return {
     id: row.google_event_id,
@@ -362,6 +385,7 @@ async function fetchCachedEvents(
     .eq("calendar_id", calendarId)
     .lt("start_utc", end.toISOString())
     .gt("end_utc", start.toISOString())
+    .neq("status", "cancelled")
     .order("start_utc", { ascending: true });
 
   if (error) {
@@ -558,11 +582,14 @@ async function fetchAndCacheRange(
   const items = response.data.items ?? [];
   const normalizedEvents = items
     .map((item) => mapGoogleEvent(item, calendarId))
-    .filter((event): event is NormalizedGoogleEvent => Boolean(event));
+    .filter((event): event is NormalizedGoogleEvent => Boolean(event))
+    .filter((event) => event.status !== "cancelled");
 
   if (normalizedEvents.length) {
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
   }
+
+  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEvents);
 
   const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
@@ -594,11 +621,14 @@ async function fetchWithSyncToken(
   const items = response.data.items ?? [];
   const normalizedEvents = items
     .map((item) => mapGoogleEvent(item, calendarId))
-    .filter((event): event is NormalizedGoogleEvent => Boolean(event));
+    .filter((event): event is NormalizedGoogleEvent => Boolean(event))
+    .filter((event) => event.status !== "cancelled");
 
   if (normalizedEvents.length) {
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
   }
+
+  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEvents);
 
   const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
