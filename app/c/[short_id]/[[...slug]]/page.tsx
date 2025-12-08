@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { buildBoardUrl } from "@/lib/board-url";
+import { resolveAppOrigin } from "@/lib/calendarSyncService";
 import { normalizeCardSlugOrRedirect } from "@/lib/server/cards";
 import { normalizeChecklist } from "@/lib/checklist";
 
@@ -26,6 +28,14 @@ export default async function CardFullPage({
   const updatedAt = new Date(card.updated_at);
   const tags = Array.isArray(card.tags) ? card.tags : [];
   const checklist = normalizeChecklist(card.checklist ?? null);
+
+  // Deep linkはボード上のモーダルを開きたいケースが多いため、ボードURLが判明していれば
+  // `/board...?card=SHORTID` にリダイレクトする。共有ページとしての表示はフォールバック。
+  if (boardUrl) {
+    const redirectUrl = new URL(boardUrl, resolveAppOrigin());
+    redirectUrl.searchParams.set("card", card.short_id);
+    redirect(redirectUrl.toString());
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50">

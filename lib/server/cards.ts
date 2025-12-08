@@ -1,11 +1,12 @@
 import "server-only";
 
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { createClient, type Card } from "@/lib/supabase";
 import { buildCanonicalPath, toSlugBase } from "@/lib/slug";
 import { getBoardById } from "./boards";
 import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
+import { resolveAppOrigin } from "@/lib/calendarSyncService";
 
 const TABLE_CARDS = "cards";
 
@@ -81,10 +82,9 @@ export async function normalizeCardSlugOrRedirect(shortId: string, slugSegments:
 
   const incoming = Array.isArray(slugSegments) ? slugSegments.join("/") : "";
   const canonicalTail = buildCanonicalTail(cardWithBoard);
-
-  if (canonicalTail && incoming !== canonicalTail) {
-    redirect(`/c/${shortId}/${canonicalTail}`);
-  }
+  // NOTE: スラッグ不一致でもリダイレクトしない。Google 等経由で非ASCIIが壊れると
+  // Location ヘッダ生成が失敗しやすく、結果として 500/redirect ループを起こすため。
+  // short_id でカードを特定できればそのまま返す。
 
   return {
     card: cardWithBoard,

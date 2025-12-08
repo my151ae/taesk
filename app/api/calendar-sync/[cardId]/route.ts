@@ -7,6 +7,9 @@ import {
     getCalendarSyncRecord,
     GooglePermissionError,
     GoogleRateLimitError,
+    buildGoogleEventDescription,
+    buildGoogleDateTimeRange,
+    resolveAppOrigin,
 } from "@/lib/calendarSyncService";
 import { getGoogleCalendarClientForUser, GoogleCalendarNotConnectedError } from "@/lib/googleCalendarServer";
 
@@ -82,21 +85,11 @@ export async function POST(
         }
 
         // Convert stored date/time into RFC3339 with JST offset for Google Calendar
-        const toJstDate = (value: string | null): string | null => {
-            if (!value) return null;
-            const date = new Date(value);
-            // shift to JST
-            const jstMs = date.getTime() + (9 * 60 * 60 * 1000);
-            const jst = new Date(jstMs);
-            const year = jst.getUTCFullYear();
-            const month = `${jst.getUTCMonth() + 1}`.padStart(2, "0");
-            const day = `${jst.getUTCDate()}`.padStart(2, "0");
-            return `${year}-${month}-${day}`;
-        };
-
-        const dateJst = toJstDate(card.due_date);
-        const startDateTime = dateJst && card.due_start ? `${dateJst}T${card.due_start.replace(/Z$/, "")}+09:00` : null;
-        const endDateTime = dateJst && card.due_end ? `${dateJst}T${card.due_end.replace(/Z$/, "")}+09:00` : null;
+        const { startDateTime, endDateTime } = buildGoogleDateTimeRange({
+            due_date: card.due_date,
+            due_start: card.due_start,
+            due_end: card.due_end,
+        });
 
         if (!startDateTime || !endDateTime) {
             return NextResponse.json(
@@ -105,9 +98,18 @@ export async function POST(
             );
         }
 
+        const description = buildGoogleEventDescription({
+            id: card.id,
+            short_id: card.short_id,
+            slug: (card as any).slug ?? null,
+            id_short: (card as any).id_short ?? null,
+            title: card.title,
+            description: card.description ?? "",
+        }, resolveAppOrigin());
+
         const result = await syncCardToCalendar(supabase, user.id, card.id, {
             summary: card.title,
-            description: card.description ?? "", // Add link to card?
+            description,
             start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
             end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
             // location: ...

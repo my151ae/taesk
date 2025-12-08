@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { syncCardToCalendar, deleteCardFromCalendar } from '@/lib/calendarSyncService';
+import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from '@/lib/calendarSyncService';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -186,13 +186,30 @@ export async function PATCH(
       // Google Calendar Sync Trigger (Fire and forget or await without blocking response error?)
       // We await it to ensure consistency, but catch errors to avoid failing the UI update.
       if (ensuredCard.due_start && ensuredCard.due_end) {
-        syncCardToCalendar(supabase, user.id, ensuredCard.id, {
-          summary: ensuredCard.title,
+        const { startDateTime, endDateTime } = buildGoogleDateTimeRange({
+          due_date: ensuredCard.due_date,
+          due_start: ensuredCard.due_start,
+          due_end: ensuredCard.due_end,
+        });
+
+        const description = buildGoogleEventDescription({
+          id: ensuredCard.id,
+          short_id: ensuredCard.short_id,
+          slug: (ensuredCard as any).slug ?? null,
+          id_short: (ensuredCard as any).id_short ?? null,
+          title: ensuredCard.title,
           description: ensuredCard.description ?? "",
-          start: { dateTime: ensuredCard.due_start, timeZone: "Asia/Tokyo" },
-          end: { dateTime: ensuredCard.due_end, timeZone: "Asia/Tokyo" },
-        }, { onlyUpdate: true })
-          .catch(err => console.error("[card-patch] google sync failed", err));
+        }, resolveAppOrigin());
+
+        if (startDateTime && endDateTime) {
+          syncCardToCalendar(supabase, user.id, ensuredCard.id, {
+            summary: ensuredCard.title,
+            description,
+            start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
+            end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
+          }, { onlyUpdate: true })
+            .catch(err => console.error("[card-patch] google sync failed", err));
+        }
       }
     }
 

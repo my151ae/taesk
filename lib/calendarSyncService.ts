@@ -1,6 +1,7 @@
 import "server-only";
 import { google, calendar_v3 } from "googleapis";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { buildCardUrl } from "@/lib/card-url";
 import {
     getGoogleCalendarClientForUser,
     hasCalendarWritePermission,
@@ -74,6 +75,76 @@ export async function createCalendarSyncRecord(
 
     if (error) throw error;
     return data;
+}
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+export function resolveAppOrigin(): string {
+    if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+    if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+    return "http://localhost:3000";
+}
+
+function appendLinkIfMissing(description: string | null | undefined, linkLine: string): string {
+    const base = description ?? "";
+    if (!linkLine) return base;
+    if (base.includes(linkLine)) return base;
+    if (!base.trim()) return linkLine;
+    return `${base}\n\n${linkLine}`;
+}
+
+export function buildCardLink(card: {
+    id: string;
+    short_id?: string | null;
+    slug?: string | null;
+    id_short?: number | null;
+    title?: string | null;
+}, origin?: string): string {
+    const path = buildCardUrl({
+        shortId: card.short_id ?? card.id,
+        title: card.title ?? "",
+        slug: card.slug ?? null,
+        idShort: card.id_short ?? null,
+    });
+    if (!path) return "";
+    const base = origin ?? resolveAppOrigin();
+    const normalizedOrigin = base.endsWith("/") ? base.slice(0, -1) : base;
+    return `${normalizedOrigin}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function buildGoogleEventDescription(card: {
+    id: string;
+    short_id?: string | null;
+    slug?: string | null;
+    id_short?: number | null;
+    title?: string | null;
+    description?: string | null;
+}, origin?: string): string {
+    const link = buildCardLink(card, origin);
+    // 見た目優先: 生の URL をそのまま埋め込む（自動リンクにならないケースは許容）
+    const linkLine = link ? `Taesk: ${link}` : "";
+    return appendLinkIfMissing(card.description ?? "", linkLine);
+}
+
+export function buildGoogleDateTimeRange(card: { due_date: string | null; due_start: string | null; due_end: string | null; }) {
+    const toJstDate = (value: string | null): string | null => {
+        if (!value) return null;
+        const date = new Date(value);
+        const jstMs = date.getTime() + (9 * 60 * 60 * 1000);
+        const jst = new Date(jstMs);
+        const year = jst.getUTCFullYear();
+        const month = `${jst.getUTCMonth() + 1}`.padStart(2, "0");
+        const day = `${jst.getUTCDate()}`.padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    };
+
+    const dateJst = toJstDate(card.due_date);
+    const startDateTime = dateJst && card.due_start ? `${dateJst}T${card.due_start.replace(/Z$/, "")}+09:00` : null;
+    const endDateTime = dateJst && card.due_end ? `${dateJst}T${card.due_end.replace(/Z$/, "")}+09:00` : null;
+    return { startDateTime, endDateTime };
 }
 
 // -----------------------------------------------------------------------------
@@ -279,4 +350,3 @@ export async function deleteCardFromCalendar(
     // If card is deleted, CASCADE handles sync record.
     // If this is just "Turn off Sync" (unlink/delete), we update status.
 }
-
