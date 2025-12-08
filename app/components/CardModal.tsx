@@ -332,6 +332,30 @@ export function CardModal({
   const syncStatus = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
   const lastGoogleEventId = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
 
+  const [resyncCandidates, setResyncCandidates] = useState<any[]>([]);
+  const [resyncLoading, setResyncLoading] = useState(false);
+
+  const handleResyncRequest = useCallback(async () => {
+    if (!title) return;
+    setResyncLoading(true);
+    try {
+      const searchParams: { title: string; start?: string; end?: string } = { title };
+      if (dueDate) {
+        searchParams.start = dueDate;
+        searchParams.end = dueDate;
+      }
+      const res = await fetch(`/api/calendar/resync-candidates?title=${encodeURIComponent(searchParams.title)}${searchParams.start ? `&start=${encodeURIComponent(searchParams.start)}` : ""}${searchParams.end ? `&end=${encodeURIComponent(searchParams.end)}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch candidates");
+      const body = await res.json().catch(() => null);
+      setResyncCandidates(body?.candidates ?? []);
+    } catch (error) {
+      console.error("resync candidates error", error);
+      setResyncCandidates([]);
+    } finally {
+      setResyncLoading(false);
+    }
+  }, [title, dueDate]);
+
   const handleDelete = () => {
     if (confirm('Delete this card?')) {
       onDelete(card.id);
@@ -823,27 +847,3 @@ export function CardModal({
       </div>
     </div>
   );
-}
-  const [resyncCandidates, setResyncCandidates] = useState<any[]>([]);
-  const [resyncLoading, setResyncLoading] = useState(false);
-
-  const handleResyncRequest = useCallback(async () => {
-    if (!title) return;
-    setResyncLoading(true);
-    try {
-      const searchParams: { title: string; start?: string; end?: string } = { title };
-      if (dueDate) {
-        searchParams.start = dueDate;
-        searchParams.end = dueDate;
-      }
-      const res = await fetch(`/api/calendar/resync-candidates?title=${encodeURIComponent(searchParams.title)}${searchParams.start ? `&start=${encodeURIComponent(searchParams.start)}` : ""}${searchParams.end ? `&end=${encodeURIComponent(searchParams.end)}` : ""}`);
-      if (!res.ok) throw new Error("Failed to fetch candidates");
-      const body = await res.json().catch(() => null);
-      setResyncCandidates(body?.candidates ?? []);
-    } catch (error) {
-      console.error("resync candidates error", error);
-      setResyncCandidates([]);
-    } finally {
-      setResyncLoading(false);
-    }
-  }, [title, dueDate]);
