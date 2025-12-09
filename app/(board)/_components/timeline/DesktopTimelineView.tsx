@@ -24,6 +24,8 @@ import { countNonEmptyLines, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/c
 import type { Checklist } from "@/lib/checklist";
 import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 
+const ALL_DAY_ROW_HEIGHT = 36;
+
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
 type DesktopTimelineViewProps = {
@@ -147,11 +149,22 @@ export function DesktopTimelineView({
   }, [overlayBucketCard, overlayBucketKey, overlayTimelineEvent]);
 
   const allDayLayout = useMemo(() => {
-    if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number }[], rows: 0 };
+    if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number; entry: ExternalCalendarEntry; startDate?: string | null; endDate?: string | null; displayTz?: string | null; calendarId?: string | null }[], rows: 0 };
 
-    type Segment = { id: string; title: string; start: number; end: number };
-    const segments: Segment[] = [];
-    const ongoing = new Map<string, Segment>();
+    type SegmentSeed = {
+      id: string;
+      title: string;
+      start: number;
+      end: number;
+      entry: ExternalCalendarEntry;
+      startDate?: string | null;
+      endDate?: string | null;
+      displayTz?: string | null;
+      calendarId?: string | null;
+    };
+    type Segment = SegmentSeed & { row: number };
+    const segments: SegmentSeed[] = [];
+    const ongoing = new Map<string, SegmentSeed>();
 
     visibleDays.forEach((day, idx) => {
       const items = calendarAllDayByDay[day.isoDate] ?? [];
@@ -166,10 +179,30 @@ export function DesktopTimelineView({
             existing.end = idx;
           } else {
             segments.push(existing);
-            ongoing.set(key, { id: key, title: item.title || "Google予定", start: idx, end: idx });
+            ongoing.set(key, {
+              id: key,
+              title: item.title || "Google予定",
+              start: idx,
+              end: idx,
+              entry: item,
+              startDate: item.startDate ?? item.dayIso ?? null,
+              endDate: item.endDate ?? null,
+              displayTz: item.displayTz ?? null,
+              calendarId: item.calendarId ?? null,
+            });
           }
         } else {
-          ongoing.set(key, { id: key, title: item.title || "Google予定", start: idx, end: idx });
+          ongoing.set(key, {
+            id: key,
+            title: item.title || "Google予定",
+            start: idx,
+            end: idx,
+            entry: item,
+            startDate: item.startDate ?? item.dayIso ?? null,
+            endDate: item.endDate ?? null,
+            displayTz: item.displayTz ?? null,
+            calendarId: item.calendarId ?? null,
+          });
         }
       });
 
@@ -189,7 +222,7 @@ export function DesktopTimelineView({
     // pack rows so spans don't overlap on the same row
     segments.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
     const rowEnds: number[] = [];
-    const placed = segments.map((seg) => {
+    const placed: Segment[] = segments.map((seg) => {
       let row = rowEnds.findIndex((end) => seg.start > end);
       if (row === -1) {
         row = rowEnds.length;
@@ -202,6 +235,35 @@ export function DesktopTimelineView({
 
     return { segments: placed, rows: rowEnds.length };
   }, [calendarAllDayByDay, hasAllDayEvents, visibleDays]);
+
+  const shiftIsoDate = (iso?: string | null, deltaDays = 0) => {
+    if (!iso) return null;
+    const [year, month, day] = iso.split("-").map((part) => Number(part));
+    if (!year || !month || !day) return iso;
+    const shifted = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + deltaDays));
+    return shifted.toISOString().split("T")[0];
+  };
+
+  const formatShortDate = (iso?: string | null) => {
+    if (!iso) return null;
+    const [, month, day] = iso.split("-");
+    if (!month || !day) return null;
+    return `${Number(month)}/${Number(day)}`;
+  };
+
+  const formatAllDayRange = (segment: { startDate?: string | null; endDate?: string | null; start: number; end: number }) => {
+    const visibleStartIso = visibleDays[segment.start]?.isoDate ?? null;
+    const visibleEndIso = visibleDays[segment.end]?.isoDate ?? null;
+    const startIso = segment.startDate ?? visibleStartIso;
+    const endExclusive = segment.endDate ?? null;
+    const endIso = endExclusive ? shiftIsoDate(endExclusive, -1) : visibleEndIso ?? startIso;
+    const startLabel = formatShortDate(startIso);
+    const endLabel = formatShortDate(endIso);
+    if (startLabel && endLabel && startLabel !== endLabel) return `${startLabel}–${endLabel}`;
+    return startLabel ?? endLabel;
+  };
+
+  const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
 
   return (
     <DndContext
@@ -297,7 +359,7 @@ export function DesktopTimelineView({
               <div
                 className="flex items-start justify-end border-r border-emerald-100/70 px-3 py-2 text-[10px] uppercase tracking-wide text-emerald-700"
                 style={{
-                  minHeight: Math.max(36, allDayLayout.rows * 28 + 8),
+                  minHeight: allDayMinHeight,
                 }}
               >
                 終日
@@ -306,7 +368,7 @@ export function DesktopTimelineView({
                 className="relative px-2 py-2"
                 style={{
                   gridColumn: `2 / span ${visibleDays.length}`,
-                  minHeight: Math.max(36, allDayLayout.rows * 28 + 8),
+                  minHeight: allDayMinHeight,
                 }}
               >
                 {allDayLayout.segments.map((item) => {
@@ -314,12 +376,18 @@ export function DesktopTimelineView({
                   const dayWidth = 100 / visibleDays.length;
                   const left = dayWidth * item.start;
                   const width = dayWidth * span;
+                  const rangeLabel = formatAllDayRange(item);
+                  const tzLabel = item.displayTz && item.displayTz !== "Asia/Tokyo" ? item.displayTz : null;
+                  const meta = [rangeLabel, tzLabel].filter(Boolean).join(" · ");
                   return (
-                    <div
+                    <button
                       key={`${item.id}-${item.start}-${item.end}`}
-                      className="absolute flex items-center gap-1 rounded-md border border-emerald-200 bg-white/90 px-2 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm"
+                      type="button"
+                      disabled={!onExternalEventClick}
+                      onClick={() => onExternalEventClick?.(item.entry)}
+                      className="absolute flex items-start gap-2 rounded-md border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
                       style={{
-                        top: 4 + item.row * 28,
+                        top: 6 + item.row * (ALL_DAY_ROW_HEIGHT + 6),
                         left: `calc(${left}% + 2px)`,
                         width: `calc(${width}% - 4px)`,
                       }}
@@ -328,8 +396,11 @@ export function DesktopTimelineView({
                       <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
                         G
                       </span>
-                      <span className="truncate">{item.title || "Google予定"}</span>
-                    </div>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate">{item.title || "Google予定"}</span>
+                        {meta ? <span className="truncate text-[10px] font-normal text-emerald-700">{meta}</span> : null}
+                      </span>
+                    </button>
                   );
                 })}
               </div>

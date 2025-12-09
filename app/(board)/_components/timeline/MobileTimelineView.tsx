@@ -430,6 +430,31 @@ export default function MobileTimelineView({
     return calendarAllDayByDay[activeDay.isoDate] ?? [];
   }, [activeDay, calendarAllDayByDay]);
 
+  const shiftIsoDate = (iso?: string | null, deltaDays = 0) => {
+    if (!iso) return null;
+    const [year, month, day] = iso.split("-").map((part) => Number(part));
+    if (!year || !month || !day) return iso;
+    const shifted = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + deltaDays));
+    return shifted.toISOString().split("T")[0];
+  };
+
+  const formatShortDate = (iso?: string | null) => {
+    if (!iso) return null;
+    const [, month, day] = iso.split("-");
+    if (!month || !day) return null;
+    return `${Number(month)}/${Number(day)}`;
+  };
+
+  const formatAllDayMeta = (entry: ExternalCalendarEntry) => {
+    const startIso = entry.startDate ?? entry.dayIso ?? activeDay?.isoDate ?? null;
+    const endIso = entry.endDate ? shiftIsoDate(entry.endDate, -1) : startIso;
+    const startLabel = formatShortDate(startIso);
+    const endLabel = formatShortDate(endIso);
+    const range = startLabel && endLabel && startLabel !== endLabel ? `${startLabel}–${endLabel}` : startLabel ?? endLabel;
+    const tzLabel = entry.displayTz && entry.displayTz !== "Asia/Tokyo" ? entry.displayTz : null;
+    return [range, tzLabel].filter(Boolean).join(" · ");
+  };
+
   const layoutMap = useMemo(() => calculateEventLayout(eventsForDay), [eventsForDay]);
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
 
@@ -540,18 +565,31 @@ export default function MobileTimelineView({
                 終日（Google）
               </div>
               <div className="flex flex-wrap gap-2">
-                {calendarAllDayForDay.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm"
-                    title={item.title || "Google予定"}
-                  >
-                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                      G
-                    </span>
-                    <span className="truncate max-w-[180px]">{item.title || "Google予定"}</span>
-                  </div>
-                ))}
+                {calendarAllDayForDay.map((item) => {
+                  const meta = formatAllDayMeta(item);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={!onExternalEventClick}
+                      onClick={() => onExternalEventClick?.(item)}
+                      className="flex min-w-0 items-start gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
+                      title={item.title || "Google予定"}
+                    >
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                        G
+                      </span>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate max-w-[180px]">{item.title || "Google予定"}</span>
+                        {meta ? (
+                          <span className="truncate text-[10px] font-normal text-emerald-700">
+                            {meta}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

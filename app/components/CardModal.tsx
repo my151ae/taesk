@@ -10,6 +10,7 @@ import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist"
 import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
+import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
 
 const getProfileDisplayName = (profile: ProfileSummary): string => {
   const identity = resolveProfileIdentity(profile, profile.email ?? null);
@@ -377,36 +378,112 @@ export function CardModal({
     };
   }, [card.id]);
 
-  const [resyncCandidates, setResyncCandidates] = useState<any[]>([]);
+  const [resyncCandidates, setResyncCandidates] = useState<ResyncCandidate[]>([]);
   const [resyncLoading, setResyncLoading] = useState(false);
+  const [resyncError, setResyncError] = useState<string | null>(null);
+  const [resyncFetched, setResyncFetched] = useState(false);
+  const [syncNowLoading, setSyncNowLoading] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
 
   const handleResyncRequest = useCallback(async () => {
     if (!title) return;
     setResyncLoading(true);
+    setResyncError(null);
+    setResyncFetched(false);
     try {
-      const searchParams: { title: string; start?: string; end?: string } = { title };
-      if (dueDate) {
-        searchParams.start = dueDate;
-        searchParams.end = dueDate;
-      }
-      const res = await fetch(`/api/calendar/resync-candidates?title=${encodeURIComponent(searchParams.title)}${searchParams.start ? `&start=${encodeURIComponent(searchParams.start)}` : ""}${searchParams.end ? `&end=${encodeURIComponent(searchParams.end)}` : ""}`);
-      if (!res.ok) throw new Error("Failed to fetch candidates");
-      const body = await res.json().catch(() => null);
-      setResyncCandidates(body?.candidates ?? []);
+      const candidates = await fetchResyncCandidates({
+        title,
+        start: dueDate ?? undefined,
+        end: dueDate ?? undefined,
+      });
+      setResyncCandidates(candidates);
+      setResyncFetched(true);
       console.log("[CardModal][GoogleSync] resync candidates", {
         cardId: card.id,
         title,
-        start: searchParams.start,
-        end: searchParams.end,
-        count: body?.candidates?.length ?? 0,
+        start: dueDate,
+        end: dueDate,
+        count: candidates.length,
       });
     } catch (error) {
       console.error("resync candidates error", error);
+      setResyncError(error instanceof Error ? error.message : "候補の取得に失敗しました");
       setResyncCandidates([]);
+      setResyncFetched(true);
     } finally {
       setResyncLoading(false);
     }
-  }, [title, dueDate]);
+  }, [title, dueDate, card.id]);
+
+  const handleResyncSelect = useCallback(async (googleEventId?: string) => {
+    setResyncLoading(true);
+    setResyncError(null);
+    setSyncToast("Google同期中...");
+    try {
+      const url = googleEventId
+        ? `/api/calendar-sync/${card.id}?google_event_id=${encodeURIComponent(googleEventId)}`
+        : `/api/calendar-sync/${card.id}`;
+      const res = await fetch(url, { method: "POST" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.error?.message || "再シンクに失敗しました");
+      }
+      setSyncStatus("active");
+      setLastGoogleEventId((prev) => googleEventId ?? prev ?? lastGoogleEventIdFromCard ?? null);
+      setSyncToast("Google同期が完了しました");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "再シンクに失敗しました";
+      setResyncError(message);
+      setSyncToast(message);
+    } finally {
+      setResyncLoading(false);
+      window.setTimeout(() => setSyncToast(null), 3000);
+    }
+  }, [card.id, lastGoogleEventIdFromCard, setSyncStatus]);
+
+  const handleSyncNow = useCallback(async () => {
+    if (!dueDate || !dueStart || !dueEnd) {
+      setSyncToast("開始・終了時刻を設定してください");
+      window.setTimeout(() => setSyncToast(null), 2500);
+      return;
+    }
+    if (!googleConnected || !googleCanWrite || syncStatus !== "active") {
+      setSyncToast("Googleとシンクを有効にしてください");
+      window.setTimeout(() => setSyncToast(null), 2500);
+      return;
+    }
+    setSyncNowLoading(true);
+    setSyncToast("Google同期中...");
+    try {
+      const res = await fetch(`/api/calendar-sync/${card.id}`, { method: "POST" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.error?.message || "同期に失敗しました");
+      }
+      setSyncToast("Google同期が完了しました");
+    } catch (error) {
+      setSyncToast(error instanceof Error ? error.message : "同期に失敗しました");
+    } finally {
+      setSyncNowLoading(false);
+      window.setTimeout(() => setSyncToast(null), 3000);
+    }
+  }, [card.id, dueDate, dueEnd, dueStart, googleCanWrite, googleConnected, syncStatus]);
+
+  const canSyncNow = Boolean(dueDate && dueStart && dueEnd && googleConnected && googleCanWrite && syncStatus === "active");
+  const canSearchResync = Boolean(dueDate && dueStart && dueEnd && googleConnected && googleCanWrite);
+  const showResyncSection = canSearchResync && (!syncStatus || syncStatus === "unlinked" || syncStatus === "deleted");
+
+  const formatCandidateTime = (candidate: ResyncCandidate) => {
+    if (candidate.isAllDay) {
+      const start = candidate.start ? new Date(candidate.start) : null;
+      return start ? `${start.getMonth() + 1}/${start.getDate()} 終日` : "終日";
+    }
+    const start = candidate.start ? new Date(candidate.start) : null;
+    const end = candidate.end ? new Date(candidate.end) : null;
+    if (!start || !end) return "時間未設定";
+    const opts: Intl.DateTimeFormatOptions = { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" };
+    return `${start.toLocaleString(undefined, opts)} - ${end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+  };
 
   const handleDelete = () => {
     if (confirm('Delete this card?')) {
@@ -627,20 +704,92 @@ export function CardModal({
 
                 {/* Google Calendar Sync Toggle */}
                 {dueDate && dueStart && dueEnd && (
-                  <GoogleSyncToggle
-                    cardId={card.id}
-                    initialStatus={syncStatus}
-                    connected={googleConnected}
-                    canWrite={googleCanWrite}
-                    hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
-                    onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
-                    onStatusChange={(next) => {
-                      setSyncStatus(next);
-                      if (next === "unlinked") {
-                        setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
-                      }
-                    }}
-                  />
+                  <div className="space-y-2">
+                    <GoogleSyncToggle
+                      cardId={card.id}
+                      initialStatus={syncStatus}
+                      connected={googleConnected}
+                      canWrite={googleCanWrite}
+                      hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
+                      onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
+                      onStatusChange={(next) => {
+                        setSyncStatus(next);
+                        if (next === "unlinked") {
+                          setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
+                        }
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSyncNow}
+                        disabled={!canSyncNow || syncNowLoading}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {syncNowLoading ? "同期中..." : "今すぐ同期"}
+                      </button>
+                      {showResyncSection && (
+                        <button
+                          type="button"
+                          onClick={handleResyncRequest}
+                          disabled={!canSearchResync || resyncLoading}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {resyncLoading ? "候補取得中..." : "再シンク候補を探す"}
+                        </button>
+                      )}
+                    </div>
+                    {syncToast && (
+                      <p className="text-xs text-emerald-700">{syncToast}</p>
+                    )}
+                    {resyncError && (
+                      <p className="text-xs text-red-600">{resyncError}</p>
+                    )}
+                    {showResyncSection && resyncCandidates.length > 0 && (
+                      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                        <p className="font-semibold text-slate-600">再接続候補</p>
+                        {resyncCandidates.slice(0, 5).map((candidate) => (
+                          <div key={candidate.id} className="flex items-start gap-2 rounded-md bg-white/60 p-2 ring-1 ring-slate-100">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{candidate.title || "無題の予定"}</p>
+                              <p className="text-[11px] text-slate-500">{formatCandidateTime(candidate)}</p>
+                              {candidate.calendarId && (
+                                <p className="text-[11px] text-slate-400">Cal: {candidate.calendarId}</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {typeof candidate.score === "number" && (
+                                <span className="text-[11px] text-slate-400">score {candidate.score.toFixed(2)}</span>
+                              )}
+                              <button
+                                type="button"
+                                className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                onClick={() => handleResyncSelect(candidate.id)}
+                                disabled={resyncLoading}
+                              >
+                                再接続
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {showResyncSection && resyncFetched && resyncCandidates.length === 0 && (
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                        候補は見つかりませんでした。新規イベントとして同期できます。
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            type="button"
+                            className="rounded bg-sky-600 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                            onClick={() => handleResyncSelect()}
+                            disabled={resyncLoading}
+                          >
+                            Googleに新規作成
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {dueDate && (!dueStart || !dueEnd) && (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-200">

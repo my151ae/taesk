@@ -355,6 +355,22 @@ async function removeCancelledEvents(
   if (error) {
     console.error("[googleCalendar] failed to delete cancelled events", error);
   }
+
+  const { error: syncUpdateError } = await supabase
+    .from("calendar_sync")
+    .update({
+      status: "unlinked",
+      google_event_id: null,
+      etag: null,
+      last_synced_at: new Date().toISOString(),
+    })
+    .eq("google_account_id", accountId)
+    .eq("calendar_id", calendarId)
+    .in("google_event_id", cancelledIds);
+
+  if (syncUpdateError) {
+    console.error("[googleCalendar] failed to downgrade cancelled sync records", syncUpdateError);
+  }
 }
 
 function shouldSkipSelfUpdate(event: NormalizedGoogleEvent): boolean {
@@ -624,9 +640,11 @@ async function fetchAndCacheRange(
   });
 
   const items = response.data.items ?? [];
-  const normalizedEvents = items
+  const normalizedEventsAll = items
     .map((item) => mapGoogleEvent(item, calendarId))
-    .filter((event): event is NormalizedGoogleEvent => Boolean(event))
+    .filter((event): event is NormalizedGoogleEvent => Boolean(event));
+
+  const normalizedEvents = normalizedEventsAll
     .filter((event) => event.status !== "cancelled")
     .filter((event) => !shouldSkipSelfUpdate(event));
 
@@ -634,7 +652,7 @@ async function fetchAndCacheRange(
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
   }
 
-  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEvents);
+  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEventsAll);
 
   const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
@@ -667,9 +685,11 @@ async function fetchWithSyncToken(
   });
 
   const items = response.data.items ?? [];
-  const normalizedEvents = items
+  const normalizedEventsAll = items
     .map((item) => mapGoogleEvent(item, calendarId))
-    .filter((event): event is NormalizedGoogleEvent => Boolean(event))
+    .filter((event): event is NormalizedGoogleEvent => Boolean(event));
+
+  const normalizedEvents = normalizedEventsAll
     .filter((event) => event.status !== "cancelled")
     .filter((event) => !shouldSkipSelfUpdate(event));
 
@@ -677,7 +697,7 @@ async function fetchWithSyncToken(
     await persistGoogleEvents(supabase, accountId, calendarId, normalizedEvents);
   }
 
-  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEvents);
+  await removeCancelledEvents(supabase, accountId, calendarId, normalizedEventsAll);
 
   const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
@@ -777,20 +797,15 @@ export async function listEventsForRange(
     }
   }
 
-  // Cache-first: if recent and window covers the request, serve cached.
   const recentEnough = syncState?.last_synced_at
     ? Date.now() - new Date(syncState.last_synced_at).getTime() < 5 * 60 * 1000
     : false;
   const covered = syncState ? isRangeCovered(start, end, syncState.window_start, syncState.window_end) : false;
+  const hasSyncToken = Boolean(syncState?.sync_token);
 
-  if (recentEnough && covered) {
-    const cached = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
-    const canWriteCached = hasCalendarWritePermission(account.scope);
-    return { events: cached, canWrite: canWriteCached };
-  }
-
+  // Cache-first: if recent and window covers the request, serve cached.
   // Try syncToken diff first
-  if (syncState?.sync_token) {
+  if (hasSyncToken) {
     try {
       await fetchWithSyncToken(calendar, supabase, account.id, calendarId, syncState.sync_token);
     } catch (err: any) {
@@ -802,6 +817,13 @@ export async function listEventsForRange(
         console.error("[googleCalendar] syncToken fetch failed", err);
       }
     }
+  }
+
+  // If we just refreshed via syncToken and windowはカバー済み、最新キャッシュを返す
+  if (recentEnough && covered && hasSyncToken) {
+    const cached = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+    const canWriteCached = hasCalendarWritePermission(account.scope);
+    return { events: cached, canWrite: canWriteCached };
   }
 
   // Ensure window coverage by full fetch

@@ -116,7 +116,7 @@ export async function POST(
             start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
             end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
             // location: ...
-        }, googleEventIdOverride ? { onlyUpdate: true, googleEventId: googleEventIdOverride } : {});
+        }, googleEventIdOverride ? { googleEventId: googleEventIdOverride } : {});
 
         if (result?.eventId) {
             // Update last_google_event_id for resync candidates

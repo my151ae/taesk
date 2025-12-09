@@ -361,8 +361,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const daySet = new Set((data?.days ?? []).map((day) => day.isoDate));
     const timedResult: Record<string, ExternalCalendarEntry[]> = {};
     const allDayResult: Record<string, ExternalCalendarEntry[]> = {};
+    const parseDateOnly = (value?: string | null) => {
+      if (!value) return null;
+      const [year, month, day] = value.split("-").map((part) => Number(part));
+      if (!year || !month || !day) return null;
+      return Date.UTC(year, (month ?? 1) - 1, day ?? 1);
+    };
+    const utcDateToIso = (ms: number) => new Date(ms).toISOString().split("T")[0];
 
     googleCalendarEvents.forEach((event) => {
+      const baseId = event.id || `gcal-${event.start}`;
+
+      if (event.isAllDay && event.startDate && event.endDate) {
+        const startMs = parseDateOnly(event.startDate);
+        const endMs = parseDateOnly(event.endDate);
+        if (startMs != null && endMs != null && startMs < endMs) {
+          let cursorMs = startMs;
+          while (cursorMs < endMs) {
+            const dayIso = utcDateToIso(cursorMs);
+            if (daySet.has(dayIso)) {
+              const entry: ExternalCalendarEntry = {
+                id: `${baseId}-${dayIso}`,
+                eventId: event.id || baseId,
+                dayIso,
+                title: event.title,
+                startMinutes: 0,
+                durationMinutes: 24 * 60,
+                isAllDay: true,
+                source: event.source,
+                startDate: event.startDate ?? null,
+                endDate: event.endDate ?? null,
+                displayTz: event.displayTz ?? null,
+                calendarId: event.calendarId ?? null,
+              };
+
+              if (!allDayResult[dayIso]) allDayResult[dayIso] = [];
+              allDayResult[dayIso].push(entry);
+            }
+            cursorMs += 24 * 60 * 60 * 1000;
+          }
+          return;
+        }
+      }
+
       const start = new Date(event.start);
       const end = new Date(event.end);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
@@ -370,7 +411,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const startMs = start.getTime();
       const endMs = end.getTime();
       let cursorMs = startMs;
-      const baseId = event.id || `gcal-${startMs}`;
+      const baseIdFallback = event.id || `gcal-${startMs}`;
 
       while (cursorMs < endMs) {
         const cursor = new Date(cursorMs);
@@ -390,14 +431,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
         if (daySet.has(dayIso)) {
           const entry: ExternalCalendarEntry = {
-            id: `${baseId}-${dayIso}`,
-            eventId: event.id || baseId,
+            id: `${baseIdFallback}-${dayIso}`,
+            eventId: event.id || baseIdFallback,
             dayIso,
             title: event.title,
             startMinutes,
             durationMinutes: duration,
             isAllDay: event.isAllDay,
             source: event.source,
+            startDate: event.startDate ?? null,
+            endDate: event.endDate ?? null,
+            displayTz: event.displayTz ?? null,
+            calendarId: event.calendarId ?? null,
           };
 
           const target = event.isAllDay ? allDayResult : timedResult;
@@ -414,7 +459,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     });
 
     Object.values(allDayResult).forEach((entries) => {
-      entries.sort((a, b) => a.title.localeCompare(b.title));
+      entries.sort((a, b) => {
+        if (a.startDate && b.startDate && a.startDate !== b.startDate) {
+          return a.startDate.localeCompare(b.startDate);
+        }
+        return (a.title || "").localeCompare(b.title || "");
+      });
     });
 
     return {
@@ -663,6 +713,28 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return () => window.removeEventListener('resize', updateHeight);
   }, []);
 
+  const syncCardNowWithToast = useCallback(async (card: Card | null) => {
+    if (!card?.due_date || !card?.due_start || !card?.due_end) return;
+    try {
+      const statusRes = await fetch(`/api/calendar-sync/${card.id}`);
+      const statusBody = await statusRes.json().catch(() => null);
+      if (!statusRes.ok || statusBody?.status !== 'active') return;
+      setGoogleToast('Google同期中...');
+      const syncRes = await fetch(`/api/calendar-sync/${card.id}`, { method: 'POST' });
+      const syncBody = await syncRes.json().catch(() => null);
+      if (!syncRes.ok) {
+        setGoogleToast(syncBody?.error?.message ? `同期失敗: ${syncBody.error.message}` : 'Google同期に失敗しました');
+        window.setTimeout(() => setGoogleToast(null), 3500);
+        return;
+      }
+      setGoogleToast('Google同期が完了しました');
+    } catch (error) {
+      console.error('[timeline] immediate sync failed', error);
+      setGoogleToast('Google同期に失敗しました');
+    } finally {
+      window.setTimeout(() => setGoogleToast(null), 3500);
+    }
+  }, []);
 
 
   const handleCardModalSave = useCallback(
@@ -829,13 +901,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         // No need to setModalCard here, as the realtime update will handle it
         // and the memoized modalCard will re-evaluate.
         // await fetchTimeline(); // Realtime should handle this
+        void syncCardNowWithToast(body?.card as Card);
         closeCardModal();
       } catch (error) {
         console.error('[timeline] save card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
       }
     },
-    [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData]
+    [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast]
   );
 
   const handleCardModalDelete = useCallback(

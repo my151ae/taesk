@@ -10,6 +10,10 @@ export type ExternalCalendarEntry = {
     durationMinutes: number;
     isAllDay: boolean;
     source: 'google_calendar';
+    startDate?: string | null;
+    endDate?: string | null;
+    displayTz?: string | null;
+    calendarId?: string | null;
 };
 
 // Constants
@@ -92,8 +96,12 @@ export const withJstMidnight = (isoDate: string | null) => {
 
 export const toLocalDay = (value: string | null | undefined) => {
     if (!value) return null;
-    const [day] = value.split('T');
-    return day ?? value;
+    try {
+        return getIsoDateJst(value);
+    } catch {
+        const [day] = value.split('T');
+        return day ?? value;
+    }
 };
 
 export const pointerMinutesFromEvent = (

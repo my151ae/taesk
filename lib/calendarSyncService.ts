@@ -227,11 +227,77 @@ export async function syncCardToCalendar(
     };
 
     try {
-        let googleEventId = syncRecord?.google_event_id;
-        let etag = syncRecord?.etag;
+        const syncedAtIso = new Date().toISOString();
+        let googleEventId = options?.googleEventId ?? syncRecord?.google_event_id ?? syncRecord?.last_google_event_id ?? null;
+        let etag = syncRecord?.etag ?? null;
+
+        const persistSyncRecord = async (eventId: string, nextEtag: string | null) => {
+            const payload = {
+                google_event_id: eventId,
+                last_google_event_id: eventId,
+                status: "active",
+                etag: nextEtag,
+                last_synced_at: syncedAtIso,
+                calendar_id: calendarId,
+            };
+
+            if (syncRecord) {
+                await supabase
+                    .from("calendar_sync")
+                    .update(payload)
+                    .eq("id", syncRecord.id);
+                syncRecord = { ...syncRecord, ...payload };
+            } else {
+                syncRecord = await createCalendarSyncRecord(supabase, {
+                    cardId,
+                    googleAccountId: account.id,
+                    calendarId,
+                    status: "active",
+                    googleEventId: eventId,
+                    lastGoogleEventId: eventId,
+                    etag: nextEtag,
+                    lastSyncedAt: syncedAtIso,
+                });
+            }
+        };
 
         // --- CREATE / RECOVERY FLOW ---
-        if (!syncRecord || !googleEventId || syncRecord.status !== 'active') {
+        if (!syncRecord || !syncRecord.google_event_id || syncRecord.status !== 'active' || (options?.googleEventId && options.googleEventId !== syncRecord.google_event_id)) {
+            if (googleEventId) {
+                try {
+                    const patchRes = await calendar.events.patch({
+                        calendarId,
+                        eventId: googleEventId,
+                        requestBody,
+                    }, etag ? { headers: { "If-Match": etag } } : undefined);
+
+                    await persistSyncRecord(googleEventId, patchRes.data.etag ?? null);
+                    return { action: syncRecord ? "updated" : "linked", eventId: googleEventId };
+                } catch (err: any) {
+                    if (err.code === 404 || err.code === 410) {
+                        googleEventId = null;
+                        etag = null;
+                    } else if (err.code === 412) {
+                        try {
+                            const latest = await calendar.events.get({ calendarId, eventId: googleEventId });
+                            const retry = await calendar.events.patch({
+                                calendarId,
+                                eventId: googleEventId,
+                                requestBody,
+                            }, latest.data.etag ? { headers: { "If-Match": latest.data.etag } } : undefined);
+
+                            await persistSyncRecord(googleEventId, retry.data.etag ?? null);
+                            return { action: "updated", eventId: googleEventId };
+                        } catch (retryErr) {
+                            googleEventId = null;
+                            etag = null;
+                        }
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+
             if (options?.onlyUpdate) {
                 return null; // Do nothing if not already synced
             }
@@ -245,39 +311,11 @@ export async function syncCardToCalendar(
 
             const existingEvent = listRes.data.items?.[0];
 
-            const syncedAtIso = new Date().toISOString();
-
             if (existingEvent?.id) {
                 // Found existing: Link and Update
                 googleEventId = existingEvent.id;
                 etag = existingEvent.etag ?? etag ?? null;
-
-                const payload = {
-                    google_event_id: existingEvent.id,
-                    last_google_event_id: existingEvent.id,
-                    status: "active",
-                    etag: existingEvent.etag ?? null,
-                    last_synced_at: syncedAtIso,
-                    calendar_id: calendarId,
-                };
-
-                if (syncRecord) {
-                    await supabase
-                        .from("calendar_sync")
-                        .update(payload)
-                        .eq("id", syncRecord.id);
-                } else {
-                    await createCalendarSyncRecord(supabase, {
-                        cardId,
-                        googleAccountId: account.id,
-                        calendarId,
-                        status: "active",
-                        googleEventId: existingEvent.id,
-                        lastGoogleEventId: existingEvent.id,
-                        etag: existingEvent.etag ?? null,
-                        lastSyncedAt: syncedAtIso,
-                    });
-                }
+                await persistSyncRecord(existingEvent.id, existingEvent.etag ?? null);
                 // Proceed to update flow
             } else {
                 // Create New
@@ -291,35 +329,7 @@ export async function syncCardToCalendar(
                 googleEventId = insertRes.data.id;
                 etag = insertRes.data.etag ?? null;
 
-                const payload = {
-                    google_event_id: insertRes.data.id,
-                    status: "active",
-                    etag: insertRes.data.etag,
-                    last_synced_at: syncedAtIso,
-                    calendar_id: calendarId, // ensure calendarId is current
-                    last_google_event_id: insertRes.data.id,
-                };
-
-                // Save DB Record
-                if (syncRecord) {
-                    // Reactivate existing record
-                    await supabase
-                        .from("calendar_sync")
-                        .update(payload)
-                        .eq("id", syncRecord.id);
-                } else {
-                    // Insert new record
-                    await createCalendarSyncRecord(supabase, {
-                        cardId,
-                        googleAccountId: account.id,
-                        calendarId,
-                        status: "active",
-                        googleEventId: insertRes.data.id,
-                        lastGoogleEventId: insertRes.data.id,
-                        etag: insertRes.data.etag ?? null,
-                        lastSyncedAt: syncedAtIso,
-                    });
-                }
+                await persistSyncRecord(insertRes.data.id, insertRes.data.etag ?? null);
                 return { action: "created", eventId: insertRes.data.id };
             }
         }
@@ -333,14 +343,7 @@ export async function syncCardToCalendar(
                     requestBody,
                 }, syncRecord?.etag ? { headers: { "If-Match": syncRecord.etag } } : undefined);
 
-                await supabase
-                    .from("calendar_sync")
-                    .update({
-                        etag: patchRes.data.etag,
-                        last_synced_at: new Date().toISOString(),
-                    })
-                    .eq("card_id", cardId); // safe enough with user check RLS
-
+                await persistSyncRecord(googleEventId, patchRes.data.etag ?? null);
                 return { action: "updated", eventId: googleEventId };
 
             } catch (err: any) {
