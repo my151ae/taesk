@@ -63,6 +63,7 @@ type DesktopTimelineViewProps = {
   floatingLayerTop: number;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
+  onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 };
 
 export function DesktopTimelineView({
@@ -102,6 +103,7 @@ export function DesktopTimelineView({
   floatingLayerTop,
   calendarEventsByDay,
   calendarAllDayByDay,
+  onExternalEventClick,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -380,6 +382,7 @@ export function DesktopTimelineView({
               editingCardId={editingCardId}
               shrinkDaysToHalf
               calendarEventsByDay={calendarEventsByDay}
+              onExternalEventClick={onExternalEventClick}
             />
           </div>
         </div>

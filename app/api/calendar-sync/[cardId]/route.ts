@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import {
     syncCardToCalendar,
     deleteCardFromCalendar,
+    unlinkCardFromCalendar,
     createCalendarSyncRecord,
     getCalendarSyncRecord,
     GooglePermissionError,
@@ -149,6 +150,54 @@ export async function PATCH(
     return POST(request, { params });
 }
 
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ cardId: string }> }
+) {
+    const supabase = await createServerSupabaseClient();
+    const { cardId } = await params;
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+        return NextResponse.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+    }
+
+    const card = await getCardAndVerifyAccess(supabase, cardId, user.id);
+    if (!card) {
+        return NextResponse.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
+    }
+
+    const { data: account } = await supabase
+        .from("google_calendar_accounts")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (!account?.id) {
+        return NextResponse.json({ status: "unlinked" }, { status: 200 });
+    }
+
+    const { data: syncRow, error } = await supabase
+        .from("calendar_sync")
+        .select("status, google_event_id, last_google_event_id, etag, last_synced_at")
+        .eq("card_id", card.id)
+        .eq("google_account_id", account.id)
+        .maybeSingle();
+
+    if (error) {
+        console.error("[calendar-sync][GET] failed", error);
+        return NextResponse.json({ error: { code: "DB_ERROR" } }, { status: 500 });
+    }
+
+    if (!syncRow) {
+        return NextResponse.json({ status: "unlinked" }, { status: 200 });
+    }
+
+    return NextResponse.json(syncRow, { status: 200 });
+}
+
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ cardId: string }> }
@@ -179,18 +228,36 @@ export async function DELETE(
         if (mode === "delete") {
             await deleteCardFromCalendar(supabase, user.id, card.id);
 
+            const existingSync = await getCalendarSyncRecord(supabase, card.id).catch(() => null);
+            const lastGoogleEventId = existingSync?.last_google_event_id ?? existingSync?.google_event_id ?? null;
+
             // Update DB status to deleted (or remove record?)
             // Plan said: "status = 'deleted'"
             await supabase
                 .from("calendar_sync")
-                .update({ status: "deleted", google_event_id: null, etag: null })
+                .update({
+                    status: "deleted",
+                    google_event_id: null,
+                    etag: null,
+                    ...(lastGoogleEventId ? { last_google_event_id: lastGoogleEventId } : {}),
+                })
                 .eq("card_id", card.id);
 
         } else {
+            const existingSync = await getCalendarSyncRecord(supabase, card.id).catch(() => null);
+            const lastGoogleEventId = existingSync?.last_google_event_id ?? existingSync?.google_event_id ?? null;
+
             // Unlink
+            await unlinkCardFromCalendar(supabase, user.id, card.id);
+
             await supabase
                 .from("calendar_sync")
-                .update({ status: "unlinked" })
+                .update({
+                    status: "unlinked",
+                    google_event_id: null,
+                    etag: null,
+                    ...(lastGoogleEventId ? { last_google_event_id: lastGoogleEventId } : {}),
+                })
                 .eq("card_id", card.id);
         }
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, type Card } from "@/lib/supabase";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
+import { syncCardToCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from "@/lib/calendarSyncService";
+import { generateShortId, slugify } from "@/lib/card-utils";
 
 function toLocalParts(iso: string, timeZone: string) {
   const fmt = new Intl.DateTimeFormat("en", {
@@ -125,34 +127,51 @@ export async function POST(request: NextRequest) {
 
   const listId = await findOrCreateList(supabase, boardId);
 
+  // Use a reasonable position value (seconds since a recent epoch, or just 0 for new cards)
+  const positionValue = Math.floor(Date.now() / 1000) % 2147483647; // Keep within integer range
+
+  // Generate short_id, id_short, and slug for the new card
+  const shortId = generateShortId();
+  const titleForCard = gEvent.summary || "Google event";
+  const slug = slugify(titleForCard);
+
+  // Get next id_short for board
+  const { data: maxIdShortData } = await supabase
+    .from("cards")
+    .select("id_short")
+    .eq("board_id", boardId)
+    .order("id_short", { ascending: false })
+    .limit(1);
+  const idShort = (maxIdShortData?.[0]?.id_short ?? 0) + 1;
+
   const { data: card, error: insertError } = await supabase
     .from("cards")
     .insert({
       board_id: boardId,
       list_id: listId,
-      position: Date.now(),
-      title: gEvent.summary || "Google event",
+      position: positionValue,
+      title: titleForCard,
       tags: [],
       due_date,
       due_start,
       due_end,
       due_bucket: gEvent.is_all_day ? "a" : null,
-      due_bucket_position: gEvent.is_all_day ? Date.now() : null,
+      due_bucket_position: gEvent.is_all_day ? positionValue : null,
       priority: "medium",
       checked: false,
       assignee_id: null,
       assigned_to: null,
       user_id: user.id,
-      short_id: null,
-      id_short: null,
-      slug: null,
+      short_id: shortId,
+      id_short: idShort,
+      slug: slug,
     })
     .select()
     .single();
 
   if (insertError || !card) {
     console.error("[calendar/convert] failed to insert card", insertError);
-    return NextResponse.json({ error: { code: "DB_ERROR", message: "Failed to create card" } }, { status: 500 });
+    return NextResponse.json({ error: { code: "DB_ERROR", message: "Failed to create card", details: insertError?.message } }, { status: 500 });
   }
 
   // Link calendar_sync
@@ -168,6 +187,37 @@ export async function POST(request: NextRequest) {
       status: "active",
       last_synced_at: new Date().toISOString(),
     }, { onConflict: "card_id,google_account_id" });
+
+  // Enrich the Google event with Taesk metadata (link and idempotent fields)
+  if (card.due_start && card.due_end) {
+    const { startDateTime, endDateTime } = buildGoogleDateTimeRange({
+      due_date: card.due_date,
+      due_start: card.due_start,
+      due_end: card.due_end,
+    });
+
+    if (startDateTime && endDateTime) {
+      const description = buildGoogleEventDescription({
+        id: card.id,
+        short_id: card.short_id,
+        slug: (card as any).slug ?? null,
+        id_short: (card as any).id_short ?? null,
+        title: card.title,
+        description: (gEvent as any)?.description ?? "",
+      }, resolveAppOrigin());
+
+      try {
+        await syncCardToCalendar(supabase, user.id, card.id, {
+          summary: card.title,
+          description,
+          start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
+          end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
+        }, { onlyUpdate: true });
+      } catch (error) {
+        console.error("[calendar/convert] failed to update Google event metadata", error);
+      }
+    }
+  }
 
   return NextResponse.json({ card, linked: true }, { status: 201 });
 }

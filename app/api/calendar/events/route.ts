@@ -8,6 +8,7 @@ import {
   getGoogleCalendarClientForUser,
   hasCalendarWritePermission,
 } from "@/lib/googleCalendarServer";
+import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,11 @@ export async function GET(request: NextRequest) {
 
   const startParam = request.nextUrl.searchParams.get("start");
   const endParam = request.nextUrl.searchParams.get("end");
+
+  const applyLinkedFilter = (events: GoogleCalendarEvent[], linkedIds: Set<string>) => {
+    if (!linkedIds.size) return events;
+    return events.filter((event) => !linkedIds.has(event.id));
+  };
 
   // MODE 1: Permission Check Only (No dates provided)
   if (!startParam && !endParam) {
@@ -78,9 +84,33 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Load linked Google event ids for this user to hide already-synced events from the external list
+  const linkedEventIds = new Set<string>();
+  const { data: account } = await supabase
+    .from("google_calendar_accounts")
+    .select("id")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (account?.id) {
+    const { data: syncRows } = await supabase
+      .from("calendar_sync")
+      .select("google_event_id, last_google_event_id, status")
+      .eq("google_account_id", account.id);
+
+    (syncRows ?? []).forEach((row) => {
+      if (row.status === "active") {
+        if (row.google_event_id) linkedEventIds.add(row.google_event_id);
+        if (row.last_google_event_id) linkedEventIds.add(row.last_google_event_id);
+      }
+    });
+  }
+
   try {
     const { events, canWrite } = await listEventsForRange(user.id, start, end, { supabase });
-    return NextResponse.json({ connected: true, canWrite, events }, { status: 200 });
+    return NextResponse.json({ connected: true, canWrite, events: applyLinkedFilter(events, linkedEventIds) }, { status: 200 });
   } catch (error: any) {
     if (error instanceof GoogleCalendarNotConnectedError) {
       return NextResponse.json({ connected: false, events: [] }, { status: 200 });
@@ -114,7 +144,7 @@ export async function GET(request: NextRequest) {
     // Fallback: serve cached events if available
     try {
       const { events, canWrite } = await listCachedEventsForRange(user.id, start, end, { supabase });
-      return NextResponse.json({ connected: true, canWrite, events, error: "STALE_CACHE" }, { status: 200 });
+      return NextResponse.json({ connected: true, canWrite, events: applyLinkedFilter(events, linkedEventIds), error: "STALE_CACHE" }, { status: 200 });
     } catch (cacheError) {
       console.error("[googleCalendar/events] cache fallback failed", cacheError);
     }

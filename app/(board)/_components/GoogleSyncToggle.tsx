@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface GoogleSyncToggleProps {
@@ -10,12 +10,18 @@ interface GoogleSyncToggleProps {
     canWrite: boolean;
     onResyncRequest?: () => void;
     hasResyncCandidate?: boolean;
+    onStatusChange?: (status: "active" | "unlinked" | "deleted") => void;
 }
 
-export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, onResyncRequest, hasResyncCandidate }: GoogleSyncToggleProps) {
+export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, onResyncRequest, hasResyncCandidate, onStatusChange }: GoogleSyncToggleProps) {
     const [status, setStatus] = useState<"active" | "unlinked" | "deleted" | undefined>(initialStatus);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        setStatus(initialStatus);
+        console.log("[GoogleSyncToggle] status prop changed", { cardId, initialStatus });
+    }, [cardId, initialStatus]);
 
     const isSyncOn = status === "active";
 
@@ -30,11 +36,14 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, o
     const handleToggle = async () => {
         setLoading(true);
         try {
+            console.log("[GoogleSyncToggle] toggle start", { cardId, isSyncOn, connected, canWrite, status });
             if (isSyncOn) {
                 // Turn OFF
                 const res = await fetch(`/api/calendar-sync/${cardId}?mode=unlinked`, { method: "DELETE" });
                 if (!res.ok) throw new Error("Failed to unlink");
                 setStatus("unlinked");
+                onStatusChange?.("unlinked");
+                console.log("[GoogleSyncToggle] unlink success", { cardId });
             } else {
                 // Turn ON
                 const res = await fetch(`/api/calendar-sync/${cardId}`, { method: "POST" });
@@ -44,12 +53,15 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, o
                     throw new Error(message);
                 }
                 setStatus("active");
+                onStatusChange?.("active");
+                console.log("[GoogleSyncToggle] link success", { cardId, body });
             }
             router.refresh();
         } catch (e) {
             console.error(e);
             const message = e instanceof Error ? e.message : "Failed to update sync status";
             alert(message);
+            console.warn("[GoogleSyncToggle] toggle failed", { cardId, error: e });
         } finally {
             setLoading(false);
         }

@@ -59,7 +59,11 @@ export async function createCalendarSyncRecord(
         cardId: string;
         googleAccountId: string;
         calendarId: string;
-        status: "active" | "unlinked";
+        status: "active" | "unlinked" | "deleted";
+        googleEventId?: string | null;
+        lastGoogleEventId?: string | null;
+        etag?: string | null;
+        lastSyncedAt?: string | null;
     }
 ) {
     const { data, error } = await supabase
@@ -69,6 +73,10 @@ export async function createCalendarSyncRecord(
             google_account_id: params.googleAccountId,
             calendar_id: params.calendarId,
             status: params.status,
+            google_event_id: params.googleEventId ?? null,
+            last_google_event_id: params.lastGoogleEventId ?? params.googleEventId ?? null,
+            etag: params.etag ?? null,
+            last_synced_at: params.lastSyncedAt ?? null,
         })
         .select()
         .single();
@@ -94,6 +102,16 @@ function appendLinkIfMissing(description: string | null | undefined, linkLine: s
     if (base.includes(linkLine)) return base;
     if (!base.trim()) return linkLine;
     return `${base}\n\n${linkLine}`;
+}
+
+function removeTaeskLinkFromDescription(description: string): string {
+    if (!description) return "";
+    // Remove lines starting with "Taesk: "
+    return description
+        .split("\n")
+        .filter(line => !line.trim().startsWith("Taesk: "))
+        .join("\n")
+        .trim();
 }
 
 export function buildCardLink(card: {
@@ -175,7 +193,7 @@ export async function syncCardToCalendar(
     userId: string,
     cardId: string,
     eventParams: CalendarSyncEventParams,
-    options: { onlyUpdate?: boolean } = {}
+    options: { onlyUpdate?: boolean; googleEventId?: string } = {}
 ) {
     // 1. Get Client & Check Permissions
     const { calendar, account } = await getGoogleCalendarClientForUser(userId, { supabase });
@@ -227,37 +245,67 @@ export async function syncCardToCalendar(
 
             const existingEvent = listRes.data.items?.[0];
 
-                if (existingEvent?.id) {
-                    // Found existing: Link and Update
-                    googleEventId = existingEvent.id;
-                    // Store last_google_event_id for resync history
+            const syncedAtIso = new Date().toISOString();
+
+            if (existingEvent?.id) {
+                // Found existing: Link and Update
+                googleEventId = existingEvent.id;
+                etag = existingEvent.etag ?? etag ?? null;
+
+                const payload = {
+                    google_event_id: existingEvent.id,
+                    last_google_event_id: existingEvent.id,
+                    status: "active",
+                    etag: existingEvent.etag ?? null,
+                    last_synced_at: syncedAtIso,
+                    calendar_id: calendarId,
+                };
+
+                if (syncRecord) {
                     await supabase
                         .from("calendar_sync")
-                        .update({ last_google_event_id: existingEvent.id })
-                        .eq("card_id", cardId);
-                    // Proceed to update flow
+                        .update(payload)
+                        .eq("id", syncRecord.id);
                 } else {
-                    // Create New
-                    const insertRes = await calendar.events.insert({
+                    await createCalendarSyncRecord(supabase, {
+                        cardId,
+                        googleAccountId: account.id,
                         calendarId,
+                        status: "active",
+                        googleEventId: existingEvent.id,
+                        lastGoogleEventId: existingEvent.id,
+                        etag: existingEvent.etag ?? null,
+                        lastSyncedAt: syncedAtIso,
+                    });
+                }
+                // Proceed to update flow
+            } else {
+                // Create New
+                const insertRes = await calendar.events.insert({
+                    calendarId,
                     requestBody,
                 });
 
                 if (!insertRes.data.id) throw new Error("Failed to create Google Event (no ID)");
+
+                googleEventId = insertRes.data.id;
+                etag = insertRes.data.etag ?? null;
+
+                const payload = {
+                    google_event_id: insertRes.data.id,
+                    status: "active",
+                    etag: insertRes.data.etag,
+                    last_synced_at: syncedAtIso,
+                    calendar_id: calendarId, // ensure calendarId is current
+                    last_google_event_id: insertRes.data.id,
+                };
 
                 // Save DB Record
                 if (syncRecord) {
                     // Reactivate existing record
                     await supabase
                         .from("calendar_sync")
-                        .update({
-                            google_event_id: insertRes.data.id,
-                            status: "active",
-                            etag: insertRes.data.etag,
-                            last_synced_at: new Date().toISOString(),
-                            calendar_id: calendarId, // ensure calendarId is current
-                            last_google_event_id: insertRes.data.id,
-                        })
+                        .update(payload)
                         .eq("id", syncRecord.id);
                 } else {
                     // Insert new record
@@ -266,6 +314,10 @@ export async function syncCardToCalendar(
                         googleAccountId: account.id,
                         calendarId,
                         status: "active",
+                        googleEventId: insertRes.data.id,
+                        lastGoogleEventId: insertRes.data.id,
+                        etag: insertRes.data.etag ?? null,
+                        lastSyncedAt: syncedAtIso,
                     });
                 }
                 return { action: "created", eventId: insertRes.data.id };
@@ -375,4 +427,46 @@ export async function deleteCardFromCalendar(
     // The caller (API) usually deletes the card or updates status.
     // If card is deleted, CASCADE handles sync record.
     // If this is just "Turn off Sync" (unlink/delete), we update status.
+}
+
+export async function unlinkCardFromCalendar(
+    supabase: SupabaseClient,
+    userId: string,
+    cardId: string
+) {
+    const syncRecord = await getCalendarSyncRecord(supabase, cardId);
+    if (!syncRecord || !syncRecord.google_event_id) return;
+
+    const { calendar } = await getGoogleCalendarClientForUser(userId, { supabase });
+
+    try {
+        // Fetch current event to get description and etag
+        const eventRes = await calendar.events.get({
+            calendarId: syncRecord.calendar_id,
+            eventId: syncRecord.google_event_id,
+        });
+
+        const currentDescription = eventRes.data.description ?? "";
+        const newDescription = removeTaeskLinkFromDescription(currentDescription);
+
+        // If description hasn't changed (no link found), no need to update
+        if (currentDescription === newDescription) return;
+
+        await calendar.events.patch({
+            calendarId: syncRecord.calendar_id,
+            eventId: syncRecord.google_event_id,
+            requestBody: {
+                description: newDescription,
+            },
+        }, eventRes.data.etag ? { headers: { "If-Match": eventRes.data.etag } } : undefined);
+
+    } catch (err: any) {
+        // Ignore permission errors (e.g. not organizer) or if event is gone
+        if (err.code === 403 || err.code === 404 || err.code === 410) {
+            console.warn(`[unlinkCardFromCalendar] Could not cleanup Google Event (code ${err.code}):`, err.message);
+            return;
+        }
+        // Log other errors but don't block unlinking
+        console.warn("[unlinkCardFromCalendar] Unexpected error cleaning up Google Event:", err);
+    }
 }

@@ -45,6 +45,7 @@ type TimelineGridProps = {
     axisWidth?: number;
     shrinkDaysToHalf?: boolean;
     calendarEventsByDay?: Record<string, ExternalCalendarEntry[]>;
+    onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 };
 
 export default function TimelineGrid({
@@ -69,6 +70,7 @@ export default function TimelineGrid({
     axisWidth = 80,
     shrinkDaysToHalf = false,
     calendarEventsByDay,
+    onExternalEventClick,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -129,6 +131,7 @@ export default function TimelineGrid({
                         shrinkToHalf={shrinkDaysToHalf}
                         setSelectedSlot={setSelectedSlot}
                         calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
+                        onExternalEventClick={onExternalEventClick}
                     />
                 ))}
             </div>

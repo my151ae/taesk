@@ -329,8 +329,53 @@ export function CardModal({
   const { connected: googleConnected, canWrite: googleCanWrite } = useGoogleCalendar();
   // Handle calendar_sync possibly being an array or object due to Supabase join
   const syncData = (card as any).calendar_sync;
-  const syncStatus = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
-  const lastGoogleEventId = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
+  const syncStatusFromCard = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
+  const lastGoogleEventIdFromCard = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
+
+  const [syncStatus, setSyncStatus] = useState<"active" | "unlinked" | "deleted" | undefined>(syncStatusFromCard);
+  const [lastGoogleEventId, setLastGoogleEventId] = useState<string | undefined | null>(lastGoogleEventIdFromCard);
+
+  useEffect(() => {
+    setSyncStatus(syncStatusFromCard);
+    setLastGoogleEventId(lastGoogleEventIdFromCard);
+  }, [syncStatusFromCard, lastGoogleEventIdFromCard, card.id]);
+
+  useEffect(() => {
+    console.log("[CardModal][GoogleSync] state", {
+      cardId: card.id,
+      syncStatus,
+      lastGoogleEventId,
+      googleConnected,
+      googleCanWrite,
+    });
+  }, [card.id, syncStatus, lastGoogleEventId, googleConnected, googleCanWrite]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSyncStatus = async () => {
+      try {
+        const res = await fetch(`/api/calendar-sync/${card.id}`);
+        const body = await res.json().catch(() => null);
+        if (!res.ok) {
+          console.warn("[CardModal][GoogleSync] status fetch failed", { cardId: card.id, status: res.status, body });
+          return;
+        }
+        if (cancelled) return;
+        const nextStatus = body?.status as "active" | "unlinked" | "deleted" | undefined;
+        const nextLast = body?.last_google_event_id ?? body?.google_event_id ?? null;
+        setSyncStatus(nextStatus);
+        setLastGoogleEventId(nextLast);
+        console.log("[CardModal][GoogleSync] status fetched", { cardId: card.id, status: nextStatus, last: nextLast });
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("[CardModal][GoogleSync] status fetch error", { cardId: card.id, error });
+      }
+    };
+    loadSyncStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [card.id]);
 
   const [resyncCandidates, setResyncCandidates] = useState<any[]>([]);
   const [resyncLoading, setResyncLoading] = useState(false);
@@ -348,6 +393,13 @@ export function CardModal({
       if (!res.ok) throw new Error("Failed to fetch candidates");
       const body = await res.json().catch(() => null);
       setResyncCandidates(body?.candidates ?? []);
+      console.log("[CardModal][GoogleSync] resync candidates", {
+        cardId: card.id,
+        title,
+        start: searchParams.start,
+        end: searchParams.end,
+        count: body?.candidates?.length ?? 0,
+      });
     } catch (error) {
       console.error("resync candidates error", error);
       setResyncCandidates([]);
@@ -582,6 +634,12 @@ export function CardModal({
                     canWrite={googleCanWrite}
                     hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
                     onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
+                    onStatusChange={(next) => {
+                      setSyncStatus(next);
+                      if (next === "unlinked") {
+                        setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
+                      }
+                    }}
                   />
                 )}
                 {dueDate && (!dueStart || !dueEnd) && (

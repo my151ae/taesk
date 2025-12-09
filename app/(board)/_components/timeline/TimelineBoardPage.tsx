@@ -1136,7 +1136,33 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const isGoogleLoading = googleCalendarStatus === 'loading';
   const isCalendarRangeReady = Boolean(calendarRangeStart && calendarRangeEnd);
 
+  const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
+    try {
+      const googleEventId = entry.eventId ?? entry.id;
+      const res = await fetch('/api/calendar/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_event_id: googleEventId }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        const details = body?.error?.details ? ` (${body.error.details})` : '';
+        throw new Error((body?.error?.message || 'Failed to sync Google event') + details);
+      }
+      await fetchTimeline(0);
+      await refreshGoogleCalendar();
+      setGoogleToast('GoogleイベントをTaeskカードに変換しました');
 
+      // Open the card modal for the newly created card
+      if (body?.card?.short_id) {
+        openCardModal(body.card.short_id, 'gcard-convert');
+      }
+    } catch (error) {
+      console.error('convert failed', error);
+      const msg = error instanceof Error ? error.message : 'Failed to sync Google event';
+      alert(`変換に失敗しました: ${msg}`);
+    }
+  }, [fetchTimeline, refreshGoogleCalendar, openCardModal]);
 
   const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
     if (!nextLength) return 0;
@@ -1501,6 +1527,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 pointerPreview={pointerPreview}
                 calendarEventsByDay={calendarEventsByDay}
                 calendarAllDayByDay={calendarAllDayEventsByDay}
+                onExternalEventClick={handleExternalEventClick}
               />
             </div>
           </div>
@@ -1623,23 +1650,3 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     </>
   );
 }
-  const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
-    try {
-      const googleEventId = entry.eventId ?? entry.id;
-      const res = await fetch('/api/calendar/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ google_event_id: googleEventId }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(body?.error?.message || 'Failed to sync Google event');
-      }
-      await fetchTimeline(0);
-      await refreshGoogleCalendar();
-      setGoogleToast('GoogleイベントをTaeskカードに変換しました');
-    } catch (error) {
-      console.error('convert failed', error);
-      alert(error instanceof Error ? error.message : 'Failed to sync Google event');
-    }
-  }, [refreshGoogleCalendar]);

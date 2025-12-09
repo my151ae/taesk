@@ -98,6 +98,7 @@ function MobileTimelineColumn({
   pointerPreview,
   activeDragCardId,
   calendarEvents,
+  onExternalEventClick,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -112,6 +113,7 @@ function MobileTimelineColumn({
   pointerPreview: DragAndDropBindings["pointerPreview"];
   activeDragCardId: string | null;
   calendarEvents: ExternalCalendarEntry[];
+  onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const calendarLayout = calculateEventLayout(
@@ -176,9 +178,14 @@ function MobileTimelineColumn({
         {calendarEvents.map((calendarEvent) => {
           const layout = calendarLayout[calendarEvent.id];
           return (
-            <div
+            <button
               key={calendarEvent.id}
-              className="pointer-events-none absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)]"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExternalEventClick?.(calendarEvent);
+              }}
+              className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
               style={{
                 top: minuteToPixels(calendarEvent.startMinutes),
                 height: Math.max(minuteToPixels(calendarEvent.durationMinutes), 18),
@@ -200,7 +207,7 @@ function MobileTimelineColumn({
                     minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
                   )}
               </p>
-            </div>
+            </button>
           );
         })}
 
@@ -373,6 +380,7 @@ type MobileTimelineViewProps = {
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
   isOverABList: boolean;
   pointerPreview: DragAndDropBindings["pointerPreview"];
+  onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 };
 
 export default function MobileTimelineView({
@@ -403,6 +411,7 @@ export default function MobileTimelineView({
   isOverABList,
   pointerPreview,
   activeDrag,
+  onExternalEventClick,
 }: MobileTimelineViewProps) {
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -578,6 +587,7 @@ export default function MobileTimelineView({
                   pointerPreview={pointerPreview}
                   activeDragCardId={activeDragCardId}
                   calendarEvents={calendarTimedEventsForDay}
+                  onExternalEventClick={onExternalEventClick}
                 />
               </div>
             </div>
