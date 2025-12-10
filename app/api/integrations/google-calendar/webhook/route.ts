@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { syncGoogleCalendarToTaesk } from "@/lib/googleCalendarServer";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,20 @@ export async function POST(request: NextRequest) {
           })
           .eq("google_account_id", state.google_account_id)
           .eq("calendar_id", state.calendar_id);
+
+        const { data: account } = await supabase
+          .from("google_calendar_accounts")
+          .select("user_id")
+          .eq("id", state.google_account_id)
+          .maybeSingle();
+
+        if (account?.user_id) {
+          try {
+            await syncGoogleCalendarToTaesk(account.user_id, state.calendar_id ?? "primary", { supabase, reason: "webhook" });
+          } catch (syncError) {
+            console.error("[googleCalendar/webhook] pull sync failed", syncError);
+          }
+        }
       }
     }
   } catch (error) {

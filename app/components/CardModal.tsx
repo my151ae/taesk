@@ -460,6 +460,11 @@ export function CardModal({
       if (!res.ok) {
         throw new Error(body?.error?.message || "同期に失敗しました");
       }
+      if (body?.pullStats) {
+        // Show pull-side diagnostics in console for debugging Google→Taesk
+        // pullStats: { matched, updated }
+        console.info("[GoogleSync][syncNow] pull stats", body.pullStats);
+      }
       setSyncToast("Google同期が完了しました");
     } catch (error) {
       setSyncToast(error instanceof Error ? error.message : "同期に失敗しました");

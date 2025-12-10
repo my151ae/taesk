@@ -12,7 +12,7 @@ import {
     buildGoogleDateTimeRange,
     resolveAppOrigin,
 } from "@/lib/calendarSyncService";
-import { getGoogleCalendarClientForUser, GoogleCalendarNotConnectedError } from "@/lib/googleCalendarServer";
+import { GoogleCalendarNotConnectedError, syncGoogleCalendarToTaesk } from "@/lib/googleCalendarServer";
 
 export const runtime = "nodejs";
 
@@ -99,6 +99,32 @@ export async function POST(
             );
         }
 
+        // Always pull latest from Google before pushing Taesk → Google to avoid overwriting newer edits.
+        const { data: existingSync } = await supabase
+            .from("calendar_sync")
+            .select("calendar_id")
+            .eq("card_id", card.id)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        let pullStats: { matched: number; updated: number } | null = null;
+        try {
+            pullStats = await syncGoogleCalendarToTaesk(user.id, existingSync?.calendar_id ?? "primary", { supabase, reason: "manual_sync" });
+            
+            // If we pulled updates, we must refresh our local card data before pushing back,
+            // otherwise we'll overwrite Google's new state with our stale state.
+            if (pullStats && pullStats.updated > 0) {
+                const refreshedCard = await getCardAndVerifyAccess(supabase, cardId, user.id);
+                if (refreshedCard) {
+                    // Update the card reference
+                    Object.assign(card, refreshedCard);
+                }
+            }
+        } catch (pullError) {
+            console.error("[calendar-sync][manual] pull failed, proceeding to push", pullError);
+        }
+
         const description = buildGoogleEventDescription({
             id: card.id,
             short_id: card.short_id,
@@ -126,7 +152,7 @@ export async function POST(
                 .eq("card_id", card.id);
         }
 
-        return NextResponse.json({ success: true, result });
+        return NextResponse.json({ success: true, pullStats, result });
     } catch (error: any) {
         if (error instanceof GoogleCalendarNotConnectedError) {
             return NextResponse.json({ error: { code: error.code, message: "Google Calendar is not connected" } }, { status: 401 });

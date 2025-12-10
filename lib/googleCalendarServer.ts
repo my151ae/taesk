@@ -374,12 +374,12 @@ async function removeCancelledEvents(
 }
 
 function shouldSkipSelfUpdate(event: NormalizedGoogleEvent): boolean {
-  if (!event.taeskUpdatedAt) return false;
-  const updatedMs = new Date(event.taeskUpdatedAt).getTime();
-  if (!Number.isFinite(updatedMs)) return false;
-  const ageMs = Date.now() - updatedMs;
-  // Skip events we just wrote within the last 30s
-  return ageMs >= 0 && ageMs <= 30_000;
+  const taeskUpdatedMs = event.taeskUpdatedAt ? Date.parse(event.taeskUpdatedAt) : NaN;
+  const googleUpdatedMs = event.updatedAtGoogle ? Date.parse(event.updatedAtGoogle) : NaN;
+  if (!Number.isFinite(taeskUpdatedMs) || !Number.isFinite(googleUpdatedMs)) return false;
+  // Skip only if the Google update is effectively the same write we just made (within 30s window)
+  const diff = googleUpdatedMs - taeskUpdatedMs;
+  return diff >= 0 && diff <= 30_000;
 }
 
 async function pruneCacheWindow(
@@ -450,6 +450,28 @@ async function fetchCachedEvents(
   }
 
   return (data ?? []).map(rowToGoogleCalendarEvent);
+}
+
+function toLocalParts(iso: string, timeZone: string) {
+  const fmt = new Intl.DateTimeFormat("en", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => fmt.find((p) => p.type === type)?.value ?? "00";
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
 }
 
 async function getSyncState(
@@ -674,7 +696,7 @@ async function fetchWithSyncToken(
   accountId: string,
   calendarId: string,
   syncToken: string
-) {
+): Promise<NormalizedGoogleEvent[]> {
   const now = new Date();
   const response = await calendar.events.list({
     calendarId,
@@ -707,6 +729,8 @@ async function fetchWithSyncToken(
   }
 
   await pruneCacheWindow(supabase, accountId, calendarId, now);
+
+  return normalizedEvents;
 }
 
 function needsWatchRenewal(state: GoogleCalendarSyncStateRow | null): boolean {
@@ -770,6 +794,222 @@ export async function getGoogleCalendarClientForUser(
   const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
   return { calendar, account };
+}
+
+export async function syncGoogleCalendarToTaesk(
+  userId: string,
+  calendarId?: string,
+  options?: { supabase?: SupabaseClient; reason?: string }
+): Promise<{ matched: number; updated: number }> {
+  const reason = options?.reason ?? "manual";
+  const supabase = options?.supabase ?? (await createServerSupabaseClient());
+  const { calendar, account } = await getGoogleCalendarClientForUser(userId, { supabase });
+  const targetCalendarId = calendarId ?? "primary";
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const syncState = await getSyncState(supabase, account.id, targetCalendarId);
+
+  let events: NormalizedGoogleEvent[] = [];
+  if (syncState?.sync_token) {
+    try {
+      events = await fetchWithSyncToken(calendar, supabase, account.id, targetCalendarId, syncState.sync_token);
+    } catch (err: any) {
+      const status = err?.code || err?.response?.status;
+      if (status === 410) {
+        await clearSyncToken(supabase, account.id, targetCalendarId);
+      } else {
+        console.error("[googleCalendar] syncToken fetch failed", err);
+      }
+    }
+  }
+
+  if (!events.length) {
+    events = await fetchAndCacheRange(calendar, supabase, account.id, targetCalendarId, windowStart, windowEnd);
+  }
+
+  if (!events.length) return { matched: 0, updated: 0 };
+
+  const eventIds = Array.from(new Set(events.map((e) => e.id).filter(Boolean)));
+  const taeskCardHints = Array.from(new Set(events.map((e) => e.taeskCardId).filter((id): id is string => Boolean(id))));
+
+  const { data: syncRows } = await supabase
+    .from("calendar_sync")
+    .select("id, card_id, google_event_id, last_google_event_id, calendar_id, google_account_id, etag, status, last_synced_at")
+    .eq("google_account_id", account.id)
+    .eq("calendar_id", targetCalendarId);
+
+  const cardIds = new Set<string>();
+  syncRows.forEach((row) => {
+    if (row.card_id) cardIds.add(row.card_id);
+  });
+  taeskCardHints.forEach((id) => cardIds.add(id));
+
+  if (!cardIds.size) return { matched: 0, updated: 0 };
+
+  const { data: cards, error: cardsError } = await supabase
+    .from("cards")
+    .select("id, title, due_date, due_start, due_end, updated_at")
+    .in("id", Array.from(cardIds));
+
+  if (cardsError) {
+    console.error("[gcal-debug] Failed to bulk fetch cards", cardsError);
+  }
+
+  const cardMap = new Map((cards ?? []).map((card) => [card.id as string, card]));
+  const syncMap = new Map<string, any>();
+  syncRows.forEach((row) => {
+    if (row.google_event_id) syncMap.set(row.google_event_id, row);
+    if (row.last_google_event_id) syncMap.set(row.last_google_event_id, row);
+  });
+
+  const updatedCardIds: string[] = [];
+  let skippedMissingCard = 0;
+  let skippedOlderGoogle = 0;
+  const debugSamples: any[] = [];
+
+  console.log(`[gcal-debug] Starting sync loop. Events: ${events.length}, SyncRows: ${syncRows.length}, CardIds: ${cardIds.size}`);
+
+  for (const event of events) {
+    const syncRow = syncMap.get(event.id);
+    const cardId = syncRow?.card_id ?? (event.taeskCardId && cardMap.has(event.taeskCardId) ? event.taeskCardId : null);
+    if (!cardId) {
+      if (skippedMissingCard < 3) {
+        console.log(`[gcal-debug] Skipped missing card for event: ${event.id} (${event.title}). taeskCardId prop: ${event.taeskCardId}`);
+      }
+      skippedMissingCard += 1;
+      continue;
+    }
+    let card = cardMap.get(cardId);
+    if (!card) {
+      // Fallback: Try fetching single card explicitly
+      // Often RLS or query limits might cause bulk fetch to miss items.
+      console.log(`[gcal-debug] Card ID ${cardId} missing in bulk map. Attempting fallback fetch...`);
+      const { data: singleCard, error: singleError } = await supabase
+        .from("cards")
+        .select("id, title, due_date, due_start, due_end, updated_at")
+        .eq("id", cardId)
+        .maybeSingle();
+
+      if (singleCard) {
+        console.log(`[gcal-debug] Recovered missing card via fallback: ${cardId}`);
+        card = singleCard;
+        cardMap.set(cardId, singleCard);
+      } else {
+        console.log(`[gcal-debug] Card ID ${cardId} missing in fallback too (event: ${event.id})`, singleError);
+        skippedMissingCard += 1;
+        continue;
+      }
+    }
+
+    let googleUpdatedMs = event.updatedAtGoogle ? Date.parse(event.updatedAtGoogle) : NaN;
+    if (!Number.isFinite(googleUpdatedMs)) {
+      // updated がないケースは最新扱いで取り込む
+      googleUpdatedMs = Date.now();
+    }
+    const taeskUpdatedMs = card.updated_at ? Date.parse(card.updated_at as string) : NaN;
+
+    if (Number.isFinite(taeskUpdatedMs) && taeskUpdatedMs >= googleUpdatedMs) {
+      if (debugSamples.length < 5) {
+        debugSamples.push({
+          cardId,
+          googleEventId: event.id,
+          taeskUpdated: card.updated_at,
+          googleUpdated: event.updatedAtGoogle,
+          reason: "skipped_older_google"
+        });
+      }
+      console.log(`[gcal-debug] Skipping older google event: ${event.id} (${event.title})`, {
+        taesk: new Date(taeskUpdatedMs).toISOString(),
+        google: new Date(googleUpdatedMs).toISOString(),
+        diff: taeskUpdatedMs - googleUpdatedMs
+      });
+      skippedOlderGoogle += 1;
+      continue;
+    }
+
+    console.log(`[gcal-debug] Processing update for card: ${cardId}`, {
+      title: event.title,
+      googleUpdated: new Date(googleUpdatedMs).toISOString(),
+      taeskUpdated: new Date(taeskUpdatedMs).toISOString()
+    });
+
+    const tz = event.displayTz || DEFAULT_DISPLAY_TZ;
+    let due_date = card.due_date ?? null;
+    let due_start = card.due_start ?? null;
+    let due_end = card.due_end ?? null;
+
+    if (event.isAllDay && event.startDate) {
+      due_date = event.startDate;
+      due_start = null;
+      due_end = null;
+    } else if (event.startUtc && event.endUtc) {
+      const startParts = toLocalParts(event.startUtc, tz);
+      const endParts = toLocalParts(event.endUtc, tz);
+      due_date = `${startParts.year}-${startParts.month}-${startParts.day}`;
+      due_start = `${startParts.hour}:${startParts.minute}:${startParts.second}`;
+      due_end = `${endParts.hour}:${endParts.minute}:${endParts.second}`;
+    }
+
+    console.log(`[gcal-debug] Attempting DB update for card ${cardId}`, {
+      title: event.title,
+      due_date,
+      due_start,
+      due_end
+    });
+
+    const { error: cardUpdateError } = await supabase
+      .from("cards")
+      .update({
+        title: event.title ?? card.title,
+        due_date,
+        due_start,
+        due_end,
+      })
+      .eq("id", cardId);
+
+    if (cardUpdateError) {
+      console.error("[gcal-debug] FAILED to update card from Google", {
+        cardId,
+        error: cardUpdateError,
+        code: cardUpdateError.code,
+        details: cardUpdateError.details,
+        message: cardUpdateError.message
+      });
+      continue;
+    }
+
+    console.log(`[gcal-debug] Successfully updated card ${cardId}`);
+
+    updatedCardIds.push(cardId);
+
+    if (syncRow) {
+      await supabase
+        .from("calendar_sync")
+        .update({
+          etag: event.etag ?? syncRow.etag ?? null,
+          last_synced_at: new Date().toISOString(),
+          google_event_id: event.id,
+          last_google_event_id: event.id,
+          status: "active",
+        })
+        .eq("id", syncRow.id);
+    }
+  }
+
+  console.info("[gcal->taesk] pull result", {
+    reason,
+    userId,
+    calendarId: targetCalendarId,
+    matched: cardIds.size,
+    updated: updatedCardIds.length,
+    skippedMissingCard,
+    skippedOlderGoogle,
+    debugSamples,
+  });
+
+  return { matched: cardIds.size, updated: updatedCardIds.length };
 }
 
 export async function listEventsForRange(
