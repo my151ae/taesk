@@ -2,11 +2,19 @@ import { redirect } from "next/navigation";
 import { getBoardById } from "@/lib/server/boards";
 import { buildBoardUrl } from "@/lib/board-url";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
+import { createServerSupabaseClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
 
 export default async function BoardDefaultPage() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    redirect("/login");
+  }
+
   const board = await getBoardById(MAIN_BOARD_ID);
 
   if (!board) {

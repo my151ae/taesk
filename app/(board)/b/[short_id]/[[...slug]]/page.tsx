@@ -53,7 +53,16 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   };
 }
 
+import { createServerSupabaseClient } from "@/lib/supabase";
+
 export default async function BoardByShortIdPage({ params }: PageProps) {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    permanentRedirect("/login");
+  }
+
   const { short_id, slug } = await params;
   const board = await getBoardByShortIdCached(short_id);
 
