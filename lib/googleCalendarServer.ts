@@ -251,7 +251,6 @@ function mapGoogleEvent(item: calendar_v3.Schema$Event, calendarId: string): Nor
     ?? end.timeZone
     ?? item.start?.timeZone
     ?? item.end?.timeZone
-    ?? item.timeZone
     ?? DEFAULT_DISPLAY_TZ;
 
   const startUtc = new Date(start.iso).toISOString();
@@ -571,11 +570,11 @@ export async function startCalendarWatch(
       address,
       token: account.id,
       params: {
-        ttl: Math.floor((options?.ttlMs ?? 86_400_000) / 1000),
+        ttl: Math.floor((options?.ttlMs ?? 86_400_000) / 1000).toString(),
       },
-      expiration,
+      expiration: expiration.toString(),
     },
-  });
+  }) as any;
 
   await supabase
     .from("google_calendar_sync_states")
@@ -841,7 +840,7 @@ export async function syncGoogleCalendarToTaesk(
     .eq("calendar_id", targetCalendarId);
 
   const cardIds = new Set<string>();
-  syncRows.forEach((row) => {
+  (syncRows || []).forEach((row) => {
     if (row.card_id) cardIds.add(row.card_id);
   });
   taeskCardHints.forEach((id) => cardIds.add(id));
@@ -859,7 +858,7 @@ export async function syncGoogleCalendarToTaesk(
 
   const cardMap = new Map((cards ?? []).map((card) => [card.id as string, card]));
   const syncMap = new Map<string, any>();
-  syncRows.forEach((row) => {
+  (syncRows || []).forEach((row) => {
     if (row.google_event_id) syncMap.set(row.google_event_id, row);
     if (row.last_google_event_id) syncMap.set(row.last_google_event_id, row);
   });
@@ -867,17 +866,11 @@ export async function syncGoogleCalendarToTaesk(
   const updatedCardIds: string[] = [];
   let skippedMissingCard = 0;
   let skippedOlderGoogle = 0;
-  const debugSamples: any[] = [];
-
-  console.log(`[gcal-debug] Starting sync loop. Events: ${events.length}, SyncRows: ${syncRows.length}, CardIds: ${cardIds.size}`);
 
   for (const event of events) {
     const syncRow = syncMap.get(event.id);
     const cardId = syncRow?.card_id ?? (event.taeskCardId && cardMap.has(event.taeskCardId) ? event.taeskCardId : null);
     if (!cardId) {
-      if (skippedMissingCard < 3) {
-        console.log(`[gcal-debug] Skipped missing card for event: ${event.id} (${event.title}). taeskCardId prop: ${event.taeskCardId}`);
-      }
       skippedMissingCard += 1;
       continue;
     }
@@ -885,19 +878,16 @@ export async function syncGoogleCalendarToTaesk(
     if (!card) {
       // Fallback: Try fetching single card explicitly
       // Often RLS or query limits might cause bulk fetch to miss items.
-      console.log(`[gcal-debug] Card ID ${cardId} missing in bulk map. Attempting fallback fetch...`);
-      const { data: singleCard, error: singleError } = await supabase
+      const { data: singleCard } = await supabase
         .from("cards")
         .select("id, title, due_date, due_start, due_end, updated_at")
         .eq("id", cardId)
         .maybeSingle();
 
       if (singleCard) {
-        console.log(`[gcal-debug] Recovered missing card via fallback: ${cardId}`);
         card = singleCard;
         cardMap.set(cardId, singleCard);
       } else {
-        console.log(`[gcal-debug] Card ID ${cardId} missing in fallback too (event: ${event.id})`, singleError);
         skippedMissingCard += 1;
         continue;
       }
@@ -911,29 +901,9 @@ export async function syncGoogleCalendarToTaesk(
     const taeskUpdatedMs = card.updated_at ? Date.parse(card.updated_at as string) : NaN;
 
     if (Number.isFinite(taeskUpdatedMs) && taeskUpdatedMs >= googleUpdatedMs) {
-      if (debugSamples.length < 5) {
-        debugSamples.push({
-          cardId,
-          googleEventId: event.id,
-          taeskUpdated: card.updated_at,
-          googleUpdated: event.updatedAtGoogle,
-          reason: "skipped_older_google"
-        });
-      }
-      console.log(`[gcal-debug] Skipping older google event: ${event.id} (${event.title})`, {
-        taesk: new Date(taeskUpdatedMs).toISOString(),
-        google: new Date(googleUpdatedMs).toISOString(),
-        diff: taeskUpdatedMs - googleUpdatedMs
-      });
       skippedOlderGoogle += 1;
       continue;
     }
-
-    console.log(`[gcal-debug] Processing update for card: ${cardId}`, {
-      title: event.title,
-      googleUpdated: new Date(googleUpdatedMs).toISOString(),
-      taeskUpdated: new Date(taeskUpdatedMs).toISOString()
-    });
 
     const tz = event.displayTz || DEFAULT_DISPLAY_TZ;
     let due_date = card.due_date ?? null;
@@ -952,13 +922,6 @@ export async function syncGoogleCalendarToTaesk(
       due_end = `${endParts.hour}:${endParts.minute}:${endParts.second}`;
     }
 
-    console.log(`[gcal-debug] Attempting DB update for card ${cardId}`, {
-      title: event.title,
-      due_date,
-      due_start,
-      due_end
-    });
-
     const { error: cardUpdateError } = await supabase
       .from("cards")
       .update({
@@ -970,17 +933,12 @@ export async function syncGoogleCalendarToTaesk(
       .eq("id", cardId);
 
     if (cardUpdateError) {
-      console.error("[gcal-debug] FAILED to update card from Google", {
+      console.error("[googleCalendar] failed to update card from Google", {
         cardId,
         error: cardUpdateError,
-        code: cardUpdateError.code,
-        details: cardUpdateError.details,
-        message: cardUpdateError.message
       });
       continue;
     }
-
-    console.log(`[gcal-debug] Successfully updated card ${cardId}`);
 
     updatedCardIds.push(cardId);
 
@@ -997,17 +955,6 @@ export async function syncGoogleCalendarToTaesk(
         .eq("id", syncRow.id);
     }
   }
-
-  console.info("[gcal->taesk] pull result", {
-    reason,
-    userId,
-    calendarId: targetCalendarId,
-    matched: cardIds.size,
-    updated: updatedCardIds.length,
-    skippedMissingCard,
-    skippedOlderGoogle,
-    debugSamples,
-  });
 
   return { matched: cardIds.size, updated: updatedCardIds.length };
 }
@@ -1045,7 +992,7 @@ export async function listEventsForRange(
 
   // Cache-first: if recent and window covers the request, serve cached.
   // Try syncToken diff first
-  if (hasSyncToken) {
+  if (hasSyncToken && syncState?.sync_token) {
     try {
       await fetchWithSyncToken(calendar, supabase, account.id, calendarId, syncState.sync_token);
     } catch (err: any) {
