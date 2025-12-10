@@ -77,14 +77,16 @@ export class GoogleCalendarNotConnectedError extends Error {
   }
 }
 
+function getAppOrigin() {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
 export function resolveGoogleRedirectUri(origin?: string) {
-  if (!origin) {
-    if (process.env.NEXT_PUBLIC_APP_URL) origin = process.env.NEXT_PUBLIC_APP_URL;
-    else if (process.env.NEXT_PUBLIC_SITE_URL) origin = process.env.NEXT_PUBLIC_SITE_URL;
-    else if (process.env.VERCEL_URL) origin = `https://${process.env.VERCEL_URL}`;
-    else origin = "http://localhost:3000";
-  }
-  const url = new URL("/api/integrations/google-calendar/callback", origin);
+  const base = origin ?? getAppOrigin();
+  const url = new URL("/api/integrations/google-calendar/callback", base);
   return url.toString();
 }
 
@@ -977,7 +979,7 @@ export async function listEventsForRange(
   // Watch renewal check
   if (needsWatchRenewal(syncState)) {
     try {
-      const address = process.env.GOOGLE_CALENDAR_WEBHOOK_URL || `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/integrations/google-calendar/webhook`;
+      const address = process.env.GOOGLE_CALENDAR_WEBHOOK_URL || `${getAppOrigin()}/api/integrations/google-calendar/webhook`;
       await startCalendarWatch(userId, calendarId, address, { supabase });
     } catch (err) {
       console.error("[googleCalendar] watch renewal failed", err);
