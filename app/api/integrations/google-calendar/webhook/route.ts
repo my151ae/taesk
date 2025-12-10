@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
   const sync = request.headers.get("x-goog-changed") ?? null;
   const nowIso = new Date().toISOString();
 
+  console.log(`[GoogleWebhook] Received: channel=${channelId} resource=${resourceId} state=${resourceState}`);
+
   try {
     const supabase = await createServerSupabaseClient();
     if (channelId) {
