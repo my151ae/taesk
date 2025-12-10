@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     const scope = tokens.scope ?? (Array.isArray(tokenInfo.scopes) ? tokenInfo.scopes.join(" ") : GOOGLE_CALENDAR_SCOPE);
     const email = tokenInfo.email ?? user.email ?? "unknown";
 
-    const { error: upsertError } = await supabase
+    const { data: savedAccount, error: upsertError } = await supabase
       .from("google_calendar_accounts")
       .upsert({
         user_id: user.id,
@@ -108,27 +108,35 @@ export async function GET(request: NextRequest) {
         updated_at: new Date().toISOString(),
       }, {
         onConflict: "user_id,google_sub",
-      });
+      })
+      .select()
+      .single();
 
-    if (upsertError) {
+    if (upsertError || !savedAccount) {
       console.error("[googleCalendar/callback] failed to store credentials", {
-        code: upsertError.code,
-        message: upsertError.message,
-        details: upsertError.details,
-        hint: upsertError.hint,
+        code: upsertError?.code,
+        message: upsertError?.message,
+        details: upsertError?.details,
+        hint: upsertError?.hint,
       });
       return NextResponse.json(
         {
           error: {
             code: "DB_ERROR",
             message: "Failed to store credentials",
-            detail: upsertError.message,
-            hint: upsertError.hint,
+            detail: upsertError?.message,
+            hint: upsertError?.hint,
           },
         },
         { status: 500 }
       );
     }
+
+    // Force a fresh watch on next usage by clearing old sync state
+    await supabase
+      .from("google_calendar_sync_states")
+      .delete()
+      .eq("google_account_id", savedAccount.id);
 
     const absoluteRedirect = (() => {
       try {
