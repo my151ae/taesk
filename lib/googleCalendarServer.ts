@@ -684,6 +684,14 @@ async function fetchAndCacheRange(
       windowStart: expandedStart,
       windowEnd: expandedEnd,
     });
+  } else {
+    console.warn("[googleCalendar] full sync finished but no nextSyncToken returned", {
+      accountId,
+      calendarId,
+      windowStart: expandedStart.toISOString(),
+      windowEnd: expandedEnd.toISOString(),
+      itemCount: normalizedEventsAll.length,
+    });
   }
 
   await pruneCacheWindow(supabase, accountId, calendarId, now);
@@ -726,6 +734,12 @@ async function fetchWithSyncToken(
   if (nextSyncToken) {
     await persistSyncState(supabase, accountId, calendarId, {
       syncToken: nextSyncToken,
+    });
+  } else {
+    console.warn("[googleCalendar] incremental sync finished but no nextSyncToken returned", {
+      accountId,
+      calendarId,
+      itemCount: normalizedEventsAll.length,
     });
   }
 
