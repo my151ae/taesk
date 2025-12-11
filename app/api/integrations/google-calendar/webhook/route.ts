@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServiceRoleSupabaseClient } from "@/lib/server/supabaseAdmin";
 import { syncGoogleCalendarToTaesk } from "@/lib/googleCalendarServer";
 
 export const runtime = "nodejs";
@@ -16,16 +16,20 @@ export async function POST(request: NextRequest) {
   console.log(`[GoogleWebhook] Received: channel=${channelId} resource=${resourceId} state=${resourceState}`);
 
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleSupabaseClient();
     if (channelId) {
-      const { data: state } = await supabase
+      const { data: state, error: stateError } = await supabase
         .from("google_calendar_sync_states")
         .select("google_account_id, calendar_id")
         .eq("watch_channel_id", channelId)
         .maybeSingle();
 
+      if (stateError) {
+        console.error("[googleCalendar/webhook] failed to load state", stateError);
+      }
+
       if (state?.google_account_id) {
-        await supabase.from("google_calendar_sync_logs").insert({
+        const { error: insertError } = await supabase.from("google_calendar_sync_logs").insert({
           google_account_id: state.google_account_id,
           calendar_id: state.calendar_id,
           google_event_id: null,
@@ -41,7 +45,11 @@ export async function POST(request: NextRequest) {
           message_number: messageNumber,
         });
 
-        await supabase
+        if (insertError) {
+          console.error("[googleCalendar/webhook] failed to insert log", insertError);
+        }
+
+        const { error: updateError } = await supabase
           .from("google_calendar_sync_states")
           .update({
             last_watch_at: nowIso,
@@ -49,6 +57,10 @@ export async function POST(request: NextRequest) {
           })
           .eq("google_account_id", state.google_account_id)
           .eq("calendar_id", state.calendar_id);
+
+        if (updateError) {
+          console.error("[googleCalendar/webhook] failed to update state", updateError);
+        }
 
         const { data: account } = await supabase
           .from("google_calendar_accounts")
