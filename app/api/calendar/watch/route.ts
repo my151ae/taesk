@@ -5,6 +5,7 @@ import { startCalendarWatch, stopCalendarWatch } from "@/lib/googleCalendarServe
 export const runtime = "nodejs";
 
 function resolveWebhookAddress(origin: string) {
+  // address は絶対 URL で Google に渡す必要がある。env があればそれを優先。
   if (process.env.GOOGLE_CALENDAR_WEBHOOK_URL) return process.env.GOOGLE_CALENDAR_WEBHOOK_URL;
   return `${origin}/api/integrations/google-calendar/webhook`;
 }
@@ -23,6 +24,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const watch = await startCalendarWatch(user.id, calendarId, address, { supabase });
+    console.log("[calendar/watch] started", {
+      userId: user.id,
+      calendarId,
+      address,
+      watch,
+    });
     return NextResponse.json({ success: true, watch });
   } catch (error) {
     console.error("[calendar/watch] start failed", error);

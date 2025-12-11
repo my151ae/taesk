@@ -28,6 +28,14 @@ export async function POST(request: NextRequest) {
         console.error("[googleCalendar/webhook] failed to load state", stateError);
       }
 
+      // 確認用に channelId と resourceId をログ出し（セキュア情報は含めない）
+      console.log("[googleCalendar/webhook] incoming", {
+        channelId,
+        resourceId,
+        resourceState,
+        messageNumber,
+      });
+
       if (state?.google_account_id) {
         const { error: insertError } = await supabase.from("google_calendar_sync_logs").insert({
           google_account_id: state.google_account_id,
