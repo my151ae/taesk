@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
 import type { Checklist } from "@/lib/checklist";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText } from "@/lib/checklist";
@@ -26,6 +26,7 @@ import {
   DEFAULT_TIMELINE_DAY_RANGE,
   formatDayLabel,
   minuteToPixels,
+  pixelsToMinutes,
   getMinutesFromTime,
   getIsoDateJst,
   getNowMinutesJst,
@@ -33,6 +34,7 @@ import {
   minutesToTime,
   withJstMidnight,
   toLocalDay,
+  getDayDiff,
 
   type UserProfile,
   type TimelineDay,
@@ -216,6 +218,26 @@ const resolveBucketKey = (card: Card, days: TimelineDay[]) => {
 };
 
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
+  // デバウンス用カスタムhook
+  const useDebounce = (callback: (...args: any[]) => void, delay: number) => {
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    return useCallback((...args: any[]) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    }, [callback, delay]);
+  };
+
+  // URLパラメータの取得
+  const searchParams = useSearchParams();
+  const urlDate = searchParams.get('date');
+  const urlRange = searchParams.get('range');
+  const urlTime = searchParams.get('time');
+
   const [data, setData] = useState<TimelineResponse | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -234,10 +256,68 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const { user, signOut } = useAuth();
+
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
-  const [dayRange, setDayRange] = useState(initialBoard.day_range ?? 2);
+
+  // URL更新関数
+  const updateUrl = useCallback((date: string | null, range: number, time?: number | null) => {
+    const params = new URLSearchParams();
+
+    if (date) {
+      params.set('date', date);
+    }
+
+    params.set('range', String(range));
+
+    // timeが指定されている場合のみURLに追加
+    if (time != null && time >= 0) {
+      params.set('time', String(Math.round(time)));
+    }
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+
+    // replaceを使用して履歴を増やさない
+    router.replace(newUrl, { scroll: false });
+  }, [router]);
+
+  // 初期化ロジック (SSRエラー回避のためuseEffect内で行う)
+  // 初期化ロジック (urlDateがある場合)
+  useEffect(() => {
+    if (urlDate) {
+      const todayJst = getIsoDateJst(new Date().toISOString());
+      const start = getDayDiff(urlDate, todayJst);
+      if (!isNaN(start)) {
+        setDayWindowStart(start);
+        dayWindowStartRef.current = start;
+      }
+    }
+  }, [urlDate]);
+
+  // デフォルトパラメータ設定 (パラメータがない場合)
+  useEffect(() => {
+    if (!urlDate && !urlRange && !urlTime) {
+      const todayJst = getIsoDateJst(new Date().toISOString());
+      const nowMinutes = getNowMinutesJst(new Date().toISOString());
+      const defaultRange = initialBoard.day_range ?? 2;
+
+      updateUrl(todayJst, defaultRange, nowMinutes);
+    }
+  }, [urlDate, urlRange, urlTime, initialBoard.day_range, updateUrl]);
+
+  // dayRangeの初期値をURLパラメータから取得
+  const initialRange = useMemo(() => {
+    const urlRangeValue = urlRange ? parseInt(urlRange, 10) : null;
+    if (urlRangeValue && urlRangeValue >= 1 && urlRangeValue <= 7) {
+      return urlRangeValue;
+    }
+    return initialBoard.day_range ?? 2;
+  }, [urlRange, initialBoard.day_range]);
+
+  const [dayRange, setDayRange] = useState(initialRange);
+  const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
   const prevGoogleStatusRef = useRef<string | null>(null);
   const [googleToast, setGoogleToast] = useState<string | null>(null);
@@ -690,6 +770,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     fetchTimeline();
   }, [fetchTimeline]);
 
+
+
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
       if (!boardMenuRef.current) return;
@@ -1011,17 +1093,90 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
     updateNow();
     const interval = window.setInterval(updateNow, 60_000);
-    return () => window.clearInterval(interval);
-  }, [data]);
+    return () => clearInterval(interval);
+  }, [data?.serverNow]);
+
+  // URLパラメータに基づくactiveDayIndexの初期化
+  useEffect(() => {
+    if (!data?.days?.length || !urlDate) return;
+
+    const targetIndex = data.days.findIndex(day => day.isoDate === urlDate);
+
+    if (targetIndex >= 0) {
+      setActiveDayIndex(targetIndex);
+    }
+    // urlDateが見つからない場合は何もしない(デフォルトの0のまま)
+  }, [data?.days, urlDate]);
+
+  // スクロール位置の復元
+  useEffect(() => {
+    if (hasRestoredScroll || !data?.days?.length || !timelineScrollRef.current) return;
+
+    if (urlTime) {
+      const timeMinutes = parseInt(urlTime, 10);
+      if (!isNaN(timeMinutes) && timeMinutes >= 0 && timeMinutes < 24 * 60) {
+        const scrollTop = minuteToPixels(timeMinutes);
+        timelineScrollRef.current.scrollTo({
+          top: scrollTop,
+          behavior: 'instant', // 即座にスクロール
+        });
+      }
+    }
+
+    setHasRestoredScroll(true);
+  }, [data?.days, urlTime, hasRestoredScroll]);
 
   useEffect(() => {
     if (!timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
+
     const container = timelineScrollRef.current;
     const target = minuteToPixels(indicatorMinutes) - container.clientHeight / 2;
-    const clamped = Math.max(0, Math.min(target, TIMELINE_HEIGHT - container.clientHeight));
-    container.scrollTop = clamped;
+
+    const clampedTop = Math.max(0, Math.min(target, container.scrollHeight - container.clientHeight));
+
+    container.scrollTo({
+      top: clampedTop,
+      behavior: 'instant',
+    });
+
     setHasAutoScrolled(true);
-  }, [indicatorMinutes, hasAutoScrolled]);
+  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled]);
+
+  // スクロールイベントハンドラ(デバウンス付き)
+  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrl });
+  // レンダリング毎に最新のstateをrefに保持
+  stateRef.current = { data, activeDayIndex, dayRange, updateUrl };
+
+  // スクロールイベントハンドラ(デバウンス付き) - refを使用して依存関係を排除
+  const handleTimelineScroll = useCallback((arg?: number | React.UIEvent<HTMLDivElement>) => {
+    // 数値が渡されたらそれを使う、イベントならcurrentTarget、なければrefから取得
+    let scrollTop: number | undefined;
+
+    if (typeof arg === 'number') {
+      scrollTop = arg;
+    } else if (arg && 'currentTarget' in arg) {
+      scrollTop = arg.currentTarget.scrollTop;
+    } else {
+      scrollTop = timelineScrollRef.current?.scrollTop;
+    }
+
+    if (scrollTop == null) return;
+
+    // refから最新のstateを取得
+    const { data, activeDayIndex, dayRange, updateUrl } = stateRef.current;
+
+    const minutes = pixelsToMinutes(scrollTop);
+    const currentDay = data?.days?.[activeDayIndex];
+
+    if (currentDay) {
+      updateUrl(currentDay.isoDate, dayRange, minutes);
+    }
+  }, []); // 依存配列は空にして再生成を防ぐ
+
+  const debouncedHandleScroll = useDebounce(handleTimelineScroll, 500);
+
+  // スクロールイベントリスナーの登録
+
 
   useEffect(() => {
     const headerEl = timelineHeaderRef.current;
@@ -1229,29 +1384,65 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handlePrevDay = useCallback(async () => {
     if (status === 'loading') return;
     if (activeDayIndex > 0) {
-      setActiveDayIndex((prev) => Math.max(0, prev - 1));
+      const newIndex = Math.max(0, activeDayIndex - 1);
+      setActiveDayIndex(newIndex);
+
+      // URL更新
+      const targetDay = data?.days?.[newIndex];
+      const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+      const currentTime = pixelsToMinutes(currentScrollTop);
+      if (targetDay) {
+        updateUrl(targetDay.isoDate, dayRange, currentTime);
+      }
       return;
     }
 
     const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
     const payload = await fetchTimeline(baseStart - 1);
     const nextDaysLength = payload?.days?.length ?? 0;
-    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, 0));
-  }, [activeDayIndex, clampActiveDayIndex, data?.startOffset, fetchTimeline, status]);
+    const newIndex = clampActiveDayIndex(nextDaysLength, 0);
+    setActiveDayIndex(newIndex);
+
+    // URL更新
+    const targetDay = payload?.days?.[newIndex];
+    const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const currentTime = pixelsToMinutes(currentScrollTop);
+    if (targetDay) {
+      updateUrl(targetDay.isoDate, dayRange, currentTime);
+    }
+  }, [activeDayIndex, clampActiveDayIndex, data?.startOffset, data?.days, fetchTimeline, status, dayRange, updateUrl]);
 
   const handleNextDay = useCallback(async () => {
     if (status === 'loading' || !data?.days?.length) return;
     const lastStartIndex = Math.max(0, data.days.length - dayRange);
     if (activeDayIndex < lastStartIndex) {
-      setActiveDayIndex((prev) => Math.min(lastStartIndex, prev + 1));
+      const newIndex = Math.min(lastStartIndex, activeDayIndex + 1);
+      setActiveDayIndex(newIndex);
+
+      // URL更新
+      const targetDay = data?.days?.[newIndex];
+      const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+      const currentTime = pixelsToMinutes(currentScrollTop);
+      if (targetDay) {
+        updateUrl(targetDay.isoDate, dayRange, currentTime);
+      }
       return;
     }
 
     const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
     const payload = await fetchTimeline(baseStart + 1);
     const nextDaysLength = payload?.days?.length ?? 0;
-    setActiveDayIndex(clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0));
-  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.startOffset, fetchTimeline, status, dayRange]);
+    const newIndex = clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0);
+    setActiveDayIndex(newIndex);
+
+    // URL更新
+    const targetDay = payload?.days?.[newIndex];
+    const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const currentTime = pixelsToMinutes(currentScrollTop);
+    if (targetDay) {
+      updateUrl(targetDay.isoDate, dayRange, currentTime);
+    }
+  }, [activeDayIndex, clampActiveDayIndex, data?.days?.length, data?.days, data?.startOffset, fetchTimeline, status, dayRange, updateUrl]);
 
   const bucketDayMap = useMemo(() => {
     const result: Record<string, string | null> = {};
@@ -1261,6 +1452,41 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     });
     return result;
   }, [data?.days]);
+
+  // dayRange変更ハンドラ
+  const handleDayRangeChange = useCallback((newRange: number) => {
+    setDayRange(newRange);
+
+    const currentDay = data?.days?.[activeDayIndex];
+    const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const currentTime = pixelsToMinutes(currentScrollTop);
+
+    if (currentDay) {
+      updateUrl(currentDay.isoDate, newRange, currentTime);
+    }
+  }, [data?.days, activeDayIndex, updateUrl]);
+
+  // Todayボタンハンドラ (router.pushを使用して履歴に追加)
+  const handleTodayClick = useCallback(async () => {
+    await fetchTimeline(0);
+    setActiveDayIndex(0);
+
+    const todayIso = data?.days?.[0]?.isoDate;
+    const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+    const currentTime = pixelsToMinutes(currentScrollTop);
+
+    if (todayIso) {
+      const params = new URLSearchParams();
+      params.set('date', todayIso);
+      params.set('range', String(dayRange));
+      if (currentTime >= 0) {
+        params.set('time', String(currentTime));
+      }
+
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      router.push(newUrl, { scroll: false }); // pushを使用
+    }
+  }, [fetchTimeline, data?.days, dayRange, router]);
 
   const {
     sensors,
@@ -1459,11 +1685,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setSelectedPriority={setSelectedPriority}
             availableTags={availableTags}
             dayRange={dayRange}
-            onDayRangeChange={setDayRange}
-            onTodayClick={async () => {
-              await fetchTimeline(0);
-              setActiveDayIndex(0);
-            }}
+            onDayRangeChange={handleDayRangeChange}
+            onTodayClick={handleTodayClick}
             onUpdateBoard={async (updates) => {
               try {
                 const response = await fetch(`/api/boards/${initialBoard.id}`, {
@@ -1509,6 +1732,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
           <div className="hidden md:block">
             <DesktopTimelineView
+              onScroll={debouncedHandleScroll}
               timelineHeaderRef={timelineHeaderRef}
               timelineScrollRef={timelineScrollRef}
               days={data?.days ?? []}

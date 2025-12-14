@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
+import { Suspense } from "react";
 
 import TimelineBoardPage from "@/app/(board)/_components/timeline/TimelineBoardPage";
 import { buildBoardUrl } from "@/lib/board-url";
@@ -80,5 +81,9 @@ export default async function BoardByShortIdPage({ params }: PageProps) {
     permanentRedirect(canonical);
   }
 
-  return <TimelineBoardPage initialBoard={board} />;
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-slate-50"><div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-sky-500 animate-spin" /></div>}>
+      <TimelineBoardPage initialBoard={board} />
+    </Suspense>
+  );
 }

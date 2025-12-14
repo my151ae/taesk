@@ -51,12 +51,24 @@ export const buildAbMeta = (day: TimelineDay) => ({
 // Helper functions
 export const minuteToPixels = (minutes: number) => (minutes / 60) * HOUR_HEIGHT;
 
+export const pixelsToMinutes = (pixels: number): number => {
+    const minutes = Math.round((pixels / HOUR_HEIGHT) * 60);
+    return Math.max(0, Math.min(24 * 60 - 1, minutes)); // 0-1439の範囲にクランプ
+};
+
 export const getMinutesFromTime = (value: string | null) => {
     if (!value) return null;
     const [hours, minutes] = value.split(":");
     const h = Number(hours ?? "0");
     const m = Number(minutes ?? "0");
     return h * 60 + m;
+};
+
+export const getDayDiff = (d1: string, d2: string) => {
+    const t1 = new Date(d1).getTime();
+    const t2 = new Date(d2).getTime();
+    if (isNaN(t1) || isNaN(t2)) return 0;
+    return Math.floor((t1 - t2) / (1000 * 60 * 60 * 24));
 };
 
 export const getIsoDateJst = (timestamp: string) => {
