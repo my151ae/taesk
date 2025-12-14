@@ -20,9 +20,6 @@ import {
   timeLabel,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
-import { countNonEmptyLines, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
-import type { Checklist } from "@/lib/checklist";
-import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 
 const ALL_DAY_ROW_HEIGHT = 36;
 
@@ -53,9 +50,6 @@ type DesktopTimelineViewProps = {
   handleResizeMove: (e: React.PointerEvent) => void;
   handleResizeEnd: (e: React.PointerEvent) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  editingCardId: string | null;
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -93,9 +87,6 @@ export function DesktopTimelineView({
   handleResizeMove,
   handleResizeEnd,
   onToggleCheck,
-  onChecklistCommit,
-  onChecklistEditingChange,
-  editingCardId,
   sensors,
   handleDragStart,
   handleDragMove,
@@ -134,7 +125,6 @@ export function DesktopTimelineView({
         title: overlayTimelineEvent.title || "Untitled card",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
-        checklistCount: countNonEmptyLines(normalizeChecklist(overlayTimelineEvent.checklist ?? EMPTY_CHECKLIST)),
       };
     }
     if (overlayBucketCard) {
@@ -142,7 +132,6 @@ export function DesktopTimelineView({
         title: overlayBucketCard.title || "Untitled card",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
-        checklistCount: countNonEmptyLines(normalizeChecklist(overlayBucketCard.checklist ?? EMPTY_CHECKLIST)),
       };
     }
     return null;
@@ -426,9 +415,6 @@ export function DesktopTimelineView({
               status={status}
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
-              onChecklistCommit={onChecklistCommit}
-              onChecklistEditingChange={onChecklistEditingChange}
-              editingCardId={editingCardId}
               bucketIndicator={bucketIndicator}
             />
 
@@ -448,9 +434,6 @@ export function DesktopTimelineView({
               handleResizeMove={handleResizeMove}
               handleResizeEnd={handleResizeEnd}
               onToggleCheck={onToggleCheck}
-              onChecklistCommit={onChecklistCommit}
-              onChecklistEditingChange={onChecklistEditingChange}
-              editingCardId={editingCardId}
               shrinkDaysToHalf
               calendarEventsByDay={calendarEventsByDay}
               onExternalEventClick={onExternalEventClick}
@@ -465,7 +448,6 @@ export function DesktopTimelineView({
             title={overlayCardData.title}
             badge={overlayCardData.badge}
             timeText={overlayCardData.timeText}
-            checklistCount={overlayCardData.checklistCount}
           />
         ) : null}
       </DragOverlay>
@@ -477,12 +459,10 @@ function DesktopDragOverlayCard({
   title,
   badge,
   timeText,
-  checklistCount,
 }: {
   title: string;
   badge: string;
   timeText: string | null;
-  checklistCount: number;
 }) {
   return (
     <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -495,7 +475,6 @@ function DesktopDragOverlayCard({
         </div>
       </div>
       {timeText ? <div className="mt-1 text-[11px] text-slate-600">{timeText}</div> : null}
-      {checklistCount > 0 ? <div className="mt-1 text-[11px] text-slate-400">☑︎ {checklistCount}</div> : null}
     </div>
   );
 }

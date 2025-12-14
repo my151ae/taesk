@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
 import type { Checklist } from "@/lib/checklist";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText } from "@/lib/checklist";
-import type { ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
 import { buildBoardUrl } from "@/lib/board-url";
 
 import { createClientTrace } from "@/lib/metrics/client";
@@ -238,7 +237,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [dayRange, setDayRange] = useState(initialBoard.day_range ?? 2);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
   const prevGoogleStatusRef = useRef<string | null>(null);
@@ -1133,25 +1131,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     });
   }, [setData, setModalCardOverride]);
 
-  const handleChecklistCommit = useCallback(async (cardId: string, checklist: Checklist, _trigger: ChecklistSaveTrigger) => {
-    applyChecklistLocally(cardId, checklist);
-    if (dataMode !== 'api') return;
-    try {
-      await applyPatch(cardId, { checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST) });
-      setModalCardOverride((current) => current && current.id === cardId ? { ...current, checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST) } as Card : current);
-    } catch (error) {
-      console.error('[timeline] checklist save failed', error);
-      setErrorMessage('Failed to save checklist');
-    }
-  }, [applyChecklistLocally, applyPatch, dataMode, setModalCardOverride]);
 
-  const handleChecklistEditingChange = useCallback((cardId: string, isEditing: boolean) => {
-    setEditingCardId((current) => {
-      if (isEditing) return cardId;
-      if (current === cardId) return null;
-      return current;
-    });
-  }, []);
 
   const handleBoardNavigate = useCallback(
     (board: Board) => {
@@ -1304,7 +1284,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     timelineScrollRef,
     bucketDayMap,
     dataMode,
-    editingCardId,
   });
 
   const eventsByDay = useMemo(() => {
@@ -1554,9 +1533,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               handleResizeMove={handleResizeMove}
               handleResizeEnd={handleResizeEnd}
               onToggleCheck={handleToggleCardChecked}
-              onChecklistCommit={handleChecklistCommit}
-              onChecklistEditingChange={handleChecklistEditingChange}
-              editingCardId={editingCardId}
               sensors={sensors}
               handleDragStart={handleDragStart}
               handleDragMove={handleDragMove}
@@ -1585,9 +1561,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 timelineViewportHeight={timelineViewportHeight}
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
-                onChecklistCommit={handleChecklistCommit}
-                onChecklistEditingChange={handleChecklistEditingChange}
-                editingCardId={editingCardId}
                 status={status}
                 activeDrag={activeDrag}
                 sensors={sensors}
