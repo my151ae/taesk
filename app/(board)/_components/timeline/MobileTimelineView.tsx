@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   HOUR_HEIGHT,
@@ -19,70 +19,12 @@ import {
   ExternalCalendarEntry,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
-import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
-import { ChecklistPreview } from "@/app/(board)/_components/checklist/ChecklistPreview";
-import { Checklist, normalizeChecklist, EMPTY_CHECKLIST, countNonEmptyLines } from "@/lib/checklist";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
-function MobileInlineChecklist({
-  cardId,
-  checklist,
-  editingCardId,
-  onChecklistEditingChange,
-  onChecklistCommit,
-  showCount = false,
-  previewClassName,
-}: {
-  cardId: string;
-  checklist: Checklist | null;
-  editingCardId: string | null;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  showCount?: boolean;
-  previewClassName?: string;
-}) {
-  const [draft, setDraft] = useState<Checklist>(normalizeChecklist(checklist ?? EMPTY_CHECKLIST));
 
-  useEffect(() => {
-    if (editingCardId === cardId) return;
-    setDraft(normalizeChecklist(checklist ?? EMPTY_CHECKLIST));
-  }, [checklist, cardId, editingCardId]);
-
-  const isEditing = editingCardId === cardId;
-  const lineCount = countNonEmptyLines(draft);
-
-  return (
-    <div className="mt-2 space-y-1">
-      {showCount ? <div className="text-[10px] text-slate-500">☑︎ {lineCount}</div> : null}
-      {isEditing ? (
-        <ChecklistEditor
-          value={draft}
-          onChange={(next) => setDraft(next)}
-          onCommit={async (next, trigger) => {
-            const normalized = normalizeChecklist(next);
-            await onChecklistCommit(cardId, normalized, trigger);
-          }}
-          onEditingChange={(editing) => onChecklistEditingChange(cardId, editing)}
-          autoSaveDelayMs={1500}
-          placeholder="- [ ] タスクを書く"
-        />
-      ) : (
-        <ChecklistPreview
-          checklist={draft}
-          maxLines={3}
-          className={previewClassName}
-          onClick={(e) => {
-            e.stopPropagation();
-            onChecklistEditingChange(cardId, true);
-          }}
-        />
-      )}
-    </div>
-  );
-}
 
 function MobileTimelineColumn({
   day,
@@ -92,9 +34,6 @@ function MobileTimelineColumn({
   layoutMap,
   openCardModal,
   onToggleCheck,
-  onChecklistEditingChange,
-  onChecklistCommit,
-  editingCardId,
   pointerPreview,
   activeDragCardId,
   calendarEvents,
@@ -107,9 +46,6 @@ function MobileTimelineColumn({
   layoutMap: Record<string, EventLayout>;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  editingCardId: string | null;
   pointerPreview: DragAndDropBindings["pointerPreview"];
   activeDragCardId: string | null;
   calendarEvents: ExternalCalendarEntry[];
@@ -217,7 +153,6 @@ function MobileTimelineColumn({
           const top = minuteToPixels(start);
           const height = Math.max(minuteToPixels(duration), 32);
           const layout = layoutMap[event.card_id];
-          const isEditing = editingCardId === event.card_id;
 
           return (
             <DraggableCard
@@ -225,7 +160,6 @@ function MobileTimelineColumn({
               id={`event:${event.card_id}`}
               data={{ kind: "event", event, cardId: event.card_id }}
               attachListenersToChild
-              disabled={isEditing}
             >
               <div
                 className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 pt-5 text-left shadow-sm select-none"
@@ -274,15 +208,6 @@ function MobileTimelineColumn({
                     {(event.due_bucket ?? "a").toUpperCase()}
                   </button>
                 </div>
-
-                <MobileInlineChecklist
-                  cardId={event.card_id}
-                  checklist={event.checklist ?? null}
-                  editingCardId={editingCardId}
-                  onChecklistEditingChange={onChecklistEditingChange}
-                  onChecklistCommit={onChecklistCommit}
-                  previewClassName="break-words line-clamp-3"
-                />
               </div>
             </DraggableCard>
           );
@@ -299,9 +224,6 @@ function MobileAbBucket({
   items,
   openCardModal,
   onToggleCheck,
-  onChecklistCommit,
-  onChecklistEditingChange,
-  editingCardId,
   bucketIndicator,
 }: {
   sectionLabel: string;
@@ -310,9 +232,6 @@ function MobileAbBucket({
   items: TimelineBucketItem[];
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  editingCardId: string | null;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
 }) {
   const { setNodeRef: setBucketRef, isOver } = useDroppable({
@@ -340,9 +259,6 @@ function MobileAbBucket({
               bucketKey={bucketKey}
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
-              onChecklistCommit={onChecklistCommit}
-              onChecklistEditingChange={onChecklistEditingChange}
-              editingCardId={editingCardId}
               bucketIndicator={bucketIndicator}
             />
           ))
@@ -367,9 +283,6 @@ type MobileTimelineViewProps = {
   timelineViewportHeight: number;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  editingCardId: string | null;
   status: string;
   activeDrag: DragAndDropBindings["activeDrag"];
   sensors: DragAndDropBindings["sensors"];
@@ -398,9 +311,6 @@ export default function MobileTimelineView({
   timelineViewportHeight,
   openCardModal,
   onToggleCheck,
-  onChecklistCommit,
-  onChecklistEditingChange,
-  editingCardId,
   status,
   sensors,
   handleDragStart,
@@ -484,7 +394,6 @@ export default function MobileTimelineView({
         title: overlayTimelineEvent.title || "Untitled card",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
-        checklistCount: countNonEmptyLines(normalizeChecklist(overlayTimelineEvent.checklist ?? EMPTY_CHECKLIST)),
       };
     }
     if (overlayBucketCard) {
@@ -492,7 +401,6 @@ export default function MobileTimelineView({
         title: overlayBucketCard.title || "Untitled card",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
-        checklistCount: countNonEmptyLines(normalizeChecklist(overlayBucketCard.checklist ?? EMPTY_CHECKLIST)),
       };
     }
     return null;
@@ -619,9 +527,6 @@ export default function MobileTimelineView({
                   layoutMap={layoutMap}
                   openCardModal={openCardModal}
                   onToggleCheck={onToggleCheck}
-                  onChecklistEditingChange={onChecklistEditingChange}
-                  onChecklistCommit={onChecklistCommit}
-                  editingCardId={editingCardId}
                   pointerPreview={pointerPreview}
                   activeDragCardId={activeDragCardId}
                   calendarEvents={calendarTimedEventsForDay}
@@ -643,9 +548,6 @@ export default function MobileTimelineView({
                       items={items}
                       openCardModal={openCardModal}
                       onToggleCheck={onToggleCheck}
-                      onChecklistCommit={onChecklistCommit}
-                      onChecklistEditingChange={onChecklistEditingChange}
-                      editingCardId={editingCardId}
                       bucketIndicator={bucketIndicator}
                     />
                   );
@@ -662,7 +564,6 @@ export default function MobileTimelineView({
             title={overlayCardData.title}
             badge={overlayCardData.badge}
             timeText={overlayCardData.timeText}
-            checklistCount={overlayCardData.checklistCount}
           />
         ) : null}
       </DragOverlay>
@@ -674,18 +575,12 @@ function MobileBucketCard({
   bucketKey,
   openCardModal,
   onToggleCheck,
-  onChecklistCommit,
-  onChecklistEditingChange,
-  editingCardId,
   bucketIndicator,
 }: {
   item: TimelineBucketItem;
   bucketKey: string;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
-  onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-  onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-  editingCardId: string | null;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
 }) {
   const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
@@ -698,7 +593,6 @@ function MobileBucketCard({
   });
   const showFallbackBottomLine =
     bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id;
-  const isEditing = editingCardId === item.card_id;
 
   return (
     <DraggableCard
@@ -706,7 +600,6 @@ function MobileBucketCard({
       id={`bucket:${item.card_id}`}
       data={{ kind: "bucket", cardId: item.card_id, bucketKey, item }}
       attachListenersToChild
-      disabled={isEditing}
     >
       <div
         className="relative flex w-full flex-col gap-1 px-3 py-3 select-none"
@@ -741,16 +634,6 @@ function MobileBucketCard({
           <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />
         )}
 
-        <MobileInlineChecklist
-          cardId={item.card_id}
-          checklist={item.checklist ?? null}
-          editingCardId={editingCardId}
-          onChecklistEditingChange={onChecklistEditingChange}
-          onChecklistCommit={onChecklistCommit}
-          showCount
-          previewClassName="break-words line-clamp-3"
-        />
-
         <div className="flex items-start gap-2">
           <input
             type="checkbox"
@@ -779,12 +662,10 @@ function MobileDragOverlayCard({
   title,
   badge,
   timeText,
-  checklistCount,
 }: {
   title: string;
   badge: string;
   timeText: string | null;
-  checklistCount: number;
 }) {
   return (
     <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -797,7 +678,6 @@ function MobileDragOverlayCard({
         </div>
       </div>
       {timeText ? <div className="mt-1 text-[11px] text-slate-600">{timeText}</div> : null}
-      {checklistCount > 0 ? <div className="mt-1 text-[11px] text-slate-400">☑︎ {checklistCount}</div> : null}
     </div>
   );
 }

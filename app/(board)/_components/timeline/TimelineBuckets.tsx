@@ -7,8 +7,6 @@ import {
 } from '@/app/(board)/_utils/timeline-helpers';
 import { BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import { TimelineBucketCard } from './TimelineBucketCard';
-import { Checklist } from '@/lib/checklist';
-import { ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
 
 type TimelineBucketsProps = {
     days: TimelineDay[];
@@ -17,9 +15,6 @@ type TimelineBucketsProps = {
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
-    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-    onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-    editingCardId: string | null;
     bucketIndicator: BucketIndicator | null;
     axisWidth?: number;
 };
@@ -41,9 +36,6 @@ export default function TimelineBuckets({
     status,
     openCardModal,
     onToggleCheck,
-    onChecklistCommit,
-    onChecklistEditingChange,
-    editingCardId,
     bucketIndicator,
     axisWidth = 80,
 }: TimelineBucketsProps) {
@@ -76,23 +68,20 @@ export default function TimelineBuckets({
                                                 <p className="text-[11px] text-slate-400 px-3">Drop cards here</p>
                                             ) : (
                                                 items.map((item) => (
-                                                <TimelineBucketCard
-                                                    key={item.card_id}
-                                                    item={item}
-                                                    bucketKey={section.bucket}
-                                                    openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
-                                                    onToggleCheck={onToggleCheck}
-                                                    onChecklistCommit={onChecklistCommit}
-                                                    onChecklistEditingChange={onChecklistEditingChange}
-                                                    editingCardId={editingCardId}
-                                                    showFallbackBottomLine={
-                                                        bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
-                                                    }
-                                                />
-                                            ))
-                                        )}
+                                                    <TimelineBucketCard
+                                                        key={item.card_id}
+                                                        item={item}
+                                                        bucketKey={section.bucket}
+                                                        openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                                                        onToggleCheck={onToggleCheck}
+                                                        showFallbackBottomLine={
+                                                            bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
+                                                        }
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
                                 )}
                             </DroppableBucket>
                         );

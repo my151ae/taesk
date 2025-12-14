@@ -7,8 +7,6 @@ import {
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import { TimelineColumn } from './TimelineColumn';
-import type { Checklist } from '@/lib/checklist';
-import type { ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
 
 type ActiveDragState = {
     cardId: string;
@@ -39,9 +37,6 @@ type TimelineGridProps = {
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
-    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-    onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-    editingCardId: string | null;
     axisWidth?: number;
     shrinkDaysToHalf?: boolean;
     calendarEventsByDay?: Record<string, ExternalCalendarEntry[]>;
@@ -64,9 +59,6 @@ export default function TimelineGrid({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
-    onChecklistCommit,
-    onChecklistEditingChange,
-    editingCardId,
     axisWidth = 80,
     shrinkDaysToHalf = false,
     calendarEventsByDay,
@@ -125,9 +117,6 @@ export default function TimelineGrid({
                         handleResizeMove={handleResizeMove}
                         handleResizeEnd={handleResizeEnd}
                         onToggleCheck={onToggleCheck}
-                        onChecklistCommit={onChecklistCommit}
-                        onChecklistEditingChange={onChecklistEditingChange}
-                        editingCardId={editingCardId}
                         shrinkToHalf={shrinkDaysToHalf}
                         setSelectedSlot={setSelectedSlot}
                         calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}

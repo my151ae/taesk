@@ -15,8 +15,6 @@ import {
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
-import type { Checklist } from '@/lib/checklist';
-import type { ChecklistSaveTrigger } from '@/app/(board)/_components/checklist/ChecklistEditor';
 
 type PointerPreviewState = {
     visible: boolean;
@@ -43,9 +41,6 @@ type TimelineColumnProps = {
     handleResizeMove: (e: React.PointerEvent) => void;
     handleResizeEnd: (e: React.PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
-    onChecklistCommit: (cardId: string, checklist: Checklist, trigger: ChecklistSaveTrigger) => void;
-    onChecklistEditingChange: (cardId: string, editing: boolean) => void;
-    editingCardId: string | null;
     shrinkToHalf?: boolean;
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
     calendarEvents: ExternalCalendarEntry[];
@@ -79,9 +74,6 @@ export const TimelineColumn = memo(function TimelineColumn({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
-    onChecklistCommit,
-    onChecklistEditingChange,
-    editingCardId,
     shrinkToHalf = false,
     setSelectedSlot,
     calendarEvents,
@@ -251,23 +243,20 @@ export const TimelineColumn = memo(function TimelineColumn({
                             );
                         })}
                         {events.map((event) => (
-                        <TimelineEventItem
-                            key={event.card_id}
-                            event={event}
-                            layout={layoutMap[event.card_id]}
-                            activeResize={activeResize}
-                            openCardModal={openCardModal}
-                            handleEventKeyDown={handleEventKeyDown}
-                            handleResizeStart={handleResizeStart}
-                            handleResizeMove={handleResizeMove}
-                            handleResizeEnd={handleResizeEnd}
-                            onToggleCheck={onToggleCheck}
-                            onClearGhost={() => setSelectedSlot(null)}
-                            onChecklistCommit={onChecklistCommit}
-                            onChecklistEditingChange={onChecklistEditingChange}
-                            editingCardId={editingCardId}
-                        />
-                    ))}
+                            <TimelineEventItem
+                                key={event.card_id}
+                                event={event}
+                                layout={layoutMap[event.card_id]}
+                                activeResize={activeResize}
+                                openCardModal={openCardModal}
+                                handleEventKeyDown={handleEventKeyDown}
+                                handleResizeStart={handleResizeStart}
+                                handleResizeMove={handleResizeMove}
+                                handleResizeEnd={handleResizeEnd}
+                                onToggleCheck={onToggleCheck}
+                                onClearGhost={() => setSelectedSlot(null)}
+                            />
+                        ))}
                     </div>
                 </div>
             </DroppableColumn>
