@@ -192,6 +192,7 @@ export async function PATCH(
           due_end: ensuredCard.due_end,
         });
 
+        const origin = request.nextUrl?.origin ?? resolveAppOrigin();
         const description = buildGoogleEventDescription({
           id: ensuredCard.id,
           short_id: ensuredCard.short_id,
@@ -199,7 +200,7 @@ export async function PATCH(
           id_short: (ensuredCard as any).id_short ?? null,
           title: ensuredCard.title,
           description: ensuredCard.description ?? "",
-        }, resolveAppOrigin());
+        }, origin);
 
         if (startDateTime && endDateTime) {
           syncCardToCalendar(supabase, user.id, ensuredCard.id, {

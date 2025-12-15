@@ -125,6 +125,7 @@ export async function POST(
             console.error("[calendar-sync][manual] pull failed, proceeding to push", pullError);
         }
 
+        const origin = request.nextUrl?.origin ?? resolveAppOrigin();
         const description = buildGoogleEventDescription({
             id: card.id,
             short_id: card.short_id,
@@ -132,7 +133,7 @@ export async function POST(
             id_short: (card as any).id_short ?? null,
             title: card.title,
             description: card.description ?? "",
-        }, resolveAppOrigin());
+        }, origin);
 
         const googleEventIdOverride = request.nextUrl.searchParams.get("google_event_id");
 

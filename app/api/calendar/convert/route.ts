@@ -197,6 +197,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (startDateTime && endDateTime) {
+      const origin = request.nextUrl?.origin ?? resolveAppOrigin();
       const description = buildGoogleEventDescription({
         id: card.id,
         short_id: card.short_id,
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
         id_short: (card as any).id_short ?? null,
         title: card.title,
         description: (gEvent as any)?.description ?? "",
-      }, resolveAppOrigin());
+      }, origin);
 
       try {
         await syncCardToCalendar(supabase, user.id, card.id, {
