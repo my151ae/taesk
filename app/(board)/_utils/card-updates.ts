@@ -5,31 +5,18 @@ import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
 import { getMinutesFromTime, toLocalDay } from "./timeline-helpers";
 import { normalizeDueBucket } from "@/lib/bucket-normalization";
 
-// Helper to resolve bucket key (duplicated from TimelineBoardPage for purity)
-const resolveBucketKey = (card: Card, days: TimelineDay[]) => {
-    let normalizedBucket: string | null = null;
-    try {
-        normalizedBucket = normalizeDueBucket(card.due_bucket);
-    } catch (error) {
-        console.error('[card-updates] invalid due_bucket', error);
-        return null;
-    }
+const DEFAULT_AB_BUCKET = "b";
 
-    if (!normalizedBucket) return null;
-
-    const localDay = toLocalDay(card.due_date ?? null);
+function resolveBucketKey(
+    days: TimelineDay[],
+    localDay: string,
+    bucket: string
+) {
     const matchedDay = days?.find((day) => toLocalDay(day.isoDate) === localDay);
-
-    if (matchedDay?.key) {
-        return `${matchedDay.key}_${normalizedBucket}`;
-    }
-
-    if (days?.[0]?.key) {
-        return `${days[0].key}_${normalizedBucket}`;
-    }
-
-    return null;
-};
+    const dayKey = matchedDay?.key ?? days?.[0]?.key ?? null;
+    if (!dayKey) return null;
+    return `${dayKey}_${bucket}`;
+}
 
 export function applyCardUpdate(
     prev: TimelineResponse,
@@ -60,9 +47,16 @@ export function applyCardUpdate(
         return { ...prev, events: nextEvents, abBuckets: nextBuckets };
     }
 
+    const checklist = normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST);
+    const localDay = toLocalDay(card.due_date ?? null);
+    const hasTime = Boolean(card.due_start && card.due_end);
+
     // 2. Add new instance for INSERT/UPDATE
-    if (card.due_date) {
-        // It's a timeline event
+    // Keep the same logic as `app/api/boards/[boardId]/timeline/route.ts`:
+    // - due_date + (due_start && due_end) => timeline event
+    // - due_date + no time => A/B list (default bucket "b" if missing)
+    if (localDay && hasTime) {
+        // Timeline event
         const startMinutes = getMinutesFromTime(card.due_start);
         const endMinutes = getMinutesFromTime(card.due_end);
         const durationMinutes = startMinutes != null && endMinutes != null
@@ -71,7 +65,7 @@ export function applyCardUpdate(
 
         const newEvent: TimelineEvent = {
             card_id: card.id,
-            due_date: card.due_date,
+            due_date: localDay,
             due_start: card.due_start,
             due_end: card.due_end,
             durationMinutes,
@@ -79,6 +73,7 @@ export function applyCardUpdate(
             tags: card.tags ?? [],
             priority: card.priority,
             checked: card.checked,
+            checklist,
             due_bucket: card.due_bucket ?? null,
             due_bucket_position: card.due_bucket_position ?? null,
             assignee_id: card.assignee_id,
@@ -100,34 +95,49 @@ export function applyCardUpdate(
             return (a.due_date ?? '').localeCompare(b.due_date ?? '');
         });
 
-    } else if (card.due_bucket) {
-        // It's a bucket item
-        const bucketKey = resolveBucketKey(card, prev.days);
-
-        if (bucketKey) {
-            if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
-
-            const newItem: TimelineBucketItem = {
-                card_id: card.id,
-                title: card.title,
-                due_date: toLocalDay(card.due_date ?? null),
-                due_start: card.due_start,
-                due_end: card.due_end,
-                checked: card.checked,
-                tags: card.tags ?? [],
-                assignee_id: card.assignee_id,
-                assignee_ids: card.assignee_ids ?? null,
-                assigned_to: card.assigned_to,
-                short_id: card.short_id,
-                slug: card.slug,
-                bucketPosition: card.due_bucket_position,
-            };
-
-            nextBuckets[bucketKey].push(newItem);
-
-            // Sort bucket items
-            nextBuckets[bucketKey].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+    } else if (localDay) {
+        // A/B list
+        let bucket = DEFAULT_AB_BUCKET;
+        try {
+            bucket = normalizeDueBucket(card.due_bucket) ?? DEFAULT_AB_BUCKET;
+        } catch (error) {
+            console.error('[card-updates] invalid due_bucket; falling back to "b"', error);
+            bucket = DEFAULT_AB_BUCKET;
         }
+
+        const bucketKey = resolveBucketKey(prev.days, localDay, bucket);
+        if (!bucketKey) {
+            return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+        }
+
+        if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
+
+        const newItem: TimelineBucketItem = {
+            card_id: card.id,
+            title: card.title,
+            due_date: localDay,
+            due_start: card.due_start,
+            due_end: card.due_end,
+            checked: card.checked,
+            checklist,
+            tags: card.tags ?? [],
+            assignee_id: card.assignee_id,
+            assignee_ids: card.assignee_ids ?? null,
+            assigned_to: card.assigned_to,
+            short_id: card.short_id,
+            slug: card.slug,
+            bucketPosition: card.due_bucket_position,
+        };
+
+        nextBuckets[bucketKey].push(newItem);
+
+        // Sort bucket items (position desc, then title for stability)
+        nextBuckets[bucketKey].sort((a, b) => {
+            const aPos = a.bucketPosition ?? 0;
+            const bPos = b.bucketPosition ?? 0;
+            if (aPos !== bPos) return bPos - aPos;
+            return (a.title ?? "").localeCompare(b.title ?? "");
+        });
     }
 
     return { ...prev, events: nextEvents, abBuckets: nextBuckets };

@@ -698,11 +698,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, [dayRange, initialBoard.id, setDayWindowStart]);
 
-  // Polling Fallback: Refresh board data every 10 seconds only when Realtime is not connected
+  // Polling fallback (debug): refresh board data every 10 seconds.
+  // Disabled by default to avoid masking Realtime/Webhook issues.
   useEffect(() => {
     if (!initialBoard.id) return;
     if (!isOnline) return;
     if (realtimeStatus === 'connected') return;
+    if (process.env.NEXT_PUBLIC_ENABLE_TIMELINE_POLLING !== 'true') return;
 
     // Check if we are online and page is visible
     if (typeof document !== 'undefined' && document.hidden) return;
