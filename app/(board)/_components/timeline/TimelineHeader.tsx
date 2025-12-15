@@ -46,6 +46,7 @@ type TimelineHeaderProps = {
     handleGoogleConnect: () => void;
     isGoogleLoading: boolean;
     isCalendarRangeReady: boolean;
+    realtimeStatus: 'SUBSCRIBED' | 'TIMED_OUT' | 'W_CLOSED' | 'CHANNEL_ERROR' | 'CONNECTING' | 'CLOSED';
 };
 
 export default function TimelineHeader({
@@ -85,6 +86,7 @@ export default function TimelineHeader({
     handleGoogleConnect,
     isGoogleLoading,
     isCalendarRangeReady,
+    realtimeStatus,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -152,6 +154,30 @@ export default function TimelineHeader({
     useClickOutside(filtersDropdownRef, () => setShowFilters(false));
     useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
     useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
+
+    const getRealtimeStatusColor = () => {
+        switch (realtimeStatus) {
+            case 'SUBSCRIBED': return 'bg-emerald-500';
+            case 'CONNECTING': return 'bg-yellow-500';
+            case 'TIMED_OUT':
+            case 'CHANNEL_ERROR':
+            case 'W_CLOSED':
+            case 'CLOSED':
+            default: return 'bg-red-500';
+        }
+    };
+
+    const getRealtimeStatusText = () => {
+        switch (realtimeStatus) {
+            case 'SUBSCRIBED': return 'Connected';
+            case 'CONNECTING': return 'Connecting...';
+            case 'TIMED_OUT': return 'Timed Out';
+            case 'CHANNEL_ERROR': return 'Connection Error';
+            case 'W_CLOSED':
+            case 'CLOSED': return 'Disconnected';
+            default: return 'Unknown';
+        }
+    };
 
     return (
         <>
@@ -244,7 +270,12 @@ export default function TimelineHeader({
                     </div>
 
                     {/* Board Name */}
-                    <h1 className="text-base font-medium text-slate-900 truncate md:text-xl md:font-semibold shrink min-w-0">{board.name}</h1>
+                    <div className="flex items-center gap-2 min-w-0 shrink">
+                        <h1 className="text-base font-medium text-slate-900 truncate md:text-xl md:font-semibold shrink min-w-0">{board.name}</h1>
+                        <div className="hidden md:flex group relative items-center justify-center" title={`Realtime: ${getRealtimeStatusText()}`}>
+                            <div className={clsx("w-2 h-2 rounded-full", getRealtimeStatusColor())} />
+                        </div>
+                    </div>
 
                     {/* Google Calendar Icon + Status Text */}
                     <div className="hidden md:flex items-center gap-1.5 shrink-0">
