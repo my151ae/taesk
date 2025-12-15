@@ -1574,7 +1574,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             handleGoogleConnect={handleGoogleConnect}
             isGoogleLoading={isGoogleLoading}
             isCalendarRangeReady={isCalendarRangeReady}
-            realtimeStatus={realtimeStatus as any}
+            realtimeStatus={realtimeStatus}
           />
 
           {/* Google Calendar controls moved to header */}

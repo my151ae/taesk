@@ -46,7 +46,7 @@ type TimelineHeaderProps = {
     handleGoogleConnect: () => void;
     isGoogleLoading: boolean;
     isCalendarRangeReady: boolean;
-    realtimeStatus: 'SUBSCRIBED' | 'TIMED_OUT' | 'W_CLOSED' | 'CHANNEL_ERROR' | 'CONNECTING' | 'CLOSED';
+    realtimeStatus: 'connected' | 'connecting' | 'disconnected';
 };
 
 export default function TimelineHeader({
@@ -157,24 +157,18 @@ export default function TimelineHeader({
 
     const getRealtimeStatusColor = () => {
         switch (realtimeStatus) {
-            case 'SUBSCRIBED': return 'bg-emerald-500';
-            case 'CONNECTING': return 'bg-yellow-500';
-            case 'TIMED_OUT':
-            case 'CHANNEL_ERROR':
-            case 'W_CLOSED':
-            case 'CLOSED':
+            case 'connected': return 'bg-emerald-500';
+            case 'connecting': return 'bg-yellow-500';
+            case 'disconnected':
             default: return 'bg-red-500';
         }
     };
 
     const getRealtimeStatusText = () => {
         switch (realtimeStatus) {
-            case 'SUBSCRIBED': return 'Connected';
-            case 'CONNECTING': return 'Connecting...';
-            case 'TIMED_OUT': return 'Timed Out';
-            case 'CHANNEL_ERROR': return 'Connection Error';
-            case 'W_CLOSED':
-            case 'CLOSED': return 'Disconnected';
+            case 'connected': return 'Connected';
+            case 'connecting': return 'Connecting...';
+            case 'disconnected': return 'Disconnected';
             default: return 'Unknown';
         }
     };
