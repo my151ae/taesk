@@ -176,6 +176,15 @@ export function useRealtimeBoard(
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
         channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
 
+        if (process.env.NEXT_PUBLIC_DEBUG_REALTIME === 'true') {
+            const bindings = (channel as any).bindings?.postgres_changes;
+            console.log('[Realtime][debug] postgres_changes bindings registered:', {
+                boardId: currentBoardId,
+                count: Array.isArray(bindings) ? bindings.length : 0,
+                bindings,
+            });
+        }
+
         realtimeState.channel = channel;
 
         channel.subscribe((status) => {
