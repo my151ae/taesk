@@ -278,22 +278,25 @@ export default function CardAnalyticsClient({ ... }) {
 5. ✅ **Esc キー** → モーダルを閉じる
 6. ✅ **多言語 slug** → 日本語などが正しく処理される
 
-### 手動テスト手順
+### 検証手順（Playwright / DevTools MCP）
 
 ```bash
-# 1. Dev サーバー起動
-npm run dev
+# 1) Playwright で検証（JSON レポート必須 / 単一ワーカー）
+# - Playwright が webServer.command 経由で `NODE_ENV=test npm run dev` を起動する
+# - 手動で `npm run dev` は実行しない
+PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/routing.json \
+  PW_WORKERS=1 \
+  npx playwright test --project=core --reporter=json
 
-# 2. ボードにアクセス
-open http://localhost:3000
+# 2) JSON を確認
+sed -n '/^{/,$p' test-results/routing.json | jq '.stats'
 
-# 3. カードをクリック → モーダルが開くことを確認
+# 3) 追加で UI のレンダリングを見たい場合は chrome-devtools MCP で
+# - スナップショット取得
+# - console / network を確認
+# を行う（手動サーバー起動はしない）
 
-# 4. 直接URLアクセス
-open http://localhost:3000/c/<short_id>
-
-# 5. 間違ったslugでアクセス → 308リダイレクトを確認
-open http://localhost:3000/c/<short_id>/wrong-slug
+# 4) 308 リダイレクトや ?card の挙動は E2E spec にテストケースを追加/更新して担保する
 ```
 
 ## ⚠️ 既知の問題と注意事項
@@ -340,10 +343,9 @@ URL: /c/GKT5kB4e/1-new-card
 
 #### 技術的詳細
 
-**現在のバージョン**:
-- Next.js: **15.5.4** (package.json で固定)
-- React: 18.3.1
-- 最終検証日: 2025-10-16
+**当時の状況（参考）**:
+- Next.js 15.5.x 系でクラッシュが確認され、暫定回避として `?card=` 形式を採用
+- 現在も互換性のため `?card=` 形式を維持しつつ、`/c/<short_id>/...` は共有/直アクセス用として利用
 
 **詳細情報**:
 - [実装の詳細](../tickets/2025-10-16/03_url_navigation_crash_fix.md)
@@ -394,7 +396,10 @@ Edge Runtime ではなく Node.js Runtime を明示的に指定しています�
 **解決策**:
 1. `app/(board)/@modal/(.)c/` が存在することを確認
 2. `app/(board)/layout.tsx` が `modal` スロットを受け取っていることを確認
-3. サーバーを再起動 (`pkill -f "next dev" && npm run dev`)
+3. Playwright 実行前にポート 3000 を解放し、孤立プロセスを停止してから再実行:
+   - `lsof -i :3000`
+   - `pkill -f 'node .*next dev'`
+   - `pkill -f 'playwright test'`
 
 ### 308 リダイレクトが動作しない
 
@@ -416,8 +421,7 @@ Edge Runtime ではなく Node.js Runtime を明示的に指定しています�
 **解決策**:
 1. Supabase ダッシュボードから正しいキーをコピー
 2. `.env.local` を更新
-3. サーバーを完全に再起動（`pkill -f "next dev"`）
-4. 数秒待ってから `npm run dev`
+3. Playwright を再実行（webServer.command が自動起動する）
 
 ---
 

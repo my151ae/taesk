@@ -16,49 +16,13 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 
 ## 2. 推奨 `playwright.config.ts`
 
-```ts
-import { defineConfig, devices } from '@playwright/test';
-import dotenv from 'dotenv';
-import path from 'path';
+`playwright.config.ts` が SSOT です。設定を変更する場合は必ずそこを更新してください。
 
-dotenv.config({ path: '.env.test' });
-
-const isCI = !!process.env.CI;
-const workers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : (isCI ? 1 : 1);
-const defaultJsonOutput = path.join('test-results', 'playwright-report.json');
-const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? defaultJsonOutput;
-
-export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: isCI ? 2 : 0,
-  workers,
-  reporter: [['json', { outputFile: jsonOutput }]],
-  outputDir: 'test-results',
-  globalSetup: require.resolve('./e2e/.setup/auth-global-setup'),
-  use: {
-    baseURL: 'http://localhost:3000',
-    screenshot: 'only-on-failure',
-    video: 'off',
-    trace: isCI ? 'on-first-retry' : 'retain-on-failure',
-    storageState: 'playwright/.auth/user.json',
-  },
-  projects: [
-    {
-      name: 'core',
-      grepInvert: /@phase3|@wip/,
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-  webServer: {
-    command: 'NODE_ENV=test npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !isCI,
-    timeout: 120 * 1000,
-  },
-});
-```
+**最低限の要件**（運用ルールと一致させる）:
+- `workers: 1`（`PW_WORKERS=1` の単一ワーカー運用）
+- reporter は **JSON を必ず生成**（`PLAYWRIGHT_JSON_OUTPUT_NAME` を `test-results/` 配下へ）
+- `webServer.command` は `NODE_ENV=test npm run dev`（Playwright 経由のみ許可）
+- 成果物は `test-results/` 配下（`outputDir` は `test-results/artifacts` など）
 
 ---
 
@@ -81,20 +45,18 @@ export default defineConfig({
   "test:e2e": "playwright test",
   "test:auth": "playwright test e2e/auth.spec.ts --project=core",
   "test:timeline": "playwright test e2e/timeline.spec.ts --project=core",
-  "test:kanban": "playwright test e2e/kanban.spec.ts --project=core",
   "test:reorder": "playwright test e2e/reorder-api.spec.ts --project=core",
   "test:comments": "playwright test e2e/comments.spec.ts --project=core",
   "test:notifications": "playwright test e2e/notifications.spec.ts --project=core",
   "test:permissions": "playwright test e2e/board-permissions.spec.ts --project=core",
   "test:rls": "playwright test e2e/rls.spec.ts --project=core",
-  "test:summary": "node test-summary.js",
+  "test:summary": "cat test-results/playwright-report.json | jq '.stats'",
   "test:failed": "bash scripts/test-rerun-failed.sh",
   "test:all-split": "bash scripts/test-all-batches.sh"
 }
 ```
 
 - `test:timeline` は Timeline ビュー専用 spec を単体で実行。
-- `test:kanban` はレガシー Kanban UI の回帰用（必要時のみ）。
 - その他の `test:*` スクリプトはバッチ実行時と同じ `--project=core` を使用。
 
 ---
@@ -119,7 +81,8 @@ export default defineConfig({
 
 ## 6. JSON レポート解析
 
-- `node test-summary.js <path>` で JSON の `.stats` と失敗ケース（`unexpected`）を抽出。
+- `npm run test:summary` で JSON の `.stats` を抽出。
+- 失敗ケース（`unexpected`）を掘る場合は `scripts/test-rerun-failed.sh`（spec 抽出+再実行）や `jq` で参照する。
 - バッチログ (`test-results/logs/batch-execution-*.log`) と合わせて `docs/tickets/<date>` に貼り付ける。
 - `jq` が使えない環境では `tail -20 report.json | grep -E '"(expected|unexpected|skipped|flaky)"'` で最低限の統計を表示。
 
@@ -136,14 +99,12 @@ export default defineConfig({
 | `reorder-api.spec.ts` | `@feature:lists`, `@failure:validation` | 並び替え API、DUPLICATE_POSITION/UNKNOWN_ID など |
 | `board-permissions.spec.ts` | `@feature:permissions` | ShareDialog、role 変更、board picker |
 | `rls.spec.ts` | `@e2e:essential` | Supabase RLS ポリシー |
-| `kanban.spec.ts` | `@legacy:kanban` | 旧 Kanban UI の回帰（必要時のみ実行） |
 
 ### タグ指針
 
 - `@e2e:essential` … CI 必須（auth / timeline / rls）。
 - `@feature:*` … 機能単位の回帰テスト。
 - `@failure:*` … 異常系。API バリデーションや quiet hours など。
-- `@legacy:kanban` … 旧 UI のみで利用。Timeline では通常実行しない。
 - `@phase3`, `@wip` … CI 除外。コミット前に必ず削除。
 
 ---
@@ -167,7 +128,6 @@ export default defineConfig({
 ## 10. 参考
 
 - `scripts/test-all-batches.sh` … バッチ実行スクリプト。ポート 3000 チェックや JSON 出力名の付与を一括で行う。
-- `test-summary.js` … JSON レポート解析ツール。CI でも利用。
 - `docs/tickets/2025-11-10/01-test-all-split-summary.md` … 最新の実行例とフォーマット。
 
 Timeline ボードの運用では Playwright JSON レポートを唯一の情報源とし、`docs/tickets/` にログと結果を残すことを徹底してください。

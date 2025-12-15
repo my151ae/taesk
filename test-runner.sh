@@ -1,24 +1,20 @@
 #!/bin/bash
-# Simple test runner with better output
+# Simple test runner (always writes JSON under test-results/)
 
-echo "🧪 Running E2E Tests..."
-echo "======================="
+set -euo pipefail
+
+mkdir -p test-results/runner
+RUN_ID=$(date +%Y%m%d-%H%M%S)
+OUT="test-results/runner/${RUN_ID}-playwright.json"
+TMP_JSON=$(mktemp)
+trap 'rm -f "$TMP_JSON"' EXIT
+
+echo "Running E2E Tests..."
+echo "JSON report: $OUT"
+
+PLAYWRIGHT_JSON_OUTPUT_NAME="$OUT" PW_WORKERS=1 npx playwright test --project=core
+
+sed -n '/^{/,$p' "$OUT" > "$TMP_JSON"
 echo ""
-
-# Run tests with line reporter (simpler output)
-npx playwright test --reporter=line,html 2>&1 | tee test-output.log
-
-# Extract summary
-echo ""
-echo "📊 Test Summary:"
-echo "================"
-grep -E "passed|failed|skipped" test-output.log | tail -1
-
-# Show failed tests
-echo ""
-echo "❌ Failed Tests:"
-echo "================"
-grep "✘" test-output.log || echo "No failures found"
-
-echo ""
-echo "📄 Full report: playwright-report/index.html"
+echo "Stats:"
+jq '.stats' "$TMP_JSON"

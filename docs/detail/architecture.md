@@ -147,7 +147,7 @@ app/layout.tsx
 
 - `createClientTrace('timeline')` … `TimelineBoardPage` の `traceRef` から `addEvent` を呼び出し、`flush()` で `POST /api/metrics` に送信。Playwright では `dumpClientMetrics(page, ['timeline'])` で抽出し、`docs/tickets/` に貼り付ける。
 - `createServerTrace('timeline')` … API ルートやサーバーユーティリティから呼び出し、Timeline API のレスポンス時間やエラー率を JSON に記録。
-- `test-summary.js` … `npx playwright test --reporter=json` の結果を解析し、バッチごとの `expected/unexpected/flaky` を Slack/Docs へ共有する。
+- Playwright JSON の `.stats` は `jq` で集計する（例: `sed -n '/^{/,$p' test-results/batches/<file>.json | jq '.stats'`）。詳細な失敗の再実行は `scripts/test-rerun-failed.sh` を利用する。
 
 ## Sequence Diagrams
 

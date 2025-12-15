@@ -81,7 +81,7 @@ done
 printf 'Re-running %d spec(s): %s\n' "${#RESOLVED_SPECS[@]}" "${RESOLVED_SPECS[*]}"
 
 # Ensure Playwright writes JSON to stdout so we can capture it in OUTPUT_PATH
-npx playwright test --project="$PROJECT" --reporter=json "${RESOLVED_SPECS[@]}" > "$OUTPUT_PATH"
+PW_WORKERS=1 npx playwright test --project="$PROJECT" --reporter=json "${RESOLVED_SPECS[@]}" > "$OUTPUT_PATH"
 
 echo "Re-run JSON report written to $OUTPUT_PATH"
 echo "Inspect stats with: sed -n '/^{/,$p' $OUTPUT_PATH | jq '.stats'"

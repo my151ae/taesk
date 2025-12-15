@@ -5,7 +5,8 @@ import path from 'path';
 dotenv.config({ path: '.env.test' });
 
 const isCI = !!process.env.CI;
-const defaultWorkers = isCI ? 2 : 1;
+// テストは常に単一ワーカーで順番に実行する（AGENTS.md 準拠）
+const defaultWorkers = 1;
 const parsedWorkers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : defaultWorkers;
 const workers = Number.isFinite(parsedWorkers) && parsedWorkers > 0 ? parsedWorkers : defaultWorkers;
 const defaultJsonOutput = path.join('test-results', 'playwright-report.json');

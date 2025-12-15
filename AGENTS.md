@@ -1,5 +1,9 @@
 # 基本ルール（ローカルコード実行禁止）
 
+> **このリポジトリのSSOT（単一の真実）**:
+> - 運用ルール/制約/禁止事項は `AGENTS.md`
+> - 仕様・設計・手順の詳細は `docs/`（例: `docs/index.md`）
+
 > - Python をはじめとしたローカルでのスクリプト／コード実行を **全面禁止** します。
 > - 解析や変換、計算が必要な場合は CLI ツールや既存スクリプト、MCP ツール（例: Supabase MCP など）を優先的に利用してください。
 > - git やシェルコマンド等の通常オペレーションは従来どおり許可されますが、目的達成のために新たな Python/Node などのワンオフ実行を作らないでください。
@@ -65,8 +69,8 @@
 ```bash
 npm run lint
 npm run build
-npx playwright test --reporter=json > playwright-report.json
-cat playwright-report.json | jq '.stats'
+npx playwright test --reporter=json > test-results/playwright-report.json
+cat test-results/playwright-report.json | jq '.stats'
 ```
 
 - `.env.test` は `playwright.config.ts` が自動で読み込む。`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` を必ず設定。
@@ -75,9 +79,9 @@ cat playwright-report.json | jq '.stats'
 
 ## Testing Guidelines
 - テスト実行前に `lsof -i :3000` で Next.js dev サーバーが残っていないか確認し、残っていたら `pkill -f 'node .*next dev'` / `pkill -f 'playwright test'` を実行してから再試行する。
-- `npm run test:all-split` が必須フロー。内部で `scripts/test-all-batches.sh` が `PLAYWRIGHT_JSON_OUTPUT_NAME=batches/<timestamp>-<batch>.json` をセットし、`test-results/batches/` に JSON を保存。
+- `npm run test:all-split` が必須フロー。内部で `scripts/test-all-batches.sh` が `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/<timestamp>-<batch>.json` をセットし、`test-results/batches/` に JSON を保存。
 - 個別検証は `npm run test:timeline`, `npm run test:comments` などスクリプトを利用し、`PW_WORKERS=1` を守る。Timeline バッチでは Today/Tomorrow 列の表示、A/B リストの所属変更、`dumpClientMetrics`（`timeline` トレース）の呼び出しを検証。
-- JSON レポートを解析するときは `sed -n '/^{/,$p' playwright-report.json | jq '.stats'` のように余計なログを除去してから `jq` へ渡す。
+- JSON レポートを解析するときは `sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'` のように余計なログを除去してから `jq` へ渡す。
 - `playwright/.auth/user.json` はグローバルセットアップで作成される。トークン失効時のみ削除してフローをやり直す。
 - `test-results/` 以外にレポートを生成しない。旧ログを参照する際は `test-results/archive/` へ退避してから扱う。
 - 通知音やカードモーダルなど UI の確認が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する（直接 `npm run dev` で確認しない）。

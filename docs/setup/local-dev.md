@@ -27,7 +27,7 @@ Playwright 実行時は `.env.test` が自動読込されるため、同じキ�
 
 ```bash
 # JSON レポートを test-results/ 配下に保存
-PLAYWRIGHT_JSON_OUTPUT_NAME=batches/$(date +%Y%m%d-%H%M%S)-notifications.json \ 
+PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/$(date +%Y%m%d-%H%M%S)-notifications.json \
   PW_WORKERS=1 \
   npx playwright test e2e/notifications.spec.ts --project=core --reporter=json
 ```

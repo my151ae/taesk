@@ -110,7 +110,7 @@ CREATE POLICY "Members can manage cards"
 
 ## 6. Observability
 
-- **Vercel**: Deploy Logs, Web Analytics, Edge Logs を利用。Timeline 特有の遅延（`board-load p95 > 3s` など）は `test-summary.js` と合わせて監視。
+- **Vercel**: Deploy Logs, Web Analytics, Edge Logs を利用。Timeline 特有の遅延（`board-load p95 > 3s` など）は Playwright の JSON レポート（`test-results/batches/*.json`）や `dumpClientMetrics` の出力と合わせて監視する。
 - **Supabase**: Database Logs / Realtime Logs / Edge Function Logs で API 失敗や Realtime 切断を調査。
 - **docs/tickets/**: 各デプロイ日の Playwright ログとメトリクスサマリーを残す。Timeline のクライアントトレース (`dumpClientMetrics`) も同フォルダに保存する。
 

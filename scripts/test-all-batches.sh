@@ -3,7 +3,21 @@
 # Test runner that executes all tests in batches and aggregates results
 # Usage: bash scripts/test-all-batches.sh
 
-set -e
+set -euo pipefail
+
+export PW_WORKERS=1
+
+if command -v lsof >/dev/null 2>&1; then
+  if lsof -i :3000 -sTCP:LISTEN -Pn >/dev/null 2>&1; then
+    echo "Port 3000 is already in use. Stop the running server/process first."
+    lsof -i :3000 -sTCP:LISTEN -Pn || true
+    echo ""
+    echo "Hint:"
+    echo "  pkill -f 'node .*next dev'"
+    echo "  pkill -f 'playwright test'"
+    exit 1
+  fi
+fi
 
 echo "=========================================="
 echo "Running all tests in batches..."
@@ -32,10 +46,6 @@ test_files=(
   "permissions"
   "rls"
 )
-
-if [[ "${INCLUDE_KANBAN_BATCH:-0}" == "1" ]]; then
-  test_files+=("kanban")
-fi
 
 failed_tests=()
 passed_tests=()
