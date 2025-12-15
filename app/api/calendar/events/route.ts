@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { events, canWrite } = await listEventsForRange(user.id, start, end, { supabase });
+    const { events, canWrite } = await listEventsForRange(user.id, start, end, { supabase, origin: request.nextUrl.origin });
     return NextResponse.json({ connected: true, canWrite, events: applyLinkedFilter(events, linkedEventIds) }, { status: 200 });
   } catch (error: any) {
     if (error instanceof GoogleCalendarNotConnectedError) {

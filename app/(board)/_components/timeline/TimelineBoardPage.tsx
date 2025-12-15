@@ -599,7 +599,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     removeComment
   });
 
-
   useEffect(() => {
     setAvailableBoards((prev) => {
       const exists = prev.some((board) => board.id === initialBoard.id);
@@ -642,10 +641,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [initialBoard]);
 
-  const fetchTimeline = useCallback(async (start?: number) => {
+  const fetchTimeline = useCallback(async (start?: number, options?: { silent?: boolean }) => {
     if (!initialBoard?.id) return null;
     const effectiveStart = typeof start === 'number' ? start : dayWindowStartRef.current;
-    setStatus('loading');
+
+    if (!options?.silent) {
+      setStatus('loading');
+    }
     setErrorMessage(null);
     try {
       traceRef.current?.mark('fetch:start');
@@ -666,7 +668,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setDataMode('api');
       setDayWindowStart(startOffset);
       dayWindowStartRef.current = startOffset;
-      setStatus('idle');
+
+      if (!options?.silent) {
+        setStatus('idle');
+      }
       const abItemCount = Object.values(payload.abBuckets || {}).reduce(
         (sum, items) => sum + (items?.length ?? 0),
         0
@@ -683,15 +688,31 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setErrorMessage('Showing sample schedule until sync succeeds');
       const fallback = buildMockTimeline();
       setData(fallback);
-      setDayWindowStart(0);
-      dayWindowStartRef.current = 0;
       setDataMode('mock');
-      setStatus('idle');
-      traceRef.current?.finish('error', { reason: 'fetch_failed' });
-      traceRef.current = createClientTrace('timeline');
+      setStatus('idle'); // Ensure status is idle even on error
       return fallback;
+    } finally {
+      if (!options?.silent && status === 'loading') {
+        setStatus('idle');
+      }
     }
-  }, [initialBoard?.id, dayRange]);
+  }, [dayRange, initialBoard.id, setDayWindowStart]);
+
+  // Polling Fallback: Refresh board data every 10 seconds if Realtime fails
+  useEffect(() => {
+    if (!initialBoard.id) return;
+
+    // Check if we are online and page is visible
+    if (typeof document !== 'undefined' && document.hidden) return;
+
+    const intervalId = setInterval(() => {
+      // Use silent fetch to avoid loading spinners
+      fetchTimeline(undefined, { silent: true });
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [initialBoard.id, fetchTimeline]);
+
 
   useEffect(() => {
     fetchTimeline();

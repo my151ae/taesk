@@ -844,16 +844,26 @@ export async function syncGoogleCalendarToTaesk(
     events = await fetchAndCacheRange(calendar, supabase, account.id, targetCalendarId, windowStart, windowEnd);
   }
 
+  return await applyGoogleEventsToTaeskCards(supabase, account.id, targetCalendarId, events);
+}
+
+async function applyGoogleEventsToTaeskCards(
+  supabase: SupabaseClient,
+  accountId: string,
+  calendarId: string,
+  events: NormalizedGoogleEvent[]
+): Promise<{ matched: number; updated: number }> {
   if (!events.length) return { matched: 0, updated: 0 };
 
-  const eventIds = Array.from(new Set(events.map((e) => e.id).filter(Boolean)));
-  const taeskCardHints = Array.from(new Set(events.map((e) => e.taeskCardId).filter((id): id is string => Boolean(id))));
+  const taeskCardHints = Array.from(
+    new Set(events.map((e) => e.taeskCardId).filter((id): id is string => Boolean(id)))
+  );
 
   const { data: syncRows } = await supabase
     .from("calendar_sync")
     .select("id, card_id, google_event_id, last_google_event_id, calendar_id, google_account_id, etag, status, last_synced_at")
-    .eq("google_account_id", account.id)
-    .eq("calendar_id", targetCalendarId);
+    .eq("google_account_id", accountId)
+    .eq("calendar_id", calendarId);
 
   const cardIds = new Set<string>();
   (syncRows || []).forEach((row) => {
@@ -869,7 +879,7 @@ export async function syncGoogleCalendarToTaesk(
     .in("id", Array.from(cardIds));
 
   if (cardsError) {
-    console.error("[gcal-debug] Failed to bulk fetch cards", cardsError);
+    console.error("[googleCalendar] failed to bulk fetch cards", cardsError);
   }
 
   const cardMap = new Map((cards ?? []).map((card) => [card.id as string, card]));
@@ -890,10 +900,9 @@ export async function syncGoogleCalendarToTaesk(
       skippedMissingCard += 1;
       continue;
     }
+
     let card = cardMap.get(cardId);
     if (!card) {
-      // Fallback: Try fetching single card explicitly
-      // Often RLS or query limits might cause bulk fetch to miss items.
       const { data: singleCard } = await supabase
         .from("cards")
         .select("id, title, due_date, due_start, due_end, updated_at")
@@ -911,7 +920,6 @@ export async function syncGoogleCalendarToTaesk(
 
     let googleUpdatedMs = event.updatedAtGoogle ? Date.parse(event.updatedAtGoogle) : NaN;
     if (!Number.isFinite(googleUpdatedMs)) {
-      // updated がないケースは最新扱いで取り込む
       googleUpdatedMs = Date.now();
     }
     const taeskUpdatedMs = card.updated_at ? Date.parse(card.updated_at as string) : NaN;
@@ -972,6 +980,16 @@ export async function syncGoogleCalendarToTaesk(
     }
   }
 
+  if (skippedMissingCard || skippedOlderGoogle) {
+    console.log("[googleCalendar] apply deltas stats", {
+      calendarId,
+      skippedMissingCard,
+      skippedOlderGoogle,
+      updated: updatedCardIds.length,
+      matchedCards: cardIds.size,
+    });
+  }
+
   return { matched: cardIds.size, updated: updatedCardIds.length };
 }
 
@@ -979,7 +997,14 @@ export async function listEventsForRange(
   userId: string,
   start: Date,
   end: Date,
-  options?: { calendarId?: string; supabase?: SupabaseClient; redirectUri?: string }
+  options?: {
+    calendarId?: string;
+    supabase?: SupabaseClient;
+    redirectUri?: string;
+    origin?: string;
+    webhookAddress?: string;
+    syncCardsOnFetch?: boolean;
+  }
 ): Promise<{ events: GoogleCalendarEvent[]; canWrite: boolean }> {
   const supabase = options?.supabase ?? await createServerSupabaseClient();
   const { calendar, account } = await getGoogleCalendarClientForUser(userId, {
@@ -993,8 +1018,28 @@ export async function listEventsForRange(
   // Watch renewal check
   if (needsWatchRenewal(syncState)) {
     try {
-      const address = process.env.GOOGLE_CALENDAR_WEBHOOK_URL || `${getAppOrigin()}/api/integrations/google-calendar/webhook`;
-      await startCalendarWatch(userId, calendarId, address, { supabase });
+      const address =
+        options?.webhookAddress
+        ?? process.env.GOOGLE_CALENDAR_WEBHOOK_URL
+        ?? (options?.origin ? `${options.origin}/api/integrations/google-calendar/webhook` : null);
+
+      if (!address) {
+        console.warn("[googleCalendar] watch renewal skipped (no origin / webhook url)", { calendarId });
+      } else {
+        let isLocalhost = false;
+        try {
+          const u = new URL(address);
+          isLocalhost = u.hostname === "localhost" || u.hostname === "127.0.0.1";
+        } catch {
+          // If parsing fails, let Google validate it and surface the error via logs.
+        }
+
+        if (isLocalhost && !process.env.GOOGLE_CALENDAR_WEBHOOK_URL) {
+          console.warn("[googleCalendar] watch renewal skipped (localhost origin; set GOOGLE_CALENDAR_WEBHOOK_URL for tunnels/prod)", { calendarId, address });
+        } else {
+          await startCalendarWatch(userId, calendarId, address, { supabase });
+        }
+      }
     } catch (err) {
       console.error("[googleCalendar] watch renewal failed", err);
     }
@@ -1005,12 +1050,14 @@ export async function listEventsForRange(
     : false;
   const covered = syncState ? isRangeCovered(start, end, syncState.window_start, syncState.window_end) : false;
   const hasSyncToken = Boolean(syncState?.sync_token);
+  const syncCardsOnFetch = options?.syncCardsOnFetch ?? true;
+  let deltaEvents: NormalizedGoogleEvent[] = [];
 
   // Cache-first: if recent and window covers the request, serve cached.
   // Try syncToken diff first
   if (hasSyncToken && syncState?.sync_token) {
     try {
-      await fetchWithSyncToken(calendar, supabase, account.id, calendarId, syncState.sync_token);
+      deltaEvents = await fetchWithSyncToken(calendar, supabase, account.id, calendarId, syncState.sync_token);
     } catch (err: any) {
       const status = err?.code || err?.response?.status;
       if (status === 410) {
@@ -1024,13 +1071,19 @@ export async function listEventsForRange(
 
   // If we just refreshed via syncToken and windowはカバー済み、最新キャッシュを返す
   if (recentEnough && covered && hasSyncToken) {
+    if (syncCardsOnFetch && deltaEvents.length) {
+      await applyGoogleEventsToTaeskCards(supabase, account.id, calendarId, deltaEvents);
+    }
     const cached = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
     const canWriteCached = hasCalendarWritePermission(account.scope);
     return { events: cached, canWrite: canWriteCached };
   }
 
   // Ensure window coverage by full fetch
-  await fetchAndCacheRange(calendar, supabase, account.id, calendarId, start, end);
+  const fullEvents = await fetchAndCacheRange(calendar, supabase, account.id, calendarId, start, end);
+  if (syncCardsOnFetch && fullEvents.length) {
+    await applyGoogleEventsToTaeskCards(supabase, account.id, calendarId, fullEvents);
+  }
 
   const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
   const canWrite = hasCalendarWritePermission(account.scope);
