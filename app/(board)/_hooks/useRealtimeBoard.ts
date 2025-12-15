@@ -163,11 +163,18 @@ export function useRealtimeBoard(
         const cardFilter = `board_id=eq.${currentBoardId}`;
         const commentFilter = `board_id=eq.${currentBoardId}`;
 
-        (['INSERT', 'UPDATE', 'DELETE'] as const).forEach((event) => {
-            channel.on('postgres_changes', { event, schema: 'public', table: 'lists', filter: listFilter }, listHandler);
-            channel.on('postgres_changes', { event, schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
-            channel.on('postgres_changes', { event, schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
-        });
+        // Register explicitly per event to satisfy RealtimeChannel.on overloads.
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lists', filter: listFilter }, listHandler);
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lists', filter: listFilter }, listHandler);
+        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lists', filter: listFilter }, listHandler);
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
+        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
+
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
+        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
 
         realtimeState.channel = channel;
 
