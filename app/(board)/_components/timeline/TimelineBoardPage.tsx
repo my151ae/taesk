@@ -698,20 +698,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, [dayRange, initialBoard.id, setDayWindowStart]);
 
-  // Polling Fallback: Refresh board data every 10 seconds if Realtime fails
+  // Polling Fallback: Refresh board data every 10 seconds only when Realtime is not connected
   useEffect(() => {
     if (!initialBoard.id) return;
+    if (!isOnline) return;
+    if (realtimeStatus === 'connected') return;
 
     // Check if we are online and page is visible
     if (typeof document !== 'undefined' && document.hidden) return;
 
-    const intervalId = setInterval(() => {
+    const intervalId = window.setInterval(() => {
       // Use silent fetch to avoid loading spinners
       fetchTimeline(undefined, { silent: true });
     }, 10000);
 
     return () => clearInterval(intervalId);
-  }, [initialBoard.id, fetchTimeline]);
+  }, [fetchTimeline, initialBoard.id, isOnline, realtimeStatus]);
 
 
   useEffect(() => {
