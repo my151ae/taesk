@@ -56,133 +56,118 @@ export function useRealtimeBoard(
 
         setRealtimeStatus('connecting');
 
-        const channel = supabase
-            .channel(`board:${currentBoardId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'lists',
-                    filter: `board_id=eq.${currentBoardId}`,
-                },
-                (payload) => {
-                    if (realtimeState.token !== token) return;
-                    console.log('List change detected:', payload);
+        const channel = supabase.channel(`board:${currentBoardId}`);
 
-                    if (setBoardData) {
-                        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                            setBoardData((prev) => {
-                                const newList = payload.new as List;
-                                const idx = prev.lists.findIndex(list => list.id === newList.id);
+        const listHandler = (payload: any) => {
+            if (realtimeState.token !== token) return;
+            console.log('List change detected:', payload);
 
-                                if (idx >= 0) {
-                                    const updatedLists = [...prev.lists];
-                                    updatedLists[idx] = newList;
-                                    return { ...prev, lists: updatedLists };
-                                }
+            if (setBoardData) {
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    setBoardData((prev) => {
+                        const newList = payload.new as List;
+                        const idx = prev.lists.findIndex(list => list.id === newList.id);
 
-                                return { ...prev, lists: [...prev.lists, newList] };
-                            });
-                        } else if (payload.eventType === 'DELETE') {
-                            setBoardData((prev) => ({
-                                ...prev,
-                                lists: prev.lists.filter((list) => list.id !== payload.old.id),
-                                cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
-                            }));
+                        if (idx >= 0) {
+                            const updatedLists = [...prev.lists];
+                            updatedLists[idx] = newList;
+                            return { ...prev, lists: updatedLists };
                         }
-                    }
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'cards',
-                    filter: `board_id=eq.${currentBoardId}`,
-                },
-                (payload) => {
-                    if (realtimeState.token !== token) return;
-                    console.log('[Realtime] Card change detected:', {
-                        eventType: payload.eventType,
-                        new: payload.new,
-                        old: payload.old,
-                        errors: payload.errors
+
+                        return { ...prev, lists: [...prev.lists, newList] };
                     });
-
-                    if (onCardChange) {
-                        onCardChange(payload as RealtimePostgresChangesPayload<Card>);
-                    }
-
-                    if (setBoardData) {
-                        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                            setBoardData((prev) => {
-                                const newCard = {
-                                    ...(payload.new as Card),
-                                    checklist: normalizeChecklist((payload.new as any).checklist ?? EMPTY_CHECKLIST),
-                                } as Card;
-                                const idx = prev.cards.findIndex(card => card.id === newCard.id);
-
-                                if (idx >= 0) {
-                                    const updatedCards = [...prev.cards];
-                                    updatedCards[idx] = newCard;
-                                    return { ...prev, cards: updatedCards };
-                                }
-
-                                return { ...prev, cards: [...prev.cards, newCard] };
-                            });
-                        } else if (payload.eventType === 'DELETE') {
-                            setBoardData((prev) => ({
-                                ...prev,
-                                cards: prev.cards.filter((card) => card.id !== payload.old.id),
-                            }));
-                        }
-                    }
+                } else if (payload.eventType === 'DELETE') {
+                    setBoardData((prev) => ({
+                        ...prev,
+                        lists: prev.lists.filter((list) => list.id !== payload.old.id),
+                        cards: prev.cards.filter((card) => card.list_id !== payload.old.id),
+                    }));
                 }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'comments',
-                    filter: `board_id=eq.${currentBoardId}`,
-                },
-                async (payload) => {
-                    if (realtimeState.token !== token) return;
+            }
+        };
 
-                    if (payload.eventType === 'DELETE') {
-                        const oldRow = payload.old as { id: string; card_id: string };
-                        if (oldRow?.card_id && oldRow?.id && removeComment) {
-                            removeComment(oldRow.card_id, oldRow.id);
-                        }
-                        return;
-                    }
+        const cardHandler = (payload: any) => {
+            if (realtimeState.token !== token) return;
+            console.log('[Realtime] Card change detected:', {
+                eventType: payload.eventType,
+                new: payload.new,
+                old: payload.old,
+                errors: payload.errors
+            });
 
-                    const newRow = payload.new as { id?: string };
-                    if (!newRow?.id) return;
+            if (onCardChange) {
+                onCardChange(payload as RealtimePostgresChangesPayload<Card>);
+            }
 
-                    if (upsertComment) {
-                        const { data, error } = await supabase
-                            .from('comments')
-                            .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
-                            .eq('id', newRow.id)
-                            .single();
+            if (setBoardData) {
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    setBoardData((prev) => {
+                        const newCard = {
+                            ...(payload.new as Card),
+                            checklist: normalizeChecklist((payload.new as any).checklist ?? EMPTY_CHECKLIST),
+                        } as Card;
+                        const idx = prev.cards.findIndex(card => card.id === newCard.id);
 
-                        if (error || !data) {
-                            console.warn('[Realtime] Failed to fetch comment for update', error);
-                            return;
+                        if (idx >= 0) {
+                            const updatedCards = [...prev.cards];
+                            updatedCards[idx] = newCard;
+                            return { ...prev, cards: updatedCards };
                         }
 
-                        const commentData = data as CommentWithAuthor;
-                        upsertComment(commentData.card_id, {
-                            ...commentData,
-                            idempotencyKey: commentData.idempotency_key ?? null,
-                        });
-                    }
+                        return { ...prev, cards: [...prev.cards, newCard] };
+                    });
+                } else if (payload.eventType === 'DELETE') {
+                    setBoardData((prev) => ({
+                        ...prev,
+                        cards: prev.cards.filter((card) => card.id !== payload.old.id),
+                    }));
                 }
-            );
+            }
+        };
+
+        const commentHandler = async (payload: any) => {
+            if (realtimeState.token !== token) return;
+
+            if (payload.eventType === 'DELETE') {
+                const oldRow = payload.old as { id: string; card_id: string };
+                if (oldRow?.card_id && oldRow?.id && removeComment) {
+                    removeComment(oldRow.card_id, oldRow.id);
+                }
+                return;
+            }
+
+            const newRow = payload.new as { id?: string };
+            if (!newRow?.id) return;
+
+            if (upsertComment) {
+                const { data, error } = await supabase
+                    .from('comments')
+                    .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
+                    .eq('id', newRow.id)
+                    .single();
+
+                if (error || !data) {
+                    console.warn('[Realtime] Failed to fetch comment for update', error);
+                    return;
+                }
+
+                const commentData = data as CommentWithAuthor;
+                upsertComment(commentData.card_id, {
+                    ...commentData,
+                    idempotencyKey: commentData.idempotency_key ?? null,
+                });
+            }
+        };
+
+        const listFilter = `board_id=eq.${currentBoardId}`;
+        const cardFilter = `board_id=eq.${currentBoardId}`;
+        const commentFilter = `board_id=eq.${currentBoardId}`;
+
+        (['INSERT', 'UPDATE', 'DELETE'] as const).forEach((event) => {
+            channel.on('postgres_changes', { event, schema: 'public', table: 'lists', filter: listFilter }, listHandler);
+            channel.on('postgres_changes', { event, schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
+            channel.on('postgres_changes', { event, schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
+        });
 
         realtimeState.channel = channel;
 
