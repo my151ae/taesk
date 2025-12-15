@@ -125,43 +125,8 @@ export function useRealtimeBoard(
             }
         };
 
-        const commentHandler = async (payload: any) => {
-            if (realtimeState.token !== token) return;
-
-            if (payload.eventType === 'DELETE') {
-                const oldRow = payload.old as { id: string; card_id: string };
-                if (oldRow?.card_id && oldRow?.id && removeComment) {
-                    removeComment(oldRow.card_id, oldRow.id);
-                }
-                return;
-            }
-
-            const newRow = payload.new as { id?: string };
-            if (!newRow?.id) return;
-
-            if (upsertComment) {
-                const { data, error } = await supabase
-                    .from('comments')
-                    .select(`*, author:profiles!comments_author_id_fkey(id, full_name, avatar_url, email)`)
-                    .eq('id', newRow.id)
-                    .single();
-
-                if (error || !data) {
-                    console.warn('[Realtime] Failed to fetch comment for update', error);
-                    return;
-                }
-
-                const commentData = data as CommentWithAuthor;
-                upsertComment(commentData.card_id, {
-                    ...commentData,
-                    idempotencyKey: commentData.idempotency_key ?? null,
-                });
-            }
-        };
-
         const listFilter = `board_id=eq.${currentBoardId}`;
         const cardFilter = `board_id=eq.${currentBoardId}`;
-        const commentFilter = `board_id=eq.${currentBoardId}`;
 
         // Register explicitly per event to satisfy RealtimeChannel.on overloads.
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lists', filter: listFilter }, listHandler);
@@ -171,10 +136,6 @@ export function useRealtimeBoard(
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
         channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
-
-        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
-        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
-        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: commentFilter }, commentHandler);
 
         if (process.env.NEXT_PUBLIC_DEBUG_REALTIME === 'true') {
             const bindings = (channel as any).bindings?.postgres_changes;
