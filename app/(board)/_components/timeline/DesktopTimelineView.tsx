@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
 import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
 import type {
@@ -61,9 +61,11 @@ type DesktopTimelineViewProps = {
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   onScroll?: (scrollTop: number) => void;
+  onMount?: () => void;
 };
 
 export function DesktopTimelineView({
+  onMount,
   timelineHeaderRef,
   timelineScrollRef,
   days,
@@ -255,6 +257,10 @@ export function DesktopTimelineView({
   };
 
   const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
+
+  useEffect(() => {
+    onMount?.();
+  }, [onMount]);
 
   return (
     <DndContext

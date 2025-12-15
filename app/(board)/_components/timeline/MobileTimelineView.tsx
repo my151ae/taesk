@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   HOUR_HEIGHT,
@@ -274,6 +274,8 @@ type MobileTimelineViewProps = {
   activeDayIndex: number;
   onPrevDay: () => void;
   onNextDay: () => void;
+  onMount?: () => void;
+  onScroll?: (scrollTop: number) => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
@@ -302,6 +304,8 @@ export default function MobileTimelineView({
   activeDayIndex,
   onPrevDay,
   onNextDay,
+  onMount,
+  onScroll,
   eventsByDay,
   abBuckets,
   calendarEventsByDay,
@@ -323,6 +327,10 @@ export default function MobileTimelineView({
   activeDrag,
   onExternalEventClick,
 }: MobileTimelineViewProps) {
+  useEffect(() => {
+    onMount?.();
+  }, [onMount]);
+
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
   const eventsForDay = useMemo(() => {
@@ -508,6 +516,7 @@ export default function MobileTimelineView({
           >
             <div
               ref={timelineScrollRef}
+              onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
               className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
             >
               <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}>

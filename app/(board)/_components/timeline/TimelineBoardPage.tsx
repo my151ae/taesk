@@ -55,6 +55,7 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
 import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
+import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -246,11 +247,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [liveNowIsoDate, setLiveNowIsoDate] = useState<string | null>(null);
   const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const router = useRouter();
-  const traceRef = useRef<ClientTrace | null>(createClientTrace('timeline'));
+  const traceRef = useRef<ClientTrace | null>(null);
+
+  useEffect(() => {
+    traceRef.current = createClientTrace('timeline');
+  }, []);
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -261,6 +268,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const [dayWindowStart, setDayWindowStart] = useState(0);
   const dayWindowStartRef = useRef(0);
+  const [isTimelineViewMounted, setIsTimelineViewMounted] = useState(false);
+
+  const syncActiveTimelineScrollRef = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    timelineScrollRef.current = isDesktop ? desktopTimelineScrollRef.current : mobileTimelineScrollRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 768px)');
+    const sync = () => syncActiveTimelineScrollRef();
+    sync();
+    mql.addEventListener('change', sync);
+    return () => mql.removeEventListener('change', sync);
+  }, [syncActiveTimelineScrollRef]);
 
   // URL更新関数
   const updateUrl = useCallback((date: string | null, range: number, time?: number | null) => {
@@ -317,7 +340,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [urlRange, initialBoard.day_range]);
 
   const [dayRange, setDayRange] = useState(initialRange);
-  const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
+  const lastScrollRestoreKeyRef = useRef<string | null>(null);
+  const scrollRestoreAttemptRef = useRef(0);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
   const prevGoogleStatusRef = useRef<string | null>(null);
   const [googleToast, setGoogleToast] = useState<string | null>(null);
@@ -560,111 +584,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setData((prev) => {
       if (!prev) return prev;
 
-      const { eventType, new: newRecord, old: oldRecord } = payload;
-      const nextEvents = [...prev.events];
-      const nextBuckets = { ...prev.abBuckets };
-
-      // Helper to remove card from all collections
-      const removeCard = (cardId: string) => {
-        // Remove from events
-        const eventIdx = nextEvents.findIndex(e => e.card_id === cardId);
-        if (eventIdx >= 0) nextEvents.splice(eventIdx, 1);
-
-        // Remove from buckets
-        Object.keys(nextBuckets).forEach(key => {
-          nextBuckets[key] = nextBuckets[key].filter(item => item.card_id !== cardId);
-        });
-      };
-
-      if (eventType === 'DELETE') {
-        const id = oldRecord.id as string;
-        if (id) removeCard(id);
-        return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+      const { eventType, new: newRecord } = payload;
+      if (eventType === 'INSERT' || eventType === 'UPDATE' || eventType === 'DELETE') {
+        return applyCardUpdate(prev, newRecord as Card, eventType);
       }
-
-      if (eventType === 'INSERT' || eventType === 'UPDATE') {
-        const card = newRecord as Card;
-        console.log('[handleCardChange] UPDATE', { cardId: card.id, checked: card.checked, eventType });
-
-        // First remove existing instance to avoid duplicates/stale data
-        removeCard(card.id);
-
-        // Determine where to put the card
-        if (card.due_date) {
-          // It's a timeline event
-          const startMinutes = getMinutesFromTime(card.due_start);
-          const endMinutes = getMinutesFromTime(card.due_end);
-          const durationMinutes = startMinutes != null && endMinutes != null
-            ? Math.max(endMinutes - startMinutes, 15)
-            : 60;
-
-          nextEvents.push({
-            card_id: card.id,
-            due_date: card.due_date,
-            due_start: card.due_start,
-            due_end: card.due_end,
-            durationMinutes,
-            title: card.title,
-            tags: card.tags ?? [],
-            priority: card.priority,
-            checked: card.checked,
-            due_bucket: card.due_bucket ?? null,
-            due_bucket_position: card.due_bucket_position ?? null,
-            assignee_id: card.assignee_id,
-            assignee_ids: card.assignee_ids ?? null,
-            assigned_to: card.assigned_to,
-            short_id: card.short_id,
-            slug: card.slug,
-          });
-
-          // Sort events
-          nextEvents.sort((a, b) => {
-            if (a.due_date === b.due_date) {
-              const aStart = getMinutesFromTime(a.due_start) ?? 0;
-              const bStart = getMinutesFromTime(b.due_start) ?? 0;
-              return aStart - bStart;
-            }
-            return (a.due_date ?? '').localeCompare(b.due_date ?? '');
-          });
-
-        } else if (card.due_bucket) {
-          // It's a bucket item
-          const bucketKey = resolveBucketKey(card, prev.days);
-          if (!bucketKey) {
-            console.warn('[timeline] skip bucket item with unknown bucket', {
-              cardId: card.id,
-              due_bucket: card.due_bucket,
-              due_date: card.due_date,
-            });
-            return prev;
-          }
-
-          if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
-
-          nextBuckets[bucketKey].push({
-            card_id: card.id,
-            title: card.title,
-            due_date: toLocalDay(card.due_date ?? null),
-            due_start: card.due_start,
-            due_end: card.due_end,
-            checked: card.checked,
-            tags: card.tags ?? [],
-            assignee_id: card.assignee_id,
-            assignee_ids: card.assignee_ids ?? null,
-            assigned_to: card.assigned_to,
-            short_id: card.short_id,
-            slug: card.slug,
-            bucketPosition: card.due_bucket_position,
-          });
-
-          // Sort bucket items
-          nextBuckets[bucketKey].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
-        }
-      }
-
-      return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+      return prev;
     });
   }, []);
+
 
   const { realtimeStatus } = useRealtimeBoard(initialBoard.id, {
     onCardChange: handleCardChange,
@@ -880,102 +807,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           setModalCardOverride(updatedCard);
 
           // Use the same logic as handleCardChange to properly move cards
+          // Use shared logic for update
           setData((prev) => {
             if (!prev) return prev;
-
-            const nextEvents = [...prev.events];
-            const nextBuckets = { ...prev.abBuckets };
-
-            // Helper to remove card from all collections
-            const removeCard = (cardId: string) => {
-              // Remove from events
-              const eventIdx = nextEvents.findIndex(e => e.card_id === cardId);
-              if (eventIdx >= 0) nextEvents.splice(eventIdx, 1);
-
-              // Remove from buckets
-              Object.keys(nextBuckets).forEach(key => {
-                nextBuckets[key] = nextBuckets[key].filter(item => item.card_id !== cardId);
-              });
-            };
-
-            // Remove card from its current location
-            removeCard(updatedCard.id);
-
-            // Determine where to put the card
-            if (updatedCard.due_date && updatedCard.due_start && updatedCard.due_end) {
-              // It's a timeline event (has date and time)
-              const startMinutes = getMinutesFromTime(updatedCard.due_start);
-              const endMinutes = getMinutesFromTime(updatedCard.due_end);
-              const durationMinutes = startMinutes != null && endMinutes != null
-                ? Math.max(endMinutes - startMinutes, 15)
-                : 60;
-
-              nextEvents.push({
-                card_id: updatedCard.id,
-                due_date: getIsoDateJst(updatedCard.due_date ?? ''),
-                due_start: updatedCard.due_start,
-                due_end: updatedCard.due_end,
-                durationMinutes,
-                title: updatedCard.title,
-                tags: updatedCard.tags ?? [],
-                priority: updatedCard.priority,
-                checked: updatedCard.checked,
-                checklist: normalizeChecklist(updatedCard.checklist ?? EMPTY_CHECKLIST),
-                due_bucket: updatedCard.due_bucket ?? null,
-                due_bucket_position: updatedCard.due_bucket_position ?? null,
-                assignee_id: updatedCard.assignee_id,
-                assignee_ids: updatedCard.assignee_ids ?? null,
-                assigned_to: updatedCard.assigned_to,
-                short_id: updatedCard.short_id,
-                slug: updatedCard.slug,
-              });
-
-              // Sort events
-              nextEvents.sort((a, b) => {
-                if (a.due_date === b.due_date) {
-                  const aStart = getMinutesFromTime(a.due_start) ?? 0;
-                  const bStart = getMinutesFromTime(b.due_start) ?? 0;
-                  return aStart - bStart;
-                }
-                return (a.due_date ?? '').localeCompare(b.due_date ?? '');
-              });
-
-            } else if (updatedCard.due_bucket) {
-              // It's a bucket item (has date but no time)
-              const bucketKey = resolveBucketKey(updatedCard, prev.days);
-              if (!bucketKey) {
-                console.warn('[timeline] skip bucket item with unknown bucket', {
-                  cardId: updatedCard.id,
-                  due_bucket: updatedCard.due_bucket,
-                  due_date: updatedCard.due_date,
-                });
-                return prev;
-              }
-
-              if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
-
-              nextBuckets[bucketKey].push({
-                card_id: updatedCard.id,
-                title: updatedCard.title,
-                due_date: toLocalDay(updatedCard.due_date ?? null),
-                due_start: updatedCard.due_start,
-                due_end: updatedCard.due_end,
-                checked: updatedCard.checked,
-                checklist: normalizeChecklist(updatedCard.checklist ?? EMPTY_CHECKLIST),
-                tags: updatedCard.tags ?? [],
-                assignee_id: updatedCard.assignee_id,
-                assignee_ids: updatedCard.assignee_ids ?? null,
-                assigned_to: updatedCard.assigned_to,
-                short_id: updatedCard.short_id,
-                slug: updatedCard.slug,
-                bucketPosition: updatedCard.due_bucket_position,
-              });
-
-              // Sort bucket items
-              nextBuckets[bucketKey].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
-            }
-
-            return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+            return applyCardUpdate(prev, updatedCard, 'UPDATE');
           });
         }
         // No need to setModalCard here, as the realtime update will handle it
@@ -1005,18 +840,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }
 
         // Optimistic delete
+        // Optimistic delete
         setData((prev) => {
           if (!prev) return prev;
-          return {
-            ...prev,
-            events: prev.events.filter(e => e.card_id !== modalCard?.id),
-            abBuckets: Object.fromEntries(
-              Object.entries(prev.abBuckets).map(([key, items]) => [
-                key,
-                items.filter(item => item.card_id !== modalCard?.id)
-              ])
-            )
-          };
+          // Construct a dummy card object for deletion using the ID
+          return applyCardUpdate(prev, { id: cardId } as Card, 'DELETE');
         });
 
         // await fetchTimeline(); // Realtime should handle this
@@ -1108,26 +936,72 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // urlDateが見つからない場合は何もしない(デフォルトの0のまま)
   }, [data?.days, urlDate]);
 
-  // スクロール位置の復元
-  useEffect(() => {
-    if (hasRestoredScroll || !data?.days?.length || !timelineScrollRef.current) return;
+  const urlTimeMinutes = useMemo(() => {
+    if (!urlTime) return null;
+    const timeMinutes = parseInt(urlTime, 10);
+    if (isNaN(timeMinutes) || timeMinutes < 0 || timeMinutes >= 24 * 60) return null;
+    return timeMinutes;
+  }, [urlTime]);
 
-    if (urlTime) {
-      const timeMinutes = parseInt(urlTime, 10);
-      if (!isNaN(timeMinutes) && timeMinutes >= 0 && timeMinutes < 24 * 60) {
-        const scrollTop = minuteToPixels(timeMinutes);
-        timelineScrollRef.current.scrollTo({
-          top: scrollTop,
-          behavior: 'instant', // 即座にスクロール
-        });
+  // スクロール位置の復元（URLのtimeを優先）
+  useEffect(() => {
+    if (urlTimeMinutes == null || !timelineScrollRef.current || !isTimelineViewMounted) return;
+
+    const restoreKey = `${urlDate ?? ''}|${urlRange ?? ''}|${urlTimeMinutes}`;
+    if (lastScrollRestoreKeyRef.current === restoreKey) return;
+
+    scrollRestoreAttemptRef.current = 0;
+    let cancelled = false;
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    const tryRestore = () => {
+      if (cancelled) return;
+      const container = timelineScrollRef.current;
+      if (!container) return;
+
+      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const desiredTop = minuteToPixels(urlTimeMinutes);
+      const clampedTop = Math.max(0, Math.min(desiredTop, maxTop));
+
+      if (Math.abs(container.scrollTop - clampedTop) >= 2) {
+        container.scrollTo({ top: clampedTop, behavior: 'auto' });
       }
+
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const canReachDesired = maxTop + 1 >= desiredTop;
+      const isCloseEnough = Math.abs(container.scrollTop - desiredTop) < 2;
+
+      if (canReachDesired && isCloseEnough) {
+        lastScrollRestoreKeyRef.current = restoreKey;
+        return;
+      }
+
+      // レイアウトが伸びる/縮む途中でも追従できるように、少しの間だけ再試行する
+      scrollRestoreAttemptRef.current += 1;
+      const timedOut = now - startedAt > 3000;
+      if (!timedOut && scrollRestoreAttemptRef.current <= 180) {
+        requestAnimationFrame(tryRestore);
+        return;
+      }
+
+      // 3秒待っても到達できない場合は、現状の最大スクロール位置で確定
+      lastScrollRestoreKeyRef.current = restoreKey;
+    };
+
+    requestAnimationFrame(tryRestore);
+    return () => {
+      cancelled = true;
+    };
+  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted]);
+
+  useEffect(() => {
+    // timeパラメータがある場合は現在時刻へのスクロールをスキップ
+    if (urlTime) {
+      if (!hasAutoScrolled) setHasAutoScrolled(true);
+      return;
     }
 
-    setHasRestoredScroll(true);
-  }, [data?.days, urlTime, hasRestoredScroll]);
-
-  useEffect(() => {
-    if (!timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
+    if (!isTimelineViewMounted || !timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
 
     const container = timelineScrollRef.current;
     const target = minuteToPixels(indicatorMinutes) - container.clientHeight / 2;
@@ -1136,11 +1010,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     container.scrollTo({
       top: clampedTop,
-      behavior: 'instant',
+      behavior: 'auto',
     });
 
     setHasAutoScrolled(true);
-  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled]);
+  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime]);
 
   // スクロールイベントハンドラ(デバウンス付き)
   const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrl });
@@ -1525,7 +1399,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const abBuckets = filteredData?.abBuckets ?? {};
 
   const timelineViewportHeight = useMemo(() => {
-    if (viewportHeight == null) return TIMELINE_MIN_VIEWPORT;
+    // 初回レンダー（viewportHeight未確定）でもタイムライン全体の高さは確保しておく
+    // （time=... のスクロール復元が、レイアウト確定前にクランプされるのを防ぐ）
+    if (viewportHeight == null) return Math.max(TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
     const usedHeight = timelineHeaderHeight;
     const available = viewportHeight - usedHeight;
     return Math.max(available, TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
@@ -1547,37 +1423,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         const newCard = body.card as Card;
         setData((prev) => {
           if (!prev) return prev;
-          const start = getMinutesFromTime(newCard.due_start ?? null) ?? 0;
-          const end = getMinutesFromTime(newCard.due_end ?? null) ?? (start + 60);
-          const newEvent: TimelineEvent = {
-            card_id: newCard.id,
-            due_date: getIsoDateJst(newCard.due_date ?? ''),
-            due_start: newCard.due_start ?? null,
-            due_end: newCard.due_end ?? null,
-            durationMinutes: end - start,
-            title: newCard.title,
-            tags: newCard.tags ?? [],
-            checklist: normalizeChecklist(newCard.checklist ?? EMPTY_CHECKLIST),
-            due_bucket: newCard.due_bucket ?? null,
-            due_bucket_position: newCard.due_bucket_position ?? null,
-            priority: newCard.priority ?? null,
-            checked: newCard.checked ?? false,
-            assignee_id: newCard.assignee_id ?? null,
-            assignee_ids: newCard.assignee_ids ?? null,
-            assigned_to: newCard.assigned_to ?? null,
-            short_id: newCard.short_id ?? null,
-            slug: newCard.slug ?? null,
-          };
 
-          // If tempId exists, replace the temp card, otherwise just add
-          const events = tempId
-            ? prev.events.map(e => e.card_id === tempId ? newEvent : e)
-            : [...prev.events, newEvent];
-
-          return {
-            ...prev,
-            events,
-          };
+          let next = prev;
+          if (tempId) {
+            // Remove temp card first
+            next = applyCardUpdate(next, { id: tempId } as Card, 'DELETE');
+          }
+          // Add real card
+          return applyCardUpdate(next, newCard, 'INSERT');
         });
 
         // Auto-open modal for the new card
@@ -1732,9 +1585,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
           <div className="hidden md:block">
             <DesktopTimelineView
+              onMount={() => {
+                setIsTimelineViewMounted(true);
+                syncActiveTimelineScrollRef();
+              }}
               onScroll={debouncedHandleScroll}
               timelineHeaderRef={timelineHeaderRef}
-              timelineScrollRef={timelineScrollRef}
+              timelineScrollRef={desktopTimelineScrollRef}
               days={data?.days ?? []}
               activeDayIndex={activeDayIndex}
               dayRange={dayRange}
@@ -1773,7 +1630,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <div className="md:hidden">
             <div className="relative h-[calc(100vh-140px)] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <MobileTimelineView
-                timelineScrollRef={timelineScrollRef}
+                timelineScrollRef={mobileTimelineScrollRef}
+                onMount={() => {
+                  setIsTimelineViewMounted(true);
+                  syncActiveTimelineScrollRef();
+                }}
+                onScroll={debouncedHandleScroll}
                 days={data?.days ?? []}
                 activeDayIndex={activeDayIndex}
                 onPrevDay={handlePrevDay}

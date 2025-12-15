@@ -104,7 +104,12 @@ export function useRealtimeBoard(
                 },
                 (payload) => {
                     if (realtimeState.token !== token) return;
-                    console.log('Card change detected:', payload);
+                    console.log('[Realtime] Card change detected:', {
+                        eventType: payload.eventType,
+                        new: payload.new,
+                        old: payload.old,
+                        errors: payload.errors
+                    });
 
                     if (onCardChange) {
                         onCardChange(payload as RealtimePostgresChangesPayload<Card>);
@@ -183,11 +188,19 @@ export function useRealtimeBoard(
 
         channel.subscribe((status) => {
             if (realtimeState.token !== token) return;
-            console.log('Realtime subscription status:', status);
+            console.log(`[Realtime] Subscription status: ${status}`);
+
             if (status === 'SUBSCRIBED') {
                 setRealtimeStatus('connected');
             } else if (status === 'CLOSED') {
                 setRealtimeStatus('disconnected');
+                console.warn('[Realtime] Subscription CLOSED');
+            } else if (status === 'CHANNEL_ERROR') {
+                setRealtimeStatus('disconnected');
+                console.error('[Realtime] Subscription CHANNEL_ERROR');
+            } else if (status === 'TIMED_OUT') {
+                setRealtimeStatus('disconnected');
+                console.warn('[Realtime] Subscription TIMED_OUT');
             }
         });
 
