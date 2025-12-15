@@ -14,53 +14,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Legacy client for backwards compatibility (client-side only)
-export const supabase = createBrowserClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    cookies: {
-      get(name: string) {
-        if (typeof document === 'undefined') return undefined;
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop()?.split(';').shift();
-      },
-      set(name: string, value: string, options: any) {
-        if (typeof document === 'undefined') return;
-        document.cookie = `${name}=${value}; path=/; ${options.maxAge ? `max-age=${options.maxAge};` : ''}`;
-      },
-      remove(name: string, options: any) {
-        if (typeof document === 'undefined') return;
-        document.cookie = `${name}=; path=/; max-age=0`;
-      },
-    },
-  }
-);
+// NOTE: In browser runtimes, @supabase/ssr will use `document.cookie` automatically
+// (including chunked cookies). Avoid overriding cookies here, or the session may not
+// be readable and Realtime will behave as anonymous.
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
 // Client factory function for use in client components
 export function createClient() {
-  return createBrowserClient(
-    supabaseUrl!,
-    supabaseAnonKey!,
-    {
-      cookies: {
-        get(name: string) {
-          if (typeof document === 'undefined') return undefined;
-          const value = `; ${document.cookie}`;
-          const parts = value.split(`; ${name}=`);
-          if (parts.length === 2) return parts.pop()?.split(';').shift();
-        },
-        set(name: string, value: string, options: any) {
-          if (typeof document === 'undefined') return;
-          document.cookie = `${name}=${value}; path=/; ${options.maxAge ? `max-age=${options.maxAge};` : ''}`;
-        },
-        remove(name: string, options: any) {
-          if (typeof document === 'undefined') return;
-          document.cookie = `${name}=; path=/; max-age=0`;
-        },
-      },
-    }
-  );
+  return createBrowserClient(supabaseUrl!, supabaseAnonKey!);
 }
 
 // Server-side client factory for use in API routes and server components
