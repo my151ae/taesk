@@ -83,22 +83,13 @@ export function TimelineCard({
             ) : null}
 
             {badgeLabel ? (
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpen();
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className="absolute top-2 right-2 flex h-7 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
-                    aria-label="Open card"
+                <div
+                    className="absolute top-2 right-2 flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
+                    aria-label="Card status"
                     data-testid={openButtonTestId}
                 >
-                    <span className="text-[11px] font-bold leading-none">{badgeLabel}</span>
-                    <span aria-hidden="true" className="text-[12px] leading-none">
-                        ›
-                    </span>
-                </button>
+                    <span className="text-[10px] font-bold leading-none text-slate-500">{badgeLabel}</span>
+                </div>
             ) : null}
 
             {childrenPosition === 'bottom' && children}

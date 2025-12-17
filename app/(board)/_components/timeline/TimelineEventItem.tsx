@@ -65,6 +65,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 onClick={(e) => {
                     e.stopPropagation();
                     onClearGhost();
+                    openCardModal(event.short_id, 'card-click');
                 }}
             >
                 <TimelineCard
@@ -82,17 +83,23 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     className="w-full h-full pt-4"
                 />
                 <div
-                    className="absolute top-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                    className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"
                     onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'top')}
                     onPointerMove={handleResizeMove}
                     onPointerUp={handleResizeEnd}
-                />
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="w-8 h-1 bg-slate-400/0 rounded-full group-hover:bg-slate-300/80 transition-colors" />
+                </div>
                 <div
-                    className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize opacity-0 hover:opacity-100 z-10"
+                    className="absolute bottom-0 left-1/2 -ml-8 w-16 h-4 -mb-2 cursor-ns-resize z-10 flex items-center justify-center group"
                     onPointerDown={(e) => handleResizeStart(e, event.card_id, start, duration, 'bottom')}
                     onPointerMove={handleResizeMove}
                     onPointerUp={handleResizeEnd}
-                />
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="w-8 h-1 bg-slate-400/0 rounded-full group-hover:bg-slate-300/80 transition-colors" />
+                </div>
             </div>
         </DraggableCard >
     );
