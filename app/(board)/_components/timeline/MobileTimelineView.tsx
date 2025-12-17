@@ -219,18 +219,18 @@ function MobileTimelineColumn({
 
 function MobileAbBucket({
   sectionLabel,
-  sectionHelper,
   bucketKey,
   items,
   openCardModal,
+  onCreateBucketCard,
   onToggleCheck,
   bucketIndicator,
 }: {
   sectionLabel: string;
-  sectionHelper: string;
   bucketKey: string;
   items: TimelineBucketItem[];
   openCardModal: (shortId: string | null, source: string) => void;
+  onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
 }) {
@@ -238,6 +238,7 @@ function MobileAbBucket({
     id: `bucket-drop:${bucketKey}`,
     data: { type: "ab-bucket", bucketKey },
   });
+  const lastCardId = items.length ? items[items.length - 1]?.card_id : undefined;
 
   return (
     <div
@@ -245,12 +246,25 @@ function MobileAbBucket({
       className={`border border-slate-200 bg-slate-50/70 shadow-inner ${isOver ? "ring-1 ring-sky-200 bg-slate-50" : ""}`}
     >
       <div className="border-b border-slate-200 px-3 py-2">
-        <p className="text-[11px] font-semibold text-slate-700">{sectionLabel}</p>
-        <p className="text-[10px] text-slate-400">{sectionHelper}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-slate-700">{sectionLabel}</p>
+          <button
+            type="button"
+            aria-label="カードを追加"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateBucketCard(bucketKey);
+            }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700"
+            data-testid={`ab-add-${bucketKey}`}
+          >
+            <span className="text-base leading-none">＋</span>
+          </button>
+        </div>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="space-y-1 px-2 pb-2">
         {items.length === 0 ? (
-          <p className="px-3 py-3 text-[11px] text-slate-400">{isOver ? "ここにドロップ" : "カードがありません"}</p>
+          <p className="px-1 py-3 text-[11px] text-slate-400">{isOver ? "ここにドロップ" : "カードがありません"}</p>
         ) : (
           items.map((item) => (
             <MobileBucketCard
@@ -263,6 +277,18 @@ function MobileAbBucket({
             />
           ))
         )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateBucketCard(bucketKey, lastCardId);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700"
+          data-testid={`ab-add-bottom-${bucketKey}`}
+        >
+          <span className="text-base leading-none">＋</span>
+          <span>追加</span>
+        </button>
       </div>
     </div>
   );
@@ -284,6 +310,7 @@ type MobileTimelineViewProps = {
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
   openCardModal: (shortId: string | null, source: string) => void;
+  onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   status: string;
   activeDrag: DragAndDropBindings["activeDrag"];
@@ -314,6 +341,7 @@ export default function MobileTimelineView({
   indicatorDayIso,
   timelineViewportHeight,
   openCardModal,
+  onCreateBucketCard,
   onToggleCheck,
   status,
   sensors,
@@ -552,10 +580,10 @@ export default function MobileTimelineView({
                     <MobileAbBucket
                       key={section.bucket}
                       sectionLabel={section.label}
-                      sectionHelper={section.helper}
                       bucketKey={section.bucket}
                       items={items}
                       openCardModal={openCardModal}
+                      onCreateBucketCard={onCreateBucketCard}
                       onToggleCheck={onToggleCheck}
                       bucketIndicator={bucketIndicator}
                     />

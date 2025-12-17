@@ -50,7 +50,7 @@ import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
-import { normalizeDueBucket } from "@/lib/bucket-normalization";
+import { bucketKeyToDueBucket, normalizeDueBucket } from "@/lib/bucket-normalization";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { MAIN_BOARD_ID } from "@/lib/board-defaults";
@@ -1432,7 +1432,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return Math.max(available, TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
   }, [viewportHeight, timelineHeaderHeight]);
 
-  const createCard = useCallback(async (payload: Partial<Card>, tempId?: string) => {
+  const createCard = useCallback(async (payload: Partial<Card>, tempId?: string, options?: { openModal?: boolean }) => {
     if (dataMode !== 'api') return;
     try {
       const response = await fetch(`/api/boards/${initialBoard.id}/cards`, {
@@ -1458,8 +1458,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           return applyCardUpdate(next, newCard, 'INSERT');
         });
 
-        // Auto-open modal for the new card
-        if (newCard.short_id) {
+        // Auto-open modal for the new card (default: true)
+        if (options?.openModal !== false && newCard.short_id) {
           openCardModal(newCard.short_id, 'create-card');
         }
       }
@@ -1473,7 +1473,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           if (!prev) return prev;
           return {
             ...prev,
-            events: prev.events.filter(e => e.card_id !== tempId),
+            events: prev.events.filter((e) => e.card_id !== tempId),
+            abBuckets: Object.fromEntries(
+              Object.entries(prev.abBuckets).map(([key, items]) => [
+                key,
+                items.filter((item) => item.card_id !== tempId),
+              ])
+            ),
           };
         });
       }
@@ -1527,6 +1533,89 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     createCard(payload, tempId);
   }, [createCard, setData]);
+
+  const resolveBucketInsertPosition = useCallback((items: TimelineBucketItem[], afterCardId?: string) => {
+    const now = Date.now();
+    if (!items.length) return now;
+    if (!afterCardId) {
+      const maxPos = items.reduce((acc, item) => (item.bucketPosition != null ? Math.max(acc, item.bucketPosition) : acc), -Infinity);
+      return Number.isFinite(maxPos) ? maxPos + 1000 : now;
+    }
+
+    const index = items.findIndex((item) => item.card_id === afterCardId);
+    if (index < 0) return now;
+    const target = items[index];
+    const next = items[index + 1];
+    const targetPos = target?.bucketPosition;
+    const nextPos = next?.bucketPosition;
+
+    if (targetPos != null && nextPos != null) return (targetPos + nextPos) / 2;
+    if (targetPos != null) return targetPos - 1000;
+    return now;
+  }, []);
+
+  const handleBucketClick = useCallback(
+    (bucketKey: string, afterCardId?: string) => {
+      const isoDate = bucketDayMap[bucketKey];
+      if (!isoDate) return;
+
+      const now = Date.now();
+      const dueBucket = bucketKeyToDueBucket(bucketKey);
+      const title = `New card ${now}`;
+      const tempId = `temp-${now}`;
+
+      const position = resolveBucketInsertPosition((data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[], afterCardId);
+
+      const payload: Partial<Card> = {
+        title,
+        checklist: EMPTY_CHECKLIST,
+        tags: [],
+        due_date: withJstMidnight(isoDate),
+        due_start: null,
+        due_end: null,
+        due_bucket: dueBucket,
+        due_bucket_position: position,
+        priority: 'medium',
+      };
+
+      // Optimistic update to show card immediately
+      setData((prev) => {
+        if (!prev) return prev;
+        const nextBuckets = { ...prev.abBuckets };
+        const currentItems = nextBuckets[bucketKey] ?? [];
+        const nextPosition = resolveBucketInsertPosition(currentItems, afterCardId);
+        const optimisticItem: TimelineBucketItem = {
+          card_id: tempId,
+          title,
+          due_date: isoDate,
+          due_start: null,
+          due_end: null,
+          checked: false,
+          checklist: EMPTY_CHECKLIST,
+          tags: [],
+          assignee_id: null,
+          assignee_ids: null,
+          assigned_to: null,
+          short_id: null,
+          slug: null,
+          bucketPosition: nextPosition,
+        };
+
+        nextBuckets[bucketKey] = [optimisticItem, ...currentItems].sort(
+          (a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0)
+        );
+        return { ...prev, abBuckets: nextBuckets };
+      });
+
+      createCard(payload, tempId, { openModal: false });
+    },
+    [bucketDayMap, createCard, data?.abBuckets, resolveBucketInsertPosition, setData]
+  );
+
+  const handleTimelineViewMount = useCallback(() => {
+    setIsTimelineViewMounted(true);
+    syncActiveTimelineScrollRef();
+  }, [syncActiveTimelineScrollRef]);
 
   // Show modal as soon as we have a card (e.g., from timeline data), even while the API is still loading.
   const shouldShowCardModal = Boolean(modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading'));
@@ -1611,10 +1700,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
           <div className="hidden md:block">
             <DesktopTimelineView
-              onMount={() => {
-                setIsTimelineViewMounted(true);
-                syncActiveTimelineScrollRef();
-              }}
+              onMount={handleTimelineViewMount}
               onScroll={debouncedHandleScroll}
               timelineHeaderRef={timelineHeaderRef}
               timelineScrollRef={desktopTimelineScrollRef}
@@ -1636,6 +1722,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               openCardModal={openCardModal}
               handleEventKeyDown={handleEventKeyDown}
               handleColumnClick={handleColumnClick}
+              onCreateBucketCard={handleBucketClick}
               handleResizeStart={handleResizeStart}
               handleResizeMove={handleResizeMove}
               handleResizeEnd={handleResizeEnd}
@@ -1657,10 +1744,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             <div className="relative h-[calc(100vh-140px)] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
               <MobileTimelineView
                 timelineScrollRef={mobileTimelineScrollRef}
-                onMount={() => {
-                  setIsTimelineViewMounted(true);
-                  syncActiveTimelineScrollRef();
-                }}
+                onMount={handleTimelineViewMount}
                 onScroll={debouncedHandleScroll}
                 days={data?.days ?? []}
                 activeDayIndex={activeDayIndex}
@@ -1672,6 +1756,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 indicatorDayIso={indicatorDayIso}
                 timelineViewportHeight={timelineViewportHeight}
                 openCardModal={openCardModal}
+                onCreateBucketCard={handleBucketClick}
                 onToggleCheck={handleToggleCardChecked}
                 status={status}
                 activeDrag={activeDrag}

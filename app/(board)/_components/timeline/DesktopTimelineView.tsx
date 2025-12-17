@@ -46,6 +46,7 @@ type DesktopTimelineViewProps = {
   openCardModal: (shortId: string | null, source: string) => void;
   handleEventKeyDown: (event: TimelineEvent, native: React.KeyboardEvent<HTMLElement>) => void;
   handleColumnClick: (day: TimelineDay, minutes: number) => void;
+  onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   handleResizeStart: (e: React.PointerEvent, cardId: string, startMinutes: number, duration: number, edge: "top" | "bottom") => void;
   handleResizeMove: (e: React.PointerEvent) => void;
   handleResizeEnd: (e: React.PointerEvent) => void;
@@ -86,6 +87,7 @@ export function DesktopTimelineView({
   openCardModal,
   handleEventKeyDown,
   handleColumnClick,
+  onCreateBucketCard,
   handleResizeStart,
   handleResizeMove,
   handleResizeEnd,
@@ -425,6 +427,7 @@ export function DesktopTimelineView({
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
               bucketIndicator={bucketIndicator}
+              onCreateBucketCard={onCreateBucketCard}
             />
 
             <TimelineGrid

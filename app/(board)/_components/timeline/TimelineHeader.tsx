@@ -6,6 +6,8 @@ import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
 import type { Priority } from '@/lib/supabase';
+import type { ProfileSummary } from '@/lib/supabase';
+import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 
 type TimelineHeaderProps = {
     board: Board;
@@ -96,6 +98,8 @@ export default function TimelineHeader({
     const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
     const filtersDropdownRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
+    const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
+    const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -495,8 +499,11 @@ export default function TimelineHeader({
                         data-testid="profile-menu-button"
                     >
                         <div className="h-6 w-6 rounded-full bg-sky-100 text-xs flex items-center justify-center text-sky-600 font-bold">
-                            {profile?.display_name?.[0]?.toUpperCase() || 'U'}
+                            {profileInitial}
                         </div>
+                        <span className="hidden max-w-[140px] truncate text-xs font-medium text-slate-700 md:block">
+                            {profileIdentity.label}
+                        </span>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-slate-400">
                             <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                         </svg>
@@ -505,8 +512,8 @@ export default function TimelineHeader({
                     {showProfileMenu && (
                         <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
                             <div className="px-4 py-3 border-b border-slate-100">
-                                <p className="text-sm font-medium text-slate-900">{profile?.display_name || 'User'}</p>
-                                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                                <p className="text-sm font-medium text-slate-900">{profileIdentity.label}</p>
+                                <p className="text-xs text-slate-500 truncate">{profileIdentity.secondary || user?.email}</p>
                             </div>
 
                             <div className="p-1">

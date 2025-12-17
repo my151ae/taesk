@@ -123,4 +123,31 @@ test.describe('@feature:timeline Timeline view', () => {
     await dumpClientMetrics(page, ['timeline']);
     await supabaseAdmin.from('cards').delete().eq('id', cardId);
   });
+
+  test('can create a date-only card from A/B list by click', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+
+    await page.goto('/board');
+    await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
+
+    const createResponsePromise = page.waitForResponse((res) => {
+      const url = res.url();
+      return (
+        res.request().method() === 'POST' &&
+        url.includes(`/api/boards/${MAIN_BOARD_ID}/cards`) &&
+        res.ok()
+      );
+    });
+
+    await page.locator('[data-testid^="ab-add-"]').first().click();
+    const response = await createResponsePromise;
+    const body = await response.json().catch(() => null);
+    const createdCardId = body?.card?.id as string | undefined;
+
+    await expect(page.locator('[data-testid^="ab-card-"]').filter({ hasText: /New card/ }).first()).toBeVisible();
+
+    if (createdCardId) {
+      await supabaseAdmin.from('cards').delete().eq('id', createdCardId);
+    }
+  });
 });

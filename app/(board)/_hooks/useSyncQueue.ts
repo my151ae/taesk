@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { syncQueue, getSyncQueueStats } from '@/lib/syncQueue';
 import { useAuth } from '@/app/contexts/AuthContext';
 
@@ -6,6 +6,21 @@ export function useSyncQueue() {
     const { user } = useAuth();
     const [isOnline, setIsOnline] = useState(true);
     const [syncQueueStats, setSyncQueueStats] = useState({ pending: 0, failed: 0, total: 0, lastSyncedAt: null as number | null });
+
+    const refreshStats = useCallback(() => {
+        const next = getSyncQueueStats();
+        setSyncQueueStats((prev) => {
+            if (
+                prev.pending === next.pending &&
+                prev.failed === next.failed &&
+                prev.total === next.total &&
+                prev.lastSyncedAt === next.lastSyncedAt
+            ) {
+                return prev;
+            }
+            return next;
+        });
+    }, []);
 
     // Online/Offline detection with auto-sync
     useEffect(() => {
@@ -19,7 +34,7 @@ export function useSyncQueue() {
                 console.log(`同期完了: ${result.success}件成功, ${result.failed}件失敗`);
             }
             // Update stats after sync
-            setSyncQueueStats(getSyncQueueStats());
+            refreshStats();
         };
 
         const handleOffline = () => {
@@ -39,7 +54,7 @@ export function useSyncQueue() {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
-    }, []);
+    }, [refreshStats]);
 
     // Sync queue on app load if online
     useEffect(() => {
@@ -51,17 +66,17 @@ export function useSyncQueue() {
                     console.log(`起動時同期完了: ${result.success}件成功, ${result.failed}件失敗`);
                 }
                 // Update stats after sync
-                setSyncQueueStats(getSyncQueueStats());
+                refreshStats();
             }
         };
 
         syncOnLoad();
-    }, [user]);
+    }, [refreshStats, user]);
 
     // Update sync queue stats periodically
     useEffect(() => {
         const updateStats = () => {
-            setSyncQueueStats(getSyncQueueStats());
+            refreshStats();
         };
 
         // Update immediately
@@ -71,7 +86,7 @@ export function useSyncQueue() {
         const interval = setInterval(updateStats, 2000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [refreshStats]);
 
     return { isOnline, syncQueueStats };
 }

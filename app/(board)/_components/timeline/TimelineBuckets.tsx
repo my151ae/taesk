@@ -16,6 +16,7 @@ type TimelineBucketsProps = {
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     bucketIndicator: BucketIndicator | null;
+    onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     axisWidth?: number;
 };
 
@@ -37,6 +38,7 @@ export default function TimelineBuckets({
     openCardModal,
     onToggleCheck,
     bucketIndicator,
+    onCreateBucketCard,
     axisWidth = 80,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
@@ -54,12 +56,27 @@ export default function TimelineBuckets({
                     {meta.sections.map((section) => {
                         const items = abBuckets[section.bucket] ?? [];
                         const isA = section.bucket.endsWith('_a');
+                        const lastCardId = items.length ? items[items.length - 1]?.card_id : undefined;
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                                 {(isOver) => (
                                     <div className={`border border-slate-100 bg-slate-50/70 py-3 shadow-inner min-h-[240px] ${!isA ? 'flex-1' : ''}`}>
-                                        <p className="text-[11px] font-semibold text-slate-600 px-3">{section.label}</p>
-                                        <p className="text-[10px] text-slate-400 px-3">{section.helper}</p>
+                                        <div className="flex items-center justify-between px-3">
+                                            <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
+                                            <button
+                                                type="button"
+                                                aria-label="カードを追加"
+                                                disabled={status === 'loading' || !onCreateBucketCard}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onCreateBucketCard?.(section.bucket);
+                                                }}
+                                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                data-testid={`ab-add-${section.bucket}`}
+                                            >
+                                                <span className="text-base leading-none">＋</span>
+                                            </button>
+                                        </div>
                                         <div className="mt-2 space-y-1">
                                             {items.length === 0 && isOver && (
                                                 <div className="mb-2 h-0.5 bg-sky-500" />
@@ -80,6 +97,19 @@ export default function TimelineBuckets({
                                                     />
                                                 ))
                                             )}
+                                            <button
+                                                type="button"
+                                                disabled={status === 'loading' || !onCreateBucketCard}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onCreateBucketCard?.(section.bucket, lastCardId);
+                                                }}
+                                                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                data-testid={`ab-add-bottom-${section.bucket}`}
+                                            >
+                                                <span className="text-base leading-none">＋</span>
+                                                <span>追加</span>
+                                            </button>
                                         </div>
                                     </div>
                                 )}

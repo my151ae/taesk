@@ -40,8 +40,8 @@ export const formatDayLabel = (isoDate: string, todayIso?: string) => {
 export const buildAbMeta = (day: TimelineDay) => ({
     title: `A/B ${day.label}`,
     sections: [
-        { bucket: `${day.key}_a`, label: `A: do on ${day.label}`, helper: 'Critical tasks' },
-        { bucket: `${day.key}_b`, label: `B: if possible on ${day.label}`, helper: 'Stretch tasks' },
+        { bucket: `${day.key}_a`, label: 'A:Critical Task', helper: '' },
+        { bucket: `${day.key}_b`, label: 'B:Stretch Task', helper: '' },
     ],
 });
 
