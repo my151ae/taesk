@@ -245,9 +245,9 @@ function MobileAbBucket({
       ref={setBucketRef}
       className={`border border-slate-200 bg-slate-50/70 shadow-inner ${isOver ? "ring-1 ring-sky-200 bg-slate-50" : ""}`}
     >
-      <div className="border-b border-slate-200 px-3 py-2">
+      <div className="border-b border-slate-200 px-3 py-1.5">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold text-slate-700">{sectionLabel}</p>
+          <p className="text-[10px] font-semibold text-slate-700">{sectionLabel}</p>
           <button
             type="button"
             aria-label="カードを追加"
@@ -255,7 +255,7 @@ function MobileAbBucket({
               e.stopPropagation();
               onCreateBucketCard(bucketKey);
             }}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700"
             data-testid={`ab-add-${bucketKey}`}
           >
             <span className="text-base leading-none">＋</span>
@@ -283,7 +283,7 @@ function MobileAbBucket({
             e.stopPropagation();
             onCreateBucketCard(bucketKey, lastCardId);
           }}
-          className="flex w-full items-center gap-2 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700"
+          className="flex w-full items-center gap-2 rounded-none border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700"
           data-testid={`ab-add-bottom-${bucketKey}`}
         >
           <span className="text-base leading-none">＋</span>
@@ -302,6 +302,7 @@ type MobileTimelineViewProps = {
   onNextDay: () => void;
   onMount?: () => void;
   onScroll?: (scrollTop: number) => void;
+  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
@@ -333,6 +334,7 @@ export default function MobileTimelineView({
   onNextDay,
   onMount,
   onScroll,
+  registerAbScrollContainer,
   eventsByDay,
   abBuckets,
   calendarEventsByDay,
@@ -456,6 +458,7 @@ export default function MobileTimelineView({
         droppable: { strategy: MeasuringStrategy.Always },
       }}
       autoScroll={{
+        enabled: false,
         threshold: { x: 0, y: 0.2 },
         acceleration: 1,
       }}
@@ -572,7 +575,12 @@ export default function MobileTimelineView({
               </div>
             </div>
 
-            <div className="min-w-0 overflow-y-auto border-l border-slate-100">
+            <div
+              ref={(el) => registerAbScrollContainer?.(activeDay.isoDate, el)}
+              data-ab-scroll-container="true"
+              data-ab-day={activeDay.isoDate}
+              className="min-w-0 overflow-y-auto border-l border-slate-100 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+            >
               <div className="space-y-3 px-3 pb-4">
                 {abMeta?.sections.map((section) => {
                   const items = activeBuckets[section.bucket] ?? [];
@@ -705,7 +713,7 @@ function MobileDragOverlayCard({
   timeText: string | null;
 }) {
   return (
-    <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+    <div className="pointer-events-none w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <div className="flex items-start gap-2">
         <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
           {badge.toUpperCase()}

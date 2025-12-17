@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
 import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
 import type {
@@ -28,6 +28,7 @@ type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 type DesktopTimelineViewProps = {
   timelineHeaderRef: React.RefObject<HTMLDivElement>;
   timelineScrollRef: React.RefObject<HTMLDivElement>;
+  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
   days: TimelineDay[];
   activeDayIndex: number;
   dayRange: number;
@@ -69,6 +70,7 @@ export function DesktopTimelineView({
   onMount,
   timelineHeaderRef,
   timelineScrollRef,
+  registerAbScrollContainer,
   days,
   activeDayIndex,
   dayRange,
@@ -108,6 +110,20 @@ export function DesktopTimelineView({
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
+  const [abViewportHeight, setAbViewportHeight] = useState(0);
+
+  useEffect(() => {
+    const el = timelineScrollRef.current;
+    if (!el) return;
+
+    const update = () => setAbViewportHeight(el.clientHeight);
+    update();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [timelineScrollRef]);
 
   // Build overlay card data for DragOverlay
   const activeDragCardId = activeDrag?.cardId ?? null;
@@ -276,7 +292,7 @@ export function DesktopTimelineView({
         droppable: { strategy: MeasuringStrategy.Always },
       }}
       autoScroll={{
-        enabled: !isOverABList,
+        enabled: false,
         threshold: { x: 0, y: 0.2 },
         acceleration: 1,
       }}
@@ -423,6 +439,8 @@ export function DesktopTimelineView({
               days={visibleDays}
               abBuckets={abBuckets}
               floatingLayerTop={floatingLayerTop}
+              viewportHeight={abViewportHeight}
+              registerAbScrollContainer={registerAbScrollContainer}
               status={status}
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
@@ -477,7 +495,7 @@ function DesktopDragOverlayCard({
   timeText: string | null;
 }) {
   return (
-    <div className="w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+    <div className="pointer-events-none w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
       <div className="flex items-start gap-2">
         <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
           {badge.toUpperCase()}

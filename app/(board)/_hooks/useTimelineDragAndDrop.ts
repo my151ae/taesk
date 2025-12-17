@@ -11,7 +11,7 @@ import {
     rectIntersection,
     UniqueIdentifier,
 } from '@dnd-kit/core';
-import { useState, useRef, useCallback, KeyboardEvent, PointerEvent } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import {
     TimelineEvent,
     TimelineBucketItem,
@@ -98,6 +98,7 @@ type UseTimelineDragAndDropProps = {
     setData: React.Dispatch<React.SetStateAction<TimelineResponse | null>>;
     applyPatch: (cardId: string, payload: Record<string, unknown>) => Promise<void>;
     timelineScrollRef: React.RefObject<HTMLDivElement>;
+    abScrollContainersRef?: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
     bucketDayMap: Record<string, string | null>;
     dataMode: 'api' | 'mock';
     editingCardId?: string | null;
@@ -108,6 +109,7 @@ export function useTimelineDragAndDrop({
     setData,
     applyPatch,
     timelineScrollRef,
+    abScrollContainersRef,
     bucketDayMap,
     dataMode,
     editingCardId,
@@ -117,6 +119,37 @@ export function useTimelineDragAndDrop({
     const [pointerPreview, setPointerPreview] = useState<PointerPreviewState>(HIDDEN_POINTER_PREVIEW);
     const [activeResize, setActiveResize] = useState<ActiveResizeState | null>(null);
     const [bucketIndicator, setBucketIndicator] = useState<BucketIndicator | null>(null);
+    const dragAutoScrollRef = useRef<{
+        raf: number | null;
+        velocityPxPerSecond: number;
+        el: HTMLDivElement | null;
+        lastTimestamp: number | null;
+    }>({
+        raf: null,
+        velocityPxPerSecond: 0,
+        el: null,
+        lastTimestamp: null,
+    });
+    const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+    const pointerTrackingHandlerRef = useRef<((e: globalThis.PointerEvent) => void) | null>(null);
+    const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+
+    const extractClientPoint = (evt: unknown): { x: number; y: number } | null => {
+        if (!evt || typeof evt !== 'object') return null;
+        if ('clientX' in evt && 'clientY' in evt) {
+            const x = (evt as { clientX?: unknown }).clientX;
+            const y = (evt as { clientY?: unknown }).clientY;
+            if (typeof x === 'number' && typeof y === 'number') return { x, y };
+        }
+        if ('touches' in evt || 'changedTouches' in evt) {
+            const anyEvt = evt as TouchEvent;
+            const touch = anyEvt.touches?.[0] ?? anyEvt.changedTouches?.[0] ?? null;
+            if (touch && typeof touch.clientX === 'number' && typeof touch.clientY === 'number') {
+                return { x: touch.clientX, y: touch.clientY };
+            }
+        }
+        return null;
+    };
 
     const sensors = useSensors(
         useSensor(MouseSensor, {
@@ -247,6 +280,22 @@ export function useTimelineDragAndDrop({
         const cardId = event.active.data.current?.cardId as string | undefined;
         if (!cardId) return;
         if (editingCardId && editingCardId === cardId) return;
+        dragStartPointerRef.current =
+            extractClientPoint(event.activatorEvent) ??
+            (() => {
+                const initial = event.active.rect.current?.initial;
+                if (initial) {
+                    return { x: initial.left + (initial.width ?? 0) / 2, y: initial.top + (initial.height ?? 0) / 2 };
+                }
+                return null;
+            })();
+        if (typeof window !== 'undefined' && !pointerTrackingHandlerRef.current) {
+            const handler = (e: globalThis.PointerEvent) => {
+                latestPointerRef.current = { x: e.clientX, y: e.clientY };
+            };
+            pointerTrackingHandlerRef.current = handler;
+            window.addEventListener('pointermove', handler, { passive: true });
+        }
         const kind = event.active.data.current?.kind as 'event' | 'bucket';
         console.log('[timeline] drag start', { cardId, kind });
         if (kind === 'event') {
@@ -267,14 +316,8 @@ export function useTimelineDragAndDrop({
     const [isOverABList, setIsOverABList] = useState(false);
 
     const resolvePointerClientY = (event: DragMoveEvent | DragEndEvent): number | null => {
-        const activator = event.activatorEvent as unknown;
-        if (activator && typeof activator === 'object' && 'clientY' in activator) {
-            const val = (activator as { clientY?: unknown }).clientY;
-            if (typeof val === 'number') {
-                return val;
-            }
-        }
-
+        const latest = latestPointerRef.current;
+        if (latest) return latest.y;
         const activeRect = event.active.rect.current;
         if (activeRect?.translated) {
             return activeRect.translated.top + (activeRect.translated.height ?? 0) / 2;
@@ -282,12 +325,189 @@ export function useTimelineDragAndDrop({
         if (activeRect?.initial) {
             return activeRect.initial.top + (activeRect.initial.height ?? 0) / 2 + (event.delta?.y ?? 0);
         }
+        const start = dragStartPointerRef.current;
+        if (start) return start.y + (event.delta?.y ?? 0);
+
+        const activator = event.activatorEvent as unknown;
+        if (activator && typeof activator === 'object' && 'clientY' in activator) {
+            const val = (activator as { clientY?: unknown }).clientY;
+            if (typeof val === 'number') {
+                return val;
+            }
+        }
         return null;
     };
+
+    const resolvePointerClientX = (event: DragMoveEvent | DragEndEvent): number | null => {
+        const latest = latestPointerRef.current;
+        if (latest) return latest.x;
+
+        const activeRect = event.active.rect.current;
+        if (activeRect?.translated) {
+            return activeRect.translated.left + (activeRect.translated.width ?? 0) / 2;
+        }
+        if (activeRect?.initial) {
+            return activeRect.initial.left + (activeRect.initial.width ?? 0) / 2 + (event.delta?.x ?? 0);
+        }
+        const start = dragStartPointerRef.current;
+        if (start) return start.x + (event.delta?.x ?? 0);
+        return null;
+    };
+
+    const stopDragAutoScroll = useCallback(() => {
+        const state = dragAutoScrollRef.current;
+        state.velocityPxPerSecond = 0;
+        state.el = null;
+        state.lastTimestamp = null;
+        if (state.raf != null) {
+            cancelAnimationFrame(state.raf);
+            state.raf = null;
+        }
+    }, []);
+
+    const stopPointerTracking = useCallback(() => {
+        if (typeof window === 'undefined') return;
+        const handler = pointerTrackingHandlerRef.current;
+        if (handler) {
+            window.removeEventListener('pointermove', handler);
+            pointerTrackingHandlerRef.current = null;
+        }
+        latestPointerRef.current = null;
+        dragStartPointerRef.current = null;
+    }, []);
+
+    const findAbScrollContainerAtPointer = useCallback(
+        (pointerX: number, pointerY: number): HTMLDivElement | null => {
+            const containers = abScrollContainersRef?.current;
+            if (!containers) return null;
+            let best: { el: HTMLDivElement; distance: number } | null = null;
+            for (const el of Object.values(containers)) {
+                if (!el) continue;
+                const rect = el.getBoundingClientRect();
+                if (!(pointerX >= rect.left && pointerX <= rect.right)) continue;
+                const distance =
+                    pointerY < rect.top ? rect.top - pointerY : pointerY > rect.bottom ? pointerY - rect.bottom : 0;
+                if (!best || distance < best.distance) best = { el, distance };
+            }
+            return best?.el ?? null;
+        },
+        [abScrollContainersRef]
+    );
+
+    const ensureDragAutoScrollLoop = useCallback(() => {
+        const state = dragAutoScrollRef.current;
+        if (state.raf != null) return;
+
+        const tick = (now: number) => {
+            const current = dragAutoScrollRef.current;
+            if (!activeDragRef.current || !current.el || current.velocityPxPerSecond === 0) {
+                current.raf = null;
+                current.lastTimestamp = null;
+                return;
+            }
+
+            const last = current.lastTimestamp ?? now;
+            const deltaMs = Math.max(0, Math.min(64, now - last));
+            current.lastTimestamp = now;
+
+            const maxTop = Math.max(0, current.el.scrollHeight - current.el.clientHeight);
+            const deltaPx = (current.velocityPxPerSecond * deltaMs) / 1000;
+            current.el.scrollTop = Math.max(0, Math.min(maxTop, current.el.scrollTop + deltaPx));
+            current.raf = requestAnimationFrame(tick);
+        };
+
+        state.raf = requestAnimationFrame(tick);
+    }, []);
+
+    const updateDragAutoScroll = useCallback(
+        (event: DragMoveEvent) => {
+            const pointerX = resolvePointerClientX(event);
+            const pointerY = resolvePointerClientY(event);
+            if (pointerX == null || pointerY == null) {
+                stopDragAutoScroll();
+                return;
+            }
+
+            const hoveredAbEl = (() => {
+                if (typeof document === 'undefined') return findAbScrollContainerAtPointer(pointerX, pointerY);
+                const top = document.elementFromPoint(pointerX, pointerY);
+                const match = top?.closest?.('[data-ab-scroll-container="true"]') as HTMLDivElement | null | undefined;
+                return match ?? findAbScrollContainerAtPointer(pointerX, pointerY);
+            })();
+            const timelineEl = timelineScrollRef.current;
+            const hoveredTimelineEl = (() => {
+                if (!timelineEl) return null;
+                if (typeof document !== 'undefined') {
+                    const top = document.elementFromPoint(pointerX, pointerY);
+                    if (top && timelineEl.contains(top)) return timelineEl;
+                }
+                const rect = timelineEl.getBoundingClientRect();
+                if (
+                    pointerX >= rect.left &&
+                    pointerX <= rect.right &&
+                    pointerY >= rect.top &&
+                    pointerY <= rect.bottom
+                ) {
+                    return timelineEl;
+                }
+                return null;
+            })();
+
+            // Prefer A/B. Even if it can't scroll, don't fall through to timeline while pointer is over A/B.
+            const targetEl = hoveredAbEl ?? hoveredTimelineEl ?? null;
+            if (!targetEl) {
+                stopDragAutoScroll();
+                return;
+            }
+
+            const rect = targetEl.getBoundingClientRect();
+            const threshold = Math.max(24, rect.height * 0.2);
+            const topZone = rect.top + threshold;
+            const bottomZone = rect.bottom - threshold;
+
+            let velocityPxPerSecond = 0;
+            const maxSpeedPxPerSecond = 240;
+            const deadZoneRatio = 0.10;
+            if (pointerY < topZone) {
+                const intensity = Math.min(1, (topZone - pointerY) / threshold);
+                if (intensity > deadZoneRatio) {
+                    const t = (intensity - deadZoneRatio) / (1 - deadZoneRatio);
+                    const eased = 1 - (1 - t) * (1 - t); // easeOutQuad: accelerates earlier, but stays smooth near edge entry
+                    velocityPxPerSecond = -maxSpeedPxPerSecond * eased;
+                }
+            } else if (pointerY > bottomZone) {
+                const intensity = Math.min(1, (pointerY - bottomZone) / threshold);
+                if (intensity > deadZoneRatio) {
+                    const t = (intensity - deadZoneRatio) / (1 - deadZoneRatio);
+                    const eased = 1 - (1 - t) * (1 - t); // easeOutQuad
+                    velocityPxPerSecond = maxSpeedPxPerSecond * eased;
+                }
+            }
+
+            const isScrollable = targetEl.scrollHeight > targetEl.clientHeight + 1;
+            const canScrollUp = targetEl.scrollTop > 0;
+            const canScrollDown = targetEl.scrollTop + targetEl.clientHeight < targetEl.scrollHeight - 1;
+            if (
+                !isScrollable ||
+                (velocityPxPerSecond < 0 && !canScrollUp) ||
+                (velocityPxPerSecond > 0 && !canScrollDown)
+            ) {
+                velocityPxPerSecond = 0;
+            }
+
+            const state = dragAutoScrollRef.current;
+            state.el = targetEl;
+            state.velocityPxPerSecond = velocityPxPerSecond;
+            if (velocityPxPerSecond !== 0) ensureDragAutoScrollLoop();
+            else stopDragAutoScroll();
+        },
+        [ensureDragAutoScrollLoop, findAbScrollContainerAtPointer, stopDragAutoScroll, timelineScrollRef]
+    );
 
     const handleDragMove = (event: DragMoveEvent) => {
         const currentDrag = activeDragRef.current;
         if (!currentDrag) {
+            stopDragAutoScroll();
             if (pointerPreview.visible) {
                 setPointerPreview(HIDDEN_POINTER_PREVIEW);
             }
@@ -295,11 +515,18 @@ export function useTimelineDragAndDrop({
         }
         const overType = event.over?.data.current?.type;
 
+        const pointerX = resolvePointerClientX(event);
+        const pointerY = resolvePointerClientY(event);
+        const hoveredAbEl =
+            pointerX != null && pointerY != null ? findAbScrollContainerAtPointer(pointerX, pointerY) : null;
+
         // Check if over A/B list
         const isAB = overType === 'ab-bucket' || overType === 'bucket-item' || overType === 'bucket-item-top' || overType === 'bucket-item-bottom';
-        if (isAB !== isOverABList) {
-            setIsOverABList(isAB);
+        const isOverAbArea = Boolean(hoveredAbEl) || isAB;
+        if (isOverAbArea !== isOverABList) {
+            setIsOverABList(isOverAbArea);
         }
+        updateDragAutoScroll(event);
 
         if (overType === 'ab-bucket') {
             const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
@@ -353,6 +580,8 @@ export function useTimelineDragAndDrop({
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over, delta } = event;
+        stopDragAutoScroll();
+        stopPointerTracking();
         setActiveDrag(null);
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
@@ -533,6 +762,8 @@ export function useTimelineDragAndDrop({
     };
 
     const handleDragCancel = () => {
+        stopDragAutoScroll();
+        stopPointerTracking();
         setActiveDrag(null);
         activeDragRef.current = null;
         setPointerPreview(HIDDEN_POINTER_PREVIEW);
@@ -570,7 +801,7 @@ export function useTimelineDragAndDrop({
         // );
     };
 
-    const handleResizeStart = useCallback((e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => {
+    const handleResizeStart = useCallback((e: ReactPointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => {
         e.preventDefault();
         e.stopPropagation();
         const target = e.currentTarget as HTMLElement;
@@ -586,7 +817,7 @@ export function useTimelineDragAndDrop({
         });
     }, []);
 
-    const handleResizeMove = useCallback((e: PointerEvent) => {
+    const handleResizeMove = useCallback((e: ReactPointerEvent) => {
         if (!activeResize) return;
         e.preventDefault();
         e.stopPropagation();
@@ -625,7 +856,7 @@ export function useTimelineDragAndDrop({
         }
     }, [activeResize]);
 
-    const handleResizeEnd = useCallback((e: PointerEvent) => {
+    const handleResizeEnd = useCallback((e: ReactPointerEvent) => {
         if (!activeResize) return;
         e.preventDefault();
         e.stopPropagation();

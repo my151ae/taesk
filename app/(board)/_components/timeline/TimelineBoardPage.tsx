@@ -249,6 +249,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -1407,6 +1408,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setData,
     applyPatch,
     timelineScrollRef,
+    abScrollContainersRef,
     bucketDayMap,
     dataMode,
   });
@@ -1704,6 +1706,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               onScroll={debouncedHandleScroll}
               timelineHeaderRef={timelineHeaderRef}
               timelineScrollRef={desktopTimelineScrollRef}
+              registerAbScrollContainer={(dayIso, el) => {
+                abScrollContainersRef.current[dayIso] = el;
+              }}
               days={data?.days ?? []}
               activeDayIndex={activeDayIndex}
               dayRange={dayRange}
@@ -1746,6 +1751,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 timelineScrollRef={mobileTimelineScrollRef}
                 onMount={handleTimelineViewMount}
                 onScroll={debouncedHandleScroll}
+                registerAbScrollContainer={(dayIso, el) => {
+                  abScrollContainersRef.current[dayIso] = el;
+                }}
                 days={data?.days ?? []}
                 activeDayIndex={activeDayIndex}
                 onPrevDay={handlePrevDay}

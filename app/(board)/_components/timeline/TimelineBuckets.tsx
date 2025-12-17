@@ -12,6 +12,8 @@ type TimelineBucketsProps = {
     days: TimelineDay[];
     abBuckets: Record<string, TimelineBucketItem[]>;
     floatingLayerTop: number;
+    viewportHeight?: number;
+    registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
@@ -34,6 +36,8 @@ export default function TimelineBuckets({
     days,
     abBuckets,
     floatingLayerTop,
+    viewportHeight,
+    registerAbScrollContainer,
     status,
     openCardModal,
     onToggleCheck,
@@ -49,10 +53,13 @@ export default function TimelineBuckets({
 
         return (
             <div
-                className="pointer-events-auto border-l border-slate-100 md:border-slate-200 bg-white overflow-y-auto overflow-x-hidden"
-                style={{ height: `calc(100vh - ${floatingLayerTop}px)` }}
+                ref={(el) => registerAbScrollContainer?.(day.isoDate, el)}
+                data-ab-scroll-container="true"
+                data-ab-day={day.isoDate}
+                className="pointer-events-auto w-full min-w-0 border-l border-slate-100 md:border-slate-200 bg-white overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                style={{ height: viewportHeight ? `${viewportHeight}px` : `calc(100vh - ${floatingLayerTop}px)` }}
             >
-                <div className="flex flex-col gap-0.5 h-full">
+                <div className="flex min-h-full flex-col gap-0.5">
                     {meta.sections.map((section) => {
                         const items = abBuckets[section.bucket] ?? [];
                         const isA = section.bucket.endsWith('_a');
@@ -60,9 +67,9 @@ export default function TimelineBuckets({
                         return (
                             <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                                 {(isOver) => (
-                                    <div className={`border border-slate-100 bg-slate-50/70 py-3 shadow-inner min-h-[240px] ${!isA ? 'flex-1' : ''}`}>
+                                    <div className={`border border-slate-100 bg-slate-50/70 py-2 shadow-inner min-h-[240px] ${!isA ? 'flex-1' : ''}`}>
                                         <div className="flex items-center justify-between px-3">
-                                            <p className="text-[11px] font-semibold text-slate-600">{section.label}</p>
+                                            <p className="text-[10px] font-semibold text-slate-600">{section.label}</p>
                                             <button
                                                 type="button"
                                                 aria-label="カードを追加"
@@ -71,7 +78,7 @@ export default function TimelineBuckets({
                                                     e.stopPropagation();
                                                     onCreateBucketCard?.(section.bucket);
                                                 }}
-                                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
                                                 data-testid={`ab-add-${section.bucket}`}
                                             >
                                                 <span className="text-base leading-none">＋</span>
@@ -104,7 +111,7 @@ export default function TimelineBuckets({
                                                     e.stopPropagation();
                                                     onCreateBucketCard?.(section.bucket, lastCardId);
                                                 }}
-                                                className="mx-2 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="flex w-full items-center gap-2 rounded-none border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
                                                 data-testid={`ab-add-bottom-${section.bucket}`}
                                             >
                                                 <span className="text-base leading-none">＋</span>
@@ -144,7 +151,7 @@ export default function TimelineBuckets({
                 <div />
                 {days.map((day) => (
                     <div key={day.key} className="relative flex justify-end">
-                        <div className="w-1/2 md:w-[calc(50%-3px)]">
+                        <div className="w-1/2 min-w-0 md:w-[calc(50%-3px)]">
                             {renderAbCard(day)}
                         </div>
                     </div>
