@@ -43,6 +43,7 @@ type DesktopTimelineViewProps = {
   activeDrag: ActiveDragState | null;
   pointerPreview: PointerPreviewState;
   activeResize: ActiveResizeState | null;
+  startHour: number;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
   openCardModal: (shortId: string | null, source: string) => void;
   handleEventKeyDown: (event: TimelineEvent, native: React.KeyboardEvent<HTMLElement>) => void;
@@ -75,6 +76,7 @@ export function DesktopTimelineView({
   activeDayIndex,
   dayRange,
   status,
+  startHour,
   handlePrevDay,
   handleNextDay,
   eventsByDay,
@@ -125,6 +127,7 @@ export function DesktopTimelineView({
     return () => observer.disconnect();
   }, [timelineScrollRef]);
 
+  // Placeholder, I will view file first
   // Build overlay card data for DragOverlay
   const activeDragCardId = activeDrag?.cardId ?? null;
   const overlayBucketEntry = useMemo(() => {
@@ -449,7 +452,8 @@ export function DesktopTimelineView({
             />
 
             <TimelineGrid
-              days={visibleDays}
+              days={days}
+              startHour={startHour}
               eventsByDay={eventsByDay}
               indicatorTop={indicatorTop}
               indicatorDayIso={indicatorDayIso}

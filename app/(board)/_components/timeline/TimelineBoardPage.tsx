@@ -404,6 +404,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return days.slice(startIndex, startIndex + Math.max(count, 0));
   }, [activeDayIndex, data?.days, dayRange]);
 
+
   const calendarRangeStart = useMemo(() => {
     if (!visibleDays.length) return null;
     const startIso = withJstMidnight(visibleDays[0]?.isoDate ?? null);
@@ -641,6 +642,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       cancel = true;
     };
   }, [initialBoard]);
+
+  // Timeline Start Time (Local preference)
+  const [startHour, setStartHour] = useState(0);
 
   const fetchTimeline = useCallback(async (start?: number, options?: { silent?: boolean }) => {
     if (!initialBoard?.id) return null;
@@ -1637,12 +1641,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setShowBoardMenu={setShowBoardMenu}
             boardMenuRef={boardMenuRef}
             setShowShareDialog={setShowShareDialog}
-            setShowNotificationSettings={setShowNotificationSettings}
-            setShowProfileSettings={setShowProfileSettings}
-            setShowBoardSettings={setShowBoardSettings}
-            profile={profile}
-            user={user}
-            signOut={signOut}
+	            setShowNotificationSettings={setShowNotificationSettings}
+	            setShowProfileSettings={setShowProfileSettings}
+	            setShowBoardSettings={setShowBoardSettings}
+	            profile={profile}
+	            user={user}
+	            signOut={signOut}
             showFilters={showFilters}
             setShowFilters={setShowFilters}
             hasActiveFilters={hasActiveFilters}
@@ -1650,17 +1654,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setSearchQuery={setSearchQuery}
             selectedTags={selectedTags}
             setSelectedTags={setSelectedTags}
-            selectedPriority={selectedPriority}
-            setSelectedPriority={setSelectedPriority}
-            availableTags={availableTags}
-            dayRange={dayRange}
-            onDayRangeChange={handleDayRangeChange}
-            onTodayClick={handleTodayClick}
-            onUpdateBoard={async (updates) => {
-              try {
-                const response = await fetch(`/api/boards/${initialBoard.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
+	            selectedPriority={selectedPriority}
+	            setSelectedPriority={setSelectedPriority}
+	            availableTags={data?.availableTags ?? []}
+	            dayRange={dayRange}
+	            onDayRangeChange={setDayRange}
+	            onTodayClick={handleTodayClick}
+	            onUpdateBoard={async (updates) => {
+	              try {
+	                const response = await fetch(`/api/boards/${initialBoard.id}`, {
+	                  method: 'PATCH',
+	                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(updates),
                 });
                 if (!response.ok) throw new Error('Failed to update board');
@@ -1709,10 +1713,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               registerAbScrollContainer={(dayIso, el) => {
                 abScrollContainersRef.current[dayIso] = el;
               }}
-              days={data?.days ?? []}
+              days={visibleDays}
               activeDayIndex={activeDayIndex}
               dayRange={dayRange}
               status={status}
+              startHour={startHour}
               handlePrevDay={handlePrevDay}
               handleNextDay={handleNextDay}
               eventsByDay={eventsByDay}
@@ -1842,6 +1847,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               </div>
               <BoardSettings
                 board={initialBoard}
+                startHour={startHour}
+                setStartHour={setStartHour}
                 onUpdate={async (updates) => {
                   try {
                     const response = await fetch(`/api/boards/${initialBoard.id}`, {

@@ -74,7 +74,10 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     timeText={timeLabel(event.due_start, event.due_end)}
-                    onOpen={() => openCardModal(event.short_id, 'event-button')}
+                    onOpen={() => {
+                        onClearGhost();
+                        openCardModal(event.short_id, 'event-button');
+                    }}
                     openButtonTestId={`cardOpenButton-${event.card_id}`}
                     dataTestId="timeline-event"
                     tabIndex={0}

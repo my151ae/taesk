@@ -18,7 +18,16 @@ export type ExternalCalendarEntry = {
 
 // Constants
 export const HOUR_HEIGHT = 40;
-export const HOURS = Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
+
+export const getDisplayHours = (startHour: number = 0) => {
+    return Array.from({ length: 24 }, (_, i) => {
+        const hour = (startHour + i) % 24;
+        return `${hour.toString().padStart(2, "0")}:00`;
+    });
+};
+
+export const HOURS = getDisplayHours(0); // Default for backward compatibility if needed, but components should use getDisplayHours
+
 export const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 export const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
 export const AXIS_WIDTH = 80;
@@ -49,11 +58,41 @@ export const buildAbMeta = (day: TimelineDay) => ({
 
 
 // Helper functions
-export const minuteToPixels = (minutes: number) => (minutes / 60) * HOUR_HEIGHT;
+export const minuteToPixels = (minutes: number, startHour: number = 0) => {
+    const startMinutes = startHour * 60;
+    // Adjust minutes to be relative to startHour
+    // If minutes < startMinutes, it means it's "next morning" (visually at bottom)
+    // E.g. start=6:00 (360), time=1:00 (60). 60 < 360.
+    // effectiveMinutes = 60 + 1440 = 1500.
+    // 1500 - 360 = 1140.
+    // (1140 / 60) * 40 = 19 * 40 = 760px.
+    //
+    // E.g. start=6:00 (360), time=7:00 (420). 420 >= 360.
+    // effectiveMinutes = 420.
+    // 420 - 360 = 60.
+    // (60 / 60) * 40 = 40px.
 
-export const pixelsToMinutes = (pixels: number): number => {
-    const minutes = Math.round((pixels / HOUR_HEIGHT) * 60);
-    return Math.max(0, Math.min(24 * 60 - 1, minutes)); // 0-1439の範囲にクランプ
+    let effectiveMinutes = minutes;
+    if (effectiveMinutes < startMinutes) {
+        effectiveMinutes += 24 * 60;
+    }
+
+    return ((effectiveMinutes - startMinutes) / 60) * HOUR_HEIGHT;
+};
+
+export const pixelsToMinutes = (pixels: number, startHour: number = 0): number => {
+    // Reverse of minuteToPixels
+    const relativeMinutes = (pixels / HOUR_HEIGHT) * 60;
+    const startMinutes = startHour * 60;
+
+    let totalMinutes = relativeMinutes + startMinutes;
+    // Normalize to 0-1439
+    if (totalMinutes >= 24 * 60) {
+        totalMinutes -= 24 * 60;
+    }
+
+    const minutes = Math.round(totalMinutes);
+    return Math.max(0, Math.min(24 * 60 - 1, minutes)); // Clamp to 0-1439
 };
 
 export const getMinutesFromTime = (value: string | null) => {
@@ -63,6 +102,7 @@ export const getMinutesFromTime = (value: string | null) => {
     const m = Number(minutes ?? "0");
     return h * 60 + m;
 };
+
 
 export const getDayDiff = (d1: string, d2: string) => {
     const t1 = new Date(d1).getTime();

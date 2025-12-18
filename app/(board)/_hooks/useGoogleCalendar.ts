@@ -12,6 +12,24 @@ type CacheEntry = {
   error: string | null;
 };
 
+const toErrorMessage = (value: unknown): string | null => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    const maybe = value as { code?: unknown; message?: unknown };
+    const message = typeof maybe.message === "string" ? maybe.message : null;
+    const code = typeof maybe.code === "string" ? maybe.code : null;
+    if (code && message) return `${code}: ${message}`;
+    if (message) return message;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "Unknown error";
+    }
+  }
+  return String(value);
+};
+
 export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null) {
   const startIso = useMemo(() => {
     if (!startDate) return null;
@@ -73,17 +91,20 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       if (controller.signal.aborted) return;
 
       if (body?.connected === false) {
-        const entry: CacheEntry = { events: [], canWrite: false, status: "disconnected", error: body?.error ?? null };
+        const normalizedError = toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ?? null;
+        const entry: CacheEntry = { events: [], canWrite: false, status: "disconnected", error: normalizedError };
         cacheRef.current.set(cacheKey, entry);
         setEvents([]);
         setCanWrite(false);
         setStatus("disconnected");
-        setError(body?.error ?? null);
+        setError(normalizedError);
         return;
       }
 
       if (!response.ok) {
-        const message = body?.error || "Failed to fetch Google Calendar events";
+        const message =
+          toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ??
+          "Failed to fetch Google Calendar events";
         const entry: CacheEntry = { events: [], canWrite: false, status: "error", error: message };
         cacheRef.current.set(cacheKey, entry);
         setEvents([]);
@@ -96,13 +117,14 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       const nextEvents = Array.isArray(body?.events) ? body!.events : [];
       const nextCanWrite = body?.canWrite ?? false;
 
-      const entry: CacheEntry = { events: nextEvents, canWrite: nextCanWrite, status: "success", error: body?.error ?? null };
+      const normalizedError = toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ?? null;
+      const entry: CacheEntry = { events: nextEvents, canWrite: nextCanWrite, status: "success", error: normalizedError };
       cacheRef.current.set(cacheKey, entry);
 
       setEvents(nextEvents);
       setCanWrite(nextCanWrite);
       setStatus("success");
-      setError(body?.error ?? null);
+      setError(normalizedError);
     } catch (err) {
       if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Failed to fetch Google Calendar events";

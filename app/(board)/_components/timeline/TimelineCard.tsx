@@ -49,6 +49,10 @@ export function TimelineCard({
             tabIndex={tabIndex}
             role={role}
             onKeyDown={onKeyDown}
+            onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+            }}
         >
             {childrenPosition === 'top' && children}
 
@@ -83,13 +87,19 @@ export function TimelineCard({
             ) : null}
 
             {badgeLabel ? (
-                <div
+                <button
+                    type="button"
                     className="absolute top-2 right-2 flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
-                    aria-label="Card status"
+                    aria-label="カードを開く"
                     data-testid={openButtonTestId}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpen();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
                 >
                     <span className="text-[10px] font-bold leading-none text-slate-500">{badgeLabel}</span>
-                </div>
+                </button>
             ) : null}
 
             {childrenPosition === 'bottom' && children}
