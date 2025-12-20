@@ -64,4 +64,5 @@ export interface TimelineResponse {
   serverNow: string;
   startOffset?: number;
   range?: number;
+  availableTags?: string[];
 }

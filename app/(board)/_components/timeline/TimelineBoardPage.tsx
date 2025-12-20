@@ -655,9 +655,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
   }, [initialBoard]);
 
-  // Timeline Start Time (Local preference)
-  const [startHour, setStartHour] = useState(0);
-
   const fetchTimeline = useCallback(async (start?: number, options?: { silent?: boolean }) => {
     if (!initialBoard?.id) return null;
     const effectiveStart = typeof start === 'number' ? start : dayWindowStartRef.current;
@@ -1721,7 +1718,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               activeDayIndex={activeDayIndex}
               dayRange={dayRange}
               status={status}
-              startHour={startHour}
               handlePrevDay={handlePrevDay}
               handleNextDay={handleNextDay}
               eventsByDay={eventsByDay}
@@ -1851,8 +1847,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               </div>
               <BoardSettings
                 board={initialBoard}
-                startHour={startHour}
-                setStartHour={setStartHour}
                 onUpdate={async (updates) => {
                   try {
                     const response = await fetch(`/api/boards/${initialBoard.id}`, {
