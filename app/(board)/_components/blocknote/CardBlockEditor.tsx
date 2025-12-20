@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { BlockNoteViewRaw, useCreateBlockNote } from "@blocknote/react";
+import { useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/react/style.css";
 
 import {
@@ -20,12 +20,17 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     initialContent: ensureTitleBlock(normalizeBlockNoteDocument(initialContent)),
   });
   const lastSerializedRef = useRef<string>("");
+  const editorRootRef = useRef<HTMLDivElement | null>(null);
 
   const handleChange = useCallback(() => {
     const next = ensureTitleBlock(editor.document as BlockNoteDocument);
     lastSerializedRef.current = JSON.stringify(next);
     onChange(next);
   }, [editor, onChange]);
+
+  useEffect(() => {
+    return editor.onChange(() => handleChange());
+  }, [editor, handleChange]);
 
   useEffect(() => {
     const normalized = ensureTitleBlock(normalizeBlockNoteDocument(initialContent));
@@ -35,21 +40,20 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     lastSerializedRef.current = serialized;
   }, [editor, initialContent]);
 
+  useEffect(() => {
+    const element = editorRootRef.current;
+    if (!element) return;
+    editor.mount(element);
+    return () => {
+      editor.unmount();
+    };
+  }, [editor]);
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <BlockNoteViewRaw
-        editor={editor}
-        onChange={handleChange}
-        className="min-h-[240px]"
-        formattingToolbar={false}
-        linkToolbar={false}
-        slashMenu={false}
-        emojiPicker={false}
-        sideMenu={false}
-        filePanel={false}
-        tableHandles={false}
-        comments={false}
-      />
+      <div className="bn-container light" data-color-scheme="light">
+        <div ref={editorRootRef} className="bn-editor min-h-[240px]" />
+      </div>
     </div>
   );
 }

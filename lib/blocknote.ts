@@ -1,18 +1,6 @@
-export type BlockNoteInlineContent = {
-  type?: string;
-  text?: string;
-  content?: BlockNoteInlineContent[] | string;
-};
+import type { PartialBlock } from "@blocknote/core";
 
-export type BlockNoteBlock = {
-  id?: string;
-  type?: string;
-  props?: Record<string, unknown>;
-  content?: BlockNoteInlineContent[] | string;
-  children?: BlockNoteBlock[];
-};
-
-export type BlockNoteDocument = BlockNoteBlock[];
+export type BlockNoteDocument = PartialBlock[];
 
 export const DEFAULT_EXCERPT_LENGTH = 160;
 const MAX_TITLE_LENGTH = 255;
@@ -26,13 +14,11 @@ export const normalizeBlockNoteDocument = (value: unknown): BlockNoteDocument =>
   return Array.isArray(value) ? (value as BlockNoteDocument) : [];
 };
 
-export const createTitleBlock = (title = ""): BlockNoteBlock => {
-  if (!title) {
-    return { type: "paragraph", content: [] };
-  }
+export const createTitleBlock = (title = ""): PartialBlock => {
+  const normalized = title.trim();
   return {
     type: "paragraph",
-    content: [{ type: "text", text: title }],
+    content: normalized ? normalized : "",
   };
 };
 
