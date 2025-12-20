@@ -32,7 +32,10 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     _tiptapOptions: {
       editorProps: {
         handleKeyDown: (view, event) => {
-          if (event.isComposing || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) {
+          if (
+            event.isComposing ||
+            !["ArrowUp", "ArrowDown", "ArrowLeft"].includes(event.key)
+          ) {
             return false;
           }
           const { selection } = view.state;
@@ -68,6 +71,15 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
               (cursor.parentBlock ? editor.getNextBlock(cursor.parentBlock) : undefined);
             if (!next) return false;
             editor.setTextCursorPosition(next, "start");
+            return true;
+          }
+
+          if (event.key === "ArrowLeft" && selection.$from.parentOffset === 0) {
+            const prev =
+              editor.getPrevBlock(cursor.block) ??
+              cursor.parentBlock;
+            if (!prev) return false;
+            editor.setTextCursorPosition(prev, "end");
             return true;
           }
 
