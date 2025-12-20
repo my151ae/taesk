@@ -63,6 +63,7 @@ import NotificationSettings from "./NotificationSettings";
 import ProfileSettings from "./ProfileSettings";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText, type Checklist } from "@/lib/checklist";
+import type { BlockNoteDocument } from "@/lib/blocknote";
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -1373,7 +1374,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     }
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: card.title,
         checklist: card.checklist ?? EMPTY_CHECKLIST,
         list_id: card.list_id,
@@ -1390,6 +1391,12 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         assigned_to: card.assigned_to ?? null,
         slug: card.slug ?? undefined,
       };
+      if (card.content !== undefined) {
+        payload.content = card.content ?? [];
+      }
+      if (card.excerpt !== undefined) {
+        payload.excerpt = card.excerpt ?? "";
+      }
 
       const response = await fetch(`/api/boards/${currentBoardId}/cards/${card.id}`, {
         method: 'PATCH',
@@ -1982,46 +1989,48 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     router.replace(fallbackPath, { scroll: false });
   };
 
-  const handleSaveCard = async (
-    id: string,
-    title: string,
-    checklist: Checklist,
-    tags?: string[],
-    due_date?: string | null,
-    priority?: Priority,
-    assigneeIds?: string[],
-    assigneeTouched?: boolean,
-    due_start?: string | null,
-    due_end?: string | null,
-    due_bucket?: DueBucket | null,
-    due_bucket_position?: number | null,
-  ) => {
-    console.log('[handleSaveCard] Starting...', { id, title, checklist, assigneeIds });
+  const handleSaveCard = async (payload: {
+    id: string;
+    title: string;
+    content: BlockNoteDocument;
+    excerpt: string;
+    tags?: string[];
+    due_date?: string | null;
+    priority?: Priority;
+    assigneeIds?: string[];
+    assigneeTouched?: boolean;
+    due_start?: string | null;
+    due_end?: string | null;
+    due_bucket?: DueBucket | null;
+    due_bucket_position?: number | null;
+  }) => {
+    console.log('[handleSaveCard] Starting...', { id: payload.id, title: payload.title, assigneeIds: payload.assigneeIds });
 
     try {
-      const slug = slugify(title);
+      const slug = slugify(payload.title);
       const updatedCards = boardData.cards.map((card) => {
-        if (card.id === id) {
+        if (card.id === payload.id) {
           // Handle assignee_ids (array) and maintain backward compatibility with assignee_id (single)
-          const nextAssigneeIds = assigneeIds && assigneeIds.length > 0 ? assigneeIds : [];
+          const nextAssigneeIds = payload.assigneeIds && payload.assigneeIds.length > 0 ? payload.assigneeIds : [];
           const nextAssigneeId = nextAssigneeIds.length > 0 ? nextAssigneeIds[0] : null;
 
-          const nextBucket: DueBucket | null = due_bucket ?? card.due_bucket ?? null;
-          const nextBucketPosition: number | null = due_bucket_position ?? card.due_bucket_position ?? null;
-          const nextStart = due_start ?? card.due_start ?? null;
-          const nextEnd = due_end ?? card.due_end ?? null;
+          const nextBucket: DueBucket | null = payload.due_bucket ?? card.due_bucket ?? null;
+          const nextBucketPosition: number | null = payload.due_bucket_position ?? card.due_bucket_position ?? null;
+          const nextStart = payload.due_start ?? card.due_start ?? null;
+          const nextEnd = payload.due_end ?? card.due_end ?? null;
 
           return {
             ...card,
-            title,
-            checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
-            tags: tags || [],
-            due_date: due_date || null,
+            title: payload.title,
+            content: payload.content,
+            excerpt: payload.excerpt ?? "",
+            tags: payload.tags || [],
+            due_date: payload.due_date || null,
             due_start: nextStart,
             due_end: nextEnd,
             due_bucket: nextBucket,
             due_bucket_position: nextBucketPosition,
-            priority: priority || 'medium',
+            priority: payload.priority || 'medium',
             assignee_id: nextAssigneeId, // Keep for backward compatibility
             assignee_ids: nextAssigneeIds.length > 0 ? nextAssigneeIds : null,
             assigned_to: null, // Clear legacy field
@@ -2038,7 +2047,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       console.log('[handleSaveCard] State updated');
 
       // Supabase に保存（変更されたカードのみ）
-      const updatedCard = updatedCards.find((c) => c.id === id);
+      const updatedCard = updatedCards.find((c) => c.id === payload.id);
       if (updatedCard) {
         if (!isOnline) {
           console.log('[handleSaveCard] Adding to sync queue (offline)');

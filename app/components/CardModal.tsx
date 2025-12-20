@@ -6,8 +6,14 @@ import Image from "next/image";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
-import { Checklist, normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
-import { ChecklistEditor, ChecklistSaveTrigger } from "@/app/(board)/_components/checklist/ChecklistEditor";
+import { CardBlockEditor } from "@/app/(board)/_components/blocknote/CardBlockEditor";
+import {
+  BlockNoteDocument,
+  deriveExcerptFromDocument,
+  deriveTitleFromDocument,
+  ensureTitleBlock,
+  normalizeBlockNoteDocument,
+} from "@/lib/blocknote";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
@@ -31,20 +37,21 @@ interface CardModalProps {
   card: Card;
   boards: Board[];
   profiles: ProfileSummary[];
-  onSave: (
-    id: string,
-    title: string,
-    checklist: Checklist,
-    tags?: string[],
-    due_date?: string | null,
-    priority?: Priority,
-    assigneeIds?: string[],
-    assigneeTouched?: boolean,
-    due_start?: string | null,
-    due_end?: string | null,
-    due_bucket?: DueBucket | null,
-    due_bucket_position?: number | null
-  ) => void;
+  onSave: (payload: {
+    id: string;
+    title: string;
+    content: BlockNoteDocument;
+    excerpt: string;
+    tags?: string[];
+    due_date?: string | null;
+    priority?: Priority;
+    assigneeIds?: string[];
+    assigneeTouched?: boolean;
+    due_start?: string | null;
+    due_end?: string | null;
+    due_bucket?: DueBucket | null;
+    due_bucket_position?: number | null;
+  }) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
   onClose: () => void;
@@ -59,8 +66,9 @@ export function CardModal({
   onMoveToBoard,
   onClose,
 }: CardModalProps) {
-  const [title, setTitle] = useState(card.title);
-  const [checklist, setChecklist] = useState<Checklist>(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
+  const [content, setContent] = useState<BlockNoteDocument>(() =>
+    normalizeBlockNoteDocument(card.content ?? [])
+  );
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [dueDate, setDueDate] = useState(card.due_date || '');
@@ -85,10 +93,13 @@ export function CardModal({
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [showDirtyDialog, setShowDirtyDialog] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const onCloseRef = useRef(onClose);
+  const requestCloseRef = useRef<() => void>(() => {});
   const memberButtonRef = useRef<HTMLButtonElement | null>(null);
   const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,18 +128,35 @@ export function CardModal({
     return profiles.filter((profile) => assigneeIds.includes(profile.id));
   }, [profiles, assigneeIds]);
 
+  const titlePreview = useMemo(() => {
+    const normalized = ensureTitleBlock(content);
+    const title = deriveTitleFromDocument(normalized);
+    return title || card.title || "Edit Card";
+  }, [content, card.title]);
+
   // onClose ref を最新に保つ
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    if (isDirty) {
+      setShowDirtyDialog(true);
+      return;
+    }
+    onCloseRef.current();
+  }, [isDirty]);
+
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  }, [requestClose]);
 
   // card prop が変わったときの処理（ただし編集中は無視）
   useEffect(() => {
     // card.id が変わった場合（別のカードを開いた）、または編集していない場合のみ更新
     if (card.id !== cardIdRef.current) {
       cardIdRef.current = card.id;
-      setTitle(card.title);
-      setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
+      setContent(normalizeBlockNoteDocument(card.content ?? []));
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -147,10 +175,11 @@ export function CardModal({
       setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
       setIsDirty(false);
+      setEditorError(null);
+      setShowDirtyDialog(false);
     } else if (!isDirty) {
       // 同じカードで編集していない場合のみ、外部の変更を反映
-      setTitle(card.title);
-      setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
+      setContent(normalizeBlockNoteDocument(card.content ?? []));
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -192,7 +221,7 @@ export function CardModal({
 
       if (event.key === "Escape") {
         event.preventDefault();
-        onCloseRef.current();
+        requestCloseRef.current();
         return;
       }
 
@@ -256,20 +285,30 @@ export function CardModal({
     const normalizedBucketPosition: number | null =
       normalizedBucket != null ? dueBucketPosition ?? Date.now() : null;
 
-    onSave(
-      card.id,
-      title,
-      normalizeChecklist(checklist),
+    const normalizedContent = ensureTitleBlock(normalizeBlockNoteDocument(content));
+    const nextTitle = deriveTitleFromDocument(normalizedContent);
+    if (!nextTitle) {
+      setEditorError("タイトルを入力してください");
+      return;
+    }
+    const nextExcerpt = deriveExcerptFromDocument(normalizedContent);
+
+    setEditorError(null);
+    onSave({
+      id: card.id,
+      title: nextTitle,
+      content: normalizedContent,
+      excerpt: nextExcerpt,
       tags,
-      normalizedDueDate,
+      due_date: normalizedDueDate,
       priority,
-      assigneeIds.length > 0 ? assigneeIds : [],
+      assigneeIds: assigneeIds.length > 0 ? assigneeIds : [],
       assigneeTouched,
-      normalizedStart,
-      normalizedEnd,
-      normalizedBucket,
-      normalizedBucketPosition
-    );
+      due_start: normalizedStart,
+      due_end: normalizedEnd,
+      due_bucket: normalizedBucket,
+      due_bucket_position: normalizedBucketPosition,
+    });
 
     if (targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);
@@ -297,6 +336,7 @@ export function CardModal({
       e.preventDefault();
       if (!tags.includes(tagInput.trim())) {
         setTags([...tags, tagInput.trim()]);
+        setIsDirty(true);
       }
       setTagInput('');
     }
@@ -304,6 +344,7 @@ export function CardModal({
 
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
+    setIsDirty(true);
   };
 
   const handleTimeToggle = (enabled: boolean) => {
@@ -386,13 +427,14 @@ export function CardModal({
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
   const handleResyncRequest = useCallback(async () => {
-    if (!title) return;
+    const nextTitle = deriveTitleFromDocument(ensureTitleBlock(content));
+    if (!nextTitle) return;
     setResyncLoading(true);
     setResyncError(null);
     setResyncFetched(false);
     try {
       const candidates = await fetchResyncCandidates({
-        title,
+        title: nextTitle,
         start: dueDate ?? undefined,
         end: dueDate ?? undefined,
       });
@@ -400,7 +442,7 @@ export function CardModal({
       setResyncFetched(true);
       console.log("[CardModal][GoogleSync] resync candidates", {
         cardId: card.id,
-        title,
+        title: nextTitle,
         start: dueDate,
         end: dueDate,
         count: candidates.length,
@@ -413,7 +455,7 @@ export function CardModal({
     } finally {
       setResyncLoading(false);
     }
-  }, [title, dueDate, card.id]);
+  }, [content, dueDate, card.id]);
 
   const handleResyncSelect = useCallback(async (googleEventId?: string) => {
     setResyncLoading(true);
@@ -501,7 +543,7 @@ export function CardModal({
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-black/50"
-        onClick={onClose}
+        onClick={requestClose}
         data-testid="card-modal-overlay"
       />
       <div
@@ -516,10 +558,10 @@ export function CardModal({
         {/* Modal Header */}
         <div className="flex justify-between items-start p-6 pb-4 border-b border-slate-200 dark:border-gray-700">
           <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
-            {title || 'Edit Card'}
+            {titlePreview}
           </h2>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
             aria-label="Close modal"
             data-autofocus
@@ -532,45 +574,25 @@ export function CardModal({
         <div className="flex flex-1 overflow-hidden">
           {/* Left Column - Details */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {/* Title */}
+            {/* Block Editor */}
             <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Title
+              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
+                Title & Notes
               </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setIsDirty(true);
-                }}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                placeholder="Card title"
-              />
-            </div>
-
-            {/* Checklist */}
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Checklist
-              </label>
-              <ChecklistEditor
-                value={checklist}
+              <CardBlockEditor
+                key={card.id}
+                initialContent={content}
                 onChange={(next) => {
-                  setChecklist(next);
+                  setContent(next);
                   setIsDirty(true);
+                  if (editorError) {
+                    setEditorError(null);
+                  }
                 }}
-                onCommit={(next) => {
-                  setChecklist(next);
-                  setIsDirty(true);
-                }}
-                onCancel={() => {
-                  setChecklist(normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST));
-                  setIsDirty(false);
-                }}
-                placeholder="- [ ] タスクを書く"
-                minRows={4}
               />
+              {editorError && (
+                <p className="mt-2 text-xs text-red-600">{editorError}</p>
+              )}
             </div>
 
             {/* Tags */}
@@ -811,7 +833,10 @@ export function CardModal({
               </label>
               <select
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
+                onChange={(e) => {
+                  setPriority(e.target.value as Priority);
+                  setIsDirty(true);
+                }}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
               >
                 <option value="low">🟢 Low</option>
@@ -976,7 +1001,10 @@ export function CardModal({
                 </label>
                 <select
                   value={targetBoardId}
-                  onChange={(e) => setTargetBoardId(e.target.value)}
+                  onChange={(e) => {
+                    setTargetBoardId(e.target.value);
+                    setIsDirty(true);
+                  }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                 >
                   {boards.map((board) => (
@@ -1050,12 +1078,51 @@ export function CardModal({
             Delete
           </button>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors font-medium ml-auto"
           >
             Close
           </button>
         </div>
+
+        {showDirtyDialog && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+              <h3 className="text-base font-semibold text-slate-900">未保存の変更があります</h3>
+              <p className="mt-2 text-sm text-slate-600">保存して閉じますか？</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDirtyDialog(false);
+                    handleSave();
+                  }}
+                  className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                >
+                  保存して閉じる
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDirtyDialog(false);
+                    setIsDirty(false);
+                    onCloseRef.current();
+                  }}
+                  className="rounded-lg bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300"
+                >
+                  破棄
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDirtyDialog(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

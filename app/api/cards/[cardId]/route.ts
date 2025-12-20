@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { normalizeBlockNoteDocument } from '@/lib/blocknote';
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +25,7 @@ export async function GET(
     const { data: card, error: cardError } = await supabase
       .from('cards')
       .select(`
-        id, short_id, id_short, slug, title, checklist, tags,
+        id, short_id, id_short, slug, title, checklist, tags, content, excerpt,
         list_id, board_id, position, user_id,
         due_date, due_start, due_end, due_bucket, due_bucket_position,
         priority, checked, assignee_id, assignee_ids, assigned_to,
@@ -90,7 +91,11 @@ export async function GET(
       .filter(Boolean);
 
     const normalizedCard = card
-      ? { ...card, checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST) }
+      ? {
+        ...card,
+        checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST),
+        content: normalizeBlockNoteDocument((card as any).content ?? []),
+      }
       : null;
 
     return NextResponse.json({ card: normalizedCard, board, profiles }, { status: 200 });

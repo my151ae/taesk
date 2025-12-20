@@ -3,8 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
-import type { Checklist } from "@/lib/checklist";
-import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText } from "@/lib/checklist";
+import { flattenChecklistText } from "@/lib/checklist";
+import {
+  buildDocumentFromTitle,
+  deriveExcerptFromDocument,
+  getDocumentPlainText,
+  normalizeBlockNoteDocument,
+  type BlockNoteDocument,
+} from "@/lib/blocknote";
 import { buildBoardUrl } from "@/lib/board-url";
 
 import { createClientTrace } from "@/lib/metrics/client";
@@ -288,10 +294,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   // URL更新関数
   const updateUrl = useCallback((date: string | null, range: number, time?: number | null) => {
-    const params = new URLSearchParams();
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
 
     if (date) {
       params.set('date', date);
+    } else {
+      params.delete('date');
     }
 
     params.set('range', String(range));
@@ -299,9 +308,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // timeが指定されている場合のみURLに追加
     if (time != null && time >= 0) {
       params.set('time', String(Math.round(time)));
+    } else {
+      params.delete('time');
     }
 
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    const query = params.toString();
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
 
     // replaceを使用して履歴を増やさない
     router.replace(newUrl, { scroll: false });
@@ -775,47 +787,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
 
   const handleCardModalSave = useCallback(
-    async (
-      id: string,
-      title: string,
-      checklist: Checklist,
-      tags?: string[],
-      due_date?: string | null,
-      priority?: Priority,
-      assigneeIds?: string[],
-      assigneeTouched?: boolean,
-      due_start?: string | null,
-      due_end?: string | null,
-      due_bucket?: DueBucket | null,
-      due_bucket_position?: number | null
-    ) => {
+    async (savePayload: {
+      id: string;
+      title: string;
+      content: BlockNoteDocument;
+      excerpt: string;
+      tags?: string[];
+      due_date?: string | null;
+      priority?: Priority;
+      assigneeIds?: string[];
+      assigneeTouched?: boolean;
+      due_start?: string | null;
+      due_end?: string | null;
+      due_bucket?: DueBucket | null;
+      due_bucket_position?: number | null;
+    }) => {
       // Use the memoized modalCard for targetCard
-      const targetCard = modalCard && modalCard.id === id ? modalCard : null;
+      const targetCard = modalCard && modalCard.id === savePayload.id ? modalCard : null;
       if (!targetCard) return;
       try {
-        const nextAssignee = assigneeIds && assigneeIds.length > 0 ? assigneeIds[0] : null;
+        const nextAssignee = savePayload.assigneeIds && savePayload.assigneeIds.length > 0 ? savePayload.assigneeIds[0] : null;
         let normalizedDueDate: string | null = null;
-        if (due_date) {
-          const parsed = new Date(due_date);
+        if (savePayload.due_date) {
+          const parsed = new Date(savePayload.due_date);
           if (!Number.isNaN(parsed.getTime())) {
             normalizedDueDate = parsed.toISOString();
           }
         }
         const payload: Record<string, unknown> = {
-          title,
-          checklist: normalizeChecklist(checklist ?? EMPTY_CHECKLIST),
-          tags,
+          title: savePayload.title,
+          content: normalizeBlockNoteDocument(savePayload.content ?? []),
+          excerpt: savePayload.excerpt ?? "",
+          tags: savePayload.tags,
           due_date: normalizedDueDate,
-          due_start,
-          due_end,
-          due_bucket: normalizeDueBucket(due_bucket),
-          due_bucket_position,
-          priority,
-          slug: slugify(title),
+          due_start: savePayload.due_start,
+          due_end: savePayload.due_end,
+          due_bucket: normalizeDueBucket(savePayload.due_bucket),
+          due_bucket_position: savePayload.due_bucket_position,
+          priority: savePayload.priority,
+          slug: slugify(savePayload.title),
         };
-        if (assigneeTouched) {
+        if (savePayload.assigneeTouched) {
           payload.assignee_id = nextAssignee;
-          payload.assignee_ids = assigneeIds && assigneeIds.length > 0 ? assigneeIds : null;
+          payload.assignee_ids = savePayload.assigneeIds && savePayload.assigneeIds.length > 0 ? savePayload.assigneeIds : null;
           payload.assigned_to = null;
         }
         console.log('[timeline] Sending card update payload:', payload);
@@ -903,7 +917,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // Ideally filterAndSortCards should be generic or we should adapt the data.
     // For now, we'll filter the arrays directly using the same logic as filterAndSortCards but inline or adapted.
 
-    const filterItem = (item: { title: string; tags: string[]; priority?: string | null; checked: boolean; checklist?: Checklist | null }) => {
+    const filterItem = (item: {
+      title: string;
+      tags: string[];
+      priority?: string | null;
+      checked: boolean;
+      excerpt?: string | null;
+      content?: BlockNoteDocument | null;
+      checklist?: unknown;
+    }) => {
       // Priority (only for events that have priority, buckets might not?)
       if (selectedPriority !== 'all') {
         if (item.priority !== selectedPriority) return false;
@@ -916,8 +938,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       // Search (Title + Tags)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const checklistText = flattenChecklistText(item.checklist ?? null);
-        const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')} ${checklistText}`.toLowerCase();
+        const contentText = getDocumentPlainText(normalizeBlockNoteDocument(item.content ?? []));
+        const checklistText = flattenChecklistText((item as any).checklist ?? null);
+        const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')} ${item.excerpt ?? ''} ${contentText} ${checklistText}`.toLowerCase();
         if (!source.includes(query)) return false;
       }
       return true;
@@ -1166,32 +1189,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     [dataMode, initialBoard.id, fetchTimeline]
   );
 
-  const applyChecklistLocally = useCallback((cardId: string, checklist: Checklist) => {
-    const normalized = normalizeChecklist(checklist ?? EMPTY_CHECKLIST);
-    setData((prev) => {
-      if (!prev) return prev;
-      const events = prev.events.map((event) =>
-        event.card_id === cardId ? { ...event, checklist: normalized } : event
-      );
-      const abBuckets = Object.fromEntries(
-        Object.entries(prev.abBuckets).map(([key, items]) => [
-          key,
-          items.map((item) => (item.card_id === cardId ? { ...item, checklist: normalized } : item)),
-        ])
-      );
-      return { ...prev, events, abBuckets };
-    });
-
-    setModalCardOverride((current) => {
-      if (current && current.id === cardId) {
-        return { ...current, checklist: normalized } as Card;
-      }
-      return current;
-    });
-  }, [setData, setModalCardOverride]);
-
-
-
   const handleBoardNavigate = useCallback(
     (board: Board) => {
       const target = buildBoardUrl(board);
@@ -1372,10 +1369,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   // Todayボタンハンドラ (router.pushを使用して履歴に追加)
   const handleTodayClick = useCallback(async () => {
-    await fetchTimeline(0);
+    const payload = await fetchTimeline(0);
     setActiveDayIndex(0);
 
-    const todayIso = data?.days?.[0]?.isoDate;
+    const todayIso = payload?.days?.[0]?.isoDate ?? data?.days?.[0]?.isoDate;
     const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
     const currentTime = pixelsToMinutes(currentScrollTop);
 
@@ -1494,10 +1491,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     console.debug('[timeline] column click', { day, minutes });
+    const title = `New card ${Date.now()}`;
+    const content = buildDocumentFromTitle(title);
+    const excerpt = deriveExcerptFromDocument(content);
 
     const payload: Partial<Card> = {
-      title: `New card ${Date.now()}`,
-      checklist: EMPTY_CHECKLIST,
+      title,
+      content,
+      excerpt,
       tags: [],
       due_date: withJstMidnight(day.isoDate),
       due_start: minutesToTime(minutes),
@@ -1516,7 +1517,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       due_end: minutesToTime(minutes + 60),
       durationMinutes: 60,
       title: payload.title || 'New card',
-      checklist: EMPTY_CHECKLIST,
+      excerpt,
       tags: [],
       due_bucket: null,
       due_bucket_position: null,
@@ -1568,13 +1569,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const now = Date.now();
       const dueBucket = bucketKeyToDueBucket(bucketKey);
       const title = `New card ${now}`;
+      const content = buildDocumentFromTitle(title);
+      const excerpt = deriveExcerptFromDocument(content);
       const tempId = `temp-${now}`;
 
       const position = resolveBucketInsertPosition((data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[], afterCardId);
 
       const payload: Partial<Card> = {
         title,
-        checklist: EMPTY_CHECKLIST,
+        content,
+        excerpt,
         tags: [],
         due_date: withJstMidnight(isoDate),
         due_start: null,
@@ -1593,11 +1597,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         const optimisticItem: TimelineBucketItem = {
           card_id: tempId,
           title,
+          excerpt,
           due_date: isoDate,
           due_start: null,
           due_end: null,
           checked: false,
-          checklist: EMPTY_CHECKLIST,
           tags: [],
           assignee_id: null,
           assignee_ids: null,
@@ -1713,7 +1717,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               registerAbScrollContainer={(dayIso, el) => {
                 abScrollContainersRef.current[dayIso] = el;
               }}
-              days={visibleDays}
+              days={data?.days ?? []}
               activeDayIndex={activeDayIndex}
               dayRange={dayRange}
               status={status}

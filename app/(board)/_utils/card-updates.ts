@@ -70,6 +70,8 @@ export function applyCardUpdate(
             due_end: card.due_end,
             durationMinutes,
             title: card.title,
+            content: (card as any).content ?? null,
+            excerpt: card.excerpt ?? null,
             tags: card.tags ?? [],
             priority: card.priority,
             checked: card.checked,
@@ -115,6 +117,8 @@ export function applyCardUpdate(
         const newItem: TimelineBucketItem = {
             card_id: card.id,
             title: card.title,
+            content: (card as any).content ?? null,
+            excerpt: card.excerpt ?? null,
             due_date: localDay,
             due_start: card.due_start,
             due_end: card.due_end,

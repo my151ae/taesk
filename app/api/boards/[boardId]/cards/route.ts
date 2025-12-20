@@ -3,11 +3,14 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { buildDocumentFromTitle, deriveExcerptFromDocument, ensureTitleBlock, normalizeBlockNoteDocument } from '@/lib/blocknote';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().max(255),
   checklist: z.any().optional(),
+  content: z.array(z.unknown()).optional(),
+  excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
@@ -144,11 +147,25 @@ export async function POST(
       slug = slugify(parsed.data.title);
     }
 
+    const contentCandidate = parsed.data.content
+      ? normalizeBlockNoteDocument(parsed.data.content)
+      : [];
+    const normalizedContent =
+      contentCandidate.length > 0
+        ? ensureTitleBlock(contentCandidate)
+        : buildDocumentFromTitle(parsed.data.title);
+    const normalizedExcerpt =
+      typeof parsed.data.excerpt === 'string'
+        ? parsed.data.excerpt
+        : deriveExcerptFromDocument(normalizedContent);
+
     const payload: Record<string, unknown> = {
       board_id: boardId,
       id: parsed.data.id,
       title: parsed.data.title,
       checklist: clampChecklist(parsed.data.checklist ?? EMPTY_CHECKLIST),
+      content: normalizedContent,
+      excerpt: normalizedExcerpt,
       list_id: listId,
       position: position,
       tags: parsed.data.tags ?? [],
@@ -194,6 +211,10 @@ export async function POST(
       !!error &&
       (error.code === '42703' ||
         (typeof error.message === 'string' && error.message.includes('checklist')));
+    const missingContentColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('content')));
 
     if (missingDueBucketColumn && 'due_bucket_position' in payloadToSend) {
       const fallbackPayload = { ...payloadToSend };
@@ -205,6 +226,13 @@ export async function POST(
       console.error('[cards POST] checklist column missing. Please apply migration 20251129090000_add_checklist_to_cards.sql');
       return NextResponse.json(
         { error: { code: 'MISSING_CHECKLIST_COLUMN', message: 'Checklist column is missing. Apply migration 20251129090000_add_checklist_to_cards.sql' } },
+        { status: 500 }
+      );
+    }
+    if (missingContentColumn && 'content' in payloadToSend) {
+      console.error('[cards POST] content column missing. Please apply migration 20251220090000_add_card_content.sql');
+      return NextResponse.json(
+        { error: { code: 'MISSING_CONTENT_COLUMN', message: 'Content column is missing. Apply migration 20251220090000_add_card_content.sql' } },
         { status: 500 }
       );
     }

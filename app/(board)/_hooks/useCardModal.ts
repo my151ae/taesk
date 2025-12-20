@@ -7,6 +7,7 @@ import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store'
 import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { normalizeBlockNoteDocument } from '@/lib/blocknote';
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -42,9 +43,12 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         setActiveCardId(shortId);
 
         const baseUrl = buildBoardUrl(initialBoard);
-        const url = `${baseUrl}?card=${shortId}`;
+        const params = new URLSearchParams(searchParams?.toString());
+        params.set('card', shortId);
+        const query = params.toString();
+        const url = query ? `${baseUrl}?${query}` : baseUrl;
         router.push(url, { scroll: false });
-    }, [dataMode, initialBoard, router]);
+    }, [dataMode, initialBoard, router, searchParams]);
 
     const closeCardModal = useCallback(() => {
         setIsModalClosing(true);
@@ -53,8 +57,12 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         setModalCardOverride(null);
         setCardModalStatus('idle');
         const baseUrl = buildBoardUrl(initialBoard);
-        router.push(baseUrl, { scroll: false });
-    }, [initialBoard, router]);
+        const params = new URLSearchParams(searchParams?.toString());
+        params.delete('card');
+        const query = params.toString();
+        const url = query ? `${baseUrl}?${query}` : baseUrl;
+        router.push(url, { scroll: false });
+    }, [initialBoard, router, searchParams]);
 
 
 
@@ -69,6 +77,8 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             return {
                 id: eventCard.card_id,
                 title: eventCard.title,
+                content: normalizeBlockNoteDocument((eventCard as any).content ?? []),
+                excerpt: eventCard.excerpt ?? null,
                 checklist: normalizeChecklist(eventCard.checklist ?? EMPTY_CHECKLIST),
                 tags: eventCard.tags,
                 priority: eventCard.priority,
@@ -100,7 +110,9 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                 return {
                     id: bucketItem.card_id,
                 title: bucketItem.title,
-                checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
+                    content: normalizeBlockNoteDocument((bucketItem as any).content ?? []),
+                    excerpt: bucketItem.excerpt ?? null,
+                    checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
                 tags: bucketItem.tags,
                     priority: 'medium',
                     checked: bucketItem.checked,

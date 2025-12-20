@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { buildBoardUrl } from "@/lib/board-url";
 import { resolveAppOrigin } from "@/lib/calendarSyncService";
 import { normalizeCardSlugOrRedirect } from "@/lib/server/cards";
-import { normalizeChecklist } from "@/lib/checklist";
+import { getBlockPlainText, normalizeBlockNoteDocument } from "@/lib/blocknote";
 
 export const revalidate = 0;
 
@@ -27,7 +27,8 @@ export default async function CardFullPage({
   const createdAt = new Date(card.created_at);
   const updatedAt = new Date(card.updated_at);
   const tags = Array.isArray(card.tags) ? card.tags : [];
-  const checklist = normalizeChecklist(card.checklist ?? null);
+  const contentBlocks = normalizeBlockNoteDocument(card.content ?? []);
+  const bodyBlocks = contentBlocks.slice(1);
 
   // Deep linkはボード上のモーダルを開きたいケースが多いため、ボードURLが判明していれば
   // `/board...?card=SHORTID` にリダイレクトする。共有ページとしての表示はフォールバック。
@@ -110,22 +111,17 @@ export default async function CardFullPage({
 
           <div className="mt-8 space-y-6">
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Checklist</h2>
-              {checklist.lines.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">No checklist</p>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Notes</h2>
+              {bodyBlocks.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">No content</p>
               ) : (
-                <ul className="mt-2 space-y-2">
-                  {checklist.lines.map((line) => (
-                    <li key={line.id} className="flex items-start gap-2 text-base leading-6 text-slate-800">
-                      <span className="mt-1 inline-flex h-4 w-4 items-center justify-center rounded border border-slate-300 text-[10px] font-bold text-slate-700">
-                        {line.checked ? "✓" : ""}
-                      </span>
-                      <span className="flex-1 whitespace-pre-wrap">
-                        {`${"  ".repeat(Math.max(0, line.level))}${line.text}`}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-2 space-y-2 text-base leading-6 text-slate-800">
+                  {bodyBlocks.map((block, index) => {
+                    const text = getBlockPlainText(block);
+                    if (!text) return null;
+                    return <p key={`block-${index}`}>{text}</p>;
+                  })}
+                </div>
               )}
             </section>
 

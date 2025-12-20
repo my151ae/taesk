@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase, List, Card, CommentWithAuthor } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { normalizeBlockNoteDocument } from '@/lib/blocknote';
 
 type BoardData = {
     lists: List[];
@@ -105,6 +106,7 @@ export function useRealtimeBoard(
                         const newCard = {
                             ...(payload.new as Card),
                             checklist: normalizeChecklist((payload.new as any).checklist ?? EMPTY_CHECKLIST),
+                            content: normalizeBlockNoteDocument((payload.new as any).content ?? []),
                         } as Card;
                         const idx = prev.cards.findIndex(card => card.id === newCard.id);
 

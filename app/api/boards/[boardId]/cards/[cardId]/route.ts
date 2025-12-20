@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { normalizeBlockNoteDocument } from '@/lib/blocknote';
 import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from '@/lib/calendarSyncService';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
   checklist: z.any().optional(),
+  content: z.array(z.unknown()).optional(),
+  excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
@@ -99,6 +102,9 @@ export async function PATCH(
     if ('checklist' in normalizedPayload) {
       normalizedPayload.checklist = clampChecklist(normalizedPayload.checklist ?? EMPTY_CHECKLIST);
     }
+    if ('content' in normalizedPayload) {
+      normalizedPayload.content = normalizeBlockNoteDocument(normalizedPayload.content ?? []);
+    }
 
     let { data: updatedCard, error } = await performUpdate(normalizedPayload);
 
@@ -111,6 +117,10 @@ export async function PATCH(
       !!error &&
       (error.code === '42703' ||
         (typeof error.message === 'string' && error.message.includes('checklist')));
+    const missingContentColumn =
+      !!error &&
+      (error.code === '42703' ||
+        (typeof error.message === 'string' && error.message.includes('content')));
 
     if (missingDueBucketColumn && 'due_bucket_position' in normalizedPayload) {
       const fallbackPayload = { ...normalizedPayload };
@@ -133,6 +143,13 @@ export async function PATCH(
       console.error('[cards PATCH] checklist column missing. Please apply migration 20251129090000_add_checklist_to_cards.sql');
       return NextResponse.json(
         { error: { code: 'MISSING_CHECKLIST_COLUMN', message: 'Checklist column is missing. Apply migration 20251129090000_add_checklist_to_cards.sql' } },
+        { status: 500 }
+      );
+    }
+    if (missingContentColumn && 'content' in normalizedPayload) {
+      console.error('[cards PATCH] content column missing. Please apply migration 20251220090000_add_card_content.sql');
+      return NextResponse.json(
+        { error: { code: 'MISSING_CONTENT_COLUMN', message: 'Content column is missing. Apply migration 20251220090000_add_card_content.sql' } },
         { status: 500 }
       );
     }
@@ -170,22 +187,28 @@ export async function PATCH(
     // Log activity (only if we have a card to reference)
     if (ensuredCard) {
       const action = parsed.data.list_id ? 'moved' : 'updated';
+      const triggersCalendarSync = ['due_date', 'due_start', 'due_end', 'title', 'excerpt'].some(
+        (key) => key in normalizedPayload
+      );
+      const isContentOnlyUpdate = Object.keys(normalizedPayload).every((key) => key === 'content');
 
-      // Independent async logging
-      supabase.from('activity_logs').insert({
-        board_id: boardId,
-        user_id: user.id,
-        action,
-        entity_type: 'card',
-        entity_id: cardId,
-        entity_title: ensuredCard?.title ?? parsed.data.title ?? null,
-      }).then(({ error: logError }) => {
-        if (logError) console.error('Activity log failed:', logError);
-      });
+      if (!isContentOnlyUpdate) {
+        // Independent async logging
+        supabase.from('activity_logs').insert({
+          board_id: boardId,
+          user_id: user.id,
+          action,
+          entity_type: 'card',
+          entity_id: cardId,
+          entity_title: ensuredCard?.title ?? parsed.data.title ?? null,
+        }).then(({ error: logError }) => {
+          if (logError) console.error('Activity log failed:', logError);
+        });
+      }
 
       // Google Calendar Sync Trigger (Fire and forget or await without blocking response error?)
       // We await it to ensure consistency, but catch errors to avoid failing the UI update.
-      if (ensuredCard.due_start && ensuredCard.due_end) {
+      if (triggersCalendarSync && ensuredCard.due_start && ensuredCard.due_end) {
         const { startDateTime, endDateTime } = buildGoogleDateTimeRange({
           due_date: ensuredCard.due_date,
           due_start: ensuredCard.due_start,

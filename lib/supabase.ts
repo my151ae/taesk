@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr';
 import { type PostgrestError } from '@supabase/supabase-js';
 import type { Checklist } from './checklist';
 import { normalizeChecklist } from './checklist';
+import type { BlockNoteDocument } from './blocknote';
+import { normalizeBlockNoteDocument } from './blocknote';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -76,6 +78,8 @@ export interface Card {
   id: string;
   title: string;
   checklist: Checklist | null;
+  content?: BlockNoteDocument | null;
+  excerpt?: string | null;
   list_id: string;
   board_id: string;
   position: number;
@@ -124,6 +128,12 @@ export function sanitizeCardForUpload(card: Card, includeAssigneeId: boolean): C
     checklist: normalizeChecklist(card.checklist ?? null),
     assigned_to: card.assigned_to ?? null,
   };
+  if (card.content !== undefined) {
+    payload.content = normalizeBlockNoteDocument(card.content ?? []);
+  }
+  if (card.excerpt !== undefined) {
+    payload.excerpt = card.excerpt ?? null;
+  }
 
   if (includeAssigneeId) {
     payload.assignee_id = assignee_id ?? null;

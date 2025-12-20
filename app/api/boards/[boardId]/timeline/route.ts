@@ -84,7 +84,7 @@ export async function GET(
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, checklist, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
+    'id, title, checklist, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -107,6 +107,7 @@ export async function GET(
         ? (fallback.data as any[]).map((card) => ({
           ...card,
           checklist: EMPTY_CHECKLIST,
+          excerpt: card.excerpt ?? null,
           due_bucket_position: null,
         }))
         : null;
@@ -149,6 +150,7 @@ export async function GET(
         due_end: card.due_end,
         durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
         title: card.title,
+        excerpt: card.excerpt ?? null,
         tags: card.tags ?? [],
         priority: card.priority,
         checked: card.checked,
@@ -173,6 +175,7 @@ export async function GET(
       abBuckets[key].push({
         card_id: card.id,
         title: card.title,
+        excerpt: card.excerpt ?? null,
         due_date: dateOnly,
         due_start: card.due_start,
         due_end: card.due_end,
