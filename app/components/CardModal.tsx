@@ -12,6 +12,7 @@ import {
   deriveExcerptFromDocument,
   deriveTitleFromDocument,
   ensureTitleBlock,
+  getDocumentPlainText,
   normalizeBlockNoteDocument,
 } from "@/lib/blocknote";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
@@ -77,6 +78,7 @@ export function CardModal({
   const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
   const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
   const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
+  const contentFetchRef = useRef<string | null>(null);
   // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
     if (card.assignee_ids && card.assignee_ids.length > 0) {
@@ -154,9 +156,14 @@ export function CardModal({
   // card prop が変わったときの処理（ただし編集中は無視）
   useEffect(() => {
     // card.id が変わった場合（別のカードを開いた）、または編集していない場合のみ更新
+    const incomingContent = normalizeBlockNoteDocument(card.content ?? []);
+    const incomingText = getDocumentPlainText(incomingContent).trim();
+    const localText = getDocumentPlainText(content).trim();
+    const shouldForceSync = isDirty && !localText && incomingText.length > 0;
+
     if (card.id !== cardIdRef.current) {
       cardIdRef.current = card.id;
-      setContent(normalizeBlockNoteDocument(card.content ?? []));
+      setContent(incomingContent);
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -175,11 +182,12 @@ export function CardModal({
       setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
       setIsDirty(false);
+      contentFetchRef.current = null;
       setEditorError(null);
       setShowDirtyDialog(false);
-    } else if (!isDirty) {
+    } else if (!isDirty || shouldForceSync) {
       // 同じカードで編集していない場合のみ、外部の変更を反映
-      setContent(normalizeBlockNoteDocument(card.content ?? []));
+      setContent(incomingContent);
       setTags(card.tags || []);
       setDueDate(card.due_date || '');
       setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -194,7 +202,26 @@ export function CardModal({
           : [];
       setAssigneeIds(newAssigneeIds);
       setAssigneeTouched(false);
+      if (shouldForceSync) {
+        setIsDirty(false);
+      }
       setTargetBoardId(card.board_id);
+    }
+
+    if (!isDirty && !localText && !incomingText && card.short_id && contentFetchRef.current !== card.short_id) {
+      contentFetchRef.current = card.short_id;
+      fetch(`/api/cards/${card.short_id}`)
+        .then((res) => res.json().catch(() => null))
+        .then((body) => {
+          const remote = normalizeBlockNoteDocument(body?.card?.content ?? []);
+          const remoteText = getDocumentPlainText(remote).trim();
+          if (!remoteText) return;
+          setContent(remote);
+          setIsDirty(false);
+        })
+        .catch(() => {
+          contentFetchRef.current = null;
+        });
     }
   }, [card, isDirty]);
 

@@ -227,22 +227,22 @@ export function ChecklistEditor({
     const target = lineRefs.current[line.id];
     const caret = target?.selectionStart ?? 0;
     if (event.key === 'ArrowUp') {
-      event.preventDefault();
       const prevLine = lines[index - 1];
       if (prevLine) {
+        event.preventDefault();
         const pos = Math.min(caret, prevLine.text.length);
         focusLine(prevLine.id, pos);
+        return;
       }
-      return;
     }
     if (event.key === 'ArrowDown') {
-      event.preventDefault();
       const nextLine = lines[index + 1];
       if (nextLine) {
+        event.preventDefault();
         const pos = Math.min(caret, nextLine.text.length);
         focusLine(nextLine.id, pos);
+        return;
       }
-      return;
     }
     if (event.key === 'ArrowLeft' && caret === 0) {
       event.preventDefault();
