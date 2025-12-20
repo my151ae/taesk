@@ -62,7 +62,7 @@
 
 ## Build, Test, and Development Commands
 - `npm run dev` は全面禁止。Playwright の `webServer.command` 以外で Next.js サーバーを起動しない。
-- **更新**: `npm run build` はビルドエラー確認のため実行してよい（ユーザーの指示がある場合）。
+- **更新**: `npm run build` はビルドエラー確認のため実行してよい。
 - ビルド/検証の代表コマンド:
 
 ```bash
