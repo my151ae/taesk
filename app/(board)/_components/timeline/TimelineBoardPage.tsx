@@ -864,7 +864,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           const titleChanged = targetCard.title !== savePayload.title;
           const dateChanged = targetCard.due_date !== normalizedDueDate;
           const startChanged = (targetCard.due_start ? targetCard.due_start.slice(0, 5) : null) !== (savePayload.due_start ? savePayload.due_start.slice(0, 5) : null);
-          const endChanged = (targetCard.due_end ? targetCard.due_end.slice(0, 5) : null) !== (savePayload.due_start ? savePayload.due_end.slice(0, 5) : null);
+          const endChanged = (targetCard.due_end ? targetCard.due_end.slice(0, 5) : null) !== (savePayload.due_end ? savePayload.due_end.slice(0, 5) : null);
 
           if (titleChanged || dateChanged || startChanged || endChanged) {
             console.log('[timeline] syncing with google calendar because title or time changed', { titleChanged, dateChanged, startChanged, endChanged });
