@@ -138,7 +138,7 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     lastSerializedRef.current = serialized;
     window.setTimeout(() => {
       suppressOnChangeRef.current = false;
-    }, 0);
+    }, 50); // 微調整：初期化時の非同期発火を確実にブロックするため、少しだけ余裕を持たせる
   }, [editor, initialContent]);
 
   useEffect(() => {

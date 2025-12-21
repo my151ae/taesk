@@ -52,6 +52,7 @@ interface CardModalProps {
     due_end?: string | null;
     due_bucket?: DueBucket | null;
     due_bucket_position?: number | null;
+    isAutoSave?: boolean;
   }) => void;
   onDelete: (id: string) => void;
   onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -68,7 +69,7 @@ export function CardModal({
   onClose,
 }: CardModalProps) {
   const [content, setContent] = useState<BlockNoteDocument>(() =>
-    normalizeBlockNoteDocument(card.content ?? [])
+    ensureTitleBlock(normalizeBlockNoteDocument(card.content ?? []))
   );
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -101,9 +102,12 @@ export function CardModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const onCloseRef = useRef(onClose);
-  const requestCloseRef = useRef<() => void>(() => {});
+  const requestCloseRef = useRef<() => void>(() => { });
   const memberButtonRef = useRef<HTMLButtonElement | null>(null);
   const memberDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Debounce for auto-save
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const filteredProfiles = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
@@ -141,17 +145,6 @@ export function CardModal({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  const requestClose = useCallback(() => {
-    if (isDirty) {
-      setShowDirtyDialog(true);
-      return;
-    }
-    onCloseRef.current();
-  }, [isDirty]);
-
-  useEffect(() => {
-    requestCloseRef.current = requestClose;
-  }, [requestClose]);
 
   // card prop が変わったときの処理（ただし編集中は無視）
   useEffect(() => {
@@ -181,8 +174,6 @@ export function CardModal({
       setMemberSearch('');
       setAssigneeTouched(false);
       setTargetBoardId(card.board_id);
-      setIsDirty(false);
-      contentFetchRef.current = null;
       setEditorError(null);
       setShowDirtyDialog(false);
     } else if (!isDirty || shouldForceSync) {
@@ -202,10 +193,41 @@ export function CardModal({
           : [];
       setAssigneeIds(newAssigneeIds);
       setAssigneeTouched(false);
-      if (shouldForceSync) {
+      setTargetBoardId(card.board_id);
+      setIsDirty(false);
+    }
+
+    // 追加：保存後のリセット対応
+    // card prop が更新された際、ローカルの状態がサーバの状態と一致していれば Dirty を落とす
+    // このチェックは isDirty が true の時でも（保存が完了したことを検知するために）行う必要がある
+    if (isDirty) {
+      const localSerialized = JSON.stringify(ensureTitleBlock(content));
+      const incomingSerialized = JSON.stringify(incomingContent);
+
+      const normalizedDueDate = card.due_date || '';
+      const dateMatch = normalizedDueDate === (dueDate || '');
+
+      const normalizedStart = card.due_start ? card.due_start.slice(0, 5) : '';
+      const startMatch = normalizedStart === (dueStart || '');
+
+      const normalizedEnd = card.due_end ? card.due_end.slice(0, 5) : '';
+      const endMatch = normalizedEnd === (dueEnd || '');
+
+      const priorityMatch = (card.priority || 'medium') === priority;
+
+      const cardAssignees = card.assignee_ids || (card.assignee_id ? [card.assignee_id] : []);
+      const assigneesMatch = cardAssignees.length === assigneeIds.length && cardAssignees.every(id => assigneeIds.includes(id));
+
+      const cardTags = card.tags || [];
+      const tagsMatch = cardTags.length === tags.length && cardTags.every(t => tags.includes(t));
+
+      const bucketMatch = (card.due_bucket ?? null) === (dueBucket ?? null);
+
+      if (localSerialized === incomingSerialized &&
+        dateMatch && startMatch && endMatch &&
+        priorityMatch && tagsMatch && bucketMatch && assigneesMatch) {
         setIsDirty(false);
       }
-      setTargetBoardId(card.board_id);
     }
 
     if (!isDirty && !localText && !incomingText && card.short_id && contentFetchRef.current !== card.short_id) {
@@ -295,13 +317,16 @@ export function CardModal({
 
     return () => {
       document.removeEventListener("keydown", trapFocus);
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
     };
   }, []); // 空配列でマウント時のみ実行
 
   // Close member dropdown when clicking outside
   useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
 
-  const handleSave = () => {
+  const handleSave = useCallback((isAutoSave = false) => {
     const normalizedDueDate = dueDate || null;
     const hasTime = dueStart && dueEnd; // Both must be present
     const normalizedStart = hasTime ? `${dueStart}:00` : null;
@@ -315,12 +340,16 @@ export function CardModal({
     const normalizedContent = ensureTitleBlock(normalizeBlockNoteDocument(content));
     const nextTitle = deriveTitleFromDocument(normalizedContent);
     if (!nextTitle) {
-      setEditorError("タイトルを入力してください");
+      if (!isAutoSave) {
+        setEditorError("タイトルを入力してください");
+      }
       return;
     }
     const nextExcerpt = deriveExcerptFromDocument(normalizedContent);
 
-    setEditorError(null);
+    if (!isAutoSave) {
+      setEditorError(null);
+    }
     onSave({
       id: card.id,
       title: nextTitle,
@@ -335,18 +364,61 @@ export function CardModal({
       due_end: normalizedEnd,
       due_bucket: normalizedBucket,
       due_bucket_position: normalizedBucketPosition,
+      isAutoSave,
     });
 
-    if (targetBoardId !== card.board_id) {
+    if (!isAutoSave && targetBoardId !== card.board_id) {
       onMoveToBoard(card.id, targetBoardId);
     }
-  };
+  }, [
+    card.id,
+    card.board_id,
+    content,
+    tags,
+    dueDate,
+    dueStart,
+    dueEnd,
+    dueBucket,
+    dueBucketPosition,
+    priority,
+    assigneeIds,
+    assigneeTouched,
+    targetBoardId,
+    onSave,
+    onMoveToBoard,
+  ]);
+
+  const triggerAutoSave = useCallback(() => {
+    setIsDirty(true);
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      handleSave(true);
+    }, 2000);
+  }, [handleSave]);
+
+  const requestClose = useCallback(() => {
+    if (isDirty) {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      handleSave(false);
+      return;
+    }
+    onCloseRef.current();
+  }, [isDirty, handleSave]);
+
+  useEffect(() => {
+    requestCloseRef.current = requestClose;
+  }, [requestClose]);
+
 
   const handleAddMember = (profileId: string) => {
     if (!assigneeIds.includes(profileId)) {
       setAssigneeIds([...assigneeIds, profileId]);
       setAssigneeTouched(true);
-      setIsDirty(true);
+      triggerAutoSave();
     }
     setShowMemberDropdown(false);
     setMemberSearch('');
@@ -355,7 +427,7 @@ export function CardModal({
   const handleRemoveMember = (profileId: string) => {
     setAssigneeIds(assigneeIds.filter(id => id !== profileId));
     setAssigneeTouched(true);
-    setIsDirty(true);
+    triggerAutoSave();
   };
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -363,7 +435,7 @@ export function CardModal({
       e.preventDefault();
       if (!tags.includes(tagInput.trim())) {
         setTags([...tags, tagInput.trim()]);
-        setIsDirty(true);
+        triggerAutoSave();
       }
       setTagInput('');
     }
@@ -371,11 +443,11 @@ export function CardModal({
 
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
-    setIsDirty(true);
+    triggerAutoSave();
   };
 
   const handleTimeToggle = (enabled: boolean) => {
-    setIsDirty(true);
+    triggerAutoSave();
     if (!enabled) {
       setDueStart('');
       setDueEnd('');
@@ -391,7 +463,7 @@ export function CardModal({
   const handleBucketChange = (next: DueBucket) => {
     setDueBucket(next);
     setDueBucketPosition(Date.now());
-    setIsDirty(true);
+    triggerAutoSave();
   };
 
   // Google Calendar Integration
@@ -611,7 +683,7 @@ export function CardModal({
                 initialContent={content}
                 onChange={(next) => {
                   setContent(next);
-                  setIsDirty(true);
+                  triggerAutoSave();
                   if (editorError) {
                     setEditorError(null);
                   }
@@ -672,7 +744,7 @@ export function CardModal({
                     value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
                     onChange={(e) => {
                       setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                      setIsDirty(true);
+                      triggerAutoSave();
                     }}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                   />
@@ -693,7 +765,7 @@ export function CardModal({
                           onChange={(e) => {
                             setDueStart(e.target.value);
                             handleTimeToggle(!!e.target.value);
-                            setIsDirty(true);
+                            triggerAutoSave();
                           }}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                         />
@@ -708,7 +780,7 @@ export function CardModal({
                           value={dueEnd}
                           onChange={(e) => {
                             setDueEnd(e.target.value);
-                            setIsDirty(true);
+                            triggerAutoSave();
                           }}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                         />
@@ -862,7 +934,7 @@ export function CardModal({
                 value={priority}
                 onChange={(e) => {
                   setPriority(e.target.value as Priority);
-                  setIsDirty(true);
+                  triggerAutoSave();
                 }}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
               >
@@ -1030,7 +1102,7 @@ export function CardModal({
                   value={targetBoardId}
                   onChange={(e) => {
                     setTargetBoardId(e.target.value);
-                    setIsDirty(true);
+                    triggerAutoSave();
                   }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
                 >
@@ -1093,7 +1165,7 @@ export function CardModal({
         {/* Modal Footer */}
         <div className="flex gap-2 p-6 pt-4 border-t border-slate-200 dark:border-gray-700">
           <button
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             className="px-4 py-2 bg-sky-500 text-white rounded-lg text-sm hover:bg-sky-600 transition-colors font-medium"
           >
             Save
@@ -1122,7 +1194,7 @@ export function CardModal({
                   type="button"
                   onClick={() => {
                     setShowDirtyDialog(false);
-                    handleSave();
+                    handleSave(false);
                   }}
                   className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700"
                 >

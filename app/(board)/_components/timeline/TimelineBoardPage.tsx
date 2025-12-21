@@ -798,6 +798,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       due_end?: string | null;
       due_bucket?: DueBucket | null;
       due_bucket_position?: number | null;
+      isAutoSave?: boolean;
     }) => {
       // Use the memoized modalCard for targetCard
       const targetCard = modalCard && modalCard.id === savePayload.id ? modalCard : null;
@@ -857,8 +858,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         // No need to setModalCard here, as the realtime update will handle it
         // and the memoized modalCard will re-evaluate.
         // await fetchTimeline(); // Realtime should handle this
-        void syncCardNowWithToast(body?.card as Card);
-        closeCardModal();
+
+        if (!savePayload.isAutoSave) {
+          // Only sync if not auto-save and title/time changed
+          const titleChanged = targetCard.title !== savePayload.title;
+          const dateChanged = targetCard.due_date !== normalizedDueDate;
+          const startChanged = (targetCard.due_start ? targetCard.due_start.slice(0, 5) : null) !== (savePayload.due_start ? savePayload.due_start.slice(0, 5) : null);
+          const endChanged = (targetCard.due_end ? targetCard.due_end.slice(0, 5) : null) !== (savePayload.due_start ? savePayload.due_end.slice(0, 5) : null);
+
+          if (titleChanged || dateChanged || startChanged || endChanged) {
+            console.log('[timeline] syncing with google calendar because title or time changed', { titleChanged, dateChanged, startChanged, endChanged });
+            void syncCardNowWithToast(body?.card as Card);
+          } else {
+            console.log('[timeline] skipping google calendar sync - no title or time change');
+          }
+          closeCardModal();
+        }
       } catch (error) {
         console.error('[timeline] save card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
@@ -1642,12 +1657,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setShowBoardMenu={setShowBoardMenu}
             boardMenuRef={boardMenuRef}
             setShowShareDialog={setShowShareDialog}
-	            setShowNotificationSettings={setShowNotificationSettings}
-	            setShowProfileSettings={setShowProfileSettings}
-	            setShowBoardSettings={setShowBoardSettings}
-	            profile={profile}
-	            user={user}
-	            signOut={signOut}
+            setShowNotificationSettings={setShowNotificationSettings}
+            setShowProfileSettings={setShowProfileSettings}
+            setShowBoardSettings={setShowBoardSettings}
+            profile={profile}
+            user={user}
+            signOut={signOut}
             showFilters={showFilters}
             setShowFilters={setShowFilters}
             hasActiveFilters={hasActiveFilters}
@@ -1655,17 +1670,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             setSearchQuery={setSearchQuery}
             selectedTags={selectedTags}
             setSelectedTags={setSelectedTags}
-	            selectedPriority={selectedPriority}
-	            setSelectedPriority={setSelectedPriority}
-	            availableTags={data?.availableTags ?? []}
-	            dayRange={dayRange}
-	            onDayRangeChange={setDayRange}
-	            onTodayClick={handleTodayClick}
-	            onUpdateBoard={async (updates) => {
-	              try {
-	                const response = await fetch(`/api/boards/${initialBoard.id}`, {
-	                  method: 'PATCH',
-	                  headers: { 'Content-Type': 'application/json' },
+            selectedPriority={selectedPriority}
+            setSelectedPriority={setSelectedPriority}
+            availableTags={data?.availableTags ?? []}
+            dayRange={dayRange}
+            onDayRangeChange={setDayRange}
+            onTodayClick={handleTodayClick}
+            onUpdateBoard={async (updates) => {
+              try {
+                const response = await fetch(`/api/boards/${initialBoard.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(updates),
                 });
                 if (!response.ok) throw new Error('Failed to update board');
