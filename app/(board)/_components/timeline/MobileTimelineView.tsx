@@ -20,6 +20,7 @@ import {
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
+import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -162,7 +163,7 @@ function MobileTimelineColumn({
               attachListenersToChild
             >
               <div
-                className="absolute flex flex-col gap-2 border border-slate-200 bg-white p-3 pt-5 text-left shadow-sm select-none"
+                className="absolute"
                 style={{
                   top,
                   height,
@@ -170,44 +171,15 @@ function MobileTimelineColumn({
                   width: layout?.width ?? "100%",
                 }}
               >
-                <div className="flex items-start gap-2 pr-6">
-                  <button
-                    type="button"
-                    onClick={(native) => {
-                      native.stopPropagation();
-                      onToggleCheck(event.card_id, !event.checked);
-                    }}
-                    aria-label={event.checked ? "未完了に戻す" : "完了にする"}
-                    className="mt-0.5 flex h-3.5 w-3.5 items-center justify-center border border-slate-300 text-[8px] font-bold text-transparent transition hover:border-sky-400"
-                  >
-                    {event.checked ? "✓" : ""}
-                  </button>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
-                    <span className="break-words leading-tight line-clamp-2">
-                      {event.title || "Untitled card"}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className="absolute -top-px left-0 px-1 text-[10px] font-semibold text-slate-600"
-                  title={timeLabel(event.due_start, event.due_end)}
-                >
-                  {timeLabel(event.due_start, event.due_end)}
-                </div>
-
-                <div className="absolute right-2 top-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openCardModal(event.short_id, "mobile-timeline");
-                    }}
-                    className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-sky-300 hover:text-sky-700"
-                  >
-                    {(event.due_bucket ?? "a").toUpperCase()}
-                  </button>
-                </div>
+                <TimelineCard
+                  title={event.title || 'Untitled card'}
+                  checked={event.checked}
+                  onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
+                  badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
+                  timeText={timeLabel(event.due_start, event.due_end)}
+                  onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
+                  className="w-full h-full pt-4"
+                />
               </div>
             </DraggableCard>
           );
@@ -647,21 +619,18 @@ function MobileBucketCard({
       attachListenersToChild
     >
       <div
-        className="relative flex w-full flex-col gap-1 px-3 py-3 select-none"
+        className="relative flex w-full flex-col select-none"
       >
-        <div className="absolute right-2 top-2">
-          <button
-            type="button"
-            className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm hover:border-sky-300 hover:text-sky-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              openCardModal(item.short_id, "mobile-ab");
-            }}
-            aria-label="カード詳細を開く"
-          >
-            {bucketKeyToDueBucket(bucketKey).toUpperCase()}
-          </button>
-        </div>
+        <TimelineCard
+          title={item.title || "Untitled card"}
+          checked={item.checked}
+          onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
+          badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
+          timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+          onOpen={() => openCardModal(item.short_id, "mobile-ab")}
+          timePlacement="inline"
+          className="w-full"
+        />
 
         <div
           ref={setTopRef}
@@ -678,26 +647,6 @@ function MobileBucketCard({
         {(isOverBottom || showFallbackBottomLine) && (
           <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />
         )}
-
-        <div className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            checked={item.checked}
-            onChange={(e) => {
-              e.stopPropagation();
-              onToggleCheck(item.card_id, e.target.checked);
-            }}
-            className="mt-0.5 h-3.5 w-3.5 cursor-pointer border-slate-300 text-sky-500"
-          />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
-              {item.title || "Untitled card"}
-            </span>
-            {item.due_start && (
-              <span className="text-[10px] text-slate-500 leading-tight">{timeLabel(item.due_start, item.due_end)}</span>
-            )}
-          </div>
-        </div>
       </div>
     </DraggableCard>
   );

@@ -713,21 +713,21 @@ export function CardModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative z-10 max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col"
+        className="relative z-10 max-h-[95vh] sm:max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex flex-col p-6 pb-4 border-b border-slate-200 dark:border-gray-700">
-          <div className="flex justify-between items-start mb-4">
-            <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
+        <div className="flex flex-col p-4 sm:p-6 pb-2 sm:pb-4 border-b border-slate-200 dark:border-gray-700">
+          <div className="flex justify-between items-start mb-3 sm:mb-4">
+            <h2 id="modal-title" className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-gray-100 line-clamp-2">
               {titlePreview}
             </h2>
             <button
               onClick={requestClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none p-1"
               aria-label="Close modal"
               data-autofocus
             >
@@ -736,7 +736,7 @@ export function CardModal({
           </div>
 
           {/* Schedule Section in Header */}
-          <div className="flex flex-wrap items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-6 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Date</span>
               <input
@@ -798,8 +798,8 @@ export function CardModal({
             )}
 
             {dueDate && (
-              <div className="flex items-center gap-2 border-l border-slate-100 dark:border-gray-700 pl-4">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Members</span>
+              <div className="flex items-center gap-2 sm:border-l sm:border-slate-100 sm:dark:border-gray-700 sm:pl-4">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap">Members</span>
                 <div className="flex flex-wrap gap-1.5 items-center relative">
                   {selectedAssignees.map((member) => (
                     <div
@@ -919,8 +919,8 @@ export function CardModal({
           </div>
         </div>
 
-        {/* 2 Column Layout */}
-        <div ref={resizeRef} className="flex flex-1 overflow-hidden">
+        {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
+        <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
           {/* Left Column - Details */}
           <div className="flex-1 overflow-y-auto p-6">
             {/* Block Editor */}
@@ -947,11 +947,11 @@ export function CardModal({
             </div>
           </div>
 
-          {/* Resizer Divider */}
+          {/* Resizer Divider - Desktop only */}
           {showSidebar && (
             <div
               onMouseDown={startResizing}
-              className={`w-1 cursor-col-resize hover:bg-sky-400 active:bg-sky-500 transition-colors z-10 ${isResizing ? 'bg-sky-500' : 'bg-slate-200 dark:bg-gray-700'
+              className={`hidden sm:block w-1 cursor-col-resize hover:bg-sky-400 active:bg-sky-500 transition-colors z-10 ${isResizing ? 'bg-sky-500' : 'bg-slate-200 dark:bg-gray-700'
                 }`}
             />
           )}
@@ -959,8 +959,8 @@ export function CardModal({
           {/* Right Column - Sidebar */}
           {showSidebar && (
             <div
-              style={{ width: `${sidebarWidth}px` }}
-              className="border-l border-transparent overflow-y-auto flex flex-col shrink-0"
+              style={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? '100%' : `${sidebarWidth}px` }}
+              className="border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 min-h-0"
             >
               <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
 
@@ -1070,22 +1070,22 @@ export function CardModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex gap-2 p-6 pt-4 border-t border-slate-200 dark:border-gray-700">
+        <div className="flex gap-2 p-4 sm:p-6 pt-3 sm:pt-4 border-t border-slate-200 dark:border-gray-700">
           <button
             onClick={() => handleSave(false)}
-            className="px-4 py-2 bg-sky-500 text-white rounded-lg text-sm hover:bg-sky-600 transition-colors font-medium"
+            className="flex-1 sm:flex-none px-4 py-2 bg-sky-500 text-white rounded-lg text-sm hover:bg-sky-600 transition-colors font-medium"
           >
             Save
           </button>
           <button
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors font-medium"
+            className="flex-1 sm:flex-none px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors font-medium"
           >
             Delete
           </button>
           <button
             onClick={requestClose}
-            className="px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors font-medium ml-auto"
+            className="hidden sm:block px-4 py-2 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-200 rounded-lg text-sm hover:bg-slate-300 dark:hover:bg-gray-500 transition-colors font-medium ml-auto"
           >
             Close
           </button>
