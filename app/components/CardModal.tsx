@@ -693,130 +693,82 @@ export function CardModal({
         {/* 2 Column Layout */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Column - Details */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6">
             {/* Block Editor */}
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
-                Title & Notes
+            <div className="h-full flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                Note
               </label>
-              <CardBlockEditor
-                key={card.id}
-                initialContent={content}
-                onChange={(next) => {
-                  setContent(next);
-                  triggerAutoSave();
-                  if (editorError) {
-                    setEditorError(null);
-                  }
-                }}
-              />
-              {editorError && (
-                <p className="mt-2 text-xs text-red-600">{editorError}</p>
-              )}
+              <div className="flex-1">
+                <CardBlockEditor
+                  key={card.id}
+                  initialContent={content}
+                  onChange={(next) => {
+                    setContent(next);
+                    triggerAutoSave();
+                    if (editorError) {
+                      setEditorError(null);
+                    }
+                  }}
+                />
+                {editorError && (
+                  <p className="mt-2 text-xs text-red-600">{editorError}</p>
+                )}
+              </div>
             </div>
+          </div>
 
-            {/* Tags */}
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Tags
-              </label>
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleAddTag}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                placeholder="Press Enter to add tag"
-              />
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300 rounded-md text-xs"
-                    >
-                      {tag}
-                      <button
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200"
-                        aria-label={`Remove tag ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Schedule */}
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Schedule
-              </label>
-              <div className="space-y-3">
-                {/* Date */}
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                    onChange={(e) => {
-                      setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                      triggerAutoSave();
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                  />
-                </div>
-
-                {dueDate && (
-                  <>
-                    {/* Time (optional) */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                          Start Time
-                        </label>
-                        <input
-                          type="time"
-                          step={900}
-                          value={dueStart}
-                          onChange={(e) => {
-                            setDueStart(e.target.value);
-                            handleTimeToggle(!!e.target.value);
-                            triggerAutoSave();
-                          }}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                          End Time
-                        </label>
-                        <input
-                          type="time"
-                          step={900}
-                          value={dueEnd}
-                          onChange={(e) => {
-                            setDueEnd(e.target.value);
-                            triggerAutoSave();
-                          }}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-                        />
-                      </div>
+          {/* Right Column - Sidebar */}
+          <div className="w-96 border-l border-slate-200 dark:border-gray-700 overflow-y-auto flex flex-col">
+            <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
+              {/* Schedule Section */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                  Schedule
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => {
+                        setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
+                        triggerAutoSave();
+                      }}
+                      className="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                  {dueDate && (
+                    <div className="grid grid-cols-2 gap-2 pl-2 border-l-2 border-slate-100 dark:border-gray-700 ml-1">
+                      <input
+                        type="time"
+                        step={900}
+                        value={dueStart}
+                        onChange={(e) => {
+                          setDueStart(e.target.value);
+                          handleTimeToggle(!!e.target.value);
+                          triggerAutoSave();
+                        }}
+                        className="px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
+                      />
+                      <input
+                        type="time"
+                        step={900}
+                        value={dueEnd}
+                        onChange={(e) => {
+                          setDueEnd(e.target.value);
+                          triggerAutoSave();
+                        }}
+                        className="px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
+                      />
                     </div>
-
-                    {/* Bucket */}
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 dark:text-gray-400 mb-1 block">
-                        Priority Bucket {dueStart && dueEnd && '(Timeline takes priority)'}
-                      </label>
+                  )}
+                  {dueDate && (
+                    <div className="pl-2 border-l-2 border-slate-100 dark:border-gray-700 ml-1">
                       <select
                         value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
                         onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
                       >
                         {BUCKET_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -824,362 +776,185 @@ export function CardModal({
                           </option>
                         ))}
                       </select>
-                      {dueStart && dueEnd && (
-                        <p className="text-xs text-slate-400 mt-1">
-                          Time is set, so this card appears in Timeline. Bucket is kept for when time is removed.
-                        </p>
-                      )}
                     </div>
-                  </>
-                )}
+                  )}
 
-                {!dueDate && (
-                  <p className="text-xs text-slate-500">
-                    No schedule set. This card will only appear in the Kanban list.
-                  </p>
-                )}
-                {dueDate && dueStart && dueEnd && (
-                  <p className="text-xs text-slate-500">
-                    📅 This card will appear in the Timeline view.
-                  </p>
-                )}
-                {dueDate && !dueStart && !dueEnd && (
-                  <p className="text-xs text-slate-500">
-                    📋 This card will appear in the A/B List.
-                  </p>
-                )}
-
-                {/* Google Calendar Sync Toggle */}
-                {dueDate && dueStart && dueEnd && (
-                  <div className="space-y-2">
-                    <GoogleSyncToggle
-                      cardId={card.id}
-                      initialStatus={syncStatus}
-                      connected={googleConnected}
-                      canWrite={googleCanWrite}
-                      hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
-                      onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
-                      onStatusChange={(next) => {
-                        setSyncStatus(next);
-                        if (next === "unlinked") {
-                          setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
-                        }
-                      }}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSyncNow}
-                        disabled={!canSyncNow || syncNowLoading}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {syncNowLoading ? "同期中..." : "今すぐ同期"}
-                      </button>
-                      {showResyncSection && (
-                        <button
-                          type="button"
-                          onClick={handleResyncRequest}
-                          disabled={!canSearchResync || resyncLoading}
-                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {resyncLoading ? "候補取得中..." : "再シンク候補を探す"}
-                        </button>
-                      )}
+                  {/* Google Calendar Sync Toggle */}
+                  {dueDate && dueStart && dueEnd && (
+                    <div className="pl-2 border-l-2 border-emerald-100 dark:border-emerald-900 ml-1 mt-1">
+                      <GoogleSyncToggle
+                        cardId={card.id}
+                        initialStatus={syncStatus}
+                        connected={googleConnected}
+                        canWrite={googleCanWrite}
+                        hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
+                        onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
+                        onStatusChange={(next) => {
+                          setSyncStatus(next);
+                          if (next === "unlinked") {
+                            setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
+                          }
+                        }}
+                      />
                     </div>
-                    {syncToast && (
-                      <p className="text-xs text-emerald-700">{syncToast}</p>
-                    )}
-                    {resyncError && (
-                      <p className="text-xs text-red-600">{resyncError}</p>
-                    )}
-                    {showResyncSection && resyncCandidates.length > 0 && (
-                      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-                        <p className="font-semibold text-slate-600">再接続候補</p>
-                        {resyncCandidates.slice(0, 5).map((candidate) => (
-                          <div key={candidate.id} className="flex items-start gap-2 rounded-md bg-white/60 p-2 ring-1 ring-slate-100">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium">{candidate.title || "無題の予定"}</p>
-                              <p className="text-[11px] text-slate-500">{formatCandidateTime(candidate)}</p>
-                              {candidate.calendarId && (
-                                <p className="text-[11px] text-slate-400">Cal: {candidate.calendarId}</p>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              {typeof candidate.score === "number" && (
-                                <span className="text-[11px] text-slate-400">score {candidate.score.toFixed(2)}</span>
-                              )}
-                              <button
-                                type="button"
-                                className="rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                                onClick={() => handleResyncSelect(candidate.id)}
-                                disabled={resyncLoading}
-                              >
-                                再接続
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {showResyncSection && resyncFetched && resyncCandidates.length === 0 && (
-                      <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
-                        候補は見つかりませんでした。新規イベントとして同期できます。
-                        <div className="mt-2 flex justify-end">
-                          <button
-                            type="button"
-                            className="rounded bg-sky-600 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                            onClick={() => handleResyncSelect()}
-                            disabled={resyncLoading}
-                          >
-                            Googleに新規作成
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {dueDate && (!dueStart || !dueEnd) && (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-200">
-                    Google Calendar 連携は開始・終了時刻があるタイムラインカードのみ有効です。時間を設定するとトグルが有効になります。
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Priority */}
-            <div>
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => {
-                  setPriority(e.target.value as Priority);
-                  triggerAutoSave();
-                }}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
-              >
-                <option value="low">🟢 Low</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="high">🔴 High</option>
-              </select>
-            </div>
-
-            {/* Members */}
-            <div className="relative">
-              {/* Debug Log */}
-              {/* {console.log('[CardModal] Rendering members', { profilesCount: profiles.length, assigneeIds, showMemberDropdown, dropdownPos })} */}
-              <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-2 block">
-                Members
-              </label>
-              <div className="flex flex-wrap gap-2 items-center">
-                {/* Selected Members */}
-                {selectedAssignees.map((member) => {
-                  const identity = resolveProfileIdentity(member, member.email ?? null);
-                  return (
+              {/* Members Section */}
+              <div className="space-y-2 overflow-visible">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                  Members
+                </label>
+                <div className="flex flex-wrap gap-1.5 items-center relative">
+                  {selectedAssignees.map((member) => (
                     <div
                       key={member.id}
-                      className="group relative inline-flex items-center gap-1 bg-slate-100 dark:bg-gray-700 rounded-full pr-1 hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                      title={identity.label}
+                      className="group relative h-7 w-7"
+                      title={resolveProfileIdentity(member, member.email ?? null).label}
                     >
                       {member.avatar_url ? (
                         <Image
                           src={member.avatar_url}
-                          alt={identity.label}
-                          width={32}
-                          height={32}
-                          className="h-8 w-8 rounded-full object-cover"
+                          alt="assigned member"
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 rounded-full object-cover ring-1 ring-white dark:ring-gray-800"
                         />
                       ) : (
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                          {getProfileInitials(member)}
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-bold text-[11px] ring-1 ring-white dark:ring-gray-800">
+                          {getProfileInitial(member, member.email ?? null)}
                         </span>
                       )}
-                      <span className="text-xs font-medium px-2 max-w-[120px] truncate">
-                        {identity.label}
-                      </span>
                       <button
                         onClick={() => handleRemoveMember(member.id)}
-                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-opacity"
-                        aria-label={`Remove ${identity.label}`}
+                        className="absolute -top-1 -right-1 bg-white dark:bg-gray-700 rounded-full text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm ring-1 ring-slate-200"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
-                  );
-                })}
-
-                {/* Add Member Button */}
-                {/* Add Member Button */}
-                <button
-                  ref={(el) => {
-                    // @ts-ignore
-                    memberButtonRef.current = el;
-                  }}
-                  onClick={() => {
-                    console.log('[CardModal] Add member clicked', { showMemberDropdown, button: memberButtonRef.current });
-                    if (showMemberDropdown) {
-                      setShowMemberDropdown(false);
-                    } else {
-                      // Calculate position
+                  ))}
+                  <button
+                    ref={(el) => {
+                      // @ts-ignore
+                      memberButtonRef.current = el;
+                    }}
+                    onClick={() => {
                       const button = memberButtonRef.current;
                       if (button) {
                         const rect = button.getBoundingClientRect();
-                        console.log('[CardModal] Button rect', rect);
-                        setDropdownPos({
-                          top: rect.bottom + 8,
-                          left: rect.left,
-                        });
-                        setShowMemberDropdown(true);
-                      } else {
-                        console.error('[CardModal] Member button ref is missing');
+                        setDropdownPos({ top: rect.bottom + 8, left: rect.left - 200 });
+                        setShowMemberDropdown(!showMemberDropdown);
                       }
-                    }
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-slate-600 dark:text-gray-300 transition-colors"
-                  aria-label="Add member"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
+                    }}
+                    className="h-7 w-7 flex items-center justify-center rounded-full border border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20 text-slate-400 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  </button>
+                </div>
               </div>
 
-              {/* Member Dropdown - Fixed Position */}
-              {showMemberDropdown && (
-                <div
-                  ref={memberDropdownRef}
-                  className="fixed z-[60] w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-slate-200 dark:border-gray-700"
-                  style={{
-                    top: dropdownPos.top,
-                    left: dropdownPos.left,
-                  }}
-                >
-                  <div className="p-2">
+              {/* Tags Section */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <div className="relative flex-1 min-w-[140px]">
                     <input
                       type="text"
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
-                      placeholder="Search members..."
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                      autoFocus
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleAddTag}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent placeholder:text-slate-400"
+                      placeholder="+ Add tag..."
                     />
                   </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredProfiles.length > 0 ? (
-                      filteredProfiles.map((profile) => {
-                        const identity = resolveProfileIdentity(profile, profile.email ?? null);
-                        const secondary = identity.secondary && identity.secondary !== identity.label
-                          ? identity.secondary
-                          : (profile.email && profile.email !== identity.label ? profile.email : null);
-
-                        return (
-                          <button
-                            key={profile.id}
-                            onClick={() => handleAddMember(profile.id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-left transition-colors"
-                          >
-                            {profile.avatar_url ? (
-                              <Image
-                                src={profile.avatar_url}
-                                alt={identity.label}
-                                width={32}
-                                height={32}
-                                className="h-8 w-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-300 text-slate-700 font-semibold text-xs dark:bg-gray-600 dark:text-gray-200">
-                                {getProfileInitials(profile)}
-                              </span>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{identity.label}</div>
-                              {secondary && (
-                                <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{secondary}</div>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-gray-400">
-                        {memberSearch ? 'No members found' : 'All members assigned'}
-                      </div>
-                    )}
-                  </div>
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-sky-900/30 text-sky-600 dark:text-sky-300 rounded-md text-[10px] font-medium border border-slate-100 dark:border-sky-800"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className="text-sky-400 hover:text-sky-600"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Move to Board */}
-            {boards.length > 1 && (
-              <div>
-                <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                  Move to Board
+              {/* Priority - Compact row */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                  Priority
                 </label>
                 <select
-                  value={targetBoardId}
+                  value={priority}
                   onChange={(e) => {
-                    setTargetBoardId(e.target.value);
+                    setPriority(e.target.value as Priority);
                     triggerAutoSave();
                   }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent"
+                  className="bg-transparent text-xs font-medium text-slate-600 dark:text-gray-300 focus:outline-none cursor-pointer"
                 >
-                  {boards.map((board) => (
-                    <option key={board.id} value={board.id}>
-                      {board.name} {board.id === card.board_id ? '(current)' : ''}
-                    </option>
-                  ))}
+                  <option value="low">🟢 Low</option>
+                  <option value="medium">🟡 Medium</option>
+                  <option value="high">🔴 High</option>
                 </select>
               </div>
-            )}
 
-            {/* Copy Links */}
-            {card.short_id && (
-              <div>
-                <label className="text-sm font-medium text-slate-600 dark:text-gray-400 mb-1 block">
-                  Share Link
-                </label>
-                <div className="flex gap-2">
+              {/* Advanced (Board & Links) */}
+              <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-gray-700/50 mt-2">
+                {boards.length > 1 && (
+                  <div className="flex-1 min-w-0">
+                    <select
+                      value={targetBoardId}
+                      onChange={(e) => {
+                        setTargetBoardId(e.target.value);
+                        triggerAutoSave();
+                      }}
+                      className="w-full bg-transparent text-[10px] font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none cursor-pointer truncate"
+                    >
+                      {boards.map((board) => (
+                        <option key={board.id} value={board.id}>
+                          Board: {board.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {card.short_id && (
                   <button
                     type="button"
                     onClick={() => {
                       const shortUrl = `${window.location.origin}/c/${card.short_id}`;
                       navigator.clipboard.writeText(shortUrl);
                     }}
-                    className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                    className="text-[10px] font-medium text-sky-500 hover:text-sky-600 dark:text-sky-400 whitespace-nowrap"
                   >
-                    📋 Copy Short Link
+                    🔗 Copy Link
                   </button>
-                  {card.id_short && card.slug && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const readableUrl = `${window.location.origin}/c/${card.short_id}/${card.id_short}-${card.slug}`;
-                        navigator.clipboard.writeText(readableUrl);
-                      }}
-                      className="flex-1 px-3 py-1.5 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-200 rounded-lg text-xs hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      📋 Copy Full Link
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Right Column - Comments */}
-          <div className="w-96 border-l border-slate-200 dark:border-gray-700 overflow-y-auto p-6">
-            <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-gray-100">
-              Comments
-            </h3>
-            <CommentsPanel
-              cardId={card.id}
-              boardId={card.board_id}
-              initialProfiles={profiles}
-            />
+            {/* Comments Area */}
+            <div className="flex-1 min-h-0 flex flex-col p-6 pt-4">
+              <h3 className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">
+                Comments
+              </h3>
+              <div className="flex-1 min-h-0">
+                <CommentsPanel
+                  cardId={card.id}
+                  boardId={card.board_id}
+                  initialProfiles={profiles}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
