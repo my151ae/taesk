@@ -93,6 +93,12 @@ export function CardModal({
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(384); // Default w-96 = 384px
+  const [isResizing, setIsResizing] = useState(false);
+
+  const resizeRef = useRef<HTMLDivElement>(null);
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
@@ -467,19 +473,55 @@ export function CardModal({
     triggerAutoSave();
   };
 
-  const handleTimeToggle = (enabled: boolean) => {
-    triggerAutoSave();
-    if (!enabled) {
+  const handleTimeToggle = (checked: boolean) => {
+    if (!checked) {
       setDueStart('');
       setDueEnd('');
-      // Keep bucket - don't clear it
       if (dueDate && !dueBucket) {
         setDueBucket(DEFAULT_BUCKET);
         setDueBucketPosition(Date.now());
       }
     }
-    // Don't clear bucket when time is added - keep it for fallback
   };
+
+  // Resize handlers
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback(
+    (e: MouseEvent) => {
+      if (isResizing && resizeRef.current) {
+        const containerRect = resizeRef.current.getBoundingClientRect();
+        // Calculate new width relative to the container’s right edge
+        const newWidth = containerRect.right - e.clientX;
+        // Clamp between 250px and 600px
+        if (newWidth >= 250 && newWidth <= 600) {
+          setSidebarWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
   const handleBucketChange = (next: DueBucket) => {
     setDueBucket(next);
@@ -691,7 +733,7 @@ export function CardModal({
         </div>
 
         {/* 2 Column Layout */}
-        <div className="flex flex-1 overflow-hidden">
+        <div ref={resizeRef} className="flex flex-1 overflow-hidden">
           {/* Left Column - Details */}
           <div className="flex-1 overflow-y-auto p-6">
             {/* Block Editor */}
@@ -718,8 +760,18 @@ export function CardModal({
             </div>
           </div>
 
+          {/* Resizer Divider */}
+          <div
+            onMouseDown={startResizing}
+            className={`w-1 cursor-col-resize hover:bg-sky-400 active:bg-sky-500 transition-colors z-10 ${isResizing ? 'bg-sky-500' : 'bg-slate-200 dark:bg-gray-700'
+              }`}
+          />
+
           {/* Right Column - Sidebar */}
-          <div className="w-96 border-l border-slate-200 dark:border-gray-700 overflow-y-auto flex flex-col">
+          <div
+            style={{ width: `${sidebarWidth}px` }}
+            className="border-l border-transparent overflow-y-auto flex flex-col shrink-0"
+          >
             <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
               {/* Schedule Section */}
               <div className="space-y-2">
