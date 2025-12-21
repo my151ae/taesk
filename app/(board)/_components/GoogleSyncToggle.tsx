@@ -11,9 +11,10 @@ interface GoogleSyncToggleProps {
     onResyncRequest?: () => void;
     hasResyncCandidate?: boolean;
     onStatusChange?: (status: "active" | "unlinked" | "deleted") => void;
+    compact?: boolean;
 }
 
-export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, onResyncRequest, hasResyncCandidate, onStatusChange }: GoogleSyncToggleProps) {
+export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, onResyncRequest, hasResyncCandidate, onStatusChange, compact }: GoogleSyncToggleProps) {
     const [status, setStatus] = useState<"active" | "unlinked" | "deleted" | undefined>(initialStatus);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -68,6 +69,7 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, o
     };
 
     if (!connected) {
+        if (compact) return null;
         return (
             <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-600 dark:bg-gray-800/60 dark:border-gray-700 dark:text-gray-200">
                 Google連携が無効です。タイムラインに同期するには再接続してください。
@@ -76,6 +78,7 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, o
     }
 
     if (!canWrite) {
+        if (compact) return null;
         return (
             <div className="mt-4 bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg border border-orange-200 dark:border-orange-800">
                 <p className="text-xs text-orange-800 dark:text-orange-200 mb-2">
@@ -87,6 +90,27 @@ export function GoogleSyncToggle({ cardId, initialStatus, connected, canWrite, o
                 >
                     Enable Write Access
                 </a>
+            </div>
+        );
+    }
+
+    if (compact) {
+        return (
+            <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-medium ${isSyncOn ? "text-emerald-600" : "text-slate-400"}`}>
+                    {statusLabel}
+                </span>
+                <button
+                    onClick={handleToggle}
+                    disabled={loading}
+                    className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800 ${isSyncOn ? "bg-sky-500" : "bg-slate-200 dark:bg-gray-600"
+                        } ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                    <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isSyncOn ? "translate-x-4" : "translate-x-1"
+                            }`}
+                    />
+                </button>
             </div>
         );
     }

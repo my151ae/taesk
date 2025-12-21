@@ -718,18 +718,104 @@ export function CardModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex justify-between items-start p-6 pb-4 border-b border-slate-200 dark:border-gray-700">
-          <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
-            {titlePreview}
-          </h2>
-          <button
-            onClick={requestClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
-            aria-label="Close modal"
-            data-autofocus
-          >
-            ✕
-          </button>
+        <div className="flex flex-col p-6 pb-4 border-b border-slate-200 dark:border-gray-700">
+          <div className="flex justify-between items-start mb-4">
+            <h2 id="modal-title" className="text-2xl font-bold text-slate-800 dark:text-gray-100">
+              {titlePreview}
+            </h2>
+            <button
+              onClick={requestClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
+              aria-label="Close modal"
+              data-autofocus
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Schedule Section in Header */}
+          <div className="flex flex-wrap items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Date</span>
+              <input
+                type="date"
+                value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
+                  triggerAutoSave();
+                }}
+                className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+              />
+            </div>
+
+            {dueDate && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Time</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="time"
+                    step={900}
+                    value={dueStart}
+                    onChange={(e) => {
+                      setDueStart(e.target.value);
+                      handleTimeToggle(!!e.target.value);
+                      triggerAutoSave();
+                    }}
+                    className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input
+                    type="time"
+                    step={900}
+                    value={dueEnd}
+                    onChange={(e) => {
+                      setDueEnd(e.target.value);
+                      triggerAutoSave();
+                    }}
+                    className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                  />
+                </div>
+              </div>
+            )}
+
+            {dueDate && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Bucket</span>
+                <select
+                  value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
+                  onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
+                  className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                >
+                  {BUCKET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {dueDate && dueStart && dueEnd && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Sync</span>
+                <GoogleSyncToggle
+                  cardId={card.id}
+                  initialStatus={syncStatus}
+                  connected={googleConnected}
+                  canWrite={googleCanWrite}
+                  hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
+                  onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
+                  onStatusChange={(next) => {
+                    setSyncStatus(next);
+                    if (next === "unlinked") {
+                      setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
+                    }
+                  }}
+                  compact={true}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 2 Column Layout */}
@@ -773,85 +859,6 @@ export function CardModal({
             className="border-l border-transparent overflow-y-auto flex flex-col shrink-0"
           >
             <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
-              {/* Schedule Section */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                  Schedule
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                      onChange={(e) => {
-                        setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                        triggerAutoSave();
-                      }}
-                      className="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
-                    />
-                  </div>
-                  {dueDate && (
-                    <div className="grid grid-cols-2 gap-2 pl-2 border-l-2 border-slate-100 dark:border-gray-700 ml-1">
-                      <input
-                        type="time"
-                        step={900}
-                        value={dueStart}
-                        onChange={(e) => {
-                          setDueStart(e.target.value);
-                          handleTimeToggle(!!e.target.value);
-                          triggerAutoSave();
-                        }}
-                        className="px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
-                      />
-                      <input
-                        type="time"
-                        step={900}
-                        value={dueEnd}
-                        onChange={(e) => {
-                          setDueEnd(e.target.value);
-                          triggerAutoSave();
-                        }}
-                        className="px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
-                      />
-                    </div>
-                  )}
-                  {dueDate && (
-                    <div className="pl-2 border-l-2 border-slate-100 dark:border-gray-700 ml-1">
-                      <select
-                        value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
-                        onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-[11px] focus:outline-none focus:ring-2 focus:ring-sky-300"
-                      >
-                        {BUCKET_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Google Calendar Sync Toggle */}
-                  {dueDate && dueStart && dueEnd && (
-                    <div className="pl-2 border-l-2 border-emerald-100 dark:border-emerald-900 ml-1 mt-1">
-                      <GoogleSyncToggle
-                        cardId={card.id}
-                        initialStatus={syncStatus}
-                        connected={googleConnected}
-                        canWrite={googleCanWrite}
-                        hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
-                        onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
-                        onStatusChange={(next) => {
-                          setSyncStatus(next);
-                          if (next === "unlinked") {
-                            setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
 
               {/* Members Section */}
               <div className="space-y-2 overflow-visible">
