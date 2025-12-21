@@ -910,6 +910,67 @@ export function CardModal({
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   </button>
+
+                  {/* Member Selection Dropdown */}
+                  {showMemberDropdown && (
+                    <div
+                      ref={memberDropdownRef}
+                      className="absolute z-[100] w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden"
+                      style={{
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px'
+                      }}
+                    >
+                      <div className="p-2 border-b border-slate-100 dark:border-gray-700">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Search members..."
+                          value={memberSearch}
+                          onChange={(e) => setMemberSearch(e.target.value)}
+                          className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-gray-900 border-none rounded-md focus:ring-1 focus:ring-sky-500 outline-none"
+                        />
+                      </div>
+                      <div className="max-h-60 overflow-y-auto p-1">
+                        {filteredProfiles.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-400">
+                            No members found
+                          </div>
+                        ) : (
+                          filteredProfiles.map((profile) => (
+                            <button
+                              key={profile.id}
+                              onClick={() => handleAddMember(profile.id)}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
+                            >
+                              {profile.avatar_url ? (
+                                <Image
+                                  src={profile.avatar_url}
+                                  alt=""
+                                  width={24}
+                                  height={24}
+                                  className="h-6 w-6 rounded-full object-cover"
+                                />
+                              ) : (
+                                <span className="h-6 w-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
+                                  {getProfileInitials(profile)}
+                                </span>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium text-slate-700 dark:text-gray-200 truncate">
+                                  {getProfileDisplayName(profile)}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  {profile.email}
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
