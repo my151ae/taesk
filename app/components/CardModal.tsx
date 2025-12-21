@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import Image from "next/image";
+import clsx from "clsx";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
@@ -102,6 +103,7 @@ export function CardModal({
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [isDirty, setIsDirty] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [showDirtyDialog, setShowDirtyDialog] = useState(false);
 
@@ -795,93 +797,26 @@ export function CardModal({
               </div>
             )}
 
-            {dueDate && dueStart && dueEnd && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Sync</span>
-                <GoogleSyncToggle
-                  cardId={card.id}
-                  initialStatus={syncStatus}
-                  connected={googleConnected}
-                  canWrite={googleCanWrite}
-                  hasResyncCandidate={Boolean(!syncStatus || syncStatus === 'unlinked' || syncStatus === 'deleted') && Boolean(lastGoogleEventId)}
-                  onResyncRequest={lastGoogleEventId ? handleResyncRequest : undefined}
-                  onStatusChange={(next) => {
-                    setSyncStatus(next);
-                    if (next === "unlinked") {
-                      setLastGoogleEventId((prev) => prev ?? lastGoogleEventIdFromCard ?? null);
-                    }
-                  }}
-                  compact={true}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 2 Column Layout */}
-        <div ref={resizeRef} className="flex flex-1 overflow-hidden">
-          {/* Left Column - Details */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {/* Block Editor */}
-            <div className="h-full flex flex-col">
-              <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
-                Note
-              </label>
-              <div className="flex-1">
-                <CardBlockEditor
-                  key={card.id}
-                  initialContent={content}
-                  onChange={(next) => {
-                    setContent(next);
-                    triggerAutoSave();
-                    if (editorError) {
-                      setEditorError(null);
-                    }
-                  }}
-                />
-                {editorError && (
-                  <p className="mt-2 text-xs text-red-600">{editorError}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Resizer Divider */}
-          <div
-            onMouseDown={startResizing}
-            className={`w-1 cursor-col-resize hover:bg-sky-400 active:bg-sky-500 transition-colors z-10 ${isResizing ? 'bg-sky-500' : 'bg-slate-200 dark:bg-gray-700'
-              }`}
-          />
-
-          {/* Right Column - Sidebar */}
-          <div
-            style={{ width: `${sidebarWidth}px` }}
-            className="border-l border-transparent overflow-y-auto flex flex-col shrink-0"
-          >
-            <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
-
-              {/* Members Section */}
-              <div className="space-y-2 overflow-visible">
-                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                  Members
-                </label>
+            {dueDate && (
+              <div className="flex items-center gap-2 border-l border-slate-100 dark:border-gray-700 pl-4">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Members</span>
                 <div className="flex flex-wrap gap-1.5 items-center relative">
                   {selectedAssignees.map((member) => (
                     <div
                       key={member.id}
-                      className="group relative h-7 w-7"
+                      className="group relative h-6 w-6"
                       title={resolveProfileIdentity(member, member.email ?? null).label}
                     >
                       {member.avatar_url ? (
                         <Image
                           src={member.avatar_url}
                           alt="assigned member"
-                          width={28}
-                          height={28}
-                          className="h-7 w-7 rounded-full object-cover ring-1 ring-white dark:ring-gray-800"
+                          width={24}
+                          height={24}
+                          className="h-6 w-6 rounded-full object-cover ring-1 ring-white dark:ring-gray-800"
                         />
                       ) : (
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-bold text-[11px] ring-1 ring-white dark:ring-gray-800">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-bold text-[10px] ring-1 ring-white dark:ring-gray-800">
                           {getProfileInitial(member, member.email ?? null)}
                         </span>
                       )}
@@ -889,36 +824,27 @@ export function CardModal({
                         onClick={() => handleRemoveMember(member.id)}
                         className="absolute -top-1 -right-1 bg-white dark:bg-gray-700 rounded-full text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm ring-1 ring-slate-200"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
                   ))}
                   <button
-                    ref={(el) => {
-                      // @ts-ignore
-                      memberButtonRef.current = el;
-                    }}
+                    ref={memberButtonRef}
                     onClick={() => {
-                      const button = memberButtonRef.current;
-                      if (button) {
-                        const rect = button.getBoundingClientRect();
-                        setDropdownPos({ top: rect.bottom + 8, left: rect.left - 200 });
-                        setShowMemberDropdown(!showMemberDropdown);
-                      }
+                      setShowMemberDropdown(!showMemberDropdown);
                     }}
-                    className="h-7 w-7 flex items-center justify-center rounded-full border border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20 text-slate-400 transition-colors"
+                    className="h-6 w-6 flex items-center justify-center rounded-full border border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20 text-slate-400 transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   </button>
 
-                  {/* Member Selection Dropdown */}
                   {showMemberDropdown && (
                     <div
                       ref={memberDropdownRef}
                       className="absolute z-[100] w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden"
                       style={{
                         top: '100%',
-                        right: 0,
+                        left: 0,
                         marginTop: '8px'
                       }}
                     >
@@ -973,109 +899,174 @@ export function CardModal({
                   )}
                 </div>
               </div>
+            )}
 
-              {/* Tags Section */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                  Tags
-                </label>
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  <div className="relative flex-1 min-w-[140px]">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={handleAddTag}
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent placeholder:text-slate-400"
-                      placeholder="+ Add tag..."
-                    />
-                  </div>
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-sky-900/30 text-sky-600 dark:text-sky-300 rounded-md text-[10px] font-medium border border-slate-100 dark:border-sky-800"
-                    >
-                      {tag}
-                      <button
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-sky-400 hover:text-sky-600"
-                        aria-label={`Remove tag ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
+            <div className="flex-1" />
 
-              {/* Priority - Compact row */}
-              <div className="flex items-center justify-between pt-1">
-                <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                  Priority
-                </label>
-                <select
-                  value={priority}
-                  onChange={(e) => {
-                    setPriority(e.target.value as Priority);
+            {/* Sidebar toggle button */}
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className={clsx(
+                "p-1.5 rounded-md transition-colors",
+                showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/30" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
+              )}
+              title={showSidebar ? "Hide sidebar" : "Show sidebar"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m-7 10V7a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* 2 Column Layout */}
+        <div ref={resizeRef} className="flex flex-1 overflow-hidden">
+          {/* Left Column - Details */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Block Editor */}
+            <div className="h-full flex flex-col">
+              <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                Note
+              </label>
+              <div className="flex-1">
+                <CardBlockEditor
+                  key={card.id}
+                  initialContent={content}
+                  onChange={(next) => {
+                    setContent(next);
                     triggerAutoSave();
+                    if (editorError) {
+                      setEditorError(null);
+                    }
                   }}
-                  className="bg-transparent text-xs font-medium text-slate-600 dark:text-gray-300 focus:outline-none cursor-pointer"
-                >
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="high">🔴 High</option>
-                </select>
-              </div>
-
-              {/* Advanced (Board & Links) */}
-              <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-gray-700/50 mt-2">
-                {boards.length > 1 && (
-                  <div className="flex-1 min-w-0">
-                    <select
-                      value={targetBoardId}
-                      onChange={(e) => {
-                        setTargetBoardId(e.target.value);
-                        triggerAutoSave();
-                      }}
-                      className="w-full bg-transparent text-[10px] font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none cursor-pointer truncate"
-                    >
-                      {boards.map((board) => (
-                        <option key={board.id} value={board.id}>
-                          Board: {board.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {card.short_id && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const shortUrl = `${window.location.origin}/c/${card.short_id}`;
-                      navigator.clipboard.writeText(shortUrl);
-                    }}
-                    className="text-[10px] font-medium text-sky-500 hover:text-sky-600 dark:text-sky-400 whitespace-nowrap"
-                  >
-                    🔗 Copy Link
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Comments Area */}
-            <div className="flex-1 min-h-0 flex flex-col p-6 pt-4">
-              <h3 className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">
-                Comments
-              </h3>
-              <div className="flex-1 min-h-0">
-                <CommentsPanel
-                  cardId={card.id}
-                  boardId={card.board_id}
-                  initialProfiles={profiles}
                 />
+                {editorError && (
+                  <p className="mt-2 text-xs text-red-600">{editorError}</p>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Resizer Divider */}
+          {showSidebar && (
+            <div
+              onMouseDown={startResizing}
+              className={`w-1 cursor-col-resize hover:bg-sky-400 active:bg-sky-500 transition-colors z-10 ${isResizing ? 'bg-sky-500' : 'bg-slate-200 dark:bg-gray-700'
+                }`}
+            />
+          )}
+
+          {/* Right Column - Sidebar */}
+          {showSidebar && (
+            <div
+              style={{ width: `${sidebarWidth}px` }}
+              className="border-l border-transparent overflow-y-auto flex flex-col shrink-0"
+            >
+              <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
+
+                {/* Tags Section */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                    Tags
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <div className="relative flex-1 min-w-[140px]">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent placeholder:text-slate-400"
+                        placeholder="+ Add tag..."
+                      />
+                    </div>
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-sky-900/30 text-sky-600 dark:text-sky-300 rounded-md text-[10px] font-medium border border-slate-100 dark:border-sky-800"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="text-sky-400 hover:text-sky-600"
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Priority - Compact row */}
+                <div className="flex items-center justify-between pt-1">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
+                    Priority
+                  </label>
+                  <select
+                    value={priority}
+                    onChange={(e) => {
+                      setPriority(e.target.value as Priority);
+                      triggerAutoSave();
+                    }}
+                    className="bg-transparent text-xs font-medium text-slate-600 dark:text-gray-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="low">🟢 Low</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="high">🔴 High</option>
+                  </select>
+                </div>
+
+                {/* Advanced (Board & Links) */}
+                <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-gray-700/50 mt-2">
+                  {boards.length > 1 && (
+                    <div className="flex-1 min-w-0">
+                      <select
+                        value={targetBoardId}
+                        onChange={(e) => {
+                          setTargetBoardId(e.target.value);
+                          triggerAutoSave();
+                        }}
+                        className="w-full bg-transparent text-[10px] font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none cursor-pointer truncate"
+                      >
+                        {boards.map((board) => (
+                          <option key={board.id} value={board.id}>
+                            Board: {board.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {card.short_id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const shortUrl = `${window.location.origin}/c/${card.short_id}`;
+                        navigator.clipboard.writeText(shortUrl);
+                      }}
+                      className="text-[10px] font-medium text-sky-500 hover:text-sky-600 dark:text-sky-400 whitespace-nowrap"
+                    >
+                      🔗 Copy Link
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Comments Area */}
+              <div className="flex-1 min-h-0 flex flex-col p-6 pt-4">
+                <h3 className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">
+                  Comments
+                </h3>
+                <div className="flex-1 min-h-0">
+                  <CommentsPanel
+                    cardId={card.id}
+                    boardId={card.board_id}
+                    initialProfiles={profiles}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
