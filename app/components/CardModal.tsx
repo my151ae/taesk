@@ -106,8 +106,9 @@ export function CardModal({
   const memberButtonRef = useRef<HTMLButtonElement | null>(null);
   const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Debounce for auto-save
+  // Debounce and max-wait for auto-save
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const filteredProfiles = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
@@ -320,6 +321,9 @@ export function CardModal({
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
+      if (autoSaveMaxTimeoutRef.current) {
+        clearTimeout(autoSaveMaxTimeoutRef.current);
+      }
     };
   }, []); // 空配列でマウント時のみ実行
 
@@ -335,7 +339,7 @@ export function CardModal({
     // Always send bucket fields (timelineはnull、A/Bはa|bを保持)
     const normalizedBucket: DueBucket | null = dueBucket ?? null;
     const normalizedBucketPosition: number | null =
-      normalizedBucket != null ? dueBucketPosition ?? Date.now() : null;
+      normalizedBucket != null ? dueBucketPosition ?? null : null;
 
     const normalizedContent = ensureTitleBlock(normalizeBlockNoteDocument(content));
     const nextTitle = deriveTitleFromDocument(normalizedContent);
@@ -394,14 +398,31 @@ export function CardModal({
       clearTimeout(autoSaveTimeoutRef.current);
     }
     autoSaveTimeoutRef.current = setTimeout(() => {
+      if (autoSaveMaxTimeoutRef.current) {
+        clearTimeout(autoSaveMaxTimeoutRef.current);
+        autoSaveMaxTimeoutRef.current = null;
+      }
       handleSave(true);
     }, 2000);
+    if (!autoSaveMaxTimeoutRef.current) {
+      autoSaveMaxTimeoutRef.current = setTimeout(() => {
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+        }
+        autoSaveMaxTimeoutRef.current = null;
+        handleSave(true);
+      }, 15000);
+    }
   }, [handleSave]);
 
   const requestClose = useCallback(() => {
     if (isDirty) {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
+      }
+      if (autoSaveMaxTimeoutRef.current) {
+        clearTimeout(autoSaveMaxTimeoutRef.current);
+        autoSaveMaxTimeoutRef.current = null;
       }
       handleSave(false);
       return;

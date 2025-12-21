@@ -261,6 +261,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const router = useRouter();
   const traceRef = useRef<ClientTrace | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
+  const saveRequestIdRef = useRef(0);
 
   useEffect(() => {
     traceRef.current = createClientTrace('timeline');
@@ -803,6 +805,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       // Use the memoized modalCard for targetCard
       const targetCard = modalCard && modalCard.id === savePayload.id ? modalCard : null;
       if (!targetCard) return;
+      let requestId = 0;
       try {
         const nextAssignee = savePayload.assigneeIds && savePayload.assigneeIds.length > 0 ? savePayload.assigneeIds[0] : null;
         let normalizedDueDate: string | null = null;
@@ -831,12 +834,22 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           payload.assigned_to = null;
         }
         console.log('[timeline] Sending card update payload:', payload);
+        if (saveAbortRef.current) {
+          saveAbortRef.current.abort();
+        }
+        requestId = ++saveRequestIdRef.current;
+        const controller = new AbortController();
+        saveAbortRef.current = controller;
         const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
         const body = await response.json().catch(() => null);
+        if (requestId !== saveRequestIdRef.current) {
+          return;
+        }
         if (!response.ok) {
           console.error('[timeline] save card failed', {
             status: response.status,
@@ -875,8 +888,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           closeCardModal();
         }
       } catch (error) {
+        const isAbortError =
+          error instanceof DOMException
+            ? error.name === 'AbortError'
+            : (error as { name?: string }).name === 'AbortError';
+        if (isAbortError) {
+          return;
+        }
         console.error('[timeline] save card failed', error);
         setCardModalError(error instanceof Error ? error.message : 'Failed to save card');
+      } finally {
+        if (requestId > 0 && requestId === saveRequestIdRef.current) {
+          saveAbortRef.current = null;
+        }
       }
     },
     [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast]
