@@ -2,9 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import { Extension, wrappingInputRule } from '@tiptap/core';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import styles from './TiptapEditor.module.css';
@@ -50,18 +48,6 @@ export default function TiptapEditor() {
       TaskList,
       TaskItem.configure({
         nested: true,
-      }),
-      // Custom Input Rule to ensure [ ] converts to TaskList
-      Extension.create({
-        name: 'checkboxInputRule',
-        addInputRules() {
-          return [
-            wrappingInputRule({
-              find: /^\s*(\[ \]|\[\])\s$/,
-              type: this.editor.schema.nodes.taskList,
-            }),
-          ];
-        },
       }),
       Placeholder.configure({
         placeholder: "Type '/' for commands…",

@@ -32,7 +32,7 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     lastDocumentRef.current = normalizedInitial;
   }
 
-  const findBlockById = useCallback((blocks: BlockNoteDocument, id: string) => {
+  const findBlockById = useCallback((blocks: BlockNoteDocument, id: string): BlockNoteDocument[number] | null => {
     for (const block of blocks) {
       if (block && typeof block === "object" && "id" in block && block.id === id) {
         return block;
