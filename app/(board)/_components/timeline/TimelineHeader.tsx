@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { Board } from '@/lib/supabase';
@@ -544,6 +545,13 @@ export default function TimelineHeader({
                                 >
                                     <span>🔔</span> Notifications
                                 </button>
+                                <Link
+                                    href="/playground"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={() => setShowProfileMenu(false)}
+                                >
+                                    <span>🧪</span> Playground
+                                </Link>
                             </div>
 
                             <div className="border-t border-slate-100 p-1">

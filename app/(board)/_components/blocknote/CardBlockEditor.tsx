@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteViewRaw, useCreateBlockNote } from "@blocknote/react";
 import "@blocknote/react/style.css";
 
 import {
   BlockNoteDocument,
   ensureTitleBlock,
+  getBlockPlainText,
   normalizeBlockNoteDocument,
 } from "@/lib/blocknote";
 
@@ -18,14 +19,36 @@ type CardBlockEditorProps = {
 export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorProps) {
   const lastCursorBlockRef = useRef<{ id: string; type: string } | null>(null);
   const lastSerializedRef = useRef<string | null>(null);
+  const lastDocumentRef = useRef<BlockNoteDocument>([]);
+  const restoringChecklistRef = useRef(false);
   const suppressOnChangeRef = useRef(true);
-  const editorRootRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedInitial = ensureTitleBlock(normalizeBlockNoteDocument(initialContent));
   const initialSerialized = JSON.stringify(normalizedInitial);
   if (lastSerializedRef.current === null) {
     lastSerializedRef.current = initialSerialized;
   }
+  if (lastDocumentRef.current.length === 0) {
+    lastDocumentRef.current = normalizedInitial;
+  }
+
+  const findBlockById = useCallback((blocks: BlockNoteDocument, id: string) => {
+    for (const block of blocks) {
+      if (block && typeof block === "object" && "id" in block && block.id === id) {
+        return block;
+      }
+      if (block && typeof block === "object" && "children" in block) {
+        const children = Array.isArray(block.children) ? (block.children as BlockNoteDocument) : [];
+        const found = findBlockById(children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
+  const stripChecklistShortcut = useCallback((text: string) => {
+    return text.replace(/^\s*(?:[-*]\s+)?\[\s*[xX ]\]\s*/, "").trimStart();
+  }, []);
 
   const editor = useCreateBlockNote({
     initialContent: normalizedInitial,
@@ -93,7 +116,33 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     const next = ensureTitleBlock(editor.document as BlockNoteDocument);
     const serialized = JSON.stringify(next);
     if (serialized === lastSerializedRef.current) return;
+    const previous = lastDocumentRef.current;
+
+    if (!suppressOnChangeRef.current && !restoringChecklistRef.current) {
+      const lastCursor = lastCursorBlockRef.current;
+      if (lastCursor?.id) {
+        const currentBlock = findBlockById(next, lastCursor.id);
+        const prevBlock = findBlockById(previous, lastCursor.id);
+        if (currentBlock?.type === "checkListItem") {
+          const currentText = getBlockPlainText(currentBlock);
+          const prevText = prevBlock ? getBlockPlainText(prevBlock) : "";
+          const restored = prevText ? stripChecklistShortcut(prevText) : "";
+          if (!currentText && restored && restored !== prevText) {
+            restoringChecklistRef.current = true;
+            editor.updateBlock(lastCursor.id, {
+              content: [{ type: "text", text: restored, styles: {} }],
+            });
+            window.setTimeout(() => {
+              restoringChecklistRef.current = false;
+            }, 0);
+            return;
+          }
+        }
+      }
+    }
+
     lastSerializedRef.current = serialized;
+    lastDocumentRef.current = next;
     if (suppressOnChangeRef.current) return;
     onChange(next);
     const lastCursor = lastCursorBlockRef.current;
@@ -106,11 +155,7 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
         editor.setTextCursorPosition(updatedBlock, "end");
       }
     }
-  }, [editor, onChange]);
-
-  useEffect(() => {
-    return editor.onChange(() => handleChange());
-  }, [editor, handleChange]);
+  }, [editor, findBlockById, onChange, stripChecklistShortcut]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -136,30 +181,34 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
     suppressOnChangeRef.current = true;
     editor.replaceBlocks(editor.document, normalized);
     lastSerializedRef.current = serialized;
+    lastDocumentRef.current = normalized;
     window.setTimeout(() => {
       suppressOnChangeRef.current = false;
     }, 50); // 微調整：初期化時の非同期発火を確実にブロックするため、少しだけ余裕を持たせる
   }, [editor, initialContent]);
 
-  useEffect(() => {
-    const element = editorRootRef.current;
-    if (!element) return;
-    editor.mount(element);
-    return () => {
-      editor.unmount();
-    };
-  }, [editor]);
-
   // key handling is configured via _tiptapOptions to avoid double-handling
 
   return (
     <div className="card-block-editor bg-white">
-      <div className="bn-container light" data-color-scheme="light">
-        <div ref={editorRootRef} className="bn-editor min-h-[240px]" />
-      </div>
+      <BlockNoteViewRaw
+        editor={editor}
+        theme="light"
+        onChange={handleChange}
+        className="bn-card-editor"
+        formattingToolbar={false}
+        linkToolbar={false}
+        slashMenu={false}
+        emojiPicker={false}
+        sideMenu={false}
+        filePanel={false}
+        tableHandles={false}
+        comments={false}
+      />
       <style jsx global>{`
         .card-block-editor .bn-editor {
           padding-inline: 20px;
+          min-height: 240px;
         }
       `}</style>
     </div>
