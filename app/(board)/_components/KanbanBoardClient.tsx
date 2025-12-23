@@ -64,6 +64,8 @@ import ProfileSettings from "./ProfileSettings";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText, type Checklist } from "@/lib/checklist";
 import type { BlockNoteDocument } from "@/lib/blocknote";
+import type { JSONContent } from "@tiptap/react";
+
 
 type KanbanBoardClientProps = {
   initialBoard?: Board | null;
@@ -1992,7 +1994,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
   const handleSaveCard = async (payload: {
     id: string;
     title: string;
-    content: BlockNoteDocument;
+    content: JSONContent | Record<string, any> | any[];
     excerpt: string;
     tags?: string[];
     due_date?: string | null;
