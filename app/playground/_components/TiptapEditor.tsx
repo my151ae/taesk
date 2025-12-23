@@ -7,8 +7,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import { Extension, wrappingInputRule } from '@tiptap/core';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { clsx } from 'clsx';
-import './TiptapEditor.css'; // We will create this file for specific Tiptap styles
+import styles from './TiptapEditor.module.css';
 
 const content = `
 <h1>Heading 1</h1>
@@ -84,7 +83,7 @@ export default function TiptapEditor() {
   }
 
   return (
-    <div className="w-full bg-white rounded-lg min-h-[600px] cursor-text" onClick={() => editor.chain().focus().run()}>
+    <div className={`w-full bg-white rounded-lg min-h-[600px] cursor-text ${styles.editor}`} onClick={() => editor.chain().focus().run()}>
       <EditorContent editor={editor} />
     </div>
   );

@@ -127,7 +127,7 @@ export function CardBlockEditor({ initialContent, onChange }: CardBlockEditorPro
           const currentText = getBlockPlainText(currentBlock);
           const prevText = prevBlock ? getBlockPlainText(prevBlock) : "";
           const restored = prevText ? stripChecklistShortcut(prevText) : "";
-          if (!currentText && restored && restored !== prevText) {
+          if (!currentText && restored) {
             restoringChecklistRef.current = true;
             editor.updateBlock(lastCursor.id, {
               content: [{ type: "text", text: restored, styles: {} }],

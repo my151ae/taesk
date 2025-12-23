@@ -1,0 +1,80 @@
+.editor :global(ul[data-type="taskList"]) {
+    list-style: none;
+    padding: 0;
+}
+
+.editor :global(ul[data-type="taskList"] p) {
+    margin: 0;
+}
+
+.editor :global(li[data-type="taskItem"]) {
+    display: flex !important;
+    /* Force flex to prevent wrapping */
+    flex-direction: row;
+    align-items: flex-start;
+    margin-bottom: 0.1rem;
+}
+
+.editor :global(li[data-type="taskItem"] > label) {
+    margin-right: 0.5rem;
+    user-select: none;
+    cursor: pointer;
+    margin-top: 0.2rem;
+    /* Align checkbox with text */
+    flex-shrink: 0;
+    /* Prevent checkbox from shrinking */
+}
+
+.editor :global(li[data-type="taskItem"] > div) {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Allow text to wrap correctly within flex container */
+}
+
+/* Ensure standard lists have bullets/numbers */
+.editor :global(.ProseMirror ul:not([data-type="taskList"])) {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+.editor :global(.ProseMirror ol) {
+    list-style-type: decimal;
+    padding-left: 1.5em;
+    /* Ensure padding for numbers */
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+.editor :global(.ProseMirror li) {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+}
+
+/* Placeholder styling */
+.editor :global(.ProseMirror p.is-editor-empty:first-child::before) {
+    color: #adb5bd;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+}
+
+/* Give headings some space */
+.editor :global(.ProseMirror h1),
+.editor :global(.ProseMirror h2),
+.editor :global(.ProseMirror h3) {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Notion-like line height and font */
+.editor :global(.ProseMirror) {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.editor :global(.ProseMirror:focus) {
+    outline: none;
+}
