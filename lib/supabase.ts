@@ -78,7 +78,7 @@ export interface Card {
   id: string;
   title: string;
   checklist: Checklist | null;
-  content?: BlockNoteDocument | null;
+  content?: BlockNoteDocument | Record<string, any> | null;
   excerpt?: string | null;
   list_id: string;
   board_id: string;
@@ -129,7 +129,11 @@ export function sanitizeCardForUpload(card: Card, includeAssigneeId: boolean): C
     assigned_to: card.assigned_to ?? null,
   };
   if (card.content !== undefined) {
-    payload.content = normalizeBlockNoteDocument(card.content ?? []);
+    if (Array.isArray(card.content)) {
+      payload.content = normalizeBlockNoteDocument(card.content);
+    } else {
+      payload.content = card.content;
+    }
   }
   if (card.excerpt !== undefined) {
     payload.excerpt = card.excerpt ?? null;

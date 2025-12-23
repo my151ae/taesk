@@ -7,15 +7,15 @@ import clsx from "clsx";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
-import { CardBlockEditor } from "@/app/(board)/_components/blocknote/CardBlockEditor";
+import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
+import { JSONContent } from "@tiptap/react";
 import {
-  BlockNoteDocument,
-  deriveExcerptFromDocument,
-  deriveTitleFromDocument,
+  deriveExcerptFromContent,
+  deriveTitleFromContent,
   ensureTitleBlock,
-  getDocumentPlainText,
-  normalizeBlockNoteDocument,
-} from "@/lib/blocknote";
+  getTiptapPlainText,
+  normalizeContent,
+} from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
@@ -42,7 +42,7 @@ interface CardModalProps {
   onSave: (payload: {
     id: string;
     title: string;
-    content: BlockNoteDocument;
+    content: JSONContent | Record<string, any> | any[];
     excerpt: string;
     tags?: string[];
     due_date?: string | null;
@@ -69,8 +69,8 @@ export function CardModal({
   onMoveToBoard,
   onClose,
 }: CardModalProps) {
-  const [content, setContent] = useState<BlockNoteDocument>(() =>
-    ensureTitleBlock(normalizeBlockNoteDocument(card.content ?? []))
+  const [content, setContent] = useState<JSONContent>(() =>
+    ensureTitleBlock(normalizeContent(card.content))
   );
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -145,7 +145,7 @@ export function CardModal({
 
   const titlePreview = useMemo(() => {
     const normalized = ensureTitleBlock(content);
-    const title = deriveTitleFromDocument(normalized);
+    const title = deriveTitleFromContent(normalized);
     return title || card.title || "Edit Card";
   }, [content, card.title]);
 
@@ -158,9 +158,9 @@ export function CardModal({
   // card prop が変わったときの処理（ただし編集中は無視）
   useEffect(() => {
     // card.id が変わった場合（別のカードを開いた）、または編集していない場合のみ更新
-    const incomingContent = normalizeBlockNoteDocument(card.content ?? []);
-    const incomingText = getDocumentPlainText(incomingContent).trim();
-    const localText = getDocumentPlainText(content).trim();
+    const incomingContent = normalizeContent(card.content);
+    const incomingText = getTiptapPlainText(incomingContent).trim();
+    const localText = getTiptapPlainText(content).trim();
     const shouldForceSync = isDirty && !localText && incomingText.length > 0;
 
     if (card.id !== cardIdRef.current) {
@@ -244,8 +244,8 @@ export function CardModal({
       fetch(`/api/cards/${card.short_id}`)
         .then((res) => res.json().catch(() => null))
         .then((body) => {
-          const remote = normalizeBlockNoteDocument(body?.card?.content ?? []);
-          const remoteText = getDocumentPlainText(remote).trim();
+          const remote = normalizeContent(body?.card?.content);
+          const remoteText = getTiptapPlainText(remote).trim();
           if (!remoteText) return;
           setContent(remote);
           setIsDirty(false);
@@ -349,15 +349,16 @@ export function CardModal({
     const normalizedBucketPosition: number | null =
       normalizedBucket != null ? dueBucketPosition ?? null : null;
 
-    const normalizedContent = ensureTitleBlock(normalizeBlockNoteDocument(content));
-    const nextTitle = deriveTitleFromDocument(normalizedContent);
+    const normalizedContent = ensureTitleBlock(content);
+    // Use deriveTitleFromContent instead of deriveTitleFromDocument
+    const nextTitle = deriveTitleFromContent(normalizedContent);
     if (!nextTitle) {
       if (!isAutoSave) {
         setEditorError("タイトルを入力してください");
       }
       return;
     }
-    const nextExcerpt = deriveExcerptFromDocument(normalizedContent);
+    const nextExcerpt = deriveExcerptFromContent(normalizedContent);
 
     if (!isAutoSave) {
       setEditorError(null);
@@ -591,7 +592,8 @@ export function CardModal({
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
   const handleResyncRequest = useCallback(async () => {
-    const nextTitle = deriveTitleFromDocument(ensureTitleBlock(content));
+    // deriveTitleFromContent here
+    const nextTitle = deriveTitleFromContent(ensureTitleBlock(content));
     if (!nextTitle) return;
     setResyncLoading(true);
     setResyncError(null);
@@ -929,7 +931,7 @@ export function CardModal({
                 Note
               </label>
               <div className="flex-1">
-                <CardBlockEditor
+                <TiptapEditor
                   key={card.id}
                   initialContent={content}
                   onChange={(next) => {

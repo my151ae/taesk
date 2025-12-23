@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { normalizeBlockNoteDocument } from '@/lib/blocknote';
+import { normalizeContent } from '@/lib/tiptap';
 import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from '@/lib/calendarSyncService';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
   checklist: z.any().optional(),
-  content: z.array(z.unknown()).optional(),
+  content: z.any().optional(),
   excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
@@ -103,7 +103,7 @@ export async function PATCH(
       normalizedPayload.checklist = clampChecklist(normalizedPayload.checklist ?? EMPTY_CHECKLIST);
     }
     if ('content' in normalizedPayload) {
-      normalizedPayload.content = normalizeBlockNoteDocument(normalizedPayload.content ?? []);
+      normalizedPayload.content = normalizeContent(normalizedPayload.content);
     }
 
     let { data: updatedCard, error } = await performUpdate(normalizedPayload);

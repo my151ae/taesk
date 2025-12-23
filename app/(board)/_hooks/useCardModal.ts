@@ -7,7 +7,7 @@ import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store'
 import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { normalizeBlockNoteDocument } from '@/lib/blocknote';
+import { normalizeContent } from '@/lib/tiptap';
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -77,7 +77,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             return {
                 id: eventCard.card_id,
                 title: eventCard.title,
-                content: normalizeBlockNoteDocument((eventCard as any).content ?? []),
+                content: normalizeContent((eventCard as any).content),
                 excerpt: eventCard.excerpt ?? null,
                 checklist: normalizeChecklist(eventCard.checklist ?? EMPTY_CHECKLIST),
                 tags: eventCard.tags,
@@ -109,11 +109,11 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             if (bucketItem) {
                 return {
                     id: bucketItem.card_id,
-                title: bucketItem.title,
-                    content: normalizeBlockNoteDocument((bucketItem as any).content ?? []),
+                    title: bucketItem.title,
+                    content: normalizeContent((bucketItem as any).content),
                     excerpt: bucketItem.excerpt ?? null,
                     checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
-                tags: bucketItem.tags,
+                    tags: bucketItem.tags,
                     priority: 'medium',
                     checked: bucketItem.checked,
                     short_id: bucketItem.short_id,
