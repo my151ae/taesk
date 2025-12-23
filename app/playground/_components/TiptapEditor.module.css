@@ -1,55 +1,72 @@
 .editor :global(ul[data-type="taskList"]) {
-    list-style: none;
-    padding: 0;
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
-.editor :global(ul[data-type="taskList"] p) {
-    margin: 0;
+.editor :global(ul[data-type="taskList"] li) {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.editor :global(li[data-type="taskItem"]) {
+/* tiptap taskList を横並びにする */
+.editor :global(ul[data-type="taskList"] > li) {
     display: flex !important;
-    /* Force flex to prevent wrapping */
-    flex-direction: row;
-    align-items: flex-start;
+    align-items: baseline !important;
+    /* Align to text baseline as requested */
+    gap: 0.5rem !important;
     margin-bottom: 0.1rem;
+    padding-left: 0 !important;
+    width: 100%;
 }
 
-.editor :global(li[data-type="taskItem"] > label) {
-    margin-right: 0.5rem;
+/* チェックボックス側 */
+.editor :global(ul[data-type="taskList"] > li > label) {
+    flex: 0 0 auto !important;
+    margin-top: 0 !important;
+    /* Remove manual margin */
+    margin-right: 0 !important;
+    display: flex;
+    align-items: center;
+    transform: translateY(0.1em);
+    /* Fine tune vertical position */
     user-select: none;
     cursor: pointer;
-    margin-top: 0.2rem;
-    /* Align checkbox with text */
-    flex-shrink: 0;
-    /* Prevent checkbox from shrinking */
 }
 
-.editor :global(li[data-type="taskItem"] > div) {
-    flex: 1 1 auto;
-    min-width: 0;
-    /* Allow text to wrap correctly within flex container */
+/* テキスト側（div）が縮まず残り幅を取る） */
+/* テキスト側（div）が縮まず残り幅を取る） */
+.editor :global(ul[data-type="taskList"] > li > div) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 
+ * チェックリスト内のpタグのマージンを強力にリセット 
+ * .ProseMirror p のスタイル（margin: 0.5em）よりも優先させるためにセレクタを重ねる
+ */
+.editor :global(ul[data-type="taskList"] li p),
+.editor :global(ul[data-type="taskList"] > li > div > p) {
+    display: block !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 0 !important;
 }
 
 /* Ensure standard lists have bullets/numbers */
-.editor :global(.ProseMirror ul:not([data-type="taskList"])) {
-    list-style-type: disc;
-    padding-left: 1.5em;
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
-}
-
+/* Ensure standard lists have bullets/numbers with tight spacing */
+.editor :global(.ProseMirror ul:not([data-type="taskList"])),
 .editor :global(.ProseMirror ol) {
-    list-style-type: decimal;
     padding-left: 1.5em;
-    /* Ensure padding for numbers */
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin-top: 0.2em !important;
+    margin-bottom: 0.2em !important;
 }
 
 .editor :global(.ProseMirror li) {
-    margin-top: 0.25em;
-    margin-bottom: 0.25em;
+    margin-top: 0.1em !important;
+    margin-bottom: 0.1em !important;
 }
 
 /* Placeholder styling */
@@ -61,18 +78,54 @@
     pointer-events: none;
 }
 
-/* Give headings some space */
-.editor :global(.ProseMirror h1),
-.editor :global(.ProseMirror h2),
-.editor :global(.ProseMirror h3) {
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
+/* Tighten standard paragraphs globally */
+.editor :global(.ProseMirror p) {
+    margin-top: 0.2em !important;
+    margin-bottom: 0.2em !important;
+    line-height: 1.5;
+    /* Slightly relaxed line height for readability */
 }
 
-/* Notion-like line height and font */
+/* Blockquote & Code Block spacing fix */
+.editor :global(.ProseMirror blockquote),
+.editor :global(.ProseMirror pre) {
+    margin-top: 0.2em !important;
+    margin-bottom: 0.2em !important;
+}
+
+.editor :global(.ProseMirror blockquote) {
+    padding-left: 1em;
+    border-left: 3px solid #e5e7eb;
+    color: inherit;
+    font-style: italic;
+}
+
+/* Give headings some space but keep tight - Reduced to half as requested */
+.editor :global(.ProseMirror h1) {
+    line-height: 1.1;
+    margin-top: 0.8rem !important;
+    /* Reduced from 1.5rem */
+    margin-bottom: 0.5rem !important;
+}
+
+.editor :global(.ProseMirror h2),
+.editor :global(.ProseMirror h3) {
+    line-height: 1.1;
+    margin-top: 0.8rem !important;
+    /* Reduced from 1.5rem */
+    margin-bottom: 0.5rem !important;
+}
+
+/* Notion-like line height and font - ensure global override */
 .editor :global(.ProseMirror) {
     font-size: 16px;
-    line-height: 1.6;
+    line-height: 1.5;
+}
+
+/* Reduce HR margins */
+.editor :global(.ProseMirror hr) {
+    margin-top: 1em !important;
+    margin-bottom: 1em !important;
 }
 
 .editor :global(.ProseMirror:focus) {

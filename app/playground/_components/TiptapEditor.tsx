@@ -4,7 +4,6 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
-import Link from '@tiptap/extension-link';
 import styles from './TiptapEditor.module.css';
 
 const content = `
@@ -44,6 +43,9 @@ export default function TiptapEditor() {
     extensions: [
       StarterKit.configure({
         // The History extension is enabled by default
+        link: {
+          openOnClick: false,
+        }
       }),
       TaskList,
       TaskItem.configure({
@@ -52,14 +54,11 @@ export default function TiptapEditor() {
       Placeholder.configure({
         placeholder: "Type '/' for commands…",
       }),
-      Link.configure({
-        openOnClick: false,
-      }),
     ],
     content,
     editorProps: {
       attributes: {
-        class: 'prose prose-slate max-w-none focus:outline-none min-h-[500px] px-4 py-2',
+        class: 'prose prose-slate max-w-none focus:outline-none min-h-[500px] px-2 py-2',
       },
     },
   });

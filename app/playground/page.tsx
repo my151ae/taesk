@@ -20,7 +20,7 @@ export default function PlaygroundPage() {
             {/* Main Content Area - Mimicking Modal Size/Feel */}
             <div className="w-full max-w-4xl px-4">
                 {/* Editor Container */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 min-h-[80vh]">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 min-h-[80vh]">
                     <TiptapEditor />
                 </div>
             </div>
