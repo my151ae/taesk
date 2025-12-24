@@ -221,10 +221,10 @@ export default function CommentEditor({
   }, [initialValue, editor, resolveName]);
 
   return (
-    <div className="border border-gray-300 rounded-md p-2 min-h-[100px] bg-white">
+    <div className="comment-editor border border-gray-300 rounded-md p-2 min-h-[100px] bg-white">
       <EditorContent editor={editor} placeholder={placeholder} />
       <style jsx global>{`
-        .mention {
+        .comment-editor .mention {
           color: #0066cc;
           background-color: #e6f2ff;
           border-radius: 0.25rem;
@@ -234,12 +234,12 @@ export default function CommentEditor({
           user-select: none;
         }
 
-        .ProseMirror {
+        .comment-editor .ProseMirror {
           min-height: 60px;
           outline: none;
         }
 
-        .ProseMirror p.is-editor-empty:first-child::before {
+        .comment-editor .ProseMirror p.is-editor-empty:first-child::before {
           color: #adb5bd;
           content: attr(data-placeholder);
           float: left;
@@ -247,7 +247,7 @@ export default function CommentEditor({
           pointer-events: none;
         }
 
-        .ProseMirror p {
+        .comment-editor .ProseMirror p {
           margin: 0;
           padding: 0.25rem 0;
         }

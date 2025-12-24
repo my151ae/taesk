@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { normalizeBlockNoteDocument } from '@/lib/blocknote';
 
 export async function GET(
   request: NextRequest,
@@ -94,7 +93,7 @@ export async function GET(
       ? {
         ...card,
         checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST),
-        content: normalizeBlockNoteDocument((card as any).content ?? []),
+        content: (card as any).content ?? null,
       }
       : null;
 

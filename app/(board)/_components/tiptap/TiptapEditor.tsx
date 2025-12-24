@@ -43,7 +43,7 @@ export default function TiptapEditor({
         content: initialContent || { type: 'doc', content: [] },
         editorProps: {
             attributes: {
-                class: `prose prose-slate max-w-none focus:outline-none min-h-[200px] ${styles.editor}`,
+                class: 'prose prose-slate max-w-none focus:outline-none min-h-[200px] px-2 py-2',
             },
         },
         onUpdate: ({ editor }) => {
