@@ -17,7 +17,7 @@ type TiptapEditorProps = {
 export default function TiptapEditor({
     initialContent,
     onChange,
-    placeholder = "Write something...",
+    placeholder = "Type '/' for commands…",
     editable = true
 }: TiptapEditorProps) {
     // Use a ref to track if we're silently updating content to avoid trigger loops
@@ -37,7 +37,7 @@ export default function TiptapEditor({
                 nested: true,
             }),
             Placeholder.configure({
-                placeholder: "Type '/' for commands…",
+                placeholder,
             }),
         ],
         content: initialContent || { type: 'doc', content: [] },
@@ -58,20 +58,21 @@ export default function TiptapEditor({
     // Note: Deep comparison might be expensive, so we trust React key="" or explicit reset
     // But CardModal updates content based on prop change (switching cards).
     useEffect(() => {
-        if (!editor || !initialContent) return;
+        if (!editor) return;
 
         // Check if content is actually different to avoid cursor jumps
         // Allow naive stringify check for now or just trust the parent to mount a new instance for a new card
         // Since CardModal uses `key={card.id}`, this component will unmount/remount on card switch.
         // So we only need to handle if the SAME card updates content from outside (Realtime).
         // For now, let's assuming remount-on-key-change strategy from CardModal is primary.
-        // But if we do need to update:
-        // const current = editor.getJSON();
-        // if (JSON.stringify(current) !== JSON.stringify(initialContent)) {
-        //    isUpdatingRef.current = true;
-        //    editor.commands.setContent(initialContent);
-        //    isUpdatingRef.current = false;
-        // }
+        // But we still sync when content is different (e.g. realtime updates).
+        const nextContent = initialContent ?? { type: 'doc', content: [] };
+        const current = editor.getJSON();
+        if (JSON.stringify(current) !== JSON.stringify(nextContent)) {
+            isUpdatingRef.current = true;
+            editor.commands.setContent(nextContent, false);
+            isUpdatingRef.current = false;
+        }
     }, [initialContent, editor]);
 
     // Update editable state

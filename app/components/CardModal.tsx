@@ -2,11 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
-import Image from "next/image";
-import clsx from "clsx";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
-import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
-import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -19,15 +15,8 @@ import {
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
-
-const getProfileDisplayName = (profile: ProfileSummary): string => {
-  const identity = resolveProfileIdentity(profile, profile.email ?? null);
-  return identity.label;
-};
-
-const getProfileInitials = (profile: ProfileSummary): string => {
-  return getProfileInitial(profile, profile.email ?? null);
-};
+import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
+import CardModalSidebar from "@/app/components/card-modal/CardModalSidebar";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -487,6 +476,32 @@ export function CardModal({
     }
   };
 
+  const handleDueDateInputChange = useCallback((value: string) => {
+    setDueDate(value ? new Date(value).toISOString() : '');
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  const handleDueStartChange = useCallback((value: string) => {
+    setDueStart(value);
+    handleTimeToggle(!!value);
+    triggerAutoSave();
+  }, [handleTimeToggle, triggerAutoSave]);
+
+  const handleDueEndChange = useCallback((value: string) => {
+    setDueEnd(value);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  const handlePriorityChange = useCallback((value: Priority) => {
+    setPriority(value);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  const handleTargetBoardChange = useCallback((value: string) => {
+    setTargetBoardId(value);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
   // Resize handlers
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -721,205 +736,32 @@ export function CardModal({
         aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="flex flex-col p-4 sm:p-6 pb-2 sm:pb-4 border-b border-slate-200 dark:border-gray-700">
-          <div className="flex justify-between items-start mb-3 sm:mb-4">
-            <h2 id="modal-title" className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-gray-100 line-clamp-2">
-              {titlePreview}
-            </h2>
-            <button
-              onClick={requestClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none p-1"
-              aria-label="Close modal"
-              data-autofocus
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Schedule Section in Header */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Date</span>
-              <input
-                type="date"
-                value={dueDate ? new Date(dueDate).toISOString().split('T')[0] : ''}
-                onChange={(e) => {
-                  setDueDate(e.target.value ? new Date(e.target.value).toISOString() : '');
-                  triggerAutoSave();
-                }}
-                className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
-              />
-            </div>
-
-            {dueDate && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Time</span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="time"
-                    step={900}
-                    value={dueStart}
-                    onChange={(e) => {
-                      setDueStart(e.target.value);
-                      handleTimeToggle(!!e.target.value);
-                      triggerAutoSave();
-                    }}
-                    className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
-                  />
-                  <span className="text-slate-400">-</span>
-                  <input
-                    type="time"
-                    step={900}
-                    value={dueEnd}
-                    onChange={(e) => {
-                      setDueEnd(e.target.value);
-                      triggerAutoSave();
-                    }}
-                    className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
-                  />
-                </div>
-              </div>
-            )}
-
-            {dueDate && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Bucket</span>
-                <select
-                  value={(dueBucket ?? DEFAULT_BUCKET) as DueBucket}
-                  onChange={(e) => handleBucketChange(e.target.value as DueBucket)}
-                  className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
-                >
-                  {BUCKET_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {dueDate && (
-              <div className="flex items-center gap-2 sm:border-l sm:border-slate-100 sm:dark:border-gray-700 sm:pl-4">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest whitespace-nowrap">Members</span>
-                <div className="flex flex-wrap gap-1.5 items-center relative">
-                  {selectedAssignees.map((member) => (
-                    <div
-                      key={member.id}
-                      className="group relative h-6 w-6"
-                      title={resolveProfileIdentity(member, member.email ?? null).label}
-                    >
-                      {member.avatar_url ? (
-                        <Image
-                          src={member.avatar_url}
-                          alt="assigned member"
-                          width={24}
-                          height={24}
-                          className="h-6 w-6 rounded-full object-cover ring-1 ring-white dark:ring-gray-800"
-                        />
-                      ) : (
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-600 font-bold text-[10px] ring-1 ring-white dark:ring-gray-800">
-                          {getProfileInitial(member, member.email ?? null)}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleRemoveMember(member.id)}
-                        className="absolute -top-1 -right-1 bg-white dark:bg-gray-700 rounded-full text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm ring-1 ring-slate-200"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    ref={memberButtonRef}
-                    onClick={() => {
-                      setShowMemberDropdown(!showMemberDropdown);
-                    }}
-                    className="h-6 w-6 flex items-center justify-center rounded-full border border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 dark:border-gray-600 dark:hover:border-sky-600 dark:hover:bg-sky-900/20 text-slate-400 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  </button>
-
-                  {showMemberDropdown && (
-                    <div
-                      ref={memberDropdownRef}
-                      className="absolute z-[100] w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden"
-                      style={{
-                        top: '100%',
-                        left: 0,
-                        marginTop: '8px'
-                      }}
-                    >
-                      <div className="p-2 border-b border-slate-100 dark:border-gray-700">
-                        <input
-                          autoFocus
-                          type="text"
-                          placeholder="Search members..."
-                          value={memberSearch}
-                          onChange={(e) => setMemberSearch(e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-gray-900 border-none rounded-md focus:ring-1 focus:ring-sky-500 outline-none"
-                        />
-                      </div>
-                      <div className="max-h-60 overflow-y-auto p-1">
-                        {filteredProfiles.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-slate-400">
-                            No members found
-                          </div>
-                        ) : (
-                          filteredProfiles.map((profile) => (
-                            <button
-                              key={profile.id}
-                              onClick={() => handleAddMember(profile.id)}
-                              className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-left"
-                            >
-                              {profile.avatar_url ? (
-                                <Image
-                                  src={profile.avatar_url}
-                                  alt=""
-                                  width={24}
-                                  height={24}
-                                  className="h-6 w-6 rounded-full object-cover"
-                                />
-                              ) : (
-                                <span className="h-6 w-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
-                                  {getProfileInitials(profile)}
-                                </span>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-slate-700 dark:text-gray-200 truncate">
-                                  {getProfileDisplayName(profile)}
-                                </div>
-                                <div className="text-[10px] text-slate-400 truncate">
-                                  {profile.email}
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1" />
-
-            {/* Sidebar toggle button */}
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className={clsx(
-                "p-1.5 rounded-md transition-colors",
-                showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/30" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
-              )}
-              title={showSidebar ? "Hide sidebar" : "Show sidebar"}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m-7 10V7a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2z" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <CardModalHeader
+          titlePreview={titlePreview}
+          dueDate={dueDate}
+          dueStart={dueStart}
+          dueEnd={dueEnd}
+          dueBucket={dueBucket}
+          bucketOptions={BUCKET_OPTIONS}
+          defaultBucket={DEFAULT_BUCKET}
+          selectedAssignees={selectedAssignees}
+          filteredProfiles={filteredProfiles}
+          memberSearch={memberSearch}
+          showMemberDropdown={showMemberDropdown}
+          memberButtonRef={memberButtonRef}
+          memberDropdownRef={memberDropdownRef}
+          onMemberSearchChange={setMemberSearch}
+          onToggleMemberDropdown={() => setShowMemberDropdown((prev) => !prev)}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
+          onDueDateChange={handleDueDateInputChange}
+          onDueStartChange={handleDueStartChange}
+          onDueEndChange={handleDueEndChange}
+          onBucketChange={handleBucketChange}
+          onRequestClose={requestClose}
+          showSidebar={showSidebar}
+          onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+        />
 
         {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
         <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
@@ -960,114 +802,23 @@ export function CardModal({
 
           {/* Right Column - Sidebar */}
           {showSidebar && (
-            <div
-              style={{ width: typeof window !== 'undefined' && window.innerWidth < 640 ? '100%' : `${sidebarWidth}px` }}
-              className="border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 min-h-0"
-            >
-              <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
-
-                {/* Tags Section */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                    Tags
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 items-center">
-                    <div className="relative flex-1 min-w-[140px]">
-                      <input
-                        type="text"
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={handleAddTag}
-                        className="w-full px-2 py-1.5 border border-slate-200 rounded-lg dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-transparent placeholder:text-slate-400"
-                        placeholder="+ Add tag..."
-                      />
-                    </div>
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-sky-900/30 text-sky-600 dark:text-sky-300 rounded-md text-[10px] font-medium border border-slate-100 dark:border-sky-800"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => handleRemoveTag(tag)}
-                          className="text-sky-400 hover:text-sky-600"
-                          aria-label={`Remove tag ${tag}`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Priority - Compact row */}
-                <div className="flex items-center justify-between pt-1">
-                  <label className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">
-                    Priority
-                  </label>
-                  <select
-                    value={priority}
-                    onChange={(e) => {
-                      setPriority(e.target.value as Priority);
-                      triggerAutoSave();
-                    }}
-                    className="bg-transparent text-xs font-medium text-slate-600 dark:text-gray-300 focus:outline-none cursor-pointer"
-                  >
-                    <option value="low">🟢 Low</option>
-                    <option value="medium">🟡 Medium</option>
-                    <option value="high">🔴 High</option>
-                  </select>
-                </div>
-
-                {/* Advanced (Board & Links) */}
-                <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-gray-700/50 mt-2">
-                  {boards.length > 1 && (
-                    <div className="flex-1 min-w-0">
-                      <select
-                        value={targetBoardId}
-                        onChange={(e) => {
-                          setTargetBoardId(e.target.value);
-                          triggerAutoSave();
-                        }}
-                        className="w-full bg-transparent text-[10px] font-medium text-slate-500 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none cursor-pointer truncate"
-                      >
-                        {boards.map((board) => (
-                          <option key={board.id} value={board.id}>
-                            Board: {board.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {card.short_id && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const shortUrl = `${window.location.origin}/c/${card.short_id}`;
-                        navigator.clipboard.writeText(shortUrl);
-                      }}
-                      className="text-[10px] font-medium text-sky-500 hover:text-sky-600 dark:text-sky-400 whitespace-nowrap"
-                    >
-                      🔗 Copy Link
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Comments Area */}
-              <div className="flex-1 min-h-0 flex flex-col p-6 pt-4">
-                <h3 className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-4">
-                  Comments
-                </h3>
-                <div className="flex-1 min-h-0">
-                  <CommentsPanel
-                    cardId={card.id}
-                    boardId={card.board_id}
-                    initialProfiles={profiles}
-                  />
-                </div>
-              </div>
-            </div>
+            <CardModalSidebar
+              sidebarWidth={sidebarWidth}
+              tagInput={tagInput}
+              tags={tags}
+              onTagInputChange={setTagInput}
+              onTagInputKeyDown={handleAddTag}
+              onRemoveTag={handleRemoveTag}
+              priority={priority}
+              onPriorityChange={handlePriorityChange}
+              boards={boards}
+              targetBoardId={targetBoardId}
+              onTargetBoardChange={handleTargetBoardChange}
+              cardShortId={card.short_id ?? null}
+              cardId={card.id}
+              boardId={card.board_id}
+              profiles={profiles}
+            />
           )}
         </div>
 
