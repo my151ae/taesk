@@ -6,7 +6,7 @@ import { createClient, type Card } from "@/lib/supabase";
 import { buildCanonicalPath, toSlugBase } from "@/lib/slug";
 import { getBoardById } from "./boards";
 import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
-import { normalizeBlockNoteDocument } from "@/lib/blocknote";
+import { normalizeContent } from "@/lib/tiptap";
 import { resolveAppOrigin } from "@/lib/calendarSyncService";
 
 const TABLE_CARDS = "cards";
@@ -47,7 +47,7 @@ export async function getCardByShortId(shortId: string): Promise<Card | null> {
   return {
     ...card,
     checklist: normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST),
-    content: normalizeBlockNoteDocument((card as any).content ?? []),
+    content: normalizeContent((card as any).content),
   };
 }
 
@@ -61,13 +61,13 @@ export async function getCardWithBoard(shortId: string): Promise<CardWithBoard |
     ...card,
     board: board
       ? {
-          id: board.id,
-          short_id: board.short_id ?? null,
-          id_short: board.id_short ?? null,
-          slug: board.slug ?? null,
-          name: board.name,
-          description: board.description ?? null,
-        }
+        id: board.id,
+        short_id: board.short_id ?? null,
+        id_short: board.id_short ?? null,
+        slug: board.slug ?? null,
+        name: board.name,
+        description: board.description ?? null,
+      }
       : null,
   };
 }

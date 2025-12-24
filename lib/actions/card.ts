@@ -1,8 +1,7 @@
-'use server';
-
 import { supabase } from '@/lib/supabase';
 import { cache } from 'react';
 import type { Card } from '@/lib/supabase';
+import { normalizeContent } from '@/lib/tiptap';
 
 /**
  * Server Action: Get card by short_id
@@ -21,7 +20,11 @@ export const getCardByShortId = cache(async (shortId: string): Promise<Card | nu
       return null;
     }
 
-    return data;
+    const card = data as Card;
+    return {
+      ...card,
+      content: normalizeContent(card.content)
+    };
   } catch (error) {
     console.error('Unexpected error fetching card:', error);
     return null;

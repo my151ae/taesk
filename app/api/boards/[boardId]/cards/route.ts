@@ -3,13 +3,13 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { buildDocumentFromTitle, deriveExcerptFromDocument, ensureTitleBlock, normalizeBlockNoteDocument } from '@/lib/blocknote';
+import { buildContentFromTitle, deriveExcerptFromContent, ensureTitleBlock, normalizeContent } from '@/lib/tiptap';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().max(255),
   checklist: z.any().optional(),
-  content: z.array(z.unknown()).optional(),
+  content: z.record(z.string(), z.unknown()).or(z.array(z.unknown())).optional(),
   excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
@@ -147,17 +147,14 @@ export async function POST(
       slug = slugify(parsed.data.title);
     }
 
-    const contentCandidate = parsed.data.content
-      ? normalizeBlockNoteDocument(parsed.data.content)
-      : [];
     const normalizedContent =
-      contentCandidate.length > 0
-        ? ensureTitleBlock(contentCandidate)
-        : buildDocumentFromTitle(parsed.data.title);
+      parsed.data.content
+        ? ensureTitleBlock(normalizeContent(parsed.data.content))
+        : buildContentFromTitle(parsed.data.title);
     const normalizedExcerpt =
       typeof parsed.data.excerpt === 'string'
         ? parsed.data.excerpt
-        : deriveExcerptFromDocument(normalizedContent);
+        : deriveExcerptFromContent(normalizedContent);
 
     const payload: Record<string, unknown> = {
       board_id: boardId,

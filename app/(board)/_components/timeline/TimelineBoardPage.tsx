@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Board, Card, DueBucket, Priority } from "@/lib/supabase";
+import type { JSONContent } from "@tiptap/react";
 import { flattenChecklistText } from "@/lib/checklist";
 import {
-  buildDocumentFromTitle,
-  deriveExcerptFromDocument,
-  getDocumentPlainText,
-  normalizeBlockNoteDocument,
-  type BlockNoteDocument,
-} from "@/lib/blocknote";
+  buildContentFromTitle,
+  deriveExcerptFromContent,
+  getTiptapPlainText,
+  normalizeContent,
+} from "@/lib/tiptap";
 import { buildBoardUrl } from "@/lib/board-url";
 
 import { CardModal } from "@/app/components/CardModal";
@@ -289,7 +289,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     async (savePayload: {
       id: string;
       title: string;
-      content: BlockNoteDocument | Record<string, any>;
+      content: JSONContent | Record<string, any>;
       excerpt: string;
       tags?: string[];
       due_date?: string | null;
@@ -317,7 +317,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         }
         const payload: Record<string, unknown> = {
           title: savePayload.title,
-          content: Array.isArray(savePayload.content) ? normalizeBlockNoteDocument(savePayload.content) : savePayload.content,
+          content: normalizeContent(savePayload.content),
           excerpt: savePayload.excerpt ?? "",
           tags: savePayload.tags,
           due_date: normalizedDueDate,
@@ -459,7 +459,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       priority?: string | null;
       checked: boolean;
       excerpt?: string | null;
-      content?: BlockNoteDocument | Record<string, any> | null;
+      content?: JSONContent | Record<string, any> | null;
       checklist?: unknown;
     }) => {
       // Priority (only for events that have priority, buckets might not?)
@@ -475,28 +475,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         let contentText = "";
-        if (Array.isArray(item.content)) {
-          contentText = getDocumentPlainText(normalizeBlockNoteDocument(item.content));
-        } else if (item.content && typeof item.content === 'object') {
-          // Tiptap - simple extraction or ignore
-          // Simple hack: JSON.stringify or use generic extractor. 
-          // Ideally import getTiptapPlainText but avoiding new imports if possible.
-          // Let's just stringify values for search? No, that includes keys. 
-          // Leaving empty for object content for now to avoid breaking build, or simple extraction.
-          // Actually, import { getTiptapPlainText } from "@/lib/tiptap"; is needed. 
-          // I'll add the import in a separate chunk or let it be generic. 
-          // For now: 
-          try {
-            // Basic deep search for 'text' keys
-            const extract = (n: any): string => {
-              if (!n) return "";
-              if (typeof n === 'string') return "";
-              if (n.text) return n.text;
-              if (n.content && Array.isArray(n.content)) return n.content.map(extract).join(" ");
-              return "";
-            }
-            contentText = extract(item.content);
-          } catch (e) { contentText = ""; }
+        if (item.content) {
+          contentText = getTiptapPlainText(normalizeContent(item.content));
         }
         const checklistText = flattenChecklistText((item as any).checklist ?? null);
         const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')} ${item.excerpt ?? ''} ${contentText} ${checklistText}`.toLowerCase();
@@ -952,8 +932,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     console.debug('[timeline] column click', { day, minutes });
     const title = `New card ${Date.now()}`;
-    const content = buildDocumentFromTitle(title);
-    const excerpt = deriveExcerptFromDocument(content);
+    const content = buildContentFromTitle(title);
+    const excerpt = deriveExcerptFromContent(content);
 
     const payload: Partial<Card> = {
       title,
@@ -1029,8 +1009,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       const now = Date.now();
       const dueBucket = bucketKeyToDueBucket(bucketKey);
       const title = `New card ${now}`;
-      const content = buildDocumentFromTitle(title);
-      const excerpt = deriveExcerptFromDocument(content);
+      const content = buildContentFromTitle(title);
+      const excerpt = deriveExcerptFromContent(content);
       const tempId = `temp-${now}`;
 
       const position = resolveBucketInsertPosition((data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[], afterCardId);

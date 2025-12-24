@@ -63,7 +63,7 @@ import NotificationSettings from "./NotificationSettings";
 import ProfileSettings from "./ProfileSettings";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText, type Checklist } from "@/lib/checklist";
-import type { BlockNoteDocument } from "@/lib/blocknote";
+import { buildContentFromTitle } from "@/lib/tiptap";
 import type { JSONContent } from "@tiptap/react";
 
 
@@ -1555,6 +1555,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       id: uuidv4(),
       title,
       checklist: EMPTY_CHECKLIST,
+      content: buildContentFromTitle(title),
       list_id: listId,
       board_id: currentBoardId,
       position,
@@ -2157,6 +2158,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       id: uuidv4(),
       title: '',
       checklist: EMPTY_CHECKLIST,
+      content: buildContentFromTitle(''),
       list_id: sourceCard.list_id,
       board_id: currentBoardId,
       position: newPosition,

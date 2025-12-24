@@ -1,5 +1,5 @@
 import type { Checklist } from '@/lib/checklist';
-import type { BlockNoteDocument } from '@/lib/blocknote';
+import type { JSONContent } from '@tiptap/react';
 
 export interface UserProfile {
   id: string;
@@ -23,7 +23,7 @@ export interface TimelineEvent {
   due_end: string | null;
   durationMinutes: number | null;
   title: string;
-  content?: BlockNoteDocument | null;
+  content?: JSONContent | null;
   excerpt?: string | null;
   tags: string[];
   priority: string | null;
@@ -41,7 +41,7 @@ export interface TimelineEvent {
 export interface TimelineBucketItem {
   card_id: string;
   title: string;
-  content?: BlockNoteDocument | null;
+  content?: JSONContent | null;
   excerpt?: string | null;
   due_date: string | null;
   due_start: string | null;

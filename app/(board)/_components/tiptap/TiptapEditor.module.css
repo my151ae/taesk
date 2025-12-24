@@ -70,12 +70,26 @@
 }
 
 /* Placeholder styling */
-.editor :global(.ProseMirror p.is-editor-empty:first-child::before) {
+.editor :global(.ProseMirror .is-empty) {
+    position: relative;
+}
+
+.editor :global(.ProseMirror .is-empty::before) {
     color: #adb5bd;
     content: attr(data-placeholder);
-    float: left;
-    height: 0;
+    left: 0;
     pointer-events: none;
+    position: absolute;
+    top: 0;
+    white-space: nowrap;
+}
+
+.editor :global(.ProseMirror li.is-empty::before) {
+    left: 1.5em;
+}
+
+.editor :global(.ProseMirror ul[data-type="taskList"] li.is-empty::before) {
+    left: 1.6em;
 }
 
 /* Tighten standard paragraphs globally */

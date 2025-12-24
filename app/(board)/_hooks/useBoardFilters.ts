@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, Priority } from '@/lib/supabase';
 import { flattenChecklistText } from '@/lib/checklist';
-import { getDocumentPlainText, normalizeBlockNoteDocument } from '@/lib/blocknote';
+import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
 
 export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc';
 
@@ -42,7 +42,7 @@ export const filterAndSortCards = (
       (card) =>
         card.title.toLowerCase().includes(query) ||
         (card.excerpt ?? "").toLowerCase().includes(query) ||
-        getDocumentPlainText(normalizeBlockNoteDocument(card.content ?? [])).toLowerCase().includes(query) ||
+        getTiptapPlainText(normalizeContent(card.content)).toLowerCase().includes(query) ||
         flattenChecklistText(card.checklist).toLowerCase().includes(query)
     );
   }

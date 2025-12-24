@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { buildBoardUrl } from "@/lib/board-url";
 import { resolveAppOrigin } from "@/lib/calendarSyncService";
 import { normalizeCardSlugOrRedirect } from "@/lib/server/cards";
-import { getBlockPlainText, normalizeBlockNoteDocument } from "@/lib/blocknote";
+import { getTiptapPlainText, normalizeContent } from "@/lib/tiptap";
 
 export const revalidate = 0;
 
@@ -27,8 +27,9 @@ export default async function CardFullPage({
   const createdAt = new Date(card.created_at);
   const updatedAt = new Date(card.updated_at);
   const tags = Array.isArray(card.tags) ? card.tags : [];
-  const contentBlocks = normalizeBlockNoteDocument(card.content ?? []);
-  const bodyBlocks = contentBlocks.slice(1);
+  const content = normalizeContent(card.content);
+  // Separate title and body if needed, but here simple full text display for fallback
+  const plainText = getTiptapPlainText(content);
 
   // Deep linkはボード上のモーダルを開きたいケースが多いため、ボードURLが判明していれば
   // `/board...?card=SHORTID` にリダイレクトする。共有ページとしての表示はフォールバック。
@@ -112,15 +113,11 @@ export default async function CardFullPage({
           <div className="mt-8 space-y-6">
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Notes</h2>
-              {bodyBlocks.length === 0 ? (
+              {!plainText ? (
                 <p className="mt-2 text-sm text-slate-500">No content</p>
               ) : (
-                <div className="mt-2 space-y-2 text-base leading-6 text-slate-800">
-                  {bodyBlocks.map((block, index) => {
-                    const text = getBlockPlainText(block);
-                    if (!text) return null;
-                    return <p key={`block-${index}`}>{text}</p>;
-                  })}
+                <div className="mt-2 space-y-2 text-base leading-6 text-slate-800 whitespace-pre-wrap">
+                  {plainText}
                 </div>
               )}
             </section>
