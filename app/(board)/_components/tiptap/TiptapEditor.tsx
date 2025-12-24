@@ -70,7 +70,7 @@ export default function TiptapEditor({
         const current = editor.getJSON();
         if (JSON.stringify(current) !== JSON.stringify(nextContent)) {
             isUpdatingRef.current = true;
-            editor.commands.setContent(nextContent, false);
+            editor.commands.setContent(nextContent, { emitUpdate: false });
             isUpdatingRef.current = false;
         }
     }, [initialContent, editor]);
