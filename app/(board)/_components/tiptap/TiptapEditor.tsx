@@ -37,20 +37,14 @@ export default function TiptapEditor({
                 nested: true,
             }),
             Placeholder.configure({
-                placeholder: ({ node, editor }) => {
+                placeholder: ({ node }) => {
                     if (node.type.name === 'heading') {
                         return `H${node.attrs.level ?? 1}`;
-                    }
-                    if (editor.isActive('taskItem') || editor.isActive('taskList')) {
-                        return 'ToDo';
-                    }
-                    if (editor.isActive('bulletList') || editor.isActive('orderedList')) {
-                        return 'List';
                     }
                     if (node.type.name === 'paragraph') {
                         return 'Text';
                     }
-                    return placeholder;
+                    return '';
                 },
                 showOnlyCurrent: true,
             }),

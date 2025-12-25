@@ -74,6 +74,9 @@
     position: relative;
 }
 
+/* プレースホルダは p や heading などのリーフノードにのみ適用されるため、
+   リスト要素自体（ul/ol/li）に left オフセットを設定する必要はありません。
+   親のパディングやマージンによって自動的に正しい位置に表示されます。 */
 .editor :global(.ProseMirror .is-empty::before) {
     color: #adb5bd;
     content: attr(data-placeholder);
@@ -82,14 +85,6 @@
     position: absolute;
     top: 0;
     white-space: nowrap;
-}
-
-.editor :global(.ProseMirror li.is-empty::before) {
-    left: 1.5em;
-}
-
-.editor :global(.ProseMirror ul[data-type="taskList"] li.is-empty::before) {
-    left: 1.6em;
 }
 
 /* Tighten standard paragraphs globally */
