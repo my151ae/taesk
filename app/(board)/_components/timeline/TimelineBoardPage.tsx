@@ -52,7 +52,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [activeDayIndex, setActiveDayIndex] = useState(0);
-  const [dayRange, setDayRange] = useState(initialBoard.day_range || 1);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
 
   // 1. URL State
@@ -63,6 +62,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     dayWindowStartRef,
     setDayWindowStart,
     updateUrl,
+    initialRange: dayRange, // URLから取得した現在のレンジをdayRangeとして使用
   } = useTimelineUrlState({ initialDayRange: initialBoard.day_range });
 
   // 2. Data Fetching
