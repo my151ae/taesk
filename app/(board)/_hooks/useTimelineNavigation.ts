@@ -1,0 +1,114 @@
+"use client";
+
+import { useCallback } from "react";
+import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import type { TimelineDay } from "@/app/(board)/_utils/timeline-helpers";
+import { pixelsToMinutes } from "@/app/(board)/_utils/timeline-helpers";
+
+interface UseTimelineNavigationProps {
+    data: any;
+    status: string;
+    dayRange: number;
+    activeDayIndex: number;
+    setActiveDayIndex: (index: number) => void;
+    fetchTimeline: (startOffset: number) => Promise<any>;
+    updateUrl: (date: string, range: number, time?: number) => void;
+    timelineScrollRef: React.RefObject<HTMLDivElement | null>;
+    router: AppRouterInstance;
+    dayWindowStartRef: React.MutableRefObject<number>;
+}
+
+export function useTimelineNavigation({
+    data,
+    status,
+    dayRange,
+    activeDayIndex,
+    setActiveDayIndex,
+    fetchTimeline,
+    updateUrl,
+    timelineScrollRef,
+    router,
+    dayWindowStartRef,
+}: UseTimelineNavigationProps) {
+
+    const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
+        if (!nextLength) return 0;
+        const maxStart = Math.max(0, nextLength - dayRange);
+        if (typeof desired === 'number') {
+            return Math.min(Math.max(0, desired), maxStart);
+        }
+        return Math.min(activeDayIndex, maxStart);
+    }, [activeDayIndex, dayRange]);
+
+    const getCurrentTime = useCallback(() => {
+        const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
+        return pixelsToMinutes(currentScrollTop);
+    }, [timelineScrollRef]);
+
+    const handlePrevDay = useCallback(async () => {
+        if (status === 'loading') return;
+        if (activeDayIndex > 0) {
+            const newIndex = Math.max(0, activeDayIndex - 1);
+            setActiveDayIndex(newIndex);
+            const targetDay = data?.days?.[newIndex];
+            if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+            return;
+        }
+
+        const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+        const payload = await fetchTimeline(baseStart - 1);
+        const nextDaysLength = payload?.days?.length ?? 0;
+        const newIndex = clampActiveDayIndex(nextDaysLength, 0);
+        setActiveDayIndex(newIndex);
+        const targetDay = payload?.days?.[newIndex];
+        if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+    }, [activeDayIndex, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
+
+    const handleNextDay = useCallback(async () => {
+        if (status === 'loading' || !data?.days?.length) return;
+        const lastStartIndex = Math.max(0, data.days.length - dayRange);
+        if (activeDayIndex < lastStartIndex) {
+            const newIndex = Math.min(lastStartIndex, activeDayIndex + 1);
+            setActiveDayIndex(newIndex);
+            const targetDay = data?.days?.[newIndex];
+            if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+            return;
+        }
+
+        const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+        const payload = await fetchTimeline(baseStart + 1);
+        const nextDaysLength = payload?.days?.length ?? 0;
+        const newIndex = clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0);
+        setActiveDayIndex(newIndex);
+        const targetDay = payload?.days?.[newIndex];
+        if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+    }, [activeDayIndex, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
+
+    const handleTodayClick = useCallback(async () => {
+        const payload = await fetchTimeline(0);
+        setActiveDayIndex(0);
+        const todayIso = payload?.days?.[0]?.isoDate ?? data?.days?.[0]?.isoDate;
+        if (todayIso) {
+            const params = new URLSearchParams();
+            params.set('date', todayIso);
+            params.set('range', String(dayRange));
+            const currentTime = getCurrentTime();
+            if (currentTime >= 0) params.set('time', String(currentTime));
+            router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+        }
+    }, [fetchTimeline, data, dayRange, router, getCurrentTime, setActiveDayIndex]);
+
+    const handleDayRangeChange = useCallback((newRange: number) => {
+        const currentDay = data?.days?.[activeDayIndex];
+        if (currentDay) {
+            updateUrl(currentDay.isoDate, newRange, getCurrentTime());
+        }
+    }, [data, activeDayIndex, updateUrl, getCurrentTime]);
+
+    return {
+        handlePrevDay,
+        handleNextDay,
+        handleTodayClick,
+        handleDayRangeChange,
+    };
+}
