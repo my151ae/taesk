@@ -63,6 +63,7 @@ export const TimelineBucketCard = ({
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
+                    duration={item.duration}
                     timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
                     timePlacement="top"
                     onOpen={() => openCardModal(item.short_id)}

@@ -38,10 +38,14 @@ export const TimelineEventItem = memo(function TimelineEventItem({
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
+    let displayStart = event.due_start;
+    let displayEnd = event.due_end;
 
     if (activeResize && activeResize.cardId === event.card_id) {
         start = activeResize.startMinutes;
         duration = activeResize.duration;
+        displayStart = minutesToTime(start);
+        displayEnd = minutesToTime(start + duration);
     }
 
     const top = minuteToPixels(start);
@@ -73,12 +77,12 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    timeText={timeLabel(event.due_start, event.due_end)}
+                    duration={duration}
+                    timeText={timeLabel(displayStart, displayEnd)}
                     onOpen={() => {
                         onClearGhost();
                         openCardModal(event.short_id, 'event-button');
                     }}
-                    openButtonTestId={`cardOpenButton-${event.card_id}`}
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"

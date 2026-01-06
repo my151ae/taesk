@@ -6,6 +6,7 @@ type TimelineCardProps = {
     checked: boolean;
     onToggleCheck: (checked: boolean) => void;
     badgeLabel?: string | null;
+    duration?: number | null;
     timeText?: ReactNode;
     timePlacement?: 'top' | 'inline';
     onOpen: () => void;
@@ -25,6 +26,7 @@ export function TimelineCard({
     checked,
     onToggleCheck,
     badgeLabel,
+    duration,
     timeText,
     timePlacement = 'top',
     onOpen,
@@ -86,7 +88,7 @@ export function TimelineCard({
                 </div>
             ) : null}
 
-            {badgeLabel ? (
+            {badgeLabel || duration ? (
                 <button
                     type="button"
                     className="absolute top-2 right-2 flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
@@ -98,7 +100,9 @@ export function TimelineCard({
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    <span className="text-[10px] font-bold leading-none text-slate-500">{badgeLabel}</span>
+                    <span className="text-[10px] font-bold leading-none text-slate-500">
+                        {duration || ''}{badgeLabel || ''}
+                    </span>
                 </button>
             ) : null}
 

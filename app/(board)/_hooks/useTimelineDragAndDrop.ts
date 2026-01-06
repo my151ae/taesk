@@ -567,8 +567,8 @@ export function useTimelineDragAndDrop({
         });
         const fallbackPointer = currentDrag.startMinutes + (event.delta.y / HOUR_HEIGHT) * 60;
         let nextStart = pointerMinutes ?? fallbackPointer;
-        nextStart = Math.round(nextStart / 15) * 15;
-        nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
+        nextStart = Math.round(nextStart / 5) * 5;
+        nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
         const desiredEnd = nextStart + currentDrag.duration;
         const endMinutes = Math.min(desiredEnd, 24 * 60 - 1);
         const durationMinutes = Math.max(endMinutes - nextStart, 1);
@@ -674,8 +674,8 @@ export function useTimelineDragAndDrop({
             });
             const fallbackPointer = activeDrag.startMinutes + (delta.y / HOUR_HEIGHT) * 60;
             let nextStart = pointerMinutes ?? fallbackPointer;
-            nextStart = Math.round(nextStart / 15) * 15;
-            nextStart = Math.max(0, Math.min(23 * 60 + 45, nextStart));
+            nextStart = Math.round(nextStart / 5) * 5;
+            nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
             let nextEnd = nextStart + activeDrag.duration;
 
             // Preserve due_bucket from source card
@@ -777,30 +777,29 @@ export function useTimelineDragAndDrop({
         event: TimelineEvent,
         native: KeyboardEvent<HTMLElement>
     ) => {
-        // Disabled to prevent conflict with checklist navigation
-        // if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
-        // native.preventDefault();
-        // const direction = native.key === 'ArrowUp' ? -15 : 15;
-        // const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
-        // const duration = event.durationMinutes ?? 60;
-        // const nextStart = Math.max(0, Math.min(23 * 60 + 45, startMinutes + direction));
-        // const nextEnd = nextStart + duration;
-        // persistPlacement(
-        //     event.card_id,
-        //     {
-        //         due_bucket: null,
-        //         due_date: withJstMidnight(event.due_date ?? null),
-        //         due_start: minutesToTime(nextStart),
-        //         due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
-        //         due_bucket_position: null,
-        //     },
-        //     {
-        //         target: 'timeline',
-        //         sourceEvent: event,
-        //         defaultDuration: duration,
-        //         localDueDate: event.due_date ?? null,
-        //     }
-        // );
+        if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
+        native.preventDefault();
+        const direction = native.key === 'ArrowUp' ? -5 : 5;
+        const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;
+        const duration = event.durationMinutes ?? 60;
+        const nextStart = Math.max(0, Math.min(23 * 60 + 55, startMinutes + direction));
+        const nextEnd = nextStart + duration;
+        persistPlacement(
+            event.card_id,
+            {
+                due_bucket: (event.due_bucket as DueBucket) ?? null,
+                due_date: withJstMidnight(event.due_date ?? null),
+                due_start: minutesToTime(nextStart),
+                due_end: minutesToTime(Math.min(nextEnd, 24 * 60 - 1)),
+                due_bucket_position: event.due_bucket_position ?? null,
+            },
+            {
+                target: 'timeline',
+                sourceEvent: event,
+                defaultDuration: duration,
+                localDueDate: event.due_date ?? null,
+            }
+        );
     };
 
     const handleResizeStart = useCallback((e: ReactPointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => {
@@ -825,10 +824,10 @@ export function useTimelineDragAndDrop({
         e.stopPropagation();
 
         const deltaY = e.clientY - activeResize.startY;
-        const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 15) * 15;
+        const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 5) * 5;
 
         if (activeResize.edge === 'bottom') {
-            const newDuration = Math.max(15, activeResize.originalDuration + deltaMinutes);
+            const newDuration = Math.max(5, activeResize.originalDuration + deltaMinutes);
             const endMinutes = activeResize.startMinutes + newDuration;
             const maxEnd = 24 * 60;
             const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
@@ -841,9 +840,9 @@ export function useTimelineDragAndDrop({
             let newDuration = activeResize.originalDuration - deltaMinutes;
 
             // Ensure minimum duration
-            if (newDuration < 15) {
-                newDuration = 15;
-                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 15;
+            if (newDuration < 5) {
+                newDuration = 5;
+                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 5;
             }
 
             // Ensure start time is not negative
