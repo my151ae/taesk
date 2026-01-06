@@ -1391,6 +1391,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
         checked: card.checked,
         assignee_id: card.assignee_id,
         assigned_to: card.assigned_to ?? null,
+        duration: card.duration ?? 60,
         slug: card.slug ?? undefined,
       };
       if (card.content !== undefined) {
@@ -1566,6 +1567,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_end: null,
       due_bucket: null,
       due_bucket_position: null,
+      duration: 60,
       priority: 'medium',
       checked: false,
       assigned_to: null,
@@ -2006,6 +2008,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
     due_end?: string | null;
     due_bucket?: DueBucket | null;
     due_bucket_position?: number | null;
+    duration?: number;
   }) => {
     console.log('[handleSaveCard] Starting...', { id: payload.id, title: payload.title, assigneeIds: payload.assigneeIds });
 
@@ -2037,6 +2040,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
             assignee_id: nextAssigneeId, // Keep for backward compatibility
             assignee_ids: nextAssigneeIds.length > 0 ? nextAssigneeIds : null,
             assigned_to: null, // Clear legacy field
+            duration: payload.duration ?? card.duration ?? 60,
             slug,
             updated_at: new Date().toISOString(),
           };
@@ -2169,6 +2173,7 @@ function KanbanBoard({ initialBoard, initialData, initialCardId }: KanbanBoardCl
       due_end: null,
       due_bucket: null,
       due_bucket_position: null,
+      duration: 60,
       priority: 'medium',
       checked: false,
       assigned_to: null,

@@ -90,6 +90,7 @@ export interface Card {
   due_end: string | null;
   due_bucket: DueBucket | null;
   due_bucket_position: number | null;
+  duration: number;
   priority: Priority;
   checked: boolean;
   /** @deprecated legacy text-based assignee field */

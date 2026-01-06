@@ -109,6 +109,7 @@ export function useTimelineCardActions({
                     due_bucket: savePayload.due_bucket,
                     due_bucket_position: savePayload.due_bucket_position,
                     priority: savePayload.priority,
+                    duration: savePayload.duration,
                     slug: slugify(savePayload.title),
                 };
                 if (savePayload.assigneeTouched) {

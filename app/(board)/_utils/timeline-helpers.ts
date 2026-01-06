@@ -194,8 +194,8 @@ export const calculateEventLayout = (events: TimelineEvent[]): Record<string, Ev
         const aStart = getMinutesFromTime(a.due_start) ?? 0;
         const bStart = getMinutesFromTime(b.due_start) ?? 0;
         if (aStart !== bStart) return aStart - bStart;
-        const aDur = a.durationMinutes ?? 60;
-        const bDur = b.durationMinutes ?? 60;
+        const aDur = a.durationMinutes ?? a.duration ?? 60;
+        const bDur = b.durationMinutes ?? b.duration ?? 60;
         return bDur - aDur;
     });
 
@@ -206,7 +206,7 @@ export const calculateEventLayout = (events: TimelineEvent[]): Record<string, Ev
 
     sorted.forEach(event => {
         const start = getMinutesFromTime(event.due_start) ?? 0;
-        const duration = event.durationMinutes ?? 60;
+        const duration = event.durationMinutes ?? event.duration ?? 60;
         const end = start + duration;
 
         if (currentCluster.length === 0) {
@@ -238,7 +238,7 @@ export const calculateEventLayout = (events: TimelineEvent[]): Record<string, Ev
             let placed = false;
             for (let i = 0; i < columns.length; i++) {
                 const lastInCol = columns[i][columns[i].length - 1];
-                const lastEnd = (getMinutesFromTime(lastInCol.due_start) ?? 0) + (lastInCol.durationMinutes ?? 60);
+                const lastEnd = (getMinutesFromTime(lastInCol.due_start) ?? 0) + (lastInCol.durationMinutes ?? lastInCol.duration ?? 60);
                 if (lastEnd <= start) {
                     columns[i].push(event);
                     placed = true;

@@ -23,6 +23,7 @@ type CardModalHeaderProps = {
     dueStart: string;
     dueEnd: string;
     dueBucket: DueBucket | null;
+    duration: number;
     bucketOptions: BucketOption[];
     defaultBucket: DueBucket;
     selectedAssignees: ProfileSummary[];
@@ -38,6 +39,7 @@ type CardModalHeaderProps = {
     onDueDateChange: (value: string) => void;
     onDueStartChange: (value: string) => void;
     onDueEndChange: (value: string) => void;
+    onDurationChange: (value: number) => void;
     onBucketChange: (bucket: DueBucket) => void;
     onRequestClose: () => void;
     showSidebar: boolean;
@@ -50,6 +52,7 @@ export default function CardModalHeader({
     dueStart,
     dueEnd,
     dueBucket,
+    duration,
     bucketOptions,
     defaultBucket,
     selectedAssignees,
@@ -65,6 +68,7 @@ export default function CardModalHeader({
     onDueDateChange,
     onDueStartChange,
     onDueEndChange,
+    onDurationChange,
     onBucketChange,
     onRequestClose,
     showSidebar,
@@ -113,9 +117,9 @@ export default function CardModalHeader({
                 </div>
 
                 {dueDate && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Time</span>
-                        <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Time</span>
                             <input
                                 type="time"
                                 step={900}
@@ -123,14 +127,26 @@ export default function CardModalHeader({
                                 onChange={(e) => onDueStartChange(e.target.value)}
                                 className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
                             />
-                            <span className="text-slate-400">-</span>
-                            <input
-                                type="time"
-                                step={900}
-                                value={dueEnd}
-                                onChange={(e) => onDueEndChange(e.target.value)}
-                                className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
-                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Dur</span>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    value={duration}
+                                    onChange={(e) => onDurationChange(parseInt(e.target.value, 10))}
+                                    className="w-14 px-1 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent text-center"
+                                />
+                                <span className="text-[10px] text-slate-400 dark:text-gray-500 font-medium">min</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400">→</span>
+                            <div className="px-2 py-1 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-md text-xs text-slate-500 dark:text-gray-400 min-w-[3.5rem] text-center font-medium">
+                                {dueEnd || '--:--'}
+                            </div>
                         </div>
                     </div>
                 )}

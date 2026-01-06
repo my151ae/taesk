@@ -29,6 +29,7 @@ const CreateCardSchema = z.object({
   slug: z.string().nullable().optional(),
   created_at: z.string().datetime().optional(),
   updated_at: z.string().datetime().optional(),
+  duration: z.number().int().min(0).nullable().optional(),
 });
 
 /**
@@ -181,6 +182,7 @@ export async function POST(
       slug: slug,
       created_at: parsed.data.created_at,
       updated_at: parsed.data.updated_at,
+      duration: parsed.data.duration ?? 60,
     };
 
     Object.keys(payload).forEach((key) => {

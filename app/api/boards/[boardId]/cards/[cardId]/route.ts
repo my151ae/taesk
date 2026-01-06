@@ -24,6 +24,7 @@ const UpdateCardSchema = z.object({
   assigned_to: z.string().nullable().optional(),
   assignee_ids: z.array(z.string().uuid()).nullable().optional(),
   slug: z.string().max(255).optional(),
+  duration: z.number().int().min(0).nullable().optional(),
 });
 
 /**

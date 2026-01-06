@@ -42,6 +42,7 @@ interface CardModalProps {
         due_end?: string | null;
         due_bucket?: DueBucket | null;
         due_bucket_position?: number | null;
+        duration?: number;
         isAutoSave?: boolean;
     }) => void;
     onDelete: (id: string) => void;
@@ -68,6 +69,7 @@ export function CardModal({
     const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
     const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
     const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
+    const [duration, setDuration] = useState<number>(card.duration ?? 60);
     const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
     const contentFetchRef = useRef<string | null>(null);
     // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
@@ -166,6 +168,7 @@ export function CardModal({
             setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
             setDueBucket(card.due_bucket ?? null);
             setDueBucketPosition(card.due_bucket_position ?? null);
+            setDuration(card.duration ?? 60);
             setPriority(card.priority || 'medium');
             // Initialize assigneeIds from card
             const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
@@ -188,6 +191,7 @@ export function CardModal({
             setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
             setDueBucket(card.due_bucket ?? null);
             setDueBucketPosition(card.due_bucket_position ?? null);
+            setDuration(card.duration ?? 60);
             setPriority(card.priority || 'medium');
             const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
                 ? card.assignee_ids
@@ -225,10 +229,10 @@ export function CardModal({
             const tagsMatch = cardTags.length === tags.length && cardTags.every(t => tags.includes(t));
 
             const bucketMatch = (card.due_bucket ?? null) === (dueBucket ?? null);
-
+            const durationMatch = (card.duration ?? 60) === duration;
             if (localSerialized === incomingSerialized &&
                 dateMatch && startMatch && endMatch &&
-                priorityMatch && tagsMatch && bucketMatch && assigneesMatch) {
+                priorityMatch && tagsMatch && bucketMatch && assigneesMatch && durationMatch) {
                 setIsDirty(false);
             }
         }
@@ -371,6 +375,7 @@ export function CardModal({
             due_end: normalizedEnd,
             due_bucket: normalizedBucket,
             due_bucket_position: normalizedBucketPosition,
+            duration: duration,
             isAutoSave,
         });
 
@@ -387,6 +392,7 @@ export function CardModal({
         dueEnd,
         dueBucket,
         dueBucketPosition,
+        duration,
         priority,
         assigneeIds,
         assigneeTouched,
@@ -489,18 +495,56 @@ export function CardModal({
     const handleDueStartChange = useCallback((value: string) => {
         setDueStart(value);
         handleTimeToggle(!!value);
+
+        // Preserve duration and move end time
+        if (value && duration) {
+            const [hours, mins] = value.split(':').map(Number);
+            const startMins = hours * 60 + mins;
+            const endMins = startMins + duration;
+            const h = Math.floor(endMins / 60) % 24;
+            const m = endMins % 60;
+            setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
+
         triggerAutoSave();
-    }, [handleTimeToggle, triggerAutoSave]);
+    }, [handleTimeToggle, duration, triggerAutoSave]);
 
     const handleDueEndChange = useCallback((value: string) => {
         setDueEnd(value);
+
+        // Update duration based on start time
+        if (value && dueStart) {
+            const [sH, sM] = dueStart.split(':').map(Number);
+            const [eH, eM] = value.split(':').map(Number);
+            const startMins = sH * 60 + sM;
+            let endMins = eH * 60 + eM;
+            if (endMins < startMins) endMins += 24 * 60; // Cross midnight
+            setDuration(Math.max(1, endMins - startMins));
+        }
+
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [dueStart, triggerAutoSave]);
 
     const handlePriorityChange = useCallback((value: Priority) => {
         setPriority(value);
         triggerAutoSave();
     }, [triggerAutoSave]);
+
+    const handleDurationChange = useCallback((value: number) => {
+        const nextDuration = Math.max(1, value);
+        setDuration(nextDuration);
+
+        // If we have start time, update end time to maintain duration
+        if (dueStart) {
+            const [hours, mins] = dueStart.split(':').map(Number);
+            const startMins = hours * 60 + mins;
+            const endMins = startMins + nextDuration;
+            const h = Math.floor(endMins / 60) % 24;
+            const m = endMins % 60;
+            setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
+        triggerAutoSave();
+    }, [dueStart, triggerAutoSave]);
 
     const handleTargetBoardChange = useCallback((value: string) => {
         setTargetBoardId(value);
@@ -746,6 +790,8 @@ export function CardModal({
                     onDueDateChange={handleDueDateInputChange}
                     onDueStartChange={handleDueStartChange}
                     onDueEndChange={handleDueEndChange}
+                    duration={duration}
+                    onDurationChange={handleDurationChange}
                     onBucketChange={handleBucketChange}
                     onRequestClose={requestClose}
                     showSidebar={showSidebar}

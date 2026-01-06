@@ -84,7 +84,7 @@ export async function GET(
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, checklist, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug';
+    'id, title, checklist, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -160,6 +160,7 @@ export async function GET(
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
+        duration: card.duration ?? 60,
         short_id: card.short_id,
         slug: card.slug,
       });
@@ -185,6 +186,7 @@ export async function GET(
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
+        duration: card.duration ?? 60,
         short_id: card.short_id,
         slug: card.slug,
         bucketPosition: card.due_bucket_position ?? null,

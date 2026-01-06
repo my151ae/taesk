@@ -81,6 +81,7 @@ export function applyCardUpdate(
             assignee_id: card.assignee_id,
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
+            duration: card.duration ?? null,
             short_id: card.short_id,
             slug: card.slug,
         };
@@ -128,6 +129,7 @@ export function applyCardUpdate(
             assignee_id: card.assignee_id,
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
+            duration: card.duration ?? null,
             short_id: card.short_id,
             slug: card.slug,
             bucketPosition: card.due_bucket_position,

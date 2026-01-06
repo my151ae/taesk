@@ -34,6 +34,7 @@ export interface TimelineEvent {
   assignee_id?: string | null;
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
+  duration?: number | null;
   short_id: string | null;
   slug: string | null;
 }
@@ -52,6 +53,7 @@ export interface TimelineBucketItem {
   assignee_id?: string | null;
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
+  duration?: number | null;
   short_id: string | null;
   slug: string | null;
   bucketPosition: number | null;

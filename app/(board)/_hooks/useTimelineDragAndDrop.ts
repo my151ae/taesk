@@ -203,7 +203,7 @@ export function useTimelineDragAndDrop({
                     const durationMinutes =
                         startMinutes != null && endMinutes != null
                             ? Math.max(endMinutes - startMinutes, 15)
-                            : baseEvent?.durationMinutes ?? meta.defaultDuration ?? 60;
+                            : baseEvent?.durationMinutes ?? baseEvent?.duration ?? baseBucketItem?.duration ?? meta.defaultDuration ?? 60;
 
                     const replacement: TimelineEvent = {
                         card_id: cardId,
@@ -301,12 +301,14 @@ export function useTimelineDragAndDrop({
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
             const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
-            const duration = Math.max(eventData.durationMinutes ?? 60, 15);
+            const duration = Math.max(eventData.durationMinutes ?? eventData.duration ?? 60, 15);
             const dragState: ActiveDragState = { cardId, startMinutes, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
         } else {
-            const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration: 60 };
+            const bucketItem = event.active.data.current?.item as TimelineBucketItem;
+            const duration = Math.max(bucketItem?.duration ?? 60, 15);
+            const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
         }
@@ -868,6 +870,7 @@ export function useTimelineDragAndDrop({
             const newEnd = activeResize.startMinutes + activeResize.duration;
             const payload: Record<string, unknown> = {
                 due_end: minutesToTime(newEnd),
+                duration: activeResize.duration,
             };
             if (activeResize.edge === 'top') {
                 payload.due_start = minutesToTime(activeResize.startMinutes);
@@ -880,6 +883,7 @@ export function useTimelineDragAndDrop({
                         return {
                             ...ev,
                             durationMinutes: activeResize.duration,
+                            duration: activeResize.duration,
                             due_end: minutesToTime(newEnd),
                             due_start: minutesToTime(activeResize.startMinutes)
                         };
