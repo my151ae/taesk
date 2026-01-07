@@ -87,7 +87,11 @@ function MobileTimelineColumn({
             key={hour}
             className="absolute left-0 right-0 border-b border-slate-200"
             style={{ top: idx * HOUR_HEIGHT }}
-          />
+          >
+            <span className="absolute -top-4 right-2 text-[11px] font-medium text-slate-400/70">
+              {hour}
+            </span>
+          </div>
         ))}
       </div>
 

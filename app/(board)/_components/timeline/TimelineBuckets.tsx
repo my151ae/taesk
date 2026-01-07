@@ -21,6 +21,7 @@ type TimelineBucketsProps = {
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     axisWidth?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
@@ -49,6 +50,7 @@ export default function TimelineBuckets({
     onCreateBucketCard,
     axisWidth = 80,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
 }: TimelineBucketsProps) {
@@ -109,6 +111,7 @@ export default function TimelineBuckets({
                                                             bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
                                                         }
                                                         onCardContextMenu={onCardContextMenu}
+                                                        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                                         isContextMenuOpen={contextMenuCardId === item.card_id}
                                                         onUpdateCardTitle={onUpdateCardTitle}
                                                     />
