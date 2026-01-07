@@ -12,6 +12,7 @@ type UseTimelineScrollSyncArgs = {
   dayRange: number;
   indicatorMinutes: number | null;
   updateUrl: (date: string | null, range: number, time?: number | null) => void;
+  timelineStartHour?: number;
 };
 
 export const useTimelineScrollSync = ({
@@ -23,6 +24,7 @@ export const useTimelineScrollSync = ({
   dayRange,
   indicatorMinutes,
   updateUrl,
+  timelineStartHour = 0,
 }: UseTimelineScrollSyncArgs) => {
   const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
   const [isTimelineViewMounted, setIsTimelineViewMounted] = useState(false);
@@ -87,7 +89,7 @@ export const useTimelineScrollSync = ({
       if (!container) return;
 
       const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      const desiredTop = minuteToPixels(urlTimeMinutes);
+      const desiredTop = minuteToPixels(urlTimeMinutes, timelineStartHour);
       const clampedTop = Math.max(0, Math.min(desiredTop, maxTop));
 
       if (Math.abs(container.scrollTop - clampedTop) >= 2) {
@@ -132,7 +134,7 @@ export const useTimelineScrollSync = ({
     if (!isTimelineViewMounted || !timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
 
     const container = timelineScrollRef.current;
-    const target = minuteToPixels(indicatorMinutes) - container.clientHeight / 2;
+    const target = minuteToPixels(indicatorMinutes, timelineStartHour) - container.clientHeight / 2;
     const clampedTop = Math.max(0, Math.min(target, container.scrollHeight - container.clientHeight));
 
     programmaticScrollRef.current = true;
@@ -145,10 +147,10 @@ export const useTimelineScrollSync = ({
       programmaticScrollRef.current = false;
     });
     setHasAutoScrolled(true);
-  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted]);
+  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, timelineStartHour]);
 
-  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrl });
-  stateRef.current = { data, activeDayIndex, dayRange, updateUrl };
+  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrl, timelineStartHour });
+  stateRef.current = { data, activeDayIndex, dayRange, updateUrl, timelineStartHour };
 
   const handleTimelineScroll = useCallback((arg?: number | React.UIEvent<HTMLDivElement>) => {
     let scrollTop: number | undefined;
@@ -164,9 +166,9 @@ export const useTimelineScrollSync = ({
     if (scrollTop == null) return;
     if (programmaticScrollRef.current) return;
 
-    const { data, activeDayIndex, dayRange, updateUrl } = stateRef.current;
+    const { data, activeDayIndex, dayRange, updateUrl, timelineStartHour } = stateRef.current;
 
-    const minutes = pixelsToMinutes(scrollTop);
+    const minutes = pixelsToMinutes(scrollTop, timelineStartHour);
     const currentDay = data?.days?.[activeDayIndex];
 
     if (currentDay) {

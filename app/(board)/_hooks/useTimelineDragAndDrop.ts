@@ -102,6 +102,7 @@ type UseTimelineDragAndDropProps = {
     bucketDayMap: Record<string, string | null>;
     dataMode: 'api' | 'mock';
     editingCardId?: string | null;
+    timelineStartHour?: number;
 };
 
 export function useTimelineDragAndDrop({
@@ -113,6 +114,7 @@ export function useTimelineDragAndDrop({
     bucketDayMap,
     dataMode,
     editingCardId,
+    timelineStartHour = 0,
 }: UseTimelineDragAndDropProps) {
     const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
     const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -564,6 +566,7 @@ export function useTimelineDragAndDrop({
             columnRect: event.over?.rect
                 ? { top: event.over.rect.top, height: event.over.rect.height }
                 : undefined,
+            startHour: timelineStartHour,
         });
         const fallbackPointer = currentDrag.startMinutes + (event.delta.y / HOUR_HEIGHT) * 60;
         let nextStart = pointerMinutes ?? fallbackPointer;

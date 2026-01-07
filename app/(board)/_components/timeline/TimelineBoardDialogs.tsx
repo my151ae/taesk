@@ -79,7 +79,10 @@ export default function TimelineBoardDialogs({
                 ✕
               </button>
             </div>
-            <ProfileSettings onProfileUpdated={fetchProfile} />
+            <ProfileSettings onProfileUpdated={() => {
+              // Reload the page to reflect all setting changes immediately
+              window.location.reload();
+            }} />
           </div>
         </div>
       )}

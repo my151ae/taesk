@@ -2,7 +2,7 @@ import { ReactNode, KeyboardEvent, PointerEvent, MouseEvent, useState, useEffect
 import {
     TimelineDay,
     TimelineEvent,
-    HOURS,
+    getDisplayHours,
     ExternalCalendarEntry,
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -41,6 +41,7 @@ type TimelineGridProps = {
     shrinkDaysToHalf?: boolean;
     calendarEventsByDay?: Record<string, ExternalCalendarEntry[]>;
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+    timelineStartHour?: number;
 };
 
 export default function TimelineGrid({
@@ -63,6 +64,7 @@ export default function TimelineGrid({
     shrinkDaysToHalf = false,
     calendarEventsByDay,
     onExternalEventClick,
+    timelineStartHour = 0,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -84,9 +86,9 @@ export default function TimelineGrid({
                 style={{ gridTemplateColumns: days.length ? `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))` : `${axisWidth}px` }}
             >
                 <aside className="relative border-r border-slate-100 text-xs text-slate-500">
-                    {HOURS.map((hour) => (
+                    {getDisplayHours(timelineStartHour).map((hour) => (
                         <div key={hour} className="flex h-10 items-start justify-end pr-3">
-                            {hour === '00:00' ? null : (
+                            {hour === `${timelineStartHour.toString().padStart(2, '0')}:00` ? null : (
                                 <span className="-mt-1 leading-none tracking-tight text-slate-600">
                                     {hour}
                                 </span>
@@ -121,6 +123,7 @@ export default function TimelineGrid({
                         setSelectedSlot={setSelectedSlot}
                         calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
                         onExternalEventClick={onExternalEventClick}
+                        timelineStartHour={timelineStartHour}
                     />
                 ))}
             </div>

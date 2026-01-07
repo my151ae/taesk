@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { display_name, full_name, avatar_url, username } = body;
+  const { display_name, full_name, avatar_url, username, timeline_start_hour } = body;
 
   let sanitizedUsername: string | null | undefined = undefined;
 
@@ -89,6 +89,12 @@ export async function PATCH(request: NextRequest) {
   if (sanitizedUsername !== undefined) {
     updates.username = sanitizedUsername;
   }
+  if (timeline_start_hour !== undefined) {
+    if (typeof timeline_start_hour !== 'number' || timeline_start_hour < 0 || timeline_start_hour > 23) {
+      return NextResponse.json({ error: 'timeline_start_hour must be a number between 0 and 23' }, { status: 400 });
+    }
+    updates.timeline_start_hour = timeline_start_hour;
+  }
 
   if (sanitizedUsername) {
     const { data: existingUsername, error: usernameCheckError } = await supabase
@@ -113,7 +119,7 @@ export async function PATCH(request: NextRequest) {
     .from('profiles')
     .update(updates)
     .eq('id', user.id)
-    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at')
+    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at, timeline_start_hour')
     .single();
 
   if (updateError) {
@@ -161,7 +167,7 @@ export async function GET() {
   // Get profile
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at')
+    .select('id, username, display_name, full_name, avatar_url, email, created_at, updated_at, timeline_start_hour')
     .eq('id', user.id)
     .single();
 

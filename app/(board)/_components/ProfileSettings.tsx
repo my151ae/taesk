@@ -10,6 +10,7 @@ type Profile = {
   full_name: string | null;
   avatar_url: string | null;
   email: string | null;
+  timeline_start_hour: number;
 };
 
 const OPTIONAL_USERNAME_MESSAGE = 'ユーザー名は任意です。設定すると @username で表示・メンションできます。';
@@ -30,6 +31,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
   const [username, setUsername] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'reserved' | 'error'>('idle');
   const [usernameMessage, setUsernameMessage] = useState<string | null>(OPTIONAL_USERNAME_MESSAGE);
+  const [timelineStartHour, setTimelineStartHour] = useState(5);
   const usernameCheckTimeoutRef = useRef<number | null>(null);
   const usernameRequestAbortRef = useRef<AbortController | null>(null);
 
@@ -53,6 +55,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       setProfile(data);
       setDisplayName(data.display_name || data.full_name || '');
       setUsername(data.username ?? '');
+      setTimelineStartHour(data.timeline_start_hour ?? 5);
 
       if (data.username) {
         setUsernameStatus('available');
@@ -244,6 +247,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
         body: JSON.stringify({
           display_name: trimmedDisplayName,
           username: normalizedUsername ? normalizedUsername : null,
+          timeline_start_hour: timelineStartHour,
         }),
       });
 
@@ -257,6 +261,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       setStatusMessage('Profile updated successfully!');
       setDisplayName(data.display_name || data.full_name || '');
       setUsername(data.username ?? '');
+      setTimelineStartHour(data.timeline_start_hour ?? 5);
 
       if (data.username) {
         setUsernameStatus('available');
@@ -370,11 +375,10 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
               placeholder="例: yossy"
               maxLength={20}
               autoComplete="off"
-              className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-gray-700 dark:text-gray-100 ${
-                usernameHasError
+              className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-gray-700 dark:text-gray-100 ${usernameHasError
                   ? 'border-red-500 focus:ring-red-500 dark:border-red-500'
                   : 'border-gray-300 focus:ring-blue-500 dark:border-gray-600 focus:ring-blue-500'
-              }`}
+                }`}
               data-testid="profile-username-input"
             />
           </div>
@@ -397,6 +401,31 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Your authentication email cannot be changed here.
           </p>
+        </div>
+
+        {/* Timeline Start Hour */}
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+          <label
+            htmlFor="timeline-start-hour"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            Timeline Start Hour
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Set the beginning hour of the 24-hour timeline.
+          </p>
+          <select
+            id="timeline-start-hour"
+            value={timelineStartHour}
+            onChange={(e) => setTimelineStartHour(parseInt(e.target.value))}
+            className="block w-full max-w-[120px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+          >
+            {Array.from({ length: 24 }, (_, i) => (
+              <option key={i} value={i}>
+                {i.toString().padStart(2, '0')}:00
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Save Button */}

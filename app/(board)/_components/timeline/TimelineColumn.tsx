@@ -5,7 +5,7 @@ import {
     TimelineDay,
     TimelineEvent,
     HOUR_HEIGHT,
-    HOURS,
+    getDisplayHours,
     TIMELINE_HEIGHT,
     minuteToPixels,
     minutesToTime,
@@ -45,6 +45,7 @@ type TimelineColumnProps = {
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
     calendarEvents: ExternalCalendarEntry[];
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+    timelineStartHour?: number;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -78,6 +79,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     setSelectedSlot,
     calendarEvents,
     onExternalEventClick,
+    timelineStartHour = 0,
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
     const calendarLayout = calculateEventLayout(
@@ -103,9 +105,11 @@ export const TimelineColumn = memo(function TimelineColumn({
         e.stopPropagation();
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
-        const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
-        const snapped = Math.round(minutes / 15) * 15;
-        setSelectedSlot({ day: dayIso, minutes: snapped });
+        const minutesRelative = Math.floor((y / HOUR_HEIGHT) * 60);
+        const snappedRelative = Math.round(minutesRelative / 15) * 15;
+        // Convert relative minutes to absolute minutes
+        const absoluteMinutes = (snappedRelative + timelineStartHour * 60) % (24 * 60);
+        setSelectedSlot({ day: dayIso, minutes: absoluteMinutes });
     };
 
     const handleDoubleClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -117,9 +121,10 @@ export const TimelineColumn = memo(function TimelineColumn({
         // Calculate position from double-click
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
-        const minutes = Math.floor((y / HOUR_HEIGHT) * 60);
-        const snapped = Math.round(minutes / 15) * 15;
-        handleColumnClick(day, snapped);
+        const minutesRelative = Math.floor((y / HOUR_HEIGHT) * 60);
+        const snappedRelative = Math.round(minutesRelative / 15) * 15;
+        const absoluteMinutes = (snappedRelative + timelineStartHour * 60) % (24 * 60);
+        handleColumnClick(day, absoluteMinutes);
         setSelectedSlot(null);
     };
 
@@ -139,8 +144,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                         <div
                             className="absolute border-2 border-dashed border-blue-300 bg-blue-50/50 z-10 cursor-pointer"
                             style={{
-                                top: minuteToPixels(selectedSlot.minutes),
-                                height: minuteToPixels(60),
+                                top: minuteToPixels(selectedSlot.minutes, timelineStartHour),
+                                height: minuteToPixels(60 + timelineStartHour * 60, timelineStartHour) - minuteToPixels(0 + timelineStartHour * 60, timelineStartHour), // Fixed height 60m
                                 left: 0,
                                 right: 0,
                             }}
@@ -162,7 +167,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                         className="pointer-events-none absolute"
                         style={{ height: TIMELINE_HEIGHT, left: isFirstColumn ? -2 : 0, right: 0, top: 0 }}
                     >
-                        {HOURS.map((hour, idx) => (
+                        {getDisplayHours(timelineStartHour).map((hour, idx) => (
                             <div
                                 key={hour}
                                 className={clsx(
@@ -189,8 +194,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                         <div
                             className="pointer-events-none absolute z-10 border border-dashed border-sky-300 bg-sky-50/40"
                             style={{
-                                top: minuteToPixels(pointerPreview.startMinutes),
-                                height: minuteToPixels(pointerPreview.durationMinutes),
+                                top: minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
+                                height: minuteToPixels(pointerPreview.startMinutes + pointerPreview.durationMinutes, timelineStartHour) - minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
                                 left: '8px',
                                 right: '8px',
                             }}
@@ -218,8 +223,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     }}
                                     className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
                                     style={{
-                                        top: minuteToPixels(calendarEvent.startMinutes),
-                                        height: Math.max(minuteToPixels(calendarEvent.durationMinutes), 18),
+                                        top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                                        height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour), 18),
                                         left: layout?.left ?? '0%',
                                         width: layout?.width ?? '100%',
                                     }}
@@ -255,6 +260,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 handleResizeEnd={handleResizeEnd}
                                 onToggleCheck={onToggleCheck}
                                 onClearGhost={() => setSelectedSlot(null)}
+                                timelineStartHour={timelineStartHour}
                             />
                         ))}
                     </div>

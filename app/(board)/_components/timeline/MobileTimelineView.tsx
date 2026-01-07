@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   HOUR_HEIGHT,
-  HOURS,
+  getDisplayHours,
   TIMELINE_HEIGHT,
   calculateEventLayout,
   minuteToPixels,
@@ -39,6 +39,7 @@ function MobileTimelineColumn({
   activeDragCardId,
   calendarEvents,
   onExternalEventClick,
+  timelineStartHour = 0,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -51,6 +52,7 @@ function MobileTimelineColumn({
   activeDragCardId: string | null;
   calendarEvents: ExternalCalendarEntry[];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+  timelineStartHour?: number;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const calendarLayout = calculateEventLayout(
@@ -72,7 +74,7 @@ function MobileTimelineColumn({
   return (
     <div className="relative">
       <div className="pointer-events-none absolute inset-0" style={{ height: TIMELINE_HEIGHT }}>
-        {HOURS.map((hour, idx) => (
+        {getDisplayHours(timelineStartHour).map((hour, idx) => (
           <div
             key={hour}
             className="absolute left-0 right-0 border-b border-slate-200"
@@ -97,8 +99,8 @@ function MobileTimelineColumn({
           <div
             className="pointer-events-none absolute z-10 border border-dashed border-sky-400 bg-sky-50/60"
             style={{
-              top: minuteToPixels(pointerPreview.startMinutes),
-              height: minuteToPixels(pointerPreview.durationMinutes),
+              top: minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
+              height: minuteToPixels(pointerPreview.startMinutes + pointerPreview.durationMinutes, timelineStartHour) - minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
               left: "6px",
               right: "6px",
             }}
@@ -124,8 +126,8 @@ function MobileTimelineColumn({
               }}
               className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
               style={{
-                top: minuteToPixels(calendarEvent.startMinutes),
-                height: Math.max(minuteToPixels(calendarEvent.durationMinutes), 18),
+                top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour), 18),
                 left: layout?.left ?? "0%",
                 width: layout?.width ?? "100%",
               }}
@@ -151,8 +153,8 @@ function MobileTimelineColumn({
         {events.map((event) => {
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = Math.max(event.durationMinutes ?? 60, 30);
-          const top = minuteToPixels(start);
-          const height = Math.max(minuteToPixels(duration), 32);
+          const top = minuteToPixels(start, timelineStartHour);
+          const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 32);
           const layout = layoutMap[event.card_id];
 
           return (
@@ -297,6 +299,7 @@ type MobileTimelineViewProps = {
   isOverABList: boolean;
   pointerPreview: DragAndDropBindings["pointerPreview"];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+  timelineStartHour?: number;
 };
 
 export default function MobileTimelineView({
@@ -329,6 +332,7 @@ export default function MobileTimelineView({
   pointerPreview,
   activeDrag,
   onExternalEventClick,
+  timelineStartHour = 0,
 }: MobileTimelineViewProps) {
   useEffect(() => {
     onMount?.();
@@ -525,7 +529,7 @@ export default function MobileTimelineView({
             >
               <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}>
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
-                  {HOURS.map((hour, idx) => (
+                  {getDisplayHours(timelineStartHour).map((hour, idx) => (
                     <div key={hour} className="flex h-10 items-start justify-end pr-2">
                       {idx === 0 ? null : <span className="-mt-1 leading-none">{hour}</span>}
                     </div>
@@ -544,6 +548,7 @@ export default function MobileTimelineView({
                   activeDragCardId={activeDragCardId}
                   calendarEvents={calendarTimedEventsForDay}
                   onExternalEventClick={onExternalEventClick}
+                  timelineStartHour={timelineStartHour}
                 />
               </div>
             </div>

@@ -19,14 +19,12 @@ export type ExternalCalendarEntry = {
 // Constants
 export const HOUR_HEIGHT = 40;
 
-export const getDisplayHours = (startHour: number = 0) => {
+export const getDisplayHours = (startHour: number = 5) => {
     return Array.from({ length: 24 }, (_, i) => {
         const hour = (startHour + i) % 24;
         return `${hour.toString().padStart(2, "0")}:00`;
     });
 };
-
-export const HOURS = getDisplayHours(0); // Default for backward compatibility if needed, but components should use getDisplayHours
 
 export const TIMELINE_HEIGHT = HOUR_HEIGHT * 24;
 export const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
@@ -58,7 +56,7 @@ export const buildAbMeta = (day: TimelineDay) => ({
 
 
 // Helper functions
-export const minuteToPixels = (minutes: number, startHour: number = 0) => {
+export const minuteToPixels = (minutes: number, startHour: number = 5) => {
     const startMinutes = startHour * 60;
     // Adjust minutes to be relative to startHour
     // If minutes < startMinutes, it means it's "next morning" (visually at bottom)
@@ -161,10 +159,12 @@ export const pointerMinutesFromEvent = (
     options?: {
         scrollTop?: number;
         columnRect?: { top: number; height: number };
+        startHour?: number;
     }
 ): number | null => {
     const scrollTop = options?.scrollTop ?? 0;
     const columnRect = options?.columnRect;
+    const startHour = options?.startHour ?? 5;
     const translated = event.active.rect.current?.translated;
     const sourceInitial = event.active.rect.current?.initial;
     const elementTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
@@ -178,9 +178,13 @@ export const pointerMinutesFromEvent = (
     }
 
     const maxHeight = columnRect?.height ?? TIMELINE_HEIGHT;
-    const clamped = Math.max(0, Math.min(relativeY, maxHeight));
-    const minutes = Math.round((clamped / HOUR_HEIGHT) * 60 / 15) * 15;
-    return Math.max(0, Math.min(23 * 60 + 45, minutes));
+    const clampedY = Math.max(0, Math.min(relativeY, maxHeight));
+
+    // Use pixelsToMinutes which already handles startHour
+    const minutes = pixelsToMinutes(clampedY, startHour);
+    // Snap to 15m intervals
+    const snapped = Math.round(minutes / 15) * 15;
+    return Math.max(0, Math.min(23 * 60 + 45, snapped));
 };
 
 export type EventLayout = {

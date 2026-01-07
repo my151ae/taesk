@@ -64,6 +64,7 @@ type DesktopTimelineViewProps = {
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   onScroll?: (scrollTop: number) => void;
   onMount?: () => void;
+  timelineStartHour?: number;
 };
 
 export function DesktopTimelineView({
@@ -105,6 +106,7 @@ export function DesktopTimelineView({
   calendarAllDayByDay,
   onExternalEventClick,
   onScroll,
+  timelineStartHour = 0,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -468,6 +470,7 @@ export function DesktopTimelineView({
               shrinkDaysToHalf
               calendarEventsByDay={calendarEventsByDay}
               onExternalEventClick={onExternalEventClick}
+              timelineStartHour={timelineStartHour}
             />
           </div>
         </div>

@@ -168,6 +168,7 @@ export interface ProfileSummary {
   full_name: string | null;
   avatar_url: string | null;
   email: string | null;
+  timeline_start_hour: number;
 }
 
 export interface List {

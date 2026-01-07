@@ -22,6 +22,7 @@ type TimelineEventItemProps = {
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onClearGhost: () => void;
+    timelineStartHour?: number;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -35,6 +36,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     handleResizeEnd,
     onToggleCheck,
     onClearGhost,
+    timelineStartHour = 0,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -48,8 +50,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
         displayEnd = minutesToTime(start + duration);
     }
 
-    const top = minuteToPixels(start);
-    const height = Math.max(minuteToPixels(duration), 32);
+    const top = minuteToPixels(start, timelineStartHour);
+    const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 32);
 
     return (
         <DraggableCard

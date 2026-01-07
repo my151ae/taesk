@@ -15,10 +15,10 @@ import {
   type TimelineEvent,
   minuteToPixels,
   getNowMinutesJst,
+  DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 
-import { DEFAULT_TIMELINE_DAY_RANGE } from "@/app/(board)/_utils/timeline-helpers";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState } from "@/app/(board)/_hooks/useTimelineUrlState";
@@ -54,6 +54,30 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
 
+  // Timeline UI specific settings from profile (fallback to 5)
+  const [timelineStartHour, setTimelineStartHour] = useState(5);
+
+  // Fetch profile and boards
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await fetch('/api/profiles');
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+        if (data?.timeline_start_hour !== undefined) {
+          setTimelineStartHour(data.timeline_start_hour);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
   // 1. URL State
   const {
     urlDate,
@@ -62,8 +86,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     dayWindowStartRef,
     setDayWindowStart,
     updateUrl,
-    initialRange: dayRange, // URLから取得した現在のレンジをdayRangeとして使用
-  } = useTimelineUrlState({ initialDayRange: initialBoard.day_range });
+    initialRange: dayRange,
+  } = useTimelineUrlState({ initialDayRange: (initialBoard as any).day_range });
 
   // 2. Data Fetching
   const {
@@ -168,6 +192,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return result;
   }, [data?.days]);
 
+  const currentBoard = availableBoards.find(b => b.id === initialBoard.id) || initialBoard;
+
   const {
     applyPatch,
     handleCardModalSave,
@@ -179,7 +205,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     googleToast,
     setGoogleToast,
   } = useTimelineCardActions({
-    initialBoardId: initialBoard.id,
+    initialBoardId: currentBoard.id,
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
     bucketDayMap, googleCalendarEvents, refreshGoogleCalendar
@@ -193,37 +219,32 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   } = useTimelineDragAndDrop({
     data: filteredData, setData, applyPatch, timelineScrollRef,
     abScrollContainersRef, bucketDayMap, dataMode,
+    timelineStartHour,
   });
 
   // 10. Scroll Sync
   const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
-  const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes) : null;
+  const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes, timelineStartHour) : null;
+
   const {
     debouncedHandleScroll,
     handleTimelineViewMount,
   } = useTimelineScrollSync({
-    urlDate, urlRange, urlTime, data, activeDayIndex, dayRange,
-    indicatorMinutes, updateUrl,
+    urlDate,
+    urlRange: (urlRange ?? (currentBoard as any).day_range ?? 2).toString(),
+    urlTime,
+    data,
+    activeDayIndex,
+    dayRange,
+    indicatorMinutes,
+    updateUrl,
+    timelineStartHour,
   });
 
   // Fetch profile and boards
-  const fetchProfile = useCallback(async () => {
-    if (!user) return;
-    try {
-      const response = await fetch('/api/profiles');
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-    }
-  }, [user]);
-
   useEffect(() => {
-    fetchProfile();
     fetch('/api/boards').then(r => r.json()).then(b => setAvailableBoards(b.boards || [])).catch(console.error);
-  }, [user, fetchProfile]);
+  }, [user]);
 
   // Click outside board menu
   useEffect(() => {
@@ -253,7 +274,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     <div className="min-h-screen bg-[#f4f5f7]">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 pt-6">
         <TimelineBoardHeader
-          board={initialBoard} modalBoards={availableBoards} handleBoardNavigate={handleBoardNavigate}
+          board={currentBoard} modalBoards={availableBoards} handleBoardNavigate={handleBoardNavigate}
           showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
           setShowShareDialog={setShowShareDialog} setShowNotificationSettings={setShowNotificationSettings}
           setShowProfileSettings={setShowProfileSettings} setShowBoardSettings={setShowBoardSettings}
@@ -266,7 +287,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onTodayClick={handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
           onUpdateBoard={async (updates) => {
             try {
-              const response = await fetch(`/api/boards/${initialBoard.id}`, {
+              const response = await fetch(`/api/boards/${currentBoard.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(updates),
@@ -274,7 +295,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               if (!response.ok) throw new Error("Failed to update board");
               const { board: updatedBoard } = await response.json();
               setAvailableBoards((prev) =>
-                prev.map((board) => (board.id === updatedBoard.id ? updatedBoard : board)),
+                prev.map((b) => (b.id === updatedBoard.id ? updatedBoard : b)),
               );
             } catch (error) {
               console.error("Failed to update board", error);
@@ -290,69 +311,105 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
         <div className="hidden md:block">
           <DesktopTimelineView
-            onMount={handleTimelineViewMount} onScroll={debouncedHandleScroll}
-            timelineHeaderRef={timelineHeaderRef} timelineScrollRef={desktopTimelineScrollRef}
-            registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
-            days={data?.days ?? []} activeDayIndex={activeDayIndex} dayRange={dayRange}
-            status={status} handlePrevDay={handlePrevDay} handleNextDay={handleNextDay}
-            eventsByDay={eventsByDay} abBuckets={filteredData?.abBuckets ?? {}}
-            indicatorTop={indicatorTop} indicatorDayIso={liveNowIsoDate}
-            timelineViewportHeight={timelineViewportHeight} activeDrag={activeDrag}
-            pointerPreview={pointerPreview} activeResize={activeResize} bucketIndicator={bucketIndicator}
-            openCardModal={openCardModal} handleEventKeyDown={handleEventKeyDown}
-            handleColumnClick={handleColumnClick} onCreateBucketCard={handleBucketClick}
-            handleResizeStart={handleResizeStart} handleResizeMove={handleResizeMove}
-            handleResizeEnd={handleResizeEnd} onToggleCheck={handleToggleCardChecked}
-            sensors={sensors} handleDragStart={handleDragStart} handleDragMove={handleDragMove}
-            handleDragEnd={handleDragEnd} handleDragCancel={handleDragCancel}
-            isOverABList={isOverABList} floatingLayerTop={timelineHeaderHeight}
-            calendarEventsByDay={calendarEventsByDay} calendarAllDayByDay={calendarAllDayEventsByDay}
+            days={data?.days ?? []}
+            activeDayIndex={activeDayIndex}
+            dayRange={dayRange}
+            timelineScrollRef={desktopTimelineScrollRef}
+            onScroll={debouncedHandleScroll}
+            onMount={handleTimelineViewMount}
+            openCardModal={openCardModal}
+            onToggleCheck={handleToggleCardChecked}
+            activeResize={activeResize}
+            handleResizeStart={handleResizeStart}
+            handleResizeMove={handleResizeMove}
+            handleResizeEnd={handleResizeEnd}
+            calendarEventsByDay={calendarEventsByDay}
             onExternalEventClick={handleExternalEventClick}
+            timelineStartHour={timelineStartHour}
+            timelineHeaderRef={timelineHeaderRef}
+            registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
+            status={status}
+            handlePrevDay={handlePrevDay}
+            handleNextDay={handleNextDay}
+            eventsByDay={eventsByDay}
+            abBuckets={filteredData?.abBuckets ?? {}}
+            indicatorTop={indicatorTop}
+            indicatorDayIso={liveNowIsoDate}
+            timelineViewportHeight={timelineViewportHeight}
+            activeDrag={activeDrag}
+            pointerPreview={pointerPreview}
+            bucketIndicator={bucketIndicator}
+            handleEventKeyDown={handleEventKeyDown}
+            handleColumnClick={handleColumnClick}
+            onCreateBucketCard={handleBucketClick}
+            sensors={sensors}
+            handleDragStart={handleDragStart}
+            handleDragMove={handleDragMove}
+            handleDragEnd={handleDragEnd}
+            handleDragCancel={handleDragCancel}
+            isOverABList={isOverABList}
+            floatingLayerTop={timelineHeaderHeight}
+            calendarAllDayByDay={calendarAllDayEventsByDay}
           />
         </div>
 
-        <div className="md:hidden">
-          <div className="relative h-[calc(100vh-140px)] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
-            <MobileTimelineView
-              timelineScrollRef={mobileTimelineScrollRef} onMount={handleTimelineViewMount}
-              onScroll={debouncedHandleScroll} registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
-              days={data?.days ?? []} activeDayIndex={activeDayIndex} onPrevDay={handlePrevDay} onNextDay={handleNextDay}
-              eventsByDay={eventsByDay} abBuckets={filteredData?.abBuckets ?? {}}
-              indicatorTop={indicatorTop} indicatorDayIso={liveNowIsoDate}
-              timelineViewportHeight={timelineViewportHeight} openCardModal={openCardModal}
-              onCreateBucketCard={handleBucketClick} onToggleCheck={handleToggleCardChecked}
-              status={status} activeDrag={activeDrag} sensors={sensors}
-              handleDragStart={handleDragStart} handleDragMove={handleDragMove}
-              handleDragEnd={handleDragEnd} handleDragCancel={handleDragCancel}
-              bucketIndicator={bucketIndicator} isOverABList={isOverABList} pointerPreview={pointerPreview}
-              calendarEventsByDay={calendarEventsByDay} calendarAllDayByDay={calendarAllDayEventsByDay}
-              onExternalEventClick={handleExternalEventClick}
-            />
-          </div>
+        <div className="flex-1 overflow-hidden md:hidden">
+          <MobileTimelineView
+            timelineScrollRef={mobileTimelineScrollRef}
+            days={data?.days ?? []}
+            activeDayIndex={activeDayIndex}
+            onPrevDay={handlePrevDay}
+            onNextDay={handleNextDay}
+            onMount={handleTimelineViewMount}
+            onScroll={debouncedHandleScroll}
+            registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
+            eventsByDay={eventsByDay}
+            abBuckets={filteredData?.abBuckets ?? {}}
+            calendarEventsByDay={calendarEventsByDay}
+            calendarAllDayByDay={calendarAllDayEventsByDay}
+            indicatorTop={indicatorTop}
+            indicatorDayIso={liveNowIsoDate}
+            timelineViewportHeight={timelineViewportHeight}
+            openCardModal={openCardModal}
+            onCreateBucketCard={handleBucketClick}
+            onToggleCheck={handleToggleCardChecked}
+            status={status}
+            activeDrag={activeDrag}
+            sensors={sensors}
+            handleDragStart={handleDragStart}
+            handleDragMove={handleDragMove}
+            handleDragEnd={handleDragEnd}
+            handleDragCancel={handleDragCancel}
+            bucketIndicator={bucketIndicator}
+            isOverABList={isOverABList}
+            pointerPreview={pointerPreview}
+            onExternalEventClick={handleExternalEventClick}
+            timelineStartHour={timelineStartHour}
+          />
         </div>
-      </div>
 
-      <TimelineBoardDialogs
-        showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog}
-        showNotificationSettings={showNotificationSettings} setShowNotificationSettings={setShowNotificationSettings}
-        showProfileSettings={showProfileSettings} setShowProfileSettings={setShowProfileSettings}
-        showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
-        initialBoard={initialBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
-        setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
-      />
-
-      {modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading') && (
-        <CardModal
-          card={modalCard} boards={availableBoards} profiles={modalProfiles}
-          onSave={handleCardModalSave} onDelete={handleCardModalDelete}
-          onMoveToBoard={() => { }} onClose={closeCardModal}
+        <TimelineBoardDialogs
+          showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog}
+          showNotificationSettings={showNotificationSettings} setShowNotificationSettings={setShowNotificationSettings}
+          showProfileSettings={showProfileSettings} setShowProfileSettings={setShowProfileSettings}
+          showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
+          initialBoard={currentBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
+          setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
         />
-      )}
-      {cardModalError && (
-        <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
-          {cardModalError}
-        </div>
-      )}
+
+        {modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading') && (
+          <CardModal
+            card={modalCard} boards={availableBoards} profiles={modalProfiles}
+            onSave={handleCardModalSave} onDelete={handleCardModalDelete}
+            onMoveToBoard={() => { }} onClose={closeCardModal}
+          />
+        )}
+        {cardModalError && (
+          <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
+            {cardModalError}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
