@@ -107,6 +107,20 @@ export function TimelineCard({
                     }}
                     aria-label={checked ? '未完了に戻す' : '完了にする'}
                     onPointerDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Enterでトグルではなくモーダルを開く
+                            if (!isEditing) {
+                                onOpen();
+                            }
+                        } else if (e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onToggleCheck(!checked);
+                        }
+                    }}
                     className={clsx(
                         "mt-0.5 flex h-4 w-4 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400",
                         checked ? "text-slate-800" : "text-transparent"
@@ -130,6 +144,15 @@ export function TimelineCard({
                             )}
                             onClick={onTitleChange ? handleTitleClick : undefined}
                             onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
+                            tabIndex={onTitleChange ? 0 : undefined}
+                            role={onTitleChange ? "button" : undefined}
+                            aria-label={onTitleChange ? "タイトルを編集" : undefined}
+                            onKeyDown={onTitleChange ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleTitleClick(e as any);
+                                }
+                            } : undefined}
                         >
                             {title || "Untitled card"}
                         </span>
@@ -163,6 +186,7 @@ export function TimelineCard({
                         onOpen();
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
+                    tabIndex={-1}
                 >
                     <span className="text-[10px] font-bold leading-none text-slate-500">
                         {badgeLabel || ''}
