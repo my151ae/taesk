@@ -11,6 +11,7 @@ import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoar
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
 import { DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
+import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
 import {
   type TimelineEvent,
   minuteToPixels,
@@ -56,6 +57,29 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   // Timeline UI specific settings from profile (fallback to 5)
   const [timelineStartHour, setTimelineStartHour] = useState(5);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    cardId: string | null;
+    x: number;
+    y: number;
+  }>({ open: false, cardId: null, x: 0, y: 0 });
+
+  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      open: true,
+      cardId,
+      x: e.clientX,
+      y: e.clientY
+    });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, open: false, cardId: null }));
+  }, []);
 
   // Fetch profile and boards
   const fetchProfile = useCallback(async () => {
@@ -350,6 +374,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             isOverABList={isOverABList}
             floatingLayerTop={timelineHeaderHeight}
             calendarAllDayByDay={calendarAllDayEventsByDay}
+            onCardContextMenu={handleCardContextMenu}
+            contextMenuCardId={contextMenu.cardId}
           />
         </div>
 
@@ -385,6 +411,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             pointerPreview={pointerPreview}
             onExternalEventClick={handleExternalEventClick}
             timelineStartHour={timelineStartHour}
+            onCardContextMenu={handleCardContextMenu}
+            contextMenuCardId={contextMenu.cardId}
           />
         </div>
 
@@ -408,6 +436,47 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
             {cardModalError}
           </div>
+        )}
+
+        {contextMenu.open && contextMenu.cardId && (
+          <CardContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onClose={closeContextMenu}
+            items={[
+              {
+                label: "カードを開く",
+                onClick: () => {
+                  const card =
+                    data?.events?.find((e: any) => e.card_id === contextMenu.cardId) ||
+                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId);
+                  if (card?.short_id) openCardModal(card.short_id, "context-menu");
+                }
+              },
+              {
+                label: (
+                  (data?.events?.find((e: any) => e.card_id === contextMenu.cardId)?.checked ||
+                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId)?.checked)
+                    ? "未完了に戻す" : "完了にする"
+                ),
+                onClick: () => {
+                  const isChecked =
+                    data?.events?.find((e: any) => e.card_id === contextMenu.cardId)?.checked ||
+                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId)?.checked;
+                  handleToggleCardChecked(contextMenu.cardId!, !isChecked);
+                }
+              },
+              {
+                label: "削除",
+                variant: "danger",
+                onClick: () => {
+                  if (confirm("カードを削除しますか？")) {
+                    handleCardModalDelete(contextMenu.cardId!);
+                  }
+                }
+              }
+            ]}
+          />
         )}
       </div>
     </div>

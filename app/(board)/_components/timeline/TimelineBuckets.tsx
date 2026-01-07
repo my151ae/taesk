@@ -20,6 +20,8 @@ type TimelineBucketsProps = {
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     axisWidth?: number;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    contextMenuCardId: string | null;
 };
 
 const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
@@ -44,6 +46,8 @@ export default function TimelineBuckets({
     bucketIndicator,
     onCreateBucketCard,
     axisWidth = 80,
+    onCardContextMenu,
+    contextMenuCardId,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
     const templateColumns = `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))`;
@@ -101,6 +105,8 @@ export default function TimelineBuckets({
                                                         showFallbackBottomLine={
                                                             bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
                                                         }
+                                                        onCardContextMenu={onCardContextMenu}
+                                                        isContextMenuOpen={contextMenuCardId === item.card_id}
                                                     />
                                                 ))
                                             )}

@@ -46,6 +46,8 @@ type TimelineColumnProps = {
     calendarEvents: ExternalCalendarEntry[];
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     timelineStartHour?: number;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    contextMenuCardId: string | null;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -80,6 +82,8 @@ export const TimelineColumn = memo(function TimelineColumn({
     calendarEvents,
     onExternalEventClick,
     timelineStartHour = 0,
+    onCardContextMenu,
+    contextMenuCardId,
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
     const calendarLayout = calculateEventLayout(
@@ -261,6 +265,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 onToggleCheck={onToggleCheck}
                                 onClearGhost={() => setSelectedSlot(null)}
                                 timelineStartHour={timelineStartHour}
+                                onCardContextMenu={onCardContextMenu}
+                                isContextMenuOpen={contextMenuCardId === event.card_id}
                             />
                         ))}
                     </div>

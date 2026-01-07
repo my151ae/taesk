@@ -42,6 +42,8 @@ type TimelineGridProps = {
     calendarEventsByDay?: Record<string, ExternalCalendarEntry[]>;
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     timelineStartHour?: number;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    contextMenuCardId: string | null;
 };
 
 export default function TimelineGrid({
@@ -65,6 +67,8 @@ export default function TimelineGrid({
     calendarEventsByDay,
     onExternalEventClick,
     timelineStartHour = 0,
+    onCardContextMenu,
+    contextMenuCardId,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -124,6 +128,8 @@ export default function TimelineGrid({
                         calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
                         onExternalEventClick={onExternalEventClick}
                         timelineStartHour={timelineStartHour}
+                        onCardContextMenu={onCardContextMenu}
+                        contextMenuCardId={contextMenuCardId}
                     />
                 ))}
             </div>

@@ -40,6 +40,8 @@ function MobileTimelineColumn({
   calendarEvents,
   onExternalEventClick,
   timelineStartHour = 0,
+  onCardContextMenu,
+  contextMenuCardId,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -53,6 +55,8 @@ function MobileTimelineColumn({
   calendarEvents: ExternalCalendarEntry[];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   timelineStartHour?: number;
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  contextMenuCardId: string | null;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const calendarLayout = calculateEventLayout(
@@ -163,6 +167,7 @@ function MobileTimelineColumn({
               id={`event:${event.card_id}`}
               data={{ kind: "event", event, cardId: event.card_id }}
               attachListenersToChild
+              disabled={contextMenuCardId === event.card_id}
             >
               <div
                 className="absolute"
@@ -172,6 +177,7 @@ function MobileTimelineColumn({
                   left: layout?.left ?? "0%",
                   width: layout?.width ?? "100%",
                 }}
+                onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
               >
                 <TimelineCard
                   title={event.title || 'Untitled card'}
@@ -200,6 +206,8 @@ function MobileAbBucket({
   onCreateBucketCard,
   onToggleCheck,
   bucketIndicator,
+  onCardContextMenu,
+  contextMenuCardId,
 }: {
   sectionLabel: string;
   bucketKey: string;
@@ -208,6 +216,8 @@ function MobileAbBucket({
   onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  contextMenuCardId: string | null;
 }) {
   const { setNodeRef: setBucketRef, isOver } = useDroppable({
     id: `bucket-drop:${bucketKey}`,
@@ -249,6 +259,8 @@ function MobileAbBucket({
               openCardModal={openCardModal}
               onToggleCheck={onToggleCheck}
               bucketIndicator={bucketIndicator}
+              onCardContextMenu={onCardContextMenu}
+              isContextMenuOpen={contextMenuCardId === item.card_id}
             />
           ))
         )}
@@ -300,6 +312,8 @@ type MobileTimelineViewProps = {
   pointerPreview: DragAndDropBindings["pointerPreview"];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   timelineStartHour?: number;
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  contextMenuCardId: string | null;
 };
 
 export default function MobileTimelineView({
@@ -333,6 +347,8 @@ export default function MobileTimelineView({
   activeDrag,
   onExternalEventClick,
   timelineStartHour = 0,
+  onCardContextMenu,
+  contextMenuCardId,
 }: MobileTimelineViewProps) {
   useEffect(() => {
     onMount?.();
@@ -549,6 +565,8 @@ export default function MobileTimelineView({
                   calendarEvents={calendarTimedEventsForDay}
                   onExternalEventClick={onExternalEventClick}
                   timelineStartHour={timelineStartHour}
+                  onCardContextMenu={onCardContextMenu}
+                  contextMenuCardId={contextMenuCardId}
                 />
               </div>
             </div>
@@ -572,6 +590,8 @@ export default function MobileTimelineView({
                       onCreateBucketCard={onCreateBucketCard}
                       onToggleCheck={onToggleCheck}
                       bucketIndicator={bucketIndicator}
+                      onCardContextMenu={onCardContextMenu}
+                      contextMenuCardId={contextMenuCardId}
                     />
                   );
                 })}
@@ -599,12 +619,16 @@ function MobileBucketCard({
   openCardModal,
   onToggleCheck,
   bucketIndicator,
+  onCardContextMenu,
+  isContextMenuOpen,
 }: {
   item: TimelineBucketItem;
   bucketKey: string;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  isContextMenuOpen: boolean;
 }) {
   const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
     id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -623,9 +647,11 @@ function MobileBucketCard({
       id={`bucket:${item.card_id}`}
       data={{ kind: "bucket", cardId: item.card_id, bucketKey, item }}
       attachListenersToChild
+      disabled={isContextMenuOpen}
     >
       <div
         className="relative flex w-full flex-col select-none"
+        onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
       >
         <TimelineCard
           title={item.title || "Untitled card"}

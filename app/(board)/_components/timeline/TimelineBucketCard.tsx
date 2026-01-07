@@ -13,6 +13,8 @@ type TimelineBucketCardProps = {
     openCardModal: (shortId: string | null) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     showFallbackBottomLine?: boolean;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    isContextMenuOpen: boolean;
 };
 
 export const TimelineBucketCard = ({
@@ -21,6 +23,8 @@ export const TimelineBucketCard = ({
     openCardModal,
     onToggleCheck,
     showFallbackBottomLine = false,
+    onCardContextMenu,
+    isContextMenuOpen,
 }: TimelineBucketCardProps) => {
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -38,8 +42,9 @@ export const TimelineBucketCard = ({
         <DraggableCard
             id={`bucket:${item.card_id}`}
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
+            disabled={isContextMenuOpen}
         >
-            <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey}>
+            <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}

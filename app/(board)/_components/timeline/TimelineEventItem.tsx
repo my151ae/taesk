@@ -23,6 +23,8 @@ type TimelineEventItemProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onClearGhost: () => void;
     timelineStartHour?: number;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    isContextMenuOpen: boolean;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -37,6 +39,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     onToggleCheck,
     onClearGhost,
     timelineStartHour = 0,
+    onCardContextMenu,
+    isContextMenuOpen,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = Math.max(event.durationMinutes ?? 60, 30);
@@ -59,6 +63,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
+            disabled={isContextMenuOpen}
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -73,6 +78,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onClearGhost();
                     openCardModal(event.short_id, 'card-click');
                 }}
+                onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
             >
                 <TimelineCard
                     title={event.title || 'Untitled card'}

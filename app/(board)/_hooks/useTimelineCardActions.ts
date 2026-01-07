@@ -164,8 +164,31 @@ export function useTimelineCardActions({
 
     const handleCardModalDelete = useCallback(
         async (cardId: string) => {
-            const targetCard = modalCard && modalCard.id === cardId ? modalCard : null;
-            if (!targetCard) return;
+            // 1. Try to find the card in the modal
+            let targetCard = modalCard && modalCard.id === cardId ? modalCard : null;
+
+            // 2. If not in modal, try to find in timeline data
+            if (!targetCard && data) {
+                const foundEvent = data.events?.find((e: any) => e.card_id === cardId);
+                if (foundEvent) {
+                    targetCard = { ...foundEvent, id: foundEvent.card_id, board_id: initialBoardId } as Card;
+                } else {
+                    const foundBucketItem = Object.values(data.abBuckets || {})
+                        .flat()
+                        .find((i: any) => (i as any).card_id === cardId);
+                    if (foundBucketItem) {
+                        targetCard = { ...foundBucketItem, id: (foundBucketItem as any).card_id, board_id: initialBoardId } as Card;
+                    }
+                }
+            }
+
+            if (!targetCard) {
+                // Fallback: assume it exists on the current board if we have an ID, 
+                // though it's safer to have found it. 
+                // For now, let's trust the ID and initialBoardId if we couldn't find the object but was triggered.
+                targetCard = { id: cardId, board_id: initialBoardId } as Card;
+            }
+
             try {
                 const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, { method: 'DELETE' });
                 if (!response.ok) throw new Error('Failed to delete card');
@@ -173,10 +196,13 @@ export function useTimelineCardActions({
             } catch (error: any) {
                 setCardModalError(error.message || 'Failed to delete card');
             } finally {
-                closeCardModal();
+                // Only close if the deleted card was the one open
+                if (modalCard?.id === cardId) {
+                    closeCardModal();
+                }
             }
         },
-        [modalCard, closeCardModal, setData, setCardModalError]
+        [modalCard, closeCardModal, setData, setCardModalError, data, initialBoardId]
     );
 
     const createCard = useCallback(async (payload: Partial<Card>, tempId?: string, options?: { openModal?: boolean }) => {
