@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import clsx from "clsx";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   HOUR_HEIGHT,
@@ -180,7 +181,7 @@ function MobileTimelineColumn({
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
               >
                 <TimelineCard
-                  title={event.title || 'Untitled card'}
+                  title={event.title || ""}
                   checked={event.checked}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
@@ -422,14 +423,14 @@ export default function MobileTimelineView({
   const overlayCardData = useMemo(() => {
     if (overlayTimelineEvent) {
       return {
-        title: overlayTimelineEvent.title || "Untitled card",
+        title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
       };
     }
     if (overlayBucketCard) {
       return {
-        title: overlayBucketCard.title || "Untitled card",
+        title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
       };
@@ -654,7 +655,7 @@ function MobileBucketCard({
         onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
       >
         <TimelineCard
-          title={item.title || "Untitled card"}
+          title={item.title || ""}
           checked={item.checked}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
@@ -700,7 +701,7 @@ function MobileDragOverlayCard({
         <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
           {badge.toUpperCase()}
         </span>
-        <div className="min-w-0 flex-1 text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
+        <div className={clsx("min-w-0 flex-1 text-[12px] font-semibold leading-tight line-clamp-2 break-words", !title ? "text-slate-400" : "text-slate-800")}>
           {title || "Untitled card"}
         </div>
       </div>

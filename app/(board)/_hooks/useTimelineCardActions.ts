@@ -238,7 +238,7 @@ export function useTimelineCardActions({
     }, [dataMode, initialBoardId, setData, openCardModal, setErrorMessage]);
 
     const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
-        const title = `New card ${Date.now()}`;
+        const title = "";
         const content = buildContentFromTitle(title);
         const excerpt = deriveExcerptFromContent(content);
         const payload: Partial<Card> = {
@@ -257,7 +257,7 @@ export function useTimelineCardActions({
         const isoDate = bucketDayMap[bucketKey];
         if (!isoDate) return;
         const now = Date.now();
-        const title = `New card ${now}`;
+        const title = "";
         const content = buildContentFromTitle(title);
         const excerpt = deriveExcerptFromContent(content);
         const tempId = `temp-${now}`;

@@ -151,14 +151,14 @@ export function DesktopTimelineView({
   const overlayCardData = useMemo(() => {
     if (overlayTimelineEvent) {
       return {
-        title: overlayTimelineEvent.title || "Untitled card",
+        title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
       };
     }
     if (overlayBucketCard) {
       return {
-        title: overlayBucketCard.title || "Untitled card",
+        title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
       };
@@ -512,7 +512,7 @@ function DesktopDragOverlayCard({
         <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
           {badge.toUpperCase()}
         </span>
-        <div className="min-w-0 flex-1 text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2 break-words">
+        <div className={clsx("min-w-0 flex-1 text-[12px] font-semibold leading-tight line-clamp-2 break-words", !title ? "text-slate-400" : "text-slate-800")}>
           {title || "Untitled card"}
         </div>
       </div>

@@ -77,8 +77,8 @@ export default function CardModalHeader({
     return (
         <div className="flex flex-col p-4 sm:p-6 pb-2 sm:pb-4 border-b border-slate-200 dark:border-gray-700">
             <div className="flex justify-between items-start mb-3 sm:mb-4 gap-4">
-                <h2 id="modal-title" className="flex-1 text-xl sm:text-2xl font-bold text-slate-800 dark:text-gray-100 line-clamp-2">
-                    {titlePreview}
+                <h2 id="modal-title" className={clsx("flex-1 text-xl sm:text-2xl font-bold line-clamp-2", !titlePreview ? "text-slate-400 dark:text-gray-500" : "text-slate-800 dark:text-gray-100")}>
+                    {titlePreview || "Untitled card"}
                 </h2>
                 <div className="flex items-center gap-1 sm:gap-2">
                     <button

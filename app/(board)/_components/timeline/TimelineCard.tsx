@@ -75,7 +75,7 @@ export function TimelineCard({
                     {checked ? '✓' : ''}
                 </button>
                 <div className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
-                    <span className="leading-tight truncate">{title || 'Untitled card'}</span>
+                    <span className={clsx("leading-tight truncate", !title && "text-slate-400")}>{title || "Untitled card"}</span>
                     {timePlacement === 'inline' && timeText ? (
                         <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
                     ) : null}

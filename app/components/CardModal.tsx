@@ -142,7 +142,7 @@ export function CardModal({
     const titlePreview = useMemo(() => {
         const normalized = ensureTitleBlock(content);
         const title = deriveTitleFromContent(normalized);
-        return title || card.title || "Edit Card";
+        return title || card.title || "";
     }, [content, card.title]);
 
     // onClose ref を最新に保つ
@@ -350,12 +350,8 @@ export function CardModal({
         const normalizedContent = ensureTitleBlock(content);
         // Use deriveTitleFromContent instead of deriveTitleFromDocument
         const nextTitle = deriveTitleFromContent(normalizedContent);
-        if (!nextTitle) {
-            if (!isAutoSave) {
-                setEditorError("タイトルを入力してください");
-            }
-            return;
-        }
+        // Title can be empty now
+        // if (!nextTitle) { ... } check removed
         const nextExcerpt = deriveExcerptFromContent(normalizedContent);
 
         if (!isAutoSave) {

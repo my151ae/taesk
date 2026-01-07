@@ -62,17 +62,10 @@ export const getTiptapPlainText = (content: JSONContent): string => {
 export const deriveTitleFromContent = (content: JSONContent): string => {
     if (!content.content || content.content.length === 0) return "";
 
-    // Look for the first heading
-    const firstHeading = content.content.find(node => node.type === 'heading');
-    if (firstHeading) {
-        const text = getTiptapPlainText({ content: [firstHeading] });
-        return clampText(text, MAX_TITLE_LENGTH);
-    }
-
-    // Fallback to first paragraph
-    const firstPara = content.content.find(node => node.type === 'paragraph');
-    if (firstPara) {
-        const text = getTiptapPlainText({ content: [firstPara] });
+    // Pick the first block's text, regardless of type
+    const firstBlock = content.content[0];
+    if (firstBlock) {
+        const text = getTiptapPlainText({ content: [firstBlock] });
         return clampText(text, MAX_TITLE_LENGTH);
     }
 
@@ -85,7 +78,7 @@ export const deriveExcerptFromContent = (
 ): string => {
     if (!content.content || content.content.length === 0) return "";
 
-    // Skip the first node (assumed title/heading) if there are multiple nodes
+    // Skip the first node (assumed title) if there are multiple nodes
     const nodesToConsider = content.content.length > 1 ? content.content.slice(1) : [];
     if (nodesToConsider.length === 0) return "";
 
@@ -94,21 +87,7 @@ export const deriveExcerptFromContent = (
 };
 
 export const ensureTitleBlock = (content: JSONContent): JSONContent => {
-    if (!content.content || content.content.length === 0) {
-        return EMPTY_DOC;
-    }
-
-    const first = content.content[0];
-    if (first.type !== 'heading' || first.attrs?.level !== 1) {
-        return {
-            ...content,
-            content: [
-                { type: 'heading', attrs: { level: 1 }, content: [] },
-                ...content.content
-            ]
-        };
-    }
-
+    // Logic removed: do not enforce H1
     return content;
 };
 

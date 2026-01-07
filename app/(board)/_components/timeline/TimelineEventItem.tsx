@@ -81,7 +81,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
             >
                 <TimelineCard
-                    title={event.title || 'Untitled card'}
+                    title={event.title || ""}
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}

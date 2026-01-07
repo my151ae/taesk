@@ -64,7 +64,7 @@ export const TimelineBucketCard = ({
                 )}
 
                 <TimelineCard
-                    title={item.title || 'Untitled card'}
+                    title={item.title || ""}
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
