@@ -47,6 +47,7 @@ type TimelineColumnProps = {
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
@@ -85,6 +86,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     onExternalEventClick,
     timelineStartHour = 0,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
 }: TimelineColumnProps) {
@@ -269,6 +271,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 onClearGhost={() => setSelectedSlot(null)}
                                 timelineStartHour={timelineStartHour}
                                 onCardContextMenu={onCardContextMenu}
+                                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                 isContextMenuOpen={contextMenuCardId === event.card_id}
                                 onUpdateCardTitle={onUpdateCardTitle}
                             />

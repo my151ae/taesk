@@ -43,6 +43,7 @@ type TimelineGridProps = {
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
@@ -70,6 +71,7 @@ export default function TimelineGrid({
     onExternalEventClick,
     timelineStartHour = 0,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
 }: TimelineGridProps) {
@@ -132,6 +134,7 @@ export default function TimelineGrid({
                         onExternalEventClick={onExternalEventClick}
                         timelineStartHour={timelineStartHour}
                         onCardContextMenu={onCardContextMenu}
+                        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}
                         onUpdateCardTitle={onUpdateCardTitle}
                     />

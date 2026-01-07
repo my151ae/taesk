@@ -21,6 +21,7 @@ type TimelineDayBucketProps = {
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
@@ -48,6 +49,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     bucketIndicator,
     onCreateBucketCard,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
 }: TimelineDayBucketProps) {
@@ -104,6 +106,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                                         bucketIndicator?.bucketKey === section.bucket && bucketIndicator.cardId === item.card_id
                                                     }
                                                     onCardContextMenu={onCardContextMenu}
+                                                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                                     isContextMenuOpen={contextMenuCardId === item.card_id}
                                                     onUpdateCardTitle={onUpdateCardTitle}
                                                 />

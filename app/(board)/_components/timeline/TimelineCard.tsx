@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useState, useCallback } from 'react';
+import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useState, useCallback, useRef } from 'react';
 import { InlineTitleEditor } from './InlineTitleEditor';
 
 type TimelineCardProps = {
@@ -19,6 +19,7 @@ type TimelineCardProps = {
     tabIndex?: number;
     role?: string;
     onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+    onOpenContextMenu?: (rect: DOMRect) => void;
     childrenPosition?: 'top' | 'bottom';
     // インライン編集用 props
     onTitleChange?: (newTitle: string, previousTitle: string) => void;
@@ -44,6 +45,7 @@ export function TimelineCard({
     tabIndex,
     role,
     onKeyDown,
+    onOpenContextMenu,
     childrenPosition = 'bottom',
     onTitleChange,
     isEditingTitle: externalIsEditing,
@@ -83,8 +85,11 @@ export function TimelineCard({
         }
     }, [isEditing, onOpen]);
 
+    const containerRef = useRef<HTMLDivElement | null>(null);
+
     return (
         <div
+            ref={containerRef}
             className={clsx(
                 'relative flex flex-col gap-2 border border-slate-200 bg-white px-[6px] py-3 text-left shadow-sm w-full max-w-full',
                 className
@@ -93,7 +98,18 @@ export function TimelineCard({
             data-testid={dataTestId}
             tabIndex={tabIndex}
             role={role}
-            onKeyDown={onKeyDown}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && !isEditing) {
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (rect) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onOpenContextMenu?.(rect);
+                        return;
+                    }
+                }
+                onKeyDown?.(event);
+            }}
             onClick={handleCardClick}
         >
             {childrenPosition === 'top' && children}

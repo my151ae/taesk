@@ -15,6 +15,7 @@ type TimelineBucketCardProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     showFallbackBottomLine?: boolean;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     isContextMenuOpen: boolean;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
@@ -27,6 +28,7 @@ export const TimelineBucketCard = ({
     onToggleCheck,
     showFallbackBottomLine = false,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     isContextMenuOpen,
     onUpdateCardTitle,
 }: TimelineBucketCardProps) => {
@@ -93,6 +95,8 @@ export const TimelineBucketCard = ({
                     }}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
                     className="min-h-[40px] pt-4 pb-1"
+                    tabIndex={0}
+                    onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
                     isEditingTitle={isEditingTitle}

@@ -66,16 +66,26 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     y: number;
   }>({ open: false, cardId: null, x: 0, y: 0 });
 
-  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const openContextMenuAt = useCallback((cardId: string, x: number, y: number) => {
     setContextMenu({
       open: true,
       cardId,
-      x: e.clientX,
-      y: e.clientY
+      x,
+      y,
     });
   }, []);
+
+  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenuAt(cardId, e.clientX, e.clientY);
+  }, [openContextMenuAt]);
+
+  const handleCardContextMenuByKeyboard = useCallback((cardId: string, rect: DOMRect) => {
+    const x = rect.right + 8;
+    const y = rect.top;
+    openContextMenuAt(cardId, x, y);
+  }, [openContextMenuAt]);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, open: false, cardId: null }));
@@ -376,6 +386,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             floatingLayerTop={timelineHeaderHeight}
             calendarAllDayByDay={calendarAllDayEventsByDay}
             onCardContextMenu={handleCardContextMenu}
+            onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
             contextMenuCardId={contextMenu.cardId}
             onUpdateCardTitle={handleUpdateCardTitle}
           />
@@ -414,6 +425,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             onExternalEventClick={handleExternalEventClick}
             timelineStartHour={timelineStartHour}
             onCardContextMenu={handleCardContextMenu}
+            onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
             contextMenuCardId={contextMenu.cardId}
           />
         </div>

@@ -71,6 +71,7 @@ type DesktopTimelineViewProps = {
   onMount?: () => void;
   timelineStartHour?: number;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
   // インライン編集用
   onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
@@ -117,6 +118,7 @@ export function DesktopTimelineView({
   onScroll,
   timelineStartHour = 0,
   onCardContextMenu,
+  onCardContextMenuByKeyboard,
   contextMenuCardId,
   onUpdateCardTitle,
 }: DesktopTimelineViewProps) {
@@ -514,6 +516,7 @@ export function DesktopTimelineView({
                   onToggleCheck={onToggleCheck}
                   onUpdateCardTitle={onUpdateCardTitle}
                   onCardContextMenu={onCardContextMenu}
+                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
                 />
               ))}

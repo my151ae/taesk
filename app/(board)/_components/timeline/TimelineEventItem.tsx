@@ -18,6 +18,7 @@ type TimelineEventItemProps = {
     activeResize: ActiveResizeState | null;
     openCardModal: (shortId: string | null, source: string) => void;
     handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => void;
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
@@ -36,6 +37,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     activeResize,
     openCardModal,
     handleEventKeyDown,
+    onCardContextMenuByKeyboard,
     handleResizeStart,
     handleResizeMove,
     handleResizeEnd,
@@ -114,6 +116,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     tabIndex={0}
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
+                    onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                     className={`w-full h-full ${isSmall ? 'pt-0' : 'pt-4'}`}
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}

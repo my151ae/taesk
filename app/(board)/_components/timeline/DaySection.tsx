@@ -55,6 +55,7 @@ type DaySectionProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
 };
 
@@ -90,6 +91,7 @@ export const DaySection = memo(function DaySection({
     onToggleCheck,
     onUpdateCardTitle,
     onCardContextMenu,
+    onCardContextMenuByKeyboard,
     contextMenuCardId,
 }: DaySectionProps) {
     return (
@@ -120,6 +122,7 @@ export const DaySection = memo(function DaySection({
                     onExternalEventClick={onExternalEventClick}
                     timelineStartHour={timelineStartHour}
                     onCardContextMenu={onCardContextMenu}
+                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}
                     onUpdateCardTitle={onUpdateCardTitle}
                 />
@@ -144,6 +147,7 @@ export const DaySection = memo(function DaySection({
                         bucketIndicator={bucketIndicator}
                         onCreateBucketCard={onCreateBucketCard}
                         onCardContextMenu={onCardContextMenu}
+                        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}
                         onUpdateCardTitle={onUpdateCardTitle}
                     />
