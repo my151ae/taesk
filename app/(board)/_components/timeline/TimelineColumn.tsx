@@ -25,7 +25,7 @@ type PointerPreviewState = {
 
 type TimelineColumnProps = {
     day: TimelineDay;
-    events: TimelineEvent[];
+    events: ReadonlyArray<TimelineEvent>;
     index: number;
     indicatorTop: number | null;
     indicatorDayIso: string | null;

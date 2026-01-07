@@ -201,7 +201,7 @@ export type EventLayout = {
     width: string;
 };
 
-export const calculateEventLayout = (events: TimelineEvent[]): Record<string, EventLayout> => {
+export const calculateEventLayout = (events: ReadonlyArray<TimelineEvent>): Record<string, EventLayout> => {
     // 1. Sort events by start time, then by duration (longer first)
     const sorted = [...events].sort((a, b) => {
         const aStart = getMinutesFromTime(a.due_start) ?? 0;

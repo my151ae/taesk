@@ -3,8 +3,7 @@
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
-import TimelineBuckets from "@/app/(board)/_components/timeline/TimelineBuckets";
-import TimelineGrid from "@/app/(board)/_components/timeline/TimelineGrid";
+import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -19,10 +18,15 @@ import {
   type ExternalCalendarEntry,
   timeLabel,
   formatDuration,
+  getDisplayHours,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 
 const ALL_DAY_ROW_HEIGHT = 36;
+
+// EMPTY配列の参照を安定化（memo効率化）
+const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
+const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -121,6 +125,15 @@ export function DesktopTimelineView({
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
+
+  // Ghost card state for Timeline
+  const [selectedSlot, setSelectedSlot] = useState<{ day: string; minutes: number } | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setSelectedSlot(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     const el = timelineScrollRef.current;
@@ -448,46 +461,63 @@ export function DesktopTimelineView({
               </div>
             )}
 
-            <TimelineBuckets
-              days={visibleDays}
-              abBuckets={abBuckets}
-              floatingLayerTop={floatingLayerTop}
-              viewportHeight={abViewportHeight}
-              registerAbScrollContainer={registerAbScrollContainer}
-              status={status}
-              openCardModal={openCardModal}
-              onToggleCheck={onToggleCheck}
-              bucketIndicator={bucketIndicator}
-              onCreateBucketCard={onCreateBucketCard}
-              onCardContextMenu={onCardContextMenu}
-              contextMenuCardId={contextMenuCardId}
-              onUpdateCardTitle={onUpdateCardTitle}
-            />
+            {/* 日単位でDOMを組み替え */}
+            <div
+              className="grid timeline-container"
+              style={{ gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+            >
+              {/* 時間軸 */}
+              <aside className="timeline-axis relative border-r border-slate-100 text-xs text-slate-500">
+                {getDisplayHours(timelineStartHour).map((hour) => (
+                  <div key={hour} className="flex h-10 items-start justify-end pr-3">
+                    {hour === `${timelineStartHour.toString().padStart(2, '0')}:00` ? null : (
+                      <span className="-mt-1 leading-none tracking-tight text-slate-600">
+                        {hour}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </aside>
 
-            <TimelineGrid
-              days={days}
-              eventsByDay={eventsByDay}
-              indicatorTop={indicatorTop}
-              indicatorDayIso={indicatorDayIso}
-              timelineViewportHeight={timelineViewportHeight}
-              activeDrag={activeDrag}
-              pointerPreview={pointerPreview}
-              activeResize={activeResize}
-              openCardModal={openCardModal}
-              handleEventKeyDown={handleEventKeyDown}
-              handleColumnClick={handleColumnClick}
-              handleResizeStart={handleResizeStart}
-              handleResizeMove={handleResizeMove}
-              handleResizeEnd={handleResizeEnd}
-              onToggleCheck={onToggleCheck}
-              shrinkDaysToHalf
-              calendarEventsByDay={calendarEventsByDay}
-              onExternalEventClick={onExternalEventClick}
-              timelineStartHour={timelineStartHour}
-              onCardContextMenu={onCardContextMenu}
-              contextMenuCardId={contextMenuCardId}
-              onUpdateCardTitle={onUpdateCardTitle}
-            />
+              {/* 日ごとにループ：Timeline → A/Bリスト の順 */}
+              {visibleDays.map((day, index) => (
+                <DaySection
+                  key={day.isoDate}
+                  day={day}
+                  index={index}
+                  events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
+                  indicatorTop={indicatorTop}
+                  indicatorDayIso={indicatorDayIso}
+                  timelineViewportHeight={timelineViewportHeight}
+                  activeDragCardId={activeDrag?.cardId ?? null}
+                  pointerPreview={pointerPreview}
+                  activeResize={activeResize}
+                  selectedSlot={selectedSlot}
+                  handleEventKeyDown={handleEventKeyDown}
+                  handleColumnClick={handleColumnClick}
+                  handleResizeStart={handleResizeStart}
+                  handleResizeMove={handleResizeMove}
+                  handleResizeEnd={handleResizeEnd}
+                  setSelectedSlot={setSelectedSlot}
+                  calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
+                  onExternalEventClick={onExternalEventClick}
+                  timelineStartHour={timelineStartHour}
+                  bucketsA={abBuckets[`${day.key}_a`] ?? EMPTY_BUCKET}
+                  bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
+                  bucketIndicator={bucketIndicator}
+                  onCreateBucketCard={onCreateBucketCard}
+                  viewportHeight={abViewportHeight}
+                  registerAbScrollContainer={registerAbScrollContainer}
+                  floatingLayerTop={floatingLayerTop}
+                  status={status}
+                  openCardModal={openCardModal}
+                  onToggleCheck={onToggleCheck}
+                  onUpdateCardTitle={onUpdateCardTitle}
+                  onCardContextMenu={onCardContextMenu}
+                  contextMenuCardId={contextMenuCardId}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>

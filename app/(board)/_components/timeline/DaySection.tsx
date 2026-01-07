@@ -1,0 +1,147 @@
+import { memo } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { TimelineColumn } from './TimelineColumn';
+import { TimelineDayBucket } from './TimelineDayBucket';
+import type {
+    TimelineDay,
+    TimelineEvent,
+    TimelineBucketItem,
+    ExternalCalendarEntry,
+} from '@/app/(board)/_utils/timeline-helpers';
+import type { ActiveResizeState, BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
+
+type PointerPreviewState = {
+    visible: boolean;
+    startMinutes: number;
+    durationMinutes: number;
+    dayIso: string | null;
+};
+
+type DaySectionProps = {
+    day: TimelineDay;
+    index: number;
+
+    // Timeline用
+    events: readonly TimelineEvent[];
+    indicatorTop: number | null;
+    indicatorDayIso: string | null;
+    timelineViewportHeight: number;
+    activeDragCardId: string | null;
+    pointerPreview: PointerPreviewState;
+    activeResize: ActiveResizeState | null;
+    selectedSlot: { day: string; minutes: number } | null;
+    handleEventKeyDown: (event: TimelineEvent, native: ReactKeyboardEvent<HTMLElement>) => void;
+    handleColumnClick: (day: TimelineDay, minutes: number) => void;
+    handleResizeStart: (e: ReactPointerEvent, cardId: string, startMinutes: number, duration: number, edge: 'top' | 'bottom') => void;
+    handleResizeMove: (e: ReactPointerEvent) => void;
+    handleResizeEnd: (e: ReactPointerEvent) => void;
+    setSelectedSlot: (slot: { day: string; minutes: number } | null) => void;
+    calendarEvents: ExternalCalendarEntry[];
+    onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+    timelineStartHour?: number;
+
+    // A/Bリスト用
+    bucketsA: readonly TimelineBucketItem[];
+    bucketsB: readonly TimelineBucketItem[];
+    bucketIndicator: BucketIndicator | null;
+    onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
+    viewportHeight?: number;
+    registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
+    floatingLayerTop: number;
+    status: string;
+
+    // 共通
+    openCardModal: (shortId: string | null, source: string) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
+    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+    contextMenuCardId: string | null;
+};
+
+export const DaySection = memo(function DaySection({
+    day,
+    index,
+    events,
+    indicatorTop,
+    indicatorDayIso,
+    timelineViewportHeight,
+    activeDragCardId,
+    pointerPreview,
+    activeResize,
+    selectedSlot,
+    handleEventKeyDown,
+    handleColumnClick,
+    handleResizeStart,
+    handleResizeMove,
+    handleResizeEnd,
+    setSelectedSlot,
+    calendarEvents,
+    onExternalEventClick,
+    timelineStartHour,
+    bucketsA,
+    bucketsB,
+    bucketIndicator,
+    onCreateBucketCard,
+    viewportHeight,
+    registerAbScrollContainer,
+    floatingLayerTop,
+    status,
+    openCardModal,
+    onToggleCheck,
+    onUpdateCardTitle,
+    onCardContextMenu,
+    contextMenuCardId,
+}: DaySectionProps) {
+    return (
+        <div className="day-section relative h-full">
+            {/* Timeline部分（ベース） */}
+            <TimelineColumn
+                day={day}
+                events={events}
+                index={index}
+                indicatorTop={indicatorTop}
+                indicatorDayIso={indicatorDayIso}
+                timelineViewportHeight={timelineViewportHeight}
+                activeDragCardId={activeDragCardId}
+                pointerPreview={pointerPreview}
+                activeResize={activeResize}
+                selectedSlot={selectedSlot}
+                openCardModal={openCardModal}
+                handleEventKeyDown={handleEventKeyDown}
+                handleColumnClick={handleColumnClick}
+                handleResizeStart={handleResizeStart}
+                handleResizeMove={handleResizeMove}
+                handleResizeEnd={handleResizeEnd}
+                onToggleCheck={onToggleCheck}
+                shrinkToHalf={false}
+                setSelectedSlot={setSelectedSlot}
+                calendarEvents={calendarEvents}
+                onExternalEventClick={onExternalEventClick}
+                timelineStartHour={timelineStartHour}
+                onCardContextMenu={onCardContextMenu}
+                contextMenuCardId={contextMenuCardId}
+                onUpdateCardTitle={onUpdateCardTitle}
+            />
+
+            {/* A/Bリスト部分（Timelineの右半分に重ねる） */}
+            <div className="absolute top-0 right-0 z-20 w-1/2 pointer-events-none md:w-[calc(50%-3px)]">
+                <TimelineDayBucket
+                    day={day}
+                    bucketsA={bucketsA}
+                    bucketsB={bucketsB}
+                    floatingLayerTop={floatingLayerTop}
+                    viewportHeight={viewportHeight}
+                    registerScrollContainer={registerAbScrollContainer}
+                    status={status}
+                    openCardModal={openCardModal}
+                    onToggleCheck={onToggleCheck}
+                    bucketIndicator={bucketIndicator}
+                    onCreateBucketCard={onCreateBucketCard}
+                    onCardContextMenu={onCardContextMenu}
+                    contextMenuCardId={contextMenuCardId}
+                    onUpdateCardTitle={onUpdateCardTitle}
+                />
+            </div>
+        </div>
+    );
+});
