@@ -25,6 +25,7 @@ interface UseTimelineCardActionsProps {
     bucketDayMap: Record<string, string | null>;
     googleCalendarEvents: any[];
     refreshGoogleCalendar: () => Promise<void> | void;
+    data: any;
 }
 
 export function useTimelineCardActions({
@@ -40,6 +41,7 @@ export function useTimelineCardActions({
     setErrorMessage,
     bucketDayMap,
     refreshGoogleCalendar,
+    data,
 }: UseTimelineCardActionsProps) {
     const saveAbortRef = useRef<AbortController | null>(null);
     const saveRequestIdRef = useRef(0);
@@ -235,7 +237,17 @@ export function useTimelineCardActions({
         const tempId = `temp-${now}`;
         const dueBucket = bucketKeyToDueBucket(bucketKey);
 
-        const position = now; // Simplified position for now, consider resolveBucketInsertPosition logic if needed
+        const currentItems = (data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[];
+        let position = now;
+
+        if (afterCardId) {
+            // Add to bottom: find current min position
+            const minPos = currentItems.length > 0
+                ? Math.min(...currentItems.map(i => i.bucketPosition ?? 0))
+                : now;
+            position = minPos - 1000; // Smaller position means lower in list due to descending sort
+        }
+
         const payload: Partial<Card> = {
             title, content, excerpt, tags: [],
             due_date: withJstMidnight(isoDate),
@@ -244,15 +256,36 @@ export function useTimelineCardActions({
             priority: 'medium',
         };
 
+        const newItem: TimelineBucketItem = {
+            card_id: tempId,
+            title,
+            excerpt,
+            due_date: isoDate,
+            due_start: null,
+            due_end: null,
+            checked: false,
+            tags: [],
+            bucketPosition: position,
+            short_id: null,
+            slug: null,
+        };
+
         setData((prev: any) => {
             if (!prev) return prev;
             const nextBuckets = { ...prev.abBuckets };
             const currentItems = nextBuckets[bucketKey] ?? [];
-            nextBuckets[bucketKey] = [{ card_id: tempId, title, excerpt, due_date: isoDate, checked: false, tags: [], bucketPosition: position }, ...currentItems];
+
+            if (afterCardId) {
+                // Insert at end for local UI consistency
+                nextBuckets[bucketKey] = [...currentItems, newItem];
+            } else {
+                // Default: insert at top
+                nextBuckets[bucketKey] = [newItem, ...currentItems];
+            }
             return { ...prev, abBuckets: nextBuckets };
         });
         createCard(payload, tempId, { openModal: false });
-    }, [bucketDayMap, createCard, setData]);
+    }, [bucketDayMap, createCard, setData, data?.abBuckets]);
 
     const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
         if (dataMode !== 'api') return;

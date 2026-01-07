@@ -208,7 +208,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialBoardId: currentBoard.id,
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
-    bucketDayMap, googleCalendarEvents, refreshGoogleCalendar
+    bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data
   });
 
   // 9. Drag and Drop
