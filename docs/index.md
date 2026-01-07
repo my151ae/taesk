@@ -236,7 +236,7 @@ taesk/
 │   ├── comments.spec.ts / notifications.spec.ts / ...    # 他バッチ
 │   └── utils/metrics.ts                 # dumpClientMetrics, createTrace helpers
 │
-├── docs/                                # 本ドキュメント + detail/ + tickets/
+├── docs/                                # 本ドキュメント + detail/
 ├── scripts/test-all-batches.sh          # PW_WORKERS=1 でバッチ実行
 ├── test-results/                        # JSON レポートとログ
 └── supabase/migrations/                 # due_* フィールド等の SQL
@@ -255,7 +255,6 @@ taesk/
 - [Testing Playbook](./detail/testing.md)
 - [Deployment Guide](./detail/deployment.md)
 - [Setup Guide](./setup/local-dev.md)
-- [Tickets Index](./tickets/README.md) / [Roadmap](./roadmap.md)
 
 ## 🎯 Key Design Decisions
 
@@ -281,7 +280,6 @@ taesk/
 
 - [docs/detail/architecture.md](./detail/architecture.md)
 - [docs/detail/testing.md](./detail/testing.md)
-- [docs/tickets/2025-11-20](./tickets/2025-11-20) - 今日の活動ログ
 - [Supabase Docs](https://supabase.com/docs)
 - [Next.js Docs](https://nextjs.org/docs)
 
