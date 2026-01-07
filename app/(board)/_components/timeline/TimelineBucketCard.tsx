@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import clsx from 'clsx';
-import { TimelineBucketItem, timeLabel } from '@/app/(board)/_utils/timeline-helpers';
+import { TimelineBucketItem, timeLabel, formatDuration } from '@/app/(board)/_utils/timeline-helpers';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
@@ -68,12 +68,17 @@ export const TimelineBucketCard = ({
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                    duration={item.duration}
-                    timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                    duration={undefined}
+                    timeText={
+                        <span className="flex gap-1">
+                            {item.duration ? <span>({formatDuration(item.duration)})</span> : null}
+                            {item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                        </span>
+                    }
                     timePlacement="top"
                     onOpen={() => openCardModal(item.short_id)}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className="min-h-[72px] pt-4"
+                    className="min-h-[40px] pt-4 pb-1"
                 />
             </div>
         </DraggableCard>

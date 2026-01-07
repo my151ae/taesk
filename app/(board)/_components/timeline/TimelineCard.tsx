@@ -8,7 +8,7 @@ type TimelineCardProps = {
     badgeLabel?: string | null;
     duration?: number | null;
     timeText?: ReactNode;
-    timePlacement?: 'top' | 'inline';
+    timePlacement?: 'top' | 'inline' | 'out-top';
     onOpen: () => void;
     className?: string;
     style?: CSSProperties;
@@ -43,7 +43,7 @@ export function TimelineCard({
     return (
         <div
             className={clsx(
-                'relative flex flex-col gap-2 border border-slate-200 bg-white p-3 text-left shadow-sm w-full max-w-full',
+                'relative flex flex-col gap-2 border border-slate-200 bg-white px-[6px] py-3 text-left shadow-sm w-full max-w-full',
                 className
             )}
             style={style}
@@ -83,7 +83,13 @@ export function TimelineCard({
             </div>
 
             {timePlacement === 'top' && timeText ? (
-                <div className="absolute top-0.5 left-0 px-1 text-[10px] font-semibold text-slate-600">
+                <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600">
+                    {timeText}
+                </div>
+            ) : null}
+
+            {timePlacement === 'out-top' && timeText ? (
+                <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 w-max">
                     {timeText}
                 </div>
             ) : null}
@@ -91,7 +97,7 @@ export function TimelineCard({
             {badgeLabel || duration ? (
                 <button
                     type="button"
-                    className="absolute top-2 right-2 flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
+                    className="absolute top-[3px] right-[6px] flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
                     aria-label="カードを開く"
                     data-testid={openButtonTestId}
                     onClick={(e) => {
@@ -101,7 +107,7 @@ export function TimelineCard({
                     onPointerDown={(e) => e.stopPropagation()}
                 >
                     <span className="text-[10px] font-bold leading-none text-slate-500">
-                        {duration || ''}{badgeLabel || ''}
+                        {badgeLabel || ''}
                     </span>
                 </button>
             ) : null}

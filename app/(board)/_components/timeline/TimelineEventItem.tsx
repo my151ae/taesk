@@ -7,6 +7,7 @@ import {
     getMinutesFromTime,
     timeLabel,
     minutesToTime,
+    formatDuration,
     EventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -43,7 +44,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     isContextMenuOpen,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
-    let duration = Math.max(event.durationMinutes ?? 60, 30);
+    let duration = event.durationMinutes ?? 60;
     let displayStart = event.due_start;
     let displayEnd = event.due_end;
 
@@ -55,7 +56,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     }
 
     const top = minuteToPixels(start, timelineStartHour);
-    const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 32);
+    const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 20);
+    const isSmall = duration < 55;
 
     return (
         <DraggableCard
@@ -85,8 +87,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    duration={duration}
-                    timeText={timeLabel(displayStart, displayEnd)}
+                    duration={undefined}
+                    timeText={`${timeLabel(displayStart, displayEnd)} (${formatDuration(duration)})`}
+                    timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
                         onClearGhost();
                         openCardModal(event.short_id, 'event-button');
@@ -95,7 +98,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     tabIndex={0}
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
-                    className="w-full h-full pt-4"
+                    className={`w-full h-full ${isSmall ? 'pt-0' : 'pt-4'}`}
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"

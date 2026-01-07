@@ -131,6 +131,15 @@ export const minutesToTime = (value: number) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
 };
 
+export const formatDuration = (minutes: number) => {
+    if (minutes === 0) return '0m';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h > 0 && m > 0) return `${h}h${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+};
+
 export const timeLabel = (start: string | null, end: string | null) => {
     if (!start && !end) return 'Anytime';
     const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');

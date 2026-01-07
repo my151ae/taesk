@@ -830,7 +830,7 @@ export function useTimelineDragAndDrop({
         const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 5) * 5;
 
         if (activeResize.edge === 'bottom') {
-            const newDuration = Math.max(5, activeResize.originalDuration + deltaMinutes);
+            const newDuration = Math.max(30, activeResize.originalDuration + deltaMinutes);
             const endMinutes = activeResize.startMinutes + newDuration;
             const maxEnd = 24 * 60;
             const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
@@ -843,9 +843,9 @@ export function useTimelineDragAndDrop({
             let newDuration = activeResize.originalDuration - deltaMinutes;
 
             // Ensure minimum duration
-            if (newDuration < 5) {
-                newDuration = 5;
-                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 5;
+            if (newDuration < 30) {
+                newDuration = 30;
+                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 30;
             }
 
             // Ensure start time is not negative

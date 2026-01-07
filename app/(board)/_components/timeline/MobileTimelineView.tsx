@@ -18,6 +18,7 @@ import {
   buildAbMeta,
   getMinutesFromTime,
   ExternalCalendarEntry,
+  formatDuration,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
@@ -157,9 +158,9 @@ function MobileTimelineColumn({
 
         {events.map((event) => {
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
-          const duration = Math.max(event.durationMinutes ?? 60, 30);
+          const duration = event.durationMinutes ?? 60;
           const top = minuteToPixels(start, timelineStartHour);
-          const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 32);
+          const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 10);
           const layout = layoutMap[event.card_id];
 
           return (
@@ -185,10 +186,11 @@ function MobileTimelineColumn({
                   checked={event.checked}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                  duration={Math.max(event.durationMinutes ?? 60, 30)}
-                  timeText={timeLabel(event.due_start, event.due_end)}
+                  duration={undefined}
+                  timeText={`${timeLabel(event.due_start, event.due_end)} (${formatDuration(Math.max(event.durationMinutes ?? 60, 0))})`}
+                  timePlacement={(event.durationMinutes ?? 60) < 55 ? 'out-top' : 'top'}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
-                  className="w-full h-full pt-4"
+                  className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? 'pt-0' : 'pt-4'}`}
                 />
               </div>
             </DraggableCard>
@@ -425,14 +427,16 @@ export default function MobileTimelineView({
       return {
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
-        timeText: timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end),
+        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} (${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)})`,
       };
     }
     if (overlayBucketCard) {
       return {
         title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
-        timeText: overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null,
+        timeText: overlayBucketCard.duration
+          ? `(${formatDuration(overlayBucketCard.duration)}) ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
+          : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
       };
     }
     return null;
@@ -659,8 +663,13 @@ function MobileBucketCard({
           checked={item.checked}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-          duration={item.duration}
-          timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+          duration={undefined}
+          timeText={
+            <span className="flex gap-1">
+              {item.duration ? <span>({formatDuration(item.duration)})</span> : null}
+              {item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+            </span>
+          }
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="inline"
           className="w-full"
