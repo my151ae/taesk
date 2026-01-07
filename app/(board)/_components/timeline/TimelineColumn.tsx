@@ -48,6 +48,8 @@ type TimelineColumnProps = {
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     contextMenuCardId: string | null;
+    // インライン編集用
+    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -84,6 +86,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     timelineStartHour = 0,
     onCardContextMenu,
     contextMenuCardId,
+    onUpdateCardTitle,
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
     const calendarLayout = calculateEventLayout(
@@ -267,6 +270,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 timelineStartHour={timelineStartHour}
                                 onCardContextMenu={onCardContextMenu}
                                 isContextMenuOpen={contextMenuCardId === event.card_id}
+                                onUpdateCardTitle={onUpdateCardTitle}
                             />
                         ))}
                     </div>

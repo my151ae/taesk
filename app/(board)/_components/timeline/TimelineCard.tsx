@@ -1,5 +1,6 @@
 import clsx from 'clsx';
-import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useState, useCallback } from 'react';
+import { InlineTitleEditor } from './InlineTitleEditor';
 
 type TimelineCardProps = {
     title: string;
@@ -19,6 +20,11 @@ type TimelineCardProps = {
     role?: string;
     onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
     childrenPosition?: 'top' | 'bottom';
+    // インライン編集用 props
+    onTitleChange?: (newTitle: string, previousTitle: string) => void;
+    /** 編集中かどうかの外部制御（DnD無効化などに使用） */
+    isEditingTitle?: boolean;
+    onEditingChange?: (isEditing: boolean) => void;
 };
 
 export function TimelineCard({
@@ -39,7 +45,44 @@ export function TimelineCard({
     role,
     onKeyDown,
     childrenPosition = 'bottom',
+    onTitleChange,
+    isEditingTitle: externalIsEditing,
+    onEditingChange,
 }: TimelineCardProps) {
+    // 内部編集状態（外部制御がない場合）
+    const [internalIsEditing, setInternalIsEditing] = useState(false);
+    const isEditing = externalIsEditing ?? internalIsEditing;
+
+    const setIsEditing = useCallback((value: boolean) => {
+        setInternalIsEditing(value);
+        onEditingChange?.(value);
+    }, [onEditingChange]);
+
+    const handleTitleClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (onTitleChange && !isEditing) {
+            setIsEditing(true);
+        }
+    }, [onTitleChange, isEditing, setIsEditing]);
+
+    const handleSave = useCallback((newTitle: string, previousTitle: string) => {
+        setIsEditing(false);
+        onTitleChange?.(newTitle, previousTitle);
+    }, [onTitleChange, setIsEditing]);
+
+    const handleCancel = useCallback(() => {
+        setIsEditing(false);
+    }, [setIsEditing]);
+
+    const handleCardClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        // 編集中はカードを開かない
+        if (!isEditing) {
+            onOpen();
+        }
+    }, [isEditing, onOpen]);
+
     return (
         <div
             className={clsx(
@@ -51,10 +94,7 @@ export function TimelineCard({
             tabIndex={tabIndex}
             role={role}
             onKeyDown={onKeyDown}
-            onClick={(e) => {
-                e.stopPropagation();
-                onOpen();
-            }}
+            onClick={handleCardClick}
         >
             {childrenPosition === 'top' && children}
 
@@ -75,7 +115,25 @@ export function TimelineCard({
                     {checked ? '✓' : ''}
                 </button>
                 <div className="mt-1 flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
-                    <span className={clsx("leading-tight truncate", !title && "text-slate-400")}>{title || "Untitled card"}</span>
+                    {isEditing && onTitleChange ? (
+                        <InlineTitleEditor
+                            title={title}
+                            onSave={handleSave}
+                            onCancel={handleCancel}
+                        />
+                    ) : (
+                        <span
+                            className={clsx(
+                                "leading-tight",
+                                onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "truncate",
+                                !title && "text-slate-400"
+                            )}
+                            onClick={onTitleChange ? handleTitleClick : undefined}
+                            onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
+                        >
+                            {title || "Untitled card"}
+                        </span>
+                    )}
                     {timePlacement === 'inline' && timeText ? (
                         <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
                     ) : null}

@@ -44,6 +44,8 @@ type TimelineGridProps = {
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     contextMenuCardId: string | null;
+    // インライン編集用
+    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
 
 export default function TimelineGrid({
@@ -69,6 +71,7 @@ export default function TimelineGrid({
     timelineStartHour = 0,
     onCardContextMenu,
     contextMenuCardId,
+    onUpdateCardTitle,
 }: TimelineGridProps) {
     const [selectedSlot, setSelectedSlot] = useState<{ day: string, minutes: number } | null>(null);
 
@@ -130,6 +133,7 @@ export default function TimelineGrid({
                         timelineStartHour={timelineStartHour}
                         onCardContextMenu={onCardContextMenu}
                         contextMenuCardId={contextMenuCardId}
+                        onUpdateCardTitle={onUpdateCardTitle}
                     />
                 ))}
             </div>

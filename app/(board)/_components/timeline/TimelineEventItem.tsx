@@ -1,4 +1,4 @@
-import { KeyboardEvent, PointerEvent, memo } from 'react';
+import { KeyboardEvent, PointerEvent, memo, useState, useCallback } from 'react';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
 import {
@@ -26,6 +26,8 @@ type TimelineEventItemProps = {
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     isContextMenuOpen: boolean;
+    // インライン編集用
+    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -42,7 +44,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     timelineStartHour = 0,
     onCardContextMenu,
     isContextMenuOpen,
+    onUpdateCardTitle,
 }: TimelineEventItemProps) {
+    // タイトル編集中の状態
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
     let displayStart = event.due_start;
@@ -59,13 +65,18 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 20);
     const isSmall = duration < 55;
 
+    const handleTitleChange = useCallback((newTitle: string, previousTitle: string) => {
+        onUpdateCardTitle?.(event.card_id, newTitle, previousTitle);
+    }, [event.card_id, onUpdateCardTitle]);
+
     return (
         <DraggableCard
             key={event.card_id}
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
-            disabled={isContextMenuOpen}
+            // 編集中またはコンテキストメニュー表示中はDnD無効化
+            disabled={isContextMenuOpen || isEditingTitle}
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -77,8 +88,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    onClearGhost();
-                    openCardModal(event.short_id, 'card-click');
+                    // 編集中はモーダルを開かない
+                    if (!isEditingTitle) {
+                        onClearGhost();
+                        openCardModal(event.short_id, 'card-click');
+                    }
                 }}
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
             >
@@ -91,14 +105,20 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     timeText={`${timeLabel(displayStart, displayEnd)} (${formatDuration(duration)})`}
                     timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
-                        onClearGhost();
-                        openCardModal(event.short_id, 'event-button');
+                        if (!isEditingTitle) {
+                            onClearGhost();
+                            openCardModal(event.short_id, 'event-button');
+                        }
                     }}
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     className={`w-full h-full ${isSmall ? 'pt-0' : 'pt-4'}`}
+                    // インライン編集
+                    onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
+                    isEditingTitle={isEditingTitle}
+                    onEditingChange={setIsEditingTitle}
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"

@@ -332,6 +332,72 @@ export function useTimelineCardActions({
         }
     }, [dataMode, initialBoardId, setData, fetchTimeline]);
 
+    // タイトルのインライン更新用 requestId
+    const titleUpdateRequestIdRef = useRef(0);
+
+    const handleUpdateCardTitle = useCallback(async (cardId: string, newTitle: string, previousTitle: string) => {
+        if (dataMode !== 'api') return;
+
+        const requestId = ++titleUpdateRequestIdRef.current;
+
+        // タイトルからcontentとexcerptを生成
+        const newContent = buildContentFromTitle(newTitle);
+        const newExcerpt = deriveExcerptFromContent(newContent);
+
+        // 楽観的UI更新
+        setData((prev: any) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: newTitle } : e),
+                abBuckets: Object.fromEntries(
+                    Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
+                        k,
+                        v.map((i: any) => i.card_id === cardId ? { ...i, title: newTitle } : i)
+                    ])
+                ),
+            };
+        });
+
+        try {
+            const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: newTitle,
+                    content: normalizeContent(newContent),
+                    excerpt: newExcerpt,
+                    slug: slugify(newTitle),
+                }),
+            });
+
+            if (!res.ok) throw new Error('Failed to update title');
+
+            // requestIdが最新でない場合は無視（レースコンディション対策）
+            if (requestId !== titleUpdateRequestIdRef.current) return;
+
+        } catch (error) {
+            // requestIdが最新の場合のみロールバック
+            if (requestId === titleUpdateRequestIdRef.current) {
+                console.error('[timeline] title update failed, rolling back', error);
+                setData((prev: any) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: previousTitle } : e),
+                        abBuckets: Object.fromEntries(
+                            Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
+                                k,
+                                v.map((i: any) => i.card_id === cardId ? { ...i, title: previousTitle } : i)
+                            ])
+                        ),
+                    };
+                });
+                setErrorMessage('タイトルの更新に失敗しました');
+            }
+        }
+    }, [dataMode, initialBoardId, setData, setErrorMessage]);
+
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {
             const googleEventId = entry.eventId ?? entry.id;
@@ -356,6 +422,7 @@ export function useTimelineCardActions({
         handleCardModalSave,
         handleCardModalDelete,
         handleToggleCardChecked,
+        handleUpdateCardTitle,
         handleColumnClick,
         handleBucketClick,
         handleExternalEventClick,

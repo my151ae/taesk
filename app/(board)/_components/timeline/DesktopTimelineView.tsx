@@ -68,6 +68,8 @@ type DesktopTimelineViewProps = {
   timelineStartHour?: number;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   contextMenuCardId: string | null;
+  // インライン編集用
+  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
 
 export function DesktopTimelineView({
@@ -112,6 +114,7 @@ export function DesktopTimelineView({
   timelineStartHour = 0,
   onCardContextMenu,
   contextMenuCardId,
+  onUpdateCardTitle,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -458,6 +461,7 @@ export function DesktopTimelineView({
               onCreateBucketCard={onCreateBucketCard}
               onCardContextMenu={onCardContextMenu}
               contextMenuCardId={contextMenuCardId}
+              onUpdateCardTitle={onUpdateCardTitle}
             />
 
             <TimelineGrid
@@ -482,6 +486,7 @@ export function DesktopTimelineView({
               timelineStartHour={timelineStartHour}
               onCardContextMenu={onCardContextMenu}
               contextMenuCardId={contextMenuCardId}
+              onUpdateCardTitle={onUpdateCardTitle}
             />
           </div>
         </div>

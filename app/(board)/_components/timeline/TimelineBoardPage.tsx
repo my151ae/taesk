@@ -223,6 +223,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleCardModalSave,
     handleCardModalDelete,
     handleToggleCardChecked,
+    handleUpdateCardTitle,
     handleColumnClick,
     handleBucketClick,
     handleExternalEventClick,
@@ -376,6 +377,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             calendarAllDayByDay={calendarAllDayEventsByDay}
             onCardContextMenu={handleCardContextMenu}
             contextMenuCardId={contextMenu.cardId}
+            onUpdateCardTitle={handleUpdateCardTitle}
           />
         </div>
 

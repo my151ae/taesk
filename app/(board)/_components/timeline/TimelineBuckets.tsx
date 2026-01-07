@@ -22,6 +22,8 @@ type TimelineBucketsProps = {
     axisWidth?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     contextMenuCardId: string | null;
+    // インライン編集用
+    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
 };
 
 const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
@@ -48,6 +50,7 @@ export default function TimelineBuckets({
     axisWidth = 80,
     onCardContextMenu,
     contextMenuCardId,
+    onUpdateCardTitle,
 }: TimelineBucketsProps) {
     if (!days.length) return null;
     const templateColumns = `${axisWidth}px repeat(${days.length}, minmax(0, 1fr))`;
@@ -107,6 +110,7 @@ export default function TimelineBuckets({
                                                         }
                                                         onCardContextMenu={onCardContextMenu}
                                                         isContextMenuOpen={contextMenuCardId === item.card_id}
+                                                        onUpdateCardTitle={onUpdateCardTitle}
                                                     />
                                                 ))
                                             )}
