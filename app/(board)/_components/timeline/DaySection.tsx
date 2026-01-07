@@ -93,54 +93,61 @@ export const DaySection = memo(function DaySection({
     contextMenuCardId,
 }: DaySectionProps) {
     return (
-        <div className="day-section relative h-full">
-            {/* Timeline部分（ベース） */}
-            <TimelineColumn
-                day={day}
-                events={events}
-                index={index}
-                indicatorTop={indicatorTop}
-                indicatorDayIso={indicatorDayIso}
-                timelineViewportHeight={timelineViewportHeight}
-                activeDragCardId={activeDragCardId}
-                pointerPreview={pointerPreview}
-                activeResize={activeResize}
-                selectedSlot={selectedSlot}
-                openCardModal={openCardModal}
-                handleEventKeyDown={handleEventKeyDown}
-                handleColumnClick={handleColumnClick}
-                handleResizeStart={handleResizeStart}
-                handleResizeMove={handleResizeMove}
-                handleResizeEnd={handleResizeEnd}
-                onToggleCheck={onToggleCheck}
-                shrinkToHalf={false}
-                setSelectedSlot={setSelectedSlot}
-                calendarEvents={calendarEvents}
-                onExternalEventClick={onExternalEventClick}
-                timelineStartHour={timelineStartHour}
-                onCardContextMenu={onCardContextMenu}
-                contextMenuCardId={contextMenuCardId}
-                onUpdateCardTitle={onUpdateCardTitle}
-            />
-
-            {/* A/Bリスト部分（Timelineの右半分に重ねる） */}
-            <div className="absolute top-0 right-0 z-20 w-1/2 pointer-events-none md:w-[calc(50%-3px)]">
-                <TimelineDayBucket
+        <div className="day-section grid grid-cols-2 h-full">
+            {/* Timeline部分（左半分） */}
+            <div className="timeline-col h-full overflow-hidden">
+                <TimelineColumn
                     day={day}
-                    bucketsA={bucketsA}
-                    bucketsB={bucketsB}
-                    floatingLayerTop={floatingLayerTop}
-                    viewportHeight={viewportHeight}
-                    registerScrollContainer={registerAbScrollContainer}
-                    status={status}
+                    events={events}
+                    index={index}
+                    indicatorTop={indicatorTop}
+                    indicatorDayIso={indicatorDayIso}
+                    timelineViewportHeight={timelineViewportHeight}
+                    activeDragCardId={activeDragCardId}
+                    pointerPreview={pointerPreview}
+                    activeResize={activeResize}
+                    selectedSlot={selectedSlot}
                     openCardModal={openCardModal}
+                    handleEventKeyDown={handleEventKeyDown}
+                    handleColumnClick={handleColumnClick}
+                    handleResizeStart={handleResizeStart}
+                    handleResizeMove={handleResizeMove}
+                    handleResizeEnd={handleResizeEnd}
                     onToggleCheck={onToggleCheck}
-                    bucketIndicator={bucketIndicator}
-                    onCreateBucketCard={onCreateBucketCard}
+                    shrinkToHalf={false}
+                    setSelectedSlot={setSelectedSlot}
+                    calendarEvents={calendarEvents}
+                    onExternalEventClick={onExternalEventClick}
+                    timelineStartHour={timelineStartHour}
                     onCardContextMenu={onCardContextMenu}
                     contextMenuCardId={contextMenuCardId}
                     onUpdateCardTitle={onUpdateCardTitle}
                 />
+            </div>
+
+            {/* A/Bリスト部分（右半分、sticky配置） */}
+            <div className="ab-col relative border-l border-slate-100">
+                <div
+                    className="sticky z-20 w-full"
+                    style={{ top: 0 }}
+                >
+                    <TimelineDayBucket
+                        day={day}
+                        bucketsA={bucketsA}
+                        bucketsB={bucketsB}
+                        floatingLayerTop={floatingLayerTop}
+                        viewportHeight={viewportHeight}
+                        registerScrollContainer={registerAbScrollContainer}
+                        status={status}
+                        openCardModal={openCardModal}
+                        onToggleCheck={onToggleCheck}
+                        bucketIndicator={bucketIndicator}
+                        onCreateBucketCard={onCreateBucketCard}
+                        onCardContextMenu={onCardContextMenu}
+                        contextMenuCardId={contextMenuCardId}
+                        onUpdateCardTitle={onUpdateCardTitle}
+                    />
+                </div>
             </div>
         </div>
     );
