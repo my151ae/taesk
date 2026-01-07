@@ -54,6 +54,9 @@ export function TimelineCard({
     // 内部編集状態（外部制御がない場合）
     const [internalIsEditing, setInternalIsEditing] = useState(false);
     const isEditing = externalIsEditing ?? internalIsEditing;
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const checkboxRef = useRef<HTMLButtonElement | null>(null);
+    const titleRef = useRef<HTMLSpanElement | null>(null);
 
     const setIsEditing = useCallback((value: boolean) => {
         setInternalIsEditing(value);
@@ -85,8 +88,6 @@ export function TimelineCard({
         }
     }, [isEditing, onOpen]);
 
-    const containerRef = useRef<HTMLDivElement | null>(null);
-
     return (
         <div
             ref={containerRef}
@@ -99,6 +100,26 @@ export function TimelineCard({
             tabIndex={tabIndex}
             role={role}
             onKeyDown={(event) => {
+                if (!isEditing && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+                    const target = event.target as HTMLElement;
+                    const tagName = target.tagName;
+                    if (tagName !== 'INPUT' && tagName !== 'TEXTAREA' && !target.isContentEditable) {
+                        const focusOrder = [containerRef.current, checkboxRef.current, titleRef.current]
+                            .filter((node): node is HTMLElement => Boolean(node));
+                        const active = document.activeElement as HTMLElement | null;
+                        const currentIndex = active ? focusOrder.indexOf(active) : -1;
+                        if (currentIndex >= 0) {
+                            const step = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? -1 : 1;
+                            const nextIndex = Math.min(Math.max(currentIndex + step, 0), focusOrder.length - 1);
+                            if (nextIndex !== currentIndex) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                focusOrder[nextIndex]?.focus();
+                                return;
+                            }
+                        }
+                    }
+                }
                 if (event.key === 'Enter' && !isEditing) {
                     const rect = containerRef.current?.getBoundingClientRect();
                     if (rect) {
@@ -117,6 +138,7 @@ export function TimelineCard({
             <div className="flex items-start gap-2 pr-6">
                 <button
                     type="button"
+                    ref={checkboxRef}
                     onClick={(e) => {
                         e.stopPropagation();
                         onToggleCheck(!checked);
@@ -158,6 +180,7 @@ export function TimelineCard({
                                 onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "truncate",
                                 !title && "text-slate-400"
                             )}
+                            ref={onTitleChange ? titleRef : undefined}
                             onClick={onTitleChange ? handleTitleClick : undefined}
                             onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
                             tabIndex={onTitleChange ? 0 : undefined}

@@ -32,6 +32,8 @@ export const DraggableCard = ({
         [extraNodeRef, setNodeRef]
     );
 
+    const draggableAttributes = disabled ? {} : { ...attributes, tabIndex: -1 };
+
     if (attachListenersToChild && isValidElement(children)) {
         const child = children as ReactElement;
         const mergedRef = (node: HTMLElement | null) => {
@@ -46,7 +48,7 @@ export const DraggableCard = ({
             },
             className: [child.props.className, !disabled && isDragging ? 'z-40 opacity-90' : undefined].filter(Boolean).join(' '),
             ...(disabled ? {} : listeners),
-            ...(disabled ? {} : attributes),
+            ...draggableAttributes,
         });
     }
 
@@ -56,7 +58,7 @@ export const DraggableCard = ({
             style={{ transform: CSS.Translate.toString(transform), touchAction: 'manipulation' }}
             className={!disabled && isDragging ? 'z-40 opacity-90' : undefined}
             {...(disabled ? {} : listeners)}
-            {...(disabled ? {} : attributes)}
+            {...draggableAttributes}
         >
             {children}
         </div>
