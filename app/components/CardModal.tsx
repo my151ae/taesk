@@ -842,6 +842,13 @@ export function CardModal({
                             cardId={card.id}
                             boardId={card.board_id}
                             profiles={profiles}
+                            googleSync={{
+                                cardId: card.id,
+                                connected: googleConnected,
+                                canWrite: googleCanWrite,
+                                status: syncStatus,
+                                onStatusChange: setSyncStatus,
+                            }}
                         />
                     )}
                 </div>

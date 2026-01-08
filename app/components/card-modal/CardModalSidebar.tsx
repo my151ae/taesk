@@ -3,6 +3,7 @@
 import type { CSSProperties, KeyboardEvent } from "react";
 import type { Board, Priority, ProfileSummary } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
+import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 
 type CardModalSidebarProps = {
   sidebarWidth: number;
@@ -20,6 +21,13 @@ type CardModalSidebarProps = {
   cardId: string;
   boardId: string;
   profiles: ProfileSummary[];
+  googleSync?: {
+    cardId: string;
+    connected: boolean;
+    canWrite: boolean;
+    status?: "active" | "unlinked" | "deleted";
+    onStatusChange?: (status: "active" | "unlinked" | "deleted") => void;
+  };
 };
 
 export default function CardModalSidebar({
@@ -38,6 +46,7 @@ export default function CardModalSidebar({
   cardId,
   boardId,
   profiles,
+  googleSync,
 }: CardModalSidebarProps) {
   const handleCopyLink = () => {
     if (!cardShortId || typeof window === "undefined") return;
@@ -128,6 +137,17 @@ export default function CardModalSidebar({
             </button>
           )}
         </div>
+        {googleSync && (
+          <div className="pt-3 border-t border-slate-100 dark:border-gray-700/50">
+            <GoogleSyncToggle
+              cardId={googleSync.cardId}
+              initialStatus={googleSync.status}
+              connected={googleSync.connected}
+              canWrite={googleSync.canWrite}
+              onStatusChange={googleSync.onStatusChange}
+            />
+          </div>
+        )}
       </div>
 
       {/* Comments Area */}

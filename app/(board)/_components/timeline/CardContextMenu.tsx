@@ -70,6 +70,7 @@ export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) 
                 }}
                 className="min-w-[160px] overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl"
                 onContextMenu={(e) => e.preventDefault()}
+                data-arrow-skip="true"
                 role="menu"
                 aria-label="カード操作メニュー"
                 onKeyDown={(e) => {

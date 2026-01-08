@@ -97,6 +97,7 @@ export const TimelineBucketCard = ({
                     className="min-h-[40px] pt-4 pb-1"
                     tabIndex={0}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
+                    focusGroup="bucket"
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
                     isEditingTitle={isEditingTitle}

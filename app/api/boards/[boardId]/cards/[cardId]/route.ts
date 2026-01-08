@@ -188,7 +188,7 @@ export async function PATCH(
     // Log activity (only if we have a card to reference)
     if (ensuredCard) {
       const action = parsed.data.list_id ? 'moved' : 'updated';
-      const triggersCalendarSync = ['due_date', 'due_start', 'due_end', 'title', 'excerpt'].some(
+      const triggersCalendarSync = ['due_date', 'due_start', 'due_end', 'title'].some(
         (key) => key in normalizedPayload
       );
       const isContentOnlyUpdate = Object.keys(normalizedPayload).every((key) => key === 'content');

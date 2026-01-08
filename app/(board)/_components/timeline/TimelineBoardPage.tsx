@@ -216,6 +216,24 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     days: data?.days ?? [],
   });
 
+  const googleCalendarLabel = useMemo(() => {
+    if (!googleCalendarEvents?.length) return "primary";
+    const ids = new Set<string>();
+    googleCalendarEvents.forEach((event: any) => {
+      if (event?.calendarId) ids.add(event.calendarId);
+    });
+    if (!ids.size) return "primary";
+    return Array.from(ids).sort().join(", ");
+  }, [googleCalendarEvents]);
+
+  const googleStatusText = useMemo(() => {
+    if (googleCalendarStatus === "loading") return "Google予定同期中...";
+    if (googleCalendarStatus === "success") return `Google予定表示中 (${googleCalendarLabel})`;
+    if (googleCalendarStatus === "disconnected") return "Google未接続";
+    if (googleCalendarStatus === "error") return "Google予定の取得エラー";
+    return "Google予定の状態確認中...";
+  }, [googleCalendarLabel, googleCalendarStatus]);
+
   // 8. Card Actions & External Sync
   const bucketDayMap = useMemo(() => {
     const result: Record<string, string | null> = {};
@@ -245,6 +263,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
     bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data
   });
+
+  const handleGoogleConnect = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.location.href = "/api/integrations/google-calendar/connect";
+  }, []);
 
   // 9. Drag and Drop
   const {
@@ -337,10 +360,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               alert("Failed to update board");
             }
           }}
-          googleStatusText={googleCalendarStatus === 'loading' ? 'Google予定同期中...' : 'Google予定表示中'}
+          googleStatusText={googleStatusText}
           googleCalendarStatus={googleCalendarStatus} googleCalendarError={googleCalendarError}
           calendarPreset={calendarPreset} setCalendarPreset={setCalendarPreset}
-          refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={() => { }}
+          refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
         />
 

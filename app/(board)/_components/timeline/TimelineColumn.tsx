@@ -9,6 +9,7 @@ import {
     TIMELINE_HEIGHT,
     minuteToPixels,
     minutesToTime,
+    getMinutesFromTime,
     calculateEventLayout,
     timeLabel,
     ExternalCalendarEntry
@@ -109,6 +110,26 @@ export const TimelineColumn = memo(function TimelineColumn({
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
+    const combinedItems = [
+        ...calendarEvents.map((calendarEvent, listIndex) => ({
+            kind: 'calendar' as const,
+            id: calendarEvent.id,
+            listIndex,
+            startMinutes: calendarEvent.startMinutes,
+            entry: calendarEvent,
+        })),
+        ...events.map((event, listIndex) => ({
+            kind: 'card' as const,
+            id: event.card_id,
+            listIndex,
+            startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
+            entry: event,
+        })),
+    ].sort((a, b) => {
+        if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
+        if (a.kind !== b.kind) return a.kind === 'calendar' ? -1 : 1;
+        return a.listIndex - b.listIndex;
+    });
 
     const handleSingleClick = (e: MouseEvent, dayIso: string) => {
         e.stopPropagation();
@@ -225,62 +246,69 @@ export const TimelineColumn = memo(function TimelineColumn({
                     )}
 
                     <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
-                        {calendarEvents.map((calendarEvent) => {
-                            const layout = calendarLayout[calendarEvent.id];
+                        {combinedItems.map((item) => {
+                            if (item.kind === 'calendar') {
+                                const calendarEvent = item.entry;
+                                const layout = calendarLayout[calendarEvent.id];
+                                return (
+                                    <button
+                                        key={`calendar-${calendarEvent.id}`}
+                                        type="button"
+                                        data-focus-group="timeline"
+                                        data-focus-part="card"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onExternalEventClick?.(calendarEvent);
+                                        }}
+                                        className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
+                                        style={{
+                                            top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                                            height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour), 18),
+                                            left: layout?.left ?? '0%',
+                                            width: layout?.width ?? '100%',
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            <span className="truncate font-semibold">{calendarEvent.title || 'Google予定'}</span>
+                                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                                                G
+                                            </span>
+                                        </div>
+                                        <p className="text-[9px] text-emerald-600">
+                                            {calendarEvent.isAllDay
+                                                ? '終日'
+                                                : timeLabel(
+                                                    minutesToTime(calendarEvent.startMinutes),
+                                                    minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                                                )
+                                            }
+                                        </p>
+                                    </button>
+                                );
+                            }
+
+                            const event = item.entry;
                             return (
-                                <button
-                                    key={calendarEvent.id}
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onExternalEventClick?.(calendarEvent);
-                                    }}
-                                    className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
-                                    style={{
-                                        top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
-                                        height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour), 18),
-                                        left: layout?.left ?? '0%',
-                                        width: layout?.width ?? '100%',
-                                    }}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        <span className="truncate font-semibold">{calendarEvent.title || 'Google予定'}</span>
-                                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                                            G
-                                        </span>
-                                    </div>
-                                    <p className="text-[9px] text-emerald-600">
-                                        {calendarEvent.isAllDay
-                                            ? '終日'
-                                            : timeLabel(
-                                                minutesToTime(calendarEvent.startMinutes),
-                                                minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                                            )
-                                        }
-                                    </p>
-                                </button>
+                                <TimelineEventItem
+                                    key={`card-${event.card_id}`}
+                                    event={event}
+                                    layout={layoutMap[event.card_id]}
+                                    activeResize={activeResize}
+                                    openCardModal={openCardModal}
+                                    handleEventKeyDown={handleEventKeyDown}
+                                    handleResizeStart={handleResizeStart}
+                                    handleResizeMove={handleResizeMove}
+                                    handleResizeEnd={handleResizeEnd}
+                                    onToggleCheck={onToggleCheck}
+                                    onClearGhost={() => setSelectedSlot(null)}
+                                    timelineStartHour={timelineStartHour}
+                                    onCardContextMenu={onCardContextMenu}
+                                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                                    isContextMenuOpen={contextMenuCardId === event.card_id}
+                                    onUpdateCardTitle={onUpdateCardTitle}
+                                />
                             );
                         })}
-                        {events.map((event) => (
-                            <TimelineEventItem
-                                key={event.card_id}
-                                event={event}
-                                layout={layoutMap[event.card_id]}
-                                activeResize={activeResize}
-                                openCardModal={openCardModal}
-                                handleEventKeyDown={handleEventKeyDown}
-                                handleResizeStart={handleResizeStart}
-                                handleResizeMove={handleResizeMove}
-                                handleResizeEnd={handleResizeEnd}
-                                onToggleCheck={onToggleCheck}
-                                onClearGhost={() => setSelectedSlot(null)}
-                                timelineStartHour={timelineStartHour}
-                                onCardContextMenu={onCardContextMenu}
-                                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                                isContextMenuOpen={contextMenuCardId === event.card_id}
-                                onUpdateCardTitle={onUpdateCardTitle}
-                            />
-                        ))}
                     </div>
                 </div>
             </DroppableColumn>

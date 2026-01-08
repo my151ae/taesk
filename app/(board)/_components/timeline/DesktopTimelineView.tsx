@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
 import type {
   ActiveDragState,
@@ -122,6 +122,48 @@ export function DesktopTimelineView({
   contextMenuCardId,
   onUpdateCardTitle,
 }: DesktopTimelineViewProps) {
+  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-arrow-skip="true"]')) return;
+    const tagName = target.tagName;
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {
+      return;
+    }
+    const container = event.currentTarget;
+    const focusable = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-group]'))
+      .filter((el) => (el.offsetParent !== null || el.getClientRects().length > 0));
+    if (!focusable.length) return;
+    const active = document.activeElement as HTMLElement | null;
+    const currentIndex = active ? focusable.indexOf(active) : -1;
+    if (currentIndex < 0) return;
+    const currentGroup = active?.dataset.focusGroup;
+    const currentPart = active?.dataset.focusPart;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (currentGroup) {
+        const targetGroup = currentGroup === 'timeline' ? 'bucket' : 'timeline';
+        const groupCurrent = focusable.filter((el) => el.dataset.focusGroup === currentGroup && (!currentPart || el.dataset.focusPart === currentPart));
+        const groupTarget = focusable.filter((el) => el.dataset.focusGroup === targetGroup && (!currentPart || el.dataset.focusPart === currentPart));
+        if (groupTarget.length) {
+          const groupIndex = groupCurrent.indexOf(active);
+          const targetIndex = Math.min(Math.max(groupIndex, 0), groupTarget.length - 1);
+          event.preventDefault();
+          event.stopPropagation();
+          groupTarget[targetIndex]?.focus();
+          return;
+        }
+      }
+    }
+
+    const step = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? -1 : 1;
+    const nextIndex = Math.min(Math.max(currentIndex + step, 0), focusable.length - 1);
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    event.stopPropagation();
+    focusable[nextIndex]?.focus();
+  }, []);
+
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
@@ -325,7 +367,10 @@ export function DesktopTimelineView({
         acceleration: 1,
       }}
     >
-      <div className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5">
+      <div
+        className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5"
+        onKeyDownCapture={handleArrowKeyFocus}
+      >
         <div ref={timelineHeaderRef} className="z-30">
           <div
             className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"

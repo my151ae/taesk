@@ -20,6 +20,7 @@ type TimelineCardProps = {
     role?: string;
     onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
     onOpenContextMenu?: (rect: DOMRect) => void;
+    focusGroup?: 'timeline' | 'bucket';
     childrenPosition?: 'top' | 'bottom';
     // インライン編集用 props
     onTitleChange?: (newTitle: string, previousTitle: string) => void;
@@ -46,6 +47,7 @@ export function TimelineCard({
     role,
     onKeyDown,
     onOpenContextMenu,
+    focusGroup,
     childrenPosition = 'bottom',
     onTitleChange,
     isEditingTitle: externalIsEditing,
@@ -99,27 +101,9 @@ export function TimelineCard({
             data-testid={dataTestId}
             tabIndex={tabIndex}
             role={role}
+            data-focus-group={focusGroup}
+            data-focus-part={focusGroup ? 'card' : undefined}
             onKeyDown={(event) => {
-                if (!isEditing && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
-                    const target = event.target as HTMLElement;
-                    const tagName = target.tagName;
-                    if (tagName !== 'INPUT' && tagName !== 'TEXTAREA' && !target.isContentEditable) {
-                        const focusOrder = [containerRef.current, checkboxRef.current, titleRef.current]
-                            .filter((node): node is HTMLElement => Boolean(node));
-                        const active = document.activeElement as HTMLElement | null;
-                        const currentIndex = active ? focusOrder.indexOf(active) : -1;
-                        if (currentIndex >= 0) {
-                            const step = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? -1 : 1;
-                            const nextIndex = Math.min(Math.max(currentIndex + step, 0), focusOrder.length - 1);
-                            if (nextIndex !== currentIndex) {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                focusOrder[nextIndex]?.focus();
-                                return;
-                            }
-                        }
-                    }
-                }
                 if (event.key === 'Enter' && !isEditing) {
                     const rect = containerRef.current?.getBoundingClientRect();
                     if (rect) {
@@ -139,6 +123,8 @@ export function TimelineCard({
                 <button
                     type="button"
                     ref={checkboxRef}
+                    data-focus-group={focusGroup}
+                    data-focus-part={focusGroup ? 'checkbox' : undefined}
                     onClick={(e) => {
                         e.stopPropagation();
                         onToggleCheck(!checked);
@@ -181,6 +167,8 @@ export function TimelineCard({
                                 !title && "text-slate-400"
                             )}
                             ref={onTitleChange ? titleRef : undefined}
+                            data-focus-group={focusGroup}
+                            data-focus-part={focusGroup ? 'title' : undefined}
                             onClick={onTitleChange ? handleTitleClick : undefined}
                             onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
                             tabIndex={onTitleChange ? 0 : undefined}

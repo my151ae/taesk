@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
@@ -78,6 +78,26 @@ function MobileTimelineColumn({
       slug: null,
     }))
   );
+  const combinedItems = [
+    ...calendarEvents.map((calendarEvent, listIndex) => ({
+      kind: "calendar" as const,
+      id: calendarEvent.id,
+      listIndex,
+      startMinutes: calendarEvent.startMinutes,
+      entry: calendarEvent,
+    })),
+    ...events.map((event, listIndex) => ({
+      kind: "card" as const,
+      id: event.card_id,
+      listIndex,
+      startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
+      entry: event,
+    })),
+  ].sort((a, b) => {
+    if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
+    if (a.kind !== b.kind) return a.kind === "calendar" ? -1 : 1;
+    return a.listIndex - b.listIndex;
+  });
 
   return (
     <div className="relative">
@@ -126,43 +146,51 @@ function MobileTimelineColumn({
           </div>
         )}
 
-        {calendarEvents.map((calendarEvent) => {
-          const layout = calendarLayout[calendarEvent.id];
-          return (
-            <button
-              key={calendarEvent.id}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onExternalEventClick?.(calendarEvent);
-              }}
-              className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
-              style={{
-                top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
-                height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour), 18),
-                left: layout?.left ?? "0%",
-                width: layout?.width ?? "100%",
-              }}
-            >
-              <div className="flex items-center gap-1">
-                <span className="truncate font-semibold">{calendarEvent.title || "Google予定"}</span>
-                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                  G
-                </span>
-              </div>
-              <p className="text-[9px] text-emerald-600">
-                {calendarEvent.isAllDay
-                  ? "終日"
-                  : timeLabel(
-                    minutesToTime(calendarEvent.startMinutes),
-                    minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                  )}
-              </p>
-            </button>
-          );
-        })}
+        {combinedItems.map((item) => {
+          if (item.kind === "calendar") {
+            const calendarEvent = item.entry;
+            const layout = calendarLayout[calendarEvent.id];
+            return (
+              <button
+                key={`calendar-${calendarEvent.id}`}
+                type="button"
+                data-focus-group="timeline"
+                data-focus-part="card"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExternalEventClick?.(calendarEvent);
+                }}
+                className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
+                style={{
+                  top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                  height: Math.max(
+                    minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) -
+                      minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                    18
+                  ),
+                  left: layout?.left ?? "0%",
+                  width: layout?.width ?? "100%",
+                }}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="truncate font-semibold">{calendarEvent.title || "Google予定"}</span>
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                    G
+                  </span>
+                </div>
+                <p className="text-[9px] text-emerald-600">
+                  {calendarEvent.isAllDay
+                    ? "終日"
+                    : timeLabel(
+                        minutesToTime(calendarEvent.startMinutes),
+                        minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                      )}
+                </p>
+              </button>
+            );
+          }
 
-        {events.map((event) => {
+          const event = item.entry;
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = event.durationMinutes ?? 60;
           const top = minuteToPixels(start, timelineStartHour);
@@ -171,7 +199,7 @@ function MobileTimelineColumn({
 
           return (
             <DraggableCard
-              key={event.card_id}
+              key={`card-${event.card_id}`}
               id={`event:${event.card_id}`}
               data={{ kind: "event", event, cardId: event.card_id }}
               attachListenersToChild
@@ -191,14 +219,15 @@ function MobileTimelineColumn({
                   title={event.title || ""}
                   checked={event.checked}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
-                  badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
+                  badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   duration={undefined}
                   timeText={`${timeLabel(event.due_start, event.due_end)} (${formatDuration(Math.max(event.durationMinutes ?? 60, 0))})`}
-                  timePlacement={(event.durationMinutes ?? 60) < 55 ? 'out-top' : 'top'}
+                  timePlacement={(event.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
-                  className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? 'pt-0' : 'pt-4'}`}
+                  className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? "pt-0" : "pt-4"}`}
                   tabIndex={0}
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
+                  focusGroup="timeline"
                 />
               </div>
             </DraggableCard>
@@ -366,6 +395,48 @@ export default function MobileTimelineView({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
 }: MobileTimelineViewProps) {
+  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-arrow-skip="true"]')) return;
+    const tagName = target.tagName;
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {
+      return;
+    }
+    const container = event.currentTarget;
+    const focusable = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-group]'))
+      .filter((el) => (el.offsetParent !== null || el.getClientRects().length > 0));
+    if (!focusable.length) return;
+    const active = document.activeElement as HTMLElement | null;
+    const currentIndex = active ? focusable.indexOf(active) : -1;
+    if (currentIndex < 0) return;
+    const currentGroup = active?.dataset.focusGroup;
+    const currentPart = active?.dataset.focusPart;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (currentGroup) {
+        const targetGroup = currentGroup === 'timeline' ? 'bucket' : 'timeline';
+        const groupCurrent = focusable.filter((el) => el.dataset.focusGroup === currentGroup && (!currentPart || el.dataset.focusPart === currentPart));
+        const groupTarget = focusable.filter((el) => el.dataset.focusGroup === targetGroup && (!currentPart || el.dataset.focusPart === currentPart));
+        if (groupTarget.length) {
+          const groupIndex = groupCurrent.indexOf(active);
+          const targetIndex = Math.min(Math.max(groupIndex, 0), groupTarget.length - 1);
+          event.preventDefault();
+          event.stopPropagation();
+          groupTarget[targetIndex]?.focus();
+          return;
+        }
+      }
+    }
+
+    const step = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? -1 : 1;
+    const nextIndex = Math.min(Math.max(currentIndex + step, 0), focusable.length - 1);
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    event.stopPropagation();
+    focusable[nextIndex]?.focus();
+  }, []);
+
   useEffect(() => {
     onMount?.();
   }, [onMount]);
@@ -474,7 +545,10 @@ export default function MobileTimelineView({
         acceleration: 1,
       }}
     >
-      <div className="relative flex h-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y">
+      <div
+        className="relative flex h-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
+        onKeyDownCapture={handleArrowKeyFocus}
+      >
         {(status === "loading" || !days.length) && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
@@ -692,6 +766,7 @@ function MobileBucketCard({
           className="w-full"
           tabIndex={0}
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
+          focusGroup="bucket"
         />
 
         <div

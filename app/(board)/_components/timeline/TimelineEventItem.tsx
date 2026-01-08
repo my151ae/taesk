@@ -117,6 +117,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
+                    focusGroup="timeline"
                     className={`w-full h-full ${isSmall ? 'pt-0' : 'pt-4'}`}
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
