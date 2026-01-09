@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       .from('boards')
       .select('id, name, description, short_id, id_short, slug, is_test_board, day_range, created_at, updated_at')
       .in('id', boardIds)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching boards:', error);

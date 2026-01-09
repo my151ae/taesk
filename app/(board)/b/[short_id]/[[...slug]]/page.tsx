@@ -32,10 +32,15 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   }
 
   const canonical = buildBoardUrl(board);
-  if (canonical) {
+  const encodedCanonical = canonical ? encodeURI(canonical) : undefined;
+  if (encodedCanonical) {
     const current = ["/b", short_id, ...(slug ?? [])].join("/");
-    if (current !== canonical) {
-      permanentRedirect(canonical);
+    // Normalize both for comparison to handle NFC/NFD mismatch (common on macOS)
+    const normalizedCurrent = decodeURIComponent(current).normalize('NFC');
+    const normalizedCanonical = canonical.normalize('NFC');
+
+    if (normalizedCurrent !== normalizedCanonical) {
+      permanentRedirect(encodedCanonical);
     }
   }
 
@@ -45,11 +50,11 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
   return {
     title,
     description,
-    alternates: canonical ? { canonical } : undefined,
+    alternates: encodedCanonical ? { canonical: encodedCanonical } : undefined,
     openGraph: {
       title,
       description,
-      url: canonical ?? undefined,
+      url: encodedCanonical,
     },
   };
 }
@@ -76,9 +81,12 @@ export default async function BoardByShortIdPage({ params }: PageProps) {
     notFound();
   }
   const current = ["/b", short_id, ...(slug ?? [])].join("/");
+  // Normalize both for comparison
+  const normalizedCurrent = decodeURIComponent(current).normalize('NFC');
+  const normalizedCanonical = canonical.normalize('NFC');
 
-  if (current !== canonical) {
-    permanentRedirect(canonical);
+  if (normalizedCurrent !== normalizedCanonical) {
+    permanentRedirect(encodeURI(canonical));
   }
 
   return (

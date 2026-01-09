@@ -214,7 +214,7 @@ export function DesktopTimelineView({
       return {
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
-        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} (${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)})`,
+        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)}`,
       };
     }
     if (overlayBucketCard) {
@@ -222,7 +222,7 @@ export function DesktopTimelineView({
         title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.duration
-          ? `(${formatDuration(overlayBucketCard.duration)}) ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
+          ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
           : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
       };
     }

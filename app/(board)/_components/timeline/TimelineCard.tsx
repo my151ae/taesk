@@ -9,6 +9,7 @@ type TimelineCardProps = {
     badgeLabel?: string | null;
     duration?: number | null;
     timeText?: ReactNode;
+    rightMeta?: ReactNode;
     timePlacement?: 'top' | 'inline' | 'out-top';
     onOpen: () => void;
     className?: string;
@@ -36,6 +37,7 @@ export function TimelineCard({
     badgeLabel,
     duration,
     timeText,
+    rightMeta,
     timePlacement = 'top',
     onOpen,
     className,
@@ -119,7 +121,7 @@ export function TimelineCard({
         >
             {childrenPosition === 'top' && children}
 
-            <div className="flex items-start gap-2 pr-6">
+            <div className="flex items-start gap-2 pr-0">
                 <button
                     type="button"
                     ref={checkboxRef}
@@ -153,37 +155,46 @@ export function TimelineCard({
                     {checked ? '✓' : ''}
                 </button>
                 <div className="mt-1 flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
-                    {isEditing && onTitleChange ? (
-                        <InlineTitleEditor
-                            title={title}
-                            onSave={handleSave}
-                            onCancel={handleCancel}
-                        />
-                    ) : (
-                        <span
-                            className={clsx(
-                                "leading-tight",
-                                onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "truncate",
-                                !title && "text-slate-400"
-                            )}
-                            ref={onTitleChange ? titleRef : undefined}
-                            data-focus-group={focusGroup}
-                            data-focus-part={focusGroup ? 'title' : undefined}
-                            onClick={onTitleChange ? handleTitleClick : undefined}
-                            onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
-                            tabIndex={onTitleChange ? 0 : undefined}
-                            role={onTitleChange ? "button" : undefined}
-                            aria-label={onTitleChange ? "タイトルを編集" : undefined}
-                            onKeyDown={onTitleChange ? (e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    handleTitleClick(e as any);
-                                }
-                            } : undefined}
-                        >
-                            {title || "Untitled card"}
-                        </span>
-                    )}
+                    <div className="flex min-w-0 items-center gap-2">
+                        {isEditing && onTitleChange ? (
+                            <div className="min-w-0 flex-1">
+                                <InlineTitleEditor
+                                    title={title}
+                                    onSave={handleSave}
+                                    onCancel={handleCancel}
+                                />
+                            </div>
+                        ) : (
+                            <span
+                                className={clsx(
+                                    "truncate leading-tight",
+                                    onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "",
+                                    !title && "text-slate-400"
+                                )}
+                                ref={onTitleChange ? titleRef : undefined}
+                                data-focus-group={focusGroup}
+                                data-focus-part={focusGroup ? 'title' : undefined}
+                                onClick={onTitleChange ? handleTitleClick : undefined}
+                                onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
+                                tabIndex={onTitleChange ? 0 : undefined}
+                                role={onTitleChange ? "button" : undefined}
+                                aria-label={onTitleChange ? "タイトルを編集" : undefined}
+                                onKeyDown={onTitleChange ? (e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        handleTitleClick(e as any);
+                                    }
+                                } : undefined}
+                            >
+                                {title || "Untitled card"}
+                            </span>
+                        )}
+                        {rightMeta ? (
+                            <span className="ml-auto shrink-0 text-[10px] font-semibold text-slate-500 text-right">
+                                {rightMeta}
+                            </span>
+                        ) : null}
+                    </div>
                     {timePlacement === 'inline' && timeText ? (
                         <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
                     ) : null}
@@ -202,7 +213,7 @@ export function TimelineCard({
                 </div>
             ) : null}
 
-            {badgeLabel || duration ? (
+            {badgeLabel && !['A', 'B'].includes(badgeLabel.toUpperCase()) ? (
                 <button
                     type="button"
                     className="absolute top-[3px] right-[6px] flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"

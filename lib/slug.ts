@@ -18,7 +18,7 @@ export function toSlugBase(title: string): string {
     .replace(/^-+|-+$/g, '');
 
   if (normalized) {
-    return normalized;
+    return normalized.normalize('NFC');
   }
 
   const fallback = encodeURIComponent(title.trim().toLowerCase());

@@ -221,7 +221,8 @@ function MobileTimelineColumn({
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   duration={undefined}
-                  timeText={`${timeLabel(event.due_start, event.due_end)} (${formatDuration(Math.max(event.durationMinutes ?? 60, 0))})`}
+                  timeText={timeLabel(event.due_start, event.due_end)}
+                  rightMeta={`:${formatDuration(Math.max(event.durationMinutes ?? 60, 0))}`}
                   timePlacement={(event.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? "pt-0" : "pt-4"}`}
@@ -511,7 +512,7 @@ export default function MobileTimelineView({
       return {
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
-        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} (${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)})`,
+        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)}`,
       };
     }
     if (overlayBucketCard) {
@@ -519,7 +520,7 @@ export default function MobileTimelineView({
         title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
         timeText: overlayBucketCard.duration
-          ? `(${formatDuration(overlayBucketCard.duration)}) ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
+          ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
           : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
       };
     }
@@ -755,15 +756,11 @@ function MobileBucketCard({
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
           duration={undefined}
-          timeText={
-            <span className="flex gap-1">
-              {item.duration ? <span>({formatDuration(item.duration)})</span> : null}
-              {item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-            </span>
-          }
+          timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+          rightMeta={item.duration ? `:${formatDuration(item.duration)}` : null}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
-          timePlacement="inline"
-          className="w-full"
+          timePlacement="out-top"
+          className="w-full min-h-0 py-1"
           tabIndex={0}
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"

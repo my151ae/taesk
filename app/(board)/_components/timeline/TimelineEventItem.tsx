@@ -104,7 +104,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     duration={undefined}
-                    timeText={`${timeLabel(displayStart, displayEnd)} (${formatDuration(duration)})`}
+                    timeText={timeLabel(displayStart, displayEnd)}
+                    rightMeta={`:${formatDuration(duration)}`}
                     timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
                         if (!isEditingTitle) {

@@ -36,9 +36,9 @@ export default async function CardFullPage({
   if (boardUrl && card.short_id) {
     const redirectUrl = new URL(boardUrl, resolveAppOrigin());
     redirectUrl.searchParams.set("card", card.short_id);
-    redirect(redirectUrl.toString());
+    redirect(encodeURI(redirectUrl.toString()));
   } else if (boardUrl) {
-    redirect(boardUrl);
+    redirect(encodeURI(boardUrl));
   }
 
   return (

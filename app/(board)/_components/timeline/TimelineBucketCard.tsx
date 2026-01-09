@@ -81,20 +81,16 @@ export const TimelineBucketCard = ({
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     duration={undefined}
-                    timeText={
-                        <span className="flex gap-1">
-                            {item.duration ? <span>({formatDuration(item.duration)})</span> : null}
-                            {item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-                        </span>
-                    }
-                    timePlacement="top"
+                    timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                    rightMeta={item.duration ? `:${formatDuration(item.duration)}` : null}
+                    timePlacement="out-top"
                     onOpen={() => {
                         if (!isEditingTitle) {
                             openCardModal(item.short_id);
                         }
                     }}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className="min-h-[40px] pt-4 pb-1"
+                    className="min-h-0 py-1"
                     tabIndex={0}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     focusGroup="bucket"

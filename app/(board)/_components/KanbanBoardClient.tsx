@@ -64,6 +64,7 @@ import ProfileSettings from "./ProfileSettings";
 import { resolveProfileIdentity, getProfileInitial } from "@/lib/usernames";
 import { normalizeChecklist, EMPTY_CHECKLIST, flattenChecklistText, type Checklist } from "@/lib/checklist";
 import { buildContentFromTitle } from "@/lib/tiptap";
+import { formatDuration } from "@/app/(board)/_utils/timeline-helpers";
 import type { JSONContent } from "@tiptap/react";
 
 
@@ -515,6 +516,7 @@ function CardVisual({
   const showAssignee = Boolean(assigneeName);
   const showBadges = Boolean(card.tags && card.tags.length > 0) || Boolean(card.due_date);
   const hasLowerContent = showDescription || showAssignee || showBadges;
+  const durationLabel = typeof card.duration === 'number' && card.duration > 0 ? formatDuration(card.duration) : null;
 
   const baseClasses = `rounded-none border border-slate-200/60 bg-white px-3 py-1 shadow-sm transition-shadow dark:border-gray-700/50 dark:bg-gray-800 ${withGrab ? 'cursor-grab active:cursor-grabbing hover:shadow-md' : ''}`;
   const subtleClasses = subtle ? ' ring-2 ring-sky-200/40 dark:ring-sky-600/40' : '';
@@ -584,6 +586,9 @@ function CardVisual({
           />
         </div>
         <div className="flex items-center gap-1">
+          {durationLabel ? (
+            <span className="text-[11px] font-semibold text-slate-500">({durationLabel})</span>
+          ) : null}
           {priorityIcon ? <span className="text-xs">{priorityIcon}</span> : null}
           {onOpenCard ? (
             <button
@@ -604,9 +609,14 @@ function CardVisual({
       </div>
 
       {showDescription ? (
-        <p className={`${showAssignee || showBadges ? 'mb-1' : 'mb-0'} line-clamp-2 text-xs leading-snug text-slate-500 dark:text-gray-400`}>
-          {checklistText || 'No checklist'}
-        </p>
+        <div className={`${showAssignee || showBadges ? 'mb-1' : 'mb-0'} flex items-start justify-between gap-2`}>
+          <p className="min-w-0 line-clamp-2 text-xs leading-snug text-slate-500 dark:text-gray-400">
+            {checklistText || 'No checklist'}
+          </p>
+          {durationLabel ? (
+            <span className="shrink-0 text-[11px] font-semibold text-slate-400">({durationLabel})</span>
+          ) : null}
+        </div>
       ) : null}
 
       {showAssignee ? (
