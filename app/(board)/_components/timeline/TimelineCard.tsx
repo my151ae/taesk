@@ -11,6 +11,8 @@ type TimelineCardProps = {
     timeText?: ReactNode;
     rightMeta?: ReactNode;
     timePlacement?: 'top' | 'inline' | 'out-top';
+    alignTop?: boolean;
+    paddingClass?: string;
     onOpen: () => void;
     className?: string;
     style?: CSSProperties;
@@ -39,6 +41,8 @@ export function TimelineCard({
     timeText,
     rightMeta,
     timePlacement = 'top',
+    alignTop = false,
+    paddingClass = 'py-3',
     onOpen,
     className,
     style,
@@ -96,7 +100,8 @@ export function TimelineCard({
         <div
             ref={containerRef}
             className={clsx(
-                'relative flex flex-col gap-2 border border-slate-200 bg-white px-[6px] py-3 text-left shadow-sm w-full max-w-full',
+                'relative flex flex-col gap-2 border border-slate-200 bg-white px-[6px] text-left shadow-sm w-full max-w-full',
+                paddingClass,
                 className
             )}
             style={style}
@@ -148,13 +153,17 @@ export function TimelineCard({
                         }
                     }}
                     className={clsx(
-                        "mt-0.5 flex h-4 w-4 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400",
+                        "flex h-4 w-4 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400",
+                        alignTop ? "mt-0" : "mt-0.5",
                         checked ? "text-slate-800" : "text-transparent"
                     )}
                 >
                     {checked ? '✓' : ''}
                 </button>
-                <div className="mt-1 flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800">
+                <div className={clsx(
+                    "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800",
+                    alignTop ? "mt-0" : "mt-1"
+                )}>
                     <div className="flex min-w-0 items-center gap-2">
                         {isEditing && onTitleChange ? (
                             <div className="min-w-0 flex-1">

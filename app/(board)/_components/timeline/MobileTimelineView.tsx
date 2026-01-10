@@ -760,7 +760,9 @@ function MobileBucketCard({
           rightMeta={item.duration ? `:${formatDuration(item.duration)}` : null}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="out-top"
-          className="w-full min-h-0 py-1"
+          alignTop
+          paddingClass="py-1"
+          className="w-full min-h-0"
           tabIndex={0}
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"

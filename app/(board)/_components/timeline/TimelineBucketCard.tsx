@@ -84,13 +84,15 @@ export const TimelineBucketCard = ({
                     timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
                     rightMeta={item.duration ? `:${formatDuration(item.duration)}` : null}
                     timePlacement="out-top"
+                    alignTop
                     onOpen={() => {
                         if (!isEditingTitle) {
                             openCardModal(item.short_id);
                         }
                     }}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
-                    className="min-h-0 py-1"
+                    paddingClass="py-1"
+                    className="min-h-0"
                     tabIndex={0}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     focusGroup="bucket"
