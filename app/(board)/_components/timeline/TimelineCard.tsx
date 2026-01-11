@@ -100,8 +100,8 @@ export function TimelineCard({
         <div
             ref={containerRef}
             className={clsx(
-                'relative flex flex-col gap-2 border border-slate-200 bg-white px-[6px] text-left shadow-sm w-full max-w-full',
-                paddingClass,
+                'relative flex flex-row items-stretch border border-slate-200 bg-white text-left shadow-sm w-full max-w-full',
+                paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 className
             )}
             style={style}
@@ -124,101 +124,113 @@ export function TimelineCard({
             }}
             onClick={handleCardClick}
         >
-            {childrenPosition === 'top' && children}
-
-            <div className="flex items-start gap-2 pr-0">
-                <button
-                    type="button"
-                    ref={checkboxRef}
-                    data-focus-group={focusGroup}
-                    data-focus-part={focusGroup ? 'checkbox' : undefined}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleCheck(!checked);
-                    }}
-                    aria-label={checked ? '未完了に戻す' : '完了にする'}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // Enterでトグルではなくモーダルを開く
-                            if (!isEditing) {
-                                onOpen();
-                            }
-                        } else if (e.key === ' ') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onToggleCheck(!checked);
-                        }
-                    }}
-                    className={clsx(
-                        "flex h-4 w-4 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400",
-                        alignTop ? "mt-0" : "mt-0.5",
-                        checked ? "text-slate-800" : "text-transparent"
-                    )}
-                >
-                    {checked ? '✓' : ''}
-                </button>
+            <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
-                    "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800",
-                    alignTop ? "mt-0" : "mt-1"
+                    "flex flex-1 flex-col gap-2 min-w-0",
+                    "pl-[6px] pr-2",
+                    // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
+                    (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-0.5 pb-3" : "pt-0.5 pb-1")
                 )}>
-                    <div className="flex min-w-0 items-center gap-2">
-                        {isEditing && onTitleChange ? (
-                            <div className="min-w-0 flex-1">
-                                <InlineTitleEditor
-                                    title={title}
-                                    onSave={handleSave}
-                                    onCancel={handleCancel}
-                                />
-                            </div>
-                        ) : (
-                            <span
-                                className={clsx(
-                                    "truncate leading-tight",
-                                    onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "",
-                                    !title && "text-slate-400"
-                                )}
-                                ref={onTitleChange ? titleRef : undefined}
-                                data-focus-group={focusGroup}
-                                data-focus-part={focusGroup ? 'title' : undefined}
-                                onClick={onTitleChange ? handleTitleClick : undefined}
-                                onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
-                                tabIndex={onTitleChange ? 0 : undefined}
-                                role={onTitleChange ? "button" : undefined}
-                                aria-label={onTitleChange ? "タイトルを編集" : undefined}
-                                onKeyDown={onTitleChange ? (e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        handleTitleClick(e as any);
+                    {childrenPosition === 'top' && children}
+
+                    <div className="flex items-start gap-2 pr-0 pt-0">
+                        <button
+                            type="button"
+                            ref={checkboxRef}
+                            data-focus-group={focusGroup}
+                            data-focus-part={focusGroup ? 'checkbox' : undefined}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleCheck(!checked);
+                            }}
+                            aria-label={checked ? '未完了に戻す' : '完了にする'}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!isEditing) {
+                                        onOpen();
                                     }
-                                } : undefined}
-                            >
-                                {title || "Untitled card"}
-                            </span>
-                        )}
-                        {rightMeta ? (
-                            <span className="ml-auto shrink-0 text-[10px] font-semibold text-slate-500 text-right">
-                                {rightMeta}
-                            </span>
-                        ) : null}
+                                } else if (e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onToggleCheck(!checked);
+                                }
+                            }}
+                            className={clsx(
+                                "flex h-4 w-4 shrink-0 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400 mt-0.5",
+                                checked ? "text-slate-800" : "text-transparent"
+                            )}
+                        >
+                            {checked ? '✓' : ''}
+                        </button>
+                        <div className={clsx(
+                            "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800 pt-0.5"
+                        )}>
+                            <div className="flex min-w-0 items-center gap-2">
+                                {isEditing && onTitleChange ? (
+                                    <div className="min-w-0 flex-1">
+                                        <InlineTitleEditor
+                                            title={title}
+                                            onSave={handleSave}
+                                            onCancel={handleCancel}
+                                        />
+                                    </div>
+                                ) : (
+                                    <span
+                                        className={clsx(
+                                            "truncate leading-tight",
+                                            onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "",
+                                            !title && "text-slate-400"
+                                        )}
+                                        ref={onTitleChange ? titleRef : undefined}
+                                        data-focus-group={focusGroup}
+                                        data-focus-part={focusGroup ? 'title' : undefined}
+                                        onClick={onTitleChange ? handleTitleClick : undefined}
+                                        onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
+                                        tabIndex={onTitleChange ? 0 : undefined}
+                                        role={onTitleChange ? "button" : undefined}
+                                        aria-label={onTitleChange ? "タイトルを編集" : undefined}
+                                        onKeyDown={onTitleChange ? (e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleTitleClick(e as any);
+                                            }
+                                        } : undefined}
+                                    >
+                                        {title || "Untitled card"}
+                                    </span>
+                                )}
+                            </div>
+                            {timePlacement === 'inline' && timeText ? (
+                                <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
+                            ) : null}
+                        </div>
                     </div>
-                    {timePlacement === 'inline' && timeText ? (
-                        <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
-                    ) : null}
+
+                    {childrenPosition === 'bottom' && children}
                 </div>
+
+                {timePlacement === 'top' && timeText ? (
+                    <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-10 pointer-events-none">
+                        {timeText}
+                    </div>
+                ) : null}
+
+                {timePlacement === 'out-top' && timeText ? (
+                    <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 w-max z-10 pointer-events-none">
+                        {timeText}
+                    </div>
+                ) : null}
             </div>
 
-            {timePlacement === 'top' && timeText ? (
-                <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600">
-                    {timeText}
-                </div>
-            ) : null}
-
-            {timePlacement === 'out-top' && timeText ? (
-                <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 w-max">
-                    {timeText}
+            {rightMeta ? (
+                <div className="flex shrink-0 items-center justify-center border-l border-slate-200 bg-white px-0.5 py-1">
+                    <div className="flex flex-col items-center text-center text-[10px] font-medium text-slate-500 leading-none gap-1">
+                        <span>{rightMeta}</span>
+                        <span className="text-slate-400 font-bold leading-none">&gt;</span>
+                    </div>
                 </div>
             ) : null}
 
@@ -240,8 +252,6 @@ export function TimelineCard({
                     </span>
                 </button>
             ) : null}
-
-            {childrenPosition === 'bottom' && children}
         </div>
     );
 }

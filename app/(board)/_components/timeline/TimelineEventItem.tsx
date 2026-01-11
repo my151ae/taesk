@@ -105,7 +105,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     duration={undefined}
                     timeText={timeLabel(displayStart, displayEnd)}
-                    rightMeta={`:${formatDuration(duration)}`}
+                    rightMeta={formatDuration(duration)}
                     timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
                         if (!isEditingTitle) {
@@ -119,7 +119,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                     focusGroup="timeline"
-                    className={`w-full h-full ${isSmall ? 'pt-0' : 'pt-4'}`}
+                    className="w-full h-full pt-0"
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
                     isEditingTitle={isEditingTitle}
