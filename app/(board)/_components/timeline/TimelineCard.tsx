@@ -127,13 +127,13 @@ export function TimelineCard({
             <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
                     "flex flex-1 flex-col gap-2 min-w-0",
-                    "pl-[6px] pr-2",
+                    "pl-[3px] pr-2",
                     // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
-                    (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-0.5 pb-3" : "pt-0.5 pb-1")
+                    (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-1 pb-3" : "pt-1 pb-1")
                 )}>
                     {childrenPosition === 'top' && children}
 
-                    <div className="flex items-start gap-2 pr-0 pt-0">
+                    <div className="flex items-center gap-1 pr-0 pt-0">
                         <button
                             type="button"
                             ref={checkboxRef}
@@ -159,11 +159,17 @@ export function TimelineCard({
                                 }
                             }}
                             className={clsx(
-                                "flex h-4 w-4 shrink-0 items-center justify-center border border-slate-300 text-xs font-bold transition hover:border-sky-400 mt-0.5",
-                                checked ? "text-slate-800" : "text-transparent"
+                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all",
+                                checked
+                                    ? "bg-slate-400 border-slate-400"
+                                    : "bg-white border-slate-300 hover:border-sky-400"
                             )}
                         >
-                            {checked ? '✓' : ''}
+                            {checked && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                            )}
                         </button>
                         <div className={clsx(
                             "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800 pt-0.5"

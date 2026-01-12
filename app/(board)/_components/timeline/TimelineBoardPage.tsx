@@ -513,6 +513,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
                 onExternalEventClick={handleExternalEventClick}
+                onCardContextMenu={handleCardContextMenu}
               />
             </div>
             <div className="flex-1 overflow-hidden md:hidden">
@@ -525,6 +526,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
                 onExternalEventClick={handleExternalEventClick}
+                onCardContextMenu={handleCardContextMenu}
               />
             </div>
           </>

@@ -291,6 +291,7 @@ export function useTimelineCardActions({
             due_end: null,
             checked: false,
             tags: [],
+            priority: 'medium',
             bucketPosition: position,
             short_id: null,
             slug: null,

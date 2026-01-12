@@ -255,6 +255,7 @@ export function useTimelineDragAndDrop({
                         checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
                         checklist: baseBucketItem?.checklist ?? baseEvent?.checklist ?? null,
                         tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
+                        priority: baseBucketItem?.priority ?? baseEvent?.priority ?? null,
                         assignee_id: baseBucketItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
                         assignee_ids: baseBucketItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
                         assigned_to: baseBucketItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
