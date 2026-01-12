@@ -210,13 +210,13 @@ export function TimelineCard({
                 </div>
 
                 {timePlacement === 'top' && timeText ? (
-                    <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-10 pointer-events-none">
-                        {timeText}
+                    <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-20 pointer-events-none whitespace-nowrap max-w-[calc(100%-12px)]">
+                        <span className="inline-block overflow-hidden text-ellipsis">{timeText}</span>
                     </div>
                 ) : null}
 
                 {timePlacement === 'out-top' && timeText ? (
-                    <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 w-max z-10 pointer-events-none">
+                    <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 whitespace-nowrap z-10 pointer-events-none">
                         {timeText}
                     </div>
                 ) : null}
