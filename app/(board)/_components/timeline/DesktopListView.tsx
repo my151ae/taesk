@@ -23,6 +23,7 @@ type DesktopListViewProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
+    status?: string;
 };
 
 export function DesktopListView({
@@ -35,6 +36,7 @@ export function DesktopListView({
     onToggleCheck,
     onExternalEventClick,
     onCardContextMenu,
+    status,
 }: DesktopListViewProps) {
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
@@ -46,6 +48,15 @@ export function DesktopListView({
             return hasTimelineEvents || hasAbItems || hasGoogleEvents;
         });
     }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
+
+    if (status === 'loading') {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-200 min-h-[400px]">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 mb-4" />
+                <p className="text-slate-400 text-sm font-medium">読み込み中...</p>
+            </div>
+        );
+    }
 
     if (daysWithEvents.length === 0) {
         return (

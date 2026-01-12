@@ -22,6 +22,7 @@ type MobileListViewProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
+    status?: string;
 };
 
 export default function MobileListView({
@@ -34,6 +35,7 @@ export default function MobileListView({
     onToggleCheck,
     onExternalEventClick,
     onCardContextMenu,
+    status,
 }: MobileListViewProps) {
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
@@ -45,6 +47,15 @@ export default function MobileListView({
             return hasTimelineEvents || hasAbItems || hasGoogleEvents;
         });
     }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
+
+    if (status === 'loading') {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center min-h-[400px]">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 mb-4" />
+                <p className="text-slate-500 font-medium">読み込み中...</p>
+            </div>
+        );
+    }
 
     if (daysWithEvents.length === 0) {
         return (

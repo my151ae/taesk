@@ -141,8 +141,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialRange: dayRange,
   } = useTimelineUrlState({ initialDayRange: (initialBoard as any).day_range });
 
+  // Compute intended day range based on current viewMode state immediately
+  // This avoids flashing when viewMode changes but URL has not yet updated
+  const intendedDayRange = useMemo(() => {
+    return viewMode === 'timeline' ? timelineRange : listRange;
+  }, [viewMode, timelineRange, listRange]);
+
   // Compute effective range based on mode
-  const effectiveDayRange = viewMode === 'timeline' ? Math.min(dayRange, 7) : dayRange;
+  const effectiveDayRange = viewMode === 'timeline' ? Math.min(intendedDayRange, 7) : intendedDayRange;
 
   const currentBoard = availableBoards.find(b => b.id === initialBoard.id) || initialBoard;
 
@@ -157,7 +163,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     realtimeStatus,
   } = useTimelineData({
     initialBoard,
-    dayRange: effectiveDayRange,
+    dayRange: intendedDayRange, // Use intended range instead of dayRange from URL
     dayWindowStartRef,
     setDayWindowStart,
     buildMockTimelineResponse,
@@ -222,8 +228,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const visibleDays = useMemo(() => {
     const days = data?.days ?? [];
     if (!days.length) return [];
-    return days.slice(activeDayIndex, activeDayIndex + dayRange);
-  }, [activeDayIndex, data?.days, dayRange]);
+    return days.slice(activeDayIndex, activeDayIndex + effectiveDayRange);
+  }, [activeDayIndex, data?.days, effectiveDayRange]);
 
   const {
     calendarEventsByDay,
@@ -315,7 +321,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     urlTime,
     data,
     activeDayIndex,
-    dayRange,
+    dayRange: effectiveDayRange,
     indicatorMinutes,
     updateUrl,
     timelineStartHour,
@@ -402,7 +408,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           searchQuery={searchQuery} setSearchQuery={setSearchQuery}
           selectedTags={selectedTags} setSelectedTags={setSelectedTags}
           selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority}
-          availableTags={availableTags} dayRange={dayRange} onDayRangeChange={handleDayRangeUpdate}
+          availableTags={availableTags} dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
           onTodayClick={handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
           onUpdateBoard={handleUpdateBoard}
           googleStatusText={googleStatusText}
@@ -514,6 +520,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onToggleCheck={handleToggleCardChecked}
                 onExternalEventClick={handleExternalEventClick}
                 onCardContextMenu={handleCardContextMenu}
+                status={status}
               />
             </div>
             <div className="flex-1 overflow-hidden md:hidden">
@@ -527,6 +534,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onToggleCheck={handleToggleCardChecked}
                 onExternalEventClick={handleExternalEventClick}
                 onCardContextMenu={handleCardContextMenu}
+                status={status}
               />
             </div>
           </>
