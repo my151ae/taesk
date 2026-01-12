@@ -69,7 +69,7 @@ export function CardModal({
     const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
     const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
     const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
-    const [duration, setDuration] = useState<number>(card.duration ?? 60);
+    const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
     const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
     const contentFetchRef = useRef<string | null>(null);
     // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
@@ -371,7 +371,7 @@ export function CardModal({
             due_end: normalizedEnd,
             due_bucket: normalizedBucket,
             due_bucket_position: normalizedBucketPosition,
-            duration: duration,
+            duration: Number(duration) || 0,
             isAutoSave,
         });
 
@@ -515,7 +515,7 @@ export function CardModal({
             const startMins = sH * 60 + sM;
             let endMins = eH * 60 + eM;
             if (endMins < startMins) endMins += 24 * 60; // Cross midnight
-            setDuration(Math.max(1, endMins - startMins));
+            setDuration(Math.max(0, endMins - startMins));
         }
 
         triggerAutoSave();
@@ -526,8 +526,12 @@ export function CardModal({
         triggerAutoSave();
     }, [triggerAutoSave]);
 
-    const handleDurationChange = useCallback((value: number) => {
-        const nextDuration = Math.max(1, value);
+    const handleDurationChange = useCallback((value: number | "") => {
+        if (value === "") {
+            setDuration("");
+            return;
+        }
+        const nextDuration = Math.max(0, value);
         setDuration(nextDuration);
 
         // If we have start time, update end time to maintain duration

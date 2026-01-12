@@ -88,7 +88,7 @@ export const buildCalendarEntriesByDay = (
       let endMinutes = isLastDay ? getMinutesJstFromIso(event.end) : 24 * 60;
       if (isLastDay && endMinutes === 0) endMinutes = 24 * 60;
 
-      const duration = Math.max(15, endMinutes - startMinutes);
+      const duration = Math.max(0, endMinutes - startMinutes);
 
       if (daySet.has(dayIso)) {
         const entry: ExternalCalendarEntry = {

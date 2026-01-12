@@ -204,7 +204,7 @@ export function useTimelineDragAndDrop({
                     const endMinutes = getMinutesFromTime(nextEnd);
                     const durationMinutes =
                         startMinutes != null && endMinutes != null
-                            ? Math.max(endMinutes - startMinutes, 15)
+                            ? Math.max(endMinutes - startMinutes, 0)
                             : baseEvent?.durationMinutes ?? baseEvent?.duration ?? baseBucketItem?.duration ?? meta.defaultDuration ?? 60;
 
                     const replacement: TimelineEvent = {
@@ -304,13 +304,13 @@ export function useTimelineDragAndDrop({
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
             const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
-            const duration = Math.max(eventData.durationMinutes ?? eventData.duration ?? 60, 15);
+            const duration = Math.max(eventData.durationMinutes ?? eventData.duration ?? 60, 0);
             const dragState: ActiveDragState = { cardId, startMinutes, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
         } else {
             const bucketItem = event.active.data.current?.item as TimelineBucketItem;
-            const duration = Math.max(bucketItem?.duration ?? 60, 15);
+            const duration = Math.max(bucketItem?.duration ?? 60, 0);
             const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
@@ -575,7 +575,7 @@ export function useTimelineDragAndDrop({
         nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
         const desiredEnd = nextStart + currentDrag.duration;
         const endMinutes = Math.min(desiredEnd, 24 * 60 - 1);
-        const durationMinutes = Math.max(endMinutes - nextStart, 1);
+        const durationMinutes = Math.max(endMinutes - nextStart, 0);
         setPointerPreview({
             visible: true,
             startMinutes: nextStart,
@@ -831,7 +831,7 @@ export function useTimelineDragAndDrop({
         const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 5) * 5;
 
         if (activeResize.edge === 'bottom') {
-            const newDuration = Math.max(30, activeResize.originalDuration + deltaMinutes);
+            const newDuration = Math.max(0, activeResize.originalDuration + deltaMinutes);
             const endMinutes = activeResize.startMinutes + newDuration;
             const maxEnd = 24 * 60;
             const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
@@ -844,9 +844,9 @@ export function useTimelineDragAndDrop({
             let newDuration = activeResize.originalDuration - deltaMinutes;
 
             // Ensure minimum duration
-            if (newDuration < 30) {
-                newDuration = 30;
-                newStart = activeResize.originalStartMinutes + activeResize.originalDuration - 30;
+            if (newDuration < 0) {
+                newDuration = 0;
+                newStart = activeResize.originalStartMinutes + activeResize.originalDuration;
             }
 
             // Ensure start time is not negative

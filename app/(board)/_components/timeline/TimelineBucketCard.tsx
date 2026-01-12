@@ -82,7 +82,7 @@ export const TimelineBucketCard = ({
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     duration={undefined}
                     timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-                    rightMeta={item.duration ? formatDuration(item.duration) : null}
+                    rightMeta={item.duration != null ? formatDuration(item.duration) : null}
                     timePlacement="out-top"
                     alignTop
                     onOpen={() => {

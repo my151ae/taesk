@@ -60,7 +60,7 @@ export function applyCardUpdate(
         const startMinutes = getMinutesFromTime(card.due_start);
         const endMinutes = getMinutesFromTime(card.due_end);
         const durationMinutes = startMinutes != null && endMinutes != null
-            ? Math.max(endMinutes - startMinutes, 15)
+            ? Math.max(endMinutes - startMinutes, 0)
             : 60;
 
         const newEvent: TimelineEvent = {

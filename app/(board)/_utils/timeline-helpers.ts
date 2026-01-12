@@ -192,7 +192,7 @@ export const pointerMinutesFromEvent = (
     // Use pixelsToMinutes which already handles startHour
     const minutes = pixelsToMinutes(clampedY, startHour);
     // Snap to 15m intervals
-    const snapped = Math.round(minutes / 15) * 15;
+    const snapped = Math.round(minutes / 5) * 5;
     return Math.max(0, Math.min(23 * 60 + 45, snapped));
 };
 

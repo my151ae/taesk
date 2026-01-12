@@ -88,14 +88,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     left: layout?.left ?? '0%',
                     width: layout?.width ?? '100%',
                 }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    // 編集中はモーダルを開かない
-                    if (!isEditingTitle) {
-                        onClearGhost();
-                        openCardModal(event.short_id, 'card-click');
-                    }
-                }}
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
             >
                 <TimelineCard

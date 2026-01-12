@@ -81,8 +81,7 @@ export default function MobileListView({
                             {allTimelineEvents.map((event) => (
                                 <div
                                     key={event.card_id}
-                                    onClick={() => openCardModal(event.short_id, 'mobile-list-view')}
-                                    className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-transform"
+                                    className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
                                 >
                                     <div className="flex justify-between items-center">
                                         <div
@@ -120,9 +119,15 @@ export default function MobileListView({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            {(event.duration || event.durationMinutes) && (
-                                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
-                                                    {formatDuration((event.duration || event.durationMinutes)!)}
+                                            {(event.duration != null || event.durationMinutes != null) && (
+                                                <span
+                                                    className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openCardModal(event.short_id, 'mobile-list-view');
+                                                    }}
+                                                >
+                                                    &gt; {formatDuration((event.duration || event.durationMinutes)!)}
                                                 </span>
                                             )}
                                             <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
@@ -166,8 +171,7 @@ export default function MobileListView({
                                     {bucketA.map(item => (
                                         <div
                                             key={item.card_id}
-                                            onClick={() => openCardModal(item.short_id, 'mobile-list-view')}
-                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-transform"
+                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
                                         >
                                             <div className="flex justify-between items-center">
                                                 <div
@@ -205,9 +209,15 @@ export default function MobileListView({
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    {item.duration && (
-                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded uppercase">
-                                                            {formatDuration(item.duration)}
+                                                    {item.duration != null && (
+                                                        <span
+                                                            className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openCardModal(item.short_id, 'mobile-list-view');
+                                                            }}
+                                                        >
+                                                            &gt; {formatDuration(item.duration)}
                                                         </span>
                                                     )}
                                                 </div>
@@ -218,8 +228,7 @@ export default function MobileListView({
                                     {bucketB.map(item => (
                                         <div
                                             key={item.card_id}
-                                            onClick={() => openCardModal(item.short_id, 'mobile-list-view')}
-                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-transform"
+                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
                                         >
                                             <div className="flex justify-between items-center">
                                                 <div
@@ -257,9 +266,15 @@ export default function MobileListView({
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    {item.duration && (
-                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded uppercase">
-                                                            {formatDuration(item.duration)}
+                                                    {item.duration != null && (
+                                                        <span
+                                                            className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openCardModal(item.short_id, 'mobile-list-view');
+                                                            }}
+                                                        >
+                                                            &gt; {formatDuration(item.duration)}
                                                         </span>
                                                     )}
                                                 </div>

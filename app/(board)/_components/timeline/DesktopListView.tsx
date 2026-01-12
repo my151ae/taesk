@@ -92,9 +92,8 @@ export function DesktopListView({
                             {allDayEvents.map((event) => (
                                 <div
                                     key={event.card_id}
-                                    onClick={() => openCardModal(event.short_id, 'list-view')}
                                     onContextMenu={(e) => onCardContextMenu?.(e, event.card_id)}
-                                    className="flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:border-sky-200 hover:shadow-sm transition-all cursor-pointer group/item"
+                                    className="flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:border-sky-200 hover:shadow-sm transition-all group/item"
                                 >
                                     <div className="flex items-center gap-2 min-w-[110px]">
                                         <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
@@ -130,9 +129,15 @@ export function DesktopListView({
                                             {event.title || 'Untitled'}
                                         </div>
                                     </div>
-                                    {(event.duration || event.durationMinutes) ? (
-                                        <div className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded lowercase">
-                                            {formatDuration((event.duration || event.durationMinutes)!)}
+                                    {(event.duration != null || event.durationMinutes != null) ? (
+                                        <div
+                                            className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openCardModal(event.short_id, 'list-view');
+                                            }}
+                                        >
+                                            &gt; {formatDuration((event.duration || event.durationMinutes)!)}
                                         </div>
                                     ) : null}
                                 </div>
@@ -168,10 +173,9 @@ export function DesktopListView({
                                     {[...bucketA.map(i => ({ ...i, bkey: 'a' })), ...bucketB.map(i => ({ ...i, bkey: 'b' }))].map((item) => (
                                         <div
                                             key={item.card_id}
-                                            onClick={() => openCardModal(item.short_id, 'list-view')}
                                             onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
                                             className={clsx(
-                                                "flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-all cursor-pointer group/item",
+                                                "flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-all group/item",
                                                 item.bkey === 'a' ? "hover:border-orange-200" : "hover:border-emerald-200"
                                             )}
                                         >
@@ -209,9 +213,15 @@ export function DesktopListView({
                                                     {item.title || 'Untitled'}
                                                 </div>
                                             </div>
-                                            {(item.duration) ? (
-                                                <div className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded lowercase">
-                                                    {formatDuration(item.duration)}
+                                            {(item.duration != null) ? (
+                                                <div
+                                                    className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openCardModal(item.short_id, 'list-view');
+                                                    }}
+                                                >
+                                                    &gt; {formatDuration(item.duration)}
                                                 </div>
                                             ) : null}
                                         </div>

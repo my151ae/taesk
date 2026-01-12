@@ -88,19 +88,11 @@ export function TimelineCard({
         setIsEditing(false);
     }, [setIsEditing]);
 
-    const handleCardClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        // 編集中はカードを開かない
-        if (!isEditing) {
-            onOpen();
-        }
-    }, [isEditing, onOpen]);
-
     return (
         <div
             ref={containerRef}
             className={clsx(
-                'relative flex flex-row items-stretch border border-slate-200 bg-white text-left shadow-sm w-full max-w-full',
+                'relative flex flex-row items-stretch border border-slate-200 bg-white text-left shadow-sm w-full max-w-full outline-none',
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 className
             )}
@@ -122,12 +114,11 @@ export function TimelineCard({
                 }
                 onKeyDown?.(event);
             }}
-            onClick={handleCardClick}
         >
             <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
                     "flex flex-1 flex-col gap-2 min-w-0",
-                    "pl-[3px] pr-2",
+                    "pl-[3px] pr-[3px]",
                     // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
                     (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-1 pb-3" : "pt-1 pb-1")
                 )}>
@@ -232,10 +223,20 @@ export function TimelineCard({
             </div>
 
             {rightMeta ? (
-                <div className="flex shrink-0 items-center justify-center border-l border-slate-200 bg-white px-0.5 py-1">
-                    <div className="flex flex-col items-center text-center text-[10px] font-medium text-slate-500 leading-none gap-1">
-                        <span>{rightMeta}</span>
-                        <span className="text-slate-400 font-bold leading-none">&gt;</span>
+                <div className={clsx(
+                    "flex shrink-0 items-start justify-center px-1",
+                    (timePlacement === 'top' && timeText) ? "pt-4" : "pt-1"
+                )}>
+                    <div
+                        className="flex items-center justify-center rounded bg-white px-[2px] h-4 min-w-[32px] ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen();
+                        }}
+                    >
+                        <span className="text-[10px] font-bold text-slate-700 leading-none">
+                            &gt; {rightMeta}
+                        </span>
                     </div>
                 </div>
             ) : null}

@@ -23,7 +23,7 @@ type CardModalHeaderProps = {
     dueStart: string;
     dueEnd: string;
     dueBucket: DueBucket | null;
-    duration: number;
+    duration: number | "";
     bucketOptions: BucketOption[];
     defaultBucket: DueBucket;
     selectedAssignees: ProfileSummary[];
@@ -39,7 +39,7 @@ type CardModalHeaderProps = {
     onDueDateChange: (value: string) => void;
     onDueStartChange: (value: string) => void;
     onDueEndChange: (value: string) => void;
-    onDurationChange: (value: number) => void;
+    onDurationChange: (value: number | "") => void;
     onBucketChange: (bucket: DueBucket) => void;
     onRequestClose: () => void;
     showSidebar: boolean;
@@ -134,9 +134,42 @@ export default function CardModalHeader({
                                 <input
                                     type="number"
                                     min={0}
-                                    step={5}
+                                    step={1}
                                     value={duration}
-                                    onChange={(e) => onDurationChange(parseInt(e.target.value, 10))}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw === "") {
+                                            onDurationChange("");
+                                            return;
+                                        }
+                                        const val = parseInt(raw, 10);
+                                        if (isNaN(val)) return;
+
+                                        const prev = typeof duration === 'number' ? duration : 0;
+                                        const diff = val - prev;
+
+                                        // ステッパーの操作（+1 or -1）と判定される場合のみ特殊ロジックを適用
+                                        if (Math.abs(diff) === 5 || Math.abs(diff) === 1) {
+                                            let nextVal = val;
+                                            if (diff > 0) { // 増加
+                                                if (prev >= 5) {
+                                                    nextVal = (Math.floor(prev / 5) + 1) * 5;
+                                                } else {
+                                                    nextVal = prev + 1;
+                                                }
+                                            } else { // 減少
+                                                if (prev > 5) {
+                                                    nextVal = (Math.ceil(prev / 5) - 1) * 5;
+                                                } else {
+                                                    nextVal = Math.max(0, prev - 1);
+                                                }
+                                            }
+                                            onDurationChange(nextVal);
+                                        } else {
+                                            // 直接入力の場合はそのまま
+                                            onDurationChange(val);
+                                        }
+                                    }}
                                     className="w-14 px-1 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent text-center"
                                 />
                                 <span className="text-[10px] text-slate-400 dark:text-gray-500 font-medium">min</span>

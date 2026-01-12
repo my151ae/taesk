@@ -136,7 +136,7 @@ export const TimelineColumn = memo(function TimelineColumn({
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const minutesRelative = Math.floor((y / HOUR_HEIGHT) * 60);
-        const snappedRelative = Math.round(minutesRelative / 15) * 15;
+        const snappedRelative = Math.round(minutesRelative / 5) * 5;
         // Convert relative minutes to absolute minutes
         const absoluteMinutes = (snappedRelative + timelineStartHour * 60) % (24 * 60);
         setSelectedSlot({ day: dayIso, minutes: absoluteMinutes });
@@ -152,7 +152,7 @@ export const TimelineColumn = memo(function TimelineColumn({
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         const minutesRelative = Math.floor((y / HOUR_HEIGHT) * 60);
-        const snappedRelative = Math.round(minutesRelative / 15) * 15;
+        const snappedRelative = Math.round(minutesRelative / 5) * 5;
         const absoluteMinutes = (snappedRelative + timelineStartHour * 60) % (24 * 60);
         handleColumnClick(day, absoluteMinutes);
         setSelectedSlot(null);

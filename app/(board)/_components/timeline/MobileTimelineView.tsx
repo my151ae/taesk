@@ -165,7 +165,7 @@ function MobileTimelineColumn({
                   top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
                   height: Math.max(
                     minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) -
-                      minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                    minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
                     18
                   ),
                   left: layout?.left ?? "0%",
@@ -182,9 +182,9 @@ function MobileTimelineColumn({
                   {calendarEvent.isAllDay
                     ? "終日"
                     : timeLabel(
-                        minutesToTime(calendarEvent.startMinutes),
-                        minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                      )}
+                      minutesToTime(calendarEvent.startMinutes),
+                      minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                    )}
                 </p>
               </button>
             );
@@ -222,7 +222,7 @@ function MobileTimelineColumn({
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   duration={undefined}
                   timeText={timeLabel(event.due_start, event.due_end)}
-                  rightMeta={`:${formatDuration(Math.max(event.durationMinutes ?? 60, 0))}`}
+                  rightMeta={`:${formatDuration(event.durationMinutes ?? 0)}`}
                   timePlacement={(event.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? "pt-0" : "pt-4"}`}
@@ -512,14 +512,14 @@ export default function MobileTimelineView({
       return {
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
-        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)}`,
+        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 0)}`,
       };
     }
     if (overlayBucketCard) {
       return {
         title: overlayBucketCard.title || "",
         badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
-        timeText: overlayBucketCard.duration
+        timeText: overlayBucketCard.duration != null
           ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
           : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
       };
@@ -757,7 +757,7 @@ function MobileBucketCard({
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
           duration={undefined}
           timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-          rightMeta={item.duration ? `:${formatDuration(item.duration)}` : null}
+          rightMeta={item.duration != null ? `:${formatDuration(item.duration)}` : null}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="out-top"
           alignTop
