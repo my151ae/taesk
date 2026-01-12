@@ -12,7 +12,7 @@ import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
 
 export const runtime = "nodejs";
 
-const MAX_RANGE_DAYS = 31;
+const MAX_RANGE_DAYS = 130;
 
 const parseDateParam = (value: string | null) => {
   if (!value) return null;

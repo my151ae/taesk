@@ -9,32 +9,41 @@ import {
     formatDayLabel,
     timeLabel,
     minutesToTime,
-    formatDuration
+    formatDuration,
+    ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
 
 type DesktopListViewProps = {
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
     abBuckets: Record<string, TimelineBucketItem[]>;
+    calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
+    calendarAllDayEventsByDay: Record<string, ExternalCalendarEntry[]>;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 };
 
 export function DesktopListView({
     days,
     eventsByDay,
     abBuckets,
+    calendarEventsByDay,
+    calendarAllDayEventsByDay,
     openCardModal,
     onToggleCheck,
+    onExternalEventClick,
 }: DesktopListViewProps) {
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
             const hasTimelineEvents = (eventsByDay[day.isoDate]?.length ?? 0) > 0;
             const hasAbItems = (abBuckets[`${day.key}_a`]?.length ?? 0) > 0 ||
                 (abBuckets[`${day.key}_b`]?.length ?? 0) > 0;
-            return hasTimelineEvents || hasAbItems;
+            const hasGoogleEvents = (calendarEventsByDay[day.isoDate]?.length ?? 0) > 0 ||
+                (calendarAllDayEventsByDay[day.isoDate]?.length ?? 0) > 0;
+            return hasTimelineEvents || hasAbItems || hasGoogleEvents;
         });
-    }, [days, eventsByDay, abBuckets]);
+    }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
 
     if (daysWithEvents.length === 0) {
         return (
@@ -104,6 +113,30 @@ export function DesktopListView({
                                             {formatDuration(event.durationMinutes)}
                                         </div>
                                     )}
+                                </div>
+                            ))}
+
+                            {/* Google Events */}
+                            {([...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])]).map((gEvent) => (
+                                <div
+                                    key={gEvent.id}
+                                    onClick={() => onExternalEventClick?.(gEvent)}
+                                    className="flex items-center gap-4 p-3 bg-white rounded-xl border border-slate-100 hover:border-emerald-200 hover:shadow-sm transition-all cursor-pointer group/item"
+                                >
+                                    <div className="flex items-center gap-1 min-w-[120px]">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                        <div className="text-xs font-medium text-slate-500">
+                                            {gEvent.isAllDay ? 'All Day' : (
+                                                `${minutesToTime(gEvent.startMinutes).slice(0, 5)} 〜 ${minutesToTime(gEvent.startMinutes + gEvent.durationMinutes).slice(0, 5)}`
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 font-medium text-sm text-slate-700">
+                                        {gEvent.title}
+                                    </div>
+                                    <div className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">
+                                        Google
+                                    </div>
                                 </div>
                             ))}
 

@@ -7,32 +7,42 @@ import {
     TimelineEvent,
     TimelineBucketItem,
     formatDayLabel,
-    formatDuration
+    formatDuration,
+    ExternalCalendarEntry,
+    minutesToTime
 } from '@/app/(board)/_utils/timeline-helpers';
 
 type MobileListViewProps = {
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
     abBuckets: Record<string, TimelineBucketItem[]>;
+    calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
+    calendarAllDayEventsByDay: Record<string, ExternalCalendarEntry[]>;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
 };
 
 export default function MobileListView({
     days,
     eventsByDay,
     abBuckets,
+    calendarEventsByDay,
+    calendarAllDayEventsByDay,
     openCardModal,
     onToggleCheck,
+    onExternalEventClick,
 }: MobileListViewProps) {
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
             const hasTimelineEvents = (eventsByDay[day.isoDate]?.length ?? 0) > 0;
             const hasAbItems = (abBuckets[`${day.key}_a`]?.length ?? 0) > 0 ||
                 (abBuckets[`${day.key}_b`]?.length ?? 0) > 0;
-            return hasTimelineEvents || hasAbItems;
+            const hasGoogleEvents = (calendarEventsByDay[day.isoDate]?.length ?? 0) > 0 ||
+                (calendarAllDayEventsByDay[day.isoDate]?.length ?? 0) > 0;
+            return hasTimelineEvents || hasAbItems || hasGoogleEvents;
         });
-    }, [days, eventsByDay, abBuckets]);
+    }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
 
     if (daysWithEvents.length === 0) {
         return (
@@ -111,6 +121,32 @@ export default function MobileListView({
                                                 {event.due_start?.slice(0, 5) ?? '--:--'}
                                             </span>
                                         </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Google Events */}
+                            {([...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])]).map((gEvent) => (
+                                <div
+                                    key={gEvent.id}
+                                    onClick={() => onExternalEventClick?.(gEvent)}
+                                    className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-emerald-50 ring-1 ring-emerald-500/10 active:scale-[0.98] transition-transform"
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                            <span className="text-[10px] font-bold text-emerald-600">
+                                                {gEvent.isAllDay ? 'All Day' : (
+                                                    `${minutesToTime(gEvent.startMinutes).slice(0, 5)} - ${minutesToTime(gEvent.startMinutes + gEvent.durationMinutes).slice(0, 5)}`
+                                                )}
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">
+                                            Google
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-semibold text-slate-800">
+                                        {gEvent.title}
                                     </div>
                                 </div>
                             ))}

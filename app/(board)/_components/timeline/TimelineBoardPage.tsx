@@ -508,8 +508,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 days={data?.days ?? []}
                 eventsByDay={eventsByDay}
                 abBuckets={filteredData?.abBuckets ?? {}}
+                calendarEventsByDay={calendarEventsByDay}
+                calendarAllDayEventsByDay={calendarAllDayEventsByDay}
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
+                onExternalEventClick={handleExternalEventClick}
               />
             </div>
             <div className="flex-1 overflow-hidden md:hidden">
@@ -517,8 +520,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 days={data?.days ?? []}
                 eventsByDay={eventsByDay}
                 abBuckets={filteredData?.abBuckets ?? {}}
+                calendarEventsByDay={calendarEventsByDay}
+                calendarAllDayEventsByDay={calendarAllDayEventsByDay}
                 openCardModal={openCardModal}
                 onToggleCheck={handleToggleCardChecked}
+                onExternalEventClick={handleExternalEventClick}
               />
             </div>
           </>
