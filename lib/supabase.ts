@@ -67,6 +67,7 @@ export interface Board {
   id_short?: number | null;
   slug?: string | null;
   day_range?: number;
+  list_range?: number;
   created_at: string;
   updated_at: string;
 }

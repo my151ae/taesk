@@ -183,6 +183,7 @@ export async function GET(
         checked: card.checked,
         checklist,
         tags: card.tags ?? [],
+        priority: card.priority,
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,

@@ -117,6 +117,9 @@ export async function PATCH(
         if (typeof payload.day_range === 'number') {
             updates.day_range = Math.max(1, Math.min(7, payload.day_range)); // Limit 1-7 days
         }
+        if (typeof payload.list_range === 'number') {
+            updates.list_range = Math.max(1, Math.min(120, payload.list_range)); // Limit 1-120 days
+        }
         if (typeof payload.name === 'string' && payload.name.trim()) {
             updates.name = payload.name.trim();
         }

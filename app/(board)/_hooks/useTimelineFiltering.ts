@@ -58,7 +58,7 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         const filteredEvents = data.events.filter(event => filterItem(event));
 
         const filteredBuckets = Object.entries(data.abBuckets).reduce((acc, [key, items]) => {
-            acc[key] = items.filter(item => filterItem({ ...item, priority: null }));
+            acc[key] = items.filter(item => filterItem({ ...item, priority: item.priority || 'all' }));
             return acc;
         }, {} as Record<string, TimelineBucketItem[]>);
 

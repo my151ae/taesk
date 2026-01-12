@@ -50,6 +50,8 @@ type TimelineHeaderProps = {
     isGoogleLoading: boolean;
     isCalendarRangeReady: boolean;
     realtimeStatus: 'connected' | 'connecting' | 'disconnected';
+    viewMode: 'timeline' | 'list';
+    setViewMode: (mode: 'timeline' | 'list') => void;
 };
 
 export default function TimelineHeader({
@@ -90,6 +92,8 @@ export default function TimelineHeader({
     isGoogleLoading,
     isCalendarRangeReady,
     realtimeStatus,
+    viewMode,
+    setViewMode,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -340,6 +344,14 @@ export default function TimelineHeader({
                 {/* Spacer to push right items */}
                 <div className="flex-1" />
 
+                {/* List Toggle Button */}
+                <button
+                    onClick={() => setViewMode(viewMode === 'timeline' ? 'list' : 'timeline')}
+                    className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 shrink-0"
+                >
+                    {viewMode === 'timeline' ? 'List' : 'Timeline'}
+                </button>
+
                 {/* Today Button */}
                 <button
                     onClick={onTodayClick}
@@ -350,50 +362,80 @@ export default function TimelineHeader({
 
                 {/* Day Range Selector */}
                 <div ref={dayRangeDropdownRef} className="flex items-center gap-1 rounded-full bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 relative text-xs shrink-0">
-                    <button
-                        onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
-                        disabled={dayRange <= 1}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                    >
-                        -
-                    </button>
+                    {viewMode === 'timeline' && (
+                        <button
+                            onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
+                            disabled={dayRange <= 1}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                        >
+                            -
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowDayRangeDropdown((prev) => !prev)}
                         className="min-w-[3rem] flex items-center justify-center gap-1 text-center font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                     >
-                        <span>{dayRange} days</span>
+                        <span>
+                            {viewMode === 'list' ? (
+                                dayRange >= 30 ? `${Math.floor(dayRange / 30)} month${dayRange / 30 > 1 ? 's' : ''}` : `${dayRange} days`
+                            ) : (
+                                `${dayRange} day${dayRange > 1 ? 's' : ''}`
+                            )}
+                        </span>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
                             <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                         </svg>
                     </button>
                     {showDayRangeDropdown && (
                         <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-50 w-32 origin-top rounded-lg border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
-                            {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                                <button
-                                    key={days}
-                                    onClick={() => {
-                                        onDayRangeChange(days);
-                                        setShowDayRangeDropdown(false);
-                                    }}
-                                    className={clsx(
-                                        "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
-                                        dayRange === days
-                                            ? "bg-sky-50 text-sky-700"
-                                            : "text-slate-700 hover:bg-slate-50"
-                                    )}
-                                >
-                                    {days} {days === 1 ? 'day' : 'days'}
-                                </button>
-                            ))}
+                            {viewMode === 'list' ? (
+                                [30, 60, 90, 120].map((days) => (
+                                    <button
+                                        key={days}
+                                        onClick={() => {
+                                            onDayRangeChange(days);
+                                            setShowDayRangeDropdown(false);
+                                        }}
+                                        className={clsx(
+                                            "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
+                                            dayRange === days
+                                                ? "bg-sky-50 text-sky-700"
+                                                : "text-slate-700 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {days / 30} month{days / 30 > 1 ? 's' : ''}
+                                    </button>
+                                ))
+                            ) : (
+                                [1, 2, 3, 4, 5, 6, 7].map((days) => (
+                                    <button
+                                        key={days}
+                                        onClick={() => {
+                                            onDayRangeChange(days);
+                                            setShowDayRangeDropdown(false);
+                                        }}
+                                        className={clsx(
+                                            "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
+                                            dayRange === days
+                                                ? "bg-sky-50 text-sky-700"
+                                                : "text-slate-700 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {days} {days === 1 ? 'day' : 'days'}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     )}
-                    <button
-                        onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
-                        disabled={dayRange >= 7}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                    >
-                        +
-                    </button>
+                    {viewMode === 'timeline' && (
+                        <button
+                            onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
+                            disabled={dayRange >= 7}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                        >
+                            +
+                        </button>
+                    )}
                 </div>
 
                 {/* Filters Button */}

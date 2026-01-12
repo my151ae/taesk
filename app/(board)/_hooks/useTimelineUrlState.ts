@@ -78,7 +78,7 @@ export const useTimelineUrlState = ({ initialDayRange }: UseTimelineUrlStateArgs
 
   const initialRange = useMemo(() => {
     const urlRangeValue = urlRange ? parseInt(urlRange, 10) : null;
-    if (urlRangeValue && urlRangeValue >= 1 && urlRangeValue <= 7) {
+    if (urlRangeValue && urlRangeValue >= 1 && urlRangeValue <= 120) {
       return urlRangeValue;
     }
     return initialDayRange ?? 2;

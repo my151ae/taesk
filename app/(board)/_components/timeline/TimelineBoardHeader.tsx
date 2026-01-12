@@ -45,6 +45,8 @@ type TimelineBoardHeaderProps = {
   isCalendarRangeReady: boolean;
   realtimeStatus: "connected" | "connecting" | "disconnected";
   googleToast: string | null;
+  viewMode: 'timeline' | 'list';
+  setViewMode: (mode: 'timeline' | 'list') => void;
 };
 
 export default function TimelineBoardHeader({
@@ -86,6 +88,8 @@ export default function TimelineBoardHeader({
   isCalendarRangeReady,
   realtimeStatus,
   googleToast,
+  viewMode,
+  setViewMode,
 }: TimelineBoardHeaderProps) {
   return (
     <>
@@ -127,6 +131,8 @@ export default function TimelineBoardHeader({
         isGoogleLoading={isGoogleLoading}
         isCalendarRangeReady={isCalendarRangeReady}
         realtimeStatus={realtimeStatus}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
       />
       {googleToast && (
         <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">

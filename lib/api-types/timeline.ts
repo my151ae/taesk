@@ -50,6 +50,7 @@ export interface TimelineBucketItem {
   checked: boolean;
   checklist?: Checklist | null;
   tags: string[];
+  priority: string | null;
   assignee_id?: string | null;
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
