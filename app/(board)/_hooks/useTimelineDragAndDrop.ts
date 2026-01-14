@@ -261,6 +261,7 @@ export function useTimelineDragAndDrop({
                         assigned_to: baseBucketItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
                         short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
                         slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
+                        duration: baseBucketItem?.duration ?? baseEvent?.durationMinutes ?? baseEvent?.duration ?? meta.defaultDuration ?? 60,
                         bucketPosition,
                     };
 
@@ -655,6 +656,7 @@ export function useTimelineDragAndDrop({
                 due_date: withJstMidnight(dayIso),
                 due_start: null,
                 due_end: null,
+                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceBucketItem?.duration ?? 60,
                 due_bucket_position: bucketPosition,
             };
             console.debug('[timeline] drop into bucket-item', { cardId, bucketKey, bucketPosition, overType });
@@ -753,6 +755,7 @@ export function useTimelineDragAndDrop({
                 due_date: withJstMidnight(dayIso),
                 due_start: null,
                 due_end: null,
+                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceBucketItem?.duration ?? 60,
                 due_bucket_position: bucketPosition,
             };
             console.debug('[timeline] drop into bucket', { cardId, bucketKey, bucketPosition });

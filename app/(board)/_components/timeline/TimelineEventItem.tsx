@@ -65,7 +65,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
 
     const top = minuteToPixels(start, timelineStartHour);
     const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 20);
-    const isSmall = duration < 55;
+
+    // 幅のパーセンテージを取得（例: "33.33%" → 33.33）
+    const widthPercent = layout?.width ? parseFloat(layout.width.replace('%', '')) : 100;
+    const isNarrow = widthPercent <= 40; // 40%以下は時間を外に出す
+    const isSmall = duration < 55 || isNarrow;
 
     const handleTitleChange = useCallback((newTitle: string, previousTitle: string) => {
         onUpdateCardTitle?.(event.card_id, newTitle, previousTitle);
@@ -100,10 +104,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     rightMeta={formatDuration(duration)}
                     timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
-                        if (!isEditingTitle) {
-                            onClearGhost();
-                            openCardModal(event.short_id, 'event-button');
-                        }
+                        openCardModal(event.short_id, 'timeline');
                     }}
                     dataTestId="timeline-event"
                     tabIndex={0}
