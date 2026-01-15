@@ -118,6 +118,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
                     isEditingTitle={isEditingTitle}
                     onEditingChange={setIsEditingTitle}
+                    backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"

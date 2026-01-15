@@ -93,7 +93,6 @@ export const TimelineBucketCard = ({
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
                     paddingClass="py-1"
                     className="min-h-0"
-                    tabIndex={0}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     focusGroup="bucket"
                     // インライン編集

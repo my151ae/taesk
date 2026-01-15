@@ -26,10 +26,13 @@ type TimelineCardProps = {
     focusGroup?: 'timeline' | 'bucket';
     childrenPosition?: 'top' | 'bottom';
     // インライン編集用 props
+    // インライン編集用 props
     onTitleChange?: (newTitle: string, previousTitle: string) => void;
     /** 編集中かどうかの外部制御（DnD無効化などに使用） */
     isEditingTitle?: boolean;
     onEditingChange?: (isEditing: boolean) => void;
+    /** 背景色のクラス（デフォルト: bg-white） */
+    backgroundClass?: string;
 };
 
 export function TimelineCard({
@@ -58,6 +61,7 @@ export function TimelineCard({
     onTitleChange,
     isEditingTitle: externalIsEditing,
     onEditingChange,
+    backgroundClass = 'bg-white',
 }: TimelineCardProps) {
     // 内部編集状態（外部制御がない場合）
     const [internalIsEditing, setInternalIsEditing] = useState(false);
@@ -80,13 +84,23 @@ export function TimelineCard({
         }
     }, [onTitleChange, isEditing, setIsEditing]);
 
+    // クリック開始時にフォーカスがあったかどうかを保持するref
+    const wasFocusedRef = useRef(false);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        // ドラッグ動作を阻害しないよう stopPropagation は行わない
+        // マウスダウンの時点でフォーカスがあるかチェック
+        wasFocusedRef.current = (document.activeElement === containerRef.current);
+    }, []);
+
     const handleContainerClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation(); // イベント伝播を止める
         // コンテナ（タイトル以外）をクリックした場合
-        // 既にドキュメントのフォーカスがある（＝選択されている）場合はモーダルを開く
-        if (document.activeElement === containerRef.current) {
+        // マウスダウン時に既にフォーカスがあった（＝選択されていた）場合はモーダルを開く
+        if (wasFocusedRef.current) {
             onOpen();
         } else {
-            // フォーカスがない場合はフォーカスさせる（選択状態にする）
+            // フォーカスがなかった場合はフォーカスさせる（選択状態にする）
             containerRef.current?.focus();
         }
     }, [onOpen]);
@@ -104,16 +118,20 @@ export function TimelineCard({
         <div
             ref={containerRef}
             className={clsx(
-                'relative flex flex-row items-stretch border border-slate-200 bg-white text-left shadow-sm w-full max-w-full outline-none',
+                'relative flex flex-row items-stretch border border-slate-200 text-left shadow-sm w-full max-w-full outline-none transition-shadow',
+                backgroundClass, // 背景色を適用
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
+                'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
+                'focus:ring-2 focus:ring-sky-500', // フォーカス時のリング
                 className
             )}
             style={style}
             data-testid={dataTestId}
-            tabIndex={tabIndex}
+            tabIndex={tabIndex ?? 0}
             role={role}
             data-focus-group={focusGroup}
             data-focus-part={focusGroup ? 'card' : undefined}
+            onMouseDown={handleMouseDown}
             onClick={handleContainerClick}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !isEditing) {
@@ -239,18 +257,13 @@ export function TimelineCard({
 
             {rightMeta ? (
                 <div className={clsx(
-                    "flex shrink-0 items-start justify-center px-1",
-                    (timePlacement === 'top' && timeText) ? "pt-4" : "pt-1"
+                    "flex shrink-0 items-center justify-center",
+                    (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : "py-1"
                 )}>
-                    <div
-                        className="flex items-center justify-center rounded bg-white px-[2px] h-4 min-w-[32px] ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onOpen();
-                        }}
-                    >
-                        <span className="text-[10px] font-bold text-slate-700 leading-none">
-                            &gt; {rightMeta}
+                    <div className="h-full w-px bg-slate-200 mx-2" />
+                    <div className="flex items-center justify-center border border-slate-300 rounded px-1.5 py-0.5 bg-slate-50/50">
+                        <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                            [{rightMeta}]
                         </span>
                     </div>
                 </div>

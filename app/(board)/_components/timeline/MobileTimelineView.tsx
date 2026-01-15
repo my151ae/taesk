@@ -758,13 +758,12 @@ function MobileBucketCard({
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
           duration={undefined}
           timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
-          rightMeta={item.duration != null ? `:${formatDuration(item.duration)}` : null}
+          rightMeta={item.duration != null ? formatDuration(item.duration) : null}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="out-top"
           alignTop
           paddingClass="py-1"
           className="w-full min-h-0"
-          tabIndex={0}
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"
         />
