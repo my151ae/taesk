@@ -33,6 +33,7 @@ type TimelineCardProps = {
     onEditingChange?: (isEditing: boolean) => void;
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
+    onCreateNext?: () => void;
 };
 
 export function TimelineCard({
@@ -62,6 +63,7 @@ export function TimelineCard({
     isEditingTitle: externalIsEditing,
     onEditingChange,
     backgroundClass = 'bg-white',
+    onCreateNext,
 }: TimelineCardProps) {
     // 内部編集状態（外部制御がない場合）
     const [internalIsEditing, setInternalIsEditing] = useState(false);
@@ -108,10 +110,18 @@ export function TimelineCard({
     const handleSave = useCallback((newTitle: string, previousTitle: string) => {
         setIsEditing(false);
         onTitleChange?.(newTitle, previousTitle);
+        // 編集完了後にカードにフォーカスを戻す
+        requestAnimationFrame(() => {
+            containerRef.current?.focus();
+        });
     }, [onTitleChange, setIsEditing]);
 
     const handleCancel = useCallback(() => {
         setIsEditing(false);
+        // キャンセル時もフォーカスを戻す
+        requestAnimationFrame(() => {
+            containerRef.current?.focus();
+        });
     }, [setIsEditing]);
 
     return (
@@ -134,14 +144,26 @@ export function TimelineCard({
             onMouseDown={handleMouseDown}
             onClick={handleContainerClick}
             onKeyDown={(event) => {
-                if (event.key === 'Enter' && !isEditing) {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    if (rect) {
+                if (!isEditing) {
+                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                         event.preventDefault();
                         event.stopPropagation();
-                        // Enterキーはコンテキストメニュー、または2度押しでモーダルなど
-                        // 既存の挙動を維持しつつ、onOpenContextMenu を呼ぶ
-                        onOpenContextMenu?.(rect);
+                        onOpen();
+                        return;
+                    }
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (onCreateNext) {
+                            onCreateNext();
+                        } else {
+                            // フォールバック: コンテキストメニュー (既存挙動維持が必要な場合)
+                            // ユーザー要望では「Enterでカード追加」なので、onCreateNextがあれば追加。
+                            // なければコンテキストメニューにするか?
+                            // いったんonCreateNextがなければ何もしないか、既存のコンテキストメニュー呼び出しを残す
+                            const rect = containerRef.current?.getBoundingClientRect();
+                            if (rect) onOpenContextMenu?.(rect);
+                        }
                         return;
                     }
                 }
@@ -260,8 +282,8 @@ export function TimelineCard({
                     "flex shrink-0 items-center justify-center",
                     (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : "py-1"
                 )}>
-                    <div className="h-full w-px bg-slate-200 mx-2" />
-                    <div className="flex items-center justify-center border border-slate-300 rounded px-1.5 py-0.5 bg-slate-50/50">
+                    <div className="h-full w-px bg-slate-200" />
+                    <div className="flex items-center justify-center px-1">
                         <span className="text-[10px] font-semibold text-slate-600 leading-none">
                             [{rightMeta}]
                         </span>

@@ -30,6 +30,8 @@ type TimelineEventItemProps = {
     isContextMenuOpen: boolean;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    initialIsEditing?: boolean;
+    onCreateNext?: () => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -48,9 +50,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     onCardContextMenu,
     isContextMenuOpen,
     onUpdateCardTitle,
+    initialIsEditing = false,
+    onCreateNext,
 }: TimelineEventItemProps) {
     // タイトル編集中の状態
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingTitle, setIsEditingTitle] = useState(initialIsEditing);
 
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
@@ -119,6 +123,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     isEditingTitle={isEditingTitle}
                     onEditingChange={setIsEditingTitle}
                     backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
+                    onCreateNext={onCreateNext}
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"

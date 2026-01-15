@@ -26,6 +26,7 @@ interface UseTimelineCardActionsProps {
     googleCalendarEvents: any[];
     refreshGoogleCalendar: () => Promise<void> | void;
     data: any;
+    onCardCreated?: (cardId: string) => void;
 }
 
 export function useTimelineCardActions({
@@ -42,10 +43,21 @@ export function useTimelineCardActions({
     bucketDayMap,
     refreshGoogleCalendar,
     data,
+    onCardCreated,
 }: UseTimelineCardActionsProps) {
     const saveAbortRef = useRef<AbortController | null>(null);
     const saveRequestIdRef = useRef(0);
     const [googleToast, setGoogleToast] = useState<string | null>(null);
+
+    // ... (rest of code) ...
+
+    // Inside handleBucketClick (around line 314 in original)
+    // I need to be careful with replace_file_content scope.
+    // I will use multiple ReplaceChunks or just target the function part if I can encompass it.
+    // The previous view_file was lines 1-434.
+    // I will replace the Props definition and destructuring first.
+    // Then handleBucketClick.
+
 
     const syncCardNowWithToast = useCallback(async (card: Card | null) => {
         if (!card?.due_date || !card?.due_start || !card?.due_end) return;
@@ -223,6 +235,7 @@ export function useTimelineCardActions({
                     if (tempId) next = applyCardUpdate(next, { id: tempId } as Card, 'DELETE');
                     return applyCardUpdate(next, newCard, 'INSERT');
                 });
+                onCardCreated?.(newCard.id);
                 if (options?.openModal !== false && newCard.short_id) openCardModal(newCard.short_id, 'create-card');
             }
         } catch (error) {
@@ -235,7 +248,7 @@ export function useTimelineCardActions({
                 } : prev);
             }
         }
-    }, [dataMode, initialBoardId, setData, openCardModal, setErrorMessage]);
+    }, [dataMode, initialBoardId, setData, openCardModal, setErrorMessage, onCardCreated]);
 
     const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
         const title = "";
@@ -248,10 +261,9 @@ export function useTimelineCardActions({
             due_end: minutesToTime(minutes + 60),
             priority: 'medium',
         };
-        const tempId = `temp-${Date.now()}`;
-        setData((prev: any) => prev ? { ...prev, events: [...prev.events, { card_id: tempId, ...payload, due_date: day.isoDate, durationMinutes: 60, checked: false }] } : prev);
-        createCard(payload, tempId);
-    }, [createCard, setData]);
+        // 楽観的更新を無効化（auto-focus時のIDのスワップ問題回避のため）
+        createCard(payload, undefined, { openModal: false });
+    }, [createCard]);
 
     const handleBucketClick = useCallback((bucketKey: string, afterCardId?: string) => {
         const isoDate = bucketDayMap[bucketKey];
@@ -260,7 +272,6 @@ export function useTimelineCardActions({
         const title = "";
         const content = buildContentFromTitle(title);
         const excerpt = deriveExcerptFromContent(content);
-        const tempId = `temp-${now}`;
         const dueBucket = bucketKeyToDueBucket(bucketKey);
 
         const currentItems = (data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[];
@@ -282,37 +293,9 @@ export function useTimelineCardActions({
             priority: 'medium',
         };
 
-        const newItem: TimelineBucketItem = {
-            card_id: tempId,
-            title,
-            excerpt,
-            due_date: isoDate,
-            due_start: null,
-            due_end: null,
-            checked: false,
-            tags: [],
-            priority: 'medium',
-            bucketPosition: position,
-            short_id: null,
-            slug: null,
-        };
-
-        setData((prev: any) => {
-            if (!prev) return prev;
-            const nextBuckets = { ...prev.abBuckets };
-            const currentItems = nextBuckets[bucketKey] ?? [];
-
-            if (afterCardId) {
-                // Insert at end for local UI consistency
-                nextBuckets[bucketKey] = [...currentItems, newItem];
-            } else {
-                // Default: insert at top
-                nextBuckets[bucketKey] = [newItem, ...currentItems];
-            }
-            return { ...prev, abBuckets: nextBuckets };
-        });
-        createCard(payload, tempId, { openModal: false });
-    }, [bucketDayMap, createCard, setData, data?.abBuckets]);
+        // 楽観的更新を無効化（auto-focus時のIDのスワップ問題回避のため）
+        createCard(payload, undefined, { openModal: false });
+    }, [bucketDayMap, createCard, data?.abBuckets]);
 
     const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
         if (dataMode !== 'api') return;
@@ -341,20 +324,90 @@ export function useTimelineCardActions({
 
         const requestId = ++titleUpdateRequestIdRef.current;
 
-        // タイトルからcontentとexcerptを生成
-        const newContent = buildContentFromTitle(newTitle);
+        // 1. Find current card to get existing content
+        let currentCard: any = null;
+        if (data) {
+            currentCard = data.events?.find((e: any) => e.card_id === cardId);
+            if (!currentCard) {
+                const buckets = Object.values(data.abBuckets || {}).flat() as any[];
+                currentCard = buckets.find((i: any) => i.card_id === cardId);
+            }
+        }
+
+        // 2. Parse input: Split title and body
+        // Split by any newline sequence including unicode line separators
+        const lines = newTitle.split(/\r\n|\r|\n|\u2028|\u2029/);
+        const nextTitle = lines[0].trim();
+        // Keep all lines for body to preserve empty lines (paragraphs)
+        const pastedBodyLines = lines.slice(1).map(line => line.trim());
+
+        // Debug output for user
+        console.log('[timeline] split result:', {
+            count: lines.length,
+            title: nextTitle,
+            firstBody: pastedBodyLines[0]
+        });
+
+        // 開発用：分割に失敗している場合はその旨を伝える（本番では削除）
+        if (newTitle.length > 50 && lines.length === 1 && newTitle.includes(' ')) {
+            // 新しい行がないが長いテキストの場合、スペースでの分割も検討すべきか？
+            // いったんログのみ
+            console.warn('[timeline] long text but no newlines detected');
+        }
+
+        // 3. Construct new content
+        // Start with existing content or empty doc
+        let baseContent: JSONContent = currentCard?.content ? normalizeContent(currentCard.content) : buildContentFromTitle("");
+
+        // Ensure structure is Tiptap JSON
+        if (!baseContent.content) {
+            baseContent = buildContentFromTitle("");
+        }
+
+        // Clone to avoid mutating state directly
+        const newContent = JSON.parse(JSON.stringify(baseContent));
+
+        // Update first block (Title)
+        if (!newContent.content) newContent.content = [];
+
+        if (newContent.content.length > 0) {
+            newContent.content[0] = {
+                type: 'paragraph',
+                content: nextTitle ? [{ type: 'text', text: nextTitle }] : []
+            };
+        } else {
+            newContent.content = [{
+                type: 'paragraph',
+                content: nextTitle ? [{ type: 'text', text: nextTitle }] : []
+            }];
+        }
+
+        // Insert pasted body lines as new paragraphs after the title
+        if (pastedBodyLines.length > 0) {
+            const newParagraphs = pastedBodyLines.map(line => {
+                if (!line) {
+                    return { type: 'paragraph' }; // Empty paragraph
+                }
+                return {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: line }]
+                };
+            });
+            // Insert after index 0 (Title)
+            newContent.content.splice(1, 0, ...newParagraphs);
+        }
+
         const newExcerpt = deriveExcerptFromContent(newContent);
 
         // 楽観的UI更新
         setData((prev: any) => {
-            if (!prev) return prev;
             return {
                 ...prev,
-                events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: newTitle } : e),
+                events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: nextTitle, content: newContent, excerpt: newExcerpt } : e),
                 abBuckets: Object.fromEntries(
                     Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
                         k,
-                        v.map((i: any) => i.card_id === cardId ? { ...i, title: newTitle } : i)
+                        v.map((i: any) => i.card_id === cardId ? { ...i, title: nextTitle, content: newContent, excerpt: newExcerpt } : i)
                     ])
                 ),
             };
@@ -365,10 +418,10 @@ export function useTimelineCardActions({
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: newTitle,
-                    content: normalizeContent(newContent),
+                    title: nextTitle,
+                    content: newContent,
                     excerpt: newExcerpt,
-                    slug: slugify(newTitle),
+                    slug: slugify(nextTitle),
                 }),
             });
 
@@ -385,11 +438,11 @@ export function useTimelineCardActions({
                     if (!prev) return prev;
                     return {
                         ...prev,
-                        events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: previousTitle } : e),
+                        events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: previousTitle, content: currentCard?.content, excerpt: currentCard?.excerpt } : e),
                         abBuckets: Object.fromEntries(
                             Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
                                 k,
-                                v.map((i: any) => i.card_id === cardId ? { ...i, title: previousTitle } : i)
+                                v.map((i: any) => i.card_id === cardId ? { ...i, title: previousTitle, content: currentCard?.content, excerpt: currentCard?.excerpt } : i)
                             ])
                         ),
                     };
@@ -397,7 +450,7 @@ export function useTimelineCardActions({
                 setErrorMessage('タイトルの更新に失敗しました');
             }
         }
-    }, [dataMode, initialBoardId, setData, setErrorMessage]);
+    }, [dataMode, initialBoardId, setData, setErrorMessage, data]);
 
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {

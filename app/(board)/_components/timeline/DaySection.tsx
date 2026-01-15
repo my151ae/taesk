@@ -57,6 +57,7 @@ type DaySectionProps = {
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
+    createdCardId?: string | null;
 };
 
 export const DaySection = memo(function DaySection({
@@ -93,6 +94,7 @@ export const DaySection = memo(function DaySection({
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
+    createdCardId,
 }: DaySectionProps) {
     return (
         <div className="day-section grid grid-cols-2 h-full">
@@ -125,6 +127,7 @@ export const DaySection = memo(function DaySection({
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}
                     onUpdateCardTitle={onUpdateCardTitle}
+                    createdCardId={createdCardId}
                 />
             </div>
 
@@ -150,6 +153,7 @@ export const DaySection = memo(function DaySection({
                         onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}
                         onUpdateCardTitle={onUpdateCardTitle}
+                        createdCardId={createdCardId}
                     />
                 </div>
             </div>

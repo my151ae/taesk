@@ -42,9 +42,10 @@ export function InlineTitleEditor({
             // カーソルを末尾に移動
             textarea.setSelectionRange(textarea.value.length, textarea.value.length);
         }
+        console.log('[InlineTitleEditor] mount', { title, length: title.length });
         // 編集開始時に hasCommittedRef をリセット
         hasCommittedRef.current = false;
-    }, []);
+    }, [title]);
 
     // 自動高さ調整
     useEffect(() => {
@@ -58,6 +59,7 @@ export function InlineTitleEditor({
     const handleSave = useCallback(() => {
         if (hasCommittedRef.current) return; // 二重保存防止
         if (isComposing) return; // IME変換中は保存しない
+        console.log('[InlineTitleEditor] handleSave', { localTitle: JSON.stringify(localTitle) });
         hasCommittedRef.current = true;
         onSave(localTitle, initialTitleRef.current);
     }, [localTitle, onSave, isComposing]);
@@ -83,7 +85,9 @@ export function InlineTitleEditor({
     }, [isComposing, handleSave, handleCancel]);
 
     const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-        setLocalTitle(e.target.value);
+        const val = e.target.value;
+        // console.log('[InlineTitleEditor] onChange', { length: val.length, val: val.slice(0, 20) });
+        setLocalTitle(val);
     }, []);
 
     const handleBlur = useCallback(() => {
@@ -100,6 +104,27 @@ export function InlineTitleEditor({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
+            onPaste={(e) => {
+                e.preventDefault();
+                const text = e.clipboardData.getData('text');
+                console.log('[InlineTitleEditor] onPaste raw:', JSON.stringify(text));
+
+                const textarea = e.currentTarget;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const currentVal = localTitle;
+
+                const newVal = currentVal.substring(0, start) + text + currentVal.substring(end);
+
+                setLocalTitle(newVal);
+
+                // Cursor position update needs to happen after render, but we can try to anticipate
+                requestAnimationFrame(() => {
+                    if (textarea) {
+                        textarea.setSelectionRange(start + text.length, start + text.length);
+                    }
+                });
+            }}
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => setIsComposing(false)}
             // DnD/クリック競合回避

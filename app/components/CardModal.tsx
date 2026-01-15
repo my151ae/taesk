@@ -256,6 +256,9 @@ export function CardModal({
 
     // Escape key to close + focus trap
     useEffect(() => {
+        // モーダルを開く直前のフォーカス要素を保持
+        const previousActiveElement = document.activeElement as HTMLElement | null;
+
         const focusableSelector =
             'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
@@ -329,6 +332,11 @@ export function CardModal({
             }
             if (autoSaveMaxTimeoutRef.current) {
                 clearTimeout(autoSaveMaxTimeoutRef.current);
+            }
+            // モーダルが閉じる際にフォーカスを戻す
+            // 要素がまだ存在している場合のみフォーカス
+            if (previousActiveElement && document.body.contains(previousActiveElement)) {
+                previousActiveElement.focus();
             }
         };
     }, []); // 空配列でマウント時のみ実行

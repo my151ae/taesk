@@ -274,6 +274,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [data?.days]);
 
 
+  const [createdCardId, setCreatedCardId] = useState<string | null>(null);
+
   const {
     applyPatch,
     handleCardModalSave,
@@ -289,7 +291,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialBoardId: currentBoard.id,
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
-    bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data
+    bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data,
+    onCardCreated: setCreatedCardId,
   });
 
   const handleGoogleConnect = useCallback(() => {
@@ -466,6 +469,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
                 contextMenuCardId={contextMenu.cardId}
                 onUpdateCardTitle={handleUpdateCardTitle}
+                createdCardId={createdCardId}
               />
             </div>
 

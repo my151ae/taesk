@@ -77,6 +77,7 @@ type DesktopTimelineViewProps = {
   contextMenuCardId: string | null;
   // インライン編集用
   onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+  createdCardId?: string | null;
 };
 
 export function DesktopTimelineView({
@@ -123,8 +124,10 @@ export function DesktopTimelineView({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
   onUpdateCardTitle,
+  createdCardId,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    // ... (rest of handleArrowKeyFocus)
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     const target = event.target as HTMLElement;
@@ -165,6 +168,8 @@ export function DesktopTimelineView({
     event.stopPropagation();
     focusable[nextIndex]?.focus();
   }, []);
+
+  // ... (rest of component body until DaySection)
 
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -565,6 +570,7 @@ export function DesktopTimelineView({
                   onCardContextMenu={onCardContextMenu}
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
+                  createdCardId={createdCardId}
                 />
               ))}
             </div>

@@ -24,6 +24,7 @@ type TimelineDayBucketProps = {
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    createdCardId?: string | null;
 };
 
 const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
@@ -52,6 +53,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
+    createdCardId,
 }: TimelineDayBucketProps) {
     const meta = buildAbMeta(day);
 
@@ -109,6 +111,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                                     isContextMenuOpen={contextMenuCardId === item.card_id}
                                                     onUpdateCardTitle={onUpdateCardTitle}
+                                                    initialIsEditing={createdCardId === item.card_id}
+                                                    onCreateBucketCard={onCreateBucketCard}
                                                 />
                                             ))
                                         )}

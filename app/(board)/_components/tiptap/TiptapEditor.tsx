@@ -54,12 +54,71 @@ export default function TiptapEditor({
             attributes: {
                 class: 'prose prose-slate max-w-none focus:outline-none min-h-[200px] px-2 py-2',
             },
+            handlePaste: (view, event, slice) => {
+                const text = event.clipboardData?.getData('text/plain');
+                if (text && (text.includes('\n') || text.includes('\r'))) {
+                    console.log('[Tiptap] multiline paste detected, handling manually');
+                    const lines = text.split(/\r\n|\r|\n/);
+                    const firstLine = lines[0];
+                    const bodyLines = lines.slice(1);
+
+                    const { state, dispatch } = view;
+                    const { selection } = state;
+
+                    // 1. Insert first line at current selection
+                    let tr = state.tr.insertText(firstLine, selection.from, selection.to);
+
+                    // 2. Insert rest as new paragraphs
+                    if (bodyLines.length > 0) {
+                        const newParagraphs = bodyLines.map(line =>
+                            state.schema.nodes.paragraph.create({}, state.schema.text(line || ' '))
+                        );
+                        // Insert after the current block
+                        // Find end of current block
+                        const $pos = tr.doc.resolve(tr.selection.to);
+                        const endOfBlock = $pos.end();
+                        tr = tr.insert(endOfBlock + 1, newParagraphs);
+                    }
+
+                    dispatch(tr);
+                    return true; // Prevent default
+                }
+                return false;
+            }
         },
         onUpdate: ({ editor }) => {
             if (isUpdatingRef.current) return;
             if (onChange) {
                 onChange(editor.getJSON());
             }
+        },
+        autofocus: false,
+        onCreate: ({ editor }) => {
+            // Focus at the end of the first block (Title line)
+            // Use setTimeout to ensure we override CardModal's initial focus trap
+            setTimeout(() => {
+                if (editor.isDestroyed) return;
+
+                const firstNode = editor.state.doc.firstChild;
+                console.log('[Tiptap] onCreate focus attempt', {
+                    hasFirstNode: !!firstNode,
+                    contentSize: editor.state.doc.content.size
+                });
+
+                if (firstNode) {
+                    const endOfFirstBlock = 1 + firstNode.content.size;
+                    // Try setting selection end of first block (Title)
+                    const tr = editor.state.tr.setSelection(
+                        editor.state.selection.constructor.near(editor.state.doc.resolve(endOfFirstBlock), -1)
+                    );
+                    editor.view.dispatch(tr);
+                    editor.commands.focus();
+                    editor.commands.scrollIntoView();
+                } else {
+                    // Fallback if empty doc
+                    editor.commands.focus('start');
+                }
+            }, 100); // Increased delay to 100ms
         },
     });
 

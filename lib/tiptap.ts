@@ -12,11 +12,6 @@ const EMPTY_DOC: JSONContent = {
     type: "doc",
     content: [
         {
-            type: "heading",
-            attrs: { level: 1 },
-            content: []
-        },
-        {
             type: "paragraph",
             content: []
         }
@@ -97,13 +92,8 @@ export const buildContentFromTitle = (title: string): JSONContent => {
         type: 'doc',
         content: [
             {
-                type: 'heading',
-                attrs: { level: 1 },
-                content: normalized ? [{ type: 'text', text: clampText(normalized, MAX_TITLE_LENGTH) }] : []
-            },
-            {
                 type: 'paragraph',
-                content: []
+                content: normalized ? [{ type: 'text', text: clampText(normalized, MAX_TITLE_LENGTH) }] : []
             }
         ]
     };

@@ -19,6 +19,8 @@ type TimelineBucketCardProps = {
     isContextMenuOpen: boolean;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    initialIsEditing?: boolean;
+    onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
 };
 
 export const TimelineBucketCard = ({
@@ -31,9 +33,11 @@ export const TimelineBucketCard = ({
     onCardContextMenuByKeyboard,
     isContextMenuOpen,
     onUpdateCardTitle,
+    initialIsEditing = false,
+    onCreateBucketCard,
 }: TimelineBucketCardProps) => {
     // タイトル編集中の状態
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingTitle, setIsEditingTitle] = useState(initialIsEditing);
 
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -99,6 +103,7 @@ export const TimelineBucketCard = ({
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
                     isEditingTitle={isEditingTitle}
                     onEditingChange={setIsEditingTitle}
+                    onCreateNext={() => onCreateBucketCard?.(bucketKey, item.card_id)}
                 />
             </div>
         </DraggableCard>
