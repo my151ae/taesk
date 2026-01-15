@@ -407,36 +407,75 @@ export default function MobileTimelineView({
       return;
     }
     const container = event.currentTarget;
-    const focusable = Array.from(container.querySelectorAll<HTMLElement>('[data-focus-group]'))
-      .filter((el) => (el.offsetParent !== null || el.getClientRects().length > 0));
-    if (!focusable.length) return;
     const active = document.activeElement as HTMLElement | null;
-    const currentIndex = active ? focusable.indexOf(active) : -1;
+    const tabStops = Array.from(container.querySelectorAll(
+      'a[href], button, input, textarea, select, [tabindex]:not([tabindex="-1"])'
+    )).filter((el): el is HTMLElement => (
+      el instanceof HTMLElement &&
+      !el.hasAttribute('disabled') &&
+      (el.offsetParent !== null || el.getClientRects().length > 0)
+    ));
+    if (!tabStops.length) return;
+    const currentIndex = active ? tabStops.indexOf(active) : -1;
     if (currentIndex < 0) return;
-    const currentGroup = active?.dataset.focusGroup;
-    const currentPart = active?.dataset.focusPart;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      if (currentGroup) {
-        const targetGroup = currentGroup === 'timeline' ? 'bucket' : 'timeline';
-        const groupCurrent = focusable.filter((el) => el.dataset.focusGroup === currentGroup && (!currentPart || el.dataset.focusPart === currentPart));
-        const groupTarget = focusable.filter((el) => el.dataset.focusGroup === targetGroup && (!currentPart || el.dataset.focusPart === currentPart));
-        if (groupTarget.length) {
-          const groupIndex = groupCurrent.indexOf(active);
-          const targetIndex = Math.min(Math.max(groupIndex, 0), groupTarget.length - 1);
-          event.preventDefault();
-          event.stopPropagation();
-          groupTarget[targetIndex]?.focus();
-          return;
-        }
-      }
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      const step = event.key === 'ArrowUp' ? -1 : 1;
+      const nextIndex = Math.min(Math.max(currentIndex + step, 0), tabStops.length - 1);
+      if (nextIndex === currentIndex) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const next = tabStops[nextIndex];
+      next?.focus();
+      next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return;
     }
 
-    const step = (event.key === 'ArrowLeft' || event.key === 'ArrowUp') ? -1 : 1;
-    const nextIndex = Math.min(Math.max(currentIndex + step, 0), focusable.length - 1);
-    if (nextIndex === currentIndex) return;
+    if (!active || !active.matches('[data-focus-part="card"]')) {
+      const step = event.key === 'ArrowLeft' ? -1 : 1;
+      const nextIndex = Math.min(Math.max(currentIndex + step, 0), tabStops.length - 1);
+      if (nextIndex === currentIndex) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const next = tabStops[nextIndex];
+      next?.focus();
+      next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return;
+    }
+
+    const focusable = Array.from(container.querySelectorAll('[data-focus-part="card"]'))
+      .filter((el): el is HTMLElement => (
+        el instanceof HTMLElement &&
+        (el.offsetParent !== null || el.getClientRects().length > 0)
+      ));
+    if (!focusable.length) return;
+    const currentRect = active.getBoundingClientRect();
+    const currentCenterX = currentRect.left + currentRect.width / 2;
+    const currentCenterY = currentRect.top + currentRect.height / 2;
+    let bestCandidate: HTMLElement | null = null;
+    let minScore = Infinity;
+    const threshold = 10;
+    focusable.forEach((card) => {
+      if (card === active) return;
+      const rect = card.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = centerX - currentCenterX;
+      const dy = centerY - currentCenterY;
+      const isValid = event.key === 'ArrowLeft' ? dx < -threshold : dx > threshold;
+      if (!isValid) return;
+      const score = (dx * dx) + (dy * dy * 4);
+      if (score < minScore) {
+        minScore = score;
+        bestCandidate = card;
+      }
+    });
     event.preventDefault();
     event.stopPropagation();
-    focusable[nextIndex]?.focus();
+    const candidate = bestCandidate as HTMLElement | null;
+    if (candidate) {
+      candidate.focus();
+      candidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
   }, []);
 
   useEffect(() => {

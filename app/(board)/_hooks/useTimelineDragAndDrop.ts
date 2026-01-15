@@ -785,6 +785,7 @@ export function useTimelineDragAndDrop({
         native: KeyboardEvent<HTMLElement>
     ) => {
         if (!['ArrowUp', 'ArrowDown'].includes(native.key)) return;
+        if (!native.altKey || native.ctrlKey || native.metaKey || native.shiftKey) return;
         native.preventDefault();
         const direction = native.key === 'ArrowUp' ? -5 : 5;
         const startMinutes = getMinutesFromTime(event.due_start ?? null) ?? 0;

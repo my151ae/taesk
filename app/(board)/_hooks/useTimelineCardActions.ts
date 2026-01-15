@@ -278,11 +278,31 @@ export function useTimelineCardActions({
         let position = now;
 
         if (afterCardId) {
-            // Add to bottom: find current min position
-            const minPos = currentItems.length > 0
-                ? Math.min(...currentItems.map(i => i.bucketPosition ?? 0))
-                : now;
-            position = minPos - 1000; // Smaller position means lower in list due to descending sort
+            // position is descending (larger is upper)
+            // Sort items to ensure order
+            const sortedItems = [...currentItems].sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+            const targetIndex = sortedItems.findIndex(i => i.card_id === afterCardId);
+
+            if (targetIndex !== -1) {
+                const targetItem = sortedItems[targetIndex];
+                const nextItem = sortedItems[targetIndex + 1];
+
+                if (nextItem) {
+                    // Insert between target and next
+                    const p1 = targetItem.bucketPosition ?? 0;
+                    const p2 = nextItem.bucketPosition ?? 0;
+                    position = (p1 + p2) / 2;
+                } else {
+                    // Target is the last item, insert below it
+                    position = (targetItem.bucketPosition ?? 0) - 1000;
+                }
+            } else {
+                // Fallback: Add to bottom if target not found
+                const minPos = currentItems.length > 0
+                    ? Math.min(...currentItems.map(i => i.bucketPosition ?? 0))
+                    : now;
+                position = minPos - 1000;
+            }
         }
 
         const payload: Partial<Card> = {

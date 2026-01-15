@@ -1,6 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import { TextSelection } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -109,7 +110,7 @@ export default function TiptapEditor({
                     const endOfFirstBlock = 1 + firstNode.content.size;
                     // Try setting selection end of first block (Title)
                     const tr = editor.state.tr.setSelection(
-                        editor.state.selection.constructor.near(editor.state.doc.resolve(endOfFirstBlock), -1)
+                        TextSelection.near(editor.state.doc.resolve(endOfFirstBlock), -1)
                     );
                     editor.view.dispatch(tr);
                     editor.commands.focus();
