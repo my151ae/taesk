@@ -74,10 +74,22 @@ export function TimelineCard({
     const handleTitleClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
+        // タイトル部分はクリックで即座に編集開始
         if (onTitleChange && !isEditing) {
             setIsEditing(true);
         }
     }, [onTitleChange, isEditing, setIsEditing]);
+
+    const handleContainerClick = useCallback((e: React.MouseEvent) => {
+        // コンテナ（タイトル以外）をクリックした場合
+        // 既にドキュメントのフォーカスがある（＝選択されている）場合はモーダルを開く
+        if (document.activeElement === containerRef.current) {
+            onOpen();
+        } else {
+            // フォーカスがない場合はフォーカスさせる（選択状態にする）
+            containerRef.current?.focus();
+        }
+    }, [onOpen]);
 
     const handleSave = useCallback((newTitle: string, previousTitle: string) => {
         setIsEditing(false);
@@ -102,12 +114,15 @@ export function TimelineCard({
             role={role}
             data-focus-group={focusGroup}
             data-focus-part={focusGroup ? 'card' : undefined}
+            onClick={handleContainerClick}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !isEditing) {
                     const rect = containerRef.current?.getBoundingClientRect();
                     if (rect) {
                         event.preventDefault();
                         event.stopPropagation();
+                        // Enterキーはコンテキストメニュー、または2度押しでモーダルなど
+                        // 既存の挙動を維持しつつ、onOpenContextMenu を呼ぶ
                         onOpenContextMenu?.(rect);
                         return;
                     }

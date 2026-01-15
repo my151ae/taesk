@@ -6,6 +6,7 @@ import {
     minuteToPixels,
     getMinutesFromTime,
     timeLabel,
+    detailedTimeLabel,
     minutesToTime,
     formatDuration,
     EventLayout
@@ -100,8 +101,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     duration={undefined}
-                    timeText={timeLabel(displayStart, displayEnd)}
-                    rightMeta={formatDuration(duration)}
+                    timeText={detailedTimeLabel(displayStart, displayEnd, duration)}
+                    rightMeta={undefined}
                     timePlacement={isSmall ? 'out-top' : 'top'}
                     onOpen={() => {
                         openCardModal(event.short_id, 'timeline');

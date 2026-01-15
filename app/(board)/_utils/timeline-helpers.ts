@@ -140,6 +140,16 @@ export const formatDuration = (minutes: number) => {
     return `${m}m`;
 };
 
+export const detailedTimeLabel = (start: string | null, end: string | null, durationMinutes?: number) => {
+    if (!start && !end) return 'Anytime';
+    const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');
+    const label = `${toLabel(start)} - ${toLabel(end)}`;
+    if (durationMinutes != null) {
+        return `${label}[${formatDuration(durationMinutes)}]`;
+    }
+    return label;
+};
+
 export const timeLabel = (start: string | null, end: string | null) => {
     if (!start && !end) return 'Anytime';
     const toLabel = (value: string | null) => (value ? value.slice(0, 5) : '--:--');

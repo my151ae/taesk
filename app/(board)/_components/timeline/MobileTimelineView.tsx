@@ -10,6 +10,7 @@ import {
   calculateEventLayout,
   minuteToPixels,
   timeLabel,
+  detailedTimeLabel,
   minutesToTime,
   EventLayout,
   TimelineBucketItem,
@@ -221,8 +222,8 @@ function MobileTimelineColumn({
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   duration={undefined}
-                  timeText={timeLabel(event.due_start, event.due_end)}
-                  rightMeta={`:${formatDuration(event.durationMinutes ?? 0)}`}
+                  timeText={detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)}
+                  rightMeta={undefined}
                   timePlacement={(event.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? "pt-0" : "pt-4"}`}
