@@ -398,8 +398,59 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return result;
   }, [filteredData?.events]);
 
+  // グローバルな矢印キーナビゲーション（上/左 = 前へ、下/右 = 次へ）
+  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    const target = event.target as HTMLElement;
+    const tagName = target.tagName;
+
+    // テキスト入力フィールドでのみ矢印キーの標準動作を許可
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {
+      return;
+    }
+
+    // それ以外は常にTab移動と同じ動作
+    event.preventDefault();
+    event.stopPropagation();
+
+    const container = event.currentTarget;
+    const active = document.activeElement as HTMLElement | null;
+
+    // フォーカス可能な要素を取得（ボタン、リンク、tabindex指定要素のみ）
+    const tabStops = Array.from(container.querySelectorAll(
+      'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"]):not([disabled])'
+    )).filter((el): el is HTMLElement => (
+      el instanceof HTMLElement &&
+      (el.offsetParent !== null || el.getClientRects().length > 0)
+    ));
+
+    if (!tabStops.length) return;
+
+    const currentIndex = active ? tabStops.indexOf(active) : -1;
+
+    // 上/左 = 前へ、下/右 = 次へ
+    const step = (event.key === 'ArrowUp' || event.key === 'ArrowLeft') ? -1 : 1;
+
+    let nextIndex: number;
+    if (currentIndex < 0) {
+      nextIndex = step > 0 ? 0 : tabStops.length - 1;
+    } else {
+      nextIndex = currentIndex + step;
+      if (nextIndex < 0) nextIndex = 0;
+      if (nextIndex >= tabStops.length) nextIndex = tabStops.length - 1;
+    }
+
+    if (nextIndex === currentIndex) return;
+
+    const next = tabStops[nextIndex];
+    next?.focus();
+    next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#f4f5f7]">
+    <div className="min-h-screen bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
       <div className="mx-auto flex max-w-6xl flex-col gap-4 pt-6">
         <TimelineBoardHeader
           board={currentBoard} modalBoards={availableBoards} handleBoardNavigate={handleBoardNavigate}

@@ -397,86 +397,6 @@ export default function MobileTimelineView({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
 }: MobileTimelineViewProps) {
-  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    const target = event.target as HTMLElement;
-    if (target.closest('[data-arrow-skip="true"]')) return;
-    const tagName = target.tagName;
-    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {
-      return;
-    }
-    const container = event.currentTarget;
-    const active = document.activeElement as HTMLElement | null;
-    const tabStops = Array.from(container.querySelectorAll(
-      'a[href], button, input, textarea, select, [tabindex]:not([tabindex="-1"])'
-    )).filter((el): el is HTMLElement => (
-      el instanceof HTMLElement &&
-      !el.hasAttribute('disabled') &&
-      (el.offsetParent !== null || el.getClientRects().length > 0)
-    ));
-    if (!tabStops.length) return;
-    const currentIndex = active ? tabStops.indexOf(active) : -1;
-    if (currentIndex < 0) return;
-    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      const step = event.key === 'ArrowUp' ? -1 : 1;
-      const nextIndex = Math.min(Math.max(currentIndex + step, 0), tabStops.length - 1);
-      if (nextIndex === currentIndex) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const next = tabStops[nextIndex];
-      next?.focus();
-      next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      return;
-    }
-
-    if (!active || !active.matches('[data-focus-part="card"]')) {
-      const step = event.key === 'ArrowLeft' ? -1 : 1;
-      const nextIndex = Math.min(Math.max(currentIndex + step, 0), tabStops.length - 1);
-      if (nextIndex === currentIndex) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const next = tabStops[nextIndex];
-      next?.focus();
-      next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      return;
-    }
-
-    const focusable = Array.from(container.querySelectorAll('[data-focus-part="card"]'))
-      .filter((el): el is HTMLElement => (
-        el instanceof HTMLElement &&
-        (el.offsetParent !== null || el.getClientRects().length > 0)
-      ));
-    if (!focusable.length) return;
-    const currentRect = active.getBoundingClientRect();
-    const currentCenterX = currentRect.left + currentRect.width / 2;
-    const currentCenterY = currentRect.top + currentRect.height / 2;
-    let bestCandidate: HTMLElement | null = null;
-    let minScore = Infinity;
-    const threshold = 10;
-    focusable.forEach((card) => {
-      if (card === active) return;
-      const rect = card.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const dx = centerX - currentCenterX;
-      const dy = centerY - currentCenterY;
-      const isValid = event.key === 'ArrowLeft' ? dx < -threshold : dx > threshold;
-      if (!isValid) return;
-      const score = (dx * dx) + (dy * dy * 4);
-      if (score < minScore) {
-        minScore = score;
-        bestCandidate = card;
-      }
-    });
-    event.preventDefault();
-    event.stopPropagation();
-    const candidate = bestCandidate as HTMLElement | null;
-    if (candidate) {
-      candidate.focus();
-      candidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
-  }, []);
 
   useEffect(() => {
     onMount?.();
@@ -588,7 +508,6 @@ export default function MobileTimelineView({
     >
       <div
         className="relative flex h-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
-        onKeyDownCapture={handleArrowKeyFocus}
       >
         {(status === "loading" || !days.length) && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">
