@@ -421,10 +421,21 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     // フォーカス可能な要素を取得（ボタン、リンク、tabindex指定要素のみ）
     const tabStops = Array.from(container.querySelectorAll(
       'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"]):not([disabled])'
-    )).filter((el): el is HTMLElement => (
-      el instanceof HTMLElement &&
-      (el.offsetParent !== null || el.getClientRects().length > 0)
-    ));
+    )).filter((el): el is HTMLElement => {
+      if (!(el instanceof HTMLElement)) return false;
+
+      // より確実な可視性チェック
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none') return false;
+      if (style.visibility === 'hidden') return false;
+      if (style.opacity === '0') return false;
+
+      // 要素が画面上に存在するかチェック
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return false;
+
+      return true;
+    });
 
     if (!tabStops.length) return;
 
