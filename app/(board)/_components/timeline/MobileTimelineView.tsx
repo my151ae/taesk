@@ -62,6 +62,7 @@ function MobileTimelineColumn({
   calendarEvents: ExternalCalendarEntry[];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   timelineStartHour?: number;
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
   hourHeight: number;

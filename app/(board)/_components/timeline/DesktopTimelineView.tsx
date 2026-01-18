@@ -20,10 +20,18 @@ import {
   formatDuration,
   getDisplayHours,
   minuteToPixels,
+  pixelsToMinutes,
+  getTimelineHeight,
+  DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { TimelineCard } from "./TimelineCard";
-import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store";
+import {
+  useTimelineZoomStore,
+  MIN_HOUR_HEIGHT,
+  MAX_HOUR_HEIGHT,
+  ZOOM_STEP,
+} from "@/app/(board)/_stores/timeline-zoom-store";
 
 const ALL_DAY_ROW_HEIGHT = 36;
 
@@ -136,6 +144,50 @@ export function DesktopTimelineView({
 
   // Zoom State
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
+  const setHourHeight = useTimelineZoomStore((state) => state.setHourHeight);
+
+  // Zoom Interaction: Ctrl + Wheel
+  useEffect(() => {
+    const container = timelineScrollRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+
+      const rect = container.getBoundingClientRect();
+      const mouseY = e.clientY - rect.top;
+      const scrollTop = container.scrollTop;
+
+      // 1. Calculate time at mouse position (Anchor)
+      const anchorMinutes = pixelsToMinutes(scrollTop + mouseY, timelineStartHour, hourHeight);
+
+      // 2. Determine new height
+      // e.deltaY < 0 means scrolling UP (zoom in)
+      const direction = e.deltaY < 0 ? 1 : -1;
+      const nextRaw = hourHeight + direction * ZOOM_STEP;
+      const nextHeight = Math.max(MIN_HOUR_HEIGHT, Math.min(MAX_HOUR_HEIGHT, nextRaw));
+
+      if (nextHeight === hourHeight) return;
+
+      // 3. Apply new height
+      setHourHeight(nextHeight);
+
+      // 4. Adjust scroll to keep anchor time at same visual position
+      // newPixelPos = newScrollTop + mouseY
+      // newScrollTop = newPixelPos - mouseY
+      // newPixelPos = minuteToPixels(anchorMinutes, ...)
+      const newTotalPos = minuteToPixels(anchorMinutes, timelineStartHour, nextHeight);
+      const newScrollTop = newTotalPos - mouseY;
+
+      container.scrollTop = newScrollTop;
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [timelineScrollRef, hourHeight, setHourHeight, timelineStartHour]);
 
   // Ghost card state for Timeline
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; minutes: number } | null>(null);
