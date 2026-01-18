@@ -125,10 +125,36 @@
     margin-bottom: 0.5rem !important;
 }
 
-/* Notion-like line height and font - ensure global override */
+/* 各段落に行単位の下線を設定 */
 .editor :global(.ProseMirror) {
     font-size: 16px;
     line-height: 1.5;
+    min-height: 200px;
+}
+
+.editor :global(.ProseMirror p),
+.editor :global(.ProseMirror ul[data-type="taskList"] li) {
+    margin: 0 !important;
+    padding-bottom: 2px !important;
+    border-bottom: 1px solid #e5e7eb;
+    line-height: 1.5;
+}
+
+/* チェックリスト内の p 要素の二重線を防止 */
+.editor :global(.ProseMirror ul[data-type="taskList"] li p) {
+    border-bottom: none !important;
+}
+
+/* タスクリストアイテムの内部 div のマージンリセット */
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div) {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Dark mode support */
+:global(.dark) .editor :global(.ProseMirror p),
+:global(.dark) .editor :global(.ProseMirror ul[data-type="taskList"] li) {
+    border-bottom-color: #374151;
 }
 
 /* Reduce HR margins */

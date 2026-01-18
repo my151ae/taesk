@@ -53,7 +53,7 @@ export default function TiptapEditor({
         content: initialContent || { type: 'doc', content: [] },
         editorProps: {
             attributes: {
-                class: 'prose prose-slate max-w-none focus:outline-none min-h-[200px] px-2 py-2',
+                class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-4 pb-4',
             },
             handlePaste: (view, event, slice) => {
                 const text = event.clipboardData?.getData('text/plain');
@@ -156,7 +156,7 @@ export default function TiptapEditor({
     }
 
     return (
-        <div className={`w-full bg-white dark:bg-gray-800 rounded-lg min-h-[200px] cursor-text ${styles.editor}`} onClick={() => editor.chain().focus().run()}>
+        <div className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`} onClick={() => editor.chain().focus().run()}>
             <EditorContent editor={editor} />
         </div>
     );
