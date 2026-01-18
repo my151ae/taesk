@@ -26,7 +26,12 @@ import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store";
+import {
+  useTimelineZoomStore,
+  MIN_HOUR_HEIGHT,
+  MAX_HOUR_HEIGHT,
+  ZOOM_STEP
+} from "@/app/(board)/_stores/timeline-zoom-store";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -537,9 +542,44 @@ export default function MobileTimelineView({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div className="flex flex-col items-center gap-0.5 text-slate-800">
-              <span>{activeDay.label}</span>
-              <span className="text-[10px] text-slate-400 normal-case tracking-normal">{activeDay.isoDate} · GMT+09</span>
+            <div className="flex items-center gap-2 text-slate-800">
+              {/* Zoom Controls (Left of date) */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    useTimelineZoomStore.getState().setHourHeight(hourHeight - ZOOM_STEP);
+                  }}
+                  disabled={hourHeight <= MIN_HOUR_HEIGHT}
+                  className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    useTimelineZoomStore.getState().setHourHeight(hourHeight + ZOOM_STEP);
+                  }}
+                  disabled={hourHeight >= MAX_HOUR_HEIGHT}
+                  className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Date Info */}
+              <div className="flex flex-col items-center gap-0">
+                <span>{activeDay.label}</span>
+                <span className="text-[10px] text-slate-400 normal-case tracking-normal">{activeDay.isoDate} · GMT+09</span>
+              </div>
             </div>
             <button
               type="button"
@@ -660,6 +700,9 @@ export default function MobileTimelineView({
             </div>
           </div>
         </div>
+
+        {/* Zoom Controls (Bottom Left) */}
+
       </div>
 
       <DragOverlay dropAnimation={null}>
