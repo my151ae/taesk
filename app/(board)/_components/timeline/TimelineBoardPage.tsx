@@ -657,6 +657,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             card={modalCard} boards={availableBoards} profiles={modalProfiles}
             onSave={handleCardModalSave} onDelete={handleCardModalDelete}
             onMoveToBoard={() => { }} onClose={closeCardModal}
+            isLoading={cardModalStatus === 'loading'}
           />
         )}
         {cardModalError && (

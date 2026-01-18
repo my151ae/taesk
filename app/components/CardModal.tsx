@@ -48,6 +48,7 @@ interface CardModalProps {
     onDelete: (id: string) => void;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
     onClose: () => void;
+    isLoading?: boolean;
 }
 
 export function CardModal({
@@ -58,6 +59,7 @@ export function CardModal({
     profiles,
     onMoveToBoard,
     onClose,
+    isLoading,
 }: CardModalProps) {
     const [content, setContent] = useState<JSONContent>(() =>
         ensureTitleBlock(normalizeContent(card.content))
@@ -203,11 +205,21 @@ export function CardModal({
             setTargetBoardId(card.board_id);
             setIsDirty(false);
         }
+    }, [card, isDirty]);
 
-        // 追加：保存後のリセット対応
-        // card prop が更新された際、ローカルの状態がサーバの状態と一致していれば Dirty を落とす
-        // このチェックは isDirty が true の時でも（保存が完了したことを検知するために）行う必要がある
+    // Added: Sync content when isLoading turns false and not dirty
+    useEffect(() => {
+        if (!isLoading && !isDirty) {
+            setContent(normalizeContent(card.content));
+        }
+    }, [isLoading, card.content, isDirty]);
+
+    // 追加：保存後のリセット対応
+    // card prop が更新された際、ローカルの状態がサーバの状態と一致していれば Dirty を落とす
+    // このチェックは isDirty が true の時でも（保存が完了したことを検知するために）行う必要がある
+    useEffect(() => {
         if (isDirty) {
+            const incomingContent = normalizeContent(card.content);
             const localSerialized = JSON.stringify(ensureTitleBlock(content));
             const incomingSerialized = JSON.stringify(incomingContent);
 
@@ -236,23 +248,7 @@ export function CardModal({
                 setIsDirty(false);
             }
         }
-
-        if (!isDirty && !localText && !incomingText && card.short_id && contentFetchRef.current !== card.short_id) {
-            contentFetchRef.current = card.short_id;
-            fetch(`/api/cards/${card.short_id}`)
-                .then((res) => res.json().catch(() => null))
-                .then((body) => {
-                    const remote = normalizeContent(body?.card?.content);
-                    const remoteText = getTiptapPlainText(remote).trim();
-                    if (!remoteText) return;
-                    setContent(remote);
-                    setIsDirty(false);
-                })
-                .catch(() => {
-                    contentFetchRef.current = null;
-                });
-        }
-    }, [card, isDirty]);
+    }, [isDirty, card, content, dueDate, dueStart, dueEnd, priority, assigneeIds, tags, dueBucket, duration]);
 
     // Escape key to close + focus trap
     useEffect(() => {
@@ -816,18 +812,29 @@ export function CardModal({
                                 <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
                                     Note
                                 </label>
-                                <div className="flex-1">
-                                    <TiptapEditor
-                                        key={card.id}
-                                        initialContent={content}
-                                        onChange={(next) => {
-                                            setContent(next);
-                                            triggerAutoSave();
-                                            if (editorError) {
-                                                setEditorError(null);
-                                            }
-                                        }}
-                                    />
+                                <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+                                    {isLoading ? (
+                                        <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                                            <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
+                                        </div>
+                                    ) : (
+                                        <TiptapEditor
+                                            key={card.id}
+                                            initialContent={content}
+                                            onChange={(val) => {
+                                                setContent(val);
+                                                triggerAutoSave();
+                                                if (editorError) {
+                                                    setEditorError(null);
+                                                }
+                                            }}
+                                            placeholder="メモを入力..."
+                                        />
+                                    )}
                                     {editorError && (
                                         <p className="mt-2 text-xs text-red-600">{editorError}</p>
                                     )}

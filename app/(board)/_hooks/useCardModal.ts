@@ -33,6 +33,9 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
     const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
     const loadComments = useCommentsStore(state => state.loadComments);
 
+    // Derived target ID to avoid multiple Effect triggers
+    const targetShortId = useMemo(() => activeCardId || cardIdFromUrl, [activeCardId, cardIdFromUrl]);
+
     const openCardModal = useCallback((shortId: string | null, debugSource?: string) => {
         if (dataMode !== 'api') return;
         if (!shortId) return;
@@ -147,14 +150,17 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         [modalCardOverride, modalCardFromData]
     );
 
-    // Load Card Data
+    // 1. Initial Data Sync: Keep local state in sync with timeline data if available
     useEffect(() => {
-        const targetShortId = activeCardId || cardIdFromUrl;
+        if (targetShortId && modalCardFromData) {
+            setModalCardOverride(modalCardFromData);
+        }
+    }, [targetShortId, modalCardFromData]);
 
+    // 2. Load Full Card Data: Fetch only when ID changes or modal opens
+    useEffect(() => {
         if (!targetShortId) {
-            if (isModalClosing) {
-                setIsModalClosing(false);
-            }
+            if (isModalClosing) setIsModalClosing(false);
             cardModalShortIdRef.current = null;
             setModalProfiles([]);
             setCardModalStatus('idle');
@@ -163,11 +169,8 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         }
 
         if (isModalClosing) {
-            if (activeCardId) {
-                setIsModalClosing(false);
-            } else {
-                return;
-            }
+            if (activeCardId) setIsModalClosing(false);
+            else return;
         }
 
         if (cardModalShortIdRef.current === targetShortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
@@ -177,30 +180,36 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
 
         let cancelled = false;
         const loadCard = async () => {
+            console.log('[useCardModal] fetching full data', targetShortId);
             setCardModalStatus('loading');
             setCardModalError(null);
-            setModalCardOverride(null);
+
             try {
                 const response = await fetch(`/api/cards/${targetShortId}`);
                 const body = await response.json().catch(() => null);
+
+                if (cancelled) {
+                    console.log('[useCardModal] fetch cancelled', targetShortId);
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error(body?.error?.message || `Failed to load card (status ${response.status})`);
                 }
-                if (cancelled) return;
+
                 const nextCard = body?.card ?? null;
                 setModalCardOverride(nextCard);
+
                 if (Array.isArray(body?.profiles) && body.profiles.length > 0) {
                     setModalProfiles(body.profiles);
                 }
+
                 if (nextCard) {
                     setCardModalStatus('ready');
-                    // Prefetch comments
                     loadComments(nextCard.id);
                 } else {
                     setCardModalError('Card not found');
-                    // Fallback: if timeline data already has the card, still show the modal
                     if (modalCardFromData) {
-                        setModalCardOverride(modalCardFromData);
                         setCardModalStatus('ready');
                     } else {
                         setCardModalStatus('error');
@@ -208,12 +217,10 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                 }
             } catch (error) {
                 if (cancelled) return;
-                console.error('[timeline] failed to load card', error);
+                console.error('[useCardModal] fetch failed', error);
                 const message = error instanceof Error ? error.message : 'Failed to load card';
                 setCardModalError(message);
-                // If we already have data in timeline state, allow opening with that as a fallback
                 if (modalCardFromData) {
-                    setModalCardOverride(modalCardFromData);
                     setCardModalStatus('ready');
                 } else {
                     setCardModalStatus('error');
@@ -226,7 +233,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         return () => {
             cancelled = true;
         };
-    }, [activeCardId, cardIdFromUrl, cardModalStatus, isModalClosing, loadComments, modalCardFromData]);
+    }, [targetShortId, isModalClosing, loadComments]);
 
     // Load Board Members
     useEffect(() => {
