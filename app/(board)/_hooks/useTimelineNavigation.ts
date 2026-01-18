@@ -16,6 +16,8 @@ interface UseTimelineNavigationProps {
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     router: AppRouterInstance;
     dayWindowStartRef: React.MutableRefObject<number>;
+    timelineStartHour?: number;
+    hourHeight?: number;
 }
 
 export function useTimelineNavigation({
@@ -29,6 +31,8 @@ export function useTimelineNavigation({
     timelineScrollRef,
     router,
     dayWindowStartRef,
+    timelineStartHour = 0,
+    hourHeight = 40,
 }: UseTimelineNavigationProps) {
 
     const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
@@ -42,8 +46,8 @@ export function useTimelineNavigation({
 
     const getCurrentTime = useCallback(() => {
         const currentScrollTop = timelineScrollRef.current?.scrollTop ?? 0;
-        return pixelsToMinutes(currentScrollTop);
-    }, [timelineScrollRef]);
+        return pixelsToMinutes(currentScrollTop, timelineStartHour, hourHeight);
+    }, [timelineScrollRef, timelineStartHour, hourHeight]);
 
     const handlePrevDay = useCallback(async () => {
         if (status === 'loading') return;

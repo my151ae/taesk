@@ -28,6 +28,7 @@ import { useTimelineUrlState } from "@/app/(board)/_hooks/useTimelineUrlState";
 import { useTimelineScrollSync } from "@/app/(board)/_hooks/useTimelineScrollSync";
 import { useTimelineData } from "@/app/(board)/_hooks/useTimelineData";
 import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store"; // [NEW]
 
 // New hooks
 import { useTimelineViewport } from "@/app/(board)/_hooks/useTimelineViewport";
@@ -59,6 +60,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   // Timeline UI specific settings from profile (fallback to 5)
   const [timelineStartHour, setTimelineStartHour] = useState(5);
+
+  const hourHeight = useTimelineZoomStore((state) => state.hourHeight); // [NEW]
 
   const searchParams = useSearchParams();
 
@@ -192,7 +195,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     timelineViewportHeight,
     liveNowMinutes,
     liveNowIsoDate,
-  } = useTimelineViewport({ timelineHeaderRef, serverNow: data?.serverNow });
+  } = useTimelineViewport({ timelineHeaderRef, serverNow: data?.serverNow, hourHeight }); // [NEW]
 
   // 5. Filtering
   const {
@@ -221,7 +224,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleDayRangeChange,
   } = useTimelineNavigation({
     data, status, dayRange, activeDayIndex, setActiveDayIndex,
-    fetchTimeline, updateUrl, timelineScrollRef, router, dayWindowStartRef
+    fetchTimeline, updateUrl, timelineScrollRef, router, dayWindowStartRef,
+    hourHeight // [NEW]
   });
 
   // 7. Calendar
@@ -309,11 +313,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     data: filteredData, setData, applyPatch, timelineScrollRef,
     abScrollContainersRef, bucketDayMap, dataMode,
     timelineStartHour,
+    hourHeight, // [NEW]
   });
 
   // 10. Scroll Sync
   const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
-  const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes, timelineStartHour) : null;
+  const indicatorTop = indicatorMinutes != null ? minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight) : null; // [NEW]
 
   const {
     debouncedHandleScroll,
@@ -328,6 +333,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     indicatorMinutes,
     updateUrl,
     timelineStartHour,
+    hourHeight, // [NEW]
   });
 
   // Fetch profile and boards

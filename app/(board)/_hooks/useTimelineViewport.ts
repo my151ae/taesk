@@ -6,15 +6,17 @@ import {
     TIMELINE_MIN_VIEWPORT,
     TIMELINE_HEADER_ESTIMATE,
     getNowMinutesJst,
-    getIsoDateJst
+    getIsoDateJst,
+    getTimelineHeight
 } from "@/app/(board)/_utils/timeline-helpers";
 
 interface UseTimelineViewportProps {
     timelineHeaderRef: RefObject<HTMLDivElement | null>;
     serverNow?: string;
+    hourHeight?: number;
 }
 
-export function useTimelineViewport({ timelineHeaderRef, serverNow }: UseTimelineViewportProps) {
+export function useTimelineViewport({ timelineHeaderRef, serverNow, hourHeight = 40 }: UseTimelineViewportProps) {
     const [viewportHeight, setViewportHeight] = useState<number | null>(null);
     const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
     const [liveNowMinutes, setLiveNowMinutes] = useState<number | null>(null);
@@ -58,10 +60,11 @@ export function useTimelineViewport({ timelineHeaderRef, serverNow }: UseTimelin
     }, [serverNow]);
 
     const timelineViewportHeight = useMemo(() => {
-        if (viewportHeight == null) return Math.max(TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
+        const totalHeight = getTimelineHeight(hourHeight);
+        if (viewportHeight == null) return Math.max(TIMELINE_MIN_VIEWPORT, totalHeight);
         const available = viewportHeight - timelineHeaderHeight;
-        return Math.max(available, TIMELINE_MIN_VIEWPORT, TIMELINE_HEIGHT);
-    }, [viewportHeight, timelineHeaderHeight]);
+        return Math.max(available, TIMELINE_MIN_VIEWPORT, totalHeight);
+    }, [viewportHeight, timelineHeaderHeight, hourHeight]);
 
     return {
         viewportHeight,

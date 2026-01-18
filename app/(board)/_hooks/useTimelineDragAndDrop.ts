@@ -103,6 +103,7 @@ type UseTimelineDragAndDropProps = {
     dataMode: 'api' | 'mock';
     editingCardId?: string | null;
     timelineStartHour?: number;
+    hourHeight?: number;
 };
 
 export function useTimelineDragAndDrop({
@@ -115,6 +116,7 @@ export function useTimelineDragAndDrop({
     dataMode,
     editingCardId,
     timelineStartHour = 0,
+    hourHeight = 40,
 }: UseTimelineDragAndDropProps) {
     const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
     const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -569,8 +571,9 @@ export function useTimelineDragAndDrop({
                 ? { top: event.over.rect.top, height: event.over.rect.height }
                 : undefined,
             startHour: timelineStartHour,
+            hourHeight,
         });
-        const fallbackPointer = currentDrag.startMinutes + (event.delta.y / HOUR_HEIGHT) * 60;
+        const fallbackPointer = currentDrag.startMinutes + (event.delta.y / hourHeight) * 60;
         let nextStart = pointerMinutes ?? fallbackPointer;
         nextStart = Math.round(nextStart / 5) * 5;
         nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
@@ -677,8 +680,9 @@ export function useTimelineDragAndDrop({
             const pointerMinutes = pointerMinutesFromEvent(event, {
                 scrollTop,
                 columnRect: over.rect ? { top: over.rect.top, height: over.rect.height } : undefined,
+                hourHeight,
             });
-            const fallbackPointer = activeDrag.startMinutes + (delta.y / HOUR_HEIGHT) * 60;
+            const fallbackPointer = activeDrag.startMinutes + (delta.y / hourHeight) * 60;
             let nextStart = pointerMinutes ?? fallbackPointer;
             nextStart = Math.round(nextStart / 5) * 5;
             nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
@@ -832,7 +836,7 @@ export function useTimelineDragAndDrop({
         e.stopPropagation();
 
         const deltaY = e.clientY - activeResize.startY;
-        const deltaMinutes = Math.round((deltaY / HOUR_HEIGHT) * 60 / 5) * 5;
+        const deltaMinutes = Math.round((deltaY / hourHeight) * 60 / 5) * 5;
 
         if (activeResize.edge === 'bottom') {
             const newDuration = Math.max(0, activeResize.originalDuration + deltaMinutes);
