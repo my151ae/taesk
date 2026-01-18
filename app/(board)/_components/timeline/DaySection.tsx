@@ -58,6 +58,7 @@ type DaySectionProps = {
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     createdCardId?: string | null;
+    hourHeight?: number;
 };
 
 export const DaySection = memo(function DaySection({
@@ -95,6 +96,7 @@ export const DaySection = memo(function DaySection({
     onCardContextMenuByKeyboard,
     contextMenuCardId,
     createdCardId,
+    hourHeight,
 }: DaySectionProps) {
     return (
         <div className="day-section grid grid-cols-2 h-full">
@@ -128,6 +130,7 @@ export const DaySection = memo(function DaySection({
                     contextMenuCardId={contextMenuCardId}
                     onUpdateCardTitle={onUpdateCardTitle}
                     createdCardId={createdCardId}
+                    hourHeight={hourHeight}
                 />
             </div>
 

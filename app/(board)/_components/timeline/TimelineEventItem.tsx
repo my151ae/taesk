@@ -32,6 +32,7 @@ type TimelineEventItemProps = {
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
     initialIsEditing?: boolean;
     onCreateNext?: () => void;
+    hourHeight?: number;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -52,6 +53,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     onUpdateCardTitle,
     initialIsEditing = false,
     onCreateNext,
+    hourHeight,
 }: TimelineEventItemProps) {
     // タイトル編集中の状態
     const [isEditingTitle, setIsEditingTitle] = useState(initialIsEditing);
@@ -68,8 +70,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
         displayEnd = minutesToTime(start + duration);
     }
 
-    const top = minuteToPixels(start, timelineStartHour);
-    const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 20);
+    const top = minuteToPixels(start, timelineStartHour, hourHeight);
+    const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 20);
 
     // 幅のパーセンテージを取得（例: "33.33%" → 33.33）
     const widthPercent = layout?.width ? parseFloat(layout.width.replace('%', '')) : 100;

@@ -7,6 +7,7 @@ import {
   HOUR_HEIGHT,
   getDisplayHours,
   TIMELINE_HEIGHT,
+  getTimelineHeight,
   calculateEventLayout,
   minuteToPixels,
   timeLabel,
@@ -25,6 +26,7 @@ import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -46,6 +48,7 @@ function MobileTimelineColumn({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  hourHeight,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -59,9 +62,9 @@ function MobileTimelineColumn({
   calendarEvents: ExternalCalendarEntry[];
   onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   timelineStartHour?: number;
-  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  hourHeight: number;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const calendarLayout = calculateEventLayout(
@@ -102,12 +105,12 @@ function MobileTimelineColumn({
 
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute inset-0" style={{ height: TIMELINE_HEIGHT }}>
+      <div className="pointer-events-none absolute inset-0" style={{ height: getTimelineHeight(hourHeight) }}>
         {getDisplayHours(timelineStartHour).map((hour, idx) => (
           <div
             key={hour}
             className="absolute left-0 right-0 border-b border-slate-200"
-            style={{ top: idx * HOUR_HEIGHT }}
+            style={{ top: idx * hourHeight }}
           >
             <span className="absolute -top-4 right-2 text-[11px] font-medium text-slate-400/70">
               {hour}
@@ -127,13 +130,13 @@ function MobileTimelineColumn({
         </div>
       )}
 
-      <div ref={setNodeRef} className="relative" style={{ height: TIMELINE_HEIGHT }}>
+      <div ref={setNodeRef} className="relative" style={{ height: getTimelineHeight(hourHeight) }}>
         {pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
           <div
             className="pointer-events-none absolute z-10 border border-dashed border-sky-400 bg-sky-50/60"
             style={{
-              top: minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
-              height: minuteToPixels(pointerPreview.startMinutes + pointerPreview.durationMinutes, timelineStartHour) - minuteToPixels(pointerPreview.startMinutes, timelineStartHour),
+              top: minuteToPixels(pointerPreview.startMinutes, timelineStartHour, hourHeight),
+              height: minuteToPixels(pointerPreview.startMinutes + pointerPreview.durationMinutes, timelineStartHour, hourHeight) - minuteToPixels(pointerPreview.startMinutes, timelineStartHour, hourHeight),
               left: "6px",
               right: "6px",
             }}
@@ -163,10 +166,10 @@ function MobileTimelineColumn({
                 }}
                 className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
                 style={{
-                  top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                  top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
                   height: Math.max(
-                    minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour) -
-                    minuteToPixels(calendarEvent.startMinutes, timelineStartHour),
+                    minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, hourHeight) -
+                    minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
                     18
                   ),
                   left: layout?.left ?? "0%",
@@ -194,8 +197,8 @@ function MobileTimelineColumn({
           const event = item.entry;
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = event.durationMinutes ?? 60;
-          const top = minuteToPixels(start, timelineStartHour);
-          const height = Math.max(minuteToPixels(start + duration, timelineStartHour) - minuteToPixels(start, timelineStartHour), 10);
+          const top = minuteToPixels(start, timelineStartHour, hourHeight);
+          const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 10);
           const layout = layoutMap[event.card_id];
 
           return (
@@ -402,6 +405,8 @@ export default function MobileTimelineView({
     onMount?.();
   }, [onMount]);
 
+  const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
+
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
   const eventsForDay = useMemo(() => {
@@ -595,10 +600,10 @@ export default function MobileTimelineView({
               onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
               className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
             >
-              <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, TIMELINE_HEIGHT) }}>
+              <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}>
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
                   {getDisplayHours(timelineStartHour).map((hour, idx) => (
-                    <div key={hour} className="flex h-10 items-start justify-end pr-2">
+                    <div key={hour} className="flex items-start justify-end pr-2" style={{ height: hourHeight }}>
                       {idx === 0 ? null : <span className="-mt-1 leading-none">{hour}</span>}
                     </div>
                   ))}
@@ -620,6 +625,7 @@ export default function MobileTimelineView({
                   onCardContextMenu={onCardContextMenu}
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
+                  hourHeight={hourHeight}
                 />
               </div>
             </div>

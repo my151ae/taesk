@@ -23,6 +23,7 @@ import {
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { TimelineCard } from "./TimelineCard";
+import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store";
 
 const ALL_DAY_ROW_HEIGHT = 36;
 
@@ -132,6 +133,9 @@ export function DesktopTimelineView({
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
+
+  // Zoom State
+  const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
 
   // Ghost card state for Timeline
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; minutes: number } | null>(null);
@@ -478,7 +482,7 @@ export function DesktopTimelineView({
               {/* 時間軸 */}
               <aside className="timeline-axis relative border-r border-slate-100 text-xs text-slate-500">
                 {getDisplayHours(timelineStartHour).map((hour) => (
-                  <div key={hour} className="flex h-10 items-start justify-end pr-3">
+                  <div key={hour} className="flex items-start justify-end pr-3" style={{ height: hourHeight }}>
                     {hour === `${timelineStartHour.toString().padStart(2, '0')}:00` ? null : (
                       <span className="-mt-1 leading-none tracking-tight text-slate-600">
                         {hour}
@@ -526,6 +530,7 @@ export function DesktopTimelineView({
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
                   createdCardId={createdCardId}
+                  hourHeight={hourHeight}
                 />
               ))}
             </div>
