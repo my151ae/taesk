@@ -398,7 +398,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return result;
   }, [filteredData?.events]);
 
-  // グローバルな矢印キーナビゲーション（上/左 = 前へ、下/右 = 次へ）
+  // グローバルな空間ナビゲーション（物理的な位置に基づいた移動）
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -411,53 +411,90 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       return;
     }
 
-    // それ以外は常にTab移動と同じ動作
-    event.preventDefault();
-    event.stopPropagation();
-
     const container = event.currentTarget;
     const active = document.activeElement as HTMLElement | null;
+    if (!active || active === document.body) return;
 
-    // フォーカス可能な要素を取得（ボタン、リンク、tabindex指定要素のみ）
+    // フォーカス可能な要素を取得
     const tabStops = Array.from(container.querySelectorAll(
       'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"]):not([disabled])'
     )).filter((el): el is HTMLElement => {
       if (!(el instanceof HTMLElement)) return false;
-
-      // より確実な可視性チェック
       const style = window.getComputedStyle(el);
-      if (style.display === 'none') return false;
-      if (style.visibility === 'hidden') return false;
-      if (style.opacity === '0') return false;
-
-      // 要素が画面上に存在するかチェック
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 && rect.height === 0) return false;
-
-      return true;
+      return style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        style.opacity !== '0' &&
+        el.getBoundingClientRect().width > 0;
     });
 
     if (!tabStops.length) return;
 
-    const currentIndex = active ? tabStops.indexOf(active) : -1;
+    // 現在の要素の矩形情報を取得
+    const activeRect = active.getBoundingClientRect();
+    const activeCenter = {
+      x: activeRect.left + activeRect.width / 2,
+      y: activeRect.top + activeRect.height / 2
+    };
 
-    // 上/左 = 前へ、下/右 = 次へ
-    const step = (event.key === 'ArrowUp' || event.key === 'ArrowLeft') ? -1 : 1;
+    let bestCandidate: HTMLElement | null = null;
+    let minScore = Infinity;
 
-    let nextIndex: number;
-    if (currentIndex < 0) {
-      nextIndex = step > 0 ? 0 : tabStops.length - 1;
-    } else {
-      nextIndex = currentIndex + step;
-      if (nextIndex < 0) nextIndex = 0;
-      if (nextIndex >= tabStops.length) nextIndex = tabStops.length - 1;
+    for (const candidate of tabStops) {
+      if (candidate === active) continue;
+
+      const rect = candidate.getBoundingClientRect();
+      const center = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+
+      const dx = center.x - activeCenter.x;
+      const dy = center.y - activeCenter.y;
+
+      // キーの方向と一致するか確認
+      let isCorrectDirection = false;
+      let primaryDist = 0;
+      let secondaryDist = 0;
+
+      switch (event.key) {
+        case 'ArrowRight':
+          isCorrectDirection = dx > 0 && Math.abs(dx) > Math.abs(dy) * 0.5;
+          primaryDist = dx;
+          secondaryDist = dy;
+          break;
+        case 'ArrowLeft':
+          isCorrectDirection = dx < 0 && Math.abs(dx) > Math.abs(dy) * 0.5;
+          primaryDist = -dx;
+          secondaryDist = dy;
+          break;
+        case 'ArrowDown':
+          isCorrectDirection = dy > 0 && Math.abs(dy) > Math.abs(dx) * 0.5;
+          primaryDist = dy;
+          secondaryDist = dx;
+          break;
+        case 'ArrowUp':
+          isCorrectDirection = dy < 0 && Math.abs(dy) > Math.abs(dx) * 0.5;
+          primaryDist = -dy;
+          secondaryDist = dx;
+          break;
+      }
+
+      if (isCorrectDirection) {
+        // スコア計算: 直進方向の距離 + 垂直方向のズレ（重み付け）
+        const score = primaryDist + (Math.abs(secondaryDist) * 2.5);
+        if (score < minScore) {
+          minScore = score;
+          bestCandidate = candidate;
+        }
+      }
     }
 
-    if (nextIndex === currentIndex) return;
-
-    const next = tabStops[nextIndex];
-    next?.focus();
-    next?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (bestCandidate) {
+      event.preventDefault();
+      event.stopPropagation();
+      bestCandidate.focus();
+      bestCandidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
   }, []);
 
   return (
