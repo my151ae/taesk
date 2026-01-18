@@ -17,7 +17,9 @@ export type ExternalCalendarEntry = {
 };
 
 // Constants
-export const HOUR_HEIGHT = 40;
+export const DEFAULT_HOUR_HEIGHT = 40;
+export const HOUR_HEIGHT = DEFAULT_HOUR_HEIGHT; // Legacy compatibility
+export const getTimelineHeight = (hourHeight: number = DEFAULT_HOUR_HEIGHT) => hourHeight * 24;
 
 export const getDisplayHours = (startHour: number = 5) => {
     return Array.from({ length: 24 }, (_, i) => {
@@ -56,7 +58,7 @@ export const buildAbMeta = (day: TimelineDay) => ({
 
 
 // Helper functions
-export const minuteToPixels = (minutes: number, startHour: number = 5) => {
+export const minuteToPixels = (minutes: number, startHour: number = 5, hourHeight: number = DEFAULT_HOUR_HEIGHT) => {
     const startMinutes = startHour * 60;
     // Adjust minutes to be relative to startHour
     // If minutes < startMinutes, it means it's "next morning" (visually at bottom)
@@ -75,12 +77,12 @@ export const minuteToPixels = (minutes: number, startHour: number = 5) => {
         effectiveMinutes += 24 * 60;
     }
 
-    return ((effectiveMinutes - startMinutes) / 60) * HOUR_HEIGHT;
+    return ((effectiveMinutes - startMinutes) / 60) * hourHeight;
 };
 
-export const pixelsToMinutes = (pixels: number, startHour: number = 0): number => {
+export const pixelsToMinutes = (pixels: number, startHour: number = 0, hourHeight: number = DEFAULT_HOUR_HEIGHT): number => {
     // Reverse of minuteToPixels
-    const relativeMinutes = (pixels / HOUR_HEIGHT) * 60;
+    const relativeMinutes = (pixels / hourHeight) * 60;
     const startMinutes = startHour * 60;
 
     let totalMinutes = relativeMinutes + startMinutes;
@@ -179,11 +181,13 @@ export const pointerMinutesFromEvent = (
         scrollTop?: number;
         columnRect?: { top: number; height: number };
         startHour?: number;
+        hourHeight?: number;
     }
 ): number | null => {
     const scrollTop = options?.scrollTop ?? 0;
     const columnRect = options?.columnRect;
     const startHour = options?.startHour ?? 5;
+    const hourHeight = options?.hourHeight ?? DEFAULT_HOUR_HEIGHT;
     const translated = event.active.rect.current?.translated;
     const sourceInitial = event.active.rect.current?.initial;
     const elementTop = translated?.top ?? (sourceInitial ? sourceInitial.top + event.delta.y : null);
@@ -196,11 +200,11 @@ export const pointerMinutesFromEvent = (
         relativeY = elementTop - AXIS_WIDTH + scrollTop;
     }
 
-    const maxHeight = columnRect?.height ?? TIMELINE_HEIGHT;
+    const maxHeight = columnRect?.height ?? getTimelineHeight(hourHeight);
     const clampedY = Math.max(0, Math.min(relativeY, maxHeight));
 
     // Use pixelsToMinutes which already handles startHour
-    const minutes = pixelsToMinutes(clampedY, startHour);
+    const minutes = pixelsToMinutes(clampedY, startHour, hourHeight);
     // Snap to 15m intervals
     const snapped = Math.round(minutes / 5) * 5;
     return Math.max(0, Math.min(23 * 60 + 45, snapped));
