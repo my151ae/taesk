@@ -109,7 +109,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     duration={undefined}
                     timeText={detailedTimeLabel(displayStart, displayEnd, duration)}
                     rightMeta={undefined}
-                    timePlacement={isSmall ? 'out-top' : 'top'}
+                    timePlacement="out-top"
                     onOpen={() => {
                         openCardModal(event.short_id, 'timeline');
                     }}

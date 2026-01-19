@@ -233,9 +233,9 @@ function MobileTimelineColumn({
                   duration={undefined}
                   timeText={detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)}
                   rightMeta={undefined}
-                  timePlacement={(event.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
+                  timePlacement="out-top"
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
-                  className={`w-full h-full ${(event.durationMinutes ?? 60) < 55 ? "pt-0" : "pt-4"}`}
+                  className="w-full h-full pt-0"
                   tabIndex={0}
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                   focusGroup="timeline"

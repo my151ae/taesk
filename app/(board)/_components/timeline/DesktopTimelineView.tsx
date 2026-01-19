@@ -611,7 +611,7 @@ export function DesktopTimelineView({
               checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? false}
               onToggleCheck={() => { }}
               onOpen={() => { }}
-              timePlacement={overlayTimelineEvent && (overlayTimelineEvent.durationMinutes ?? 60) < 55 ? "out-top" : "top"}
+              timePlacement="out-top"
               className="w-full h-full border-none shadow-none"
               paddingClass="py-2"
               alignTop
