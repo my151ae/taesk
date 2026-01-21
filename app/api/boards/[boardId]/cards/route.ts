@@ -150,7 +150,7 @@ export async function POST(
 
     const normalizedContent =
       parsed.data.content
-        ? ensureTitleBlock(normalizeContent(parsed.data.content))
+        ? normalizeContent(parsed.data.content)
         : buildContentFromTitle(parsed.data.title);
     const normalizedExcerpt =
       typeof parsed.data.excerpt === 'string'

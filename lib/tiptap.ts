@@ -55,15 +55,7 @@ export const getTiptapPlainText = (content: JSONContent): string => {
 };
 
 export const deriveTitleFromContent = (content: JSONContent): string => {
-    if (!content.content || content.content.length === 0) return "";
-
-    // Pick the first block's text, regardless of type
-    const firstBlock = content.content[0];
-    if (firstBlock) {
-        const text = getTiptapPlainText({ content: [firstBlock] });
-        return clampText(text, MAX_TITLE_LENGTH);
-    }
-
+    // Logic removed: title is now stored separately
     return "";
 };
 
@@ -71,29 +63,26 @@ export const deriveExcerptFromContent = (
     content: JSONContent,
     maxLength = DEFAULT_EXCERPT_LENGTH
 ): string => {
+    // Logic updated: consider all content (do not skip first block)
     if (!content.content || content.content.length === 0) return "";
 
-    // Skip the first node (assumed title) if there are multiple nodes
-    const nodesToConsider = content.content.length > 1 ? content.content.slice(1) : [];
-    if (nodesToConsider.length === 0) return "";
-
-    const text = getTiptapPlainText({ content: nodesToConsider });
+    const text = getTiptapPlainText(content);
     return clampText(text, maxLength);
 };
 
 export const ensureTitleBlock = (content: JSONContent): JSONContent => {
-    // Logic removed: do not enforce H1
+    // Logic removed: do not enforce H1 or first block as title
     return content;
 };
 
-export const buildContentFromTitle = (title: string): JSONContent => {
-    const normalized = title.replace(/\s+/g, " ").trim();
+export const buildContentFromTitle = (_title: string): JSONContent => {
+    // Logic changed: do not put title in content
     return {
         type: 'doc',
         content: [
             {
                 type: 'paragraph',
-                content: normalized ? [{ type: 'text', text: clampText(normalized, MAX_TITLE_LENGTH) }] : []
+                content: []
             }
         ]
     };

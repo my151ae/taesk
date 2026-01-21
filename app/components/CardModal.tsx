@@ -62,8 +62,9 @@ export function CardModal({
     isLoading,
 }: CardModalProps) {
     const [content, setContent] = useState<JSONContent>(() =>
-        ensureTitleBlock(normalizeContent(card.content))
+        normalizeContent(card.content)
     );
+    const [title, setTitle] = useState(card.title || "");
     const [tags, setTags] = useState<string[]>(card.tags || []);
     const [tagInput, setTagInput] = useState('');
     const [dueDate, setDueDate] = useState(card.due_date || '');
@@ -141,11 +142,7 @@ export function CardModal({
         return profiles.filter((profile) => assigneeIds.includes(profile.id));
     }, [profiles, assigneeIds]);
 
-    const titlePreview = useMemo(() => {
-        const normalized = ensureTitleBlock(content);
-        const title = deriveTitleFromContent(normalized);
-        return title || card.title || "";
-    }, [content, card.title]);
+    const titlePreview = title || card.title || "";
 
     // onClose ref を最新に保つ
     useEffect(() => {
@@ -164,6 +161,7 @@ export function CardModal({
         if (card.id !== cardIdRef.current) {
             cardIdRef.current = card.id;
             setContent(incomingContent);
+            setTitle(card.title || "");
             setTags(card.tags || []);
             setDueDate(card.due_date || '');
             setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -187,6 +185,7 @@ export function CardModal({
         } else if (!isDirty || shouldForceSync) {
             // 同じカードで編集していない場合のみ、外部の変更を反映
             setContent(incomingContent);
+            if (!isDirty) setTitle(card.title || "");
             setTags(card.tags || []);
             setDueDate(card.due_date || '');
             setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
@@ -242,13 +241,16 @@ export function CardModal({
 
             const bucketMatch = (card.due_bucket ?? null) === (dueBucket ?? null);
             const durationMatch = (card.duration ?? 60) === duration;
+            const titleMatch = (card.title || "") === title;
+
             if (localSerialized === incomingSerialized &&
+                titleMatch &&
                 dateMatch && startMatch && endMatch &&
                 priorityMatch && tagsMatch && bucketMatch && assigneesMatch && durationMatch) {
                 setIsDirty(false);
             }
         }
-    }, [isDirty, card, content, dueDate, dueStart, dueEnd, priority, assigneeIds, tags, dueBucket, duration]);
+    }, [isDirty, card, content, title, dueDate, dueStart, dueEnd, priority, assigneeIds, tags, dueBucket, duration]);
 
     // Escape key to close + focus trap
     useEffect(() => {
@@ -351,11 +353,10 @@ export function CardModal({
         const normalizedBucketPosition: number | null =
             normalizedBucket != null ? dueBucketPosition ?? null : null;
 
-        const normalizedContent = ensureTitleBlock(content);
-        // Use deriveTitleFromContent instead of deriveTitleFromDocument
-        const nextTitle = deriveTitleFromContent(normalizedContent);
-        // Title can be empty now
-        // if (!nextTitle) { ... } check removed
+        const normalizedContent = content; // ensureTitleBlock removed
+        // Use title state directly
+        const nextTitle = title.trim();
+        // Title can be empty
         const nextExcerpt = deriveExcerptFromContent(normalizedContent);
 
         if (!isAutoSave) {
@@ -386,6 +387,7 @@ export function CardModal({
         card.id,
         card.board_id,
         content,
+        title,
         tags,
         dueDate,
         dueStart,
@@ -775,6 +777,10 @@ export function CardModal({
             >
                 <CardModalHeader
                     titlePreview={titlePreview}
+                    onTitleChange={(val) => {
+                        setTitle(val);
+                        triggerAutoSave();
+                    }}
                     dueDate={dueDate}
                     dueStart={dueStart}
                     dueEnd={dueEnd}
