@@ -765,10 +765,12 @@ function MobileBucketCard({
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
           duration={undefined}
-          timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+          timeText={null}
           rightMeta={item.duration != null ? formatDuration(item.duration) : null}
+          note={item.excerpt ?? undefined}
+          noteClampClass="line-clamp-2"
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
-          timePlacement="out-top"
+          timePlacement="inline"
           alignTop
           paddingClass="py-1"
           className="w-full min-h-0"
