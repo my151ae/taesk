@@ -73,11 +73,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     const top = minuteToPixels(start, timelineStartHour, hourHeight);
     const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 20);
 
-    // 幅のパーセンテージを取得（例: "33.33%" → 33.33）
-    const widthPercent = layout?.width ? parseFloat(layout.width.replace('%', '')) : 100;
-    const isNarrow = widthPercent <= 40; // 40%以下は時間を外に出す
-    const isSmall = duration < 55 || isNarrow;
-
     const handleTitleChange = useCallback((newTitle: string, previousTitle: string) => {
         onUpdateCardTitle?.(event.card_id, newTitle, previousTitle);
     }, [event.card_id, onUpdateCardTitle]);
@@ -106,7 +101,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    duration={undefined}
                     timeText={detailedTimeLabel(displayStart, displayEnd, duration)}
                     rightMeta={undefined}
                     timePlacement="out-top"

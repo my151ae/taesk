@@ -99,9 +99,9 @@ export const DaySection = memo(function DaySection({
     hourHeight,
 }: DaySectionProps) {
     return (
-        <div className="day-section grid grid-cols-2 h-full">
+        <div className="day-section grid grid-cols-2 h-full min-w-0">
             {/* Timeline部分（左半分） */}
-            <div className="timeline-col h-full overflow-hidden">
+            <div className="timeline-col h-full min-w-0 overflow-hidden">
                 <TimelineColumn
                     day={day}
                     events={events}
@@ -135,9 +135,9 @@ export const DaySection = memo(function DaySection({
             </div>
 
             {/* A/Bリスト部分（右半分、sticky配置） */}
-            <div className="ab-col relative border-l border-slate-100">
+            <div className="ab-col relative min-w-0 border-l border-slate-100">
                 <div
-                    className="sticky z-20 w-full"
+                    className="sticky z-20 w-full min-w-0"
                     style={{ top: 0 }}
                 >
                     <TimelineDayBucket

@@ -49,16 +49,6 @@ export function useTimelineCardActions({
     const saveRequestIdRef = useRef(0);
     const [googleToast, setGoogleToast] = useState<string | null>(null);
 
-    // ... (rest of code) ...
-
-    // Inside handleBucketClick (around line 314 in original)
-    // I need to be careful with replace_file_content scope.
-    // I will use multiple ReplaceChunks or just target the function part if I can encompass it.
-    // The previous view_file was lines 1-434.
-    // I will replace the Props definition and destructuring first.
-    // Then handleBucketClick.
-
-
     const syncCardNowWithToast = useCallback(async (card: Card | null) => {
         if (!card?.due_date || !card?.due_start || !card?.due_end) return;
         try {

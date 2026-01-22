@@ -211,7 +211,6 @@ export function DesktopTimelineView({
     return () => observer.disconnect();
   }, [timelineScrollRef]);
 
-  // Placeholder, I will view file first
   // Build overlay card data for DragOverlay
   const activeDragCardId = activeDrag?.cardId ?? null;
   const overlayBucketEntry = useMemo(() => {
@@ -234,6 +233,7 @@ export function DesktopTimelineView({
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 60)}`,
+        note: overlayTimelineEvent.excerpt ?? null,
       };
     }
     if (overlayBucketCard) {
@@ -243,6 +243,7 @@ export function DesktopTimelineView({
         timeText: overlayBucketCard.duration
           ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
           : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
+        note: overlayBucketCard.excerpt ?? null,
       };
     }
     return null;
@@ -529,6 +530,7 @@ export function DesktopTimelineView({
             {/* 日単位でDOMを組み替え */}
             <div
               className="grid timeline-container"
+              data-testid="timeline-grid"
               style={{ gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
             >
               {/* 時間軸 */}
@@ -607,6 +609,8 @@ export function DesktopTimelineView({
               timeText={overlayTimelineEvent
                 ? timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)
                 : overlayCardData.timeText}
+              note={overlayCardData.note ?? undefined}
+              noteClampClass="line-clamp-2"
               rightMeta={overlayTimelineEvent ? formatDuration(overlayTimelineEvent.durationMinutes ?? 60) : undefined}
               checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? false}
               onToggleCheck={() => { }}
@@ -614,7 +618,6 @@ export function DesktopTimelineView({
               timePlacement="out-top"
               className="w-full h-full border-none shadow-none"
               paddingClass="py-2"
-              alignTop
             />
           </div>
         ) : null}

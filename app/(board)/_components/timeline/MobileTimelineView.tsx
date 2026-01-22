@@ -136,7 +136,13 @@ function MobileTimelineColumn({
         </div>
       )}
 
-      <div ref={setNodeRef} className="relative" style={{ height: getTimelineHeight(hourHeight) }}>
+      <div
+        ref={setNodeRef}
+        className="relative"
+        data-dnd="timeline-column"
+        data-day-iso={day.isoDate}
+        style={{ height: getTimelineHeight(hourHeight) }}
+      >
         {pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
           <div
             className="pointer-events-none absolute z-10 border border-dashed border-sky-400 bg-sky-50/60"
@@ -230,7 +236,6 @@ function MobileTimelineColumn({
                   checked={event.checked}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
-                  duration={undefined}
                   timeText={detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)}
                   rightMeta={undefined}
                   timePlacement="out-top"
@@ -282,6 +287,8 @@ function MobileAbBucket({
     <div
       ref={setBucketRef}
       className={`border border-slate-200 bg-slate-50/70 shadow-inner ${isOver ? "ring-1 ring-sky-200 bg-slate-50" : ""}`}
+      data-dnd="ab-bucket"
+      data-bucket-key={bucketKey}
     >
       <div className="border-b border-slate-200 px-3 py-1.5">
         <div className="flex items-center justify-between">
@@ -484,6 +491,7 @@ export default function MobileTimelineView({
         title: overlayTimelineEvent.title || "",
         badge: overlayTimelineEvent.due_bucket ?? "a",
         timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 0)}`,
+        note: overlayTimelineEvent.excerpt ?? null,
       };
     }
     if (overlayBucketCard) {
@@ -493,6 +501,7 @@ export default function MobileTimelineView({
         timeText: overlayBucketCard.duration != null
           ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
           : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
+        note: overlayBucketCard.excerpt ?? null,
       };
     }
     return null;
@@ -641,7 +650,11 @@ export default function MobileTimelineView({
               onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
               className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
             >
-              <div className="relative grid h-full grid-cols-[60px_1fr]" style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}>
+              <div
+                className="relative grid h-full grid-cols-[60px_1fr]"
+                data-testid="timeline-grid"
+                style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}
+              >
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
                   {getDisplayHours(timelineStartHour).map((hour, idx) => (
                     <div key={hour} className="flex items-start justify-end pr-2" style={{ height: hourHeight }}>
@@ -675,7 +688,7 @@ export default function MobileTimelineView({
               ref={(el) => registerAbScrollContainer?.(activeDay.isoDate, el)}
               data-ab-scroll-container="true"
               data-ab-day={activeDay.isoDate}
-              className="min-w-0 overflow-y-auto border-l border-slate-100 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+              className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
             >
               <div className="space-y-3 px-3 pb-4">
                 {abMeta?.sections.map((section) => {
@@ -711,6 +724,7 @@ export default function MobileTimelineView({
             title={overlayCardData.title}
             badge={overlayCardData.badge}
             timeText={overlayCardData.timeText}
+            note={overlayCardData.note ?? undefined}
           />
         ) : null}
       </DragOverlay>
@@ -764,14 +778,12 @@ function MobileBucketCard({
           checked={item.checked}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-          duration={undefined}
           timeText={null}
           rightMeta={item.duration != null ? formatDuration(item.duration) : null}
           note={item.excerpt ?? undefined}
           noteClampClass="line-clamp-2"
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="inline"
-          alignTop
           paddingClass="py-1"
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
@@ -802,10 +814,12 @@ function MobileDragOverlayCard({
   title,
   badge,
   timeText,
+  note,
 }: {
   title: string;
   badge: string;
   timeText: string | null;
+  note?: string;
 }) {
   return (
     <div className="pointer-events-none w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -817,6 +831,11 @@ function MobileDragOverlayCard({
           {title || "Untitled card"}
         </div>
       </div>
+      {note ? (
+        <div className="mt-1 text-[10px] text-slate-600 leading-tight line-clamp-2 whitespace-pre-wrap break-words">
+          {note}
+        </div>
+      ) : null}
       {timeText ? <div className="mt-1 text-[11px] text-slate-600">{timeText}</div> : null}
     </div>
   );

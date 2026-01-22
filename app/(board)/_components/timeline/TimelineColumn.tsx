@@ -59,7 +59,12 @@ type TimelineColumnProps = {
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
     const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: 'timeline-column', day } });
     return (
-        <div ref={setNodeRef} className="relative h-full">
+        <div
+            ref={setNodeRef}
+            className="relative h-full"
+            data-dnd="timeline-column"
+            data-day-iso={day.isoDate}
+        >
             {children}
         </div>
     );

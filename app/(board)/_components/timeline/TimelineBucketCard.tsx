@@ -61,7 +61,7 @@ export const TimelineBucketCard = ({
             // 編集中またはコンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen || isEditingTitle}
         >
-            <div className="relative" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
+            <div className="relative min-w-0" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}
@@ -85,12 +85,10 @@ export const TimelineBucketCard = ({
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                    duration={undefined}
                     timePlacement="inline"
                     note={item.excerpt ?? undefined}
                     noteClampClass={NOTE_CLAMP_CLASS}
                     rightMeta={item.duration != null ? formatDuration(item.duration) : null}
-                    alignTop
                     onOpen={() => {
                         if (!isEditingTitle) {
                             openCardModal(item.short_id);

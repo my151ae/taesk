@@ -20,7 +20,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 │  • Today/Tomorrow timeline grid (24h)                            │
 │  • A/B lists (today_a/b, tomorrow_a/b)                           │
 │  • CardModal / CommentsPanel (parallel routes + Zustand)         │
-│  Hooks: useRealtimeBoard, useSyncQueue, useBoardFilters          │
+│  Hooks: useTimelineData, useTimelineFiltering, useTimelineDragAndDrop │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ TimelineResponse (days/events/ab)
 ┌───────────────────────────────▼──────────────────────────────────┐
@@ -62,25 +62,27 @@ app/layout.tsx
                 ├── Header
                 │   ├── Board picker (fetch `/api/boards`)
                 │   ├── ShareDialog / NotificationSettings / ProfileSettings
-                │   ├── Filters/SearchBar (useBoardFilters)
-                │   └── Status indicators (online/offline, realtime, syncQueue stats)
-                ├── TimelineGrid (Today/Tomorrow)
-                │   ├── Hour scale (24h × 40px)
-                │   ├── Live indicator (JST)
-                │   └── timeline-event components (`data-testid="timeline-event"`)
-                ├── ABLists
-                │   ├── Sections: today_a/b + tomorrow_a/b
-                │   └── Drop targets for Drag & Drop
+                │   ├── Filters/SearchBar (useTimelineFiltering)
+                │   └── Status indicators (realtimeStatus)
+                ├── DesktopTimelineView / MobileTimelineView
+                │   ├── DaySection (per day)
+                │   │   ├── TimelineColumn (hour axis + events)
+                │   │   └── TimelineDayBucket (A/B lists)
+                │   └── DragOverlay + PointerPreview
                 ├── CardModal (useSearchParams + @modal route)
                 └── CommentsPanel (Zustand store, `useCommentsStore`)
 ```
 
 `TimelineBoardPage` は巨大なクライアントコンポーネントだが、責務ごとに以下のフックへ委譲している:
 
-- `useBoardFilters` … 検索文字列 / タグ / 優先度 / ソートモード / フィルターパネル表示状態
-- `useRealtimeBoard(boardId, { onCardChange, upsertComment, removeComment })` … Supabase Realtime の購読
-- `useSyncQueue()` … オフラインキュー状態（処理中アクション件数、最終成功時刻、オンライン可否）
-- `useCommentsStore()` … コメント optimistic update と localStorage キュー (`comment-queue`)
+- `useTimelineUrlState` … URL 由来の表示範囲/日付の同期
+- `useTimelineData` … Timeline API 取得・Realtime 反映・オンライン状態（内部で `useRealtimeBoard` / `useSyncQueue`）
+- `useTimelineViewport` … ヘッダー高さ/表示領域/現在時刻の算出
+- `useTimelineFiltering` … 検索・タグ・優先度のフィルタ（内部で `useBoardFilters`）
+- `useTimelineNavigation` … 日付移動/範囲変更の制御
+- `useTimelineCalendar` … 外部カレンダーの取得と表示
+- `useTimelineDragAndDrop` … DnD/リサイズ/プレビュー状態
+- `useTimelineCardActions` … CardModal 保存や新規作成の処理
 
 ## Data Flow
 
@@ -95,12 +97,12 @@ app/layout.tsx
 
 4. **User interaction**  
    - Timeline での DnD → `handleDragStart` / `handleDragMove` / `handleDragEnd`  
-     `handleDragEnd` は `activeDrag` 情報をもとに `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換え、`syncQueue.enqueue` で API 更新。失敗時はロールバック。
+     `handleDragEnd` は `activeDrag` 情報をもとに `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換える。確定後は `applyPatch` で `PATCH /api/boards/:id/cards/:id` を実行し、失敗時はロールバック。
    - CardModal での編集 → `PATCH /api/cards/:id` を呼び、成功レスポンスをローカル状態へ反映（タイトル/タグ/期日/`assignee_ids` 等）。リアルタイム通知とも整合するため再フェッチは原則不要。
-   - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、`syncQueue` を通じて API へ送信。エラー時はローカルキューへ残存。
+   - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、`comment-queue` に保持した上で API へ送信。エラー時はローカルキューへ残存。
 
 5. **Offline / retry**  
-   `useSyncQueue` が localStorage (`taesk-sync-queue`) にアクションを保存。オンライン復帰時は順番に API を叩き、成功したらキューから削除。UI には `syncQueueStats.pendingActions` や `isOnline` が表示される。
+   `useSyncQueue` は localStorage (`taesk-sync-queue`) を監視し、オンライン状態や未同期数を提供。Timeline は直接 `PATCH` を行うため、失敗時はロールバックとエラー表示で対応する。
 
 6. **Metrics**  
    `createClientTrace('timeline')` が `traceRef` に格納され、ページロードや DnD 操作ごとに `traceRef.current?.addEvent('drag_end', payload)` のように記録。アンマウント時に `traceRef.current?.flush()` が呼ばれ、`test-results/batches/*` に含まれる `dumpClientMetrics` で取得可能。
@@ -117,9 +119,9 @@ app/layout.tsx
 - `taesk-sync-queue` を localStorage に保持。アクション単位で `enqueue` し、成功/失敗を `stats` に反映。
 - Timeline DnD、CardModal 保存、コメント投稿など全てのミューテーションがここを通過するため、board state を直接書き換える場面でも API 反映との整合が保たれる。
 
-### useBoardFilters
-- `searchQuery`, `selectedTags`, `selectedPriority`, `sortBy`, `showFilters` を管理し、`filterAndSortCards` で Timeline events と A/B リストを共通ロジックで絞り込み。
-- クライアントのみで完結するため、Filters UI から 1ms オーダーでレスポンスが返る。
+### useTimelineFiltering
+- `searchQuery`, `selectedTags`, `selectedPriority`, `sortBy`, `showFilters` を管理し、`events` と `abBuckets` を同時にフィルタする。
+- 内部で `useBoardFilters` を利用し、`availableTags` / `hasActiveFilters` などの補助情報も返す。
 
 ### useCommentsStore
 - コメントとそのローカルキュー (`comment-queue`) を Zustand で管理。
@@ -173,7 +175,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  participant UI as TimelineGrid
+  participant UI as TimelineView
   participant DnD as useTimelineDragAndDrop
   participant State as Timeline state
   participant Sync as useSyncQueue
@@ -194,7 +196,7 @@ sequenceDiagram
 sequenceDiagram
   participant RT as Supabase Realtime
   participant State as Timeline state
-  participant UI as TimelineGrid/CardModal
+  participant UI as TimelineView/CardModal
 
   RT-->>State: onCardChange(payload)
   State-->>UI: setData (events/abBuckets with assignee_ids)

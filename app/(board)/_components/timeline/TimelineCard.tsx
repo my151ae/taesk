@@ -7,11 +7,9 @@ type TimelineCardProps = {
     checked: boolean;
     onToggleCheck: (checked: boolean) => void;
     badgeLabel?: string | null;
-    duration?: number | null;
     timeText?: ReactNode;
     rightMeta?: ReactNode;
     timePlacement?: 'top' | 'inline' | 'out-top';
-    alignTop?: boolean;
     paddingClass?: string;
     onOpen: () => void;
     className?: string;
@@ -44,11 +42,9 @@ export function TimelineCard({
     checked,
     onToggleCheck,
     badgeLabel,
-    duration,
     timeText,
     rightMeta,
     timePlacement = 'top',
-    alignTop = false,
     paddingClass = 'py-3',
     onOpen,
     className,

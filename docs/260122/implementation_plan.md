@@ -7,7 +7,7 @@
 
 ## 方針サマリ
 - **overflow-hidden は内側だけ**: rootではなく「本文ラッパー」に付与し、`out-top` の時刻を保護する。`min-h-0` も同じ箇所に付与。
-- **本文は line-clamp 前提（Plan A）**: 既存 `excerpt` は改行を潰して1本化しているため、行ベース truncate はせず `line-clamp` で高さ制御する。
+- **本文は multi-line + clamp 併用**: `note` は改行やチェックリストを保持して表示し、A/B は `line-clamp-2` で行数制御。Timeline は clamp を付けずカード高さでクリップする。
 - **A/B は独立スクロールにする**: 外枠ではスクロールさせず、A枠・B枠それぞれのリストを `overflow-y-auto` に。これでカードは内容に応じて可変高にでき、スクロールは各枠で吸収。
 
 ---
@@ -22,7 +22,7 @@
 - **本文表示**: タイトル直下に `note` を追加。共通クラス:
   - `text-[10px] text-slate-600 leading-tight`
   - Tailwind `line-clamp-X` を受け取れるよう `noteClampClass` (デフォルトなし) を props で渡せるようにする。
-  - `whitespace-normal break-words` にして折り返し許容、`line-clamp` で行数制御。
+  - `whitespace-pre-wrap break-words` で改行を保持。チェックリスト行は簡易チェックボックスを描画。
 - **タイトル**: 既存 `truncate` 維持。
 
 ### 2) A/B レイアウト分離 (`TimelineDayBucket`)
@@ -67,4 +67,4 @@
 ---
 
 ## 任意の追加検討（実装しないがメモ）
-- `excerpt` を改行保持で生成し直す案（行単位 truncate を復活させたい場合）。
+- `excerpt` 生成の見直し（行単位 truncate を復活させたい場合は `note` 表示仕様とセットで再設計）。

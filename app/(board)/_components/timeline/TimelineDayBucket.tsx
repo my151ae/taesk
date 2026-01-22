@@ -31,7 +31,12 @@ const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver:
     const { setNodeRef, isOver } = useDroppable({ id: `bucket-drop:${bucketKey}`, data: { type: 'ab-bucket', bucketKey } });
     const highlight = !disabled && isOver ? 'bg-slate-100/50' : '';
     return (
-        <div ref={setNodeRef} className={highlight}>
+        <div
+            ref={setNodeRef}
+            className={highlight}
+            data-dnd="ab-bucket"
+            data-bucket-key={bucketKey}
+        >
             {children(isOver)}
         </div>
     );
@@ -71,7 +76,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     return (
                         <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                             {(isOver) => (
-                                <div className="border border-slate-100 bg-slate-50/70 py-2 shadow-inner flex flex-col min-h-0 flex-1">
+                                <div className="border border-slate-100 bg-slate-50/70 py-2 shadow-inner flex flex-col min-h-0 flex-1 min-w-0">
                                     <div className="flex items-center justify-between px-3">
                                         <p className="text-[10px] font-semibold text-slate-600">{section.label}</p>
                                         <button
@@ -91,7 +96,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     <div
                                         ref={(el) => registerScrollContainer?.(day.isoDate, el, isA ? 'a' : 'b')}
                                         data-ab-scroll-container="true"
-                                        className="mt-2 flex-1 min-h-0 space-y-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                                        className="mt-2 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
                                     >
                                         {items.length === 0 && isOver && (
                                             <div className="mb-2 h-0.5 bg-sky-500" />

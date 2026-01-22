@@ -13,8 +13,8 @@ Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中
   - `liveNowMinutes`, `liveNowIsoDate`: JST に変換した現在時刻
   - `availableBoards`: ボード切り替え用リスト
   - `modalCard`, `cardModalStatus`, `modalProfiles`: CardModal のロード状態
-  - `searchQuery`, `selectedTags`, `selectedPriority`, `sortBy`, `showFilters`: `useBoardFilters` で管理
-  - `syncQueueStats`, `isOnline`: `useSyncQueue` から取得
+  - `searchQuery`, `selectedTags`, `selectedPriority`, `sortBy`, `showFilters`, `filteredData`, `hasActiveFilters`, `availableTags`: `useTimelineFiltering`（内部で `useBoardFilters`）で管理
+  - `realtimeStatus`: `useTimelineData` 経由で `useRealtimeBoard` が提供
 
 ### 描画構造（抜粋）
 
@@ -22,22 +22,19 @@ Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中
 TimelineBoardPage
 ├── Header
 │   ├── Board Menu (board picker + Sign out)
-│   ├── SearchBar + Filter toggles (useBoardFilters)
-│   ├── Metrics: realtimeStatus, isOnline, syncQueueStats
+│   ├── SearchBar + Filter toggles (useTimelineFiltering)
+│   ├── Metrics: realtimeStatus
 │   ├── Actions
 │   │   ├── ShareDialog
 │   │   ├── NotificationsBell
 │   │   ├── NotificationSettings
 │   │   └── ProfileSettings
 │   └── Timeline meta (Live badge, date range, JST clock)
-├── TimelineGrid (Today/Tomorrow columns)
-│   ├── HourScale (24 rows)
-│   ├── NowIndicator (based on `serverNow`)
-│   └── TimelineEvent blocks (`data-testid="timeline-event"`)
-├── ABLists
-│   ├── A/B Today (today_a / today_b)
-│   └── A/B Tomorrow (tomorrow_a / tomorrow_b)
-├── DragOverlay + PointerPreview
+├── DesktopTimelineView / MobileTimelineView
+│   ├── DaySection (1日分)
+│   │   ├── TimelineColumn (hour axis + events)
+│   │   └── TimelineDayBucket (A/B lists)
+│   └── DragOverlay + PointerPreview
 ├── CardModal + CommentsPanel (parallel route)
 └── Toasts / inline errors
 ```
@@ -45,24 +42,24 @@ TimelineBoardPage
 ### Header
 
 - ボード選択: `/api/boards` から取得したリストをフライアウトとして表示。`signOut` ボタンも同じメニュー内に配置。
-- フィルター: `useBoardFilters` の状態を双方向バインドし、タグ・優先度・ソート順を切り替えると `filterAndSortCards` で Timeline / A/B のレンダリング内容が更新される。
+- フィルター: `useTimelineFiltering` の状態を双方向バインドし、タグ・優先度・ソート順を切り替えると Timeline / A/B のレンダリング内容が更新される。
 - 通知関連: `NotificationsBell` と `NotificationSettings` は `app/(board)/_components/` 配下の共通コンポーネントをそのまま利用。Timeline ヘッダー内にモーダルを開く導線を提供する。
-- Sync インジケーター: `useSyncQueue` の `isOnline`, `syncQueueStats.pendingActions`, `syncQueueStats.lastSuccessAt` を小さなバッジで表示。
+- Sync インジケーター: 現状は `realtimeStatus` のみを表示。
 
-### TimelineGrid
+### Timeline (DaySection + TimelineColumn)
 
-- `TIMELINE_HEIGHT = 24 * 40px` で 1 日分のキャンバスを描画。
-- `minutes -> px` 変換は `minuteToPixels` と `getMinutesFromTime` で計算。
+- `getDisplayHours` と `minuteToPixels` で 1 日分のキャンバスを描画。
+- `data-testid="timeline-grid"` はスクロール領域のコンテナに付与し、E2E の安定待機に利用。
 - `Live` ラインは `serverNow` を JST へ変換 (`getIsoDateJst`, `getNowMinutesJst`) し、Today カラム内で赤い水平線として描画。
 - イベント要素 (`timeline-event`) のスタイル:
-  - 高さ: `durationMinutes` の長さに応じて `max(end-start, 30)` で確保
+  - 高さ: `durationMinutes` の長さに応じて最低値を確保（デスクトップは 20px 以上、モバイルは 10px 以上）
   - ラベル: タイトル、タグ、優先度、チェック状態
   - クリックで CardModal を開く（`handleOpenCardModal`）
 
 ### A/B Lists
 
 - `AB_CARD_META` により Today/Tomorrow の 2 グループを定義し、各グループに `sections` (A/B) を持たせている。
-- `abBuckets` の配列を `filterAndSortCards` に通し、タグ/優先度検索に合わせて表示リストを更新。
+- `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタし、タグ/優先度検索に合わせて表示リストを更新。
 - ドラッグ対象として `useDroppable` を設定し、 `bucketPosition` を使って降順ソート。
 
 ### CardModal & CommentsPanel
@@ -115,9 +112,9 @@ interface ActiveDragState {
 
 | Hook / Store | 役割 | 主な戻り値 |
 | --- | --- | --- |
-| `useBoardFilters` | 検索・タグ・優先度・並び順を管理。Timeline と A/B 雑貨に同じフィルタを適用。 | `searchQuery`, `selectedTags`, `selectedPriority`, `setSortBy`, `filterAndSortCards()` |
+| `useTimelineFiltering` | 検索・タグ・優先度・並び順を管理。Timeline と A/B を同時にフィルタ。 | `searchQuery`, `selectedTags`, `selectedPriority`, `setSortBy`, `filteredData`, `hasActiveFilters`, `availableTags` |
 | `useRealtimeBoard(boardId, callbacks)` | Supabase Realtime (cards/comments) を購読し、差分を UI に反映 | `{ realtimeStatus }` |
-| `useSyncQueue()` | オフラインキュー (`taesk-sync-queue`) を管理し、pending アクション数や最終成功時刻を返す | `{ enqueue, isOnline, syncQueueStats }` |
+| `useSyncQueue()` | オフラインキュー (`taesk-sync-queue`) を監視し、オンライン状態と統計を返す | `{ isOnline, syncQueueStats }` |
 | `useCommentsStore()` | コメントリストと pending キューを管理。Realtime からの upsert/delete も反映 | `fetchComments`, `upsertComment`, `removeComment`, `pendingCount` |
 
 ## 5. Routing & Modal Flow
@@ -133,7 +130,7 @@ interface ActiveDragState {
 
 ## 7. 状態永続化
 
-- TimelineBoardPage 自体は localStorage を直接利用しないが、`useSyncQueue` と `useCommentsStore` が `taesk-sync-queue` / `comment-queue` を管理している。これにより DnD やコメント投稿がオフラインでも失われない。
+- TimelineBoardPage 自体は localStorage を直接利用しないが、`useSyncQueue` と `useCommentsStore` が `taesk-sync-queue` / `comment-queue` を管理している。コメント投稿はローカルキューを保持し、オンライン復帰時に再送する。
 - `availableBoards` や Timeline レンダリング状態はメモリ内のみに保持し、ページ再読み込み時は `fetch('/api/boards/:id/timeline')` を再度実行して整合性を保つ。
 
 Timeline コンポーネント群は以上の構造で連携し、Today/Tomorrow 計画、A/B タスク整理、カードコメント、通知設定を一体化した体験を提供します。
