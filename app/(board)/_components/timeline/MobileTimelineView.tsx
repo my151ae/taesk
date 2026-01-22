@@ -343,7 +343,7 @@ type MobileTimelineViewProps = {
   onNextDay: () => void;
   onMount?: () => void;
   onScroll?: (scrollTop: number) => void;
-  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
+  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;

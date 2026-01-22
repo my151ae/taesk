@@ -31,27 +31,46 @@ export const normalizeContent = (value: unknown): JSONContent => {
     return EMPTY_DOC;
 };
 
+const joinChildren = (node: JSONContent, formatter: (n: JSONContent) => string) =>
+    (node.content ?? []).map(formatter).join('');
+
 /**
- * Recursively extracts plain text from Tiptap JSONContent.
- * Handles nested structures like lists, blockquotes, etc.
+ * 段落・リスト・チェックボックスを含むテキスト抽出（改行保持）。
+ * taskItem は `[ ]` / `[x]` をプレフィックスしてカード上で視覚化する。
  */
 export const getTiptapPlainText = (content: JSONContent): string => {
-    const parts: string[] = [];
-
-    const traverse = (node: JSONContent) => {
-        if (node.text) {
-            parts.push(node.text);
-        }
-        if (node.content && Array.isArray(node.content)) {
-            node.content.forEach(traverse);
+    const formatNode = (node: JSONContent): string => {
+        switch (node.type) {
+            case 'text':
+                return node.text ?? '';
+            case 'hardBreak':
+                return '\n';
+            case 'paragraph':
+            case 'heading':
+                return joinChildren(node, formatNode).trimEnd() + '\n';
+            case 'bulletList':
+            case 'orderedList':
+            case 'taskList':
+                return (node.content ?? [])
+                    .map((child) => formatNode(child).trimEnd())
+                    .join('\n') + '\n';
+            case 'listItem':
+                return '- ' + joinChildren(node, formatNode).trim();
+            case 'taskItem': {
+                const checked = (node as any).attrs?.checked;
+                const prefix = checked ? '[x] ' : '[ ] ';
+                return prefix + joinChildren(node, formatNode).trim();
+            }
+            default:
+                return joinChildren(node, formatNode);
         }
     };
 
-    if (content.content && Array.isArray(content.content)) {
-        content.content.forEach(traverse);
-    }
+    if (!content?.content || !Array.isArray(content.content)) return '';
 
-    return parts.join(" ").replace(/\s+/g, " ").trim();
+    const raw = content.content.map(formatNode).join('').trimEnd();
+    // 連続する空行を1行に圧縮
+    return raw.replace(/\n{3,}/g, '\n\n');
 };
 
 export const deriveTitleFromContent = (content: JSONContent): string => {

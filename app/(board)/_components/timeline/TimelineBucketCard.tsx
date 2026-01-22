@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import clsx from 'clsx';
 import { useState, useCallback } from 'react';
-import { TimelineBucketItem, timeLabel, formatDuration } from '@/app/(board)/_utils/timeline-helpers';
+import { TimelineBucketItem, formatDuration } from '@/app/(board)/_utils/timeline-helpers';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
@@ -36,6 +36,7 @@ export const TimelineBucketCard = ({
     initialIsEditing = false,
     onCreateBucketCard,
 }: TimelineBucketCardProps) => {
+    const NOTE_CLAMP_CLASS = "line-clamp-2";
     // タイトル編集中の状態
     const [isEditingTitle, setIsEditingTitle] = useState(initialIsEditing);
 
@@ -85,9 +86,10 @@ export const TimelineBucketCard = ({
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     duration={undefined}
-                    timeText={item.due_start ? timeLabel(item.due_start, item.due_end) : null}
+                    timePlacement="inline"
+                    note={item.excerpt ?? undefined}
+                    noteClampClass={NOTE_CLAMP_CLASS}
                     rightMeta={item.duration != null ? formatDuration(item.duration) : null}
-                    timePlacement="out-top"
                     alignTop
                     onOpen={() => {
                         if (!isEditingTitle) {

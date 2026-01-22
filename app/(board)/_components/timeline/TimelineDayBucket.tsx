@@ -14,7 +14,7 @@ type TimelineDayBucketProps = {
     bucketsB: readonly TimelineBucketItem[];
     floatingLayerTop: number;
     viewportHeight?: number;
-    registerScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
+    registerScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
@@ -59,10 +59,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
     return (
         <div
-            ref={(el) => registerScrollContainer?.(day.isoDate, el)}
-            data-ab-scroll-container="true"
             data-ab-day={day.isoDate}
-            className="pointer-events-auto w-full min-w-0 border-l border-slate-100 md:border-slate-200 bg-white overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+            className="pointer-events-auto w-full min-w-0 border-l border-slate-100 md:border-slate-200 bg-white overflow-hidden"
             style={{ height: viewportHeight ? `${viewportHeight}px` : `calc(100vh - ${floatingLayerTop}px)` }}
         >
             <div className="flex min-h-full flex-col gap-0.5">
@@ -73,7 +71,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     return (
                         <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                             {(isOver) => (
-                                <div className={`border border-slate-100 bg-slate-50/70 py-2 shadow-inner min-h-[240px] ${!isA ? 'flex-1' : ''}`}>
+                                <div className="border border-slate-100 bg-slate-50/70 py-2 shadow-inner flex flex-col min-h-0 flex-1">
                                     <div className="flex items-center justify-between px-3">
                                         <p className="text-[10px] font-semibold text-slate-600">{section.label}</p>
                                         <button
@@ -90,7 +88,11 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                             <span className="text-base leading-none">＋</span>
                                         </button>
                                     </div>
-                                    <div className="mt-2 space-y-1">
+                                    <div
+                                        ref={(el) => registerScrollContainer?.(day.isoDate, el, isA ? 'a' : 'b')}
+                                        data-ab-scroll-container="true"
+                                        className="mt-2 flex-1 min-h-0 space-y-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                                    >
                                         {items.length === 0 && isOver && (
                                             <div className="mb-2 h-0.5 bg-sky-500" />
                                         )}

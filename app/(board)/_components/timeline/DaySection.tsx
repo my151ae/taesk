@@ -46,7 +46,7 @@ type DaySectionProps = {
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     viewportHeight?: number;
-    registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
+    registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
     floatingLayerTop: number;
     status: string;
 

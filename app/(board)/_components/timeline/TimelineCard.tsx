@@ -25,6 +25,10 @@ type TimelineCardProps = {
     onOpenContextMenu?: (rect: DOMRect) => void;
     focusGroup?: 'timeline' | 'bucket';
     childrenPosition?: 'top' | 'bottom';
+    /** 本文のプレビュー文字列 */
+    note?: string;
+    /** 本文に適用する line-clamp 等のクラスを指定。未指定なら高さクリップのみ。 */
+    noteClampClass?: string;
     // インライン編集用 props
     onTitleChange?: (newTitle: string, previousTitle: string) => void;
     /** 編集中かどうかの外部制御（DnD無効化などに使用） */
@@ -58,6 +62,8 @@ export function TimelineCard({
     onOpenContextMenu,
     focusGroup,
     childrenPosition = 'bottom',
+    note,
+    noteClampClass,
     onTitleChange,
     isEditingTitle: externalIsEditing,
     onEditingChange,
@@ -182,7 +188,7 @@ export function TimelineCard({
         >
             <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
-                    "flex flex-1 flex-col gap-2 min-w-0",
+                    "flex flex-1 flex-col gap-2 min-w-0 overflow-hidden min-h-0",
                     "pl-[3px] pr-[3px]",
                     // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
                     (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-1 pb-3" : "pt-1 pb-1")
@@ -258,6 +264,46 @@ export function TimelineCard({
                             ) : null}
                         </div>
                     </div>
+
+                    {note ? (
+                        <div
+                            className={clsx(
+                                "text-[10px] text-slate-600 leading-tight whitespace-pre-wrap break-words",
+                                noteClampClass
+                            )}
+                        >
+                            {note.split('\n').flatMap((line, idx, arr) => {
+                                const taskMatch = line.match(/^\[( |x|X)\]\s?(.*)$/);
+                                const isTask = Boolean(taskMatch);
+                                const checked = taskMatch?.[1]?.toLowerCase() === 'x';
+                                const text = isTask ? (taskMatch?.[2] ?? '') : line;
+
+                                const lineNode = (
+                                    <span key={`line-${idx}`} className="inline-flex items-start gap-1 align-top">
+                                        {isTask ? (
+                                            <span
+                                                className={clsx(
+                                                    "mt-[2px] h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0",
+                                                    checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
+                                                )}
+                                                aria-hidden="true"
+                                            >
+                                                {checked ? (
+                                                    <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                ) : null}
+                                            </span>
+                                        ) : null}
+                                        <span>{text || '\u00A0'}</span>
+                                    </span>
+                                );
+
+                                if (idx === arr.length - 1) return [lineNode];
+                                return [lineNode, '\n'];
+                            })}
+                        </div>
+                    ) : null}
 
                     {childrenPosition === 'bottom' && children}
                 </div>

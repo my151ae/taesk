@@ -547,7 +547,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onExternalEventClick={handleExternalEventClick}
                 timelineStartHour={timelineStartHour}
                 timelineHeaderRef={timelineHeaderRef}
-                registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
+                registerAbScrollContainer={(iso, el, bucket) => {
+                  const key = bucket ? `${iso}:${bucket}` : iso;
+                  abScrollContainersRef.current[key] = el;
+                }}
                 status={status}
                 handlePrevDay={handlePrevDay}
                 handleNextDay={handleNextDay}
@@ -587,7 +590,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onNextDay={handleNextDay}
                 onMount={handleTimelineViewMount}
                 onScroll={debouncedHandleScroll}
-                registerAbScrollContainer={(iso, el) => { abScrollContainersRef.current[iso] = el; }}
+                registerAbScrollContainer={(iso, el, bucket) => {
+                  const key = bucket ? `${iso}:${bucket}` : iso;
+                  abScrollContainersRef.current[key] = el;
+                }}
                 eventsByDay={eventsByDay}
                 abBuckets={filteredData?.abBuckets ?? {}}
                 calendarEventsByDay={calendarEventsByDay}

@@ -44,7 +44,7 @@ type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 type DesktopTimelineViewProps = {
   timelineHeaderRef: React.RefObject<HTMLDivElement>;
   timelineScrollRef: React.RefObject<HTMLDivElement>;
-  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null) => void;
+  registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
   days: TimelineDay[];
   activeDayIndex: number;
   dayRange: number;
