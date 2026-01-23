@@ -242,8 +242,8 @@ export function useTimelineCardActions({
 
     const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
         const title = "";
-        const content = normalizeContent(null); // Empty doc
-        const excerpt = "";
+        const content = buildContentFromTitle(''); // Default unchecked task
+        const excerpt = deriveExcerptFromContent(content);
         const payload: Partial<Card> = {
             title, content, excerpt, tags: [],
             due_date: withJstMidnight(day.isoDate),
@@ -260,8 +260,8 @@ export function useTimelineCardActions({
         if (!isoDate) return;
         const now = Date.now();
         const title = "";
-        const content = normalizeContent(null); // Empty doc
-        const excerpt = "";
+        const content = buildContentFromTitle(''); // Default unchecked task
+        const excerpt = deriveExcerptFromContent(content);
         const dueBucket = bucketKeyToDueBucket(bucketKey);
 
         const currentItems = (data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[];

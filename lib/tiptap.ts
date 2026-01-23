@@ -95,13 +95,24 @@ export const ensureTitleBlock = (content: JSONContent): JSONContent => {
 };
 
 export const buildContentFromTitle = (_title: string): JSONContent => {
-    // Logic changed: do not put title in content
+    // Default body starts with an unchecked task item
     return {
         type: 'doc',
         content: [
             {
-                type: 'paragraph',
-                content: []
+                type: 'taskList',
+                content: [
+                    {
+                        type: 'taskItem',
+                        attrs: { checked: false },
+                        content: [
+                            {
+                                type: 'paragraph',
+                                content: []
+                            }
+                        ]
+                    }
+                ]
             }
         ]
     };

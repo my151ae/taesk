@@ -96,7 +96,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     <div
                                         ref={(el) => registerScrollContainer?.(day.isoDate, el, isA ? 'a' : 'b')}
                                         data-ab-scroll-container="true"
-                                        className="mt-2 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+                                        className="mt-2 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
                                     >
                                         {items.length === 0 && isOver && (
                                             <div className="mb-2 h-0.5 bg-sky-500" />

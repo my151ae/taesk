@@ -103,8 +103,9 @@ export function DesktopListView({
                             {allDayEvents.map((event) => (
                                 <div
                                     key={event.card_id}
+                                    tabIndex={0}
                                     onContextMenu={(e) => onCardContextMenu?.(e, event.card_id)}
-                                    className="flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:border-sky-200 hover:shadow-sm transition-all group/item"
+                                    className="flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:border-sky-200 hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item"
                                 >
                                     <div className="flex items-center gap-2 min-w-[110px]">
                                         <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
@@ -184,9 +185,10 @@ export function DesktopListView({
                                     {[...bucketA.map(i => ({ ...i, bkey: 'a' })), ...bucketB.map(i => ({ ...i, bkey: 'b' }))].map((item) => (
                                         <div
                                             key={item.card_id}
+                                            tabIndex={0}
                                             onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
                                             className={clsx(
-                                                "flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-all group/item",
+                                                "flex w-full items-center gap-1 p-3 bg-white rounded-xl border border-slate-100 hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item",
                                                 item.bkey === 'a' ? "hover:border-orange-200" : "hover:border-emerald-200"
                                             )}
                                         >

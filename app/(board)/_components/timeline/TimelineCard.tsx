@@ -134,6 +134,7 @@ export function TimelineCard({
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
                 'focus:ring-2 focus:ring-sky-500', // フォーカス時のリング
+                'focus:z-10',
                 className
             )}
             style={style}

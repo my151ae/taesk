@@ -61,7 +61,7 @@ export const TimelineBucketCard = ({
             // 編集中またはコンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen || isEditingTitle}
         >
-            <div className="relative min-w-0" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
+            <div className="relative min-w-0 has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}
