@@ -687,8 +687,8 @@ export function useTimelineDragAndDrop({
         });
 
         if (overType === 'bucket-item-top' || overType === 'bucket-item-bottom') {
-            const bucketKey = over.data.current?.bucketKey as string | undefined;
-            const targetCardId = over.data.current?.cardId as string | undefined;
+            const bucketKey = over?.data.current?.bucketKey as string | undefined;
+            const targetCardId = over?.data.current?.cardId as string | undefined;
             if (!bucketKey || !targetCardId) return;
             const bucketItems = data?.abBuckets?.[bucketKey];
             if (!bucketItems?.length) return;
@@ -813,7 +813,7 @@ export function useTimelineDragAndDrop({
         }
 
         if (overType === 'ab-bucket') {
-            const bucketKey = over.data.current?.bucketKey as string;
+            const bucketKey = over?.data.current?.bucketKey as string;
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const bucketItems = data?.abBuckets?.[bucketKey] ?? [];
             const fallbackTargetCardId =

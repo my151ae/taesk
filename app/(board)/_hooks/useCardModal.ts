@@ -173,25 +173,26 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             else return;
         }
 
-        if (cardModalShortIdRef.current === targetShortId && (cardModalStatus === 'ready' || cardModalStatus === 'loading')) {
-            return;
-        }
+        // REMOVED: Blocking guard clause that caused the reload issue
+        // The previous check (cardModalShortIdRef.current === targetShortId && status === loading/ready)
+        // prevented re-fetching when React Strict Mode cancelled the first attempt but left the status as 'loading'.
+
         cardModalShortIdRef.current = targetShortId;
 
-        let cancelled = false;
+        const abortController = new AbortController();
+
         const loadCard = async () => {
             console.log('[useCardModal] fetching full data', targetShortId);
             setCardModalStatus('loading');
             setCardModalError(null);
 
             try {
-                const response = await fetch(`/api/cards/${targetShortId}`);
+                const response = await fetch(`/api/cards/${targetShortId}`, {
+                    signal: abortController.signal
+                });
                 const body = await response.json().catch(() => null);
 
-                if (cancelled) {
-                    console.log('[useCardModal] fetch cancelled', targetShortId);
-                    return;
-                }
+                if (abortController.signal.aborted) return;
 
                 if (!response.ok) {
                     throw new Error(body?.error?.message || `Failed to load card (status ${response.status})`);
@@ -216,7 +217,11 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                     }
                 }
             } catch (error) {
-                if (cancelled) return;
+                if (error instanceof Error && error.name === 'AbortError') {
+                    // Ignore abort errors
+                    return;
+                }
+
                 console.error('[useCardModal] fetch failed', error);
                 const message = error instanceof Error ? error.message : 'Failed to load card';
                 setCardModalError(message);
@@ -231,7 +236,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         loadCard();
 
         return () => {
-            cancelled = true;
+            abortController.abort();
         };
     }, [targetShortId, isModalClosing, loadComments]);
 
