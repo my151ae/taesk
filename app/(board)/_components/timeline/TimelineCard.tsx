@@ -287,7 +287,7 @@ export function TimelineCard({
                                         {isTask ? (
                                             <span
                                                 className={clsx(
-                                                    "mt-[2px] h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0",
+                                                    "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0",
                                                     checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
                                                 )}
                                                 aria-hidden="true"
