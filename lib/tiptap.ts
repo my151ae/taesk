@@ -39,7 +39,7 @@ const joinChildren = (node: JSONContent, formatter: (n: JSONContent) => string) 
  * taskItem は `[ ]` / `[x]` をプレフィックスしてカード上で視覚化する。
  */
 export const getTiptapPlainText = (content: JSONContent): string => {
-    const formatNode = (node: JSONContent): string => {
+    const formatNode = (node: JSONContent, level = 0): string => {
         switch (node.type) {
             case 'text':
                 return node.text ?? '';
@@ -47,28 +47,37 @@ export const getTiptapPlainText = (content: JSONContent): string => {
                 return '\n';
             case 'paragraph':
             case 'heading':
-                return joinChildren(node, formatNode).trimEnd() + '\n';
+                return joinChildren(node, (n) => formatNode(n, level)).trimEnd() + '\n';
             case 'bulletList':
             case 'orderedList':
             case 'taskList':
                 return (node.content ?? [])
-                    .map((child) => formatNode(child).trimEnd())
+                    .map((child) => formatNode(child, level).trimEnd())
                     .join('\n') + '\n';
             case 'listItem':
-                return '- ' + joinChildren(node, formatNode).trim();
+                return '  '.repeat(level) + '- ' + joinChildren(node, (n) => formatNode(n, level + 1)).trim();
             case 'taskItem': {
                 const checked = (node as any).attrs?.checked;
                 const prefix = checked ? '[x] ' : '[ ] ';
-                return prefix + joinChildren(node, formatNode).trim();
+                // taskItem の直下にある paragraph は現在のレベル、
+                // 入れ子の taskList は次のレベル (level + 1) として扱う
+                const childrenText = (node.content ?? []).map((child) => {
+                    const nextLevel = (child.type === 'taskList' || child.type === 'bulletList' || child.type === 'orderedList')
+                        ? level + 1
+                        : 0; // paragraph などのテキスト要素はインデント不要（プレフィックスに続くため）
+                    return formatNode(child, nextLevel);
+                }).join('');
+
+                return '  '.repeat(level) + prefix + childrenText.trim();
             }
             default:
-                return joinChildren(node, formatNode);
+                return joinChildren(node, (n) => formatNode(n, level));
         }
     };
 
     if (!content?.content || !Array.isArray(content.content)) return '';
 
-    const raw = content.content.map(formatNode).join('').trimEnd();
+    const raw = content.content.map((n) => formatNode(n, 0)).join('').trimEnd();
     // 連続する空行を1行に圧縮
     return raw.replace(/\n{3,}/g, '\n\n');
 };

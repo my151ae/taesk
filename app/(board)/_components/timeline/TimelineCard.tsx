@@ -269,14 +269,21 @@ export function TimelineCard({
                                 noteClampClass
                             )}
                         >
-                            {note.split('\n').flatMap((line, idx, arr) => {
-                                const taskMatch = line.match(/^\[( |x|X)\]\s?(.*)$/);
+                            {note.split(/\r?\n/).flatMap((line, idx, arr) => {
+                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
                                 const isTask = Boolean(taskMatch);
-                                const checked = taskMatch?.[1]?.toLowerCase() === 'x';
-                                const text = isTask ? (taskMatch?.[2] ?? '') : line;
+                                const indentRaw = taskMatch?.[1] ?? '';
+                                // タブは2スペース分、その他は1文字分として計算
+                                const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
+                                const checked = taskMatch?.[2]?.toLowerCase() === 'x';
+                                const text = isTask ? (taskMatch?.[3] ?? '') : line;
 
                                 const lineNode = (
-                                    <span key={`line-${idx}`} className="inline-flex items-start gap-1 align-top">
+                                    <span
+                                        key={`line-${idx}`}
+                                        className="inline-flex items-start gap-1 align-top w-full"
+                                        style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                    >
                                         {isTask ? (
                                             <span
                                                 className={clsx(
