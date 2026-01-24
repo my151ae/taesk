@@ -265,23 +265,21 @@ export function TimelineCard({
                     {note ? (
                         <div
                             className={clsx(
-                                "text-[10px] text-slate-600 leading-tight whitespace-pre-wrap break-words",
-                                noteClampClass
+                                "flex flex-col gap-0.5 text-[10px] text-slate-600 leading-tight min-w-0"
                             )}
                         >
-                            {note.split(/\r?\n/).flatMap((line, idx, arr) => {
+                            {note.split(/\r?\n/).map((line, idx) => {
                                 const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
                                 const isTask = Boolean(taskMatch);
                                 const indentRaw = taskMatch?.[1] ?? '';
-                                // タブは2スペース分、その他は1文字分として計算
                                 const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
                                 const checked = taskMatch?.[2]?.toLowerCase() === 'x';
                                 const text = isTask ? (taskMatch?.[3] ?? '') : line;
 
-                                const lineNode = (
-                                    <span
+                                return (
+                                    <div
                                         key={`line-${idx}`}
-                                        className="inline-flex items-start gap-1 align-top w-full"
+                                        className="flex items-center gap-1 w-full min-w-0"
                                         style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
                                     >
                                         {isTask ? (
@@ -299,12 +297,9 @@ export function TimelineCard({
                                                 ) : null}
                                             </span>
                                         ) : null}
-                                        <span>{text || '\u00A0'}</span>
-                                    </span>
+                                        <span className="truncate">{text || '\u00A0'}</span>
+                                    </div>
                                 );
-
-                                if (idx === arr.length - 1) return [lineNode];
-                                return [lineNode, '\n'];
                             })}
                         </div>
                     ) : null}
