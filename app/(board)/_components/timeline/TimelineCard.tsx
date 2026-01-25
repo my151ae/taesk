@@ -35,6 +35,8 @@ type TimelineCardProps = {
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
     onCreateNext?: () => void;
+    /** インライン編集での貼り付け時に抽出された本文（2行目以降）を受け取る */
+    onNoteExtracted?: (bodyLines: string[], updatedTitle?: string) => void;
 };
 
 export function TimelineCard({
@@ -65,6 +67,7 @@ export function TimelineCard({
     onEditingChange,
     backgroundClass = 'bg-white',
     onCreateNext,
+    onNoteExtracted,
 }: TimelineCardProps) {
     // 内部編集状態（外部制御がない場合）
     const [internalIsEditing, setInternalIsEditing] = useState(false);
@@ -228,6 +231,7 @@ export function TimelineCard({
                                             title={title}
                                             onSave={handleSave}
                                             onCancel={handleCancel}
+                                            onNoteExtracted={onNoteExtracted}
                                         />
                                     </div>
                                 ) : (

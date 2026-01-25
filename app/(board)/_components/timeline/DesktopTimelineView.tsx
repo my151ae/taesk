@@ -86,6 +86,7 @@ type DesktopTimelineViewProps = {
   contextMenuCardId: string | null;
   // インライン編集用
   onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
   createdCardId?: string | null;
 };
 
@@ -133,6 +134,7 @@ export function DesktopTimelineView({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
   onUpdateCardTitle,
+  onNoteExtracted,
   createdCardId,
 }: DesktopTimelineViewProps) {
 

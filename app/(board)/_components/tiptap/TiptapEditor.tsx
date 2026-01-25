@@ -7,6 +7,7 @@ import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import styles from './TiptapEditor.module.css';
 import { useEffect, useRef } from 'react';
+import { ensureTitleTask } from '@/lib/tiptap';
 
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
@@ -95,6 +96,15 @@ export default function TiptapEditor({
         },
         autofocus: false,
         onCreate: ({ editor }) => {
+            // 補正：先頭行をタイトルタスクに強制
+            const currentContent = editor.getJSON();
+            const { content: correctedContent, changed } = ensureTitleTask(currentContent);
+            if (changed) {
+                isUpdatingRef.current = true;
+                editor.commands.setContent(correctedContent, { emitUpdate: false });
+                isUpdatingRef.current = false;
+            }
+
             // Focus at the end of the first block (Title line)
             // Use setTimeout to ensure we override CardModal's initial focus trap
             setTimeout(() => {

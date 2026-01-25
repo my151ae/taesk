@@ -1,7 +1,6 @@
-'use client';
-
 import { useState, useRef, useEffect, useCallback, KeyboardEvent, ChangeEvent } from 'react';
 import clsx from 'clsx';
+import { splitPastedText } from '@/lib/tiptap';
 
 // 最大高さ（6行分相当）
 const MAX_HEIGHT_PX = 120;
@@ -10,6 +9,7 @@ type InlineTitleEditorProps = {
     title: string;
     onSave: (newTitle: string, previousTitle: string) => void;
     onCancel: () => void;
+    onNoteExtracted?: (bodyLines: string[], updatedTitle?: string) => void;
     className?: string;
 };
 
@@ -25,6 +25,7 @@ export function InlineTitleEditor({
     title,
     onSave,
     onCancel,
+    onNoteExtracted,
     className,
 }: InlineTitleEditorProps) {
     // 編集開始時のタイトルを保持（ロールバック用）
@@ -109,19 +110,26 @@ export function InlineTitleEditor({
                 const text = e.clipboardData.getData('text');
                 console.log('[InlineTitleEditor] onPaste raw:', JSON.stringify(text));
 
+                const { title: pastedTitle, bodyLines } = splitPastedText(text);
+
                 const textarea = e.currentTarget;
                 const start = textarea.selectionStart;
                 const end = textarea.selectionEnd;
                 const currentVal = localTitle;
 
-                const newVal = currentVal.substring(0, start) + text + currentVal.substring(end);
-
+                // 1行目（タイトル分）を現在位置に挿入
+                const newVal = currentVal.substring(0, start) + pastedTitle + currentVal.substring(end);
                 setLocalTitle(newVal);
 
-                // Cursor position update needs to happen after render, but we can try to anticipate
+                // 2行目以降があればコールバックで親に渡す
+                if (bodyLines.length > 0 && onNoteExtracted) {
+                    onNoteExtracted(bodyLines, pastedTitle);
+                }
+
+                // Cursor position update needs to happen after render
                 requestAnimationFrame(() => {
                     if (textarea) {
-                        textarea.setSelectionRange(start + text.length, start + text.length);
+                        textarea.setSelectionRange(start + pastedTitle.length, start + pastedTitle.length);
                     }
                 });
             }}

@@ -83,15 +83,136 @@ export const getTiptapPlainText = (content: JSONContent): string => {
 };
 
 export const deriveTitleFromContent = (content: JSONContent): string => {
-    // Logic removed: title is now stored separately
-    return "";
+    return extractTitleTask(content).text;
+};
+
+/**
+ * ペーストされたテキストをタイトル（1行目）と本文（2行目以降）に分割する。
+ */
+export const splitPastedText = (text: string): { title: string; bodyLines: string[] } => {
+    const lines = text.split(/\r\n|\r|\n/);
+    const title = lines[0]?.trim() || "";
+    const bodyLines = lines.slice(1);
+    return { title, bodyLines };
+};
+
+/**
+ * コンテンツの先頭にある taskItem からテキストと checked 状態を抽出する。
+ */
+export const extractTitleTask = (content: JSONContent): { text: string; checked: boolean } => {
+    if (!content?.content || !Array.isArray(content.content)) return { text: "", checked: false };
+
+    // doc -> taskList -> taskItem の構造を探す
+    const firstNode = content.content[0];
+    if (firstNode?.type === 'taskList' && Array.isArray(firstNode.content)) {
+        const firstTaskItem = firstNode.content[0];
+        if (firstTaskItem?.type === 'taskItem') {
+            const checked = !!firstTaskItem.attrs?.checked;
+            // taskItem の中の paragraph からテキストを抽出
+            const paragraph = firstTaskItem.content?.find(node => node.type === 'paragraph');
+            const text = paragraph ? getTiptapPlainText({ type: 'doc', content: [paragraph] }).trim() : "";
+            return { text, checked };
+        }
+    }
+
+    return { text: "", checked: false };
+};
+
+/**
+ * 先頭の taskItem を更新する（差分がある場合のみ）。
+ */
+export const setTitleTask = (
+    content: JSONContent,
+    updates: { text?: string; checked?: boolean }
+): { content: JSONContent; changed: boolean } => {
+    if (!content?.content || !Array.isArray(content.content)) return { content, changed: false };
+
+    let changed = false;
+    const newContent = JSON.parse(JSON.stringify(content)) as JSONContent;
+    const firstNode = newContent.content![0];
+
+    if (firstNode?.type === 'taskList' && Array.isArray(firstNode.content)) {
+        const firstTaskItem = firstNode.content[0];
+        if (firstTaskItem?.type === 'taskItem') {
+            // Check status update
+            if (updates.checked !== undefined) {
+                const oldChecked = !!firstTaskItem.attrs?.checked;
+                if (oldChecked !== updates.checked) {
+                    firstTaskItem.attrs = { ...firstTaskItem.attrs, checked: updates.checked };
+                    changed = true;
+                }
+            }
+
+            // Text update
+            if (updates.text !== undefined) {
+                const currentText = extractTitleTask(newContent).text;
+                if (currentText !== updates.text) {
+                    const paragraph = firstTaskItem.content?.find(node => node.type === 'paragraph');
+                    if (paragraph) {
+                        paragraph.content = updates.text ? [{ type: 'text', text: updates.text }] : [];
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return { content: newContent, changed };
+};
+
+/**
+ * モーダル展開時や保存時に、先頭ノードが taskList (taskItem) でなければ置換して補正する。
+ */
+export const ensureTitleTask = (
+    content: JSONContent,
+    fallbackTitle = "",
+    fallbackChecked = false
+): { content: JSONContent; changed: boolean } => {
+    if (!content?.content || !Array.isArray(content.content)) {
+        return { content: buildContentFromTitle(fallbackTitle), changed: true };
+    }
+
+    const current = extractTitleTask(content);
+    // すでに正しい構造なら内容だけチェック
+    if (content.content[0]?.type === 'taskList' && content.content[0].content?.[0]?.type === 'taskItem') {
+        return { content, changed: false };
+    }
+
+    // 補正：先頭ノードを taskList(taskItem) に置換
+    const firstNode = content.content[0];
+    const newTitle = current.text || (firstNode ? getTiptapPlainText({ type: 'doc', content: [firstNode] }).trim() : fallbackTitle);
+
+    const titleTask = {
+        type: 'taskList',
+        content: [
+            {
+                type: 'taskItem',
+                attrs: { checked: fallbackChecked },
+                content: [
+                    {
+                        type: 'paragraph',
+                        content: newTitle ? [{ type: 'text', text: newTitle }] : []
+                    }
+                ]
+            }
+        ]
+    };
+
+    const newContent: JSONContent = {
+        ...content,
+        content: [
+            titleTask,
+            ...(content.content.slice(1))
+        ]
+    };
+
+    return { content: newContent, changed: true };
 };
 
 export const deriveExcerptFromContent = (
     content: JSONContent,
     maxLength = DEFAULT_EXCERPT_LENGTH
 ): string => {
-    // Logic updated: consider all content (do not skip first block)
     if (!content.content || content.content.length === 0) return "";
 
     const text = getTiptapPlainText(content);
@@ -99,12 +220,11 @@ export const deriveExcerptFromContent = (
 };
 
 export const ensureTitleBlock = (content: JSONContent): JSONContent => {
-    // Logic removed: do not enforce H1 or first block as title
-    return content;
+    return ensureTitleTask(content).content;
 };
 
-export const buildContentFromTitle = (_title: string): JSONContent => {
-    // Default body starts with an unchecked task item
+export const buildContentFromTitle = (title: string): JSONContent => {
+    // 新ルール：タイトル文字が含まれた先頭 taskItem を生成
     return {
         type: 'doc',
         content: [
@@ -117,7 +237,7 @@ export const buildContentFromTitle = (_title: string): JSONContent => {
                         content: [
                             {
                                 type: 'paragraph',
-                                content: []
+                                content: title ? [{ type: 'text', text: title }] : []
                             }
                         ]
                     }
@@ -126,3 +246,4 @@ export const buildContentFromTitle = (_title: string): JSONContent => {
         ]
     };
 };
+

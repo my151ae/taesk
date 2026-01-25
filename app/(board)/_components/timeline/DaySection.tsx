@@ -54,6 +54,7 @@ type DaySectionProps = {
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
@@ -92,6 +93,7 @@ export const DaySection = memo(function DaySection({
     openCardModal,
     onToggleCheck,
     onUpdateCardTitle,
+    onNoteExtracted,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
@@ -129,6 +131,7 @@ export const DaySection = memo(function DaySection({
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}
                     onUpdateCardTitle={onUpdateCardTitle}
+                    onNoteExtracted={onNoteExtracted}
                     createdCardId={createdCardId}
                     hourHeight={hourHeight}
                 />
@@ -156,6 +159,7 @@ export const DaySection = memo(function DaySection({
                         onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}
                         onUpdateCardTitle={onUpdateCardTitle}
+                        onNoteExtracted={onNoteExtracted}
                         createdCardId={createdCardId}
                     />
                 </div>

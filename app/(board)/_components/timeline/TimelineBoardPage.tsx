@@ -19,6 +19,7 @@ import {
   DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
+import { deriveExcerptFromContent, ensureTitleTask, setTitleTask } from "@/lib/tiptap";
 import { DesktopListView } from "@/app/(board)/_components/timeline/DesktopListView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 
@@ -299,6 +300,66 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     onCardCreated: setCreatedCardId,
   });
 
+  const handleNoteExtracted = useCallback(async (cardId: string, bodyLines: string[], updatedTitle?: string) => {
+    if (!data) return;
+    // 1. Find the card to get its current content
+    const allItems = [
+      ...(data.events || []),
+      ...Object.values(data.abBuckets || {}).flat()
+    ];
+    const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
+    if (!card) return;
+
+    // 2. Prepare new content
+    // まず構造を保証（先頭が taskList(taskItem) でなければ補正）
+    let { content: workingContent } = ensureTitleTask(card.content || { type: 'doc', content: [] });
+
+    // タイトルが渡されていれば同期
+    if (updatedTitle !== undefined) {
+      const { content: syncedContent } = setTitleTask(workingContent, { text: updatedTitle });
+      workingContent = syncedContent;
+    }
+
+    const paragraphs = bodyLines.map(line => ({
+      type: 'paragraph',
+      content: line ? [{ type: 'text', text: line }] : []
+    }));
+
+    const newContent = {
+      ...workingContent,
+      content: [
+        ...(workingContent.content?.slice(0, 1) || []),
+        ...paragraphs,
+        ...(workingContent.content?.slice(1) || [])
+      ]
+    };
+
+    const newExcerpt = deriveExcerptFromContent(newContent);
+    const finalTitle = updatedTitle ?? card.title;
+
+    // 3. Optimistic local update
+    setData((prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: finalTitle, content: newContent, excerpt: newExcerpt } : e),
+        abBuckets: Object.fromEntries(
+          Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
+            k,
+            v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: finalTitle, content: newContent, excerpt: newExcerpt } : i)
+          ])
+        ),
+      };
+    });
+
+    // 4. Save
+    await applyPatch(cardId, {
+      title: finalTitle,
+      content: newContent,
+      excerpt: newExcerpt
+    });
+  }, [data, applyPatch, setData]);
+
   const handleGoogleConnect = useCallback(() => {
     if (typeof window === "undefined") return;
     window.location.href = "/api/integrations/google-calendar/connect";
@@ -577,6 +638,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
                 contextMenuCardId={contextMenu.cardId}
                 onUpdateCardTitle={handleUpdateCardTitle}
+                onNoteExtracted={handleNoteExtracted}
                 createdCardId={createdCardId}
               />
             </div>
@@ -619,6 +681,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onCardContextMenu={handleCardContextMenu}
                 onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
                 contextMenuCardId={contextMenu.cardId}
+                onUpdateCardTitle={handleUpdateCardTitle}
+                onNoteExtracted={handleNoteExtracted}
               />
             </div>
           </>

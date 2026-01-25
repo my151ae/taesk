@@ -19,6 +19,7 @@ type TimelineBucketCardProps = {
     isContextMenuOpen: boolean;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
     initialIsEditing?: boolean;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
 };
@@ -33,6 +34,7 @@ export const TimelineBucketCard = ({
     onCardContextMenuByKeyboard,
     isContextMenuOpen,
     onUpdateCardTitle,
+    onNoteExtracted,
     initialIsEditing = false,
     onCreateBucketCard,
 }: TimelineBucketCardProps) => {
@@ -101,6 +103,7 @@ export const TimelineBucketCard = ({
                     focusGroup="bucket"
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
+                    onNoteExtracted={onNoteExtracted ? (lines: string[], updatedTitle?: string) => onNoteExtracted(item.card_id, lines, updatedTitle) : undefined}
                     isEditingTitle={isEditingTitle}
                     onEditingChange={setIsEditingTitle}
                     onCreateNext={() => onCreateBucketCard?.(bucketKey, item.card_id)}

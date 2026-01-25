@@ -30,6 +30,7 @@ type TimelineEventItemProps = {
     isContextMenuOpen: boolean;
     // インライン編集用
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
     initialIsEditing?: boolean;
     onCreateNext?: () => void;
     hourHeight?: number;
@@ -51,6 +52,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     onCardContextMenu,
     isContextMenuOpen,
     onUpdateCardTitle,
+    onNoteExtracted,
     initialIsEditing = false,
     onCreateNext,
     hourHeight,
@@ -117,6 +119,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     className="w-full h-full pt-0"
                     // インライン編集
                     onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
+                    onNoteExtracted={onNoteExtracted ? (lines: string[], updatedTitle?: string) => onNoteExtracted(event.card_id, lines, updatedTitle) : undefined}
                     isEditingTitle={isEditingTitle}
                     onEditingChange={setIsEditingTitle}
                     backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"

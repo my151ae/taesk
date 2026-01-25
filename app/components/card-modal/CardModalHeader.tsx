@@ -19,6 +19,8 @@ type BucketOption = { value: DueBucket; label: string };
 
 type CardModalHeaderProps = {
     titlePreview: string;
+    checked: boolean;
+    onToggleCheck: (value: boolean) => void;
     onTitleChange: (value: string) => void;
     dueDate: string;
     dueStart: string;
@@ -49,6 +51,8 @@ type CardModalHeaderProps = {
 
 export default function CardModalHeader({
     titlePreview,
+    checked,
+    onToggleCheck,
     onTitleChange,
     dueDate,
     dueStart,
@@ -79,16 +83,36 @@ export default function CardModalHeader({
     return (
         <div className="flex flex-col p-4 sm:p-6 pb-2 sm:pb-4 border-b border-slate-200 dark:border-gray-700">
             <div className="flex justify-between items-start mb-3 sm:mb-4 gap-4">
-                <input
-                    id="modal-title"
-                    value={titlePreview}
-                    onChange={(e) => onTitleChange(e.target.value)}
-                    placeholder="Untitled card"
-                    className={clsx(
-                        "flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-slate-300 dark:placeholder:text-gray-600",
-                        !titlePreview ? "text-slate-400 dark:text-gray-500" : "text-slate-800 dark:text-gray-100"
-                    )}
-                />
+                <div className="flex-1 flex items-center gap-3">
+                    <div
+                        role="checkbox"
+                        aria-checked={checked}
+                        onClick={() => onToggleCheck(!checked)}
+                        className={clsx(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer mt-1",
+                            checked
+                                ? "bg-slate-400 border-slate-400"
+                                : "bg-white border-slate-300 hover:border-sky-400 dark:bg-gray-700 dark:border-gray-500"
+                        )}
+                        aria-label={checked ? '未完了に戻す' : '完了にする'}
+                    >
+                        {checked && (
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                    <input
+                        id="modal-title"
+                        value={titlePreview}
+                        onChange={(e) => onTitleChange(e.target.value)}
+                        placeholder="Untitled card"
+                        className={clsx(
+                            "flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-slate-300 dark:placeholder:text-gray-600",
+                            !titlePreview ? "text-slate-400 dark:text-gray-500" : "text-slate-800 dark:text-gray-100"
+                        )}
+                    />
+                </div>
                 <div className="flex items-center gap-1 sm:gap-2">
                     <button
                         onClick={onToggleSidebar}

@@ -7,8 +7,9 @@ import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
-    deriveTitleFromContent,
-    ensureTitleBlock,
+    extractTitleTask,
+    setTitleTask,
+    ensureTitleTask,
     getTiptapPlainText,
     normalizeContent,
 } from "@/lib/tiptap";
@@ -43,6 +44,7 @@ interface CardModalProps {
         due_bucket?: DueBucket | null;
         due_bucket_position?: number | null;
         duration?: number;
+        checked?: boolean;
         isAutoSave?: boolean;
     }) => void;
     onDelete: (id: string) => void;
@@ -74,6 +76,7 @@ export function CardModal({
     const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
     const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
     const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
+    const [checked, setChecked] = useState(card.checked || false);
     const contentFetchRef = useRef<string | null>(null);
     // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
     const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
@@ -170,6 +173,7 @@ export function CardModal({
             setDueBucketPosition(card.due_bucket_position ?? null);
             setDuration(card.duration ?? 60);
             setPriority(card.priority || 'medium');
+            setChecked(card.checked || false);
             // Initialize assigneeIds from card
             const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
                 ? card.assignee_ids
@@ -194,6 +198,7 @@ export function CardModal({
             setDueBucketPosition(card.due_bucket_position ?? null);
             setDuration(card.duration ?? 60);
             setPriority(card.priority || 'medium');
+            setChecked(card.checked || false);
             const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
                 ? card.assignee_ids
                 : card.assignee_id
@@ -219,7 +224,7 @@ export function CardModal({
     useEffect(() => {
         if (isDirty) {
             const incomingContent = normalizeContent(card.content);
-            const localSerialized = JSON.stringify(ensureTitleBlock(content));
+            const localSerialized = JSON.stringify(ensureTitleTask(content).content);
             const incomingSerialized = JSON.stringify(incomingContent);
 
             const normalizedDueDate = card.due_date || '';
@@ -242,9 +247,11 @@ export function CardModal({
             const bucketMatch = (card.due_bucket ?? null) === (dueBucket ?? null);
             const durationMatch = (card.duration ?? 60) === duration;
             const titleMatch = (card.title || "") === title;
+            const checkedMatch = (card.checked || false) === checked;
 
             if (localSerialized === incomingSerialized &&
                 titleMatch &&
+                checkedMatch &&
                 dateMatch && startMatch && endMatch &&
                 priorityMatch && tagsMatch && bucketMatch && assigneesMatch && durationMatch) {
                 setIsDirty(false);
@@ -353,11 +360,10 @@ export function CardModal({
         const normalizedBucketPosition: number | null =
             normalizedBucket != null ? dueBucketPosition ?? null : null;
 
-        const normalizedContent = content; // ensureTitleBlock removed
-        // Use title state directly
+        // 保存時に構造を最終補正
+        const { content: correctedContent } = ensureTitleTask(content, title, checked);
         const nextTitle = title.trim();
-        // Title can be empty
-        const nextExcerpt = deriveExcerptFromContent(normalizedContent);
+        const nextExcerpt = deriveExcerptFromContent(correctedContent);
 
         if (!isAutoSave) {
             setEditorError(null);
@@ -365,8 +371,9 @@ export function CardModal({
         onSave({
             id: card.id,
             title: nextTitle,
-            content: normalizedContent,
+            content: correctedContent,
             excerpt: nextExcerpt,
+            checked,
             tags,
             due_date: normalizedDueDate,
             priority,
@@ -663,7 +670,7 @@ export function CardModal({
 
     const handleResyncRequest = useCallback(async () => {
         // deriveTitleFromContent here
-        const nextTitle = deriveTitleFromContent(ensureTitleBlock(content));
+        const nextTitle = extractTitleTask(ensureTitleTask(content).content).text;
         if (!nextTitle) return;
         setResyncLoading(true);
         setResyncError(null);
@@ -777,8 +784,21 @@ export function CardModal({
             >
                 <CardModalHeader
                     titlePreview={titlePreview}
+                    checked={checked}
+                    onToggleCheck={(val: boolean) => {
+                        setChecked(val);
+                        const { content: newContent, changed } = setTitleTask(content, { checked: val });
+                        if (changed) {
+                            setContent(newContent);
+                        }
+                        triggerAutoSave();
+                    }}
                     onTitleChange={(val) => {
                         setTitle(val);
+                        const { content: newContent, changed } = setTitleTask(content, { text: val });
+                        if (changed) {
+                            setContent(newContent);
+                        }
                         triggerAutoSave();
                     }}
                     dueDate={dueDate}

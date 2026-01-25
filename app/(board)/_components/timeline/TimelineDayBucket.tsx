@@ -24,6 +24,7 @@ type TimelineDayBucketProps = {
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
+    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
     createdCardId?: string | null;
 };
 
@@ -58,6 +59,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onCardContextMenuByKeyboard,
     contextMenuCardId,
     onUpdateCardTitle,
+    onNoteExtracted,
     createdCardId,
 }: TimelineDayBucketProps) {
     const meta = buildAbMeta(day);
@@ -118,6 +120,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                                     isContextMenuOpen={contextMenuCardId === item.card_id}
                                                     onUpdateCardTitle={onUpdateCardTitle}
+                                                    onNoteExtracted={onNoteExtracted}
                                                     initialIsEditing={createdCardId === item.card_id}
                                                     onCreateBucketCard={onCreateBucketCard}
                                                 />
