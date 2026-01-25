@@ -198,10 +198,14 @@ export default function TiptapEditor({
                 isUpdatingRef.current = false;
             }
 
-            // 初期フォーカス位置を強制的に先頭に設定（Race condition 対策）
-            if (editor.state) {
+            // 初期フォーカス位置を「1行目（タイトル行）の末尾」に設定
+            if (editor.state && editor.state.doc.firstChild) {
+                const firstNode = editor.state.doc.firstChild;
+                // TextSelection.near を使用して、1行目の末尾（ノードの内側）にフォーカス
+                // 1 + content.size はタイトル行の末尾の内部位置
+                const endOfFirstBlock = 1 + firstNode.content.size;
                 const tr = editor.state.tr.setSelection(
-                    TextSelection.atStart(editor.state.doc)
+                    TextSelection.near(editor.state.doc.resolve(Math.min(endOfFirstBlock, editor.state.doc.content.size)), -1)
                 );
                 editor.view.dispatch(tr);
             }
