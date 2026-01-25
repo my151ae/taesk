@@ -52,6 +52,7 @@ type TimelineHeaderProps = {
     realtimeStatus: 'connected' | 'connecting' | 'disconnected';
     viewMode: 'timeline' | 'list';
     setViewMode: (mode: 'timeline' | 'list') => void;
+    onShortcutsClick: () => void;
 };
 
 export default function TimelineHeader({
@@ -94,6 +95,7 @@ export default function TimelineHeader({
     realtimeStatus,
     viewMode,
     setViewMode,
+    onShortcutsClick,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -343,6 +345,14 @@ export default function TimelineHeader({
 
                 {/* Spacer to push right items */}
                 <div className="flex-1" />
+
+                {/* Shortcuts Button */}
+                <button
+                    onClick={onShortcutsClick}
+                    className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 shrink-0"
+                >
+                    Shortcuts
+                </button>
 
                 {/* List Toggle Button */}
                 <button

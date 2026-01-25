@@ -47,6 +47,7 @@ type TimelineBoardHeaderProps = {
   googleToast: string | null;
   viewMode: 'timeline' | 'list';
   setViewMode: (mode: 'timeline' | 'list') => void;
+  onShortcutsClick: () => void;
 };
 
 export default function TimelineBoardHeader({
@@ -90,6 +91,7 @@ export default function TimelineBoardHeader({
   googleToast,
   viewMode,
   setViewMode,
+  onShortcutsClick,
 }: TimelineBoardHeaderProps) {
   return (
     <>
@@ -133,6 +135,7 @@ export default function TimelineBoardHeader({
         realtimeStatus={realtimeStatus}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        onShortcutsClick={onShortcutsClick}
       />
       {googleToast && (
         <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">

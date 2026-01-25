@@ -12,6 +12,7 @@ import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoa
 import { DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
+import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
 import {
   type TimelineEvent,
   minuteToPixels,
@@ -55,6 +56,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
@@ -594,6 +596,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
           viewMode={viewMode} setViewMode={handleSetViewMode}
+          onShortcutsClick={() => setShowShortcutsModal(true)}
         />
 
         {viewMode === 'timeline' ? (
@@ -734,6 +737,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
           initialBoard={currentBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
           setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
+        />
+
+        <ShortcutsModal
+          isOpen={showShortcutsModal}
+          onClose={() => setShowShortcutsModal(false)}
         />
 
         {modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading') && (
