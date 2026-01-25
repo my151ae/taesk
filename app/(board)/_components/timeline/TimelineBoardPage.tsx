@@ -302,7 +302,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const handleNoteExtracted = useCallback(async (cardId: string, bodyLines: string[], updatedTitle?: string) => {
     if (!data) return;
-    // 1. Find the card to get its current content
+    // 1. Find the card
     const allItems = [
       ...(data.events || []),
       ...Object.values(data.abBuckets || {}).flat()
@@ -311,31 +311,39 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (!card) return;
 
     // 2. Prepare new content
-    // まず構造を保証（先頭が taskList(taskItem) でなければ補正）
-    let { content: workingContent } = ensureTitleTask(card.content || { type: 'doc', content: [] });
+    // タイトルの抽出。渡された updatedTitle があれば優先、なければ既存、なければ空。
+    const finalTitle = updatedTitle ?? card.title ?? "";
 
-    // タイトルが渡されていれば同期
+    // ensureTitleTask に fallbackTitle を渡すことで、空カードの場合に正しくタスク化される
+    let { content: workingContent } = ensureTitleTask(card.content || { type: 'doc', content: [] }, finalTitle);
+
+    // タイトルが渡されていれば改めて同期（既に ensureTitleTask 内で反映されている可能性もあるが念打ち）
     if (updatedTitle !== undefined) {
       const { content: syncedContent } = setTitleTask(workingContent, { text: updatedTitle });
       workingContent = syncedContent;
     }
 
+    // 貼り付けデータの段落化
     const paragraphs = bodyLines.map(line => ({
       type: 'paragraph',
       content: line ? [{ type: 'text', text: line }] : []
     }));
 
+    // 本文の構築
+    // 既存の content から「タイトル（インデックス0）」以降を抽出。
+    // もし元々 1 行しかなくて、それが空文字だった場合は slice(1) は空。
+    const existingBody = workingContent.content?.slice(1) || [];
+
     const newContent = {
       ...workingContent,
       content: [
-        ...(workingContent.content?.slice(0, 1) || []),
+        workingContent.content![0], // タイトル行
         ...paragraphs,
-        ...(workingContent.content?.slice(1) || [])
+        ...existingBody
       ]
     };
 
     const newExcerpt = deriveExcerptFromContent(newContent);
-    const finalTitle = updatedTitle ?? card.title;
 
     // 3. Optimistic local update
     setData((prev: any) => {

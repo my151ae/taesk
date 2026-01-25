@@ -109,9 +109,34 @@ export const extractTitleTask = (content: JSONContent): { text: string; checked:
         if (firstTaskItem?.type === 'taskItem') {
             const checked = !!firstTaskItem.attrs?.checked;
             // taskItem の中の paragraph からテキストを抽出
+            // getTiptapPlainText は [] などの記号を付与するため、ここでは使わず
+            // ネストされたノードの text を結合する独自の方法または正規表現除去を行う
             const paragraph = firstTaskItem.content?.find(node => node.type === 'paragraph');
-            const text = paragraph ? getTiptapPlainText({ type: 'doc', content: [paragraph] }).trim() : "";
+            let text = "";
+            if (paragraph) {
+                // プレーンテキストのみを取得（記号を含ませない）
+                text = (paragraph.content ?? [])
+                    .map(n => n.type === 'text' ? (n.text ?? '') : '')
+                    .join('')
+                    .trim();
+            }
+
+            // 保険：万が一記号が含まれていた場合は除去
+            text = text.replace(/^\s*\[(x| )\]\s*/i, '');
+
             return { text, checked };
+        }
+    }
+
+    // フォールバック: taskList 構造でなくても、最初に見つかるテキストをタイトルとする
+    for (const node of content.content) {
+        // node 単位でのプレーンテキスト取得
+        const text = getTiptapPlainText({ type: 'doc', content: [node] })
+            .trim()
+            .replace(/^\s*\[(x| )\]\s*/i, ''); // 記号除去
+
+        if (text) {
+            return { text, checked: false };
         }
     }
 
@@ -155,13 +180,23 @@ export const setTitleTask = (
                 }
             }
         }
+    } else if (firstNode?.type === 'paragraph' && updates.text !== undefined) {
+        // 構造化前でもタイトルの同期だけは通す
+        const currentText = (firstNode.content ?? [])
+            .map((n: any) => n.text ?? '')
+            .join('');
+        if (currentText !== updates.text) {
+            firstNode.content = updates.text ? [{ type: 'text', text: updates.text }] : [];
+            changed = true;
+        }
     }
 
     return { content: newContent, changed };
 };
 
 /**
- * モーダル展開時や保存時に、先頭ノードが taskList (taskItem) でなければ置換して補正する。
+ * モーダル展開時や保存時に構造を補足する。
+ * ただし「空なら何もしない」合意に基づき、空テキストの場合は paragraph を許容する。
  */
 export const ensureTitleTask = (
     content: JSONContent,
@@ -172,16 +207,24 @@ export const ensureTitleTask = (
         return { content: buildContentFromTitle(fallbackTitle), changed: true };
     }
 
+    const firstNode = content.content[0];
     const current = extractTitleTask(content);
-    // すでに正しい構造なら内容だけチェック
-    if (content.content[0]?.type === 'taskList' && content.content[0].content?.[0]?.type === 'taskItem') {
+
+    // すでにタスクリスト構造がある場合は、そのまま（内容は setTitleTask 等で同期される）
+    if (firstNode?.type === 'taskList') {
         return { content, changed: false };
     }
 
-    // 補正：先頭ノードを taskList(taskItem) に置換
-    const firstNode = content.content[0];
-    const newTitle = current.text || (firstNode ? getTiptapPlainText({ type: 'doc', content: [firstNode] }).trim() : fallbackTitle);
+    // タスクリスト構造がない場合かつ、テキストがある場合はタスク化（補正）
+    const nodeText = firstNode ? getTiptapPlainText({ type: 'doc', content: [firstNode] }).trim() : "";
+    const textToUse = nodeText || fallbackTitle;
 
+    if (textToUse === "") {
+        // 全くテキストがない場合は、paragraph のまま（合意：空なら何もしない）
+        return { content, changed: false };
+    }
+
+    // テキストがあるのに taskList でない場合は、taskList(taskItem) に変換して補正
     const titleTask = {
         type: 'taskList',
         content: [
@@ -191,7 +234,7 @@ export const ensureTitleTask = (
                 content: [
                     {
                         type: 'paragraph',
-                        content: newTitle ? [{ type: 'text', text: newTitle }] : []
+                        content: [{ type: 'text', text: textToUse }]
                     }
                 ]
             }
@@ -224,7 +267,14 @@ export const ensureTitleBlock = (content: JSONContent): JSONContent => {
 };
 
 export const buildContentFromTitle = (title: string): JSONContent => {
-    // 新ルール：タイトル文字が含まれた先頭 taskItem を生成
+    // 合意仕様: 空なら paragraph、文字があれば taskItem
+    if (!title.trim()) {
+        return {
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [] }]
+        };
+    }
+
     return {
         type: 'doc',
         content: [
@@ -237,7 +287,7 @@ export const buildContentFromTitle = (title: string): JSONContent => {
                         content: [
                             {
                                 type: 'paragraph',
-                                content: title ? [{ type: 'text', text: title }] : []
+                                content: [{ type: 'text', text: title }]
                             }
                         ]
                     }

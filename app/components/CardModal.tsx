@@ -362,7 +362,12 @@ export function CardModal({
 
         // 保存時に構造を最終補正
         const { content: correctedContent } = ensureTitleTask(content, title, checked);
-        const nextTitle = title.trim();
+        // 重要：最新の content (エディタの中身) からタイトルとチェック状態を優先的に再抽出する
+        // これにより、onChange での同期と保存時の最終ステートを一致させる
+        const extracted = extractTitleTask(correctedContent);
+        // 合意A: 空文字も正当なタイトルとして受け入れる（復活バグの防止）
+        const nextTitle = extracted.text.trim();
+        const nextChecked = extracted.checked;
         const nextExcerpt = deriveExcerptFromContent(correctedContent);
 
         if (!isAutoSave) {
@@ -373,7 +378,7 @@ export function CardModal({
             title: nextTitle,
             content: correctedContent,
             excerpt: nextExcerpt,
-            checked,
+            checked: nextChecked,
             tags,
             due_date: normalizedDueDate,
             priority,
@@ -847,12 +852,22 @@ export function CardModal({
                                     initialContent={content}
                                     onChange={(val) => {
                                         setContent(val);
+                                        // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
+                                        const { text: extractedText, checked: newChecked } = extractTitleTask(val);
+                                        // 空文字列も変更として反映（全削除対応）
+                                        if (extractedText !== title) {
+                                            setTitle(extractedText);
+                                        }
+                                        if (newChecked !== checked) {
+                                            setChecked(newChecked);
+                                        }
                                         triggerAutoSave();
                                         if (editorError) {
                                             setEditorError(null);
                                         }
                                     }}
                                     placeholder="メモを入力..."
+                                    data-autofocus
                                 />
                             )}
                             {editorError && (

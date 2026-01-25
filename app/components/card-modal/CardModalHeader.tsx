@@ -105,10 +105,11 @@ export default function CardModalHeader({
                     <input
                         id="modal-title"
                         value={titlePreview}
-                        onChange={(e) => onTitleChange(e.target.value)}
+                        readOnly
+                        tabIndex={-1}
                         placeholder="Untitled card"
                         className={clsx(
-                            "flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-slate-300 dark:placeholder:text-gray-600",
+                            "flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-slate-300 dark:placeholder:text-gray-600 cursor-default",
                             !titlePreview ? "text-slate-400 dark:text-gray-500" : "text-slate-800 dark:text-gray-100"
                         )}
                     />

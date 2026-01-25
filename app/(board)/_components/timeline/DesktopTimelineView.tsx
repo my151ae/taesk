@@ -582,6 +582,7 @@ export function DesktopTimelineView({
                   openCardModal={openCardModal}
                   onToggleCheck={onToggleCheck}
                   onUpdateCardTitle={onUpdateCardTitle}
+                  onNoteExtracted={onNoteExtracted}
                   onCardContextMenu={onCardContextMenu}
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}

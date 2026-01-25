@@ -1,7 +1,7 @@
 'use client';
 
-import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
-import { TextSelection } from '@tiptap/pm/state';
+import { Extension, useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import { TextSelection, Plugin, PluginKey, EditorState, Transaction } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -9,18 +9,90 @@ import styles from './TiptapEditor.module.css';
 import { useEffect, useRef } from 'react';
 import { ensureTitleTask } from '@/lib/tiptap';
 
+/**
+ * 先頭ブロックが空でないテキストを持つ場合、自動的に taskItem に変換する拡張
+ */
+const AutoTaskFirstLine = Extension.create({
+    name: 'autoTaskFirstLine',
+
+    addOptions() {
+        return {
+            enabled: true,
+        };
+    },
+
+    addGlobalAttributes() {
+        return [];
+    },
+
+    addProseMirrorPlugins() {
+        return [
+            new Plugin({
+                key: new PluginKey('autoTaskFirstLine'),
+                appendTransaction: (transactions: readonly Transaction[], oldState: EditorState, newState: EditorState) => {
+                    // 安全ガード: newState がない場合は何もしない
+                    if (!newState || !newState.doc) return;
+
+                    // 変更がない、またはメタフラグがある場合はスキップ
+                    if (!transactions.some(tr => tr.docChanged) || transactions.some(tr => tr.getMeta('autoTaskFirstLine'))) {
+                        return;
+                    }
+
+                    const { doc, schema } = newState;
+                    const firstNode = doc.firstChild;
+
+                    // 先頭が taskList 構造でない場合のみ変換対象
+                    if (firstNode && firstNode.type.name !== 'taskList') {
+                        const textContent = firstNode.textContent.trim();
+
+                        // 合意A: 空なら何もしない
+                        if (textContent !== "") {
+                            // 厳密仕様B: 先頭ブロックの内容を抽出し、taskItem(paragraph) に変換
+                            const tr = newState.tr;
+
+                            const newTaskItem = schema.nodes.taskItem.create(
+                                { checked: false },
+                                [schema.nodes.paragraph.create({}, schema.text(textContent))]
+                            );
+                            const newTaskList = schema.nodes.taskList.create({}, [newTaskItem]);
+
+                            // 先頭ブロックを置換
+                            tr.replaceWith(0, firstNode.nodeSize, newTaskList);
+
+                            // メタフラグ付与と履歴除外
+                            tr.setMeta('autoTaskFirstLine', true);
+                            tr.setMeta('addToHistory', false);
+
+                            // セレクションの復元
+                            try {
+                                tr.setSelection(TextSelection.atStart(tr.doc));
+                            } catch (e) {
+                                // ignore
+                            }
+
+                            return tr;
+                        }
+                    }
+                },
+            }),
+        ];
+    },
+});
+
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
     placeholder?: string;
     editable?: boolean;
+    'data-autofocus'?: boolean;
 };
 
 export default function TiptapEditor({
     initialContent,
     onChange,
     placeholder = "Type '/' for commands…",
-    editable = true
+    editable = true,
+    'data-autofocus': dataAutofocus
 }: TiptapEditorProps) {
     // Use a ref to track if we're silently updating content to avoid trigger loops
     const isUpdatingRef = useRef(false);
@@ -38,6 +110,7 @@ export default function TiptapEditor({
             TaskItem.configure({
                 nested: true,
             }),
+            AutoTaskFirstLine,
             Placeholder.configure({
                 placeholder: ({ node }) => {
                     if (node.type.name === 'heading') {
@@ -55,35 +128,55 @@ export default function TiptapEditor({
         editorProps: {
             attributes: {
                 class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-4 pb-4',
+                ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handlePaste: (view, event, slice) => {
                 const text = event.clipboardData?.getData('text/plain');
                 if (text && (text.includes('\n') || text.includes('\r'))) {
-                    console.log('[Tiptap] multiline paste detected, handling manually');
                     const lines = text.split(/\r\n|\r|\n/);
                     const firstLine = lines[0];
                     const bodyLines = lines.slice(1);
 
                     const { state, dispatch } = view;
-                    const { selection } = state;
+                    const { selection, schema } = state;
+                    const $pos = selection.$from;
 
-                    // 1. Insert first line at current selection
-                    let tr = state.tr.insertText(firstLine, selection.from, selection.to);
+                    // 1. リスト内でのペーストか判定 (taskItem の中か)
+                    // depth が 0 の場合はドキュメントトップなので除外
+                    let tr = state.tr;
+                    let isInsideTask = false;
+                    let taskDepth = 0;
 
-                    // 2. Insert rest as new paragraphs
-                    if (bodyLines.length > 0) {
-                        const newParagraphs = bodyLines.map(line =>
-                            state.schema.nodes.paragraph.create({}, state.schema.text(line || ' '))
-                        );
-                        // Insert after the current block
-                        // Find end of current block
-                        const $pos = tr.doc.resolve(tr.selection.to);
-                        const endOfBlock = $pos.end();
-                        tr = tr.insert(endOfBlock + 1, newParagraphs);
+                    for (let d = $pos.depth; d > 0; d--) {
+                        if (state.doc.nodeAt($pos.before(d))?.type.name === 'taskItem') {
+                            isInsideTask = true;
+                            taskDepth = d;
+                            break;
+                        }
                     }
 
-                    dispatch(tr);
-                    return true; // Prevent default
+                    if (isInsideTask && bodyLines.length > 0) {
+                        console.log('[Tiptap] multiline paste in list detected, escaping list for body lines');
+
+                        // 1行目を現在位置へ挿入（選択範囲を置換）
+                        tr = tr.insertText(firstLine, selection.from, selection.to);
+
+                        // 2行目以降は現在の taskItem を抜けてその直後に挿入
+                        // 1行目挿入後の selection.to から解決し直すと安全
+                        const $newPos = tr.doc.resolve(tr.mapping.map(selection.to));
+                        const insertPos = $newPos.after(taskDepth);
+
+                        const newParagraphs = bodyLines.map(line =>
+                            schema.nodes.paragraph.create({}, line ? schema.text(line) : [])
+                        );
+
+                        tr = tr.insert(insertPos, newParagraphs);
+                        dispatch(tr);
+                        return true;
+                    }
+
+                    // リスト外の場合や1行のみの場合は標準挙動に任せる
+                    return false;
                 }
                 return false;
             }
@@ -94,7 +187,7 @@ export default function TiptapEditor({
                 onChange(editor.getJSON());
             }
         },
-        autofocus: false,
+        autofocus: 'start', // 'start' に設定して初期化時に先頭へフォーカス
         onCreate: ({ editor }) => {
             // 補正：先頭行をタイトルタスクに強制
             const currentContent = editor.getJSON();
@@ -105,31 +198,13 @@ export default function TiptapEditor({
                 isUpdatingRef.current = false;
             }
 
-            // Focus at the end of the first block (Title line)
-            // Use setTimeout to ensure we override CardModal's initial focus trap
-            setTimeout(() => {
-                if (editor.isDestroyed) return;
-
-                const firstNode = editor.state.doc.firstChild;
-                console.log('[Tiptap] onCreate focus attempt', {
-                    hasFirstNode: !!firstNode,
-                    contentSize: editor.state.doc.content.size
-                });
-
-                if (firstNode) {
-                    const endOfFirstBlock = 1 + firstNode.content.size;
-                    // Try setting selection end of first block (Title)
-                    const tr = editor.state.tr.setSelection(
-                        TextSelection.near(editor.state.doc.resolve(endOfFirstBlock), -1)
-                    );
-                    editor.view.dispatch(tr);
-                    editor.commands.focus();
-                    editor.commands.scrollIntoView();
-                } else {
-                    // Fallback if empty doc
-                    editor.commands.focus('start');
-                }
-            }, 100); // Increased delay to 100ms
+            // 初期フォーカス位置を強制的に先頭に設定（Race condition 対策）
+            if (editor.state) {
+                const tr = editor.state.tr.setSelection(
+                    TextSelection.atStart(editor.state.doc)
+                );
+                editor.view.dispatch(tr);
+            }
         },
     });
 
