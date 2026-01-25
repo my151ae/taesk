@@ -279,13 +279,13 @@ export function TimelineCard({
                                 return (
                                     <div
                                         key={`line-${idx}`}
-                                        className="flex items-center gap-1 w-full min-w-0"
+                                        className="flex items-start gap-1 w-full min-w-0"
                                         style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
                                     >
                                         {isTask ? (
                                             <span
                                                 className={clsx(
-                                                    "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0",
+                                                    "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0 mt-[1px]",
                                                     checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
                                                 )}
                                                 aria-hidden="true"
@@ -297,7 +297,7 @@ export function TimelineCard({
                                                 ) : null}
                                             </span>
                                         ) : null}
-                                        <span className="truncate">{text || '\u00A0'}</span>
+                                        <span className="line-clamp-2">{text || '\u00A0'}</span>
                                     </div>
                                 );
                             })}
