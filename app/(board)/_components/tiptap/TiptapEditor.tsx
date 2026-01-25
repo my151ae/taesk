@@ -63,9 +63,10 @@ const AutoTaskFirstLine = Extension.create({
                             tr.setMeta('autoTaskFirstLine', true);
                             tr.setMeta('addToHistory', false);
 
-                            // セレクションの復元
+                            // セレクションの復元（入力した文字の直後にカーソルを置く）
                             try {
-                                tr.setSelection(TextSelection.atStart(tr.doc));
+                                const endOfFirstBlock = tr.doc.firstChild!.nodeSize - 1;
+                                tr.setSelection(TextSelection.near(tr.doc.resolve(endOfFirstBlock), -1));
                             } catch (e) {
                                 // ignore
                             }

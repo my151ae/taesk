@@ -61,9 +61,17 @@ export function InlineTitleEditor({
         if (hasCommittedRef.current) return; // 二重保存防止
         if (isComposing) return; // IME変換中は保存しない
         console.log('[InlineTitleEditor] handleSave', { localTitle: JSON.stringify(localTitle) });
+
+        const { title: finalTitle, bodyLines } = splitPastedText(localTitle);
+
+        // 改行が含まれている（2行目以降がある）場合は本文として抽出
+        if (bodyLines.length > 0 && onNoteExtracted) {
+            onNoteExtracted(bodyLines, finalTitle);
+        }
+
         hasCommittedRef.current = true;
-        onSave(localTitle, initialTitleRef.current);
-    }, [localTitle, onSave, isComposing]);
+        onSave(finalTitle, initialTitleRef.current);
+    }, [localTitle, onSave, isComposing, onNoteExtracted]);
 
     const handleCancel = useCallback(() => {
         if (hasCommittedRef.current) return;
