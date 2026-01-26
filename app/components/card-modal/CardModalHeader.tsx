@@ -18,10 +18,6 @@ const getProfileInitials = (profile: ProfileSummary): string => {
 type BucketOption = { value: DueBucket; label: string };
 
 type CardModalHeaderProps = {
-    titlePreview: string;
-    checked: boolean;
-    onToggleCheck: (value: boolean) => void;
-    onTitleChange: (value: string) => void;
     dueDate: string;
     dueStart: string;
     dueEnd: string;
@@ -50,10 +46,6 @@ type CardModalHeaderProps = {
 };
 
 export default function CardModalHeader({
-    titlePreview,
-    checked,
-    onToggleCheck,
-    onTitleChange,
     dueDate,
     dueStart,
     dueEnd,
@@ -81,63 +73,7 @@ export default function CardModalHeader({
     onToggleSidebar,
 }: CardModalHeaderProps) {
     return (
-        <div className="flex flex-col p-4 sm:p-6 pb-2 sm:pb-4 border-b border-slate-200 dark:border-gray-700">
-            <div className="flex justify-between items-start mb-3 sm:mb-4 gap-4">
-                <div className="flex-1 flex items-center gap-3">
-                    <div
-                        role="checkbox"
-                        aria-checked={checked}
-                        onClick={() => onToggleCheck(!checked)}
-                        className={clsx(
-                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer mt-1",
-                            checked
-                                ? "bg-slate-400 border-slate-400"
-                                : "bg-white border-slate-300 hover:border-sky-400 dark:bg-gray-700 dark:border-gray-500"
-                        )}
-                        aria-label={checked ? '未完了に戻す' : '完了にする'}
-                    >
-                        {checked && (
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                        )}
-                    </div>
-                    <input
-                        id="modal-title"
-                        value={titlePreview}
-                        readOnly
-                        tabIndex={-1}
-                        placeholder="Untitled card"
-                        className={clsx(
-                            "flex-1 text-xl sm:text-2xl font-bold bg-transparent border-none outline-none placeholder:text-slate-300 dark:placeholder:text-gray-600 cursor-default",
-                            !titlePreview ? "text-slate-400 dark:text-gray-500" : "text-slate-800 dark:text-gray-100"
-                        )}
-                    />
-                </div>
-                <div className="flex items-center gap-1 sm:gap-2">
-                    <button
-                        onClick={onToggleSidebar}
-                        className={clsx(
-                            "p-2 rounded-lg transition-all duration-200",
-                            showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/40 ring-1 ring-sky-200 dark:ring-sky-800" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
-                        )}
-                        title={showSidebar ? "Hide details" : "Show details"}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </button>
-                    <div className="w-px h-6 bg-slate-200 dark:bg-gray-700 mx-1 hidden sm:block" />
-                    <button
-                        onClick={onRequestClose}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
-                        aria-label="Close modal"
-                    >
-                        <span className="text-xl leading-none">✕</span>
-                    </button>
-                </div>
-            </div>
-
+        <div className="flex flex-col p-3 sm:p-4 pb-2 sm:pb-3 border-b border-slate-200 dark:border-gray-700">
             {/* Schedule Section in Header */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-6 text-sm">
                 <div className="flex items-center gap-2">
@@ -340,6 +276,28 @@ export default function CardModalHeader({
                         </div>
                     </div>
                 )}
+                <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+                    <button
+                        onClick={onToggleSidebar}
+                        className={clsx(
+                            "p-2 rounded-lg transition-all duration-200",
+                            showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/40 ring-1 ring-sky-200 dark:ring-sky-800" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
+                        )}
+                        title={showSidebar ? "Hide details" : "Show details"}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </button>
+                    <div className="w-px h-6 bg-slate-200 dark:bg-gray-700 mx-1 hidden sm:block" />
+                    <button
+                        onClick={onRequestClose}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Close modal"
+                    >
+                        <span className="text-xl leading-none">✕</span>
+                    </button>
+                </div>
             </div>
         </div>
     );
