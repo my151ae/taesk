@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/react";
 import type { Card, DueBucket, Priority } from "@/lib/supabase";
-import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent } from "@/lib/tiptap";
+import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent, setTitleTask } from "@/lib/tiptap";
 import { slugify } from "@/lib/card-utils";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { minutesToTime } from "@/app/(board)/_utils/timeline-helpers";
@@ -333,22 +333,41 @@ export function useTimelineCardActions({
         if (dataMode !== 'api') return;
 
         const requestId = ++titleUpdateRequestIdRef.current;
-
-        // 1. Find current card needed? Not for content anymore.
-        // We just update the title field.
-
         const nextTitle = newTitle.trim();
 
-        // 2. Optimistic Update
-        // We only update the title. Content remains untouched.
+        // 1. 同期対象のカードとコンテンツを取得
+        const allItems = [
+            ...(data?.events || []),
+            ...Object.values(data?.abBuckets || {}).flat()
+        ];
+        const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
+
+        // 2. 新しいコンテンツと抜粋の生成
+        let nextContent = card?.content;
+        let nextExcerpt = card?.excerpt || "";
+
+        if (card) {
+            // setTitleTask を使用して Tiptap コンテンツ内のタイトル行を更新
+            const { content: updatedContent, changed } = setTitleTask(
+                normalizeContent(card.content),
+                { text: nextTitle }
+            );
+            if (changed) {
+                nextContent = updatedContent;
+                nextExcerpt = deriveExcerptFromContent(nextContent);
+            }
+        }
+
+        // 3. 楽観的更新 (Optimistic Update)
         setData((prev: any) => {
+            if (!prev) return prev;
             return {
                 ...prev,
-                events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: nextTitle } : e),
+                events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: nextTitle, content: nextContent, excerpt: nextExcerpt } : e),
                 abBuckets: Object.fromEntries(
                     Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
                         k,
-                        v.map((i: any) => i.card_id === cardId ? { ...i, title: nextTitle } : i)
+                        v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: nextTitle, content: nextContent, excerpt: nextExcerpt } : i)
                     ])
                 ),
             };
@@ -361,27 +380,27 @@ export function useTimelineCardActions({
                 body: JSON.stringify({
                     title: nextTitle,
                     slug: slugify(nextTitle),
+                    content: nextContent,
+                    excerpt: nextExcerpt,
                 }),
             });
 
             if (!res.ok) throw new Error('Failed to update title');
 
-            // requestIdが最新でない場合は無視（レースコンディション対策）
             if (requestId !== titleUpdateRequestIdRef.current) return;
 
         } catch (error) {
-            // requestIdが最新の場合のみロールバック
             if (requestId === titleUpdateRequestIdRef.current) {
                 console.error('[timeline] title update failed, rolling back', error);
                 setData((prev: any) => {
                     if (!prev) return prev;
                     return {
                         ...prev,
-                        events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, title: previousTitle } : e),
+                        events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: previousTitle, content: card?.content, excerpt: card?.excerpt } : e),
                         abBuckets: Object.fromEntries(
                             Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
                                 k,
-                                v.map((i: any) => i.card_id === cardId ? { ...i, title: previousTitle } : i)
+                                v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: previousTitle, content: card?.content, excerpt: card?.excerpt } : i)
                             ])
                         ),
                     };
@@ -389,7 +408,7 @@ export function useTimelineCardActions({
                 setErrorMessage('タイトルの更新に失敗しました');
             }
         }
-    }, [dataMode, initialBoardId, setData, setErrorMessage]);
+    }, [dataMode, initialBoardId, setData, setErrorMessage, data]);
 
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {
