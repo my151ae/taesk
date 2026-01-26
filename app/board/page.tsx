@@ -15,10 +15,25 @@ export default async function BoardDefaultPage() {
     redirect("/login");
   }
 
-  const board = await getBoardById(MAIN_BOARD_ID);
+  // ユーザーが所属しているボードを1つ取得
+  const { data: membership } = await supabase
+    .from('board_members')
+    .select('board_id')
+    .eq('profile_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  let targetBoardId = MAIN_BOARD_ID;
+  if (membership) {
+    targetBoardId = membership.board_id;
+  }
+
+  const board = await getBoardById(targetBoardId);
 
   if (!board) {
-    throw new Error("Main board not found");
+    // ボードが1つもない場合は、ログイン直後の画面などへ飛ばすか、エラーを表示
+    throw new Error("No boards found for user");
   }
 
   // Redirect to canonical URL
