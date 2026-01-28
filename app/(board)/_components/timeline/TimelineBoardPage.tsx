@@ -312,12 +312,35 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
     if (!card) return;
 
+    // 1.5. Ensure we have full content before patching (timeline payload may not include content)
+    let baseContent = card.content ?? null;
+    const hasDocContent =
+      baseContent &&
+      typeof baseContent === 'object' &&
+      'type' in baseContent &&
+      (baseContent as any).type === 'doc';
+    if (!hasDocContent && card.short_id) {
+      try {
+        const res = await fetch(`/api/cards/${card.short_id}`);
+        if (res.ok) {
+          const body = await res.json().catch(() => null);
+          baseContent = body?.card?.content ?? null;
+        } else {
+          console.warn('[timeline] failed to fetch full card for inline note', { cardId, status: res.status });
+          return;
+        }
+      } catch (error) {
+        console.warn('[timeline] failed to fetch full card for inline note', { cardId, error });
+        return;
+      }
+    }
+
     // 2. Prepare new content
     // タイトルの抽出。渡された updatedTitle があれば優先、なければ既存、なければ空。
     const finalTitle = updatedTitle ?? card.title ?? "";
 
     // ensureTitleTask に fallbackTitle を渡すことで、空カードの場合に正しくタスク化される
-    let { content: workingContent } = ensureTitleTask(card.content || { type: 'doc', content: [] }, finalTitle);
+    let { content: workingContent } = ensureTitleTask(baseContent || { type: 'doc', content: [] }, finalTitle);
 
     // タイトルが渡されていれば改めて同期（既に ensureTitleTask 内で反映されている可能性もあるが念打ち）
     if (updatedTitle !== undefined) {
@@ -325,23 +348,41 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       workingContent = syncedContent;
     }
 
-    // 貼り付けデータの段落化
-    const paragraphs = bodyLines.map(line => ({
-      type: 'paragraph',
-      content: line ? [{ type: 'text', text: line }] : []
-    }));
-
     // 本文の構築
     // 既存の content から「タイトル（インデックス0）」以降を抽出。
     // もし元々 1 行しかなくて、それが空文字だった場合は slice(1) は空。
     const existingBody = workingContent.content?.slice(1) || [];
 
+    // 改行テキストの挿入先は、既存の先頭が taskList ならその先頭に追加。
+    // そうでなければ従来どおり paragraph を挿入する。
+    let nextBody: any[] = existingBody;
+    if (bodyLines.length > 0) {
+      if (existingBody[0]?.type === 'taskList') {
+        const taskItems = bodyLines.map(line => ({
+          type: 'taskItem',
+          attrs: { checked: false },
+          content: [{ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] }]
+        }));
+        const firstList = existingBody[0];
+        const mergedList = {
+          ...firstList,
+          content: [...taskItems, ...(firstList.content ?? [])]
+        };
+        nextBody = [mergedList, ...existingBody.slice(1)];
+      } else {
+        const paragraphs = bodyLines.map(line => ({
+          type: 'paragraph',
+          content: line ? [{ type: 'text', text: line }] : []
+        }));
+        nextBody = [...paragraphs, ...existingBody];
+      }
+    }
+
     const newContent = {
       ...workingContent,
       content: [
         workingContent.content![0], // タイトル行
-        ...paragraphs,
-        ...existingBody
+        ...nextBody
       ]
     };
 
