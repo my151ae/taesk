@@ -77,7 +77,6 @@ export function CardModal({
     const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
     const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
     const [checked, setChecked] = useState(card.checked || false);
-    const contentFetchRef = useRef<string | null>(null);
     // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
     const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
         if (card.assignee_ids && card.assignee_ids.length > 0) {
@@ -106,6 +105,8 @@ export function CardModal({
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardIdRef = useRef(card.id);
+    const hasAppliedInitialLoadRef = useRef(false);
+    const previousLoadingRef = useRef<boolean | null>(null);
     const onCloseRef = useRef(onClose);
     const requestCloseRef = useRef<() => void>(() => { });
     const memberButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -159,11 +160,12 @@ export function CardModal({
 
     // card prop が変わったときの処理
     useEffect(() => {
-        const incomingContent = normalizeContent(card.content);
-
         // カードIDが変わった場合は、エディタも含め全てリセット
         if (card.id !== cardIdRef.current) {
             cardIdRef.current = card.id;
+            hasAppliedInitialLoadRef.current = false;
+            previousLoadingRef.current = null;
+            const incomingContent = normalizeContent(card.content);
             // ステートのリセット（TiptapEditor は key={card.id} でリマウントされる）
             setContent(incomingContent);
             setTitle(card.title || "");
@@ -195,23 +197,24 @@ export function CardModal({
     }, [card.id]); // id 変化のみを監視
 
     // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
-    const lastSyncedContentRef = useRef<string | null>(null);
-
     useEffect(() => {
         if (card.id !== cardIdRef.current) return;
+        const loadingNow = Boolean(isLoading);
+        const wasLoading = previousLoadingRef.current;
+        previousLoadingRef.current = loadingNow;
         if (isDirty) return;
+        if (loadingNow) return;
+        if (hasAppliedInitialLoadRef.current) return;
+        if (wasLoading !== true) return;
 
         const incomingContent = normalizeContent(card.content);
-        const incomingStr = JSON.stringify(incomingContent);
-        if (incomingStr === lastSyncedContentRef.current) return;
-
-        lastSyncedContentRef.current = incomingStr;
         setContent(incomingContent);
         const extracted = extractTitleTask(incomingContent);
         setTitle(extracted.text);
         setChecked(extracted.checked);
         setEditorError(null);
-    }, [card.content, card.id, isDirty]);
+        hasAppliedInitialLoadRef.current = true;
+    }, [card.content, card.id, isDirty, isLoading]);
 
     // 保存後のリセット対応は 各ハンドラーと card prop の同期にて行う
     // (重い JSON.stringify 比較は行わない)

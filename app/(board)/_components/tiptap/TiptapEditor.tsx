@@ -2,6 +2,7 @@
 
 import { Extension, useEditor, EditorContent, JSONContent } from '@tiptap/react';
 import { TextSelection, Plugin, PluginKey, EditorState, Transaction } from '@tiptap/pm/state';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -97,6 +98,8 @@ export default function TiptapEditor({
 }: TiptapEditorProps) {
     // Use a ref to track if we're silently updating content to avoid trigger loops
     const isUpdatingRef = useRef(false);
+    const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
+    const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -184,6 +187,10 @@ export default function TiptapEditor({
         },
         onUpdate: ({ editor }) => {
             if (isUpdatingRef.current) return;
+            const currentDoc = editor.state.doc;
+            if (lastAppliedDocRef.current && currentDoc.eq(lastAppliedDocRef.current)) return;
+            if (lastEmittedDocRef.current && currentDoc.eq(lastEmittedDocRef.current)) return;
+            lastEmittedDocRef.current = currentDoc;
             if (onChange) {
                 onChange(editor.getJSON());
             }
@@ -198,6 +205,7 @@ export default function TiptapEditor({
                 editor.commands.setContent(correctedContent, { emitUpdate: false });
                 isUpdatingRef.current = false;
             }
+            lastAppliedDocRef.current = editor.state.doc;
 
             // 初期フォーカス位置を「1行目（タイトル行）の末尾」に設定
             if (editor.state && editor.state.doc.firstChild) {
@@ -219,15 +227,16 @@ export default function TiptapEditor({
     useEffect(() => {
         if (!editor) return;
 
-        // Check if content is actually different to avoid cursor jumps
-        // Allow naive stringify check for now or just trust the parent to mount a new instance for a new card
-        // Since CardModal uses `key={card.id}`, this component will unmount/remount on card switch.
-        // So we only need to handle if the SAME card updates content from outside (Realtime).
-        // For now, let's assuming remount-on-key-change strategy from CardModal is primary.
-        // But we still sync when content is different (e.g. realtime updates).
+        // 外部更新は doc.eq で比較して必要時のみ適用（setContent ループを避ける）
         const nextContent = initialContent ?? { type: 'doc', content: [] };
-        const current = editor.getJSON();
-        if (JSON.stringify(current) !== JSON.stringify(nextContent)) {
+        let nextDoc: ProseMirrorNode | null = null;
+        try {
+            nextDoc = editor.schema.nodeFromJSON(nextContent);
+        } catch {
+            return;
+        }
+        lastAppliedDocRef.current = nextDoc;
+        if (!editor.state.doc.eq(nextDoc)) {
             isUpdatingRef.current = true;
             editor.commands.setContent(nextContent, { emitUpdate: false });
             isUpdatingRef.current = false;
