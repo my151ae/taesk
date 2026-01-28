@@ -7,7 +7,7 @@ const MAX_HEIGHT_PX = 120;
 
 type InlineTitleEditorProps = {
     title: string;
-    onSave: (newTitle: string, previousTitle: string) => void;
+    onSave: (newTitle: string, previousTitle: string, meta?: { noteExtracted?: boolean }) => void;
     onCancel: () => void;
     onNoteExtracted?: (bodyLines: string[], updatedTitle?: string) => void;
     className?: string;
@@ -33,6 +33,8 @@ export function InlineTitleEditor({
     const [localTitle, setLocalTitle] = useState(title);
     const [isComposing, setIsComposing] = useState(false);
     const hasCommittedRef = useRef(false);
+    const noteExtractedRef = useRef(false);
+    const extractedTitleRef = useRef<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // 編集開始時にフォーカス
@@ -46,6 +48,8 @@ export function InlineTitleEditor({
         console.log('[InlineTitleEditor] mount', { title, length: title.length });
         // 編集開始時に hasCommittedRef をリセット
         hasCommittedRef.current = false;
+        noteExtractedRef.current = false;
+        extractedTitleRef.current = null;
     }, [title]);
 
     // 自動高さ調整
@@ -63,14 +67,19 @@ export function InlineTitleEditor({
         console.log('[InlineTitleEditor] handleSave', { localTitle: JSON.stringify(localTitle) });
 
         const { title: finalTitle, bodyLines } = splitPastedText(localTitle);
+        const shouldExtractNote = bodyLines.length > 0 && !!onNoteExtracted;
 
         // 改行が含まれている（2行目以降がある）場合は本文として抽出
-        if (bodyLines.length > 0 && onNoteExtracted) {
+        if (shouldExtractNote && onNoteExtracted) {
             onNoteExtracted(bodyLines, finalTitle);
+            noteExtractedRef.current = true;
+            extractedTitleRef.current = finalTitle;
         }
 
         hasCommittedRef.current = true;
-        onSave(finalTitle, initialTitleRef.current);
+        const shouldSkipTitleUpdate =
+            noteExtractedRef.current && (extractedTitleRef.current ?? "") === finalTitle;
+        onSave(finalTitle, initialTitleRef.current, { noteExtracted: shouldSkipTitleUpdate });
     }, [localTitle, onSave, isComposing, onNoteExtracted]);
 
     const handleCancel = useCallback(() => {
@@ -132,6 +141,8 @@ export function InlineTitleEditor({
                 // 2行目以降があればコールバックで親に渡す
                 if (bodyLines.length > 0 && onNoteExtracted) {
                     onNoteExtracted(bodyLines, pastedTitle);
+                    noteExtractedRef.current = true;
+                    extractedTitleRef.current = pastedTitle;
                 }
 
                 // Cursor position update needs to happen after render

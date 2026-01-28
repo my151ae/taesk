@@ -111,9 +111,11 @@ export function TimelineCard({
         }
     }, [onOpen]);
 
-    const handleSave = useCallback((newTitle: string, previousTitle: string) => {
+    const handleSave = useCallback((newTitle: string, previousTitle: string, meta?: { noteExtracted?: boolean }) => {
         setIsEditing(false);
-        onTitleChange?.(newTitle, previousTitle);
+        if (!meta?.noteExtracted) {
+            onTitleChange?.(newTitle, previousTitle);
+        }
         // 編集完了後にカードにフォーカスを戻す
         requestAnimationFrame(() => {
             containerRef.current?.focus();
