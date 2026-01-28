@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { buildContentFromTitle, deriveExcerptFromContent, ensureTitleBlock, normalizeContent } from '@/lib/tiptap';
+import { buildContentFromTitle, deriveExcerptFromContent, ensureTitleBlock, normalizeContent, extractTitleTask } from '@/lib/tiptap';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
@@ -152,6 +152,18 @@ export async function POST(
       parsed.data.content
         ? normalizeContent(parsed.data.content)
         : buildContentFromTitle(parsed.data.title);
+
+    // content が明示的に渡された場合は content から title/checked を派生
+    let derivedTitle = parsed.data.title;
+    let derivedChecked = parsed.data.checked ?? false;
+    if (parsed.data.content) {
+      const extracted = extractTitleTask(normalizedContent);
+      if (extracted.text) {
+        derivedTitle = extracted.text;
+        derivedChecked = extracted.checked;
+      }
+    }
+
     const normalizedExcerpt =
       typeof parsed.data.excerpt === 'string'
         ? parsed.data.excerpt
@@ -160,7 +172,7 @@ export async function POST(
     const payload: Record<string, unknown> = {
       board_id: boardId,
       id: parsed.data.id,
-      title: parsed.data.title,
+      title: derivedTitle,
       checklist: clampChecklist(parsed.data.checklist ?? EMPTY_CHECKLIST),
       content: normalizedContent,
       excerpt: normalizedExcerpt,
@@ -173,7 +185,7 @@ export async function POST(
       due_bucket: parsed.data.due_bucket ?? null,
       due_bucket_position: parsed.data.due_bucket_position ?? null,
       priority: parsed.data.priority ?? 'medium',
-      checked: parsed.data.checked ?? false,
+      checked: derivedChecked,
       assignee_id: parsed.data.assignee_id ?? null,
       assigned_to: parsed.data.assigned_to ?? null,
       user_id: parsed.data.user_id ?? user.id,

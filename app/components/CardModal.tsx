@@ -100,12 +100,7 @@ export function CardModal({
     const [assigneeTouched, setAssigneeTouched] = useState(false);
     const [targetBoardId, setTargetBoardId] = useState(card.board_id);
     const [isDirty, setIsDirty] = useState(false);
-    const [showSidebar, setShowSidebar] = useState(() => {
-        if (typeof window !== "undefined") {
-            return window.innerWidth >= 640; // sm breakpoint
-        }
-        return true;
-    });
+    const [showSidebar, setShowSidebar] = useState(false);
     const [editorError, setEditorError] = useState<string | null>(null);
     const [showDirtyDialog, setShowDirtyDialog] = useState(false);
 
@@ -153,16 +148,23 @@ export function CardModal({
     }, [onClose]);
 
 
-    // card prop が変わったときの処理（ただし編集中は無視）
+    // 初期表示時のみ、デスクトップならサイドバーを開く
     useEffect(() => {
-        // card.id が変わった場合（別のカードを開いた）、または編集していない場合のみ更新
-        const incomingContent = normalizeContent(card.content);
-        const incomingText = getTiptapPlainText(incomingContent).trim();
-        const localText = getTiptapPlainText(content).trim();
-        const shouldForceSync = isDirty && !localText && incomingText.length > 0;
+        if (typeof window === "undefined") return;
+        const media = window.matchMedia("(min-width: 640px)");
+        if (media.matches) {
+            setShowSidebar(true);
+        }
+    }, []);
 
+    // card prop が変わったときの処理
+    useEffect(() => {
+        const incomingContent = normalizeContent(card.content);
+
+        // カードIDが変わった場合は、エディタも含め全てリセット
         if (card.id !== cardIdRef.current) {
             cardIdRef.current = card.id;
+            // ステートのリセット（TiptapEditor は key={card.id} でリマウントされる）
             setContent(incomingContent);
             setTitle(card.title || "");
             setTags(card.tags || []);
@@ -174,7 +176,7 @@ export function CardModal({
             setDuration(card.duration ?? 60);
             setPriority(card.priority || 'medium');
             setChecked(card.checked || false);
-            // Initialize assigneeIds from card
+
             const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
                 ? card.assignee_ids
                 : card.assignee_id
@@ -186,78 +188,33 @@ export function CardModal({
             setTargetBoardId(card.board_id);
             setEditorError(null);
             setShowDirtyDialog(false);
-        } else if (!isDirty || shouldForceSync) {
-            // 同じカードで編集していない場合のみ、外部の変更を反映
-            setContent(incomingContent);
-            if (!isDirty) setTitle(card.title || "");
-            setTags(card.tags || []);
-            setDueDate(card.due_date || '');
-            setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
-            setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
-            setDueBucket(card.due_bucket ?? null);
-            setDueBucketPosition(card.due_bucket_position ?? null);
-            setDuration(card.duration ?? 60);
-            setPriority(card.priority || 'medium');
-            setChecked(card.checked || false);
-            const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
-                ? card.assignee_ids
-                : card.assignee_id
-                    ? [card.assignee_id]
-                    : [];
-            setAssigneeIds(newAssigneeIds);
-            setAssigneeTouched(false);
-            setTargetBoardId(card.board_id);
             setIsDirty(false);
         }
-    }, [card, isDirty]);
+        // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
+        // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
+    }, [card.id]); // id 変化のみを監視
 
-    // Added: Sync content when isLoading turns false and not dirty
+    // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
+    const lastSyncedContentRef = useRef<string | null>(null);
+
     useEffect(() => {
-        if (!isLoading && !isDirty) {
-            setContent(normalizeContent(card.content));
-        }
-    }, [isLoading, card.content, isDirty]);
+        if (card.id !== cardIdRef.current) return;
+        if (isDirty) return;
 
-    // 追加：保存後のリセット対応
-    // card prop が更新された際、ローカルの状態がサーバの状態と一致していれば Dirty を落とす
-    // このチェックは isDirty が true の時でも（保存が完了したことを検知するために）行う必要がある
-    useEffect(() => {
-        if (isDirty) {
-            const incomingContent = normalizeContent(card.content);
-            const localSerialized = JSON.stringify(ensureTitleTask(content).content);
-            const incomingSerialized = JSON.stringify(incomingContent);
+        const incomingContent = normalizeContent(card.content);
+        const incomingStr = JSON.stringify(incomingContent);
+        if (incomingStr === lastSyncedContentRef.current) return;
 
-            const normalizedDueDate = card.due_date || '';
-            const dateMatch = normalizedDueDate === (dueDate || '');
+        lastSyncedContentRef.current = incomingStr;
+        setContent(incomingContent);
+        const extracted = extractTitleTask(incomingContent);
+        setTitle(extracted.text);
+        setChecked(extracted.checked);
+        setEditorError(null);
+    }, [card.content, card.id, isDirty]);
 
-            const normalizedStart = card.due_start ? card.due_start.slice(0, 5) : '';
-            const startMatch = normalizedStart === (dueStart || '');
-
-            const normalizedEnd = card.due_end ? card.due_end.slice(0, 5) : '';
-            const endMatch = normalizedEnd === (dueEnd || '');
-
-            const priorityMatch = (card.priority || 'medium') === priority;
-
-            const cardAssignees = card.assignee_ids || (card.assignee_id ? [card.assignee_id] : []);
-            const assigneesMatch = cardAssignees.length === assigneeIds.length && cardAssignees.every(id => assigneeIds.includes(id));
-
-            const cardTags = card.tags || [];
-            const tagsMatch = cardTags.length === tags.length && cardTags.every(t => tags.includes(t));
-
-            const bucketMatch = (card.due_bucket ?? null) === (dueBucket ?? null);
-            const durationMatch = (card.duration ?? 60) === duration;
-            const titleMatch = (card.title || "") === title;
-            const checkedMatch = (card.checked || false) === checked;
-
-            if (localSerialized === incomingSerialized &&
-                titleMatch &&
-                checkedMatch &&
-                dateMatch && startMatch && endMatch &&
-                priorityMatch && tagsMatch && bucketMatch && assigneesMatch && durationMatch) {
-                setIsDirty(false);
-            }
-        }
-    }, [isDirty, card, content, title, dueDate, dueStart, dueEnd, priority, assigneeIds, tags, dueBucket, duration]);
+    // 保存後のリセット対応は 各ハンドラーと card prop の同期にて行う
+    // (重い JSON.stringify 比較は行わない)
 
     // Escape key to close + focus trap
     useEffect(() => {
@@ -788,24 +745,6 @@ export function CardModal({
                 onClick={(e) => e.stopPropagation()}
             >
                 <CardModalHeader
-                    titlePreview={titlePreview}
-                    checked={checked}
-                    onToggleCheck={(val: boolean) => {
-                        setChecked(val);
-                        const { content: newContent, changed } = setTitleTask(content, { checked: val });
-                        if (changed) {
-                            setContent(newContent);
-                        }
-                        triggerAutoSave();
-                    }}
-                    onTitleChange={(val) => {
-                        setTitle(val);
-                        const { content: newContent, changed } = setTitleTask(content, { text: val });
-                        if (changed) {
-                            setContent(newContent);
-                        }
-                        triggerAutoSave();
-                    }}
                     dueDate={dueDate}
                     dueStart={dueStart}
                     dueEnd={dueEnd}
@@ -836,45 +775,86 @@ export function CardModal({
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
                 <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
                     {/* Left Column - Details (Note) */}
-                    {(!showSidebar || (typeof window !== "undefined" && window.innerWidth >= 640)) && (
-                        <div className="flex-1 overflow-y-auto p-0">
-                            {isLoading ? (
-                                <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                                    <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
+                    <div className={`flex-1 overflow-y-auto p-0 ${showSidebar ? "hidden sm:block" : "block"}`}>
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                                <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-full min-h-0">
+                                {/* 固定タイトルバー (Sticky Title Bar) */}
+                                <div className="sticky top-0 z-20 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(e) => {
+                                            const val = e.target.checked;
+                                            setChecked(val);
+                                            const { content: newContent, changed } = setTitleTask(content, { checked: val });
+                                            if (changed) {
+                                                setContent(newContent);
+                                                triggerAutoSave();
+                                            }
+                                        }}
+                                        className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setTitle(val);
+                                            const { content: newContent, changed } = setTitleTask(content, { text: val });
+                                            if (changed) {
+                                                setContent(newContent);
+                                                triggerAutoSave();
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            // フォーカスアウト時に構造補正を確実に行う
+                                            const { content: correctedContent } = ensureTitleTask(content, title, checked);
+                                            setContent(correctedContent);
+                                        }}
+                                        placeholder="タイトルなし"
+                                        className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none"
+                                    />
                                 </div>
-                            ) : (
-                                <TiptapEditor
-                                    key={card.id}
-                                    initialContent={content}
-                                    onChange={(val) => {
-                                        setContent(val);
-                                        // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
-                                        const { text: extractedText, checked: newChecked } = extractTitleTask(val);
-                                        // 空文字列も変更として反映（全削除対応）
-                                        if (extractedText !== title) {
-                                            setTitle(extractedText);
-                                        }
-                                        if (newChecked !== checked) {
-                                            setChecked(newChecked);
-                                        }
-                                        triggerAutoSave();
-                                        if (editorError) {
-                                            setEditorError(null);
-                                        }
-                                    }}
-                                    placeholder="メモを入力..."
-                                    data-autofocus
-                                />
-                            )}
-                            {editorError && (
-                                <p className="mt-2 text-xs text-red-600">{editorError}</p>
-                            )}
-                        </div>
-                    )}
+
+                                {/* メインエディタエリア (scrollable) */}
+                                <div className="flex-1 p-0">
+                                    <TiptapEditor
+                                        key={card.id}
+                                        initialContent={content as any} // ローカルステートを渡す
+                                        onChange={(val) => {
+                                            setContent(val);
+                                            // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
+                                            const { text: extractedText, checked: newChecked } = extractTitleTask(val);
+                                            // 背景でのステート同期（不必要な再描画を防ぐため、値が違う時のみ）
+                                            if (extractedText !== title) {
+                                                setTitle(extractedText);
+                                            }
+                                            if (newChecked !== checked) {
+                                                setChecked(newChecked);
+                                            }
+                                            triggerAutoSave();
+                                            if (editorError) {
+                                                setEditorError(null);
+                                            }
+                                        }}
+                                        placeholder="メモを入力..."
+                                        data-autofocus
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {editorError && (
+                            <p className="mt-2 text-xs text-red-600">{editorError}</p>
+                        )}
+                    </div>
 
                     {/* Right Column - Sidebar (integrated conditionally on mobile) */}
                     {showSidebar && (

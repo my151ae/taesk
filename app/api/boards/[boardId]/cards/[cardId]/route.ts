@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { normalizeContent } from '@/lib/tiptap';
+import { normalizeContent, extractTitleTask, deriveExcerptFromContent } from '@/lib/tiptap';
 import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from '@/lib/calendarSyncService';
 
 const UpdateCardSchema = z.object({
@@ -92,7 +92,14 @@ export async function PATCH(
         .limit(1)
         .maybeSingle();
 
-    const normalizedPayload = { ...parsed.data };
+    // 元リクエストキーで判定（派生値を足す前）
+    const originalKeys = Object.keys(parsed.data);
+    const isContentOnlyUpdate = originalKeys.every((key) => key === 'content');
+    const triggersCalendarSync = ['due_date', 'due_start', 'due_end', 'title'].some(
+      (key) => originalKeys.includes(key)
+    );
+
+    const normalizedPayload: Record<string, unknown> = { ...parsed.data };
     if (
       normalizedPayload.due_bucket_position != null &&
       typeof normalizedPayload.due_bucket_position !== 'number'
@@ -101,10 +108,15 @@ export async function PATCH(
     }
 
     if ('checklist' in normalizedPayload) {
-      normalizedPayload.checklist = clampChecklist(normalizedPayload.checklist ?? EMPTY_CHECKLIST);
+      normalizedPayload.checklist = clampChecklist((normalizedPayload.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof clampChecklist>[0]);
     }
     if ('content' in normalizedPayload) {
       normalizedPayload.content = normalizeContent(normalizedPayload.content);
+      // content から title/checked/excerpt を派生（生成列化）
+      const extracted = extractTitleTask(normalizedPayload.content as Record<string, unknown>);
+      normalizedPayload.title = extracted.text || (parsed.data.title ?? '');
+      normalizedPayload.checked = extracted.checked;
+      normalizedPayload.excerpt = deriveExcerptFromContent(normalizedPayload.content as Record<string, unknown>);
     }
 
     let { data: updatedCard, error } = await performUpdate(normalizedPayload);
@@ -188,10 +200,7 @@ export async function PATCH(
     // Log activity (only if we have a card to reference)
     if (ensuredCard) {
       const action = parsed.data.list_id ? 'moved' : 'updated';
-      const triggersCalendarSync = ['due_date', 'due_start', 'due_end', 'title'].some(
-        (key) => key in normalizedPayload
-      );
-      const isContentOnlyUpdate = Object.keys(normalizedPayload).every((key) => key === 'content');
+      // isContentOnlyUpdate と triggersCalendarSync は元リクエストキーで事前判定済み
 
       if (!isContentOnlyUpdate) {
         // Independent async logging

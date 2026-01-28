@@ -2,6 +2,11 @@
 
 > Today/Tomorrow の時間軸と A/B リストをひとつのビューで計画できる Next.js + Supabase 製 Timeline ボード
 
+## UI Scope
+
+現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。  
+Kanban 関連（`KanbanBoardClient` など）はレガシー扱いのため、明示的な依頼がない限り触らない。
+
 ## 📋 Table of Contents
 
 - [Quick Start](#quick-start)

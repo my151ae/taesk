@@ -129,14 +129,17 @@ export const extractTitleTask = (content: JSONContent): { text: string; checked:
     }
 
     // フォールバック: taskList 構造でなくても、最初に見つかるテキストをタイトルとする
-    for (const node of content.content) {
-        // node 単位でのプレーンテキスト取得
-        const text = getTiptapPlainText({ type: 'doc', content: [node] })
-            .trim()
-            .replace(/^\s*\[(x| )\]\s*/i, ''); // 記号除去
+    if (content.content) {
+        for (const node of content.content) {
+            if (!node) continue;
+            // node 単位でのプレーンテキスト取得
+            const text = getTiptapPlainText({ type: 'doc', content: [node] })
+                .trim()
+                .replace(/^\s*\[(x| )\]\s*/i, ''); // 記号除去
 
-        if (text) {
-            return { text, checked: false };
+            if (text) {
+                return { text, checked: false };
+            }
         }
     }
 
@@ -234,7 +237,7 @@ export const ensureTitleTask = (
                 content: [
                     {
                         type: 'paragraph',
-                        content: [{ type: 'text', text: textToUse }]
+                        content: textToUse ? [{ type: 'text', text: textToUse }] : []
                     }
                 ]
             }
@@ -245,7 +248,7 @@ export const ensureTitleTask = (
         ...content,
         content: [
             titleTask,
-            ...(content.content.slice(1))
+            ...(Array.isArray(content.content) ? content.content.slice(1) : [])
         ]
     };
 

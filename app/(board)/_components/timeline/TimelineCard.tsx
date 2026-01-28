@@ -272,39 +272,60 @@ export function TimelineCard({
                                 "flex flex-col gap-0.5 text-[10px] text-slate-600 leading-tight min-w-0"
                             )}
                         >
-                            {note.split(/\r?\n/).map((line, idx) => {
-                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                const isTask = Boolean(taskMatch);
-                                const indentRaw = taskMatch?.[1] ?? '';
-                                const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
-                                const checked = taskMatch?.[2]?.toLowerCase() === 'x';
-                                const text = isTask ? (taskMatch?.[3] ?? '') : line;
+                            {(() => {
+                                const lines = note.split(/\r?\n/);
+                                const processedTitle = title.trim().toLowerCase();
 
-                                return (
-                                    <div
-                                        key={`line-${idx}`}
-                                        className="flex items-start gap-1 w-full min-w-0"
-                                        style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
-                                    >
-                                        {isTask ? (
-                                            <span
-                                                className={clsx(
-                                                    "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0 mt-[1px]",
-                                                    checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
-                                                )}
-                                                aria-hidden="true"
-                                            >
-                                                {checked ? (
-                                                    <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                ) : null}
-                                            </span>
-                                        ) : null}
-                                        <span className="line-clamp-2">{text || '\u00A0'}</span>
-                                    </div>
-                                );
-                            })}
+                                // 先頭数行をチェックして、タイトルと実質的に同じ内容であればスキップ
+                                // content の 1行目が taskItem なので、excerpt の冒頭は通常 "[ ] タイトル" または "タイトル" になる
+                                let skipCount = 0;
+                                if (lines.length > 0) {
+                                    const firstLine = lines[0].trim();
+                                    // "[ ] title" または "title" そのものに一致するか判定
+                                    const taskMatch = firstLine.match(/^\[[ xX]\]\s?(.*)$/);
+                                    const firstLineContent = (taskMatch ? taskMatch[1] : firstLine).trim().toLowerCase();
+
+                                    if (firstLineContent === processedTitle || (processedTitle === "" && firstLineContent === "")) {
+                                        skipCount = 1;
+                                    }
+                                }
+
+                                return lines.slice(skipCount).map((line, idx) => {
+                                    const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                    const isTask = Boolean(taskMatch);
+                                    const indentRaw = taskMatch?.[1] ?? '';
+                                    const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
+                                    const checked = taskMatch?.[2]?.toLowerCase() === 'x';
+                                    const text = isTask ? (taskMatch?.[3] ?? '') : line;
+
+                                    if (!text.trim() && !isTask) return null;
+
+                                    return (
+                                        <div
+                                            key={`line-${idx}`}
+                                            className="flex items-start gap-1 w-full min-w-0"
+                                            style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                        >
+                                            {isTask ? (
+                                                <span
+                                                    className={clsx(
+                                                        "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0 mt-[1px]",
+                                                        checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
+                                                    )}
+                                                    aria-hidden="true"
+                                                >
+                                                    {checked ? (
+                                                        <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    ) : null}
+                                                </span>
+                                            ) : null}
+                                            <span className="line-clamp-2">{text || '\u00A0'}</span>
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     ) : null}
 

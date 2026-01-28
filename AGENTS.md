@@ -24,6 +24,11 @@
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
 
+## UI Scope (Timeline Only)
+現在の運用UIは **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
+- Kanban 関連（`KanbanBoardClient` 等）の修正・言及は、明示的な依頼がない限り行わない。
+- 不具合報告が `/b/...` に関する場合、Timeline 側のみを対象に調査・修正する。
+
 ## Build, Test, and Development Commands
 - `npm run dev` は全面禁止。
 - ビルドエラー確認のための `npm run build` は実行可能。
