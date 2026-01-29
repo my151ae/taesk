@@ -8,6 +8,7 @@ import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import styles from './TiptapEditor.module.css';
 import { useEffect, useRef } from 'react';
+import type { RefObject } from 'react';
 import { ensureTitleTask } from '@/lib/tiptap';
 
 /**
@@ -87,6 +88,7 @@ type TiptapEditorProps = {
     placeholder?: string;
     editable?: boolean;
     'data-autofocus'?: boolean;
+    containerRef?: RefObject<HTMLDivElement>;
 };
 
 export default function TiptapEditor({
@@ -94,7 +96,8 @@ export default function TiptapEditor({
     onChange,
     placeholder = "Type '/' for commands…",
     editable = true,
-    'data-autofocus': dataAutofocus
+    'data-autofocus': dataAutofocus,
+    containerRef
 }: TiptapEditorProps) {
     // Use a ref to track if we're silently updating content to avoid trigger loops
     const isUpdatingRef = useRef(false);
@@ -255,7 +258,11 @@ export default function TiptapEditor({
     }
 
     return (
-        <div className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`} onClick={() => editor.chain().focus().run()}>
+        <div
+            ref={containerRef}
+            className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
+            onClick={() => editor.chain().focus().run()}
+        >
             <EditorContent editor={editor} />
         </div>
     );

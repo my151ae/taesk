@@ -151,6 +151,47 @@
     padding: 0 !important;
 }
 
+/* First taskList's first line (title task) should visually match the modal title style */
+.editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child) {
+    align-items: center !important;
+    gap: 0.75rem !important;
+    background-color: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0 7px !important;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+:global(.dark) .editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child) {
+    background-color: rgba(31, 41, 55, 0.8);
+    border-bottom-color: #374151;
+}
+
+.editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child > label) {
+    transform: translateY(0);
+}
+
+.editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child > div > p) {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+:global(.dark) .editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child > div > p) {
+    color: #f3f4f6;
+}
+
+/* Enlarge checkbox for the title task */
+.editor :global(.ProseMirror > ul[data-type="taskList"]:first-child > li:first-child > label input[type="checkbox"]) {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    accent-color: #0284c7;
+}
+
 /* Dark mode support */
 :global(.dark) .editor :global(.ProseMirror p),
 :global(.dark) .editor :global(.ProseMirror ul[data-type="taskList"] li) {

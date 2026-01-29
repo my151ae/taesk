@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
@@ -90,18 +90,22 @@ export function CardModal({
     const [showMemberDropdown, setShowMemberDropdown] = useState(false);
     const [memberSearch, setMemberSearch] = useState('');
     const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+    const [stickyOpacity, setStickyOpacity] = useState(0);
 
     // Sidebar resize state
     const [sidebarWidth, setSidebarWidth] = useState(384); // Default w-96 = 384px
     const [isResizing, setIsResizing] = useState(false);
 
     const resizeRef = useRef<HTMLDivElement>(null);
+    const contentScrollRef = useRef<HTMLDivElement>(null);
+    const editorContainerRef = useRef<HTMLDivElement>(null);
     const [assigneeTouched, setAssigneeTouched] = useState(false);
     const [targetBoardId, setTargetBoardId] = useState(card.board_id);
     const [isDirty, setIsDirty] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
     const [editorError, setEditorError] = useState<string | null>(null);
     const [showDirtyDialog, setShowDirtyDialog] = useState(false);
+    const lastTitleVisibilityRef = useRef<number | null>(null);
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardIdRef = useRef(card.id);
@@ -157,6 +161,77 @@ export function CardModal({
             setShowSidebar(true);
         }
     }, []);
+
+    useEffect(() => {
+        const root = contentScrollRef.current;
+        const dialog = dialogRef.current;
+        const editorWrap = editorContainerRef.current;
+        const proseMirror = editorWrap?.querySelector<HTMLElement>('.ProseMirror') ?? null;
+        const getDebugName = (el: Element | null) =>
+            el
+                ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${el.className ? `.${String(el.className).trim().replace(/\\s+/g, ".")}` : ""}`
+                : "null";
+        if ((!root && !dialog) || isLoading || typeof window === "undefined") {
+            setStickyOpacity(0);
+            return;
+        }
+
+        let rafId = 0;
+        const fadeDistance = 40;
+
+        const getScrollTop = () => {
+            const rootTop = root?.scrollTop ?? 0;
+            const dialogTop = dialog?.scrollTop ?? 0;
+            const editorTop = editorWrap?.scrollTop ?? 0;
+            const proseTop = proseMirror?.scrollTop ?? 0;
+            const docTop = document.scrollingElement?.scrollTop ?? 0;
+            const maxTop = Math.max(rootTop, dialogTop, editorTop, proseTop, docTop);
+            return {
+                maxTop,
+                rootTop,
+                dialogTop,
+                editorTop,
+                proseTop,
+                docTop,
+            };
+        };
+
+        const updateVisibility = () => {
+            rafId = 0;
+            const { maxTop, rootTop, dialogTop, editorTop, proseTop, docTop } = getScrollTop();
+            const progress = Math.min(1, Math.max(0, maxTop / fadeDistance));
+            setStickyOpacity(progress);
+            if (lastTitleVisibilityRef.current !== progress) {
+                console.log("[CardModal][StickyTitle] scrollTop:", maxTop, "opacity:", progress);
+                lastTitleVisibilityRef.current = progress;
+            }
+        };
+
+        const onScroll = () => {
+            if (rafId) return;
+            rafId = window.requestAnimationFrame(updateVisibility);
+        };
+
+        updateVisibility();
+        root?.addEventListener("scroll", onScroll, { passive: true });
+        dialog?.addEventListener("scroll", onScroll, { passive: true });
+        editorWrap?.addEventListener("scroll", onScroll, { passive: true });
+        proseMirror?.addEventListener("scroll", onScroll, { passive: true });
+        document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+        window.addEventListener("resize", onScroll);
+
+        return () => {
+            if (rafId) {
+                window.cancelAnimationFrame(rafId);
+            }
+            root?.removeEventListener("scroll", onScroll);
+            dialog?.removeEventListener("scroll", onScroll);
+            editorWrap?.removeEventListener("scroll", onScroll);
+            proseMirror?.removeEventListener("scroll", onScroll);
+            document.removeEventListener("scroll", onScroll, true);
+            window.removeEventListener("resize", onScroll);
+        };
+    }, [card.id, isLoading]);
 
     // card prop が変わったときの処理
     useEffect(() => {
@@ -778,19 +853,17 @@ export function CardModal({
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
                 <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
                     {/* Left Column - Details (Note) */}
-                    <div className={`flex-1 overflow-y-auto p-0 ${showSidebar ? "hidden sm:block" : "block"}`}>
-                        {isLoading ? (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                                <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col h-full min-h-0">
-                                {/* 固定タイトルバー (Sticky Title Bar) */}
-                                <div className="sticky top-0 z-20 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3">
+                    <div className={`flex flex-col flex-1 min-h-0 p-0 relative ${showSidebar ? "hidden sm:flex" : "flex"}`}>
+                        {!isLoading && (
+                            <div
+                                className="absolute top-0 left-0 right-0 z-20"
+                                style={{ opacity: stickyOpacity, pointerEvents: stickyOpacity > 0 ? "auto" : "none" }}
+                                aria-hidden={stickyOpacity === 0}
+                            >
+                                <div
+                                    data-sticky-title
+                                    className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3 transition-opacity"
+                                >
                                     <input
                                         type="checkbox"
                                         checked={checked}
@@ -826,34 +899,48 @@ export function CardModal({
                                         className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none"
                                     />
                                 </div>
-
-                                {/* メインエディタエリア (scrollable) */}
-                                <div className="flex-1 p-0">
-                                    <TiptapEditor
-                                        key={card.id}
-                                        initialContent={content as any} // ローカルステートを渡す
-                                        onChange={(val) => {
-                                            setContent(val);
-                                            // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
-                                            const { text: extractedText, checked: newChecked } = extractTitleTask(val);
-                                            // 背景でのステート同期（不必要な再描画を防ぐため、値が違う時のみ）
-                                            if (extractedText !== title) {
-                                                setTitle(extractedText);
-                                            }
-                                            if (newChecked !== checked) {
-                                                setChecked(newChecked);
-                                            }
-                                            triggerAutoSave();
-                                            if (editorError) {
-                                                setEditorError(null);
-                                            }
-                                        }}
-                                        placeholder="メモを入力..."
-                                        data-autofocus
-                                    />
-                                </div>
                             </div>
                         )}
+                        <div ref={contentScrollRef} className="flex-1 overflow-y-auto min-h-0">
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                                    <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col h-full min-h-0">
+                                    {/* メインエディタエリア (scrollable) */}
+                                    <div className="flex-1 p-0">
+                                        <TiptapEditor
+                                            key={card.id}
+                                            containerRef={editorContainerRef}
+                                            initialContent={content as any} // ローカルステートを渡す
+                                            onChange={(val) => {
+                                                setContent(val);
+                                                // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
+                                                const { text: extractedText, checked: newChecked } = extractTitleTask(val);
+                                                // 背景でのステート同期（不必要な再描画を防ぐため、値が違う時のみ）
+                                                if (extractedText !== title) {
+                                                    setTitle(extractedText);
+                                                }
+                                                if (newChecked !== checked) {
+                                                    setChecked(newChecked);
+                                                }
+                                                triggerAutoSave();
+                                                if (editorError) {
+                                                    setEditorError(null);
+                                                }
+                                            }}
+                                            placeholder="メモを入力..."
+                                            data-autofocus
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         {editorError && (
                             <p className="mt-2 text-xs text-red-600">{editorError}</p>
                         )}
