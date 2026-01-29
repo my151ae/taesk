@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
+import { isAdminEmail } from '@/lib/admins';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
@@ -9,8 +10,6 @@ const CreateBoardSchema = z.object({
   description: z.string().optional(),
   is_test_board: z.boolean().optional(),
 });
-
-const ADMIN_EMAILS = new Set(['matsumocy@gmail.com']);
 
 /**
  * GET /api/boards
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userEmail = user.email?.toLowerCase().trim();
-    if (userEmail && ADMIN_EMAILS.has(userEmail)) {
+    if (isAdminEmail(userEmail)) {
       const adminSupabase = createServiceRoleSupabaseClient();
       const { data: boards, error } = await adminSupabase
         .from('boards')

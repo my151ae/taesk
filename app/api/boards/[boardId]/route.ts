@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
+import { isAdminEmail } from '@/lib/admins';
 
 /**
  * DELETE /api/boards/[boardId]
@@ -20,6 +22,46 @@ export async function DELETE(
                 { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
                 { status: 401 }
             );
+        }
+
+        const isAdmin = isAdminEmail(user.email ?? null);
+        if (isAdmin) {
+            const adminSupabase = createServiceRoleSupabaseClient();
+            const { data: board, error: boardError } = await adminSupabase
+                .from('boards')
+                .select('id')
+                .eq('id', boardId)
+                .maybeSingle();
+
+            if (boardError) {
+                console.error('Error checking board for admin delete:', boardError);
+                return NextResponse.json(
+                    { error: { code: 'DB_ERROR', message: boardError.message } },
+                    { status: 500 }
+                );
+            }
+
+            if (!board) {
+                return NextResponse.json(
+                    { error: { code: 'NOT_FOUND', message: 'Board not found' } },
+                    { status: 404 }
+                );
+            }
+
+            const { error: deleteError } = await adminSupabase
+                .from('boards')
+                .delete()
+                .eq('id', boardId);
+
+            if (deleteError) {
+                console.error('Error deleting board (admin):', deleteError);
+                return NextResponse.json(
+                    { error: { code: 'DB_ERROR', message: deleteError.message } },
+                    { status: 500 }
+                );
+            }
+
+            return NextResponse.json({ success: true }, { status: 200 });
         }
 
         // Check if user is owner of the board
@@ -90,6 +132,8 @@ export async function PATCH(
             );
         }
 
+        const isAdmin = isAdminEmail(user.email ?? null);
+
         // Check if user is member of the board
         const { data: membership, error: membershipError } = await supabase
             .from('board_members')
@@ -98,7 +142,7 @@ export async function PATCH(
             .eq('profile_id', user.id)
             .single();
 
-        if (membershipError || !membership) {
+        if ((membershipError || !membership) && !isAdmin) {
             return NextResponse.json(
                 { error: { code: 'NOT_FOUND', message: 'Board not found or access denied' } },
                 { status: 404 }
@@ -106,7 +150,7 @@ export async function PATCH(
         }
 
         // Only owner or editor can update settings (for now let's say owner/editor)
-        if (!['owner', 'editor'].includes(membership.role)) {
+        if (!isAdmin && !['owner', 'editor'].includes(membership.role)) {
             return NextResponse.json(
                 { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
                 { status: 403 }
@@ -128,7 +172,8 @@ export async function PATCH(
             return NextResponse.json({ success: true }); // Nothing to update
         }
 
-        const { data: updatedBoard, error: updateError } = await supabase
+        const updateClient = isAdmin ? createServiceRoleSupabaseClient() : supabase;
+        const { data: updatedBoard, error: updateError } = await updateClient
             .from('boards')
             .update(updates)
             .eq('id', boardId)
