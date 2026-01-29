@@ -68,7 +68,7 @@ function LoginForm() {
           Taesk
         </h1>
         <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-          Your modern Kanban board
+          Your modern timeline board
         </p>
 
         {error && (

@@ -171,7 +171,7 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
       return;
     }
 
-    // 3. Fetch from API as last resort (should rarely happen if KanbanBoardClient already loaded)
+    // 3. Fetch from API as last resort
     let ignore = false;
 
     const loadMembers = async () => {

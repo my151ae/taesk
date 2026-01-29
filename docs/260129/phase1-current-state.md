@@ -33,11 +33,11 @@
   - docs: Today/Tomorrow 2日固定。
   - code: `day_range` 最大7日、`list_range` 最大120日（Timeline/List の range 切替あり）。
 - **Kanban 表記**
-  - `app/layout.tsx` / `app/login/page.tsx` に Kanban 文言が残存。
+  - `app/layout.tsx` / `app/login/page.tsx` の Kanban 文言は Phase4 で更新済み。
 
 ## 3. レガシー／互換コード（確定事項）
-- Kanban UI: `app/(board)/_components/KanbanBoardClient.tsx` が残存。
-- list 系 API: `app/api/boards/[boardId]/lists/*` / `cards/reorder` / `cards/renumber` / `boards/[boardId]/data`。
+- Kanban UI: `app/(board)/_components/KanbanBoardClient.tsx` は Phase4 で削除済み。
+- list 系 API: `app/api/boards/[boardId]/lists/*` / `boards/[boardId]/data` は Phase4 で削除済み。
 - assignee 互換: `assigned_to` + `assignee_id` + `assignee_ids` が混在。
 - BlockNote 互換: `lib/tiptap.ts` の array 入力処理。
 - Calendar Sync API: `app/api/calendar-sync/[cardId]/route.ts` が `card.description` を参照（DBで description が drop 済みなら不整合）。

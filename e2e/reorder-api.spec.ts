@@ -4,7 +4,7 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
 const API_HEADERS = { 'x-e2e-secret': E2E_SECRET } as const;
 
-test.describe('Reorder API (Phase 2) @feature:lists', () => {
+test.describe('Reorder API (Timeline) @feature:reorder', () => {
   let boardId: string;
   let listId: string;
   let cardIds: string[] = [];
@@ -17,25 +17,20 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
     const boardData = await boardRes.json();
     boardId = boardData.board.id;
 
-    // Create a test list
-    const listRes = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
-      data: { title: 'Test List', position: 1000 },
-    });
-    const listData = await listRes.json();
-    listId = listData.lists[0].id;
-
-    // Create 5 test cards
+    // Create 5 test cards (let API create the default list if needed)
     cardIds = [];
     for (let i = 0; i < 5; i++) {
       const cardRes = await request.post(`${BASE_URL}/api/boards/${boardId}/cards`, {
         data: {
           title: `Card ${i + 1}`,
-          list_id: listId,
           position: 1000 + i * 10,
         },
       });
       const cardData = await cardRes.json();
       cardIds.push(cardData.card.id);
+      if (!listId) {
+        listId = cardData.card.list_id;
+      }
     }
   });
 
@@ -111,142 +106,10 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
     expect(result.error.message).toBe('Validation failed');
   });
 
-  test('should reorder lists successfully', async ({ request }) => {
-    // Create 3 lists
-    const listIds: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const res = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
-        data: { title: `List ${i + 1}`, position: 1000 + i * 10 },
-      });
-      const data = await res.json();
-      listIds.push(data.lists[0].id);
-    }
-
-    const updates = [
-      { id: listIds[2], position: 1000 },
-      { id: listIds[1], position: 1010 },
-      { id: listIds[0], position: 1020 },
-    ];
-
-    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
-      data: { updates },
-    });
-
-    expect(res.status()).toBe(200);
-    const result = await res.json();
-    expect(result.updated).toBe(3);
-  });
-
-  test('should reject duplicate positions for lists @failure:validation', async ({ request }) => {
-    // Create 2 lists
-    const listIds: string[] = [];
-    for (let i = 0; i < 2; i++) {
-      const res = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
-        data: { title: `List ${i + 1}`, position: 1000 + i * 10 },
-      });
-      const data = await res.json();
-      listIds.push(data.lists[0].id);
-    }
-
-    // Try to assign same position to both lists
-    const updates = [
-      { id: listIds[0], position: 1000 },
-      { id: listIds[1], position: 1000 }, // duplicate position
-    ];
-
-    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
-      data: { updates },
-    });
-
-    expect(res.status()).toBe(400);
-    const result = await res.json();
-    expect(result.error.code).toBe('VALIDATION_ERROR');
-    expect(result.issues).toBeDefined();
-    expect(result.issues.some((i: any) => i.code === 'DUPLICATE_POSITION')).toBe(true);
-  });
-
-  test('should reject unknown list IDs @failure:validation', async ({ request }) => {
-    const updates = [
-      { id: '123e4567-e89b-12d3-a456-426614174000', position: 1000 }, // valid UUID but not in board
-    ];
-
-    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
-      data: { updates },
-    });
-
-    expect(res.status()).toBe(400);
-    const result = await res.json();
-    expect(result.error.code).toBe('VALIDATION_ERROR');
-    expect(result.issues).toBeDefined();
-    expect(result.issues.some((i: any) => i.code === 'UNKNOWN_ID')).toBe(true);
-  });
-
-  test('should reject cross-board list updates @failure:validation', async ({ request }) => {
-    // Create another board
-    const otherBoardRes = await request.post(`${BASE_URL}/api/boards`, {
-      data: { name: 'Other Board', is_test_board: true },
-    });
-    const otherBoard = await otherBoardRes.json();
-    const otherBoardId = otherBoard.board.id;
-
-    // Create a list in the other board
-    const otherListRes = await request.post(`${BASE_URL}/api/boards/${otherBoardId}/lists`, {
-      data: { title: 'Other List', position: 1000 },
-    });
-    const otherListData = await otherListRes.json();
-    const otherListId = otherListData.lists[0].id;
-
-    // Create a list in the main board
-    const mainListRes = await request.post(`${BASE_URL}/api/boards/${boardId}/lists`, {
-      data: { title: 'Main List', position: 1000 },
-    });
-    const mainListData = await mainListRes.json();
-    const mainListId = mainListData.lists[0].id;
-
-    // Try to reorder lists from different boards
-    const updates = [
-      { id: mainListId, position: 1000 },
-      { id: otherListId, position: 1010 }, // cross-board ID
-    ];
-
-    const res = await request.patch(`${BASE_URL}/api/boards/${boardId}/lists/reorder`, {
-      data: { updates },
-    });
-
-    expect(res.status()).toBe(400);
-    const result = await res.json();
-    expect(result.error.code).toBe('VALIDATION_ERROR');
-    expect(result.issues).toBeDefined();
-    expect(result.issues.some((i: any) => i.code === 'CROSS_BOARD')).toBe(true);
-
-    // Clean up other board
-    await request.delete(`${BASE_URL}/api/boards/${otherBoardId}`);
-  });
-
   test('should renumber card positions in a list', async ({ request }) => {
     const res = await request.post(`${BASE_URL}/api/boards/${boardId}/cards/renumber`, {
       data: { listId },
     });
-
-    expect(res.status()).toBe(200);
-    const result = await res.json();
-    expect(result.updated).toBeGreaterThan(0);
-    expect(result.durationMs).toBeGreaterThan(0);
-
-    // Verify positions are renumbered with gaps
-    const dataRes = await request.get(`${BASE_URL}/api/boards/${boardId}/data`);
-    const data = await dataRes.json();
-    const cards = data.lists.find((l: any) => l.id === listId)?.cards || [];
-
-    // Check that positions have proper gaps (10)
-    for (let i = 1; i < cards.length; i++) {
-      const gap = cards[i].position - cards[i - 1].position;
-      expect(gap).toBeGreaterThanOrEqual(10);
-    }
-  });
-
-  test('should renumber list positions in a board', async ({ request }) => {
-    const res = await request.post(`${BASE_URL}/api/boards/${boardId}/lists/renumber`);
 
     expect(res.status()).toBe(200);
     const result = await res.json();
@@ -261,7 +124,6 @@ test.describe('Reorder API (Phase 2) @feature:lists', () => {
       const res = await request.post(`${BASE_URL}/api/boards/${boardId}/cards`, {
         data: {
           title: `Concurrent Card ${i + 1}`,
-          list_id: listId,
           position: 2000 + i * 10,
         },
       });

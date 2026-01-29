@@ -4,8 +4,7 @@
 
 ## UI Scope
 
-現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。  
-Kanban 関連（`KanbanBoardClient` など）はレガシー扱いのため、明示的な依頼がない限り触らない。
+現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
 
 ## 📋 Table of Contents
 
@@ -113,7 +112,7 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 ┌──────────────▼───────────────────────────────────────────────┐
 │             API Routes & Server Utilities                     │
 │  GET /api/boards/:id/timeline  (start/range + A/B)            │
-│  POST /api/cards/* /lists/* /comments/* (shared CRUD)         │
+│  POST /api/cards/* /comments/* (shared CRUD)                  │
 │  createClientTrace('timeline') / createServerTrace('timeline')│
 └──────────────┬───────────────────────────────────────────────┘
                │ Supabase client (SSR + browser)
@@ -222,7 +221,6 @@ taesk/
 │   │   ├── _components/
 │   │   │   ├── timeline/TimelineBoardPage.tsx  # Timeline UI 本体
 │   │   │   ├── Card/Notification/Share など共通 UI
-│   │   │   └── KanbanBoardClient.tsx          # 旧 UI（参照用）
 │   │   ├── _hooks/                     # useRealtimeBoard, useSyncQueue, useBoardFilters
 │   │   ├── _stores/                    # comments-store など
 │   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Timeline からカードモーダルを開く

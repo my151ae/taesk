@@ -1,6 +1,6 @@
 # Component Structure (Timeline Board)
 
-Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中心に構築されています。旧 Kanban コンポーネントは残っていますが参照用であり、実際の画面はすべて TimelineBoardPage とそのサブコンポーネントで描画されます。
+Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中心に構築されています。実際の画面はすべて TimelineBoardPage とそのサブコンポーネントで描画されます。
 
 ## 1. TimelineBoardPage（トップレベル）
 

@@ -26,7 +26,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                       API + Server Utilities                     │
 │  • GET /api/boards/:id/timeline (start/range + A/B buckets)      │
-│  • POST /api/cards/* /lists/* (shared CRUD endpoints)            │
+│  • POST /api/cards/* (shared CRUD endpoints)                     │
 │  • Metrics: createClientTrace('timeline'), createServerTrace()   │
 │  • Supabase Realtime subscriptions (cards/comments)              │
 └───────────────────────────────┬──────────────────────────────────┘

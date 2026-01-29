@@ -7,8 +7,8 @@ import NotificationBadgeListener from "@/app/components/NotificationBadgeListene
 const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
-  title: "Taesk - Kanban Board",
-  description: "Trello-like Kanban board with drag and drop",
+  title: "Taesk - Timeline Board",
+  description: "Timeline planning board with A/B task buckets",
   manifest: "/manifest.json",
   metadataBase: new URL(appOrigin),
   appleWebApp: {

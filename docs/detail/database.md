@@ -8,7 +8,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Timeline UI 向け
 | --- | --- | --- |
 | `boards` | ボード本体。short URL / slug 管理 | `/board` の初期ボードやボードピッカーに利用 |
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
-| `lists` | 旧 Kanban のリスト（A/B では未使用） | 既存 API 互換のため残存 |
+| `lists` | 旧 Kanban のリスト（A/B では未使用） | カードの `list_id` 互換のため残存 |
 | `cards` | Timeline/A/B のカード | `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked`, `checklist`, `content`, `excerpt` など |
 | `comments` | カードコメント | CardModal / CommentsPanel |
 | `notifications`, `notification_preferences`, `notification_delivery_logs`, `push_subscriptions` | 通知系テーブル | NotificationSettings / Web Push |
