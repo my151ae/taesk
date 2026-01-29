@@ -142,19 +142,21 @@ export async function PATCH(
             .eq('profile_id', user.id)
             .single();
 
-        if ((membershipError || !membership) && !isAdmin) {
-            return NextResponse.json(
-                { error: { code: 'NOT_FOUND', message: 'Board not found or access denied' } },
-                { status: 404 }
-            );
-        }
+        if (!isAdmin) {
+            if (membershipError || !membership) {
+                return NextResponse.json(
+                    { error: { code: 'NOT_FOUND', message: 'Board not found or access denied' } },
+                    { status: 404 }
+                );
+            }
 
-        // Only owner or editor can update settings (for now let's say owner/editor)
-        if (!isAdmin && !['owner', 'editor'].includes(membership.role)) {
-            return NextResponse.json(
-                { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
-                { status: 403 }
-            );
+            // Only owner or editor can update settings (for now let's say owner/editor)
+            if (!['owner', 'editor'].includes(membership.role)) {
+                return NextResponse.json(
+                    { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
+                    { status: 403 }
+                );
+            }
         }
 
         const updates: Record<string, any> = {};

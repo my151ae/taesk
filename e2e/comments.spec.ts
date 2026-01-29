@@ -23,6 +23,15 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
+const isoDateJst = (): string => {
+  const now = Date.now();
+  const jst = new Date(now + 9 * 60 * 60 * 1000);
+  const year = jst.getUTCFullYear();
+  const month = `${jst.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${jst.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface TestBoardContext {
   id: string;
   name: string;
@@ -148,9 +157,8 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
     user_id: TEST_USER_ID,
     position,
     tags: [],
-    due_date: null,
-    due_channel: 'ab-list',
-    due_bucket: 'today_a',
+    due_date: `${isoDateJst()}T00:00:00+09:00`,
+    due_bucket: 'a',
     due_bucket_position: 1000,
     priority: 'medium',
     assigned_to: null,

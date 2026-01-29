@@ -132,7 +132,7 @@ export async function POST(
             slug: (card as any).slug ?? null,
             id_short: (card as any).id_short ?? null,
             title: card.title,
-            description: card.description ?? "",
+            description: card.excerpt ?? "",
         }, origin);
 
         const googleEventIdOverride = request.nextUrl.searchParams.get("google_event_id");

@@ -232,7 +232,7 @@ export async function PATCH(
           slug: (ensuredCard as any).slug ?? null,
           id_short: (ensuredCard as any).id_short ?? null,
           title: ensuredCard.title,
-          description: ensuredCard.description ?? "",
+          description: ensuredCard.excerpt ?? "",
         }, origin);
 
         if (startDateTime && endDateTime) {
