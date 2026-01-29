@@ -10,18 +10,16 @@ Taesk のドメインモデルは、**Timeline** と **A/B Buckets** という2�
 - **Members**: ボードには複数のメンバーが所属し、権限（Owner, Editor, Commenter, Viewer）によって操作が制限されます。
 
 ### 2. Card (カード)
-タスクや予定を表す最小単位です。カードは以下のいずれかの「チャンネル (`due_channel`)」に属します。
+タスクや予定を表す最小単位です。表示種別は `due_date` と `due_start` / `due_end` の有無で決まります。
 
-| Channel | Description | UI Representation |
+| Type | Description | UI Representation |
 | :--- | :--- | :--- |
-| **Timeline** | 時間が決まっている予定 | Today/Tomorrow の 24時間グリッド上に配置 |
-| **A/B List** | 時間は決まっていないが、今日/明日やるべきタスク | A/B バケット (Today A/B, Tomorrow A/B) に配置 |
-| **List-only** | (Legacy) 旧 Kanban リスト | Timeline UI には表示されない |
-| **Archived** | 完了または不要になったタスク | アーカイブ済み |
+| **Timeline Event** | 日付 + 時間が決まっている予定 | Timeline の時間軸ブロック |
+| **A/B Item** | 日付はあるが時間が未設定のタスク | A/B バケット（`a` / `b`） |
 
 ### 3. Timeline (タイムライン)
 「時間」を軸にした計画ビューです。
-- **Scope**: 今日 (Today) と 明日 (Tomorrow) の2日間のみを表示します。
+- **Scope**: day_range に応じて 1〜7 日の範囲を表示します（デフォルトは Today/Tomorrow の2日）。
 - **Granularity**: 1分単位の精度を持ちますが、UI上は適度なスナップ（15分など）が適用されます。
 - **JST Canonical**: すべての日付・時刻計算は日本標準時 (JST) を基準に行われます。
 
@@ -29,12 +27,10 @@ Taesk のドメインモデルは、**Timeline** と **A/B Buckets** という2�
 「優先度」と「タイミング」を軸にしたタスクのグルーピングです。
 Timeline の隙間時間を埋めるタスクを管理するために使用します。
 
-- **Today A**: 今日やるべき、優先度が高いタスク
-- **Today B**: 今日できればやる、または A の次にやるタスク
-- **Tomorrow A**: 明日やるべきタスク
-- **Tomorrow B**: 明日以降でも良いタスク
+- **Bucket A**: その日に優先度が高いタスク
+- **Bucket B**: その日に余裕があれば取り組むタスク
 
-カードはバケット内で `due_bucket_position` によって並び替えられます。
+カードはバケット内で `due_bucket_position` によって並び替えられます。日付は `due_date` で決まり、バケット自体は `a` / `b` のみを保持します。
 
 ## Data Flow & Synchronization
 
@@ -54,8 +50,8 @@ erDiagram
     MEMBER ||--o{ COMMENT : writes
 
     CARD {
-        string due_channel "timeline | ab-list"
-        string due_bucket "today_a | today_b..."
+        timestamp due_date
+        string due_bucket "a | b"
         time due_start
         time due_end
     }

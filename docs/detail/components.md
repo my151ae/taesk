@@ -50,7 +50,7 @@ TimelineBoardPage
 
 - `getDisplayHours` と `minuteToPixels` で 1 日分のキャンバスを描画。
 - `data-testid="timeline-grid"` はスクロール領域のコンテナに付与し、E2E の安定待機に利用。
-- `Live` ラインは `serverNow` を JST へ変換 (`getIsoDateJst`, `getNowMinutesJst`) し、Today カラム内で赤い水平線として描画。
+- `Live` ラインは `serverNow` を JST へ変換 (`getIsoDateJst`, `getNowMinutesJst`) し、Today が可視範囲に含まれる場合に赤い水平線として描画。
 - イベント要素 (`timeline-event`) のスタイル:
   - 高さ: `durationMinutes` の長さに応じて最低値を確保（デスクトップは 20px 以上、モバイルは 10px 以上）
   - ラベル: タイトル、タグ、優先度、チェック状態
@@ -58,13 +58,13 @@ TimelineBoardPage
 
 ### A/B Lists
 
-- `AB_CARD_META` により Today/Tomorrow の 2 グループを定義し、各グループに `sections` (A/B) を持たせている。
+- `buildAbMeta` により表示中の日付ごとに `A/B` セクションを生成し、キーは `${isoDate}_a` / `${isoDate}_b` を使用する。
 - `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタし、タグ/優先度検索に合わせて表示リストを更新。
 - ドラッグ対象として `useDroppable` を設定し、 `bucketPosition` を使って降順ソート。
 
 ### CardModal & CommentsPanel
 
-- `CardModal` は `app/components/CardModal.tsx` を再利用。Timeline 特有の `due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position` を編集できるようにフォーム項目を拡張済み。
+- `CardModal` は `app/components/CardModal.tsx` を再利用。Timeline 特有の `due_start`, `due_end`, `due_bucket`, `due_bucket_position` を編集できるようにフォーム項目を拡張済み。
 - Modal 打ち上げパス:  
   1. `Card` をクリック → `router.push('?card=SHORTID')`  
   2. `cardModalShortIdRef` に short_id を保持  
@@ -82,18 +82,13 @@ TimelineBoardPage
 
 ```ts
 interface ActiveDragState {
-  id: UniqueIdentifier;
-  source: 'timeline' | 'ab';
-  sourceBucket?: DueBucket;
-  originMinutes?: number;        // start/end のコピー
-  originChannel: DueChannel;
-  originCard: Card;
-  pointerOffset: { x: number; y: number; };
-  originalPosition: DOMRect | null;
+  cardId: string;
+  startMinutes: number;
+  duration: number;
 }
 ```
 
-`activeDragRef` に保存した値を `handleDragEnd` で参照し、エラー時は `previousData` に戻す。これにより 1 回の DnD 操作から複数の最小変更セット（channel/bucket/start/end）を再計算できる。
+`activeDragRef` に保存した値を `handleDragEnd` で参照し、エラー時は `previousData` に戻す。これにより 1 回の DnD 操作から複数の最小変更セット（bucket/start/end）を再計算できる。
 
 ## 3. 共通コンポーネント
 

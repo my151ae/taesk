@@ -19,8 +19,8 @@ localStorage-backed queues (taesk-sync-queue, comment-queue)
 
 ## 2. Supabase API
 
-- `GET /api/boards/[boardId]/timeline` が Today/Tomorrow + A/B の統合レスポンスを返す。エラーハンドリングは `status` / `errorMessage` で管理。
-- ミューテーション（カード DnD、CardModal 保存、コメント追加など）は既存の REST API (`/api/cards/*`, `/api/comments/*`) を経由。Timeline 固有パラメータ (`due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position`) を payload に含める。
+- `GET /api/boards/[boardId]/timeline` が day_range（1〜7日）+ A/B の統合レスポンスを返す。エラーハンドリングは `status` / `errorMessage` で管理。
+- ミューテーション（カード DnD、CardModal 保存、コメント追加など）は既存の REST API (`/api/cards/*`, `/api/comments/*`) を経由。Timeline 固有パラメータ (`due_start`, `due_end`, `due_bucket`, `due_bucket_position`) を payload に含める。
 - サーバーは Supabase JS (SSR) を使用し、`board_members` 経由で認可。エラー時は JSON `{ error: { code, message } }` を返し、クライアントでトースト表示。
 
 ## 3. localStorage-backed Queues
@@ -83,7 +83,6 @@ Realtime event arrives → merges server state
 const applyTimelineDrop = async (cardId, targetMinutes) => {
   const payload = {
     id: cardId,
-    due_channel: 'timeline',
     due_start: minutesToTime(targetMinutes),
     due_end: minutesToTime(targetMinutes + 60),
     due_bucket: null,

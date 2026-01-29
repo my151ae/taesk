@@ -17,15 +17,15 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 │                        Timeline Application Layer                │
 │  TimelineBoardPage (client)                                      │
 │  • Header (board picker, share dialog, filters, notifications)   │
-│  • Today/Tomorrow timeline grid (24h)                            │
-│  • A/B lists (today_a/b, tomorrow_a/b)                           │
+│  • day_range timeline grid (24h, 1-7日)                          │
+│  • A/B lists (YYYY-MM-DD_a/b)                                    │
 │  • CardModal / CommentsPanel (parallel routes + Zustand)         │
 │  Hooks: useTimelineData, useTimelineFiltering, useTimelineDragAndDrop │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ TimelineResponse (days/events/ab)
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                       API + Server Utilities                     │
-│  • GET /api/boards/:id/timeline (JST 2 days + A/B buckets)       │
+│  • GET /api/boards/:id/timeline (start/range + A/B buckets)      │
 │  • POST /api/cards/* /lists/* (shared CRUD endpoints)            │
 │  • Metrics: createClientTrace('timeline'), createServerTrace()   │
 │  • Supabase Realtime subscriptions (cards/comments)              │
@@ -34,7 +34,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                         Supabase (PostgreSQL)                    │
 │  • Tables: boards, board_members, cards, lists, comments, ...    │
-│  • Timeline fields on cards: due_channel/start/end/bucket/...    │
+│  • Timeline fields on cards: due_start/due_end/due_bucket/...    │
 │  • Realtime (postgres_changes)                                   │
 │  • RLS policies per board_id + profile_id                        │
 └──────────────────────────────────────────────────────────────────┘
@@ -42,9 +42,9 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 
 ### Timeline Response Contract
 
-- `days`: 今日/明日の JST ISO 日付 (`{ key: 'today' | 'tomorrow', label, isoDate }`)
-- `events`: `due_channel='timeline'` のカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `priority`, `checked`, `assignee_id`, `assignee_ids`, `assigned_to`, `short_id`, `slug` を含む
-- `abBuckets`: `today_a`, `today_b`, `tomorrow_a`, `tomorrow_b` の 4 配列。`due_bucket_position` で降順ソートし、`assignee_ids` を含めて返却
+- `days`: JST ISO 日付 (`{ key: 'YYYY-MM-DD', label, isoDate }`)
+- `events`: `due_date` + `due_start` + `due_end` が揃うカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `priority`, `checked`, `due_bucket`, `due_bucket_position`, `assignee_id`, `assignee_ids`, `assigned_to`, `short_id`, `slug` を含む
+- `abBuckets`: `${isoDate}_a` / `${isoDate}_b` のキーで配列を保持。`due_bucket_position` で降順ソートし、`assignee_ids` を含めて返却
 - `serverNow`: API 生成時刻 (UTC ISO)。クライアントは JST に変換して Now ラインを描画
 
 `GET /api/boards/[boardId]/timeline` はボードメンバーのみアクセス可能。`board_members` に存在しないユーザーは 403 を受け取り、未認証の場合は 401 となる。
@@ -97,7 +97,7 @@ app/layout.tsx
 
 4. **User interaction**  
    - Timeline での DnD → `handleDragStart` / `handleDragMove` / `handleDragEnd`  
-     `handleDragEnd` は `activeDrag` 情報をもとに `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換える。確定後は `applyPatch` で `PATCH /api/boards/:id/cards/:id` を実行し、失敗時はロールバック。
+     `handleDragEnd` は `activeDrag` 情報をもとに `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換える。確定後は `applyPatch` で `PATCH /api/boards/:id/cards/:id` を実行し、失敗時はロールバック。
    - CardModal での編集 → `PATCH /api/cards/:id` を呼び、成功レスポンスをローカル状態へ反映（タイトル/タグ/期日/`assignee_ids` 等）。リアルタイム通知とも整合するため再フェッチは原則不要。
    - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、`comment-queue` に保持した上で API へ送信。エラー時はローカルキューへ残存。
 
@@ -133,8 +133,8 @@ app/layout.tsx
 2. `handleDragStart` が `activeDragRef` に対象カードや開始位置 (`originColumn`, `originBucket`, `originMinutes`) を保存し、`setPointerPreview` でカスタムプレビューを表示。
 3. `handleDragMove` が `pointerWithin` / `rectIntersection` を併用してドロップ候補を判定し、Timeline や A/B のハイライト状態を更新。
 4. `handleDragEnd` が drop target を解析:
-   - Timeline へのドロップ → `due_channel='timeline'`, `due_start`/`due_end` を座標から再計算
-   - A/B へのドロップ → `due_channel='ab-list'`, `due_bucket` をターゲットから取得し、`due_bucket_position` を算出
+   - Timeline へのドロップ → `due_start`/`due_end` を座標から再計算
+   - A/B へのドロップ → `due_bucket` をターゲットから取得し、`due_bucket_position` を算出
    - 不正なドロップ or キャンセル → `previousData` を戻し、`activeDrag` を解除
 5. 成功した変更は `syncQueue` に enqueue され、API 反映後に `fetchTimeline()` を再実行して整合性を取る。
 
@@ -142,7 +142,7 @@ app/layout.tsx
 
 - `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` が intercepting modal と standalone page の両方を担当。
 - Timeline 上でカードをクリックすると `router.push('?card=SHORTID')` を行い、parallel route が `CardModal` を描画。URL を直接開いた場合も同じモーダルが表示される。
-- `CardModal` 内では `due_channel`, `due_start`, `due_end`, `due_bucket`, `priority`, `assignee_ids` などを編集可能。保存成功時はレスポンスをローカル状態へ即時反映し、`assignee_ids` を保持したままリアルタイム通知を待つ。
+- `CardModal` 内では `due_start`, `due_end`, `due_bucket`, `priority`, `assignee_ids` などを編集可能。保存成功時はレスポンスをローカル状態へ即時反映し、`assignee_ids` を保持したままリアルタイム通知を待つ。
 - `CommentsPanel` は `CardModal` からタブ切り替えで開き、`useCommentsStore` 経由で投稿/削除/Realtime 反映を行う。
 
 ## Metrics & Observability
@@ -183,7 +183,7 @@ sequenceDiagram
   participant RT as Supabase Realtime
 
   UI->>DnD: handleDragEnd(cardId, target)
-  DnD->>State: persistPlacement (due_channel/bucket/start/end, keep assignee_ids)
+  DnD->>State: persistPlacement (bucket/start/end, keep assignee_ids)
   DnD->>Sync: enqueue({payload})
   Sync->>API: PATCH cards
   API-->>RT: postgres_changes
@@ -213,9 +213,8 @@ sequenceDiagram
 ## Supabase Schema Highlights
 
 - `cards` テーブルに Timeline 用カラムを追加:
-  - `due_channel` (`timeline` | `ab-list` | `list-only` | `archived`)
   - `due_start` / `due_end` (time without time zone, 1 分単位)
-  - `due_bucket` (`today_a` | `today_b` | `tomorrow_a` | `tomorrow_b`)
+  - `due_bucket` (`a` | `b`)
   - `due_bucket_position` (numeric, 降順で並べ替え)
 - `board_members` でボードアクセスを制御し、全 API ルートが RLS で保護される。
 - Realtime は `cards`, `comments`, `notifications` を購読。TimelineBoardPage では `cards` と `comments` のみ使用。

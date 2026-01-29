@@ -1,6 +1,6 @@
 # Deployment Guide (Timeline Board)
 
-Taesk の Timeline ボードは **Next.js 15 + Vercel** をフロントエンドとして、**Supabase** をデータストア/認証/Realtime 基盤として使用します。ここではデプロイ構成、環境変数、Supabase マイグレーション、RLS、運用時のチェックリストをまとめます。
+Taesk の Timeline ボードは **Next.js 16 + Vercel** をフロントエンドとして、**Supabase** をデータストア/認証/Realtime 基盤として使用します。ここではデプロイ構成、環境変数、Supabase マイグレーション、RLS、運用時のチェックリストをまとめます。
 
 ## 1. Overview
 
@@ -118,7 +118,7 @@ CREATE POLICY "Members can manage cards"
 
 | 事象 | 原因/対処 |
 | --- | --- |
-| `cards` 取得で `42703 column "due_channel" does not exist` | Supabase で `20251113090000_add_due_fields.sql` が未適用。マイグレーションを実行し、`idx_cards_board_due_date` を含めて再構築する。 |
+| `cards` 取得で `42703 column "due_bucket" does not exist` | Supabase で `20251113090000_add_due_fields.sql` が未適用。マイグレーションを実行し、`idx_cards_board_due_date` を含めて再構築する。 |
 | Timeline API が 401 を返す | `playwright/.auth/user.json` が期限切れ。ファイルを削除して Playwright を再実行すると自動で再ログインする。 |
 | Vercel build が失敗 (`NEXT_PUBLIC_SUPABASE_URL is not defined`) | 環境変数を Production/Preview/Development すべてに設定しているか確認。 |
 | `npm run test:all-split` が `auth` バッチで停止 | `lsof -i :3000` で dev server 残存を確認し、`pkill -f 'node .*next dev'` → `pkill -f 'playwright test'` を実行してから再開。 |

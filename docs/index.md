@@ -90,15 +90,15 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 | permissions | `e2e/board-permissions.spec.ts` | ShareDialog, member roles, invites |
 | rls | `e2e/rls.spec.ts` | RLS policy での強制アクセス制御 |
 
-`timeline` バッチは Timeline UI が Today/Tomorrow + A/B の 1 分粒度でレンダリングされるか、および `createClientTrace('timeline')` からメトリクスが送出されるかを確認する。タイムアウトが発生した場合は個別に `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/<timestamp>-timeline.json npx playwright test e2e/timeline.spec.ts --project=core --reporter=json` を実行し、問題を切り分けてから `npm run test:all-split` を再開する。
+`timeline` バッチは Timeline UI が **day_range（デフォルト2日 / 最大7日）+ A/B** を 1 分粒度でレンダリングできるか、および `createClientTrace('timeline')` からメトリクスが送出されるかを確認する。タイムアウトが発生した場合は個別に `PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/<timestamp>-timeline.json npx playwright test e2e/timeline.spec.ts --project=core --reporter=json` を実行し、問題を切り分けてから `npm run test:all-split` を再開する。
 
 ## 🏗️ Architecture Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                   TimelineBoardPage (client)                 │
-│  - 今日/明日カラム (24h * 40px)                              │
-│  - A/B リスト (today_a/b, tomorrow_a/b)                      │
+│  - day_range 分のカラム (24h * 40px, 1-7日)                  │
+│  - A/B リスト (YYYY-MM-DD_a/b)                               │
 │  - フィルター/検索バー + ヘッダー (Share/Notifications etc.) │
 │  - CardModal / CommentsPanel (parallel routes)               │
 └──────────────┬───────────────────────────────────────────────┘
@@ -112,14 +112,14 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
                │ timeline response (days, events, abBuckets)
 ┌──────────────▼───────────────────────────────────────────────┐
 │             API Routes & Server Utilities                     │
-│  GET /api/boards/:id/timeline  (Today/Tomorrow + A/B)         │
+│  GET /api/boards/:id/timeline  (start/range + A/B)            │
 │  POST /api/cards/* /lists/* /comments/* (shared CRUD)         │
 │  createClientTrace('timeline') / createServerTrace('timeline')│
 └──────────────┬───────────────────────────────────────────────┘
                │ Supabase client (SSR + browser)
 ┌──────────────▼───────────────────────────────────────────────┐
 │                       Supabase (Postgres)                     │
-│  cards.due_channel / due_start / due_end / due_bucket / ...   │
+│  cards.due_start / due_end / due_bucket / due_bucket_position │
 │  board_members + RLS + realtime subscription                  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -130,8 +130,8 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 
 ```ts
 interface TimelineDay {
-  key: 'today' | 'tomorrow';
-  label: string;      // "Today" / "Tomorrow"
+  key: string;        // YYYY-MM-DD
+  label: string;      // "Today" / "Tomorrow" / "MM/DD (Wed)" など
   isoDate: string;    // JST YYYY-MM-DD
 }
 
@@ -145,6 +145,8 @@ interface TimelineEvent {
   tags: string[];
   priority: 'low' | 'medium' | 'high' | null;
   checked: boolean;
+  due_bucket?: 'a' | 'b' | null;
+  due_bucket_position?: number | null;
   assignee_id?: string | null;      // legacy single
   assignee_ids?: string[] | null;   // current multi-assign
   assigned_to?: string | null;      // legacy alias
@@ -152,11 +154,12 @@ interface TimelineEvent {
   slug: string | null;
 }
 
-type TimelineBuckets = Record<'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b', TimelineBucketItem[]>;
+type TimelineBuckets = Record<string, TimelineBucketItem[]>; // key = `${isoDate}_a` / `${isoDate}_b`
 ```
 
-- `due_channel='timeline'` のカードは Today/Tomorrow の時間軸に並び、`due_start` と `due_end` の差から `durationMinutes` が算出される
-- `due_channel='ab-list'` のカードは `due_bucket` ごとに A/B 列へグルーピングされ、`due_bucket_position` で降順ソート
+- `due_date` があり `due_start`/`due_end` が **両方ある** カードは Timeline イベントとして並び、`durationMinutes` を算出する
+- `due_date` があり `due_start`/`due_end` が **未設定** のカードは A/B に入り、`due_bucket`（未指定なら `b`）でグルーピングされる
+- A/B は `due_bucket_position` で降順ソート
 - `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
 - API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す
 
@@ -165,15 +168,15 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 ### TimelineBoardPage の主な処理
 
 - `createClientTrace('timeline')` を `useEffect` で起動し、ロード時間・描画イベント数・D&D 回数などを JSON で送信
-- `@dnd-kit/core` による DragStart/DragMove/DragEnd を定義し、A/B ⇄ Timeline の移動で `due_channel` / `due_bucket` / `due_start` / `due_end` を再計算
+- `@dnd-kit/core` による DragStart/DragMove/DragEnd を定義し、A/B ⇄ Timeline の移動で `due_bucket` / `due_start` / `due_end` を再計算
 - `useRealtimeBoard` が Supabase Realtime の UPDATE/INSERT/DELETE を購読し、`TimelineEvent` / `abBuckets` へ変換
 - `CardModal` / `CommentsPanel` は URL (`?card=SHORTID` や `/c/SHORTID`) からでも開閉でき、Parallel Routes 経由でモーダル表示
 
 ## ✨ Features
 
 ### Timeline Planning
-- 🕒 **Today/Tomorrow Timeline**: 24h × 40px のスケールで 1 分単位の予定ブロックを可視化
-- 🅰️ **A/B Buckets**: `today_a/b` `tomorrow_a/b` にカードを割り当て、Now ラインより前後を切り替え
+- 🕒 **Timeline (1-7日)**: 24h × 40px のスケールで 1 分単位の予定ブロックを可視化（デフォルトは Today/Tomorrow の2日）
+- 🅰️ **A/B Buckets**: `YYYY-MM-DD_a/b` にカードを割り当て、日ごとのタスク整理を行う
 - 🔁 **Drag & Drop**: Timeline ⇄ A/B 間の移動、時間軸上でのリサイズ/再配置を DnD Kit でサポート
 - 📍 **Live Indicator**: JST 基準の Now ラインと「Live」バッジで現在時刻を強調
 - 👓 **Filters & Search**: タグ/優先度/テキストフィルターをヘッダーに表示し、Timeline と A/B 同時に絞り込み
@@ -182,10 +185,10 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 - 💬 **CardModal + CommentsPanel**: Timeline から直接モーダルを開き、詳細・チェックリスト・コメント・@mentions を編集
 - 🔔 **Notifications**: NotificationSettings + NotificationsBell で通知音、quiet hours、Web Push を制御
 - 👥 **Board Header**: ShareDialog / board picker / profile menu を Timeline ヘッダーへ統合
-- ✍️ **Due Editor**: CardModal や Timeline DnD から `due_channel`, `due_start`, `due_end`, `due_bucket` を編集
+- ✍️ **Due Editor**: CardModal や Timeline DnD から `due_start`, `due_end`, `due_bucket` を編集
 
 ### Data Integrity & Observability
-- ⛳ **due_* Fields**: `due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position` をカードテーブルに追加し、Timeline/A/B 所属を排他制御
+- ⛳ **due_* Fields**: `due_start`, `due_end`, `due_bucket`, `due_bucket_position` をカードテーブルに追加し、時間あり/なしで Timeline と A/B を分岐
 - 📡 **Realtime + Offline Queue**: `useRealtimeBoard` が Supabase Realtime を購読、`useSyncQueue` が失敗時にロールバック
 - 📊 **Client Metrics**: `createClientTrace('timeline')` でロード時間・D&D 操作数を収集し、`docs/detail/architecture.md` で可視化ルールを管理
 - 🔐 **RLS**: Supabase RLS が board_id / profile_id に基づきカードアクセスを制限
@@ -197,7 +200,7 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js 15 (App Router, Parallel Routes, Server Components)
+- **Framework**: Next.js 16 (App Router, Parallel Routes, Server Components)
 - **UI**: React 18 + Tailwind CSS 3
 - **Timeline Rendering**: Custom components + `@dnd-kit/core`
 - **State**: React hooks + Zustand stores (comments, notifications)
@@ -264,13 +267,13 @@ taesk/
 ## 🎯 Key Design Decisions
 
 1. **Timeline-First UI**  
-   Kanban レイアウトを廃止し、Today/Tomorrow と A/B リストを 1 ページで扱う Timeline UI を唯一の正史とした。Now ラインや日付ナビを基点に最短で日次計画へアクセスできる。
+   Kanban レイアウトを廃止し、**デフォルト2日（Today/Tomorrow）〜最大7日**の Timeline と A/B リストを 1 ページで扱う UI を唯一の正史とした。Now ラインや日付ナビを基点に最短で日次計画へアクセスできる。
 
-2. **due_* Fields & Exclusive Channels**  
-   `due_channel` / `due_start` / `due_end` / `due_bucket` / `due_bucket_position` により「時間軸」「A/B」「list-only」「archived」の所属を排他制御。サーバーで検証し、重複所属を防ぐ。
+2. **due_* Fields & Timeline/A-B 分岐**  
+   `due_start` / `due_end` の有無で Timeline or A/B を分岐し、A/B は `due_bucket` + `due_bucket_position` で制御。サーバーで整合性を担保する。
 
 3. **JST Canonical Time**  
-   API と UI はすべて JST (+09:00) を基準に日付計算する。`GET /timeline` は Today/Tomorrow を JST で算出し、クライアントも `getIsoDateJst` を利用して一貫性を保つ。
+   API と UI はすべて JST (+09:00) を基準に日付計算する。`GET /timeline` は day_range (1-7日) の範囲を JST で算出し、クライアントも `getIsoDateJst` を利用して一貫性を保つ。
 
 4. **Parallel Routes for Card Modal**  
    `/@modal/(...)c/[short_id]/[[...slug]]` を用い、Timeline でカードを開いても背後のボード状態を維持。URL 直アクセスでも同じモーダルが開く。

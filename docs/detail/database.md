@@ -9,7 +9,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Timeline UI 向け
 | `boards` | ボード本体。short URL / slug 管理 | `/board` の初期ボードやボードピッカーに利用 |
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
 | `lists` | 旧 Kanban のリスト（A/B では未使用） | 既存 API 互換のため残存 |
-| `cards` | Timeline/A/B/List-only のカード | `due_channel`, `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked` など |
+| `cards` | Timeline/A/B のカード | `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked`, `checklist`, `content`, `excerpt` など |
 | `comments` | カードコメント | CardModal / CommentsPanel |
 | `notifications`, `notification_preferences`, `notification_delivery_logs`, `push_subscriptions` | 通知系テーブル | NotificationSettings / Web Push |
 | `activity_logs` | 操作監査 | ボードレベルでの変更追跡 |
@@ -46,6 +46,8 @@ CREATE TABLE public.boards (
   short_id TEXT UNIQUE,
   id_short INTEGER UNIQUE,
   slug TEXT,
+  day_range INTEGER DEFAULT 2,
+  list_range INTEGER DEFAULT 30,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -54,6 +56,7 @@ CREATE TABLE public.boards (
 - `short_id` + `slug` は `/b/:short_id/:slug` や `/@modal/(...)c` などで使用。
 - `MAIN_BOARD_ID` (0000...0001) が `/board` のデフォルト対象。
 - `is_test_board` が true の場合、E2E 専用ボードとして扱い、初期データを制限。
+- `day_range` / `list_range` は Timeline/List の表示日数を制御。
 
 ## board_members
 
@@ -94,7 +97,6 @@ CREATE TABLE public.lists (
 CREATE TABLE public.cards (
   id UUID PRIMARY KEY,
   title TEXT NOT NULL,
-  description TEXT DEFAULT '' NOT NULL,
   list_id UUID NOT NULL REFERENCES public.lists(id) ON DELETE CASCADE,
   board_id UUID NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
   user_id UUID NULL,
@@ -103,13 +105,15 @@ CREATE TABLE public.cards (
   due_date TIMESTAMPTZ NULL, -- JST 変換の基準日
   due_start TIME WITHOUT TIME ZONE NULL,
   due_end TIME WITHOUT TIME ZONE NULL,
-  due_channel TEXT NOT NULL DEFAULT 'list-only'
-    CHECK (due_channel IN ('timeline', 'ab-list', 'list-only', 'archived')),
   due_bucket TEXT NULL
-    CHECK (due_bucket IS NULL OR due_bucket IN ('today_a', 'today_b', 'tomorrow_a', 'tomorrow_b')),
+    CHECK (due_bucket IS NULL OR due_bucket IN ('a', 'b')),
   due_bucket_position DOUBLE PRECISION NULL,
   priority TEXT NOT NULL DEFAULT 'medium', -- enum: low / medium / high
   checked BOOLEAN NOT NULL DEFAULT FALSE,
+  checklist JSONB NOT NULL DEFAULT jsonb_build_object('version', 1, 'lines', '[]'::jsonb),
+  content JSONB NOT NULL DEFAULT '[]'::jsonb,
+  excerpt TEXT NOT NULL DEFAULT '',
+  duration INTEGER DEFAULT 60,
   assignee_id UUID NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
   assignee_ids UUID[] DEFAULT ARRAY[]::UUID[],
   assigned_to TEXT NULL, -- legacy fallback
@@ -125,11 +129,9 @@ CREATE INDEX idx_cards_board_due_date ON public.cards(board_id, due_date);
 CREATE INDEX idx_cards_due_bucket_position ON public.cards(due_bucket, due_bucket_position DESC NULLS LAST);
 ```
 
-- `due_channel` でカードの所属を判別:  
-  - `timeline`: Today/Tomorrow の時間軸へ表示。`due_start` / `due_end` の差からブロック高さを算出。  
-  - `ab-list`: Today/Tomorrow の A/B リストへ表示。`due_bucket` と `due_bucket_position` を使用。  
-  - `list-only`: 旧 Kanban のみで使用する遺産。Timeline API では除外。  
-  - `archived`: Timeline/A/B には表示されない。  
+- `due_date` があり `due_start`/`due_end` が両方ある場合は Timeline イベントとして表示。  
+- `due_date` があり `due_start`/`due_end` が未設定の場合は A/B に入り、`due_bucket` と `due_bucket_position` で並ぶ。  
+- `due_bucket` が未指定の場合は UI 側で `b` をフォールバックとして扱う。  
 - `due_bucket_position` は降順で並ぶ floating number。DnD 時に `Date.now()` を使いユニーク値を割り当てる。
 - `checked` は Timeline の完了チェックボックスや A/B カードにもそのまま反映される。
 
@@ -165,7 +167,7 @@ CREATE INDEX idx_comments_card ON public.comments(card_id, created_at ASC);
 
 ## activity_logs
 
-ボード内の CRUD 操作を監査し、Timeline/A/B 操作もここで追跡できる。`details` JSON に `due_channel` 変更や `due_bucket` の変遷を格納可能。
+ボード内の CRUD 操作を監査し、Timeline/A/B 操作もここで追跡できる。`details` JSON に `due_bucket` や時刻変更の差分を格納可能。
 
 ```sql
 CREATE TABLE public.activity_logs (
@@ -187,29 +189,29 @@ CREATE TABLE public.activity_logs (
 - ロジック:
   1. Supabase SSR クライアントで `auth.getUser()` → 認可
   2. `board_members` をチェック（owner/editor/commenter/viewer 全員許可）
-  3. `cards` を `board_id` + `due_channel`/`due_bucket` で取得  
-     - 42703 (column missing) を検知した場合、`due_*` カラムがない古い DB に向けて互換レスポンスを返す
+  3. `cards` を `board_id` で取得し、`due_date` + `due_start`/`due_end` の有無で events/abBuckets を振り分け
   4. `events` / `abBuckets` / `serverNow` を整形し JSON で返却
-- `days` は常に Today/Tomorrow の 2 日分。`formatDateJst` が JST (+09:00) で日付を生成。
+- `days` は `start`/`range` を元に JST (+09:00) で生成（1〜7日）。
 
 ## Migrations
 
-- `20251113090000_add_due_fields.sql`: `due_start`, `due_end`, `due_channel`, `due_bucket`、チェック制約、`idx_cards_board_due_date` を追加
+- `20251113090000_add_due_fields.sql`: `due_start`, `due_end`, `due_bucket` などを追加（初期）
 - `20251117091500_add_due_bucket_position.sql`: `due_bucket_position` と降順インデックスを追加
-- 以前の Kanban 用マイグレーションも `supabase/migrations/` に残っているが、Timeline で必要なのは上記 2 つ + `20251111090000_add_card_checked_flag.sql`
+- `20251125000000_update_bucket_schema.sql`: `due_bucket` を `a|b` へ統一（`due_channel` を削除）
+- `20251129090000_add_checklist_to_cards.sql`: `checklist` 追加、`description` 削除
+- `20251220090000_add_card_content.sql`: `content` / `excerpt` 追加
+- `20260107000000_add_duration_to_cards.sql`: `duration` 追加
 
 ## 参考: 型定義
 
-`lib/supabase.ts` で TypeScript 型を定義。Timeline UI は `DueChannel`, `DueBucket`, `Card` 型を直接 import している。
+`lib/supabase.ts` で TypeScript 型を定義。Timeline UI は `DueBucket`, `Card` 型を直接 import している。
 
 ```ts
-export type DueChannel = 'timeline' | 'ab-list' | 'list-only' | 'archived';
-export type DueBucket = 'today_a' | 'today_b' | 'tomorrow_a' | 'tomorrow_b';
+export type DueBucket = 'a' | 'b';
 
 export interface Card {
   id: string;
   title: string;
-  due_channel: DueChannel;
   due_start: string | null;
   due_end: string | null;
   due_bucket: DueBucket | null;
