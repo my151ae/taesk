@@ -13,7 +13,6 @@ type TimelineBoardHeaderProps = {
   showBoardMenu: boolean;
   setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
   boardMenuRef: RefObject<HTMLDivElement>;
-  setShowShareDialog: (show: boolean) => void;
   setShowNotificationSettings: (show: boolean) => void;
   setShowProfileSettings: (show: boolean) => void;
   setShowBoardSettings: (show: boolean) => void;
@@ -57,7 +56,6 @@ export default function TimelineBoardHeader({
   showBoardMenu,
   setShowBoardMenu,
   boardMenuRef,
-  setShowShareDialog,
   setShowNotificationSettings,
   setShowProfileSettings,
   setShowBoardSettings,
@@ -102,7 +100,6 @@ export default function TimelineBoardHeader({
         showBoardMenu={showBoardMenu}
         setShowBoardMenu={setShowBoardMenu}
         boardMenuRef={boardMenuRef}
-        setShowShareDialog={setShowShareDialog}
         setShowNotificationSettings={setShowNotificationSettings}
         setShowProfileSettings={setShowProfileSettings}
         setShowBoardSettings={setShowBoardSettings}

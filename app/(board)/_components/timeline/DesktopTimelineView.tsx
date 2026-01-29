@@ -18,11 +18,9 @@ import {
   type ExternalCalendarEntry,
   timeLabel,
   formatDuration,
-  getDisplayHours,
   minuteToPixels,
   pixelsToMinutes,
   getTimelineHeight,
-  DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { TimelineCard } from "./TimelineCard";
@@ -32,8 +30,11 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP,
 } from "@/app/(board)/_stores/timeline-zoom-store";
+import type { ProfileSummary } from "@/lib/supabase";
+import { getProfileInitial, resolveProfileIdentity } from "@/lib/usernames";
 
 const ALL_DAY_ROW_HEIGHT = 36;
+const AXIS_WIDTH_PX = 120;
 
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
@@ -88,6 +89,8 @@ type DesktopTimelineViewProps = {
   onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
   onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
   createdCardId?: string | null;
+  boardMembers?: ProfileSummary[];
+  onOpenShareDialog?: () => void;
 };
 
 export function DesktopTimelineView({
@@ -136,6 +139,8 @@ export function DesktopTimelineView({
   onUpdateCardTitle,
   onNoteExtracted,
   createdCardId,
+  boardMembers,
+  onOpenShareDialog,
 }: DesktopTimelineViewProps) {
 
   // Calculate how many days to show based on dayRange setting
@@ -368,6 +373,15 @@ export function DesktopTimelineView({
 
   const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
 
+  const sortedMembers = useMemo(() => {
+    if (!boardMembers?.length) return [];
+    return [...boardMembers].sort((a, b) => {
+      const aLabel = resolveProfileIdentity(a, a.email ?? null).label;
+      const bLabel = resolveProfileIdentity(b, b.email ?? null).label;
+      return aLabel.localeCompare(bLabel, "ja");
+    });
+  }, [boardMembers]);
+
   useEffect(() => {
     onMount?.();
   }, [onMount]);
@@ -396,11 +410,11 @@ export function DesktopTimelineView({
           <div
             className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
             style={{
-              gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))`,
             }}
           >
             <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
-              <span className="leading-none text-[10px] text-slate-400">GMT+09</span>
+              <span className="leading-none text-[10px] text-slate-400">閲覧メンバー</span>
             </div>
             {visibleDays.map((day, index) => (
               <div
@@ -462,7 +476,7 @@ export function DesktopTimelineView({
             <div
               className="grid border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
               style={{
-                gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+                gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))`,
               }}
             >
               <div
@@ -533,19 +547,54 @@ export function DesktopTimelineView({
             <div
               className="grid timeline-container"
               data-testid="timeline-grid"
-              style={{ gridTemplateColumns: `80px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
             >
               {/* 時間軸 */}
               <aside className="timeline-axis relative border-r border-slate-100 text-xs text-slate-500">
-                {getDisplayHours(timelineStartHour).map((hour) => (
-                  <div key={hour} className="flex items-start justify-end pr-3" style={{ height: hourHeight }}>
-                    {hour === `${timelineStartHour.toString().padStart(2, '0')}:00` ? null : (
-                      <span className="-mt-1 leading-none tracking-tight text-slate-600">
-                        {hour}
-                      </span>
-                    )}
+                <div className="sticky top-0 z-10 bg-white/95 px-2.5 py-3 backdrop-blur">
+                  <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span>閲覧可</span>
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">
+                      {sortedMembers.length}
+                    </span>
                   </div>
-                ))}
+                  {sortedMembers.length ? (
+                    <ul className="mt-3 space-y-2">
+                      {sortedMembers.map((member) => {
+                        const identity = resolveProfileIdentity(member, member.email ?? null);
+                        const initial = getProfileInitial(member, member.email ?? null);
+                        return (
+                          <li key={member.id} className="flex items-center gap-2 text-[11px] text-slate-700">
+                            {member.avatar_url ? (
+                              <img
+                                src={member.avatar_url}
+                                alt={identity.label}
+                                className="h-6 w-6 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                                {initial}
+                              </div>
+                            )}
+                            <span className="min-w-0 truncate" title={identity.label}>
+                              {identity.label}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="mt-3 text-[10px] text-slate-400">メンバーなし</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onOpenShareDialog}
+                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                  >
+                    <span className="text-sm leading-none">＋</span>
+                    追加
+                  </button>
+                </div>
               </aside>
 
               {/* 日ごとにループ：Timeline → A/Bリスト の順 */}

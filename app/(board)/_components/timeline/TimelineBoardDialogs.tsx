@@ -21,6 +21,7 @@ type TimelineBoardDialogsProps = {
   setAvailableBoards: Dispatch<SetStateAction<Board[]>>;
   setActiveDayIndex: (value: number) => void;
   fetchTimeline: (start?: number) => Promise<unknown>;
+  onMemberAdded?: () => void | Promise<void>;
 };
 
 export default function TimelineBoardDialogs({
@@ -37,11 +38,16 @@ export default function TimelineBoardDialogs({
   setAvailableBoards,
   setActiveDayIndex,
   fetchTimeline,
+  onMemberAdded,
 }: TimelineBoardDialogsProps) {
   return (
     <>
       {showShareDialog && (
-        <ShareDialog boardId={initialBoard.id} onClose={() => setShowShareDialog(false)} />
+        <ShareDialog
+          boardId={initialBoard.id}
+          onClose={() => setShowShareDialog(false)}
+          onMemberAdded={onMemberAdded}
+        />
       )}
 
       {showNotificationSettings && (

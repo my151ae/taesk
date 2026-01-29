@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
-  HOUR_HEIGHT,
   getDisplayHours,
-  TIMELINE_HEIGHT,
   getTimelineHeight,
   calculateEventLayout,
   minuteToPixels,
@@ -32,6 +30,8 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP
 } from "@/app/(board)/_stores/timeline-zoom-store";
+import type { ProfileSummary } from "@/lib/supabase";
+import { getProfileInitial, resolveProfileIdentity } from "@/lib/usernames";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -390,6 +390,8 @@ type MobileTimelineViewProps = {
   contextMenuCardId: string | null;
   onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
   onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
+  boardMembers?: ProfileSummary[];
+  onOpenShareDialog?: () => void;
 };
 
 export default function MobileTimelineView({
@@ -428,6 +430,8 @@ export default function MobileTimelineView({
   contextMenuCardId,
   onUpdateCardTitle,
   onNoteExtracted,
+  boardMembers,
+  onOpenShareDialog,
 }: MobileTimelineViewProps) {
 
   useEffect(() => {
@@ -435,6 +439,15 @@ export default function MobileTimelineView({
   }, [onMount]);
 
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
+
+  const sortedMembers = useMemo(() => {
+    if (!boardMembers?.length) return [];
+    return [...boardMembers].sort((a, b) => {
+      const aLabel = resolveProfileIdentity(a, a.email ?? null).label;
+      const bLabel = resolveProfileIdentity(b, b.email ?? null).label;
+      return aLabel.localeCompare(bLabel, "ja");
+    });
+  }, [boardMembers]);
 
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -672,11 +685,47 @@ export default function MobileTimelineView({
                 style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}
               >
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
-                  {getDisplayHours(timelineStartHour).map((hour, idx) => (
-                    <div key={hour} className="flex items-start justify-end pr-2" style={{ height: hourHeight }}>
-                      {idx === 0 ? null : <span className="-mt-1 leading-none">{hour}</span>}
+                  <div className="sticky top-0 z-10 bg-white/95 px-1.5 py-2 backdrop-blur">
+                    <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                      <span>閲覧</span>
+                      <span className="rounded-full bg-slate-100 px-1 py-0.5 text-[9px] text-slate-500">
+                        {sortedMembers.length}
+                      </span>
                     </div>
-                  ))}
+                    {sortedMembers.length ? (
+                      <ul className="mt-2 space-y-2">
+                        {sortedMembers.map((member) => {
+                          const identity = resolveProfileIdentity(member, member.email ?? null);
+                          const initial = getProfileInitial(member, member.email ?? null);
+                          return (
+                            <li key={member.id} className="flex items-center justify-center">
+                              {member.avatar_url ? (
+                                <img
+                                  src={member.avatar_url}
+                                  alt={identity.label}
+                                  className="h-6 w-6 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
+                                  {initial}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 text-center text-[9px] text-slate-400">なし</div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onOpenShareDialog}
+                      className="mt-2 flex h-7 w-full items-center justify-center rounded-md border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
+                      aria-label="メンバー追加"
+                    >
+                      ＋
+                    </button>
+                  </div>
                 </div>
 
                 <MobileTimelineColumn

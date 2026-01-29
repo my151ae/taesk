@@ -37,6 +37,8 @@ import { useTimelineViewport } from "@/app/(board)/_hooks/useTimelineViewport";
 import { useTimelineFiltering } from "@/app/(board)/_hooks/useTimelineFiltering";
 import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigation";
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
+import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
+import { useBoardMembersStore, type BoardMember } from "@/app/(board)/_stores/board-members-store";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -157,6 +159,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const effectiveDayRange = viewMode === 'timeline' ? Math.min(intendedDayRange, 7) : intendedDayRange;
 
   const currentBoard = availableBoards.find(b => b.id === initialBoard.id) || initialBoard;
+  const { boardMembers, setBoardMembers } = useBoardMembers(currentBoard?.id ?? null);
+  const { setMembers: setStoredMembers } = useBoardMembersStore();
 
   // 2. Data Fetching
   const {
@@ -453,6 +457,26 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     fetch('/api/boards').then(r => r.json()).then(b => setAvailableBoards(b.boards || [])).catch(console.error);
   }, [user]);
 
+  const refreshBoardMembers = useCallback(async () => {
+    if (!currentBoard?.id) return;
+    try {
+      const response = await fetch(`/api/boards/${currentBoard.id}/members`);
+      if (!response.ok) {
+        console.warn('[timeline] failed to refresh board members', { status: response.status });
+        return;
+      }
+      const { members } = await response.json();
+      const nextMembers: BoardMember[] = (members || []).map((m: any) => ({
+        profile: m.profile,
+        role: m.role,
+      }));
+      setBoardMembers(nextMembers.map((m) => m.profile));
+      setStoredMembers(currentBoard.id, nextMembers);
+    } catch (error) {
+      console.error('[timeline] failed to refresh board members', error);
+    }
+  }, [currentBoard?.id, setBoardMembers, setStoredMembers]);
+
   // Click outside board menu
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -621,7 +645,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         <TimelineBoardHeader
           board={currentBoard} modalBoards={availableBoards} handleBoardNavigate={handleBoardNavigate}
           showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
-          setShowShareDialog={setShowShareDialog} setShowNotificationSettings={setShowNotificationSettings}
+          setShowNotificationSettings={setShowNotificationSettings}
           setShowProfileSettings={setShowProfileSettings} setShowBoardSettings={setShowBoardSettings}
           profile={profile} user={user} signOut={signOut}
           showFilters={showFilters} setShowFilters={setShowFilters} hasActiveFilters={hasActiveFilters}
@@ -692,6 +716,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onUpdateCardTitle={handleUpdateCardTitle}
                 onNoteExtracted={handleNoteExtracted}
                 createdCardId={createdCardId}
+                boardMembers={boardMembers}
+                onOpenShareDialog={() => setShowShareDialog(true)}
               />
             </div>
 
@@ -735,6 +761,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 contextMenuCardId={contextMenu.cardId}
                 onUpdateCardTitle={handleUpdateCardTitle}
                 onNoteExtracted={handleNoteExtracted}
+                boardMembers={boardMembers}
+                onOpenShareDialog={() => setShowShareDialog(true)}
               />
             </div>
           </>
@@ -778,6 +806,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
           initialBoard={currentBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
           setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
+          onMemberAdded={refreshBoardMembers}
         />
 
         <ShortcutsModal

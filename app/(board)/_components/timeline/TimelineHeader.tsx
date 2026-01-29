@@ -17,7 +17,6 @@ type TimelineHeaderProps = {
     showBoardMenu: boolean;
     setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
     boardMenuRef: React.RefObject<HTMLDivElement>;
-    setShowShareDialog: (show: boolean) => void;
     setShowNotificationSettings: (show: boolean) => void;
     setShowProfileSettings: (show: boolean) => void;
     profile: UserProfile | null;
@@ -62,7 +61,6 @@ export default function TimelineHeader({
     showBoardMenu,
     setShowBoardMenu,
     boardMenuRef,
-    setShowShareDialog,
     setShowNotificationSettings,
     setShowProfileSettings,
     profile,
@@ -578,15 +576,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     <span>👤</span> Profile Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowShareDialog(true);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>📤</span> Share Board
                                 </button>
                                 <button
                                     onClick={() => {

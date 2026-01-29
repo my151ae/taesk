@@ -343,46 +343,79 @@ export function useTimelineCardActions({
         const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
 
         // 2. 新しいコンテンツと抜粋の生成
-        let nextContent = card?.content;
-        let nextExcerpt = card?.excerpt || "";
+        let resolvedContent: JSONContent | null = null;
+        const hasDocContent = (value: unknown): value is JSONContent => {
+            return !!value && typeof value === 'object' && 'type' in value && (value as any).type === 'doc';
+        };
 
-        if (card) {
+        if (hasDocContent(card?.content)) {
+            resolvedContent = card.content;
+        } else if (card?.short_id) {
+            try {
+                const res = await fetch(`/api/cards/${card.short_id}`);
+                if (res.ok) {
+                    const body = await res.json().catch(() => null);
+                    if (hasDocContent(body?.card?.content)) {
+                        resolvedContent = body.card.content;
+                    }
+                } else {
+                    console.warn('[timeline] failed to fetch full card for title update', { cardId, status: res.status });
+                }
+            } catch (error) {
+                console.warn('[timeline] failed to fetch full card for title update', { cardId, error });
+            }
+        }
+
+        let nextContent: JSONContent | undefined;
+        let nextExcerpt: string | undefined;
+
+        if (card && resolvedContent) {
             // setTitleTask を使用して Tiptap コンテンツ内のタイトル行を更新
-            const { content: updatedContent, changed } = setTitleTask(
-                normalizeContent(card.content),
+            const { content: updatedContent } = setTitleTask(
+                normalizeContent(resolvedContent),
                 { text: nextTitle }
             );
-            if (changed) {
-                nextContent = updatedContent;
-                nextExcerpt = deriveExcerptFromContent(nextContent);
-            }
+            nextContent = updatedContent;
+            nextExcerpt = deriveExcerptFromContent(updatedContent);
         }
 
         // 3. 楽観的更新 (Optimistic Update)
         setData((prev: any) => {
             if (!prev) return prev;
+            const applyOptimistic = (item: any) => {
+                if ((item.card_id || item.id) !== cardId) return item;
+                const base = { ...item, title: nextTitle };
+                if (nextContent && nextExcerpt !== undefined) {
+                    return { ...base, content: nextContent, excerpt: nextExcerpt };
+                }
+                return base;
+            };
             return {
                 ...prev,
-                events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: nextTitle, content: nextContent, excerpt: nextExcerpt } : e),
+                events: prev.events.map(applyOptimistic),
                 abBuckets: Object.fromEntries(
                     Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
                         k,
-                        v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: nextTitle, content: nextContent, excerpt: nextExcerpt } : i)
+                        v.map(applyOptimistic)
                     ])
                 ),
             };
         });
 
         try {
+            const payload: Record<string, unknown> = {
+                title: nextTitle,
+                slug: slugify(nextTitle),
+            };
+            if (nextContent && nextExcerpt !== undefined) {
+                payload.content = nextContent;
+                payload.excerpt = nextExcerpt;
+            }
+
             const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: nextTitle,
-                    slug: slugify(nextTitle),
-                    content: nextContent,
-                    excerpt: nextExcerpt,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) throw new Error('Failed to update title');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
@@ -8,6 +9,8 @@ const CreateBoardSchema = z.object({
   description: z.string().optional(),
   is_test_board: z.boolean().optional(),
 });
+
+const ADMIN_EMAILS = new Set(['matsumocy@gmail.com']);
 
 /**
  * GET /api/boards
@@ -23,6 +26,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    const userEmail = user.email?.toLowerCase().trim();
+    if (userEmail && ADMIN_EMAILS.has(userEmail)) {
+      const adminSupabase = createServiceRoleSupabaseClient();
+      const { data: boards, error } = await adminSupabase
+        .from('boards')
+        .select('id, name, description, short_id, id_short, slug, is_test_board, day_range, created_at, updated_at')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching boards for admin:', error);
+        return NextResponse.json(
+          { error: { code: 'DB_ERROR', message: error.message } },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(
+        { boards: boards || [] },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
