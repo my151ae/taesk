@@ -4,7 +4,7 @@
 ### UI / Routing
 - 主要 UI は `TimelineBoardPage` を中心とする Timeline + A/B + List View。
 - `/b/:short_id/:slug?` がボード正規ルート、`/board` はメンバー初期ボードへリダイレクト。
-- Card Modal は @modal intercept + `?card=` 遷移で開閉（Next.js 15 バグ回避のため）。
+- Card Modal は @modal intercept + `?card=` 遷移で開閉（Next.js 15.5.x の不具合回避が起点。現行は Next.js 16.0.7）。
 
 ### Timeline データ契約
 - `app/api/boards/[boardId]/timeline/route.ts`

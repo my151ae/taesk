@@ -7,6 +7,7 @@ import { generateShortId, slugify as slugifyCardTitle } from '@/lib/card-utils';
 const TEST_BOARD_NAME = 'E2E Comments Test Board';
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 const DEFAULT_LIST_TITLE = 'Comments List';
+const TEST_DISPLAY_NAME = 'Test Display Name Updated';
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -85,7 +86,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
 
   const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
     id: TEST_USER_ID,
-    full_name: 'E2E Test User',
+    full_name: TEST_DISPLAY_NAME,
     email: TEST_USER_EMAIL,
     avatar_url: null,
   });
@@ -406,7 +407,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(suggestionPopup.locator('button').first()).toBeVisible({ timeout: 5000 });
 
     // Verify specific user option is visible (display_name takes priority when username is null)
-    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test Display Name Updated' });
+    const userOption = suggestionPopup.locator('button').filter({ hasText: TEST_DISPLAY_NAME });
     await expect(userOption).toBeVisible({ timeout: 5000 });
 
     // Click to select mention
@@ -414,7 +415,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.waitForTimeout(500);
 
     // Verify mention node is inserted (displays as @Display Name)
-    const mentionNode = editor.locator('span.mention').filter({ hasText: '@Test Display Name Updated' });
+    const mentionNode = editor.locator('span.mention').filter({ hasText: `@${TEST_DISPLAY_NAME}` });
     await expect(mentionNode).toBeVisible();
 
     // Add some text after mention
@@ -429,7 +430,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentBody).toBeVisible({ timeout: 10000 });
 
     // Verify mention renders with data-mention-id (wait for DOM update)
-    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@Test Display Name Updated' });
+    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: `@${TEST_DISPLAY_NAME}` });
     await expect(mentionInList).toBeVisible({ timeout: 10000 });
   });
 
@@ -625,10 +626,10 @@ test.describe('Comments Feature @feature:comments', () => {
 
     // Type full-width ＠ to trigger mention suggestion
     await editor.pressSequentially('＠');
-    await waitForMentionOptions(page, 'Test Display Name Updated');
+    await waitForMentionOptions(page, TEST_DISPLAY_NAME);
 
     const suggestionPopup = page.locator('.bg-white.border.border-gray-200.rounded-lg');
-    const userOption = suggestionPopup.locator('button').filter({ hasText: 'Test Display Name Updated' });
+    const userOption = suggestionPopup.locator('button').filter({ hasText: TEST_DISPLAY_NAME });
     await expect(userOption).toBeVisible({ timeout: 5000 });
 
     // Click to select mention
@@ -636,7 +637,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.waitForTimeout(500);
 
     // Verify mention node was inserted in editor
-    const mention = editor.locator('.mention').filter({ hasText: '@Test Display Name Updated' });
+    const mention = editor.locator('.mention').filter({ hasText: `@${TEST_DISPLAY_NAME}` });
     await expect(mention).toBeVisible({ timeout: 5000 });
 
     // Add some text after mention
@@ -651,7 +652,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentBody).toBeVisible({ timeout: 10000 });
 
     // Verify mention renders with data-mention-id
-    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: '@Test Display Name Updated' });
+    const mentionInList = commentBody.locator('[data-mention-id]').filter({ hasText: `@${TEST_DISPLAY_NAME}` });
     await expect(mentionInList).toBeVisible({ timeout: 10000 });
   });
 

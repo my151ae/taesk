@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import { dumpClientMetrics } from './utils/metrics';
+
+import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2';
-const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
-const TIMELINE_LIST_ID = '00000000-0000-0000-0000-000000000010';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -27,37 +26,67 @@ const isoDateJst = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-async function ensureBoardFixtures() {
+type TimelineBoardContext = {
+  boardId: string;
+  boardShortId: string;
+  boardIdShort: number;
+  boardSlug: string;
+  listId: string;
+  canonicalPath: string;
+  boardName: string;
+};
+
+async function ensureBoardFixtures(): Promise<TimelineBoardContext> {
   const now = new Date().toISOString();
-  await supabaseAdmin.from('boards').upsert({
-    id: MAIN_BOARD_ID,
-    name: 'Timeline Test Board',
+  const boardId = crypto.randomUUID();
+  const boardName = `Timeline Test Board ${Date.now()}`;
+  const boardShortId = await createUniqueBoardShortId();
+  const boardIdShort = await getNextBoardIdShort();
+  const boardSlug = slugifyBoardName(boardName);
+  const listId = crypto.randomUUID();
+
+  await supabaseAdmin.from('boards').insert({
+    id: boardId,
+    name: boardName,
     description: 'Board used for timeline specs',
     is_test_board: true,
     user_id: TEST_USER_ID,
-    short_id: 'TLNBD',
-    id_short: 42,
-    slug: 'timeline-board',
+    short_id: boardShortId,
+    id_short: boardIdShort,
+    slug: boardSlug,
     created_at: now,
     updated_at: now,
   });
 
-  await supabaseAdmin.from('board_members').upsert({
-    board_id: MAIN_BOARD_ID,
+  await supabaseAdmin.from('board_members').insert({
+    board_id: boardId,
     profile_id: TEST_USER_ID,
     role: 'owner',
     created_at: now,
   });
 
-  await supabaseAdmin.from('lists').upsert({
-    id: TIMELINE_LIST_ID,
+  await supabaseAdmin.from('lists').insert({
+    id: listId,
     title: 'Timeline Tasks',
     position: 1000,
-    board_id: MAIN_BOARD_ID,
+    board_id: boardId,
     user_id: TEST_USER_ID,
     created_at: now,
     updated_at: now,
   });
+
+  const canonicalTail = boardSlug ? `${boardIdShort}-${boardSlug}` : `${boardIdShort}`;
+  const canonicalPath = boardSlug ? `/b/${boardShortId}/${canonicalTail}` : `/b/${boardShortId}`;
+
+  return {
+    boardId,
+    boardShortId,
+    boardIdShort,
+    boardSlug,
+    listId,
+    canonicalPath,
+    boardName,
+  };
 }
 
 async function supportsDueColumns(): Promise<boolean> {
@@ -70,18 +99,29 @@ async function supportsDueColumns(): Promise<boolean> {
 }
 
 let dueColumnsAvailable = true;
+let boardContext: TimelineBoardContext | null = null;
 
 test.describe('@feature:timeline Timeline view', () => {
   test.beforeAll(async () => {
-    await ensureBoardFixtures();
+    boardContext = await ensureBoardFixtures();
     dueColumnsAvailable = await supportsDueColumns();
     if (!dueColumnsAvailable) {
       console.warn('Skipping timeline spec: cards table missing due_* columns. Run supabase/migrations/20251113090000_add_due_fields.sql');
     }
   });
 
+  test.afterAll(async () => {
+    if (boardContext?.boardId) {
+      await supabaseAdmin.from('boards').delete().eq('id', boardContext.boardId);
+    }
+    boardContext = null;
+  });
+
   test('renders timeline events and emits metrics', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
     const cardId = crypto.randomUUID();
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
@@ -91,8 +131,8 @@ test.describe('@feature:timeline Timeline view', () => {
       id: cardId,
       title: 'Timeline focus card',
       checklist: { version: 1, lines: [] },
-      board_id: MAIN_BOARD_ID,
-      list_id: TIMELINE_LIST_ID,
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
       user_id: TEST_USER_ID,
       position: 1500,
       tags: [],
@@ -114,27 +154,29 @@ test.describe('@feature:timeline Timeline view', () => {
 
     expect(insertError).toBeNull();
 
-    await page.goto('/board');
-    await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
+    await page.goto(boardContext.canonicalPath);
+    await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
     const focusEvent = page.getByTestId('timeline-event').filter({ hasText: 'Timeline focus card' }).first();
     await focusEvent.scrollIntoViewIfNeeded();
     await expect(focusEvent).toBeVisible();
 
-    await dumpClientMetrics(page, ['timeline']);
     await supabaseAdmin.from('cards').delete().eq('id', cardId);
   });
 
   test('can create a date-only card from A/B list by click', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
 
-    await page.goto('/board');
-    await expect(page.getByRole('heading', { name: 'Timeline Test Board' })).toBeVisible();
+    await page.goto(boardContext.canonicalPath);
+    await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
     const createResponsePromise = page.waitForResponse((res) => {
       const url = res.url();
       return (
         res.request().method() === 'POST' &&
-        url.includes(`/api/boards/${MAIN_BOARD_ID}/cards`) &&
+        url.includes(`/api/boards/${boardContext.boardId}/cards`) &&
         res.ok()
       );
     });

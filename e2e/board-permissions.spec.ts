@@ -1,10 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-import { supabase } from '@/lib/supabase';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+import { createClient } from '@supabase/supabase-js';
 
 const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 const MOCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Missing Supabase admin credentials for board-permissions.spec.ts');
+}
+
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false },
+});
 
 interface TestBoard {
   id: string;
@@ -20,7 +31,7 @@ async function createTestBoard(boardName: string): Promise<TestBoard> {
   const idShort = await getNextBoardIdShort();
   const slug = slugifyBoardName(boardName);
 
-  const { error: boardError } = await supabase.from('boards').insert({
+  const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
     name: boardName,
     user_id: TEST_USER_ID,
@@ -35,7 +46,7 @@ async function createTestBoard(boardName: string): Promise<TestBoard> {
   }
 
   // Add owner member
-  const { error: memberError } = await supabase.from('board_members').insert({
+  const { error: memberError } = await supabaseAdmin.from('board_members').insert({
     board_id: boardId,
     profile_id: TEST_USER_ID,
     role: 'owner',
@@ -139,7 +150,7 @@ test.describe('Board Permissions @feature:boards', () => {
 
   test.afterEach(async () => {
     if (testBoard?.id) {
-      await supabase.from('boards').delete().eq('id', testBoard.id);
+      await supabaseAdmin.from('boards').delete().eq('id', testBoard.id);
     }
     testBoard = null;
   });

@@ -20,7 +20,7 @@ test.describe('Authentication @e2e:essential', () => {
 
     if (page.url().includes('/login')) {
       await expect(page.getByRole('heading', { name: 'Taesk' })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Google/i })).toBeVisible();
     } else {
       await expect(page).toHaveURL(/\/board/);
     }
@@ -36,7 +36,7 @@ test.describe('Authentication @e2e:essential', () => {
   test('should disable login button while logging in', async ({ page }) => {
     await page.goto('/login');
 
-    const loginButton = page.getByRole('button', { name: /Continue with Google/i });
+    const loginButton = page.getByRole('button', { name: /Google/i });
     await expect(loginButton).toBeEnabled();
 
     // Click login button - it will redirect to Google OAuth

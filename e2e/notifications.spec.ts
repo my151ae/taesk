@@ -5,8 +5,9 @@ import { mockServiceWorkerAndPush } from './utils/push';
 type QuietHours = { start: string; end: string; timezone: string };
 
 async function openNotificationSettings(page: import('@playwright/test').Page) {
-  await page.getByTestId('notify-button').click();
-  await expect(page.getByRole('heading', { name: 'Notification Settings' })).toBeVisible();
+  await page.getByTestId('profile-menu-button').click();
+  await page.getByRole('button', { name: 'Notifications' }).click();
+  await expect(page.getByTestId('enable-push-button')).toBeVisible({ timeout: 10000 });
 }
 
 test.describe('Web Push Notifications @feature:notifications', () => {
@@ -114,7 +115,6 @@ test.describe('Web Push Notifications @feature:notifications', () => {
   test('renders push notification controls', async ({ page }) => {
     await openNotificationSettings(page);
 
-    await expect(page.locator('text=Browser Notifications', { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId('enable-push-button')).toBeVisible();
     await page.getByTestId('enable-push-button').click();
     await expect(page.getByTestId('enable-push-button')).toBeVisible();

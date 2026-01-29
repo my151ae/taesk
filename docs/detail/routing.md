@@ -1,6 +1,6 @@
 # Routing & Card URLs
 
-このドキュメントでは、Taesk の Next.js 15 Intercepting Routes を使用したカードURL機能とモーダル表示について説明します。Timeline ボードも同じ仕組みを用い、Kanban 遺産を経由せずにカードモーダルを開きます。
+このドキュメントでは、Taesk の Next.js App Router（現行: 16.0.7）における Intercepting Routes を使用したカードURL機能とモーダル表示について説明します。Timeline ボードも同じ仕組みを用い、Kanban 遺産を経由せずにカードモーダルを開きます。
 
 ## 📋 概要
 
@@ -301,7 +301,7 @@ sed -n '/^{/,$p' test-results/routing.json | jq '.stats'
 
 ## ⚠️ 既知の問題と注意事項
 
-### Next.js App Router のクラッシュ回避（2025-10-16）
+### Next.js App Router のクラッシュ回避（2025-10-16 の事例）
 
 **⚠️ 重要**: モーダル表示時のURL形式を一時的に変更しています
 
@@ -309,7 +309,7 @@ sed -n '/^{/,$p' test-results/routing.json | jq '.stats'
 
 **理想**: `/c/<short_id>/<idShort>-<slug>` 形式（Trello風、美しい、SEO対応）
 
-**現実**: Next.js 15.5.x のバグにより、この形式でクラッシュが発生
+**当時の現実**: Next.js 15.5.x のバグにより、この形式でクラッシュが発生
 
 **問題**: Next.js 15.5.x で `fillCacheWithNewSubTreeData` の "e is not iterable" エラー
 - **原因**: インターセプトされたルートの Flight Data に `notFound()` や `redirect()` が混在すると、`segmentPath` に `null` が紛れ込みクラッシュ
@@ -321,7 +321,7 @@ sed -n '/^{/,$p' test-results/routing.json | jq '.stats'
 3. **E2E テストで監視**: 無効な URL でのクラッシュ防止を継続的に検証
 
 **将来の対応**:
-- ✅ Next.js の次期バージョンでバグが修正されたら `/c/...` 形式に戻す予定
+- ✅ バージョンアップ時に `/c/...` 形式への復帰可否を再検証する
 - 📋 バージョンアップ前に必ず E2E テスト実行（`should handle invalid card URL gracefully`）
 - 📋 [移行手順](../tickets/2025-10-16/04_nextjs_flight_data_bug_details.md#migration-path-back-to-c-urls) を参照
 
@@ -356,7 +356,7 @@ URL: /c/GKT5kB4e/1-new-card
 **問題**: 公式ドキュメントと実装の動作が異なる
 
 - **公式**: Parallel Route スロット (`@modal`) はセグメントとしてカウントされない → `(..)c` が正しいはず
-- **実装**: Next.js 15.5.4 では `(.)c` が正しく動作
+- **実装**: Next.js 15.5.4 で `(.)c` が正しく動作（当時の実測）
 
 **結論**: 実装上の動作を優先し、エラーメッセージに従うべき
 
