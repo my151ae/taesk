@@ -159,7 +159,7 @@
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid #e2e8f0;
-    padding: 0 7px !important;
+    padding: 0 7px 12px 8px !important;
     margin-left: 0;
     margin-right: 0;
 }

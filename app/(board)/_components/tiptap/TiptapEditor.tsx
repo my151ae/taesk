@@ -134,7 +134,7 @@ export default function TiptapEditor({
         content: initialContent || { type: 'doc', content: [] },
         editorProps: {
             attributes: {
-                class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-4 pb-4',
+                class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-3 pb-3',
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handlePaste: (view, event, slice) => {

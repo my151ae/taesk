@@ -862,7 +862,7 @@ export function CardModal({
                             >
                                 <div
                                     data-sticky-title
-                                    className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3 transition-opacity"
+                                    className="bg-white dark:bg-gray-800 border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3 transition-opacity"
                                 >
                                     <input
                                         type="checkbox"
