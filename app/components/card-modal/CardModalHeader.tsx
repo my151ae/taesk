@@ -89,7 +89,7 @@ export default function CardModalHeader({
                 {dueDate && (
                     <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Time</span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Start</span>
                             <input
                                 type="time"
                                 step={900}
@@ -145,11 +145,15 @@ export default function CardModalHeader({
                                 <span className="text-[10px] text-slate-400 dark:text-gray-500 font-medium">min</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-slate-400">→</span>
-                            <div className="px-2 py-1 bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700 rounded-md text-xs text-slate-500 dark:text-gray-400 min-w-[3.5rem] text-center font-medium">
-                                {dueEnd || '--:--'}
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">End</span>
+                            <input
+                                type="time"
+                                step={900}
+                                value={dueEnd}
+                                onChange={(e) => onDueEndChange(e.target.value)}
+                                className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                            />
                         </div>
                     </div>
                 )}
