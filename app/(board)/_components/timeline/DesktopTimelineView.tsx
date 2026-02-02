@@ -589,6 +589,7 @@ export function DesktopTimelineView({
                   <button
                     type="button"
                     onClick={onOpenShareDialog}
+                    data-testid="share-button"
                     className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
                   >
                     <span className="text-sm leading-none">＋</span>

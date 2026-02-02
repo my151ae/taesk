@@ -6,7 +6,7 @@ type QuietHours = { start: string; end: string; timezone: string };
 
 async function openNotificationSettings(page: import('@playwright/test').Page) {
   await page.getByTestId('profile-menu-button').click();
-  await page.getByRole('button', { name: 'Notifications' }).click();
+  await page.getByRole('button', { name: '🔔 Notifications' }).click();
   await expect(page.getByTestId('enable-push-button')).toBeVisible({ timeout: 10000 });
 }
 
@@ -149,19 +149,21 @@ test.describe('Web Push Notifications @feature:notifications', () => {
     await openNotificationSettings(page);
     const beforeCount = testNotificationCount;
 
-    await page.getByTestId('send-test-notification-button').click();
+    const testResponsePromise = page.waitForResponse((res) => {
+      return (
+        res.request().method() === 'POST' &&
+        res.url().includes('/api/notifications/test') &&
+        res.ok()
+      );
+    }, { timeout: 10_000 });
 
-    await page.waitForTimeout(500);
-
-    if (testNotificationCount === beforeCount) {
-      await page.evaluate(async () => {
-        await fetch('/api/notifications/test', { method: 'POST' });
-      });
-    }
-
+    const sendButton = page.getByTestId('send-test-notification-button');
+    await sendButton.scrollIntoViewIfNeeded();
+    await sendButton.dispatchEvent('click');
+    await testResponsePromise;
     await expect
-      .poll(() => testNotificationCount - beforeCount)
-      .toBeGreaterThan(0);
+      .poll(() => testNotificationCount, { timeout: 5_000 })
+      .toBeGreaterThan(beforeCount);
   });
 });
 

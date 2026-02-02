@@ -720,6 +720,7 @@ export default function MobileTimelineView({
                     <button
                       type="button"
                       onClick={onOpenShareDialog}
+                      data-testid="share-button"
                       className="mt-2 flex h-7 w-full items-center justify-center rounded-md border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
                       aria-label="メンバー追加"
                     >

@@ -20,6 +20,12 @@ if (fs.existsSync(envPath)) {
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('Missing Supabase admin credentials for auth-global-setup');
+}
 
 const TEST_USER = {
   email: process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app',
@@ -42,17 +48,31 @@ export default async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();
+  page.setDefaultTimeout(15_000);
+  const postWithRetry = async (url: string, options: Parameters<typeof page.request.post>[1], retries = 2) => {
+    let lastResponse: Awaited<ReturnType<typeof page.request.post>> | null = null;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const response = await page.request.post(url, options);
+      if (response.ok() || response.status() !== 404) {
+        return response;
+      }
+      lastResponse = response;
+      await page.waitForTimeout(1000);
+    }
+    return lastResponse!;
+  };
 
   try {
     // 1. Ensure test user exists
     console.log(`[Global Setup] Ensuring test user exists: ${TEST_USER.email}`);
 
-    const ensureUserResponse = await page.request.post(`${BASE_URL}/api/e2e/ensure-user`, {
+    const ensureUserResponse = await postWithRetry(`${BASE_URL}/api/e2e/ensure-user`, {
       headers: {
         'Content-Type': 'application/json',
         'x-e2e-secret': E2E_SECRET,
       },
       data: TEST_USER,
+      timeout: 15_000,
     });
 
     if (!ensureUserResponse.ok()) {
@@ -66,12 +86,13 @@ export default async function globalSetup(config: FullConfig) {
     // 2. Sign in programmatically
     console.log('[Global Setup] Signing in...');
 
-    const loginResponse = await page.request.post(`${BASE_URL}/api/e2e/login-as`, {
+    const loginResponse = await postWithRetry(`${BASE_URL}/api/e2e/login-as`, {
       headers: {
         'Content-Type': 'application/json',
         'x-e2e-secret': E2E_SECRET,
       },
       data: TEST_USER,
+      timeout: 15_000,
     });
 
     if (!loginResponse.ok()) {
@@ -84,58 +105,11 @@ export default async function globalSetup(config: FullConfig) {
 
     const session = loginResult.session;
 
-    // 4. Navigate to app to establish session in browser context
-    await page.goto(BASE_URL);
-
-    // 5. Inject Supabase session into localStorage and cookies
-    // Extract project ref from Supabase URL
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
-    const storageKey = `sb-${projectRef}-auth-token`;
-
-    // Store in localStorage (for backward compatibility)
-    await page.evaluate(({ key, sessionData }) => {
-      localStorage.setItem(key, JSON.stringify(sessionData));
-      console.log('[Global Setup] Session stored in localStorage with key:', key);
-    }, { key: storageKey, sessionData: session });
-
-    // Store in cookies (required for @supabase/ssr)
-    const domain = new URL(BASE_URL).hostname;
-    const accessTokenCookie = {
-      name: `sb-${projectRef}-auth-token`,
-      value: JSON.stringify(session),
-      domain: domain,
-      path: '/',
-      httpOnly: false,
-      secure: false,
-      sameSite: 'Lax' as const,
-      expires: session.expires_at || Date.now() / 1000 + 3600,
-    };
-
-    await context.addCookies([accessTokenCookie]);
-    console.log('[Global Setup] Session stored in cookies');
-
-    // 5. Save storage state
-    await context.storageState({ path: AUTH_FILE });
-    console.log(`[Global Setup] Storage state saved to: ${AUTH_FILE}`);
-
-    // 6. Verify authentication works
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-
-    // Check if we're authenticated (should not redirect to login)
-    const url = page.url();
-    if (url.includes('/login')) {
-      throw new Error('Authentication failed - redirected to login page');
-    }
-
-    // 7. Ensure MAIN_BOARD exists for tests
+    // 4. Ensure MAIN_BOARD exists for tests (before hitting /board)
     console.log('[Global Setup] Ensuring MAIN_BOARD exists...');
 
     const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -169,6 +143,45 @@ export default async function globalSetup(config: FullConfig) {
       }
     } else {
       console.log('[Global Setup] ✅ MAIN_BOARD already exists');
+    }
+
+    // 5. Inject Supabase session into cookies (required for @supabase/ssr)
+    const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+    const storageKey = `sb-${projectRef}-auth-token`;
+    const domain = new URL(BASE_URL).hostname;
+    const accessTokenCookie = {
+      name: `sb-${projectRef}-auth-token`,
+      value: JSON.stringify(session),
+      domain,
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax' as const,
+      expires: session.expires_at || Date.now() / 1000 + 3600,
+    };
+
+    await context.addCookies([accessTokenCookie]);
+    console.log('[Global Setup] Session stored in cookies');
+
+    // 6. Navigate to app and set localStorage (requires same origin)
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+    await page.evaluate(({ key, sessionData }) => {
+      localStorage.setItem(key, JSON.stringify(sessionData));
+      console.log('[Global Setup] Session stored in localStorage with key:', key);
+    }, { key: storageKey, sessionData: session });
+
+    // 7. Save storage state
+    await context.storageState({ path: AUTH_FILE });
+    console.log(`[Global Setup] Storage state saved to: ${AUTH_FILE}`);
+
+    // 8. Verify authentication works
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 15_000 });
+    await page.waitForTimeout(500);
+
+    // Check if we're authenticated (should not redirect to login)
+    const url = page.url();
+    if (url.includes('/login')) {
+      throw new Error('Authentication failed - redirected to login page');
     }
 
     console.log('[Global Setup] ✅ Authentication setup complete');

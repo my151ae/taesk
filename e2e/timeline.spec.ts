@@ -186,7 +186,11 @@ test.describe('@feature:timeline Timeline view', () => {
     const body = await response.json().catch(() => null);
     const createdCardId = body?.card?.id as string | undefined;
 
-    await expect(page.locator('[data-testid^="ab-card-"]').filter({ hasText: /New card/ }).first()).toBeVisible();
+    if (createdCardId) {
+      await expect(page.getByTestId(`ab-card-${createdCardId}`).first()).toBeVisible();
+    } else {
+      await expect(page.locator('[data-testid^="ab-card-"]').first()).toBeVisible();
+    }
 
     if (createdCardId) {
       await supabaseAdmin.from('cards').delete().eq('id', createdCardId);

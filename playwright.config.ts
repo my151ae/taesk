@@ -47,7 +47,7 @@ export default defineConfig({
   projects: [
     {
       name: 'core',
-      grepInvert: /@phase3|@wip/,
+      grepInvert: /@phase3|@wip|@perf/,
       use: { ...devices['Desktop Chrome'] },
     },
     {

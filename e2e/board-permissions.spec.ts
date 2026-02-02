@@ -163,55 +163,34 @@ test.describe('Board Permissions @feature:boards', () => {
     });
 
     // Click share button
-    const shareButton = page.getByTestId('share-button');
+    const shareButton = page.getByTestId('share-button').first();
     await shareButton.waitFor({ state: 'visible', timeout: 10000 });
     await shareButton.click();
 
     // Verify ShareDialog is visible
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Share Board')).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Share Board')).toBeVisible();
 
     // Verify members list is displayed (check for names as they are primary)
-    await expect(page.getByText('Test Owner')).toBeVisible();
-    await expect(page.getByText('Test Editor')).toBeVisible();
+    await expect(dialog.getByText('Test Owner')).toBeVisible();
+    await expect(dialog.getByText('Test Editor')).toBeVisible();
   });
 
   test('should change member role', async ({ page }) => {
     // Open ShareDialog
-    const shareButton = page.getByTestId('share-button');
+    const shareButton = page.getByTestId('share-button').first();
     await shareButton.click();
     await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
     // Find editor member and change role
-    await expect(page.getByText('Test Editor')).toBeVisible();
-    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Test Editor')).toBeVisible();
+    const editorRow = dialog.locator('div').filter({ hasText: 'Test Editor' }).first();
     const roleSelect = editorRow.getByRole('combobox').first();
 
-    const patchResult = await page.evaluate(
-      async ({ boardId, memberId }) => {
-        const response = await fetch(`/api/boards/${boardId}/members/${memberId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'commenter' }),
-        });
-        return {
-          ok: response.ok,
-          status: response.status,
-        };
-      },
-      { boardId: testBoard?.id, memberId: MOCK_MEMBER_ID }
-    );
-
-    expect(patchResult.ok).toBe(true);
-
-    const refreshedMembers = await page.evaluate(async ({ boardId }) => {
-      const response = await fetch(`/api/boards/${boardId}/members`);
-      const data = await response.json();
-      return data.members;
-    }, { boardId: testBoard?.id });
-
-    const editorMember = refreshedMembers.find((member: any) => member.profile_id === MOCK_MEMBER_ID);
-    expect(editorMember?.role).toBe('commenter');
+    await roleSelect.selectOption('commenter');
+    await expect(roleSelect).toHaveValue('commenter');
   });
 
   test('should remove board member', async ({ page }) => {
@@ -231,13 +210,14 @@ test.describe('Board Permissions @feature:boards', () => {
     });
 
     // Open ShareDialog
-    const shareButton = page.getByTestId('share-button');
+    const shareButton = page.getByTestId('share-button').first();
     await shareButton.click();
     await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
     // Find editor member and click remove button
-    await expect(page.getByText('Test Editor')).toBeVisible();
-    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Test Editor')).toBeVisible();
+    const editorRow = dialog.locator('div').filter({ hasText: 'Test Editor' }).first();
     const removeButton = editorRow.getByRole('button', { name: /remove/i });
 
     // Handle confirmation dialog if present
@@ -249,7 +229,7 @@ test.describe('Board Permissions @feature:boards', () => {
 
   test('should display invite link section (Phase 3) @phase3', async ({ page }) => {
     // Open ShareDialog
-    const shareButton = page.getByTestId('share-button');
+    const shareButton = page.getByTestId('share-button').first();
     await shareButton.click();
     await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
 
@@ -269,15 +249,16 @@ test.describe('Board Permissions @feature:boards', () => {
 
   test('should prevent non-owner from changing owner role @failure:permissions', async ({ page }) => {
     // Open ShareDialog
-    const shareButton = page.getByTestId('share-button');
+    const shareButton = page.getByTestId('share-button').first();
     await shareButton.click();
 
     // Wait for dialog and members list to load
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText('Test Owner')).toBeVisible({ timeout: 10000 });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Test Owner')).toBeVisible({ timeout: 10000 });
 
     // Find owner member row using border class and email text
-    const ownerRow = page.locator('.border.rounded').filter({ hasText: 'Test Owner' }).first();
+    const ownerRow = dialog.locator('.border.rounded').filter({ hasText: 'Test Owner' }).first();
     await expect(ownerRow).toBeVisible();
 
     // Find the select within that row

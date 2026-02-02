@@ -19,6 +19,7 @@ test.describe('Reorder API (Timeline) @feature:reorder', () => {
 
     // Create 5 test cards (let API create the default list if needed)
     cardIds = [];
+    listId = '';
     for (let i = 0; i < 5; i++) {
       const cardRes = await request.post(`${BASE_URL}/api/boards/${boardId}/cards`, {
         data: {
