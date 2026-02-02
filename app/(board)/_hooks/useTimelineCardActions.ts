@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { JSONContent } from "@tiptap/react";
 import type { Card, DueBucket, Priority } from "@/lib/supabase";
-import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent, setTitleTask } from "@/lib/tiptap";
+import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent } from "@/lib/tiptap";
 import { slugify } from "@/lib/card-utils";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { minutesToTime } from "@/app/(board)/_utils/timeline-helpers";
@@ -326,123 +325,6 @@ export function useTimelineCardActions({
         }
     }, [dataMode, initialBoardId, setData, fetchTimeline]);
 
-    // タイトルのインライン更新用 requestId
-    const titleUpdateRequestIdRef = useRef(0);
-
-    const handleUpdateCardTitle = useCallback(async (cardId: string, newTitle: string, previousTitle: string) => {
-        if (dataMode !== 'api') return;
-
-        const requestId = ++titleUpdateRequestIdRef.current;
-        const nextTitle = newTitle.trim();
-
-        // 1. 同期対象のカードとコンテンツを取得
-        const allItems = [
-            ...(data?.events || []),
-            ...Object.values(data?.abBuckets || {}).flat()
-        ];
-        const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
-
-        // 2. 新しいコンテンツと抜粋の生成
-        let resolvedContent: JSONContent | null = null;
-        const hasDocContent = (value: unknown): value is JSONContent => {
-            return !!value && typeof value === 'object' && 'type' in value && (value as any).type === 'doc';
-        };
-
-        if (hasDocContent(card?.content)) {
-            resolvedContent = card.content;
-        } else if (card?.short_id) {
-            try {
-                const res = await fetch(`/api/cards/${card.short_id}`);
-                if (res.ok) {
-                    const body = await res.json().catch(() => null);
-                    if (hasDocContent(body?.card?.content)) {
-                        resolvedContent = body.card.content;
-                    }
-                } else {
-                    console.warn('[timeline] failed to fetch full card for title update', { cardId, status: res.status });
-                }
-            } catch (error) {
-                console.warn('[timeline] failed to fetch full card for title update', { cardId, error });
-            }
-        }
-
-        let nextContent: JSONContent | undefined;
-        let nextExcerpt: string | undefined;
-
-        if (card && resolvedContent) {
-            // setTitleTask を使用して Tiptap コンテンツ内のタイトル行を更新
-            const { content: updatedContent } = setTitleTask(
-                normalizeContent(resolvedContent),
-                { text: nextTitle }
-            );
-            nextContent = updatedContent;
-            nextExcerpt = deriveExcerptFromContent(updatedContent);
-        }
-
-        // 3. 楽観的更新 (Optimistic Update)
-        setData((prev: any) => {
-            if (!prev) return prev;
-            const applyOptimistic = (item: any) => {
-                if ((item.card_id || item.id) !== cardId) return item;
-                const base = { ...item, title: nextTitle };
-                if (nextContent && nextExcerpt !== undefined) {
-                    return { ...base, content: nextContent, excerpt: nextExcerpt };
-                }
-                return base;
-            };
-            return {
-                ...prev,
-                events: prev.events.map(applyOptimistic),
-                abBuckets: Object.fromEntries(
-                    Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
-                        k,
-                        v.map(applyOptimistic)
-                    ])
-                ),
-            };
-        });
-
-        try {
-            const payload: Record<string, unknown> = {
-                title: nextTitle,
-                slug: slugify(nextTitle),
-            };
-            if (nextContent && nextExcerpt !== undefined) {
-                payload.content = nextContent;
-                payload.excerpt = nextExcerpt;
-            }
-
-            const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            if (!res.ok) throw new Error('Failed to update title');
-
-            if (requestId !== titleUpdateRequestIdRef.current) return;
-
-        } catch (error) {
-            if (requestId === titleUpdateRequestIdRef.current) {
-                console.error('[timeline] title update failed, rolling back', error);
-                setData((prev: any) => {
-                    if (!prev) return prev;
-                    return {
-                        ...prev,
-                        events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: previousTitle, content: card?.content, excerpt: card?.excerpt } : e),
-                        abBuckets: Object.fromEntries(
-                            Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
-                                k,
-                                v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: previousTitle, content: card?.content, excerpt: card?.excerpt } : i)
-                            ])
-                        ),
-                    };
-                });
-                setErrorMessage('タイトルの更新に失敗しました');
-            }
-        }
-    }, [dataMode, initialBoardId, setData, setErrorMessage, data]);
-
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {
             const googleEventId = entry.eventId ?? entry.id;
@@ -467,7 +349,6 @@ export function useTimelineCardActions({
         handleCardModalSave,
         handleCardModalDelete,
         handleToggleCardChecked,
-        handleUpdateCardTitle,
         handleColumnClick,
         handleBucketClick,
         handleExternalEventClick,

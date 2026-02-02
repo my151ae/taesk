@@ -20,7 +20,6 @@ import {
   DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
-import { deriveExcerptFromContent, ensureTitleTask, setTitleTask } from "@/lib/tiptap";
 import { DesktopListView } from "@/app/(board)/_components/timeline/DesktopListView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 
@@ -300,14 +299,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [data?.days]);
 
 
-  const [createdCardId, setCreatedCardId] = useState<string | null>(null);
-
   const {
     applyPatch,
     handleCardModalSave,
     handleCardModalDelete,
     handleToggleCardChecked,
-    handleUpdateCardTitle,
     handleColumnClick,
     handleBucketClick,
     handleExternalEventClick,
@@ -318,117 +314,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
     bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data,
-    onCardCreated: setCreatedCardId,
   });
-
-  const handleNoteExtracted = useCallback(async (cardId: string, bodyLines: string[], updatedTitle?: string) => {
-    if (!data) return;
-    // 1. Find the card
-    const allItems = [
-      ...(data.events || []),
-      ...Object.values(data.abBuckets || {}).flat()
-    ];
-    const card: any = allItems.find((i: any) => (i.card_id || i.id) === cardId);
-    if (!card) return;
-
-    // 1.5. Ensure we have full content before patching (timeline payload may not include content)
-    let baseContent = card.content ?? null;
-    const hasDocContent =
-      baseContent &&
-      typeof baseContent === 'object' &&
-      'type' in baseContent &&
-      (baseContent as any).type === 'doc';
-    if (!hasDocContent && card.short_id) {
-      try {
-        const res = await fetch(`/api/cards/${card.short_id}`);
-        if (res.ok) {
-          const body = await res.json().catch(() => null);
-          baseContent = body?.card?.content ?? null;
-        } else {
-          console.warn('[timeline] failed to fetch full card for inline note', { cardId, status: res.status });
-          return;
-        }
-      } catch (error) {
-        console.warn('[timeline] failed to fetch full card for inline note', { cardId, error });
-        return;
-      }
-    }
-
-    // 2. Prepare new content
-    // タイトルの抽出。渡された updatedTitle があれば優先、なければ既存、なければ空。
-    const finalTitle = updatedTitle ?? card.title ?? "";
-
-    // ensureTitleTask に fallbackTitle を渡すことで、空カードの場合に正しくタスク化される
-    let { content: workingContent } = ensureTitleTask(baseContent || { type: 'doc', content: [] }, finalTitle);
-
-    // タイトルが渡されていれば改めて同期（既に ensureTitleTask 内で反映されている可能性もあるが念打ち）
-    if (updatedTitle !== undefined) {
-      const { content: syncedContent } = setTitleTask(workingContent, { text: updatedTitle });
-      workingContent = syncedContent;
-    }
-
-    // 本文の構築
-    // 既存の content から「タイトル（インデックス0）」以降を抽出。
-    // もし元々 1 行しかなくて、それが空文字だった場合は slice(1) は空。
-    const existingBody = workingContent.content?.slice(1) || [];
-
-    // 改行テキストの挿入先は、既存の先頭が taskList ならその先頭に追加。
-    // そうでなければ従来どおり paragraph を挿入する。
-    let nextBody: any[] = existingBody;
-    if (bodyLines.length > 0) {
-      if (existingBody[0]?.type === 'taskList') {
-        const taskItems = bodyLines.map(line => ({
-          type: 'taskItem',
-          attrs: { checked: false },
-          content: [{ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] }]
-        }));
-        const firstList = existingBody[0];
-        const mergedList = {
-          ...firstList,
-          content: [...taskItems, ...(firstList.content ?? [])]
-        };
-        nextBody = [mergedList, ...existingBody.slice(1)];
-      } else {
-        const paragraphs = bodyLines.map(line => ({
-          type: 'paragraph',
-          content: line ? [{ type: 'text', text: line }] : []
-        }));
-        nextBody = [...paragraphs, ...existingBody];
-      }
-    }
-
-    const newContent = {
-      ...workingContent,
-      content: [
-        workingContent.content![0], // タイトル行
-        ...nextBody
-      ]
-    };
-
-    const newExcerpt = deriveExcerptFromContent(newContent);
-
-    // 3. Optimistic local update
-    setData((prev: any) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        events: prev.events.map((e: any) => (e.card_id || e.id) === cardId ? { ...e, title: finalTitle, content: newContent, excerpt: newExcerpt } : e),
-        abBuckets: Object.fromEntries(
-          Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [
-            k,
-            v.map((i: any) => (i.card_id || i.id) === cardId ? { ...i, title: finalTitle, content: newContent, excerpt: newExcerpt } : i)
-          ])
-        ),
-      };
-    });
-
-    // 4. Save
-    await applyPatch(cardId, {
-      title: finalTitle,
-      content: newContent,
-      excerpt: newExcerpt
-    });
-  }, [data, applyPatch, setData]);
 
   const handleGoogleConnect = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -731,9 +617,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onCardContextMenu={handleCardContextMenu}
                 onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
                 contextMenuCardId={contextMenu.cardId}
-                onUpdateCardTitle={handleUpdateCardTitle}
-                onNoteExtracted={handleNoteExtracted}
-                createdCardId={createdCardId}
                 boardMembers={boardMembers}
                 onOpenShareDialog={() => setShowShareDialog(true)}
               />
@@ -777,8 +660,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onCardContextMenu={handleCardContextMenu}
                 onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
                 contextMenuCardId={contextMenu.cardId}
-                onUpdateCardTitle={handleUpdateCardTitle}
-                onNoteExtracted={handleNoteExtracted}
                 boardMembers={boardMembers}
                 onOpenShareDialog={() => setShowShareDialog(true)}
               />

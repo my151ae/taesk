@@ -143,13 +143,6 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                         <ShortcutRow label="Create next card" keys={[<KeyIcon key="shift">⇧</KeyIcon>, "Enter"]} />
                     </Section>
 
-                    <Section title="Inline Editing">
-                        <ShortcutRow label="Start title editing" keys={[<KeyIcon key="cmd">⌘</KeyIcon>, "Enter"]} />
-                        <ShortcutRow label="New line" keys={["Enter"]} />
-                        <ShortcutRow label="Save changes" keys={[<KeyIcon key="cmd">⌘</KeyIcon>, "Enter"]} />
-                        <ShortcutRow label="Cancel editing" keys={["Esc"]} />
-                    </Section>
-
                     <Section title="Scheduling">
                         <ShortcutRow label="Move 5m earlier" keys={[<KeyIcon key="opt">⌥</KeyIcon>, <KeyIcon key="up">↑</KeyIcon>]} />
                         <ShortcutRow label="Move 5m later" keys={[<KeyIcon key="opt">⌥</KeyIcon>, <KeyIcon key="down">↓</KeyIcon>]} />

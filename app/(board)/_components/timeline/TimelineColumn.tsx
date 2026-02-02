@@ -50,10 +50,6 @@ type TimelineColumnProps = {
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
-    // インライン編集用
-    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
-    createdCardId?: string | null;
     hourHeight?: number;
 };
 
@@ -97,9 +93,6 @@ export const TimelineColumn = memo(function TimelineColumn({
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
-    onUpdateCardTitle,
-    onNoteExtracted,
-    createdCardId,
     hourHeight,
 }: TimelineColumnProps) {
     const layoutMap = calculateEventLayout(events);
@@ -318,9 +311,6 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     onCardContextMenu={onCardContextMenu}
                                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                     isContextMenuOpen={contextMenuCardId === event.card_id}
-                                    onUpdateCardTitle={onUpdateCardTitle}
-                                    onNoteExtracted={onNoteExtracted}
-                                    initialIsEditing={createdCardId === event.card_id}
                                     onCreateNext={() => {
                                         const endMinutes = (getMinutesFromTime(event.due_start ?? null) ?? 0) + (event.durationMinutes ?? 60);
                                         handleColumnClick(day, endMinutes);

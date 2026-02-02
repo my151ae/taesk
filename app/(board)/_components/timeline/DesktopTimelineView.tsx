@@ -85,10 +85,6 @@ type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  // インライン編集用
-  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
-  createdCardId?: string | null;
   boardMembers?: ProfileSummary[];
   onOpenShareDialog?: () => void;
 };
@@ -136,9 +132,6 @@ export function DesktopTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  onUpdateCardTitle,
-  onNoteExtracted,
-  createdCardId,
   boardMembers,
   onOpenShareDialog,
 }: DesktopTimelineViewProps) {
@@ -631,12 +624,9 @@ export function DesktopTimelineView({
                   status={status}
                   openCardModal={openCardModal}
                   onToggleCheck={onToggleCheck}
-                  onUpdateCardTitle={onUpdateCardTitle}
-                  onNoteExtracted={onNoteExtracted}
                   onCardContextMenu={onCardContextMenu}
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
-                  createdCardId={createdCardId}
                   hourHeight={hourHeight}
                 />
               ))}

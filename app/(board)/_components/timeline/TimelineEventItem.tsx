@@ -1,4 +1,4 @@
-import { KeyboardEvent, PointerEvent, memo, useState, useCallback } from 'react';
+import { KeyboardEvent, PointerEvent, memo } from 'react';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
 import {
@@ -28,10 +28,6 @@ type TimelineEventItemProps = {
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     isContextMenuOpen: boolean;
-    // インライン編集用
-    onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-    onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
-    initialIsEditing?: boolean;
     onCreateNext?: () => void;
     hourHeight?: number;
 };
@@ -51,15 +47,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     timelineStartHour = 0,
     onCardContextMenu,
     isContextMenuOpen,
-    onUpdateCardTitle,
-    onNoteExtracted,
-    initialIsEditing = false,
     onCreateNext,
     hourHeight,
 }: TimelineEventItemProps) {
-    // タイトル編集中の状態
-    const [isEditingTitle, setIsEditingTitle] = useState(initialIsEditing);
-
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
     let displayStart = event.due_start;
@@ -75,18 +65,14 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     const top = minuteToPixels(start, timelineStartHour, hourHeight);
     const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 20);
 
-    const handleTitleChange = useCallback((newTitle: string, previousTitle: string) => {
-        onUpdateCardTitle?.(event.card_id, newTitle, previousTitle);
-    }, [event.card_id, onUpdateCardTitle]);
-
     return (
         <DraggableCard
             key={event.card_id}
             id={`event:${event.card_id}`}
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
-            // 編集中またはコンテキストメニュー表示中はDnD無効化
-            disabled={isContextMenuOpen || isEditingTitle}
+            // コンテキストメニュー表示中はDnD無効化
+            disabled={isContextMenuOpen}
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -118,11 +104,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                     focusGroup="timeline"
                     className="w-full h-full pt-0"
-                    // インライン編集
-                    onTitleChange={onUpdateCardTitle ? handleTitleChange : undefined}
-                    onNoteExtracted={onNoteExtracted ? (lines: string[], updatedTitle?: string) => onNoteExtracted(event.card_id, lines, updatedTitle) : undefined}
-                    isEditingTitle={isEditingTitle}
-                    onEditingChange={setIsEditingTitle}
                     backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
                     onCreateNext={onCreateNext}
                 />

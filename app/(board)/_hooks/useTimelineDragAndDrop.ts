@@ -133,7 +133,6 @@ type UseTimelineDragAndDropProps = {
     abScrollContainersRef?: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
     bucketDayMap: Record<string, string | null>;
     dataMode: 'api' | 'mock';
-    editingCardId?: string | null;
     timelineStartHour?: number;
     hourHeight?: number;
 };
@@ -146,7 +145,6 @@ export function useTimelineDragAndDrop({
     abScrollContainersRef,
     bucketDayMap,
     dataMode,
-    editingCardId,
     timelineStartHour = 0,
     hourHeight = 40,
 }: UseTimelineDragAndDropProps) {
@@ -321,7 +319,6 @@ export function useTimelineDragAndDrop({
     const handleDragStart = (event: DragStartEvent) => {
         const cardId = event.active.data.current?.cardId as string | undefined;
         if (!cardId) return;
-        if (editingCardId && editingCardId === cardId) return;
         dragStartPointerRef.current =
             extractClientPoint(event.activatorEvent) ??
             (() => {

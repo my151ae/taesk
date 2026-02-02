@@ -54,8 +54,6 @@ function MobileTimelineColumn({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
   hourHeight,
-  onUpdateCardTitle,
-  onNoteExtracted,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -73,8 +71,6 @@ function MobileTimelineColumn({
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
   hourHeight: number;
-  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const calendarLayout = calculateEventLayout(
@@ -249,8 +245,6 @@ function MobileTimelineColumn({
                   tabIndex={0}
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                   focusGroup="timeline"
-                  onTitleChange={onUpdateCardTitle ? (newTitle: string, prev: string) => onUpdateCardTitle(event.card_id, newTitle, prev) : undefined}
-                  onNoteExtracted={onNoteExtracted ? (bodyLines: string[], updatedTitle?: string) => onNoteExtracted(event.card_id, bodyLines, updatedTitle) : undefined}
                 />
               </div>
             </DraggableCard>
@@ -272,8 +266,6 @@ function MobileAbBucket({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  onUpdateCardTitle,
-  onNoteExtracted,
 }: {
   sectionLabel: string;
   bucketKey: string;
@@ -285,8 +277,6 @@ function MobileAbBucket({
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
 }) {
   const { setNodeRef: setBucketRef, isOver } = useDroppable({
     id: `bucket-drop:${bucketKey}`,
@@ -333,8 +323,6 @@ function MobileAbBucket({
               onCardContextMenu={onCardContextMenu}
               onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
               isContextMenuOpen={contextMenuCardId === item.card_id}
-              onUpdateCardTitle={onUpdateCardTitle}
-              onNoteExtracted={onNoteExtracted}
             />
           ))
         )}
@@ -389,8 +377,6 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
   boardMembers?: ProfileSummary[];
   onOpenShareDialog?: () => void;
 };
@@ -429,8 +415,6 @@ export default function MobileTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  onUpdateCardTitle,
-  onNoteExtracted,
   boardMembers,
   onOpenShareDialog,
 }: MobileTimelineViewProps) {
@@ -747,8 +731,6 @@ export default function MobileTimelineView({
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
                   hourHeight={hourHeight}
-                  onUpdateCardTitle={onUpdateCardTitle}
-                  onNoteExtracted={onNoteExtracted}
                 />
               </div>
             </div>
@@ -775,8 +757,6 @@ export default function MobileTimelineView({
                       onCardContextMenu={onCardContextMenu}
                       onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                       contextMenuCardId={contextMenuCardId}
-                      onUpdateCardTitle={onUpdateCardTitle}
-                      onNoteExtracted={onNoteExtracted}
                     />
                   );
                 })}
@@ -811,8 +791,6 @@ function MobileBucketCard({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   isContextMenuOpen,
-  onUpdateCardTitle,
-  onNoteExtracted,
 }: {
   item: TimelineBucketItem;
   bucketKey: string;
@@ -822,8 +800,6 @@ function MobileBucketCard({
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   isContextMenuOpen: boolean;
-  onUpdateCardTitle?: (cardId: string, newTitle: string, previousTitle: string) => void;
-  onNoteExtracted?: (cardId: string, bodyLines: string[], updatedTitle?: string) => void;
 }) {
   const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
     id: `bucket-item-top:${bucketKey}:${item.card_id}`,
@@ -864,8 +840,6 @@ function MobileBucketCard({
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"
-          onTitleChange={onUpdateCardTitle ? (newTitle: string, prev: string) => onUpdateCardTitle(item.card_id, newTitle, prev) : undefined}
-          onNoteExtracted={onNoteExtracted ? (bodyLines: string[], updatedTitle?: string) => onNoteExtracted(item.card_id, bodyLines, updatedTitle) : undefined}
         />
 
         <div

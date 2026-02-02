@@ -1,6 +1,5 @@
 import clsx from 'clsx';
-import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useState, useCallback, useRef } from 'react';
-import { InlineTitleEditor } from './InlineTitleEditor';
+import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useRef, useCallback } from 'react';
 
 type TimelineCardProps = {
     title: string;
@@ -27,16 +26,9 @@ type TimelineCardProps = {
     note?: string;
     /** 本文に適用する line-clamp 等のクラスを指定。未指定なら高さクリップのみ。 */
     noteClampClass?: string;
-    // インライン編集用 props
-    onTitleChange?: (newTitle: string, previousTitle: string) => void;
-    /** 編集中かどうかの外部制御（DnD無効化などに使用） */
-    isEditingTitle?: boolean;
-    onEditingChange?: (isEditing: boolean) => void;
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
     onCreateNext?: () => void;
-    /** インライン編集での貼り付け時に抽出された本文（2行目以降）を受け取る */
-    onNoteExtracted?: (bodyLines: string[], updatedTitle?: string) => void;
     /** フォーカス復帰用のカードID */
     cardId?: string;
 };
@@ -64,34 +56,12 @@ export function TimelineCard({
     childrenPosition = 'bottom',
     note,
     noteClampClass,
-    onTitleChange,
-    isEditingTitle: externalIsEditing,
-    onEditingChange,
     backgroundClass = 'bg-white',
     onCreateNext,
-    onNoteExtracted,
     cardId,
 }: TimelineCardProps) {
-    // 内部編集状態（外部制御がない場合）
-    const [internalIsEditing, setInternalIsEditing] = useState(false);
-    const isEditing = externalIsEditing ?? internalIsEditing;
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
-    const titleRef = useRef<HTMLSpanElement | null>(null);
-
-    const setIsEditing = useCallback((value: boolean) => {
-        setInternalIsEditing(value);
-        onEditingChange?.(value);
-    }, [onEditingChange]);
-
-    const handleTitleClick = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        // タイトル部分はクリックで即座に編集開始
-        if (onTitleChange && !isEditing) {
-            setIsEditing(true);
-        }
-    }, [onTitleChange, isEditing, setIsEditing]);
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
@@ -113,25 +83,6 @@ export function TimelineCard({
             containerRef.current?.focus();
         }
     }, [onOpen]);
-
-    const handleSave = useCallback((newTitle: string, previousTitle: string, meta?: { noteExtracted?: boolean }) => {
-        setIsEditing(false);
-        if (!meta?.noteExtracted) {
-            onTitleChange?.(newTitle, previousTitle);
-        }
-        // 編集完了後にカードにフォーカスを戻す
-        requestAnimationFrame(() => {
-            containerRef.current?.focus();
-        });
-    }, [onTitleChange, setIsEditing]);
-
-    const handleCancel = useCallback(() => {
-        setIsEditing(false);
-        // キャンセル時もフォーカスを戻す
-        requestAnimationFrame(() => {
-            containerRef.current?.focus();
-        });
-    }, [setIsEditing]);
 
     return (
         <div
@@ -155,53 +106,41 @@ export function TimelineCard({
             onMouseDown={handleMouseDown}
             onClick={handleContainerClick}
             onKeyDown={(event) => {
-                if (!isEditing) {
-                    // Title editing: Cmd+Enter or Ctrl+Enter
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (onTitleChange) {
-                            setIsEditing(true);
-                        }
-                        return;
+                // Create next card: Shift+Enter
+                if (event.key === 'Enter' && event.shiftKey) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (onCreateNext) {
+                        onCreateNext();
                     }
-
-                    // Create next card: Shift+Enter
-                    if (event.key === 'Enter' && event.shiftKey) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (onCreateNext) {
-                            onCreateNext();
-                        }
-                        return;
-                    }
-
-                    // Open card details: Enter
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onOpen();
-                        return;
-                    }
-
-                    // Context menu: Delete
-                    if (event.key === 'Delete') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const rect = containerRef.current?.getBoundingClientRect();
-                        if (rect) onOpenContextMenu?.(rect);
-                        return;
-                    }
-
-                    // Toggle Check: Space
-                    if (event.key === ' ') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onToggleCheck(!checked);
-                        return;
-                    }
-
+                    return;
                 }
+
+                // Open card details: Enter
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onOpen();
+                    return;
+                }
+
+                // Context menu: Delete
+                if (event.key === 'Delete') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    if (rect) onOpenContextMenu?.(rect);
+                    return;
+                }
+
+                // Toggle Check: Space
+                if (event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleCheck(!checked);
+                    return;
+                }
+
                 onKeyDown?.(event);
             }}
         >
@@ -244,40 +183,17 @@ export function TimelineCard({
                             "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800 pt-0.5"
                         )}>
                             <div className="flex min-w-0 items-center gap-2">
-                                {isEditing && onTitleChange ? (
-                                    <div className="min-w-0 flex-1">
-                                        <InlineTitleEditor
-                                            title={title}
-                                            onSave={handleSave}
-                                            onCancel={handleCancel}
-                                            onNoteExtracted={onNoteExtracted}
-                                        />
-                                    </div>
-                                ) : (
-                                    <span
-                                        className={clsx(
-                                            "truncate leading-tight",
-                                            onTitleChange ? "cursor-text hover:bg-slate-50 rounded px-0.5 -mx-0.5" : "",
-                                            !title && "text-slate-400"
-                                        )}
-                                        ref={onTitleChange ? titleRef : undefined}
-                                        data-focus-group={focusGroup}
-                                        data-focus-part={focusGroup ? 'title' : undefined}
-                                        onClick={onTitleChange ? handleTitleClick : undefined}
-                                        onPointerDown={onTitleChange ? (e) => e.stopPropagation() : undefined}
-                                        tabIndex={-1}
-                                        role={onTitleChange ? "button" : undefined}
-                                        aria-label={onTitleChange ? "タイトルを編集" : undefined}
-                                        onKeyDown={onTitleChange ? (e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                handleTitleClick(e as any);
-                                            }
-                                        } : undefined}
-                                    >
-                                        {title || "Untitled card"}
-                                    </span>
-                                )}
+                                <span
+                                    className={clsx(
+                                        "truncate leading-tight",
+                                        !title && "text-slate-400"
+                                    )}
+                                    data-focus-group={focusGroup}
+                                    data-focus-part={focusGroup ? 'title' : undefined}
+                                    tabIndex={-1}
+                                >
+                                    {title || "Untitled card"}
+                                </span>
                             </div>
                             {timePlacement === 'inline' && timeText ? (
                                 <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
