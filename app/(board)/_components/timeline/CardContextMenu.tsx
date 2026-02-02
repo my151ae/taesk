@@ -14,7 +14,7 @@ interface CardContextMenuProps {
     x: number;
     y: number;
     items: ContextMenuItem[];
-    onClose: () => void;
+    onClose: (reason: "action" | "dismiss") => void;
 }
 
 export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) {
@@ -25,11 +25,11 @@ export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                onClose();
+                onClose("dismiss");
             }
         };
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") onClose("dismiss");
         };
 
         document.addEventListener("mousedown", handleClickOutside);
@@ -86,7 +86,7 @@ export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) 
                         const activeItem = items[activeIndex];
                         if (activeItem) {
                             activeItem.onClick();
-                            onClose();
+                            onClose("action");
                         }
                     }
                 }}
@@ -109,7 +109,7 @@ export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) 
                             onClick={(e) => {
                                 e.stopPropagation();
                                 item.onClick();
-                                onClose();
+                                onClose("action");
                             }}
                         >
                             {item.label}

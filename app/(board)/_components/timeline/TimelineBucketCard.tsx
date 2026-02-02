@@ -86,6 +86,7 @@ export const TimelineBucketCard = ({
                     title={item.title || ""}
                     checked={item.checked}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
+                    cardId={item.card_id}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     timePlacement="inline"
                     note={item.excerpt ?? undefined}

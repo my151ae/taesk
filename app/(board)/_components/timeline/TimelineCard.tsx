@@ -37,6 +37,8 @@ type TimelineCardProps = {
     onCreateNext?: () => void;
     /** インライン編集での貼り付け時に抽出された本文（2行目以降）を受け取る */
     onNoteExtracted?: (bodyLines: string[], updatedTitle?: string) => void;
+    /** フォーカス復帰用のカードID */
+    cardId?: string;
 };
 
 export function TimelineCard({
@@ -68,6 +70,7 @@ export function TimelineCard({
     backgroundClass = 'bg-white',
     onCreateNext,
     onNoteExtracted,
+    cardId,
 }: TimelineCardProps) {
     // 内部編集状態（外部制御がない場合）
     const [internalIsEditing, setInternalIsEditing] = useState(false);
@@ -144,6 +147,7 @@ export function TimelineCard({
             )}
             style={style}
             data-testid={dataTestId}
+            data-card-id={cardId}
             tabIndex={tabIndex ?? 0}
             role={role}
             data-focus-group={focusGroup}
@@ -162,17 +166,30 @@ export function TimelineCard({
                         return;
                     }
 
-                    // Create next card: Enter
-                    if (event.key === 'Enter') {
+                    // Create next card: Shift+Enter
+                    if (event.key === 'Enter' && event.shiftKey) {
                         event.preventDefault();
                         event.stopPropagation();
                         if (onCreateNext) {
                             onCreateNext();
-                        } else {
-                            // フォールバック: コンテキストメニュー (既存挙動維持が必要な場合)
-                            const rect = containerRef.current?.getBoundingClientRect();
-                            if (rect) onOpenContextMenu?.(rect);
                         }
+                        return;
+                    }
+
+                    // Open card details: Enter
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onOpen();
+                        return;
+                    }
+
+                    // Context menu: Delete
+                    if (event.key === 'Delete') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const rect = containerRef.current?.getBoundingClientRect();
+                        if (rect) onOpenContextMenu?.(rect);
                         return;
                     }
 

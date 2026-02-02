@@ -140,8 +140,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                     <Section title="Card Actions">
                         <ShortcutRow label="Open card details" keys={["Enter"]} />
                         <ShortcutRow label="Toggle complete" keys={["Space"]} />
-                        <ShortcutRow label="Create next card" keys={["Enter"]} />
-                        <ShortcutRow label="Context menu" keys={["Enter (on focus)"]} />
+                        <ShortcutRow label="Create next card" keys={[<KeyIcon key="shift">⇧</KeyIcon>, "Enter"]} />
                     </Section>
 
                     <Section title="Inline Editing">

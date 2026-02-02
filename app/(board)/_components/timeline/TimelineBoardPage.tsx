@@ -91,8 +91,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     x: number;
     y: number;
   }>({ open: false, cardId: null, x: 0, y: 0 });
+  const lastContextMenuCardIdRef = useRef<string | null>(null);
+
+  const focusCardById = useCallback((cardId: string | null) => {
+    if (!cardId) return;
+    const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
+    if (target) {
+      target.focus();
+    }
+  }, []);
 
   const openContextMenuAt = useCallback((cardId: string, x: number, y: number) => {
+    lastContextMenuCardIdRef.current = cardId;
     setContextMenu({
       open: true,
       cardId,
@@ -113,9 +123,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     openContextMenuAt(cardId, x, y);
   }, [openContextMenuAt]);
 
-  const closeContextMenu = useCallback(() => {
+  const closeContextMenu = useCallback((reason: "action" | "dismiss") => {
     setContextMenu(prev => ({ ...prev, open: false, cardId: null }));
-  }, []);
+    if (reason === "action") {
+      requestAnimationFrame(() => {
+        focusCardById(lastContextMenuCardIdRef.current);
+      });
+    }
+  }, [focusCardById]);
 
   // Fetch profile and boards
   const fetchProfile = useCallback(async () => {
@@ -547,6 +562,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
     const target = event.target as HTMLElement;
     const tagName = target.tagName;
+
+    // コンテキストメニュー等、独自の矢印操作を持つUIでは介入しない
+    if (target.closest('[data-arrow-skip="true"]')) return;
 
     // テキスト入力フィールドでのみ矢印キーの標準動作を許可
     if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {

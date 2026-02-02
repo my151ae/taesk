@@ -102,6 +102,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     title={event.title || ""}
                     checked={event.checked}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
+                    cardId={event.card_id}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     timeText={detailedTimeLabel(displayStart, displayEnd, duration)}
                     rightMeta={undefined}

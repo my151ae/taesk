@@ -239,6 +239,7 @@ function MobileTimelineColumn({
                   title={event.title || ""}
                   checked={event.checked}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
+                  cardId={event.card_id}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   timeText={detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)}
                   rightMeta={undefined}
@@ -851,6 +852,7 @@ function MobileBucketCard({
           title={item.title || ""}
           checked={item.checked}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
+          cardId={item.card_id}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
           timeText={null}
           rightMeta={item.duration != null ? formatDuration(item.duration) : null}
