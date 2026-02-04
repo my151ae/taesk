@@ -234,7 +234,7 @@ export async function POST(
     // Get card's board_id for notifications
     const { data: cardData } = await supabase
       .from('cards')
-      .select('board_id, title')
+      .select('board_id, title, short_id, slug')
       .eq('id', cardId)
       .single();
 
@@ -281,6 +281,9 @@ export async function POST(
               boardId: cardData.board_id,
               senderId: user.id,
               recipientIds: mentionRecipients,
+              commentBody: commentBody,
+              cardShortId: cardData.short_id,
+              cardSlug: cardData.slug,
             },
             senderName
           );
@@ -288,17 +291,28 @@ export async function POST(
 
         // Reply notification (reply target only)
         if (parent_id && replyToAuthorId && replyToAuthorId !== user.id) {
+          const snippet = commentBody.replace(/\s+/g, ' ').trim();
+          const preview =
+            snippet.length > 140 ? `${snippet.slice(0, 140).trim()}…` : snippet;
           const payload = {
             comment_id: newComment.id,
             card_id: cardId,
+            card_short_id: cardData.short_id ?? null,
+            card_slug: cardData.slug ?? null,
             board_id: cardData.board_id,
             sender_id: user.id,
             sender_name: senderName,
             card_title: cardData.title || 'Untitled',
-            message: generateNotificationMessage('comment_replied', {
-              sender_name: senderName,
-              card_title: cardData.title,
-            }),
+            comment_body: commentBody,
+            message: preview
+              ? `${generateNotificationMessage('comment_replied', {
+                  sender_name: senderName,
+                  card_title: cardData.title,
+                })}: ${preview}`
+              : generateNotificationMessage('comment_replied', {
+                  sender_name: senderName,
+                  card_title: cardData.title,
+                }),
           };
 
           await createNotification({

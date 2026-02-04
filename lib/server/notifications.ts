@@ -39,6 +39,9 @@ export interface CommentNotificationEvent {
   boardId: string;
   senderId: string;
   recipientIds?: string[];
+  commentBody?: string | null;
+  cardShortId?: string | null;
+  cardSlug?: string | null;
 }
 
 interface CreateNotificationParams {
@@ -235,6 +238,21 @@ export function generateNotificationMessage(
   }
 }
 
+function buildCommentSnippet(commentBody?: string | null): string | null {
+  if (!commentBody) {
+    return null;
+  }
+  const normalized = commentBody.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+  const limit = 140;
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+  return `${normalized.slice(0, limit).trim()}…`;
+}
+
 /**
  * Create notifications for a comment event
  */
@@ -259,19 +277,26 @@ export async function createCommentNotifications(
       .eq('id', event.cardId)
       .single();
 
+    const snippet = buildCommentSnippet(event.commentBody);
+    const messageBase = generateNotificationMessage(event.event, {
+      sender_name: senderName,
+      card_title: card?.title,
+    });
+    const message = snippet ? `${messageBase}: ${snippet}` : messageBase;
+
     const notifications = await Promise.all(
       recipients.map(async (recipientId) => {
         const payload = {
           comment_id: event.commentId,
           card_id: event.cardId,
+          card_short_id: event.cardShortId ?? null,
+          card_slug: event.cardSlug ?? null,
           board_id: event.boardId,
           sender_id: event.senderId,
           sender_name: senderName || 'Unknown',
           card_title: card?.title || 'Untitled',
-          message: generateNotificationMessage(event.event, {
-            sender_name: senderName,
-            card_title: card?.title,
-          }),
+          comment_body: event.commentBody ?? null,
+          message,
         };
 
         return await createNotification({

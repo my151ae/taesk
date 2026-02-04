@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { featureFlags } from '@/lib/featureFlags';
 import { supabase, Notification } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
@@ -11,6 +12,7 @@ type TabType = 'all' | 'unread';
 
 export default function NotificationsBell() {
   const { user } = useAuth();
+  const router = useRouter();
   const [showDrawer, setShowDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
@@ -142,7 +144,12 @@ export default function NotificationsBell() {
     if (!notification.read_at) {
       markAsRead(notification.id);
     }
-    // TODO: Navigate to card if notification has card context
+    const cardShortId = notification.payload?.card_short_id as string | undefined;
+    const cardSlug = notification.payload?.card_slug as string | undefined;
+    if (cardShortId) {
+      setShowDrawer(false);
+      router.push(`/c/${cardShortId}${cardSlug ? `/${cardSlug}` : ''}`);
+    }
   };
 
   const handleMarkAllAsRead = async () => {
@@ -289,6 +296,11 @@ export default function NotificationsBell() {
                         <p className="text-sm text-gray-900 dark:text-gray-100">
                           {notification.payload?.message || 'New notification'}
                         </p>
+                        {notification.payload?.comment_body && (
+                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                            {notification.payload.comment_body as string}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           {new Date(notification.created_at).toLocaleString()}
                         </p>
