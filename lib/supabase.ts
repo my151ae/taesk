@@ -248,6 +248,9 @@ export interface Notification {
     card_id?: string;
     comment_id?: string;
     message: string;
+    comment_body?: string | null;
+    card_short_id?: string | null;
+    card_slug?: string | null;
     [key: string]: unknown;
   };
   read_at: string | null;
