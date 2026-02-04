@@ -10,6 +10,7 @@
 - **PWA Push / バッジ / 通知音**はフロー一式が存在。
 - **「開始時間に合わせた通知」**に相当するスケジューラ／ジョブ／トリガーは見当たらない。
 - **カード単位の通知設定**は DB/ UI ともに未実装。
+- **Push は通知フラグに加えて `NEXT_PUBLIC_FF_PUSH` でも抑止され得る**ため、運用時は両方の確認が必要。
 
 ---
 
@@ -18,6 +19,7 @@
 - コメント投稿時に通知が生成される。
 - 生成関数: `lib/server/notifications.ts` (createNotification / createCommentNotifications)
 - 起点: `app/api/cards/[cardId]/comments/route.ts`
+- `createNotification` 内で **in-app 無効**または **quiet hours 中**の場合は作成が抑止される。
 
 ### 2) 集約 (Notifications ドロワー)
 - ヘッダーベルが `/api/notifications` を取得し一覧表示。
@@ -88,17 +90,22 @@
 ## 止まりやすいポイント
 - `NEXT_PUBLIC_FF_NOTIFICATIONS` が `true` でないと UI / Realtime / Polling が無効。
   - `lib/featureFlags.ts`
+- `NEXT_PUBLIC_FF_PUSH` が `true` でないと Push 周りが無効になり得る。
+  - `lib/featureFlags.ts`
 - Supabase Realtime で `notifications` が publish されていないと Realtime 更新が来ない。
   - `supabase/migrations/20251024000000_enable_notifications_realtime.sql`
 - Push トリガーは旧版と最新版があるため、DB 適用順が崩れると Edge Function が呼ばれない可能性。
   - 旧: `20251022000001_notification_push_trigger.sql`
   - 新: `20251024120000_notification_push_trigger.sql`
+ - `notification_preferences` によって **in-app / quiet hours 抑止**が働くため、通知が作られないケースがある。
+   - `lib/server/notifications.ts`
 
 ---
 
 ## 次の検証候補
 - Playwright: `e2e/notifications.spec.ts`
 - 手動: NotificationSettings のテスト通知 / Push / 音声 unlock
+- 追加確認: `due_soon` を作るスケジューラの有無（cron / schedule / queue / reminder など）
 
 ---
 

@@ -1,7 +1,11 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { Comment, CommentWithAuthor } from '@/lib/supabase';
-import { createCommentNotifications } from '@/lib/server/notifications';
+import {
+  createCommentNotifications,
+  createNotification,
+  generateNotificationMessage,
+} from '@/lib/server/notifications';
 
 // GET /api/cards/[cardId]/comments - List comments for a card
 export async function GET(
@@ -230,7 +234,7 @@ export async function POST(
     // Get card's board_id for notifications
     const { data: cardData } = await supabase
       .from('cards')
-      .select('board_id')
+      .select('board_id, title')
       .eq('id', cardId)
       .single();
 
@@ -243,11 +247,32 @@ export async function POST(
 
     const senderName = senderProfile?.full_name || senderProfile?.email || 'Unknown';
 
+    let replyToAuthorId: string | null = null;
+    if (parent_id) {
+      const { data: parentComment, error: parentError } = await supabase
+        .from('comments')
+        .select('author_id')
+        .eq('id', parent_id)
+        .eq('card_id', cardId)
+        .maybeSingle();
+
+      if (parentError) {
+        console.warn('Failed to fetch parent comment author:', parentError);
+      } else {
+        replyToAuthorId = parentComment?.author_id ?? null;
+      }
+    }
+
     // Create notifications
     if (cardData) {
       try {
-        // Mention notifications
-        if (mentions && mentions.length > 0) {
+        const mentionRecipients =
+          parent_id && replyToAuthorId
+            ? mentions.filter((id) => id !== replyToAuthorId)
+            : mentions;
+
+        // Mention notifications (new comments + replies)
+        if (mentionRecipients && mentionRecipients.length > 0) {
           await createCommentNotifications(
             {
               event: 'mention',
@@ -255,23 +280,33 @@ export async function POST(
               cardId,
               boardId: cardData.board_id,
               senderId: user.id,
-              recipientIds: mentions,
+              recipientIds: mentionRecipients,
             },
             senderName
           );
         }
 
-        // Comment notification (for card participants)
-        await createCommentNotifications(
-          {
-            event: parent_id ? 'comment_replied' : 'comment_created',
-            commentId: newComment.id,
-            cardId,
-            boardId: cardData.board_id,
-            senderId: user.id,
-          },
-          senderName
-        );
+        // Reply notification (reply target only)
+        if (parent_id && replyToAuthorId && replyToAuthorId !== user.id) {
+          const payload = {
+            comment_id: newComment.id,
+            card_id: cardId,
+            board_id: cardData.board_id,
+            sender_id: user.id,
+            sender_name: senderName,
+            card_title: cardData.title || 'Untitled',
+            message: generateNotificationMessage('comment_replied', {
+              sender_name: senderName,
+              card_title: cardData.title,
+            }),
+          };
+
+          await createNotification({
+            type: 'comment_replied',
+            recipientId: replyToAuthorId,
+            payload,
+          });
+        }
       } catch (notifError) {
         // Log but don't fail the comment creation
         console.error('Error creating notifications:', notifError);
