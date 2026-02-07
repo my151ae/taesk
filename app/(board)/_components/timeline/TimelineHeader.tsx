@@ -52,6 +52,9 @@ type TimelineHeaderProps = {
     viewMode: 'timeline' | 'list';
     setViewMode: (mode: 'timeline' | 'list') => void;
     onShortcutsClick: () => void;
+    onPrevDay?: () => void;
+    onNextDay?: () => void;
+    listStartDate?: string | null;
 };
 
 export default function TimelineHeader({
@@ -94,6 +97,9 @@ export default function TimelineHeader({
     viewMode,
     setViewMode,
     onShortcutsClick,
+    onPrevDay,
+    onNextDay,
+    listStartDate,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -379,13 +385,23 @@ export default function TimelineHeader({
                             -
                         </button>
                     )}
+                    {viewMode === 'list' && dayRange >= 30 && (
+                        <button
+                            onClick={() => onPrevDay?.()}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+                        >
+                            -
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowDayRangeDropdown((prev) => !prev)}
                         className="min-w-[3rem] flex items-center justify-center gap-1 text-center font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                     >
                         <span>
                             {viewMode === 'list' ? (
-                                dayRange >= 30 ? `${Math.floor(dayRange / 30)} month${dayRange / 30 > 1 ? 's' : ''}` : `${dayRange} days`
+                                dayRange >= 30
+                                    ? `${listStartDate ?? '----/--/--'} · ${Math.floor(dayRange / 30)} month${dayRange / 30 > 1 ? 's' : ''}`
+                                    : `${listStartDate ?? '----/--/--'} · ${dayRange} days`
                             ) : (
                                 `${dayRange} day${dayRange > 1 ? 's' : ''}`
                             )}
@@ -440,6 +456,14 @@ export default function TimelineHeader({
                             onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
                             disabled={dayRange >= 7}
                             className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                        >
+                            +
+                        </button>
+                    )}
+                    {viewMode === 'list' && dayRange >= 30 && (
+                        <button
+                            onClick={() => onNextDay?.()}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
                         >
                             +
                         </button>

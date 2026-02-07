@@ -423,6 +423,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, [viewMode, handleDayRangeChange, handleUpdateBoard]);
 
+  const shiftListWindow = useCallback(async (delta: number) => {
+    if (status === "loading") return;
+    const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+    const payload = await fetchTimeline(baseStart + delta);
+    const nextStartDay = payload?.days?.[0] ?? data?.days?.[0];
+    if (nextStartDay) {
+      updateUrl(nextStartDay.isoDate, intendedDayRange, null);
+    }
+    setActiveDayIndex(0);
+  }, [status, data?.startOffset, data?.days, dayWindowStartRef, fetchTimeline, updateUrl, intendedDayRange]);
+
+  const handleListPrevDay = useCallback(() => shiftListWindow(-1), [shiftListWindow]);
+  const handleListNextDay = useCallback(() => shiftListWindow(1), [shiftListWindow]);
+
   const handleSetViewMode = useCallback((mode: 'timeline' | 'list') => {
     setViewMode(mode);
     const targetRange = mode === 'timeline' ? timelineRange : listRange;
@@ -567,6 +581,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
           viewMode={viewMode} setViewMode={handleSetViewMode}
           onShortcutsClick={() => setShowShortcutsModal(true)}
+          onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
+          onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
+          listStartDate={data?.days?.[0]?.isoDate ?? urlDate ?? null}
         />
 
         {viewMode === 'timeline' ? (

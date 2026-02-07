@@ -47,6 +47,9 @@ type TimelineBoardHeaderProps = {
   viewMode: 'timeline' | 'list';
   setViewMode: (mode: 'timeline' | 'list') => void;
   onShortcutsClick: () => void;
+  onPrevDay?: () => void;
+  onNextDay?: () => void;
+  listStartDate?: string | null;
 };
 
 export default function TimelineBoardHeader({
@@ -90,6 +93,9 @@ export default function TimelineBoardHeader({
   viewMode,
   setViewMode,
   onShortcutsClick,
+  onPrevDay,
+  onNextDay,
+  listStartDate,
 }: TimelineBoardHeaderProps) {
   return (
     <>
@@ -133,6 +139,9 @@ export default function TimelineBoardHeader({
         viewMode={viewMode}
         setViewMode={setViewMode}
         onShortcutsClick={onShortcutsClick}
+        onPrevDay={onPrevDay}
+        onNextDay={onNextDay}
+        listStartDate={listStartDate}
       />
       {googleToast && (
         <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">
