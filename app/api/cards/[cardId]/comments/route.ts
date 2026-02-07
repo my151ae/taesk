@@ -1,11 +1,24 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
-import { Comment, CommentWithAuthor } from '@/lib/supabase';
+import { Comment, CommentWithAuthor, ProfileSummary } from '@/lib/supabase';
 import {
   createCommentNotifications,
   createNotification,
   generateNotificationMessage,
 } from '@/lib/server/notifications';
+import { MENTION_REGEX } from '@/lib/mention-utils';
+import { resolveProfileIdentity } from '@/lib/usernames';
+
+function replaceMentionsForNotification(
+  body: string,
+  profilesById: Map<string, ProfileSummary>
+): string {
+  return body.replace(MENTION_REGEX, (_match, id: string) => {
+    const profile = profilesById.get(id) ?? null;
+    const identity = resolveProfileIdentity(profile, profile?.email ?? null);
+    return identity.label.startsWith('@') ? identity.label : `@${identity.label}`;
+  });
+}
 
 // GET /api/cards/[cardId]/comments - List comments for a card
 export async function GET(
@@ -247,6 +260,21 @@ export async function POST(
 
     const senderName = senderProfile?.full_name || senderProfile?.email || 'Unknown';
 
+    let notificationBody = commentBody;
+    if (mentions && mentions.length > 0) {
+      const { data: mentionProfiles, error: mentionProfilesError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, full_name, avatar_url, email')
+        .in('id', mentions);
+
+      if (mentionProfilesError) {
+        console.warn('Failed to load mention profiles:', mentionProfilesError);
+      } else if (mentionProfiles && mentionProfiles.length > 0) {
+        const profilesById = new Map(mentionProfiles.map((p) => [p.id, p]));
+        notificationBody = replaceMentionsForNotification(commentBody, profilesById);
+      }
+    }
+
     let replyToAuthorId: string | null = null;
     if (parent_id) {
       const { data: parentComment, error: parentError } = await supabase
@@ -281,7 +309,7 @@ export async function POST(
               boardId: cardData.board_id,
               senderId: user.id,
               recipientIds: mentionRecipients,
-              commentBody: commentBody,
+              commentBody: notificationBody,
               cardShortId: cardData.short_id,
               cardSlug: cardData.slug,
             },
@@ -291,7 +319,7 @@ export async function POST(
 
         // Reply notification (reply target only)
         if (parent_id && replyToAuthorId && replyToAuthorId !== user.id) {
-          const snippet = commentBody.replace(/\s+/g, ' ').trim();
+          const snippet = notificationBody.replace(/\s+/g, ' ').trim();
           const preview =
             snippet.length > 140 ? `${snippet.slice(0, 140).trim()}…` : snippet;
           const payload = {
@@ -303,7 +331,7 @@ export async function POST(
             sender_id: user.id,
             sender_name: senderName,
             card_title: cardData.title || 'Untitled',
-            comment_body: commentBody,
+            comment_body: notificationBody,
             message: preview
               ? `${generateNotificationMessage('comment_replied', {
                   sender_name: senderName,

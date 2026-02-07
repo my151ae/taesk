@@ -7,6 +7,7 @@ import { slugify } from "@/lib/card-utils";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { minutesToTime } from "@/app/(board)/_utils/timeline-helpers";
 import { withJstMidnight } from "@/app/(board)/_utils/timeline-helpers";
+import { getIsoDateJst, toLocalDay } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import type { TimelineBucketItem, TimelineEvent, TimelineDay } from "@/app/(board)/_utils/timeline-helpers";
 
@@ -27,6 +28,14 @@ interface UseTimelineCardActionsProps {
     data: any;
     onCardCreated?: (cardId: string) => void;
 }
+
+const addDays = (isoDate: string, offsetDays: number) => {
+    const [y, m, d] = isoDate.split('-').map((v) => Number(v));
+    if (!y || !m || !d || Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return isoDate;
+    const baseUtc = Date.UTC(y, m - 1, d);
+    const nextUtc = baseUtc + offsetDays * 24 * 60 * 60 * 1000;
+    return new Date(nextUtc).toISOString().split('T')[0];
+};
 
 export function useTimelineCardActions({
     initialBoardId,
@@ -344,6 +353,60 @@ export function useTimelineCardActions({
         }
     }, [fetchTimeline, refreshGoogleCalendar, openCardModal]);
 
+    const moveCardByDayOffset = useCallback((cardId: string, offsetDays: number) => {
+        if (!data) return;
+        const todayIso = getIsoDateJst(data?.serverNow ?? new Date().toISOString());
+        const targetDay = addDays(todayIso, offsetDays);
+
+        const event = data.events?.find((e: any) => e.card_id === cardId) ?? null;
+        let bucketItem: any = null;
+        let bucketKey: string | null = null;
+        if (!event) {
+            for (const [key, items] of Object.entries(data.abBuckets || {})) {
+                const found = (items as any[]).find((i) => i.card_id === cardId);
+                if (found) {
+                    bucketItem = found;
+                    bucketKey = key;
+                    break;
+                }
+            }
+        }
+        if (!event && !bucketItem) return;
+
+        const currentDueDate = event?.due_date ?? bucketItem?.due_date ?? null;
+        const currentLocalDay = toLocalDay(currentDueDate);
+        if (currentLocalDay === targetDay) return;
+
+        const dueBucketFromKey = bucketKey ? (bucketKey.split('_')[1] as DueBucket) : null;
+        const updatedCard = {
+            id: cardId,
+            title: event?.title ?? bucketItem?.title ?? "Untitled card",
+            content: event?.content ?? bucketItem?.content ?? null,
+            excerpt: event?.excerpt ?? bucketItem?.excerpt ?? null,
+            checklist: event?.checklist ?? bucketItem?.checklist ?? null,
+            tags: event?.tags ?? bucketItem?.tags ?? [],
+            priority: event?.priority ?? bucketItem?.priority ?? null,
+            checked: event?.checked ?? bucketItem?.checked ?? false,
+            assignee_id: event?.assignee_id ?? bucketItem?.assignee_id ?? null,
+            assignee_ids: event?.assignee_ids ?? bucketItem?.assignee_ids ?? null,
+            assigned_to: event?.assigned_to ?? bucketItem?.assigned_to ?? null,
+            duration: event?.duration ?? bucketItem?.duration ?? event?.durationMinutes ?? 60,
+            short_id: event?.short_id ?? bucketItem?.short_id ?? null,
+            slug: event?.slug ?? bucketItem?.slug ?? null,
+            due_date: withJstMidnight(targetDay),
+            due_start: event?.due_start ?? bucketItem?.due_start ?? null,
+            due_end: event?.due_end ?? bucketItem?.due_end ?? null,
+            due_bucket: (event?.due_bucket as DueBucket | null) ?? dueBucketFromKey,
+            due_bucket_position: event?.due_bucket_position ?? bucketItem?.bucketPosition ?? null,
+        } as Card;
+
+        setData((prev: any) => (prev ? applyCardUpdate(prev, updatedCard, 'UPDATE') : prev));
+
+        if (dataMode === 'api') {
+            applyPatch(cardId, { due_date: withJstMidnight(targetDay) });
+        }
+    }, [data, dataMode, applyPatch, setData]);
+
     return {
         applyPatch,
         handleCardModalSave,
@@ -352,6 +415,7 @@ export function useTimelineCardActions({
         handleColumnClick,
         handleBucketClick,
         handleExternalEventClick,
+        moveCardByDayOffset,
         googleToast,
         setGoogleToast,
     };

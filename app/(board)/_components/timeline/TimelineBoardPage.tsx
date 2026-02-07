@@ -307,6 +307,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleColumnClick,
     handleBucketClick,
     handleExternalEventClick,
+    moveCardByDayOffset,
     googleToast,
     setGoogleToast,
   } = useTimelineCardActions({
@@ -753,6 +754,24 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     data?.events?.find((e: any) => e.card_id === contextMenu.cardId)?.checked ||
                     Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId)?.checked;
                   handleToggleCardChecked(contextMenu.cardId!, !isChecked);
+                }
+              },
+              {
+                label: "Todayへ",
+                onClick: () => {
+                  moveCardByDayOffset(contextMenu.cardId!, 0);
+                }
+              },
+              {
+                label: "翌日へ",
+                onClick: () => {
+                  moveCardByDayOffset(contextMenu.cardId!, 1);
+                }
+              },
+              {
+                label: "翌週へ",
+                onClick: () => {
+                  moveCardByDayOffset(contextMenu.cardId!, 7);
                 }
               },
               {
