@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { Card, DueBucket, Priority } from "@/lib/supabase";
-import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent } from "@/lib/tiptap";
+import { normalizeContent, buildContentFromTitle, deriveExcerptFromContent, ensureTitleTask, setTitleTask } from "@/lib/tiptap";
 import { slugify } from "@/lib/card-utils";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { minutesToTime } from "@/app/(board)/_utils/timeline-helpers";
@@ -215,36 +215,63 @@ export function useTimelineCardActions({
         [modalCard, closeCardModal, setData, setCardModalError, data, initialBoardId]
     );
 
-    const createCard = useCallback(async (payload: Partial<Card>, tempId?: string, options?: { openModal?: boolean }) => {
+    const createCard = useCallback(async (payload: Partial<Card>, options?: { openModal?: boolean }) => {
         if (dataMode !== 'api') return;
+
+        const optimisticId = payload.id ?? crypto.randomUUID();
+        const nowIso = new Date().toISOString();
+        const optimisticContent = payload.content ?? buildContentFromTitle(payload.title ?? '');
+        const optimisticExcerpt = payload.excerpt ?? deriveExcerptFromContent(optimisticContent);
+
+        const optimisticCard: Card = {
+            id: optimisticId,
+            title: payload.title ?? '',
+            checklist: payload.checklist ?? null,
+            content: optimisticContent,
+            excerpt: optimisticExcerpt,
+            list_id: payload.list_id ?? 'optimistic',
+            board_id: initialBoardId,
+            position: payload.position ?? 0,
+            user_id: payload.user_id ?? null,
+            tags: payload.tags ?? [],
+            due_date: payload.due_date ?? null,
+            due_start: payload.due_start ?? null,
+            due_end: payload.due_end ?? null,
+            due_bucket: payload.due_bucket ?? null,
+            due_bucket_position: payload.due_bucket_position ?? null,
+            duration: payload.duration ?? 60,
+            priority: payload.priority ?? 'medium',
+            checked: payload.checked ?? false,
+            assigned_to: payload.assigned_to ?? null,
+            assignee_id: payload.assignee_id ?? null,
+            assignee_ids: payload.assignee_ids ?? null,
+            short_id: payload.short_id ?? null,
+            id_short: payload.id_short ?? null,
+            slug: payload.slug ?? null,
+            created_at: payload.created_at ?? nowIso,
+            updated_at: payload.updated_at ?? nowIso,
+        };
+
+        // 楽観的更新: IDを先行生成し、サーバー確定後は同一IDでUPDATEする
+        setData((prev: any) => (prev ? applyCardUpdate(prev, optimisticCard, 'INSERT') : prev));
+
         try {
             const response = await fetch(`/api/boards/${initialBoardId}/cards`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ ...payload, id: optimisticId }),
             });
             if (!response.ok) throw new Error('Failed to create card');
             const body = await response.json();
             if (body.card) {
                 const newCard = body.card as Card;
-                setData((prev: any) => {
-                    if (!prev) return prev;
-                    let next = prev;
-                    if (tempId) next = applyCardUpdate(next, { id: tempId } as Card, 'DELETE');
-                    return applyCardUpdate(next, newCard, 'INSERT');
-                });
+                setData((prev: any) => (prev ? applyCardUpdate(prev, newCard, 'UPDATE') : prev));
                 onCardCreated?.(newCard.id);
                 if (options?.openModal !== false && newCard.short_id) openCardModal(newCard.short_id, 'create-card');
             }
         } catch (error) {
             setErrorMessage('Failed to create card');
-            if (tempId) {
-                setData((prev: any) => prev ? {
-                    ...prev,
-                    events: prev.events.filter((e: any) => e.card_id !== tempId),
-                    abBuckets: Object.fromEntries(Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [k, v.filter((i: any) => i.card_id !== tempId)])),
-                } : prev);
-            }
+            setData((prev: any) => (prev ? applyCardUpdate(prev, { id: optimisticId } as Card, 'DELETE') : prev));
         }
     }, [dataMode, initialBoardId, setData, openCardModal, setErrorMessage, onCardCreated]);
 
@@ -259,8 +286,8 @@ export function useTimelineCardActions({
             due_end: minutesToTime(minutes + 60),
             priority: 'medium',
         };
-        // 楽観的更新を無効化（auto-focus時のIDのスワップ問題回避のため）
-        createCard(payload, undefined, { openModal: false });
+        // 楽観的更新: IDを先行生成し、サーバー確定後は同一IDで更新
+        createCard(payload, { openModal: false });
     }, [createCard]);
 
     const handleBucketClick = useCallback((bucketKey: string, afterCardId?: string) => {
@@ -311,28 +338,55 @@ export function useTimelineCardActions({
             priority: 'medium',
         };
 
-        // 楽観的更新を無効化（auto-focus時のIDのスワップ問題回避のため）
-        createCard(payload, undefined, { openModal: false });
+        // 楽観的更新: IDを先行生成し、サーバー確定後は同一IDで更新
+        createCard(payload, { openModal: false });
     }, [bucketDayMap, createCard, data?.abBuckets]);
 
     const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
         if (dataMode !== 'api') return;
         try {
+            const event = data?.events?.find((e: any) => e.card_id === cardId) ?? null;
+            let bucketItem: any = null;
+            if (!event) {
+                for (const items of Object.values(data?.abBuckets || {})) {
+                    const found = (items as any[]).find((i) => i.card_id === cardId);
+                    if (found) {
+                        bucketItem = found;
+                        break;
+                    }
+                }
+            }
+
+            const source = event ?? bucketItem;
+            const fallbackTitle = source?.title ?? "";
+            const baseContent = normalizeContent(source?.content ?? buildContentFromTitle(fallbackTitle));
+            const ensured = ensureTitleTask(baseContent, fallbackTitle, nextChecked);
+            const { content: nextContent } = setTitleTask(ensured.content, { checked: nextChecked });
+            const nextExcerpt = deriveExcerptFromContent(nextContent);
+
             setData((prev: any) => prev ? {
                 ...prev,
-                events: prev.events.map((e: any) => e.card_id === cardId ? { ...e, checked: nextChecked } : e),
-                abBuckets: Object.fromEntries(Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [k, v.map((i: any) => i.card_id === cardId ? { ...i, checked: nextChecked } : i)])),
+                events: prev.events.map((e: any) => e.card_id === cardId
+                    ? { ...e, checked: nextChecked, content: nextContent, excerpt: nextExcerpt }
+                    : e
+                ),
+                abBuckets: Object.fromEntries(Object.entries(prev.abBuckets).map(([k, v]: [string, any]) => [k, v.map((i: any) => i.card_id === cardId
+                    ? { ...i, checked: nextChecked, content: nextContent, excerpt: nextExcerpt }
+                    : i
+                )])),
             } : prev);
+
+            const payload = source ? { content: nextContent } : { checked: nextChecked };
             const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ checked: nextChecked }),
+                body: JSON.stringify(payload),
             });
             if (!res.ok) throw new Error();
         } catch (e) {
             fetchTimeline();
         }
-    }, [dataMode, initialBoardId, setData, fetchTimeline]);
+    }, [dataMode, initialBoardId, setData, fetchTimeline, data]);
 
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {

@@ -68,7 +68,9 @@ export const getTiptapPlainText = (content: JSONContent): string => {
                     return formatNode(child, nextLevel);
                 }).join('');
 
-                return '  '.repeat(level) + prefix + childrenText.trim();
+                const trimmed = childrenText.trim();
+                if (!trimmed) return '';
+                return '  '.repeat(level) + prefix + trimmed;
             }
             default:
                 return joinChildren(node, (n) => formatNode(n, level));
@@ -270,14 +272,7 @@ export const ensureTitleBlock = (content: JSONContent): JSONContent => {
 };
 
 export const buildContentFromTitle = (title: string): JSONContent => {
-    // 合意仕様: 空なら paragraph、文字があれば taskItem
-    if (!title.trim()) {
-        return {
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [] }]
-        };
-    }
-
+    // 空でも taskItem を用意して、モーダル初期表示でチェックボックスを出す
     return {
         type: 'doc',
         content: [
@@ -290,7 +285,7 @@ export const buildContentFromTitle = (title: string): JSONContent => {
                         content: [
                             {
                                 type: 'paragraph',
-                                content: [{ type: 'text', text: title }]
+                                content: title.trim() ? [{ type: 'text', text: title }] : []
                             }
                         ]
                     }
@@ -299,4 +294,3 @@ export const buildContentFromTitle = (title: string): JSONContent => {
         ]
     };
 };
-
