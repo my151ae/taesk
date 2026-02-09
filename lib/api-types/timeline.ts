@@ -22,6 +22,10 @@ export interface TimelineEvent {
   due_date: string;
   due_start: string | null;
   due_end: string | null;
+  start_reminder_enabled?: boolean;
+  start_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  end_reminder_enabled?: boolean;
+  end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   durationMinutes: number | null;
   title: string;
   content?: JSONContent | null;
@@ -48,6 +52,10 @@ export interface TimelineBucketItem {
   due_date: string | null;
   due_start: string | null;
   due_end: string | null;
+  start_reminder_enabled?: boolean;
+  start_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  end_reminder_enabled?: boolean;
+  end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   checked: boolean;
   checklist?: Checklist | null;
   tags: string[];

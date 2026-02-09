@@ -16,6 +16,7 @@ const getProfileInitials = (profile: ProfileSummary): string => {
 };
 
 type BucketOption = { value: DueBucket; label: string };
+type ReminderMinuteOption = 0 | 5 | 10 | 15 | 30 | 60;
 
 type CardModalHeaderProps = {
     dueDate: string;
@@ -38,6 +39,15 @@ type CardModalHeaderProps = {
     onDueDateChange: (value: string) => void;
     onDueStartChange: (value: string) => void;
     onDueEndChange: (value: string) => void;
+    startReminderEnabled: boolean;
+    startReminderMinutes: ReminderMinuteOption;
+    endReminderEnabled: boolean;
+    endReminderMinutes: ReminderMinuteOption;
+    reminderMinuteOptions: ReminderMinuteOption[];
+    onStartReminderEnabledChange: (enabled: boolean) => void;
+    onStartReminderMinutesChange: (minutes: ReminderMinuteOption) => void;
+    onEndReminderEnabledChange: (enabled: boolean) => void;
+    onEndReminderMinutesChange: (minutes: ReminderMinuteOption) => void;
     onDurationChange: (value: number | "") => void;
     onBucketChange: (bucket: DueBucket) => void;
     onRequestClose: () => void;
@@ -66,6 +76,15 @@ export default function CardModalHeader({
     onDueDateChange,
     onDueStartChange,
     onDueEndChange,
+    startReminderEnabled,
+    startReminderMinutes,
+    endReminderEnabled,
+    endReminderMinutes,
+    reminderMinuteOptions,
+    onStartReminderEnabledChange,
+    onStartReminderMinutesChange,
+    onEndReminderEnabledChange,
+    onEndReminderMinutesChange,
     onDurationChange,
     onBucketChange,
     onRequestClose,
@@ -97,6 +116,28 @@ export default function CardModalHeader({
                                 onChange={(e) => onDueStartChange(e.target.value)}
                                 className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
                             />
+                            <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">
+                                <input
+                                    type="checkbox"
+                                    checked={startReminderEnabled}
+                                    onChange={(e) => onStartReminderEnabledChange(e.target.checked)}
+                                    className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                通知
+                            </label>
+                            {startReminderEnabled && (
+                                <select
+                                    value={startReminderMinutes}
+                                    onChange={(e) => onStartReminderMinutesChange(Number(e.target.value) as ReminderMinuteOption)}
+                                    className="px-1.5 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-[10px] focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                                >
+                                    {reminderMinuteOptions.map((minute) => (
+                                        <option key={`start-${minute}`} value={minute}>
+                                            {minute}分前
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Dur</span>
@@ -154,6 +195,28 @@ export default function CardModalHeader({
                                 onChange={(e) => onDueEndChange(e.target.value)}
                                 className="px-2 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
                             />
+                            <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">
+                                <input
+                                    type="checkbox"
+                                    checked={endReminderEnabled}
+                                    onChange={(e) => onEndReminderEnabledChange(e.target.checked)}
+                                    className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                通知
+                            </label>
+                            {endReminderEnabled && (
+                                <select
+                                    value={endReminderMinutes}
+                                    onChange={(e) => onEndReminderMinutesChange(Number(e.target.value) as ReminderMinuteOption)}
+                                    className="px-1.5 py-1 border border-slate-200 rounded-md dark:bg-gray-700 dark:border-gray-600 text-[10px] focus:outline-none focus:ring-2 focus:ring-sky-300 bg-transparent"
+                                >
+                                    {reminderMinuteOptions.map((minute) => (
+                                        <option key={`end-${minute}`} value={minute}>
+                                            {minute}分前
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                     </div>
                 )}

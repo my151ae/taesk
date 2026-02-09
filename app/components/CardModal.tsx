@@ -24,6 +24,8 @@ const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
     { value: 'a', label: 'A (do today)' },
     { value: 'b', label: 'B (if possible)' },
 ];
+const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
+type ReminderMinuteOption = typeof REMINDER_MINUTE_OPTIONS[number];
 
 interface CardModalProps {
     card: Card;
@@ -41,6 +43,10 @@ interface CardModalProps {
         assigneeTouched?: boolean;
         due_start?: string | null;
         due_end?: string | null;
+        start_reminder_enabled?: boolean;
+        start_reminder_minutes?: ReminderMinuteOption;
+        end_reminder_enabled?: boolean;
+        end_reminder_minutes?: ReminderMinuteOption;
         due_bucket?: DueBucket | null;
         due_bucket_position?: number | null;
         duration?: number;
@@ -72,6 +78,18 @@ export function CardModal({
     const [dueDate, setDueDate] = useState(card.due_date || '');
     const [dueStart, setDueStart] = useState(card.due_start ? card.due_start.slice(0, 5) : '');
     const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
+    const [startReminderEnabled, setStartReminderEnabled] = useState(Boolean(card.start_reminder_enabled));
+    const [startReminderMinutes, setStartReminderMinutes] = useState<ReminderMinuteOption>(
+        REMINDER_MINUTE_OPTIONS.includes((card.start_reminder_minutes ?? 0) as ReminderMinuteOption)
+            ? (card.start_reminder_minutes ?? 0) as ReminderMinuteOption
+            : 0
+    );
+    const [endReminderEnabled, setEndReminderEnabled] = useState(Boolean(card.end_reminder_enabled));
+    const [endReminderMinutes, setEndReminderMinutes] = useState<ReminderMinuteOption>(
+        REMINDER_MINUTE_OPTIONS.includes((card.end_reminder_minutes ?? 0) as ReminderMinuteOption)
+            ? (card.end_reminder_minutes ?? 0) as ReminderMinuteOption
+            : 0
+    );
     const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
     const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
     const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
@@ -248,6 +266,18 @@ export function CardModal({
             setDueDate(card.due_date || '');
             setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
             setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
+            setStartReminderEnabled(Boolean(card.start_reminder_enabled));
+            setStartReminderMinutes(
+                REMINDER_MINUTE_OPTIONS.includes((card.start_reminder_minutes ?? 0) as ReminderMinuteOption)
+                    ? (card.start_reminder_minutes ?? 0) as ReminderMinuteOption
+                    : 0
+            );
+            setEndReminderEnabled(Boolean(card.end_reminder_enabled));
+            setEndReminderMinutes(
+                REMINDER_MINUTE_OPTIONS.includes((card.end_reminder_minutes ?? 0) as ReminderMinuteOption)
+                    ? (card.end_reminder_minutes ?? 0) as ReminderMinuteOption
+                    : 0
+            );
             setDueBucket(card.due_bucket ?? null);
             setDueBucketPosition(card.due_bucket_position ?? null);
             setDuration(card.duration ?? 60);
@@ -421,6 +451,10 @@ export function CardModal({
             assigneeTouched,
             due_start: normalizedStart,
             due_end: normalizedEnd,
+            start_reminder_enabled: startReminderEnabled,
+            start_reminder_minutes: startReminderMinutes,
+            end_reminder_enabled: endReminderEnabled,
+            end_reminder_minutes: endReminderMinutes,
             due_bucket: normalizedBucket,
             due_bucket_position: normalizedBucketPosition,
             duration: Number(duration) || 0,
@@ -439,6 +473,10 @@ export function CardModal({
         dueDate,
         dueStart,
         dueEnd,
+        startReminderEnabled,
+        startReminderMinutes,
+        endReminderEnabled,
+        endReminderMinutes,
         dueBucket,
         dueBucketPosition,
         duration,
@@ -576,6 +614,32 @@ export function CardModal({
 
     const handlePriorityChange = useCallback((value: Priority) => {
         setPriority(value);
+        triggerAutoSave();
+    }, [triggerAutoSave]);
+
+    const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
+        setStartReminderEnabled(enabled);
+        if (enabled && !REMINDER_MINUTE_OPTIONS.includes(startReminderMinutes)) {
+            setStartReminderMinutes(0);
+        }
+        triggerAutoSave();
+    }, [startReminderMinutes, triggerAutoSave]);
+
+    const handleStartReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
+        setStartReminderMinutes(minutes);
+        triggerAutoSave();
+    }, [triggerAutoSave]);
+
+    const handleEndReminderEnabledChange = useCallback((enabled: boolean) => {
+        setEndReminderEnabled(enabled);
+        if (enabled && !REMINDER_MINUTE_OPTIONS.includes(endReminderMinutes)) {
+            setEndReminderMinutes(0);
+        }
+        triggerAutoSave();
+    }, [endReminderMinutes, triggerAutoSave]);
+
+    const handleEndReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
+        setEndReminderMinutes(minutes);
         triggerAutoSave();
     }, [triggerAutoSave]);
 
@@ -842,6 +906,15 @@ export function CardModal({
                     onDueDateChange={handleDueDateInputChange}
                     onDueStartChange={handleDueStartChange}
                     onDueEndChange={handleDueEndChange}
+                    startReminderEnabled={startReminderEnabled}
+                    startReminderMinutes={startReminderMinutes}
+                    endReminderEnabled={endReminderEnabled}
+                    endReminderMinutes={endReminderMinutes}
+                    reminderMinuteOptions={[...REMINDER_MINUTE_OPTIONS]}
+                    onStartReminderEnabledChange={handleStartReminderEnabledChange}
+                    onStartReminderMinutesChange={handleStartReminderMinutesChange}
+                    onEndReminderEnabledChange={handleEndReminderEnabledChange}
+                    onEndReminderMinutesChange={handleEndReminderMinutesChange}
                     duration={duration}
                     onDurationChange={handleDurationChange}
                     onBucketChange={handleBucketChange}
