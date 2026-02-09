@@ -52,10 +52,13 @@ export default function TimelineBoardDialogs({
 
       {showNotificationSettings && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
           onClick={() => setShowNotificationSettings(false)}
         >
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="my-6 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Notification Settings</h2>
               <button
@@ -65,7 +68,9 @@ export default function TimelineBoardDialogs({
                 ✕
               </button>
             </div>
-            <NotificationSettings />
+            <div className="overflow-y-auto pr-1">
+              <NotificationSettings />
+            </div>
           </div>
         </div>
       )}
