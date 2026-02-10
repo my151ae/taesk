@@ -6,6 +6,8 @@ import { buildCalendarEntriesByDay } from "@/app/(board)/_utils/calendar-helpers
 import type { TimelineDay } from "@/app/(board)/_utils/timeline-helpers";
 
 type CalendarPreset = "visible" | "this-week" | "next-week";
+const CALENDAR_BUFFER_DAYS = 14;
+const MAX_CALENDAR_RANGE_DAYS = 130;
 
 type UseTimelineCalendarArgs = {
   calendarPreset: CalendarPreset;
@@ -20,6 +22,24 @@ export const useTimelineCalendar = ({
   calendarRangeEnd,
   days,
 }: UseTimelineCalendarArgs) => {
+  const expandRangeWithBuffer = useCallback((start: Date | null, end: Date | null) => {
+    if (!start || !end) return { start, end };
+
+    const expandedStart = new Date(start);
+    expandedStart.setUTCDate(expandedStart.getUTCDate() - CALENDAR_BUFFER_DAYS);
+
+    const expandedEnd = new Date(end);
+    expandedEnd.setUTCDate(expandedEnd.getUTCDate() + CALENDAR_BUFFER_DAYS);
+
+    const maxEnd = new Date(expandedStart);
+    maxEnd.setUTCDate(maxEnd.getUTCDate() + MAX_CALENDAR_RANGE_DAYS);
+
+    return {
+      start: expandedStart,
+      end: expandedEnd.getTime() > maxEnd.getTime() ? maxEnd : expandedEnd,
+    };
+  }, []);
+
   const startOfWeekJst = useCallback((base: Date) => {
     const jstMs = base.getTime() + 9 * 60 * 60 * 1000;
     const jst = new Date(jstMs);
@@ -44,8 +64,8 @@ export const useTimelineCalendar = ({
       end.setUTCDate(end.getUTCDate() + 7);
       return { start, end };
     }
-    return { start: calendarRangeStart, end: calendarRangeEnd };
-  }, [calendarPreset, calendarRangeEnd, calendarRangeStart, startOfWeekJst]);
+    return expandRangeWithBuffer(calendarRangeStart, calendarRangeEnd);
+  }, [calendarPreset, calendarRangeEnd, calendarRangeStart, expandRangeWithBuffer, startOfWeekJst]);
 
   const {
     events: googleCalendarEvents,
