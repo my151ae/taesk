@@ -2,7 +2,6 @@
 
 import { useCallback } from "react";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import type { TimelineDay } from "@/app/(board)/_utils/timeline-helpers";
 import { pixelsToMinutes } from "@/app/(board)/_utils/timeline-helpers";
 
 interface UseTimelineNavigationProps {
@@ -34,6 +33,7 @@ export function useTimelineNavigation({
     timelineStartHour = 0,
     hourHeight = 40,
 }: UseTimelineNavigationProps) {
+    const navStep = Math.max(1, dayRange - 1);
 
     const clampActiveDayIndex = useCallback((nextLength: number, desired?: number) => {
         if (!nextLength) return 0;
@@ -51,8 +51,10 @@ export function useTimelineNavigation({
 
     const handlePrevDay = useCallback(async () => {
         if (status === 'loading') return;
-        if (activeDayIndex > 0) {
-            const newIndex = Math.max(0, activeDayIndex - 1);
+        const desiredIndex = activeDayIndex - navStep;
+
+        if (desiredIndex >= 0) {
+            const newIndex = desiredIndex;
             setActiveDayIndex(newIndex);
             const targetDay = data?.days?.[newIndex];
             if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
@@ -60,19 +62,21 @@ export function useTimelineNavigation({
         }
 
         const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-        const payload = await fetchTimeline(baseStart - 1);
+        const payload = await fetchTimeline(baseStart - navStep);
         const nextDaysLength = payload?.days?.length ?? 0;
-        const newIndex = clampActiveDayIndex(nextDaysLength, 0);
+        const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
         setActiveDayIndex(newIndex);
         const targetDay = payload?.days?.[newIndex];
         if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
-    }, [activeDayIndex, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
+    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
 
     const handleNextDay = useCallback(async () => {
         if (status === 'loading' || !data?.days?.length) return;
         const lastStartIndex = Math.max(0, data.days.length - dayRange);
-        if (activeDayIndex < lastStartIndex) {
-            const newIndex = Math.min(lastStartIndex, activeDayIndex + 1);
+        const desiredIndex = activeDayIndex + navStep;
+
+        if (desiredIndex <= lastStartIndex) {
+            const newIndex = desiredIndex;
             setActiveDayIndex(newIndex);
             const targetDay = data?.days?.[newIndex];
             if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
@@ -80,13 +84,13 @@ export function useTimelineNavigation({
         }
 
         const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-        const payload = await fetchTimeline(baseStart + 1);
+        const payload = await fetchTimeline(baseStart + navStep);
         const nextDaysLength = payload?.days?.length ?? 0;
-        const newIndex = clampActiveDayIndex(nextDaysLength, nextDaysLength ? nextDaysLength - dayRange : 0);
+        const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
         setActiveDayIndex(newIndex);
         const targetDay = payload?.days?.[newIndex];
         if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
-    }, [activeDayIndex, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
+    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef]);
 
     const handleTodayClick = useCallback(async () => {
         const payload = await fetchTimeline(0);
