@@ -310,6 +310,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     moveCardByDayOffset,
     googleToast,
     setGoogleToast,
+    historySaveWarning,
+    retryHistorySave,
+    closeModalWithoutHistory,
   } = useTimelineCardActions({
     initialBoardId: currentBoard.id,
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
@@ -737,6 +740,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             onSave={handleCardModalSave} onDelete={handleCardModalDelete}
             onMoveToBoard={() => { }} onClose={closeCardModal}
             isLoading={cardModalStatus === 'loading'}
+            historySaveWarning={historySaveWarning}
+            onRetryHistorySave={retryHistorySave}
+            onCloseWithoutHistory={closeModalWithoutHistory}
           />
         )}
         {cardModalError && (

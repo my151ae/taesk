@@ -53,6 +53,8 @@ type CardModalHeaderProps = {
     onRequestClose: () => void;
     showSidebar: boolean;
     onToggleSidebar: () => void;
+    onOpenHistory: () => void;
+    historyActive: boolean;
 };
 
 export default function CardModalHeader({
@@ -90,6 +92,8 @@ export default function CardModalHeader({
     onRequestClose,
     showSidebar,
     onToggleSidebar,
+    onOpenHistory,
+    historyActive,
 }: CardModalHeaderProps) {
     return (
         <div className="flex flex-col p-3 sm:p-4 pb-2 sm:pb-3 border-b border-slate-200 dark:border-gray-700">
@@ -344,6 +348,18 @@ export default function CardModalHeader({
                     </div>
                 )}
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+                    <button
+                        onClick={onOpenHistory}
+                        className={clsx(
+                            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
+                            historyActive
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "text-slate-500 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        )}
+                        title="履歴を表示"
+                    >
+                        履歴
+                    </button>
                     <button
                         onClick={onToggleSidebar}
                         className={clsx(

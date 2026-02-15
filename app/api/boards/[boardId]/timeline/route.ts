@@ -84,7 +84,7 @@ export async function GET(
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, checklist, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
+    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards = null;
@@ -98,6 +98,7 @@ export async function GET(
   if (initial.error && initial.error.code === '42703') {
     const fallbackSelect = baseSelect
       .replace('checklist, ', '')
+      .replace('content, ', '')
       .replace('start_reminder_enabled, ', '')
       .replace('start_reminder_minutes, ', '')
       .replace('end_reminder_enabled, ', '')
@@ -112,6 +113,7 @@ export async function GET(
         ? (fallback.data as any[]).map((card) => ({
           ...card,
           checklist: EMPTY_CHECKLIST,
+          content: null,
           excerpt: card.excerpt ?? null,
           start_reminder_enabled: false,
           start_reminder_minutes: 0,
@@ -163,6 +165,7 @@ export async function GET(
         end_reminder_minutes: card.end_reminder_minutes ?? 0,
         durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
         title: card.title,
+        content: (card as any).content ?? null,
         excerpt: card.excerpt ?? null,
         tags: card.tags ?? [],
         priority: card.priority,
@@ -189,6 +192,7 @@ export async function GET(
       abBuckets[key].push({
         card_id: card.id,
         title: card.title,
+        content: (card as any).content ?? null,
         excerpt: card.excerpt ?? null,
         due_date: dateOnly,
         due_start: card.due_start,

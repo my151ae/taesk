@@ -55,7 +55,25 @@ export function useTimelineCardActions({
 }: UseTimelineCardActionsProps) {
     const saveAbortRef = useRef<AbortController | null>(null);
     const saveRequestIdRef = useRef(0);
+    const historyRetryContextRef = useRef<{ boardId: string; cardId: string; content: unknown } | null>(null);
     const [googleToast, setGoogleToast] = useState<string | null>(null);
+    const [historySaveWarning, setHistorySaveWarning] = useState<string | null>(null);
+
+    const postHistorySnapshot = useCallback(
+        async (params: { boardId: string; cardId: string; content: unknown; signal?: AbortSignal }) => {
+            const response = await fetch(`/api/boards/${params.boardId}/cards/${params.cardId}/history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: params.content }),
+                signal: params.signal,
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => null);
+                throw new Error(body?.error?.message || '履歴の保存に失敗しました');
+            }
+        },
+        []
+    );
 
     const syncCardNowWithToast = useCallback(async (card: Card | null) => {
         if (!card?.due_date || !card?.due_start || !card?.due_end) return;
@@ -104,31 +122,39 @@ export function useTimelineCardActions({
             if (!targetCard) return;
             let requestId = 0;
             try {
+                setHistorySaveWarning(null);
+                historyRetryContextRef.current = null;
+                const isRestoreFromHistory = Boolean(savePayload.restoreFromHistory);
                 const nextAssignee = savePayload.assigneeIds?.[0] || null;
                 let normalizedDueDate: string | null = null;
                 if (savePayload.due_date) {
                     const parsed = new Date(savePayload.due_date);
                     if (!Number.isNaN(parsed.getTime())) normalizedDueDate = parsed.toISOString();
                 }
-                const payload: any = {
-                    title: savePayload.title,
-                    content: normalizeContent(savePayload.content),
-                    excerpt: savePayload.excerpt ?? "",
-                    tags: savePayload.tags,
-                    due_date: normalizedDueDate,
-                    due_start: savePayload.due_start,
-                    due_end: savePayload.due_end,
-                    start_reminder_enabled: Boolean(savePayload.start_reminder_enabled),
-                    start_reminder_minutes: savePayload.start_reminder_minutes ?? 0,
-                    end_reminder_enabled: Boolean(savePayload.end_reminder_enabled),
-                    end_reminder_minutes: savePayload.end_reminder_minutes ?? 0,
-                    due_bucket: savePayload.due_bucket,
-                    due_bucket_position: savePayload.due_bucket_position,
-                    priority: savePayload.priority,
-                    duration: savePayload.duration,
-                    slug: slugify(savePayload.title),
-                };
-                if (savePayload.assigneeTouched) {
+                const normalizedContent = normalizeContent(savePayload.content);
+                const payload: any = isRestoreFromHistory
+                    ? {
+                        content: normalizedContent,
+                    }
+                    : {
+                        title: savePayload.title,
+                        content: normalizedContent,
+                        excerpt: savePayload.excerpt ?? "",
+                        tags: savePayload.tags,
+                        due_date: normalizedDueDate,
+                        due_start: savePayload.due_start,
+                        due_end: savePayload.due_end,
+                        start_reminder_enabled: Boolean(savePayload.start_reminder_enabled),
+                        start_reminder_minutes: savePayload.start_reminder_minutes ?? 0,
+                        end_reminder_enabled: Boolean(savePayload.end_reminder_enabled),
+                        end_reminder_minutes: savePayload.end_reminder_minutes ?? 0,
+                        due_bucket: savePayload.due_bucket,
+                        due_bucket_position: savePayload.due_bucket_position,
+                        priority: savePayload.priority,
+                        duration: savePayload.duration,
+                        slug: slugify(savePayload.title),
+                    };
+                if (!isRestoreFromHistory && savePayload.assigneeTouched) {
                     payload.assignee_id = nextAssignee;
                     payload.assignee_ids = savePayload.assigneeIds?.length ? savePayload.assigneeIds : null;
                     payload.assigned_to = null;
@@ -156,13 +182,38 @@ export function useTimelineCardActions({
                 }
 
                 if (!savePayload.isAutoSave) {
-                    const titleChanged = targetCard.title !== savePayload.title;
-                    const dateChanged = targetCard.due_date !== normalizedDueDate;
-                    const startChanged = (targetCard.due_start?.slice(0, 5)) !== (savePayload.due_start?.slice(0, 5));
-                    const endChanged = (targetCard.due_end?.slice(0, 5)) !== (savePayload.due_end?.slice(0, 5));
+                    const historyContent = body?.card?.content ?? normalizedContent;
+                    try {
+                        await postHistorySnapshot({
+                            boardId: targetCard.board_id,
+                            cardId: targetCard.id,
+                            content: historyContent,
+                            signal: controller.signal,
+                        });
+                    } catch (historyError: any) {
+                        if (historyError?.name === 'AbortError') return;
+                        historyRetryContextRef.current = {
+                            boardId: targetCard.board_id,
+                            cardId: targetCard.id,
+                            content: historyContent,
+                        };
+                        setHistorySaveWarning('本文の保存は完了。履歴の作成に失敗しました。');
+                        return;
+                    }
 
-                    if (titleChanged || dateChanged || startChanged || endChanged) {
-                        void syncCardNowWithToast(body?.card as Card);
+                    if (requestId !== saveRequestIdRef.current) return;
+                    historyRetryContextRef.current = null;
+                    setHistorySaveWarning(null);
+
+                    if (!isRestoreFromHistory) {
+                        const titleChanged = targetCard.title !== savePayload.title;
+                        const dateChanged = targetCard.due_date !== normalizedDueDate;
+                        const startChanged = (targetCard.due_start?.slice(0, 5)) !== (savePayload.due_start?.slice(0, 5));
+                        const endChanged = (targetCard.due_end?.slice(0, 5)) !== (savePayload.due_end?.slice(0, 5));
+
+                        if (titleChanged || dateChanged || startChanged || endChanged) {
+                            void syncCardNowWithToast(body?.card as Card);
+                        }
                     }
                     closeCardModal();
                 }
@@ -173,8 +224,27 @@ export function useTimelineCardActions({
                 if (requestId === saveRequestIdRef.current) saveAbortRef.current = null;
             }
         },
-        [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast]
+        [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast, postHistorySnapshot]
     );
+
+    const retryHistorySave = useCallback(async () => {
+        const context = historyRetryContextRef.current;
+        if (!context) return;
+        try {
+            await postHistorySnapshot(context);
+            historyRetryContextRef.current = null;
+            setHistorySaveWarning(null);
+            closeCardModal();
+        } catch (error: any) {
+            setHistorySaveWarning(error?.message || '履歴の再保存に失敗しました。');
+        }
+    }, [closeCardModal, postHistorySnapshot]);
+
+    const closeModalWithoutHistory = useCallback(() => {
+        historyRetryContextRef.current = null;
+        setHistorySaveWarning(null);
+        closeCardModal();
+    }, [closeCardModal]);
 
     const handleCardModalDelete = useCallback(
         async (cardId: string) => {
@@ -391,10 +461,22 @@ export function useTimelineCardActions({
                 body: JSON.stringify(payload),
             });
             if (!res.ok) throw new Error();
+            const body = await res.json().catch(() => null);
+            const historyContent = body?.card?.content ?? nextContent;
+            try {
+                await postHistorySnapshot({
+                    boardId: initialBoardId,
+                    cardId,
+                    content: historyContent,
+                });
+            } catch (historyError) {
+                console.warn('[timeline] checked toggle saved but history snapshot failed', historyError);
+                setErrorMessage('チェック更新は保存されましたが、履歴の保存に失敗しました。');
+            }
         } catch (e) {
             fetchTimeline();
         }
-    }, [dataMode, initialBoardId, setData, fetchTimeline, data]);
+    }, [dataMode, initialBoardId, setData, fetchTimeline, data, postHistorySnapshot, setErrorMessage]);
 
     const handleExternalEventClick = useCallback(async (entry: any) => {
         try {
@@ -484,5 +566,8 @@ export function useTimelineCardActions({
         moveCardByDayOffset,
         googleToast,
         setGoogleToast,
+        historySaveWarning,
+        retryHistorySave,
+        closeModalWithoutHistory,
     };
 }

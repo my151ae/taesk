@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
-import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
+import type { Card, Board, Priority, ProfileSummary, DueBucket, CardContentHistoryMeta } from "@/lib/supabase";
 import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -52,11 +52,16 @@ interface CardModalProps {
         duration?: number;
         checked?: boolean;
         isAutoSave?: boolean;
+        restoreFromHistory?: boolean;
+        historySourceId?: string;
     }) => void;
     onDelete: (id: string) => void;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
     onClose: () => void;
     isLoading?: boolean;
+    historySaveWarning?: string | null;
+    onRetryHistorySave?: () => void;
+    onCloseWithoutHistory?: () => void;
 }
 
 export function CardModal({
@@ -68,6 +73,9 @@ export function CardModal({
     onMoveToBoard,
     onClose,
     isLoading,
+    historySaveWarning,
+    onRetryHistorySave,
+    onCloseWithoutHistory,
 }: CardModalProps) {
     const [content, setContent] = useState<JSONContent>(() =>
         normalizeContent(card.content)
@@ -121,6 +129,14 @@ export function CardModal({
     const [targetBoardId, setTargetBoardId] = useState(card.board_id);
     const [isDirty, setIsDirty] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history">("comments");
+    const [historyItems, setHistoryItems] = useState<CardContentHistoryMeta[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+    const [previewHistoryContent, setPreviewHistoryContent] = useState<JSONContent | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
     const [editorError, setEditorError] = useState<string | null>(null);
     const [showDirtyDialog, setShowDirtyDialog] = useState(false);
     const lastTitleVisibilityRef = useRef<number | null>(null);
@@ -296,6 +312,14 @@ export function CardModal({
             setEditorError(null);
             setShowDirtyDialog(false);
             setIsDirty(false);
+            setActiveSidebarTab('comments');
+            setHistoryItems([]);
+            setHistoryError(null);
+            setHistoryLoading(false);
+            setSelectedHistoryId(null);
+            setPreviewHistoryContent(null);
+            setPreviewError(null);
+            setPreviewLoading(false);
         }
         // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
         // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
@@ -414,7 +438,53 @@ export function CardModal({
     // Close member dropdown when clicking outside
     useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
 
-    const handleSave = useCallback((isAutoSave = false) => {
+    const isHistoryPreviewing = previewHistoryContent !== null;
+
+    const fetchHistoryList = useCallback(async () => {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/history?limit=50`);
+            const body = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(body?.error?.message || '履歴の取得に失敗しました');
+            }
+            setHistoryItems(Array.isArray(body?.history) ? body.history : []);
+        } catch (error) {
+            setHistoryError(error instanceof Error ? error.message : '履歴の取得に失敗しました');
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, [card.board_id, card.id]);
+
+    const handleSelectHistory = useCallback(async (historyId: string) => {
+        setSelectedHistoryId(historyId);
+        setPreviewLoading(true);
+        setPreviewError(null);
+        try {
+            const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/history/${historyId}`);
+            const body = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(body?.error?.message || '履歴の取得に失敗しました');
+            }
+            const historyContent = normalizeContent(body?.history?.content);
+            setPreviewHistoryContent(historyContent);
+        } catch (error) {
+            setPreviewError(error instanceof Error ? error.message : '履歴の取得に失敗しました');
+            setPreviewHistoryContent(null);
+        } finally {
+            setPreviewLoading(false);
+        }
+    }, [card.board_id, card.id]);
+
+    const cancelHistoryPreview = useCallback(() => {
+        setSelectedHistoryId(null);
+        setPreviewHistoryContent(null);
+        setPreviewError(null);
+        setPreviewLoading(false);
+    }, []);
+
+    const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; }) => {
         const normalizedDueDate = dueDate || null;
         const hasTime = dueStart && dueEnd; // Both must be present
         const normalizedStart = hasTime ? `${dueStart}:00` : null;
@@ -426,7 +496,8 @@ export function CardModal({
             normalizedBucket != null ? dueBucketPosition ?? null : null;
 
         // 保存時に構造を最終補正
-        const { content: correctedContent } = ensureTitleTask(content, title, checked);
+        const sourceContent = options?.contentOverride ?? content;
+        const { content: correctedContent } = ensureTitleTask(sourceContent, title, checked);
         // 重要：最新の content (エディタの中身) からタイトルとチェック状態を優先的に再抽出する
         // これにより、onChange での同期と保存時の最終ステートを一致させる
         const extracted = extractTitleTask(correctedContent);
@@ -459,9 +530,11 @@ export function CardModal({
             due_bucket_position: normalizedBucketPosition,
             duration: Number(duration) || 0,
             isAutoSave,
+            restoreFromHistory: options?.restoreFromHistory,
+            historySourceId: options?.historySourceId,
         });
 
-        if (!isAutoSave && targetBoardId !== card.board_id) {
+        if (!isAutoSave && !options?.restoreFromHistory && targetBoardId !== card.board_id) {
             onMoveToBoard(card.id, targetBoardId);
         }
     }, [
@@ -489,6 +562,7 @@ export function CardModal({
     ]);
 
     const triggerAutoSave = useCallback(() => {
+        if (isHistoryPreviewing) return;
         setIsDirty(true);
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
@@ -509,9 +583,13 @@ export function CardModal({
                 handleSave(true);
             }, 15000);
         }
-    }, [handleSave]);
+    }, [handleSave, isHistoryPreviewing]);
 
     const requestClose = useCallback(() => {
+        if (isHistoryPreviewing) {
+            cancelHistoryPreview();
+            return;
+        }
         if (isDirty) {
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
@@ -524,14 +602,20 @@ export function CardModal({
             return;
         }
         onCloseRef.current();
-    }, [isDirty, handleSave]);
+    }, [isDirty, handleSave, isHistoryPreviewing, cancelHistoryPreview]);
 
     useEffect(() => {
         requestCloseRef.current = requestClose;
     }, [requestClose]);
 
+    useEffect(() => {
+        if (!showSidebar || activeSidebarTab !== 'history') return;
+        void fetchHistoryList();
+    }, [activeSidebarTab, showSidebar, fetchHistoryList]);
+
 
     const handleAddMember = (profileId: string) => {
+        if (isHistoryPreviewing) return;
         if (!assigneeIds.includes(profileId)) {
             setAssigneeIds([...assigneeIds, profileId]);
             setAssigneeTouched(true);
@@ -542,12 +626,14 @@ export function CardModal({
     };
 
     const handleRemoveMember = (profileId: string) => {
+        if (isHistoryPreviewing) return;
         setAssigneeIds(assigneeIds.filter(id => id !== profileId));
         setAssigneeTouched(true);
         triggerAutoSave();
     };
 
     const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (isHistoryPreviewing) return;
         if (e.key === 'Enter' && tagInput.trim()) {
             e.preventDefault();
             if (!tags.includes(tagInput.trim())) {
@@ -559,6 +645,7 @@ export function CardModal({
     };
 
     const handleRemoveTag = (tagToRemove: string) => {
+        if (isHistoryPreviewing) return;
         setTags(tags.filter(t => t !== tagToRemove));
         triggerAutoSave();
     };
@@ -575,11 +662,13 @@ export function CardModal({
     };
 
     const handleDueDateInputChange = useCallback((value: string) => {
+        if (isHistoryPreviewing) return;
         setDueDate(value ? new Date(value).toISOString() : '');
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [isHistoryPreviewing, triggerAutoSave]);
 
     const handleDueStartChange = useCallback((value: string) => {
+        if (isHistoryPreviewing) return;
         setDueStart(value);
         handleTimeToggle(!!value);
 
@@ -594,9 +683,10 @@ export function CardModal({
         }
 
         triggerAutoSave();
-    }, [handleTimeToggle, duration, triggerAutoSave]);
+    }, [isHistoryPreviewing, handleTimeToggle, duration, triggerAutoSave]);
 
     const handleDueEndChange = useCallback((value: string) => {
+        if (isHistoryPreviewing) return;
         setDueEnd(value);
 
         // Update duration based on start time
@@ -610,40 +700,46 @@ export function CardModal({
         }
 
         triggerAutoSave();
-    }, [dueStart, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, triggerAutoSave]);
 
     const handlePriorityChange = useCallback((value: Priority) => {
+        if (isHistoryPreviewing) return;
         setPriority(value);
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [isHistoryPreviewing, triggerAutoSave]);
 
     const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
+        if (isHistoryPreviewing) return;
         setStartReminderEnabled(enabled);
         if (enabled && !REMINDER_MINUTE_OPTIONS.includes(startReminderMinutes)) {
             setStartReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [startReminderMinutes, triggerAutoSave]);
+    }, [isHistoryPreviewing, startReminderMinutes, triggerAutoSave]);
 
     const handleStartReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
+        if (isHistoryPreviewing) return;
         setStartReminderMinutes(minutes);
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [isHistoryPreviewing, triggerAutoSave]);
 
     const handleEndReminderEnabledChange = useCallback((enabled: boolean) => {
+        if (isHistoryPreviewing) return;
         setEndReminderEnabled(enabled);
         if (enabled && !REMINDER_MINUTE_OPTIONS.includes(endReminderMinutes)) {
             setEndReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [endReminderMinutes, triggerAutoSave]);
+    }, [isHistoryPreviewing, endReminderMinutes, triggerAutoSave]);
 
     const handleEndReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
+        if (isHistoryPreviewing) return;
         setEndReminderMinutes(minutes);
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [isHistoryPreviewing, triggerAutoSave]);
 
     const handleDurationChange = useCallback((value: number | "") => {
+        if (isHistoryPreviewing) return;
         if (value === "") {
             setDuration("");
             return;
@@ -661,12 +757,13 @@ export function CardModal({
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
         triggerAutoSave();
-    }, [dueStart, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, triggerAutoSave]);
 
     const handleTargetBoardChange = useCallback((value: string) => {
+        if (isHistoryPreviewing) return;
         setTargetBoardId(value);
         triggerAutoSave();
-    }, [triggerAutoSave]);
+    }, [isHistoryPreviewing, triggerAutoSave]);
 
     // Resize handlers
     const startResizing = useCallback((e: React.MouseEvent) => {
@@ -708,6 +805,7 @@ export function CardModal({
     }, [isResizing, resize, stopResizing]);
 
     const handleBucketChange = (next: DueBucket) => {
+        if (isHistoryPreviewing) return;
         setDueBucket(next);
         setDueBucketPosition(Date.now());
         triggerAutoSave();
@@ -869,6 +967,20 @@ export function CardModal({
         }
     };
 
+    const handleApplyHistory = useCallback(() => {
+        if (!previewHistoryContent || !selectedHistoryId) return;
+        const extracted = extractTitleTask(previewHistoryContent);
+        setContent(previewHistoryContent);
+        setTitle(extracted.text);
+        setChecked(extracted.checked);
+        setIsDirty(false);
+        handleSave(false, {
+            restoreFromHistory: true,
+            historySourceId: selectedHistoryId,
+            contentOverride: previewHistoryContent,
+        });
+    }, [previewHistoryContent, selectedHistoryId, handleSave]);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
             <div
@@ -921,7 +1033,33 @@ export function CardModal({
                     onRequestClose={requestClose}
                     showSidebar={showSidebar}
                     onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+                    onOpenHistory={() => {
+                        setShowSidebar(true);
+                        setActiveSidebarTab('history');
+                    }}
+                    historyActive={activeSidebarTab === 'history'}
                 />
+                {historySaveWarning && (
+                    <div className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        <p>{historySaveWarning}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => onRetryHistorySave?.()}
+                                className="rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white hover:bg-amber-700"
+                            >
+                                履歴作成を再試行
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onCloseWithoutHistory?.()}
+                                className="rounded-md border border-amber-300 px-2.5 py-1 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                            >
+                                履歴なしで閉じる
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
                 <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
@@ -940,7 +1078,9 @@ export function CardModal({
                                     <input
                                         type="checkbox"
                                         checked={checked}
+                                        disabled={isHistoryPreviewing}
                                         onChange={(e) => {
+                                            if (isHistoryPreviewing) return;
                                             const val = e.target.checked;
                                             setChecked(val);
                                             const { content: newContent, changed } = setTitleTask(content, { checked: val });
@@ -954,7 +1094,9 @@ export function CardModal({
                                     <input
                                         type="text"
                                         value={title}
+                                        disabled={isHistoryPreviewing}
                                         onChange={(e) => {
+                                            if (isHistoryPreviewing) return;
                                             const val = e.target.value;
                                             setTitle(val);
                                             const { content: newContent, changed } = setTitleTask(content, { text: val });
@@ -964,12 +1106,13 @@ export function CardModal({
                                             }
                                         }}
                                         onBlur={() => {
+                                            if (isHistoryPreviewing) return;
                                             // フォーカスアウト時に構造補正を確実に行う
                                             const { content: correctedContent } = ensureTitleTask(content, title, checked);
                                             setContent(correctedContent);
                                         }}
                                         placeholder="タイトルなし"
-                                        className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none"
+                                        className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
                                     />
                                 </div>
                             </div>
@@ -985,31 +1128,59 @@ export function CardModal({
                                 </div>
                             ) : (
                                 <div className="flex flex-col h-full min-h-0">
-                                    {/* メインエディタエリア (scrollable) */}
+                                    {isHistoryPreviewing && (
+                                        <div className="mx-6 mt-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                            <p className="font-semibold">履歴プレビュー中</p>
+                                            <p className="mt-1">「この履歴に戻す」で確定するまで本文は変更されません。</p>
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleApplyHistory}
+                                                    className="rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white hover:bg-amber-700"
+                                                >
+                                                    この履歴に戻す
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelHistoryPreview}
+                                                    className="rounded-md border border-amber-300 px-2.5 py-1 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                                                >
+                                                    キャンセル
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {previewError && (
+                                        <p className="mx-6 mb-2 text-xs text-red-600">{previewError}</p>
+                                    )}
                                     <div className="flex-1 p-0">
-                                        <TiptapEditor
-                                            key={card.id}
-                                            containerRef={editorContainerRef}
-                                            initialContent={content as any} // ローカルステートを渡す
-                                            onChange={(val) => {
-                                                setContent(val);
-                                                // 同期: エディタの内容からタイトルとチェック状態を抽出して反映
-                                                const { text: extractedText, checked: newChecked } = extractTitleTask(val);
-                                                // 背景でのステート同期（不必要な再描画を防ぐため、値が違う時のみ）
-                                                if (extractedText !== title) {
-                                                    setTitle(extractedText);
-                                                }
-                                                if (newChecked !== checked) {
-                                                    setChecked(newChecked);
-                                                }
-                                                triggerAutoSave();
-                                                if (editorError) {
-                                                    setEditorError(null);
-                                                }
-                                            }}
-                                            placeholder="メモを入力..."
-                                            data-autofocus
-                                        />
+                                        {previewLoading ? (
+                                            <div className="flex h-full items-center justify-center text-sm text-slate-500">履歴を読み込み中...</div>
+                                        ) : (
+                                            <TiptapEditor
+                                                key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
+                                                containerRef={editorContainerRef}
+                                                initialContent={(isHistoryPreviewing ? previewHistoryContent : content) as any}
+                                                editable={!isHistoryPreviewing}
+                                                onChange={(val) => {
+                                                    if (isHistoryPreviewing) return;
+                                                    setContent(val);
+                                                    const { text: extractedText, checked: newChecked } = extractTitleTask(val);
+                                                    if (extractedText !== title) {
+                                                        setTitle(extractedText);
+                                                    }
+                                                    if (newChecked !== checked) {
+                                                        setChecked(newChecked);
+                                                    }
+                                                    triggerAutoSave();
+                                                    if (editorError) {
+                                                        setEditorError(null);
+                                                    }
+                                                }}
+                                                placeholder="メモを入力..."
+                                                data-autofocus={!isHistoryPreviewing}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1037,6 +1208,18 @@ export function CardModal({
                             cardId={card.id}
                             boardId={card.board_id}
                             profiles={profiles}
+                            activeTab={activeSidebarTab}
+                            onTabChange={(tab) => {
+                                setActiveSidebarTab(tab);
+                                if (tab === 'history') {
+                                    setShowSidebar(true);
+                                }
+                            }}
+                            historyItems={historyItems}
+                            historyLoading={historyLoading}
+                            historyError={historyError}
+                            selectedHistoryId={selectedHistoryId}
+                            onSelectHistory={handleSelectHistory}
                             googleSync={{
                                 cardId: card.id,
                                 connected: googleConnected,

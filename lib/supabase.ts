@@ -109,6 +109,19 @@ export interface Card {
   updated_at: string;
 }
 
+export interface CardContentHistory {
+  id: string;
+  card_id: string;
+  board_id: string;
+  content: JSONContent;
+  excerpt: string;
+  saved_by: string;
+  created_at: string;
+  saved_by_profile?: ProfileSummary | null;
+}
+
+export type CardContentHistoryMeta = Omit<CardContentHistory, 'content'>;
+
 export interface CalendarSync {
   id: string;
   card_id: string;
