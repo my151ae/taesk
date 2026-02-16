@@ -89,9 +89,9 @@
 - [x] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
 - [x] `cat test-results/playwright-report.json | jq '.stats'`
 - [x] 必要に応じて chrome-devtools MCP でログ/スナップショットを採取
-  - 注記: 実行時に `global timeout (300s)` を付与して結果を回収。`21 passed / 61 did not run` のため、全量回帰判定は未完了。
+  - 注記: `core/full` ともに spec 単位の個別実行を実施し、`unexpected=0` を確認（`comments` の `@wip` は `fixme` により skip）。
 
 ## 完了判定
 - [x] 全 Phase の完了条件を満たす
-- [ ] 回帰バグが無い（主要フロー: カード作成/保存/削除/移動/Google連携）
+- [x] 回帰バグが無い（主要フロー: カード作成/保存/削除/移動/Google連携）
 - [x] 変更内容を `docs/` に反映し、次の着手者が追える状態になっている

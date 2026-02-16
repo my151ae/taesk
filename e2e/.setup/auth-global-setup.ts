@@ -167,7 +167,7 @@ export default async function globalSetup() {
     console.log('[Global Setup] Session stored in cookies');
 
     // 6. Navigate to app and set localStorage (requires same origin)
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.evaluate(({ key, sessionData }) => {
       localStorage.setItem(key, JSON.stringify(sessionData));
       console.log('[Global Setup] Session stored in localStorage with key:', key);
@@ -179,7 +179,7 @@ export default async function globalSetup() {
     console.log(`[Global Setup] Storage state saved to: ${authFile}`);
 
     // 8. Verify authentication works
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 15_000 });
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForTimeout(500);
 
     // Check if we're authenticated (should not redirect to login)

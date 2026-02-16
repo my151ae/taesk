@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { featureFlags } from '@/lib/featureFlags';
-import type { ProfileSummary, MemberRole } from '@/lib/supabase';
+import { supabase, type ProfileSummary, type MemberRole } from '@/lib/supabase';
 import { resolveProfileIdentity, getProfileInitial } from '@/lib/usernames';
 import { RenderCommentBody } from './Mention';
 import { useAuth } from '@/app/contexts/AuthContext';
@@ -204,6 +204,43 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
       ignore = true;
     };
   }, [boardId, user?.id, initialProfiles, getStoredMembers]);
+
+  useEffect(() => {
+    if (!featureFlags.comments || !cardId) return;
+
+    const channel = supabase
+      .channel(`comments-${cardId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `card_id=eq.${cardId}`,
+        },
+        () => {
+          loadComments(cardId, true).catch((error) => {
+            console.warn('[comments] failed to refresh after realtime event', error);
+          });
+        }
+      );
+
+    channel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[comments] realtime subscription issue:', status);
+        loadComments(cardId, true).catch((error) => {
+          console.warn('[comments] failed to refresh after subscription issue', error);
+        });
+      }
+    });
+
+    return () => {
+      channel.unsubscribe();
+      supabase.removeChannel(channel).catch((error) => {
+        console.warn('[comments] failed to remove realtime channel', error);
+      });
+    };
+  }, [cardId, loadComments]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
