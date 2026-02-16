@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
-import { isAdminEmail } from '@/lib/admins';
+import { isAdminUser } from '@/lib/admins';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userEmail = user.email?.toLowerCase().trim();
-    if (isAdminEmail(userEmail)) {
+    if (isAdminUser({ id: user.id, email: user.email })) {
       const adminSupabase = createServiceRoleSupabaseClient();
       const { data: boards, error } = await adminSupabase
         .from('boards')

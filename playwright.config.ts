@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: '.env.test' });
+dotenv.config({ path: '.env.test', quiet: true });
 
 const isCI = !!process.env.CI;
 // テストは常に単一ワーカーで順番に実行する（AGENTS.md 準拠）
@@ -59,5 +59,6 @@ export default defineConfig({
     command: 'NODE_ENV=test npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !isCI,
+    timeout: 180_000,
   },
 });

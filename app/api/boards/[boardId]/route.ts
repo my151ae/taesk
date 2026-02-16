@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
-import { isAdminEmail } from '@/lib/admins';
+import { isAdminUser } from '@/lib/admins';
 
 /**
  * DELETE /api/boards/[boardId]
@@ -24,7 +24,7 @@ export async function DELETE(
             );
         }
 
-        const isAdmin = isAdminEmail(user.email ?? null);
+        const isAdmin = isAdminUser({ id: user.id, email: user.email });
         if (isAdmin) {
             const adminSupabase = createServiceRoleSupabaseClient();
             const { data: board, error: boardError } = await adminSupabase
@@ -132,7 +132,7 @@ export async function PATCH(
             );
         }
 
-        const isAdmin = isAdminEmail(user.email ?? null);
+        const isAdmin = isAdminUser({ id: user.id, email: user.email });
 
         // Check if user is member of the board
         const { data: membership, error: membershipError } = await supabase

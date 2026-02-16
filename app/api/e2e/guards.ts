@@ -10,19 +10,23 @@ import { NextRequest } from 'next/server';
  * This prevents accidental exposure in production.
  */
 export function assertE2EEnabled(req: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('E2E_NOT_FOUND');
+  }
+
   const enabled = process.env.E2E_ENABLED === 'true';
   const secret = process.env.E2E_SECRET;
   const header = req.headers.get('x-e2e-secret');
 
   if (!enabled) {
-    throw new Error('E2E endpoints are disabled');
+    throw new Error('E2E_NOT_FOUND');
   }
 
   if (!secret) {
-    throw new Error('E2E_SECRET not configured');
+    throw new Error('E2E_NOT_FOUND');
   }
 
   if (header !== secret) {
-    throw new Error('Invalid E2E secret');
+    throw new Error('E2E_NOT_FOUND');
   }
 }

@@ -8,6 +8,7 @@ import {
 } from '@/lib/server/notifications';
 import { MENTION_REGEX } from '@/lib/mention-utils';
 import { resolveProfileIdentity } from '@/lib/usernames';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 function replaceMentionsForNotification(
   body: string,
@@ -18,6 +19,43 @@ function replaceMentionsForNotification(
     const identity = resolveProfileIdentity(profile, profile?.email ?? null);
     return identity.label.startsWith('@') ? identity.label : `@${identity.label}`;
   });
+}
+
+async function assertCardMemberAccess(
+  supabase: SupabaseClient,
+  cardId: string,
+  userId: string
+): Promise<string> {
+  const { data: card, error: cardError } = await supabase
+    .from('cards')
+    .select('board_id')
+    .eq('id', cardId)
+    .maybeSingle();
+
+  if (cardError) {
+    throw new Error('CARD_LOOKUP_FAILED');
+  }
+
+  if (!card) {
+    throw new Error('CARD_NOT_FOUND');
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('board_members')
+    .select('role')
+    .eq('board_id', card.board_id)
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new Error('MEMBERSHIP_LOOKUP_FAILED');
+  }
+
+  if (!membership) {
+    throw new Error('FORBIDDEN');
+  }
+
+  return card.board_id;
 }
 
 // GET /api/cards/[cardId]/comments - List comments for a card
@@ -34,6 +72,29 @@ export async function GET(
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401 }
+      );
+    }
+
+    try {
+      await assertCardMemberAccess(supabase, cardId, user.id);
+    } catch (accessError) {
+      const reason = accessError instanceof Error ? accessError.message : 'UNKNOWN';
+      if (reason === 'CARD_NOT_FOUND') {
+        return NextResponse.json(
+          { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+          { status: 404 }
+        );
+      }
+      if (reason === 'FORBIDDEN') {
+        return NextResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
+          { status: 403 }
+        );
+      }
+      console.error('[comments:get] access check failed');
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: 'Failed to verify permissions' } },
+        { status: 500 }
       );
     }
 
@@ -56,7 +117,7 @@ export async function GET(
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Error fetching comments:', error);
+      console.error('[comments:get] fetch failed');
       return NextResponse.json(
         { error: { code: 'DB_ERROR', message: error.message } },
         { status: 500 }
@@ -79,7 +140,7 @@ export async function GET(
 
     return NextResponse.json({ comments: transformedComments });
   } catch (error) {
-    console.error('Unexpected error in GET /api/cards/[cardId]/comments:', error);
+    console.error('[comments:get] unexpected error');
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }
@@ -101,6 +162,30 @@ export async function POST(
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401 }
+      );
+    }
+
+    let boardId: string;
+    try {
+      boardId = await assertCardMemberAccess(supabase, cardId, user.id);
+    } catch (accessError) {
+      const reason = accessError instanceof Error ? accessError.message : 'UNKNOWN';
+      if (reason === 'CARD_NOT_FOUND') {
+        return NextResponse.json(
+          { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+          { status: 404 }
+        );
+      }
+      if (reason === 'FORBIDDEN') {
+        return NextResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
+          { status: 403 }
+        );
+      }
+      console.error('[comments:post] access check failed');
+      return NextResponse.json(
+        { error: { code: 'DB_ERROR', message: 'Failed to verify permissions' } },
+        { status: 500 }
       );
     }
 
@@ -165,25 +250,11 @@ export async function POST(
         );
       }
 
-      // Get the board_id for this card
-      const { data: card, error: cardError } = await supabase
-        .from('cards')
-        .select('board_id')
-        .eq('id', cardId)
-        .single();
-
-      if (cardError || !card) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Card not found' } },
-          { status: 404 }
-        );
-      }
-
       // Check if all mentioned users are board members
       const { data: boardMembers, error: membersError } = await supabase
         .from('board_members')
         .select('profile_id')
-        .eq('board_id', card.board_id);
+        .eq('board_id', boardId);
 
       if (membersError) {
         return NextResponse.json(
@@ -237,7 +308,7 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error('Error creating comment:', error);
+      console.error('[comments:post] create failed');
       return NextResponse.json(
         { error: { code: 'DB_ERROR', message: error.message } },
         { status: 500 }
@@ -268,7 +339,7 @@ export async function POST(
         .in('id', mentions);
 
       if (mentionProfilesError) {
-        console.warn('Failed to load mention profiles:', mentionProfilesError);
+        console.warn('[comments:post] failed to load mention profiles');
       } else if (mentionProfiles && mentionProfiles.length > 0) {
         const profilesById = new Map(mentionProfiles.map((p) => [p.id, p]));
         notificationBody = replaceMentionsForNotification(commentBody, profilesById);
@@ -285,7 +356,7 @@ export async function POST(
         .maybeSingle();
 
       if (parentError) {
-        console.warn('Failed to fetch parent comment author:', parentError);
+        console.warn('[comments:post] failed to fetch parent comment author');
       } else {
         replyToAuthorId = parentComment?.author_id ?? null;
       }
@@ -306,7 +377,7 @@ export async function POST(
               event: 'mention',
               commentId: newComment.id,
               cardId,
-              boardId: cardData.board_id,
+              boardId: boardId,
               senderId: user.id,
               recipientIds: mentionRecipients,
               commentBody: notificationBody,
@@ -327,7 +398,7 @@ export async function POST(
             card_id: cardId,
             card_short_id: cardData.short_id ?? null,
             card_slug: cardData.slug ?? null,
-            board_id: cardData.board_id,
+            board_id: boardId,
             sender_id: user.id,
             sender_name: senderName,
             card_title: cardData.title || 'Untitled',
@@ -351,13 +422,13 @@ export async function POST(
         }
       } catch (notifError) {
         // Log but don't fail the comment creation
-        console.error('Error creating notifications:', notifError);
+        console.error('[comments:post] notification creation failed');
       }
     }
 
     return NextResponse.json({ comment: newComment }, { status: 201 });
   } catch (error) {
-    console.error('Unexpected error in POST /api/cards/[cardId]/comments:', error);
+    console.error('[comments:post] unexpected error');
     return NextResponse.json(
       { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
       { status: 500 }

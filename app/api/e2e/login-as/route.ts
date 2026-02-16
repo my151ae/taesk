@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error('[E2E] Sign-in failed:', error);
+      console.error('[E2E] sign-in failed');
       throw error;
     }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       throw new Error('No session returned from sign-in');
     }
 
-    console.log(`[E2E] Successfully signed in: ${email}`);
+    console.log('[E2E] sign-in succeeded');
 
     // Return session data for Playwright to store
     return NextResponse.json(
@@ -69,9 +69,16 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (e: any) {
-    console.error('[E2E] login-as error:', e);
+    if (e instanceof Error && e.message === 'E2E_NOT_FOUND') {
+      return NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Not found' } },
+        { status: 404 }
+      );
+    }
+
+    console.error('[E2E] login-as request failed');
     return NextResponse.json(
-      { error: String(e?.message || e) },
+      { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
       { status: 401 }
     );
   }

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
     if (existingUser) {
-      console.log(`[E2E] User ${email} already exists, ensuring board membership`);
+      console.log('[E2E] existing user found, ensuring board membership');
 
       // Ensure user is a member of the test board
       const { data: membership } = await supabaseAdmin
@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
           });
 
         if (memberError) {
-          console.error('[E2E] Failed to add existing user to test board:', memberError);
+          console.error('[E2E] failed to add existing user to test board');
         } else {
-          console.log(`[E2E] Added existing user ${email} as owner of test board`);
+          console.log('[E2E] existing user added to test board');
         }
       }
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error('[E2E] Failed to create user:', error);
+      console.error('[E2E] failed to create user');
       throw error;
     }
 
@@ -93,21 +93,28 @@ export async function POST(req: NextRequest) {
       });
 
     if (memberError) {
-      console.error('[E2E] Failed to add user to test board:', memberError);
+      console.error('[E2E] failed to add user to test board');
       // Continue anyway - user was created successfully
     } else {
-      console.log(`[E2E] Added user ${email} as owner of test board ${MAIN_TEST_BOARD_ID}`);
+      console.log('[E2E] new user added to test board');
     }
 
-    console.log(`[E2E] Created test user: ${email}`);
+    console.log('[E2E] test user created');
     return NextResponse.json(
       { created: true, user: { id: data.user.id, email: data.user.email } },
       { status: 201 }
     );
   } catch (e: any) {
-    console.error('[E2E] ensure-user error:', e);
+    if (e instanceof Error && e.message === 'E2E_NOT_FOUND') {
+      return NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Not found' } },
+        { status: 404 }
+      );
+    }
+
+    console.error('[E2E] ensure-user request failed');
     return NextResponse.json(
-      { error: String(e?.message || e) },
+      { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
       { status: 401 }
     );
   }

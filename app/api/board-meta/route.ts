@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buildBoardUrl } from "@/lib/board-url";
-import { getBoardById } from "@/lib/server/boards";
+import { createServerSupabaseClient } from "@/lib/supabase";
 
 export const runtime = "edge";
 
@@ -10,18 +10,67 @@ export async function GET(req: Request) {
   const uuid = searchParams.get("uuid");
 
   if (!uuid) {
-    return NextResponse.json({ error: "uuid required" }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "uuid required" } },
+      { status: 400 }
+    );
   }
 
   try {
-    const board = await getBoardById(uuid);
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHENTICATED", message: "Login required" } },
+        { status: 401 }
+      );
+    }
+
+    const { data: membership } = await supabase
+      .from("board_members")
+      .select("role")
+      .eq("board_id", uuid)
+      .eq("profile_id", user.id)
+      .maybeSingle();
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Not found" } },
+        { status: 404 }
+      );
+    }
+
+    const { data: board, error: boardError } = await supabase
+      .from("boards")
+      .select("short_id, id_short, slug, name")
+      .eq("id", uuid)
+      .maybeSingle();
+
+    if (boardError) {
+      console.error("[api/board-meta] failed to fetch board");
+      return NextResponse.json(
+        { error: { code: "DB_ERROR", message: "Failed to fetch board" } },
+        { status: 500 }
+      );
+    }
+
     if (!board?.short_id || typeof board.id_short !== "number") {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Not found" } },
+        { status: 404 }
+      );
     }
 
     const canonicalPath = buildBoardUrl(board);
     if (!canonicalPath) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Not found" } },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({
@@ -31,7 +80,10 @@ export async function GET(req: Request) {
       canonical_path: canonicalPath,
     });
   } catch (error) {
-    console.error("[api/board-meta] unexpected error:", error);
-    return NextResponse.json({ error: "unexpected error" }, { status: 500 });
+    console.error("[api/board-meta] unexpected error");
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "Internal server error" } },
+      { status: 500 }
+    );
   }
 }
