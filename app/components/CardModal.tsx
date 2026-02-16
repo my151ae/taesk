@@ -574,7 +574,11 @@ export function CardModal({
             cancelHistoryPreview();
             return;
         }
-        if (isDirty || dirtyRef.current) {
+        const hasHeaderDiff =
+            checked !== Boolean(card.checked) ||
+            title !== (card.title || "");
+
+        if (isDirty || dirtyRef.current || hasHeaderDiff) {
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
             }
@@ -588,7 +592,7 @@ export function CardModal({
             return;
         }
         onCloseRef.current();
-    }, [isDirty, handleSave, isHistoryPreviewing, cancelHistoryPreview]);
+    }, [isDirty, handleSave, isHistoryPreviewing, cancelHistoryPreview, checked, card.checked, title, card.title]);
 
     useEffect(() => {
         requestCloseRef.current = requestClose;
@@ -1074,8 +1078,8 @@ export function CardModal({
                                             const { content: newContent, changed } = setTitleTask(content, { checked: val });
                                             if (changed) {
                                                 setContent(newContent);
-                                                triggerAutoSave();
                                             }
+                                            triggerAutoSave();
                                         }}
                                         className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
                                     />
@@ -1090,8 +1094,8 @@ export function CardModal({
                                             const { content: newContent, changed } = setTitleTask(content, { text: val });
                                             if (changed) {
                                                 setContent(newContent);
-                                                triggerAutoSave();
                                             }
+                                            triggerAutoSave();
                                         }}
                                         onBlur={() => {
                                             if (isHistoryPreviewing) return;
