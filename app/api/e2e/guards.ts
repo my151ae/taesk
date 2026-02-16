@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * E2E API Guard
@@ -10,7 +11,7 @@ import { NextRequest } from 'next/server';
  * This prevents accidental exposure in production.
  */
 export function assertE2EEnabled(req: NextRequest) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') {
     throw new Error('E2E_NOT_FOUND');
   }
 
@@ -22,11 +23,17 @@ export function assertE2EEnabled(req: NextRequest) {
     throw new Error('E2E_NOT_FOUND');
   }
 
-  if (!secret) {
+  if (!secret || !header) {
     throw new Error('E2E_NOT_FOUND');
   }
 
-  if (header !== secret) {
+  const headerBuffer = Buffer.from(header);
+  const secretBuffer = Buffer.from(secret);
+  if (headerBuffer.length !== secretBuffer.length) {
+    throw new Error('E2E_NOT_FOUND');
+  }
+
+  if (!timingSafeEqual(headerBuffer, secretBuffer)) {
     throw new Error('E2E_NOT_FOUND');
   }
 }

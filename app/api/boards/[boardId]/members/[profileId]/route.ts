@@ -1,27 +1,32 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { MemberRole } from '@/lib/supabase';
+import {
+  getBoardMembership,
+  requireAuthenticatedUser,
+  validateMutationRequestOrigin,
+} from '@/lib/server/api-security';
 
 // PATCH /api/boards/[boardId]/members/[profileId] - Update member role
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
+  const originError = validateMutationRequestOrigin(request);
+  if (originError) {
+    return originError;
+  }
+
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: actorMembership } = await supabase
-      .from('board_members')
-      .select('role')
-      .eq('board_id', boardId)
-      .eq('profile_id', user.id)
-      .maybeSingle();
+    const actorMembership = await getBoardMembership(supabase, boardId, user.id);
 
     if (!actorMembership || actorMembership.role !== 'owner') {
       return NextResponse.json({ error: 'Only owner can update member roles' }, { status: 403 });
@@ -83,21 +88,21 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
 ) {
+  const originError = validateMutationRequestOrigin(request);
+  if (originError) {
+    return originError;
+  }
+
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: actorMembership } = await supabase
-      .from('board_members')
-      .select('role')
-      .eq('board_id', boardId)
-      .eq('profile_id', user.id)
-      .maybeSingle();
+    const actorMembership = await getBoardMembership(supabase, boardId, user.id);
 
     const { data: targetMembership } = await supabase
       .from('board_members')

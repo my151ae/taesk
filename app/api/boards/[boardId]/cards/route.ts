@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import {
+  getBoardMembership,
+  hasAnyRole,
+  requireAuthenticatedUser,
+  validateMutationRequestOrigin,
+} from '@/lib/server/api-security';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
@@ -60,25 +66,25 @@ export async function POST(
   { params }: { params: Promise<{ boardId: string }> }
 ) {
   try {
+    const originError = validateMutationRequestOrigin(request);
+    if (originError) {
+      return originError;
+    }
+
     const { boardId } = await params;
     const supabase = await createServerSupabaseClient();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401 }
       );
     }
 
-    const { data: membership } = await supabase
-      .from('board_members')
-      .select('role')
-      .eq('board_id', boardId)
-      .eq('profile_id', user.id)
-      .maybeSingle();
+    const membership = await getBoardMembership(supabase, boardId, user.id);
 
-    if (!membership || (membership.role !== 'owner' && membership.role !== 'editor')) {
+    if (!membership || !hasAnyRole(membership.role, ['owner', 'editor'])) {
       return NextResponse.json(
         { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
         { status: 403 }

@@ -1,28 +1,9 @@
 import 'server-only';
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 import type { QuietHoursPreference } from '@/lib/supabase';
-
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
-  }
-
-  if (!serviceRoleKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required');
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 
 export type NotificationType =
   | 'comment_created'
@@ -105,7 +86,7 @@ export async function createNotification(
   params: CreateNotificationParams
 ): Promise<CreateNotificationResult> {
   const { type, recipientId, payload, dedupeKey } = params;
-  const supabase = getSupabaseAdmin();
+  const supabase = createServiceRoleSupabaseClient();
 
   // Generate dedupe key if not provided
   const finalDedupeKey =
@@ -260,7 +241,7 @@ export async function createCommentNotifications(
   event: CommentNotificationEvent,
   senderName?: string
 ) {
-  const supabase = getSupabaseAdmin();
+  const supabase = createServiceRoleSupabaseClient();
 
   try {
     const recipients = await resolveCommentRecipients(supabase, event);

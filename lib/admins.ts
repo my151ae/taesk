@@ -1,5 +1,3 @@
-export const ADMIN_EMAILS = new Set(["matsumocy@gmail.com"]);
-
 function parseAdminUserIds(raw?: string): Set<string> {
   if (!raw) return new Set();
   return new Set(
@@ -14,11 +12,5 @@ export const ADMIN_USER_IDS = parseAdminUserIds(process.env.ADMIN_USER_IDS);
 
 export function isAdminUser(input: { id?: string | null; email?: string | null }): boolean {
   const userId = input.id?.trim();
-  if (userId && ADMIN_USER_IDS.has(userId)) {
-    return true;
-  }
-
-  const email = input.email?.trim().toLowerCase();
-  if (!email) return false;
-  return ADMIN_EMAILS.has(email);
+  return Boolean(userId && ADMIN_USER_IDS.has(userId));
 }

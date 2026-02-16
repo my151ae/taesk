@@ -1,19 +1,19 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { MemberRole, ProfileSummary } from '@/lib/supabase';
+import {
+  getBoardMembership,
+  hasAnyRole,
+  requireAuthenticatedUser,
+  validateMutationRequestOrigin,
+} from '@/lib/server/api-security';
 
 async function getActorMembership(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   boardId: string,
   userId: string
 ) {
-  const { data: membership } = await supabase
-    .from('board_members')
-    .select('role')
-    .eq('board_id', boardId)
-    .eq('profile_id', userId)
-    .maybeSingle();
-  return membership;
+  return getBoardMembership(supabase, boardId, userId);
 }
 
 // GET /api/boards/[boardId]/members - List members with optional search
@@ -28,9 +28,9 @@ export async function GET(
 
   try {
     // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const actorMembership = await getActorMembership(supabase, boardId, user.id);
@@ -105,17 +105,22 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
 ) {
+  const originError = validateMutationRequestOrigin(request);
+  if (originError) {
+    return originError;
+  }
+
   const supabase = await createServerSupabaseClient();
   const { boardId } = await params;
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const actorMembership = await getActorMembership(supabase, boardId, user.id);
-    if (!actorMembership || !['owner', 'editor'].includes(actorMembership.role)) {
+    if (!actorMembership || !hasAnyRole(actorMembership.role, ['owner', 'editor'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

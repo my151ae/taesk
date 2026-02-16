@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleSupabaseClient } from "@/lib/server/supabaseAdmin";
 import { syncGoogleCalendarToTaesk } from "@/lib/googleCalendarServer";
+import { sanitizeProviderError } from "@/lib/server/log-sanitizer";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: "UNAUTHORIZED_WEBHOOK" }, { status: 401 });
       }
 
+      if (messageNumber) {
+        const { data: duplicate } = await supabase
+          .from("google_calendar_sync_logs")
+          .select("id")
+          .eq("channel_id", channelId)
+          .eq("message_number", messageNumber)
+          .maybeSingle();
+
+        if (duplicate?.id) {
+          console.warn("[googleCalendar/webhook] duplicate message ignored", {
+            channelId,
+            messageNumber,
+          });
+          return NextResponse.json({ ok: true, duplicate: true });
+        }
+      }
+
       if (state?.google_account_id) {
         const { error: insertError } = await supabase.from("google_calendar_sync_logs").insert({
           google_account_id: state.google_account_id,
@@ -100,13 +118,13 @@ export async function POST(request: NextRequest) {
           try {
             await syncGoogleCalendarToTaesk(account.user_id, state.calendar_id ?? "primary", { supabase, reason: "webhook" });
           } catch (syncError) {
-            console.error("[googleCalendar/webhook] pull sync failed", syncError);
+            console.error("[googleCalendar/webhook] pull sync failed", sanitizeProviderError(syncError));
           }
         }
       }
     }
   } catch (error) {
-    console.error("[googleCalendar/webhook] failed to record", error);
+    console.error("[googleCalendar/webhook] failed to record", sanitizeProviderError(error));
     // Do not fail the ack.
   }
 

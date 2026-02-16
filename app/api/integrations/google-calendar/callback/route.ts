@@ -5,6 +5,7 @@ import {
   GOOGLE_CALENDAR_SCOPE,
   resolveGoogleRedirectUri,
 } from "@/lib/googleCalendarServer";
+import { sanitizeProviderError } from "@/lib/server/log-sanitizer";
 
 export const runtime = "nodejs";
 
@@ -153,17 +154,14 @@ export async function GET(request: NextRequest) {
     });
     return response;
   } catch (error) {
-    const err: any = error;
-    console.error("[googleCalendar/callback] token exchange failed", {
-      message: err?.message,
-      code: err?.code,
-      response: err?.response?.data,
-      errors: err?.errors,
-    });
+    const sanitized = sanitizeProviderError(error);
+    console.error("[googleCalendar/callback] token exchange failed", sanitized);
+    const responsePayload = 'response' in sanitized ? sanitized.response : null;
+    const message = 'message' in sanitized ? sanitized.message : null;
     const detail =
-      err?.response?.data?.error_description ||
-      err?.response?.data?.error ||
-      err?.message ||
+      (responsePayload as { error_description?: string; error?: string } | null)?.error_description ||
+      (responsePayload as { error?: string } | null)?.error ||
+      message ||
       null;
     return NextResponse.json(
       { error: { code: "GOOGLE_OAUTH_ERROR", message: "Failed to connect Google Calendar", detail } },

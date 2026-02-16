@@ -8,24 +8,10 @@ import {
   type UsernameAvailabilityReason,
 } from '@/lib/usernames';
 import { checkRateLimit } from '@/lib/server/rate-limit';
+import { getClientIp } from '@/lib/server/api-security';
 
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_COUNT = 20;
-
-function getClientIdentifier(request: NextRequest): string {
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    const firstIp = forwardedFor.split(',')[0]?.trim();
-    if (firstIp) {
-      return firstIp;
-    }
-  }
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
-  return 'unknown';
-}
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -35,8 +21,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rateKey = `check-username:${getClientIdentifier(request)}`;
-  const rateLimit = checkRateLimit({
+  const rateKey = `check-username:${getClientIp(request)}`;
+  const rateLimit = await checkRateLimit({
     key: rateKey,
     limit: RATE_LIMIT_COUNT,
     windowMs: RATE_LIMIT_WINDOW_MS,

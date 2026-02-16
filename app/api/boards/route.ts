@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import { isAdminUser } from '@/lib/admins';
+import { requireAuthenticatedUser, validateMutationRequestOrigin } from '@/lib/server/api-security';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
@@ -20,9 +21,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401, headers: { 'Cache-Control': 'no-store' } }
       );
@@ -95,11 +96,16 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const originError = validateMutationRequestOrigin(request);
+    if (originError) {
+      return originError;
+    }
+
     const supabase = await createServerSupabaseClient();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
+    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
         { status: 401 }
       );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { normalizeUsername } from '@/lib/usernames';
 import { checkRateLimit } from '@/lib/server/rate-limit';
+import { getClientIp } from '@/lib/server/api-security';
 
 /**
  * GET /api/profiles/search?board_id={boardId}&query={query}
@@ -41,8 +42,8 @@ export async function GET(request: NextRequest) {
       }, { status: 403 });
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-    const rate = checkRateLimit({
+    const ip = getClientIp(request);
+    const rate = await checkRateLimit({
       key: `profiles_search:${user.id}:${boardId}:${ip}`,
       limit: 60,
       windowMs: 60_000,

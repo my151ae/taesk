@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import { isAdminUser } from '@/lib/admins';
+import {
+    getBoardMembership,
+    hasAnyRole,
+    requireAuthenticatedUser,
+    validateMutationRequestOrigin,
+} from '@/lib/server/api-security';
 
 /**
  * DELETE /api/boards/[boardId]
@@ -13,12 +19,17 @@ export async function DELETE(
     { params }: { params: Promise<{ boardId: string }> }
 ) {
     try {
+        const originError = validateMutationRequestOrigin(request);
+        if (originError) {
+            return originError;
+        }
+
         const { boardId } = await params;
         const supabase = await createServerSupabaseClient();
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json(
+        const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+        if (errorResponse || !user) {
+            return errorResponse ?? NextResponse.json(
                 { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
                 { status: 401 }
             );
@@ -120,13 +131,18 @@ export async function PATCH(
     { params }: { params: Promise<{ boardId: string }> }
 ) {
     try {
+        const originError = validateMutationRequestOrigin(request);
+        if (originError) {
+            return originError;
+        }
+
         const { boardId } = await params;
         const supabase = await createServerSupabaseClient();
         const payload = await request.json();
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json(
+        const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+        if (errorResponse || !user) {
+            return errorResponse ?? NextResponse.json(
                 { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
                 { status: 401 }
             );
@@ -135,15 +151,10 @@ export async function PATCH(
         const isAdmin = isAdminUser({ id: user.id, email: user.email });
 
         // Check if user is member of the board
-        const { data: membership, error: membershipError } = await supabase
-            .from('board_members')
-            .select('role')
-            .eq('board_id', boardId)
-            .eq('profile_id', user.id)
-            .single();
+        const membership = await getBoardMembership(supabase, boardId, user.id);
 
         if (!isAdmin) {
-            if (membershipError || !membership) {
+            if (!membership) {
                 return NextResponse.json(
                     { error: { code: 'NOT_FOUND', message: 'Board not found or access denied' } },
                     { status: 404 }
@@ -151,7 +162,7 @@ export async function PATCH(
             }
 
             // Only owner or editor can update settings (for now let's say owner/editor)
-            if (!['owner', 'editor'].includes(membership.role)) {
+            if (!hasAnyRole(membership.role, ['owner', 'editor'])) {
                 return NextResponse.json(
                     { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
                     { status: 403 }

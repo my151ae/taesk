@@ -10,8 +10,8 @@
 - [ ] Webhook 偽装・E2E API 無効化のテストを追加
 
 2. JSON レポート運用の固定化
-- [ ] 実行コマンドを `PW_WORKERS=1` 前提でドキュメント化
-- [ ] `test-results/playwright-report.json` の確認手順を固定化
+- [x] 実行コマンドを `PW_WORKERS=1` 前提でドキュメント化
+- [x] `test-results/playwright-report.json` の確認手順を固定化
 - [ ] 失敗分類（authz/validation/infra）のテンプレートを作成
 
 3. 監査ログ/観測性
@@ -20,10 +20,10 @@
 - [ ] トリアージ手順を `docs/` に記載
 
 4. 完了判定
-- [ ] `npm run lint`
-- [ ] `npm run build`
-- [ ] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
-- [ ] `.stats.unexpected == 0` を確認
+- [x] `npm run lint`
+- [x] `npm run build`
+- [x] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
+- [x] `.stats.unexpected == 0` を確認
 
 ## 完了条件
 - [ ] セキュリティ関連の回帰テストが CI 相当手順で安定
