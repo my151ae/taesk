@@ -125,7 +125,7 @@ export const useTimelineScrollSync = ({
       cancelled = true;
       programmaticScrollRef.current = false;
     };
-  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, hourHeight]);
+  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, timelineStartHour, hourHeight]);
 
   useEffect(() => {
     if (urlTime) {

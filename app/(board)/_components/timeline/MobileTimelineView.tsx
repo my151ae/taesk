@@ -685,6 +685,7 @@ export default function MobileTimelineView({
                           return (
                             <li key={member.id} className="flex items-center justify-center">
                               {member.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
                                 <img
                                   src={member.avatar_url}
                                   alt={identity.label}

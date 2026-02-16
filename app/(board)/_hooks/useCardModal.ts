@@ -246,7 +246,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isModalClosing, loadComments]);
+    }, [targetShortId, isModalClosing, activeCardId, modalCardFromData, loadComments]);
 
     // Load Board Members
     useEffect(() => {

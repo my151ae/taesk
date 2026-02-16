@@ -559,6 +559,7 @@ export function DesktopTimelineView({
                         return (
                           <li key={member.id} className="flex items-center gap-2 text-[11px] text-slate-700">
                             {member.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
                               <img
                                 src={member.avatar_url}
                                 alt={identity.label}

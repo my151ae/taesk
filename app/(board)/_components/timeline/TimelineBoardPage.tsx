@@ -234,9 +234,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
   const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
-  const timelineScrollRef = useMemo(() => ({
-    current: desktopTimelineScrollRef.current || mobileTimelineScrollRef.current
-  }), [desktopTimelineScrollRef.current, mobileTimelineScrollRef.current]);
+  const timelineScrollRef = useMemo(
+    () =>
+      ({
+        get current() {
+          return desktopTimelineScrollRef.current || mobileTimelineScrollRef.current;
+        },
+      } as React.RefObject<HTMLDivElement>),
+    []
+  );
 
   const {
     handlePrevDay,

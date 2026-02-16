@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { assertE2EEnabled } from '../guards';
+import { errorResponse, ApiErrorCode } from '@/lib/server/api-error';
+
+function isRetryableAuthError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const name = error.name.toLowerCase();
+  const message = error.message.toLowerCase();
+  return name.includes('retryable') || message.includes('fetch failed');
+}
+
+async function withAuthRetry<T>(operation: () => Promise<T>, retries = 2): Promise<T> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableAuthError(error) || attempt === retries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
 
 async function findUserByEmail(
   supabaseAdmin: any,
@@ -11,10 +35,12 @@ async function findUserByEmail(
   const maxPages = 25;
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-      page,
-      perPage,
-    });
+    const { data, error } = await withAuthRetry<any>(() =>
+      supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      })
+    );
 
     if (error) {
       throw error;
@@ -31,6 +57,20 @@ async function findUserByEmail(
   }
 
   return null;
+}
+
+function getErrorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message };
+  }
+  if (error && typeof error === 'object') {
+    const source = error as { code?: unknown; status?: unknown };
+    return {
+      code: typeof source.code === 'string' ? source.code : undefined,
+      status: typeof source.status === 'number' ? source.status : undefined,
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -55,9 +95,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Supabase admin client with service role key
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
+
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -72,7 +118,18 @@ export async function POST(req: NextRequest) {
     const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
     if (existingUser) {
-      console.log('[E2E] existing user found, ensuring board membership');
+      console.log('[E2E] existing user found, syncing credentials and ensuring board membership');
+
+      const { error: updateError } = await withAuthRetry<any>(() =>
+        supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+          password,
+          email_confirm: true,
+        })
+      );
+      if (updateError) {
+        console.error('[E2E] failed to sync existing user password');
+        throw updateError;
+      }
 
       // Ensure user is a member of the test board
       const { data: membership } = await supabaseAdmin
@@ -102,15 +159,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Create user with email confirmation pre-approved
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Skip email verification for test users
-    });
+    const { data, error } = await withAuthRetry<any>(() =>
+      supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Skip email verification for test users
+      })
+    );
 
     if (error) {
       console.error('[E2E] failed to create user');
       throw error;
+    }
+    if (!data?.user) {
+      throw new Error('No user returned from createUser');
     }
 
     // Add user as member of main test board
@@ -142,10 +204,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.error('[E2E] ensure-user request failed');
-    return NextResponse.json(
-      { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 }
+    const status = typeof e?.status === 'number' ? e.status : null;
+    if (status === 400 || status === 401 || status === 403) {
+      console.error('[E2E] ensure-user authentication failed');
+      return errorResponse(ApiErrorCode.UNAUTHENTICATED, 'Unauthorized', 401);
+    }
+
+    console.error('[E2E] ensure-user request failed', e);
+    return errorResponse(
+      ApiErrorCode.INTERNAL_ERROR,
+      'Internal server error',
+      500,
+      getErrorDetails(e)
     );
   }
 }

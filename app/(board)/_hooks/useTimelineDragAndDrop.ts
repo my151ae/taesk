@@ -940,7 +940,7 @@ export function useTimelineDragAndDrop({
                 setActiveResize(prev => prev ? { ...prev, startMinutes: newStart, duration: newDuration } : null);
             }
         }
-    }, [activeResize]);
+    }, [activeResize, hourHeight]);
 
     const handleResizeEnd = useCallback((e: ReactPointerEvent) => {
         if (!activeResize) return;

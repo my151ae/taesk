@@ -1,4 +1,4 @@
-import { chromium, FullConfig } from '@playwright/test';
+import { chromium } from '@playwright/test';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
@@ -35,8 +35,6 @@ const TEST_USER = {
   password: process.env.E2E_USER_PASSWORD || 'replace-with-local-test-password',
 };
 
-const AUTH_FILE = path.join(__dirname, '../../playwright/.auth/user.json');
-
 /**
  * Global Setup for E2E Tests
  *
@@ -45,7 +43,7 @@ const AUTH_FILE = path.join(__dirname, '../../playwright/.auth/user.json');
  * 2. Sign in and capture session
  * 3. Save storageState for all tests to reuse
  */
-export default async function globalSetup(config: FullConfig) {
+export default async function globalSetup() {
   console.log('[Global Setup] Starting authentication setup...');
 
   const browser = await chromium.launch();
@@ -102,12 +100,6 @@ export default async function globalSetup(config: FullConfig) {
 
     if (!loginResponse.ok()) {
       const errorText = await loginResponse.text();
-      if (fs.existsSync(AUTH_FILE)) {
-        console.warn(
-          `[Global Setup] login-as failed (${loginResponse.status()}), falling back to existing storageState: ${errorText}`
-        );
-        return;
-      }
       throw new Error(`Failed to sign in (${loginResponse.status()}): ${errorText}`);
     }
 
@@ -182,8 +174,9 @@ export default async function globalSetup(config: FullConfig) {
     }, { key: storageKey, sessionData: session });
 
     // 7. Save storage state
-    await context.storageState({ path: AUTH_FILE });
-    console.log(`[Global Setup] Storage state saved to: ${AUTH_FILE}`);
+    const authFile = path.join(__dirname, '../../playwright/.auth/user.json');
+    await context.storageState({ path: authFile });
+    console.log(`[Global Setup] Storage state saved to: ${authFile}`);
 
     // 8. Verify authentication works
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 15_000 });

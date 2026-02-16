@@ -323,6 +323,7 @@ export function CardModal({
         }
         // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
         // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- カード切替時のみ初期化する設計
     }, [card.id]); // id 変化のみを監視
 
     // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
@@ -555,10 +556,11 @@ export function CardModal({
         duration,
         priority,
         assigneeIds,
-        assigneeTouched,
-        targetBoardId,
-        onSave,
-        onMoveToBoard,
+            assigneeTouched,
+            checked,
+            targetBoardId,
+            onSave,
+            onMoveToBoard,
     ]);
 
     const triggerAutoSave = useCallback(() => {
@@ -650,8 +652,8 @@ export function CardModal({
         triggerAutoSave();
     };
 
-    const handleTimeToggle = (checked: boolean) => {
-        if (!checked) {
+    const handleTimeToggle = useCallback((isTimeEnabled: boolean) => {
+        if (!isTimeEnabled) {
             setDueStart('');
             setDueEnd('');
             if (dueDate && !dueBucket) {
@@ -659,7 +661,7 @@ export function CardModal({
                 setDueBucketPosition(Date.now());
             }
         }
-    };
+    }, [dueDate, dueBucket]);
 
     const handleDueDateInputChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
