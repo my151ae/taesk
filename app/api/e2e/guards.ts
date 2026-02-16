@@ -1,5 +1,20 @@
 import { NextRequest } from 'next/server';
-import { timingSafeEqual } from 'crypto';
+
+function safeEqualSecret(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  const max = Math.max(aBytes.length, bBytes.length);
+  let diff = aBytes.length ^ bBytes.length;
+
+  for (let i = 0; i < max; i += 1) {
+    const av = i < aBytes.length ? aBytes[i] : 0;
+    const bv = i < bBytes.length ? bBytes[i] : 0;
+    diff |= av ^ bv;
+  }
+
+  return diff === 0;
+}
 
 /**
  * E2E API Guard
@@ -27,13 +42,7 @@ export function assertE2EEnabled(req: NextRequest) {
     throw new Error('E2E_NOT_FOUND');
   }
 
-  const headerBuffer = Buffer.from(header);
-  const secretBuffer = Buffer.from(secret);
-  if (headerBuffer.length !== secretBuffer.length) {
-    throw new Error('E2E_NOT_FOUND');
-  }
-
-  if (!timingSafeEqual(headerBuffer, secretBuffer)) {
+  if (!safeEqualSecret(header, secret)) {
     throw new Error('E2E_NOT_FOUND');
   }
 }

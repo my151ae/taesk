@@ -11,14 +11,14 @@
 4. [Phase 4: テスト/監視/運用定着](./phase-4-testing-ops.md)
 
 ## 全体チェックリスト
-- [ ] Phase 1 の完了条件をすべて満たす
-- [ ] Phase 2 の完了条件をすべて満たす
-- [ ] Phase 3 の完了条件をすべて満たす
-- [ ] Phase 4 の完了条件をすべて満たす
-- [ ] `npm run lint` が通る
-- [ ] `npm run build` が通る
-- [ ] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json` の `.stats.unexpected == 0`
-- [ ] 変更内容を `docs/` に反映（設計・運用ルール）
+- [x] Phase 1 の完了条件をすべて満たす
+- [x] Phase 2 の完了条件をすべて満たす
+- [x] Phase 3 の完了条件をすべて満たす
+- [x] Phase 4 の完了条件をすべて満たす
+- [x] `npm run lint` が通る
+- [x] `npm run build` が通る
+- [x] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json` の `.stats.unexpected == 0`
+- [x] 変更内容を `docs/` に反映（設計・運用ルール）
 
 ## 推奨進行順
 1. Phase 1 を先に完了（露出リスクを早期低減）

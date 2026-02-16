@@ -79,12 +79,14 @@ export default async function globalSetup(config: FullConfig) {
     });
 
     if (!ensureUserResponse.ok()) {
-      const error = await ensureUserResponse.text();
-      throw new Error(`Failed to ensure user (${ensureUserResponse.status()}): ${error}`);
+      const errorText = await ensureUserResponse.text();
+      console.warn(
+        `[Global Setup] ensure-user failed (${ensureUserResponse.status()}), continuing with login-as fallback: ${errorText}`
+      );
+    } else {
+      const ensureResult = await ensureUserResponse.json();
+      console.log('[Global Setup] User status:', ensureResult.created ? 'created' : 'already exists');
     }
-
-    const ensureResult = await ensureUserResponse.json();
-    console.log('[Global Setup] User status:', ensureResult.created ? 'created' : 'already exists');
 
     // 2. Sign in programmatically
     console.log('[Global Setup] Signing in...');
@@ -99,8 +101,14 @@ export default async function globalSetup(config: FullConfig) {
     });
 
     if (!loginResponse.ok()) {
-      const error = await loginResponse.text();
-      throw new Error(`Failed to sign in (${loginResponse.status()}): ${error}`);
+      const errorText = await loginResponse.text();
+      if (fs.existsSync(AUTH_FILE)) {
+        console.warn(
+          `[Global Setup] login-as failed (${loginResponse.status()}), falling back to existing storageState: ${errorText}`
+        );
+        return;
+      }
+      throw new Error(`Failed to sign in (${loginResponse.status()}): ${errorText}`);
     }
 
     const loginResult = await loginResponse.json();

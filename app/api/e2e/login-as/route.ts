@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { assertE2EEnabled } from '../guards';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
+import { errorResponse, ApiErrorCode } from '@/lib/server/api-error';
 
 /**
  * E2E Programmatic Sign-In Endpoint
@@ -9,19 +11,15 @@ import { assertE2EEnabled } from '../guards';
  * Playwright will use this session in storageState.
  * Requires E2E_ENABLED=true and correct x-e2e-secret header.
  */
-export async function POST(req: NextRequest) {
-  try {
-    // Guard: Only allow in E2E mode with correct secret
-    assertE2EEnabled(req);
+async function postLoginAs(req: NextRequest) {
+  // Guard: Only allow in E2E mode with correct secret
+  assertE2EEnabled(req);
 
-    const { email, password } = await req.json();
+  const { email, password } = await req.json();
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password required' },
-        { status: 400 }
-      );
-    }
+  if (!email || !password) {
+    return errorResponse(ApiErrorCode.INVALID_BODY, 'Email and password required', 400);
+  }
 
     // Create Supabase client (same as app client, not admin)
     const supabase = createClient(
@@ -41,33 +39,38 @@ export async function POST(req: NextRequest) {
       password,
     });
 
-    if (error) {
-      console.error('[E2E] sign-in failed');
-      throw error;
-    }
+  if (error) {
+    console.error('[E2E] sign-in failed');
+    throw error;
+  }
 
-    if (!data.session) {
-      throw new Error('No session returned from sign-in');
-    }
+  if (!data.session) {
+    throw new Error('No session returned from sign-in');
+  }
 
     console.log('[E2E] sign-in succeeded');
 
     // Return session data for Playwright to store
-    return NextResponse.json(
-      {
-        success: true,
-        session: {
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-          expires_at: data.session.expires_at,
-          user: {
-            id: data.user.id,
-            email: data.user.email,
-          },
+  return NextResponse.json(
+    {
+      success: true,
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
         },
       },
-      { status: 200 }
-    );
+    },
+    { status: 200 }
+  );
+}
+
+export const POST = withErrorHandling(async (req: NextRequest) => {
+  try {
+    return await postLoginAs(req);
   } catch (e: any) {
     if (e instanceof Error && e.message === 'E2E_NOT_FOUND') {
       return NextResponse.json(
@@ -82,4 +85,4 @@ export async function POST(req: NextRequest) {
       { status: 401 }
     );
   }
-}
+}, 'api/e2e/login-as');

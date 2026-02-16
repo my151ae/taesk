@@ -8,7 +8,7 @@
 1. 管理者判定の統一
 - [x] `lib/admins.ts` の固定メール判定を廃止
 - [x] `ADMIN_USER_IDS` のみで判定する実装へ移行
-- [ ] 管理者の設定手順を `docs/` に追加
+- [x] 管理者の設定手順を `docs/` に追加
 
 2. service-role 利用箇所の棚卸し
 - [x] `createServiceRoleSupabaseClient` 利用箇所を一覧化
@@ -16,19 +16,19 @@
 - [x] 不要な service-role 利用を anon/RLS 経路へ戻す
 
 3. RLS/API ガード方針の定義
-- [ ] 「DB で必ず守る条件」を定義
-- [ ] 「API 層で先に弾く条件」を定義
-- [ ] 例外（Webhook, background job）の方針を記載
+- [x] 「DB で必ず守る条件」を定義
+- [x] 「API 層で先に弾く条件」を定義
+- [x] 例外（Webhook, background job）の方針を記載
 
 4. Webhook 検証の強化
-- [ ] 既存 token/resource 検証のテストを追加
+- [x] 既存 token/resource 検証のテストを追加
 - [x] replay 対策（message number の再利用拒否）を設計
 - [x] 失敗時の監査ログを最小情報で記録
 
 ## 完了条件
 - [x] 管理者判定が環境変数ベースに統一されている
 - [x] service-role の使用理由が全箇所で説明可能
-- [ ] RLS/API の責務がドキュメント化されている
+- [x] RLS/API の責務がドキュメント化されている
 
 ## service-role 利用棚卸し（2026-02-16）
 - `app/api/boards/route.ts`: `read-only admin`（管理者向け board 一覧取得）
@@ -40,3 +40,23 @@
 
 ## 備考
 - `app/api/e2e/ensure-user/route.ts` はテスト専用経路のため、本番無効化（`NODE_ENV` / `VERCEL_ENV`）と secret ヘッダ検証を必須条件とする。
+
+## 管理者設定手順
+1. `.env.local` / デプロイ環境に `ADMIN_USER_IDS` を設定する（UUID をカンマ区切り）。
+2. 固定メール判定は使わない。管理者昇格は `ADMIN_USER_IDS` のみを SSOT とする。
+3. 変更後は `GET /api/boards` の管理者挙動で確認する。
+
+## RLS/API 責務分担
+- DB (RLS) で守る:
+  - board/card/comment への最終アクセス制御
+  - `board_id` / `profile_id` 不整合書き込みの拒否
+- API で先に弾く:
+  - 未認証 (`UNAUTHENTICATED`)
+  - ロール不足 (`FORBIDDEN`)
+  - 不正 Origin (`INVALID_ORIGIN`)
+- 例外経路:
+  - Webhook: service-role + 独自署名/トークン検証で保護
+  - E2E API: 非本番 + `E2E_ENABLED=true` + secret header のみ許可
+
+## Webhook テスト範囲
+- `e2e/security-hardening.spec.ts` で `UNAUTHORIZED_WEBHOOK` を検証済み。
