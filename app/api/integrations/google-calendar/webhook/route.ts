@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   // Google sends headers only; body is usually empty. We just ack and log minimal info.
   const channelId = request.headers.get("x-goog-channel-id") ?? null;
+  const channelToken = request.headers.get("x-goog-channel-token") ?? null;
   const resourceId = request.headers.get("x-goog-resource-id") ?? null;
   const resourceState = request.headers.get("x-goog-resource-state") ?? null;
   const messageNumber = request.headers.get("x-goog-message-number") ?? null;
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (channelId) {
       const { data: state, error: stateError } = await supabase
         .from("google_calendar_sync_states")
-        .select("google_account_id, calendar_id")
+        .select("google_account_id, calendar_id, watch_channel_token, watch_resource_id")
         .eq("watch_channel_id", channelId)
         .maybeSingle();
 
@@ -31,10 +32,29 @@ export async function POST(request: NextRequest) {
       // 確認用に channelId と resourceId をログ出し（セキュア情報は含めない）
       console.log("[googleCalendar/webhook] incoming", {
         channelId,
+        hasChannelToken: Boolean(channelToken),
         resourceId,
         resourceState,
         messageNumber,
       });
+
+      // Reject spoofed callbacks: require channel token + resource id match.
+      if (
+        !state ||
+        !state.google_account_id ||
+        !state.watch_channel_token ||
+        channelToken !== state.watch_channel_token ||
+        (state.watch_resource_id && resourceId !== state.watch_resource_id)
+      ) {
+        console.warn("[googleCalendar/webhook] rejected callback due to token/resource mismatch", {
+          channelId,
+          hasState: Boolean(state),
+          hasStoredToken: Boolean(state?.watch_channel_token),
+          hasIncomingToken: Boolean(channelToken),
+          resourceId,
+        });
+        return NextResponse.json({ ok: false, error: "UNAUTHORIZED_WEBHOOK" }, { status: 401 });
+      }
 
       if (state?.google_account_id) {
         const { error: insertError } = await supabase.from("google_calendar_sync_logs").insert({

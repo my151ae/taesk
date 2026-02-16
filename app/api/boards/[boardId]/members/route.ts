@@ -1,6 +1,20 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
-import { BoardMember, MemberRole, ProfileSummary } from '@/lib/supabase';
+import { MemberRole, ProfileSummary } from '@/lib/supabase';
+
+async function getActorMembership(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  boardId: string,
+  userId: string
+) {
+  const { data: membership } = await supabase
+    .from('board_members')
+    .select('role')
+    .eq('board_id', boardId)
+    .eq('profile_id', userId)
+    .maybeSingle();
+  return membership;
+}
 
 // GET /api/boards/[boardId]/members - List members with optional search
 export async function GET(
@@ -17,6 +31,11 @@ export async function GET(
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const actorMembership = await getActorMembership(supabase, boardId, user.id);
+    if (!actorMembership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Build query
@@ -95,11 +114,20 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const actorMembership = await getActorMembership(supabase, boardId, user.id);
+    if (!actorMembership || !['owner', 'editor'].includes(actorMembership.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { profile_id, role = 'editor' } = body as { profile_id: string; role?: MemberRole };
 
     if (!profile_id) {
       return NextResponse.json({ error: 'profile_id is required' }, { status: 400 });
+    }
+
+    if (role === 'owner' && actorMembership.role !== 'owner') {
+      return NextResponse.json({ error: 'Only owner can assign owner role' }, { status: 403 });
     }
 
     // Insert new member
@@ -114,6 +142,9 @@ export async function POST(
       .single();
 
     if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json({ error: 'Member already exists' }, { status: 409 });
+      }
       console.error('Error adding board member:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

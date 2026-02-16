@@ -54,6 +54,7 @@ type GoogleCalendarSyncStateRow = {
   window_start: string | null;
   window_end: string | null;
   watch_channel_id: string | null;
+  watch_channel_token: string | null;
   watch_resource_id: string | null;
   watch_expiration: string | null;
   watch_status: string | null;
@@ -562,6 +563,7 @@ export async function startCalendarWatch(
   });
 
   const channelId = randomUUID();
+  const channelToken = randomUUID();
   const expiration = Date.now() + (options?.ttlMs ?? 86_400_000); // default 24h
 
   const res = await calendar.events.watch({
@@ -570,7 +572,7 @@ export async function startCalendarWatch(
       id: channelId,
       type: "web_hook",
       address,
-      token: account.id,
+      token: channelToken,
       params: {
         ttl: Math.floor((options?.ttlMs ?? 86_400_000) / 1000).toString(),
       },
@@ -584,6 +586,7 @@ export async function startCalendarWatch(
       google_account_id: account.id,
       calendar_id: calendarId,
       watch_channel_id: res.data.id ?? channelId,
+      watch_channel_token: channelToken,
       watch_resource_id: res.data.resourceId ?? null,
       watch_expiration: res.data.expiration ? new Date(Number(res.data.expiration)).toISOString() : new Date(expiration).toISOString(),
       watch_status: "active",
@@ -629,6 +632,7 @@ export async function stopCalendarWatch(
     .from("google_calendar_sync_states")
     .update({
       watch_channel_id: null,
+      watch_channel_token: null,
       watch_resource_id: null,
       watch_expiration: null,
       watch_status: "inactive",

@@ -56,6 +56,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (recipient_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Cannot create notifications for other users' },
+        { status: 403 }
+      );
+    }
+
     // Insert notification
     const { data: notification, error } = await supabase
       .from('notifications')

@@ -69,6 +69,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       const queryValue = rawInput.startsWith('@') ? rawInput.slice(1) : rawInput;
       params.set('query', queryValue);
     }
+    params.set('board_id', boardId);
 
     setInviting(true);
     try {
@@ -78,6 +79,10 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       if (!searchRes.ok) {
         if (searchRes.status === 404) {
           alert('一致するユーザーが見つかりませんでした。入力したメールアドレスまたはユーザー名を確認してください。');
+        } else if (searchRes.status === 403) {
+          alert('このボードではユーザー検索を実行できません。');
+        } else if (searchRes.status === 429) {
+          alert('検索リクエストが多すぎます。少し待ってから再試行してください。');
         } else {
           alert('ユーザー検索に失敗しました');
         }
