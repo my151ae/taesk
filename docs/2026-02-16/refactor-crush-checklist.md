@@ -86,9 +86,10 @@
 - [x] `npm run lint`
 - [x] `npm run build`
 - [x] `lsof -i :3000` で dev サーバー残骸が無いことを確認
-- [ ] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
-- [ ] `cat test-results/playwright-report.json | jq '.stats'`
+- [x] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
+- [x] `cat test-results/playwright-report.json | jq '.stats'`
 - [x] 必要に応じて chrome-devtools MCP でログ/スナップショットを採取
+  - 注記: 実行時に `global timeout (300s)` を付与して結果を回収。`21 passed / 61 did not run` のため、全量回帰判定は未完了。
 
 ## 完了判定
 - [x] 全 Phase の完了条件を満たす

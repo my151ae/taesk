@@ -146,6 +146,33 @@ export function useTimelineCardActions({
           if (!Number.isNaN(parsed.getTime())) normalizedDueDate = parsed.toISOString();
         }
         const normalizedContent = normalizeContent(savePayload.content);
+        const optimisticCard: Card = {
+          ...targetCard,
+          title: savePayload.title,
+          checked: Boolean(savePayload.checked),
+          content: normalizedContent,
+          excerpt: savePayload.excerpt ?? deriveExcerptFromContent(normalizedContent),
+          tags: savePayload.tags ?? targetCard.tags ?? [],
+          due_date: normalizedDueDate,
+          due_start: savePayload.due_start ?? null,
+          due_end: savePayload.due_end ?? null,
+          start_reminder_enabled: Boolean(savePayload.start_reminder_enabled),
+          start_reminder_minutes: savePayload.start_reminder_minutes ?? 0,
+          end_reminder_enabled: Boolean(savePayload.end_reminder_enabled),
+          end_reminder_minutes: savePayload.end_reminder_minutes ?? 0,
+          due_bucket: savePayload.due_bucket ?? null,
+          due_bucket_position: savePayload.due_bucket_position ?? null,
+          priority: savePayload.priority ?? targetCard.priority ?? 'medium',
+          duration: savePayload.duration ?? targetCard.duration ?? null,
+          slug: slugify(savePayload.title),
+        };
+
+        if (!isRestoreFromHistory && savePayload.assigneeTouched) {
+          optimisticCard.assignee_id = nextAssignee;
+          optimisticCard.assignee_ids = savePayload.assigneeIds?.length ? savePayload.assigneeIds : null;
+          optimisticCard.assigned_to = null;
+        }
+
         const payload: Record<string, unknown> = isRestoreFromHistory
           ? {
             content: normalizedContent,
@@ -179,6 +206,10 @@ export function useTimelineCardActions({
         requestId = ++saveRequestIdRef.current;
         const controller = new AbortController();
         saveAbortRef.current = controller;
+
+        // モーダルを閉じる前にカード表面へ先行反映し、体感遅延を抑える
+        setModalCardOverride(optimisticCard);
+        setData((prev) => (prev ? applyCardUpdate(prev, optimisticCard, "UPDATE") : prev));
 
         const response = await fetch(`/api/boards/${targetCard.board_id}/cards/${targetCard.id}`, {
           method: "PATCH",
@@ -235,11 +266,13 @@ export function useTimelineCardActions({
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         setCardModalError(error instanceof Error ? error.message : "Failed to save card");
+        // 楽観更新失敗時はサーバー状態へ戻す
+        void fetchTimeline(data?.startOffset);
       } finally {
         if (requestId === saveRequestIdRef.current) saveAbortRef.current = null;
       }
     },
-    [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast, postHistorySnapshot]
+    [modalCard, closeCardModal, setCardModalError, setModalCardOverride, setData, syncCardNowWithToast, postHistorySnapshot, fetchTimeline, data?.startOffset]
   );
 
   const retryHistorySave = useCallback(async () => {
