@@ -20,7 +20,10 @@ export async function unlockAudio(): Promise<boolean> {
 
     // Create AudioContext if not exists
     if (!audioContext) {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextCtor = window.AudioContext
+        || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) return false;
+      audioContext = new AudioContextCtor();
     }
 
     // Resume if suspended (autoplay policy)

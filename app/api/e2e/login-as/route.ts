@@ -125,7 +125,7 @@ function getErrorDetails(error: unknown) {
 export const POST = withErrorHandling(async (req: NextRequest) => {
   try {
     return await postLoginAs(req);
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof Error && e.message === 'E2E_NOT_FOUND') {
       return NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Not found' } },

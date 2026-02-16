@@ -37,11 +37,11 @@ export const useTimelineScrollSync = ({
   const scrollRestoreAttemptRef = useRef(0);
   const programmaticScrollRef = useRef(false);
 
-  const useDebounce = (callback: (...args: any[]) => void, delay: number) => {
+  const useDebounce = <TArgs extends unknown[]>(callback: (...args: TArgs) => void, delay: number) => {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     return useCallback(
-      (...args: any[]) => {
+      (...args: TArgs) => {
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }

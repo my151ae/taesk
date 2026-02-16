@@ -19,7 +19,7 @@ export interface FetchCommentsResult {
 }
 
 export interface CommentResult {
-  comment: CommentWithAuthor;
+  comment: CommentWithAuthor | null;
   error?: { code: string; message: string };
 }
 
@@ -76,7 +76,7 @@ export async function createComment(params: CreateCommentParams): Promise<Commen
       const errorData = await response.json().catch(() => ({}));
       console.error('Create comment failed:', errorData);
       return {
-        comment: null as any,
+        comment: null,
         error: errorData.error || { code: 'CREATE_ERROR', message: 'Failed to create comment' },
       };
     }
@@ -86,7 +86,7 @@ export async function createComment(params: CreateCommentParams): Promise<Commen
   } catch (error) {
     console.error('Error creating comment:', error);
     return {
-      comment: null as any,
+      comment: null,
       error: { code: 'NETWORK_ERROR', message: 'Network error while creating comment' },
     };
   }
@@ -107,7 +107,7 @@ export async function updateComment(params: UpdateCommentParams): Promise<Commen
       const errorData = await response.json().catch(() => ({}));
       console.error('Update comment failed:', errorData);
       return {
-        comment: null as any,
+        comment: null,
         error: errorData.error || { code: 'UPDATE_ERROR', message: 'Failed to update comment' },
       };
     }
@@ -117,7 +117,7 @@ export async function updateComment(params: UpdateCommentParams): Promise<Commen
   } catch (error) {
     console.error('Error updating comment:', error);
     return {
-      comment: null as any,
+      comment: null,
       error: { code: 'NETWORK_ERROR', message: 'Network error while updating comment' },
     };
   }

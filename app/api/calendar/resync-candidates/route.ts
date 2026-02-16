@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       .map(({ event, score }) => ({ ...event, score }));
 
     return NextResponse.json({ candidates: scored }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof GoogleCalendarNotConnectedError) {
       return NextResponse.json({ error: { code: "NOT_CONNECTED" } }, { status: 200 });
     }

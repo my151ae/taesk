@@ -39,8 +39,8 @@ export function useBoardMembers(currentBoardId: string | null) {
                     return;
                 }
 
-                const { members } = await response.json();
-                const boardMembers: BoardMember[] = members.map((m: any) => ({
+                const { members } = await response.json() as { members: Array<{ profile: ProfileSummary; role: BoardMember['role'] }> };
+                const boardMembers: BoardMember[] = members.map((m) => ({
                     profile: m.profile,
                     role: m.role
                 }));

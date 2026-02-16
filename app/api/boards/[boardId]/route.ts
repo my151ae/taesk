@@ -170,7 +170,7 @@ export async function PATCH(
             }
         }
 
-        const updates: Record<string, any> = {};
+        const updates: Record<string, unknown> = {};
         if (typeof payload.day_range === 'number') {
             updates.day_range = Math.max(1, Math.min(7, payload.day_range)); // Limit 1-7 days
         }

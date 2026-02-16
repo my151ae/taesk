@@ -24,7 +24,7 @@ export const normalizeContent = (value: unknown): JSONContent => {
         return EMPTY_DOC;
     }
     // If it's an object and has 'type': 'doc', it's Tiptap
-    if (value && typeof value === 'object' && 'type' in value && (value as any).type === 'doc') {
+    if (value && typeof value === 'object' && 'type' in value && (value as { type?: unknown }).type === 'doc') {
         return value as JSONContent;
     }
     // Default fallback
@@ -57,7 +57,7 @@ export const getTiptapPlainText = (content: JSONContent): string => {
             case 'listItem':
                 return '  '.repeat(level) + '- ' + joinChildren(node, (n) => formatNode(n, level + 1)).trim();
             case 'taskItem': {
-                const checked = (node as any).attrs?.checked;
+                const checked = (node as { attrs?: { checked?: boolean } }).attrs?.checked;
                 const prefix = checked ? '[x] ' : '[ ] ';
                 // taskItem の直下にある paragraph は現在のレベル、
                 // 入れ子の taskList は次のレベル (level + 1) として扱う
@@ -188,7 +188,7 @@ export const setTitleTask = (
     } else if (firstNode?.type === 'paragraph' && updates.text !== undefined) {
         // 構造化前でもタイトルの同期だけは通す
         const currentText = (firstNode.content ?? [])
-            .map((n: any) => n.text ?? '')
+            .map((n: JSONContent) => n.text ?? '')
             .join('');
         if (currentText !== updates.text) {
             firstNode.content = updates.text ? [{ type: 'text', text: updates.text }] : [];

@@ -38,6 +38,8 @@ import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigatio
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
 import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
 import { useBoardMembersStore, type BoardMember } from "@/app/(board)/_stores/board-members-store";
+import { findTimelineCardById } from "@/app/(board)/_utils/timeline-card-lookup";
+import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -80,18 +82,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [searchParams]);
 
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>(initialViewMode);
-
-
-
-  // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{
-    open: boolean;
-    cardId: string | null;
-    x: number;
-    y: number;
-  }>({ open: false, cardId: null, x: 0, y: 0 });
-  const lastContextMenuCardIdRef = useRef<string | null>(null);
-
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
     const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
@@ -100,36 +90,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, []);
 
-  const openContextMenuAt = useCallback((cardId: string, x: number, y: number) => {
-    lastContextMenuCardIdRef.current = cardId;
-    setContextMenu({
-      open: true,
-      cardId,
-      x,
-      y,
-    });
-  }, []);
-
-  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openContextMenuAt(cardId, e.clientX, e.clientY);
-  }, [openContextMenuAt]);
-
-  const handleCardContextMenuByKeyboard = useCallback((cardId: string, rect: DOMRect) => {
-    const x = rect.right + 8;
-    const y = rect.top;
-    openContextMenuAt(cardId, x, y);
-  }, [openContextMenuAt]);
-
-  const closeContextMenu = useCallback((reason: "action" | "dismiss") => {
-    setContextMenu(prev => ({ ...prev, open: false, cardId: null }));
-    if (reason === "action") {
-      requestAnimationFrame(() => {
-        focusCardById(lastContextMenuCardIdRef.current);
-      });
-    }
-  }, [focusCardById]);
+  const {
+    contextMenu,
+    handleCardContextMenu,
+    handleCardContextMenuByKeyboard,
+    closeContextMenu,
+  } = useTimelineContextMenu({ focusCardById });
 
   // Fetch profile and boards
   const fetchProfile = useCallback(async () => {
@@ -161,7 +127,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setDayWindowStart,
     updateUrl,
     initialRange: dayRange,
-  } = useTimelineUrlState({ initialDayRange: (initialBoard as any).day_range });
+  } = useTimelineUrlState({ initialDayRange: initialBoard.day_range });
 
   // Compute intended day range based on current viewMode state immediately
   // This avoids flashing when viewMode changes but URL has not yet updated
@@ -279,7 +245,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const googleCalendarLabel = useMemo(() => {
     if (!googleCalendarEvents?.length) return "primary";
     const ids = new Set<string>();
-    googleCalendarEvents.forEach((event: any) => {
+    googleCalendarEvents.forEach((event) => {
       if (event?.calendarId) ids.add(event.calendarId);
     });
     if (!ids.size) return "primary";
@@ -323,7 +289,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialBoardId: currentBoard.id,
     dataMode, setData, fetchTimeline, openCardModal, closeCardModal,
     modalCard, setModalCardOverride, setCardModalError, setErrorMessage,
-    bucketDayMap, googleCalendarEvents, refreshGoogleCalendar, data,
+    bucketDayMap, refreshGoogleCalendar, data,
   });
 
   const handleGoogleConnect = useCallback(() => {
@@ -352,7 +318,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleTimelineViewMount,
   } = useTimelineScrollSync({
     urlDate,
-    urlRange: (urlRange ?? (currentBoard as any).day_range ?? 2).toString(),
+    urlRange: (urlRange ?? currentBoard.day_range ?? 2).toString(),
     urlTime,
     data,
     activeDayIndex,
@@ -377,7 +343,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         return;
       }
       const { members } = await response.json();
-      const nextMembers: BoardMember[] = (members || []).map((m: any) => ({
+      const nextMembers: BoardMember[] = (members || []).map((m: { profile: BoardMember["profile"]; role: BoardMember["role"] }) => ({
         profile: m.profile,
         role: m.role,
       }));
@@ -766,22 +732,28 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
               {
                 label: "カードを開く",
                 onClick: () => {
-                  const card =
-                    data?.events?.find((e: any) => e.card_id === contextMenu.cardId) ||
-                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId);
+                  const targetId = contextMenu.cardId;
+                  if (!targetId) return;
+                  const match = findTimelineCardById(data, targetId);
+                  const card = match.event ?? match.bucketItem;
                   if (card?.short_id) openCardModal(card.short_id, "context-menu");
                 }
               },
               {
                 label: (
-                  (data?.events?.find((e: any) => e.card_id === contextMenu.cardId)?.checked ||
-                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId)?.checked)
+                  (() => {
+                    const targetId = contextMenu.cardId;
+                    if (!targetId) return false;
+                    const match = findTimelineCardById(data, targetId);
+                    return Boolean(match.event?.checked ?? match.bucketItem?.checked);
+                  })()
                     ? "未完了に戻す" : "完了にする"
                 ),
                 onClick: () => {
-                  const isChecked =
-                    data?.events?.find((e: any) => e.card_id === contextMenu.cardId)?.checked ||
-                    Object.values(data?.abBuckets || {}).flat().find((i: any) => (i as any).card_id === contextMenu.cardId)?.checked;
+                  const targetId = contextMenu.cardId;
+                  if (!targetId) return;
+                  const match = findTimelineCardById(data, targetId);
+                  const isChecked = Boolean(match.event?.checked ?? match.bucketItem?.checked);
                   handleToggleCardChecked(contextMenu.cardId!, !isChecked);
                 }
               },

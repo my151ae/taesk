@@ -66,6 +66,48 @@ type GoogleCalendarSyncStateRow = {
   last_poll_started_at: string | null;
 };
 
+type CalendarSyncRow = {
+  id: string;
+  card_id: string | null;
+  google_event_id: string | null;
+  last_google_event_id: string | null;
+  calendar_id: string;
+  google_account_id: string;
+  etag: string | null;
+  status: string | null;
+  last_synced_at: string | null;
+};
+
+type CachedGoogleEventRow = {
+  google_event_id: string;
+  summary: string | null;
+  start_utc: string;
+  end_utc: string;
+  is_all_day: boolean | null;
+  calendar_id: string | null;
+  html_link: string | null;
+  status: string | null;
+  display_tz: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  location: string | null;
+  attendees: Record<string, unknown>[] | null;
+  conference_data: Record<string, unknown> | null;
+  etag: string | null;
+  description: string | null;
+};
+
+type GoogleApiErrorShape = {
+  code?: number;
+  response?: { status?: number };
+  message?: string;
+};
+
+function toGoogleApiError(error: unknown): GoogleApiErrorShape {
+  if (!error || typeof error !== "object") return {};
+  return error as GoogleApiErrorShape;
+}
+
 export function hasCalendarWritePermission(scope: string): boolean {
   return scope.includes("calendar.events") || scope.includes("https://www.googleapis.com/auth/calendar") || scope.includes("https://www.googleapis.com/auth/calendar.events");
 }
@@ -263,8 +305,12 @@ function mapGoogleEvent(item: calendar_v3.Schema$Event, calendarId: string): Nor
   const title = item.summary ?? "Untitled event";
 
   const privateProps = item.extendedProperties?.private ?? {};
-  const taeskCardId = typeof privateProps === "object" ? (privateProps as any).taeskCardId ?? (privateProps as any).taeskCardID ?? null : null;
-  const taeskUpdatedAt = typeof privateProps === "object" ? (privateProps as any).taeskUpdatedAt ?? null : null;
+  const taeskCardId = typeof privateProps === "object"
+    ? privateProps.taeskCardId ?? privateProps.taeskCardID ?? null
+    : null;
+  const taeskUpdatedAt = typeof privateProps === "object"
+    ? privateProps.taeskUpdatedAt ?? null
+    : null;
 
   return {
     id,
@@ -405,7 +451,7 @@ async function pruneCacheWindow(
   }
 }
 
-function rowToGoogleCalendarEvent(row: any): GoogleCalendarEvent {
+function rowToGoogleCalendarEvent(row: CachedGoogleEventRow): GoogleCalendarEvent {
   return {
     id: row.google_event_id,
     title: row.summary ?? "Untitled event",
@@ -578,7 +624,7 @@ export async function startCalendarWatch(
       },
       expiration: expiration.toString(),
     },
-  }) as any;
+  });
 
   await supabase
     .from("google_calendar_sync_states")
@@ -834,8 +880,9 @@ export async function syncGoogleCalendarToTaesk(
   if (syncState?.sync_token) {
     try {
       events = await fetchWithSyncToken(calendar, supabase, account.id, targetCalendarId, syncState.sync_token);
-    } catch (err: any) {
-      const status = err?.code || err?.response?.status;
+    } catch (err) {
+      const parsed = toGoogleApiError(err);
+      const status = parsed.code || parsed.response?.status;
       if (status === 410) {
         await clearSyncToken(supabase, account.id, targetCalendarId);
       } else {
@@ -887,10 +934,11 @@ async function applyGoogleEventsToTaeskCards(
   }
 
   const cardMap = new Map((cards ?? []).map((card) => [card.id as string, card]));
-  const syncMap = new Map<string, any>();
+  const syncMap = new Map<string, CalendarSyncRow>();
   (syncRows || []).forEach((row) => {
-    if (row.google_event_id) syncMap.set(row.google_event_id, row);
-    if (row.last_google_event_id) syncMap.set(row.last_google_event_id, row);
+    const typedRow = row as CalendarSyncRow;
+    if (typedRow.google_event_id) syncMap.set(typedRow.google_event_id, typedRow);
+    if (typedRow.last_google_event_id) syncMap.set(typedRow.last_google_event_id, typedRow);
   });
 
   const updatedCardIds: string[] = [];
@@ -1062,8 +1110,9 @@ export async function listEventsForRange(
   if (hasSyncToken && syncState?.sync_token) {
     try {
       deltaEvents = await fetchWithSyncToken(calendar, supabase, account.id, calendarId, syncState.sync_token);
-    } catch (err: any) {
-      const status = err?.code || err?.response?.status;
+    } catch (err) {
+      const parsed = toGoogleApiError(err);
+      const status = parsed.code || parsed.response?.status;
       if (status === 410) {
         await clearSyncToken(supabase, account.id, calendarId);
         // fall through to full fetch below

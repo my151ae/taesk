@@ -80,7 +80,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             return {
                 id: eventCard.card_id,
                 title: eventCard.title,
-                content: normalizeContent((eventCard as any).content),
+                content: normalizeContent(eventCard.content),
                 excerpt: eventCard.excerpt ?? null,
                 checklist: normalizeChecklist(eventCard.checklist ?? EMPTY_CHECKLIST),
                 tags: eventCard.tags,
@@ -118,7 +118,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                 return {
                     id: bucketItem.card_id,
                     title: bucketItem.title,
-                    content: normalizeContent((bucketItem as any).content),
+                    content: normalizeContent(bucketItem.content),
                     excerpt: bucketItem.excerpt ?? null,
                     checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
                     tags: bucketItem.tags,
@@ -273,13 +273,13 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                 const { members } = await response.json();
                 if (cancelled) return;
 
-                const normalized = members.map((member: { profile: ProfileSummary; role: any }) => ({
+                const normalized: Array<{ profile: ProfileSummary; role: "owner" | "editor" | "commenter" | "viewer" }> = members.map((member: { profile: ProfileSummary; role: "owner" | "editor" | "commenter" | "viewer" }) => ({
                     profile: member.profile,
                     role: member.role,
                 }));
 
                 setStoredMembers(boardId, normalized);
-                setModalProfiles(normalized.map((member: { profile: ProfileSummary; role: any }) => member.profile));
+                setModalProfiles(normalized.map((member) => member.profile));
             } catch (error) {
                 if (!cancelled) {
                     console.warn('[timeline] error loading board members', error);

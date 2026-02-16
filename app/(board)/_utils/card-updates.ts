@@ -47,7 +47,7 @@ export function applyCardUpdate(
         return { ...prev, events: nextEvents, abBuckets: nextBuckets };
     }
 
-    const checklist = normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST);
+    const checklist = normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST);
     const localDay = toLocalDay(card.due_date ?? null);
     const hasTime = Boolean(card.due_start && card.due_end);
 
@@ -74,7 +74,7 @@ export function applyCardUpdate(
             end_reminder_minutes: card.end_reminder_minutes,
             durationMinutes,
             title: card.title,
-            content: (card as any).content ?? null,
+            content: card.content ?? null,
             excerpt: card.excerpt ?? null,
             tags: card.tags ?? [],
             priority: card.priority,
@@ -122,7 +122,7 @@ export function applyCardUpdate(
         const newItem: TimelineBucketItem = {
             card_id: card.id,
             title: card.title,
-            content: (card as any).content ?? null,
+            content: card.content ?? null,
             excerpt: card.excerpt ?? null,
             due_date: localDay,
             due_start: card.due_start,

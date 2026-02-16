@@ -25,8 +25,8 @@ const defaultTimezone =
     : 'UTC';
 
 const supportedTimezones: string[] =
-  typeof Intl !== 'undefined' && typeof (Intl as any).supportedValuesOf === 'function'
-    ? (Intl as any).supportedValuesOf('timeZone')
+  typeof Intl !== 'undefined' && typeof (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf === 'function'
+    ? (Intl as unknown as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone')
     : [defaultTimezone];
 
 export default function NotificationSettings() {
@@ -268,7 +268,7 @@ export default function NotificationSettings() {
     setStatusMessage(null);
 
     try {
-      const automated = typeof navigator !== 'undefined' && (navigator as any).webdriver;
+      const automated = typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { webdriver?: boolean }).webdriver);
       const success = automated
         ? true
         : await Promise.race([

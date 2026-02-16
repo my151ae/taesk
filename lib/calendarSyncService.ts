@@ -9,6 +9,19 @@ import {
 } from "@/lib/googleCalendarServer";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
+type GoogleApiErrorShape = {
+    code?: number;
+    response?: {
+        status?: number;
+        data?: {
+            error?: {
+                errors?: Array<{ reason?: string }>;
+            };
+        };
+    };
+    errors?: Array<{ reason?: string }>;
+    message?: string;
+};
 
 export type CalendarSyncEventParams = {
     summary: string;
@@ -114,6 +127,11 @@ function removeTaeskLinkFromDescription(description: string): string {
         .trim();
 }
 
+function toGoogleApiError(error: unknown): GoogleApiErrorShape {
+    if (!error || typeof error !== "object") return {};
+    return error as GoogleApiErrorShape;
+}
+
 export function buildCardLink(card: {
     id: string;
     short_id?: string | null;
@@ -169,13 +187,14 @@ export function buildGoogleDateTimeRange(card: { due_date: string | null; due_st
 // Sync Logic
 // -----------------------------------------------------------------------------
 
-async function handleGoogleError(error: any) {
-    const code = error.code || error.response?.status;
+async function handleGoogleError(error: unknown) {
+    const parsed = toGoogleApiError(error);
+    const code = parsed.code || parsed.response?.status;
     if (code === 401) throw new GoogleCalendarNotConnectedError("Token expired");
     if (code === 403) {
         // Check if it's a rate limit or permission issue
-        const errors = error.errors || error.response?.data?.error?.errors || [];
-        const isRateLimit = errors.some((e: any) => e.reason === "rateLimitExceeded");
+        const errors = parsed.errors || parsed.response?.data?.error?.errors || [];
+        const isRateLimit = errors.some((entry) => entry.reason === "rateLimitExceeded");
         if (isRateLimit) throw new GoogleRateLimitError();
         throw new GooglePermissionError();
     }
@@ -273,11 +292,12 @@ export async function syncCardToCalendar(
 
                     await persistSyncRecord(googleEventId, patchRes.data.etag ?? null);
                     return { action: syncRecord ? "updated" : "linked", eventId: googleEventId };
-                } catch (err: any) {
-                    if (err.code === 404 || err.code === 410) {
+                } catch (err) {
+                    const parsed = toGoogleApiError(err);
+                    if (parsed.code === 404 || parsed.code === 410) {
                         googleEventId = null;
                         etag = null;
-                    } else if (err.code === 412) {
+                    } else if (parsed.code === 412) {
                         try {
                             const latest = await calendar.events.get({ calendarId, eventId: googleEventId });
                             const retry = await calendar.events.patch({
@@ -293,7 +313,7 @@ export async function syncCardToCalendar(
                             etag = null;
                         }
                     } else {
-                        throw err;
+                        throw parsed;
                     }
                 }
             }
@@ -346,8 +366,9 @@ export async function syncCardToCalendar(
                 await persistSyncRecord(googleEventId, patchRes.data.etag ?? null);
                 return { action: "updated", eventId: googleEventId };
 
-            } catch (err: any) {
-                if (err.code === 404) {
+            } catch (err) {
+                const parsed = toGoogleApiError(err);
+                if (parsed.code === 404) {
                     // Event deleted on Google side. Recover?
                     // Strategy: Clear google_event_id and retry creation (recursive or next tick)
                     // For now, let's mark as unlinked or deleted in DB?
@@ -363,7 +384,7 @@ export async function syncCardToCalendar(
                     // simplified: throw specific error to trigger retry logic up stack or just recurse
                     return syncCardToCalendar(supabase, userId, cardId, eventParams);
                 }
-                if (err.code === 412) {
+                if (parsed.code === 412) {
                     // ETag mismatch: fetch latest etag then retry once without If-Match
                     try {
                         const latest = await calendar.events.get({ calendarId, eventId: googleEventId });
@@ -387,7 +408,7 @@ export async function syncCardToCalendar(
                         throw retryErr;
                     }
                 }
-                throw err; // 403, 412, etc.
+                throw parsed; // 403, 412, etc.
             }
         }
 
@@ -414,8 +435,9 @@ export async function deleteCardFromCalendar(
             calendarId: syncRecord.calendar_id,
             eventId: syncRecord.google_event_id,
         });
-    } catch (err: any) {
-        if (err.code === 404 || err.code === 410) {
+    } catch (err) {
+        const parsed = toGoogleApiError(err);
+        if (parsed.code === 404 || parsed.code === 410) {
             // Already gone, verify success
         } else {
             // Log but maybe swallow if we want to ensure local DB deletion proceeds?
@@ -463,10 +485,11 @@ export async function unlinkCardFromCalendar(
             },
         }, eventRes.data.etag ? { headers: { "If-Match": eventRes.data.etag } } : undefined);
 
-    } catch (err: any) {
+    } catch (err) {
+        const parsed = toGoogleApiError(err);
         // Ignore permission errors (e.g. not organizer) or if event is gone
-        if (err.code === 403 || err.code === 404 || err.code === 410) {
-            console.warn(`[unlinkCardFromCalendar] Could not cleanup Google Event (code ${err.code}):`, err.message);
+        if (parsed.code === 403 || parsed.code === 404 || parsed.code === 410) {
+            console.warn(`[unlinkCardFromCalendar] Could not cleanup Google Event (code ${parsed.code}):`, parsed.message);
             return;
         }
         // Log other errors but don't block unlinking

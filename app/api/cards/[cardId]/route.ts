@@ -93,8 +93,8 @@ export async function GET(
     const normalizedCard = card
       ? {
         ...card,
-        checklist: normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST),
-        content: (card as any).content ?? null,
+        checklist: normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST),
+        content: card.content ?? null,
       }
       : null;
 

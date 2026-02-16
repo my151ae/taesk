@@ -28,12 +28,12 @@ export interface CommentNotificationEvent {
 interface CreateNotificationParams {
   type: NotificationType;
   recipientId: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   dedupeKey?: string;
 }
 
 interface CreateNotificationResult {
-  data: any;
+  data: unknown;
   isDuplicate: boolean;
   skipped: boolean;
 }
@@ -199,21 +199,24 @@ export async function resolveCommentRecipients(
  */
 export function generateNotificationMessage(
   type: NotificationType,
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 ): string {
+  const asString = (value: unknown, fallback: string) =>
+    typeof value === 'string' && value.trim().length > 0 ? value : fallback;
+
   switch (type) {
     case 'comment_created':
-      return `New comment on card: ${payload.card_title || 'Untitled'}`;
+      return `New comment on card: ${asString(payload.card_title, 'Untitled')}`;
     case 'comment_replied':
-      return `${payload.sender_name || 'Someone'} replied to your comment`;
+      return `${asString(payload.sender_name, 'Someone')} replied to your comment`;
     case 'mention':
-      return `${payload.sender_name || 'Someone'} mentioned you in a comment`;
+      return `${asString(payload.sender_name, 'Someone')} mentioned you in a comment`;
     case 'assignee_changed':
-      return `You were assigned to card: ${payload.card_title || 'Untitled'}`;
+      return `You were assigned to card: ${asString(payload.card_title, 'Untitled')}`;
     case 'due_soon':
-      return `Card due soon: ${payload.card_title || 'Untitled'}`;
+      return `Card due soon: ${asString(payload.card_title, 'Untitled')}`;
     case 'test':
-      return payload.message || 'Test notification';
+      return asString(payload.message, 'Test notification');
     default:
       return 'New notification';
   }

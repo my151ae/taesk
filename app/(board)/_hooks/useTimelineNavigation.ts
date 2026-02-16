@@ -3,14 +3,15 @@
 import { useCallback } from "react";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { pixelsToMinutes } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
 
 interface UseTimelineNavigationProps {
-    data: any;
+    data: TimelineResponse | null;
     status: string;
     dayRange: number;
     activeDayIndex: number;
     setActiveDayIndex: (index: number) => void;
-    fetchTimeline: (startOffset: number) => Promise<any>;
+    fetchTimeline: (startOffset: number) => Promise<TimelineResponse | null>;
     updateUrl: (date: string, range: number, time?: number) => void;
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
     router: AppRouterInstance;

@@ -322,7 +322,7 @@ export default function TimelineHeader({
                                         <>
                                             <select
                                                 value={calendarPreset}
-                                                onChange={(e) => setCalendarPreset(e.target.value as any)}
+                                                onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}
                                                 className="w-full text-xs rounded-md border border-slate-200 px-2 py-1"
                                             >
                                                 <option value="visible">Visible Range</option>

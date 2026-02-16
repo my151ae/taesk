@@ -14,7 +14,7 @@ import { buildContentFromTitle, deriveExcerptFromContent, ensureTitleBlock, norm
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().max(255),
-  checklist: z.any().optional(),
+  checklist: z.unknown().optional(),
   content: z.record(z.string(), z.unknown()).or(z.array(z.unknown())).optional(),
   excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
@@ -197,7 +197,7 @@ export async function POST(
       board_id: boardId,
       id: parsed.data.id,
       title: derivedTitle,
-      checklist: clampChecklist(parsed.data.checklist ?? EMPTY_CHECKLIST),
+      checklist: clampChecklist((parsed.data.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof clampChecklist>[0]),
       content: normalizedContent,
       excerpt: normalizedExcerpt,
       list_id: listId,

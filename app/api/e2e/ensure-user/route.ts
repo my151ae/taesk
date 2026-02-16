@@ -3,6 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { assertE2EEnabled } from '../guards';
 import { errorResponse, ApiErrorCode } from '@/lib/server/api-error';
 
+type AdminUser = { id: string; email?: string | null };
+type ListUsersResult = { users?: AdminUser[] };
+type CreateUserResult = { user?: AdminUser | null };
+
 function isRetryableAuthError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const name = error.name.toLowerCase();
@@ -27,16 +31,23 @@ async function withAuthRetry<T>(operation: () => Promise<T>, retries = 2): Promi
 }
 
 async function findUserByEmail(
-  supabaseAdmin: any,
+  supabaseAdmin: unknown,
   email: string
 ) {
+  const adminApi = supabaseAdmin as {
+    auth: {
+      admin: {
+        listUsers: (params: { page: number; perPage: number }) => Promise<{ data: ListUsersResult; error: unknown }>;
+      };
+    };
+  };
   const normalizedEmail = email.trim().toLowerCase();
   const perPage = 200;
   const maxPages = 25;
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const { data, error } = await withAuthRetry<any>(() =>
-      supabaseAdmin.auth.admin.listUsers({
+    const { data, error } = await withAuthRetry<{ data: ListUsersResult; error: unknown }>(() =>
+      adminApi.auth.admin.listUsers({
         page,
         perPage,
       })
@@ -46,7 +57,7 @@ async function findUserByEmail(
       throw error;
     }
 
-    const found = data.users?.find((u: any) => (u.email ?? '').toLowerCase() === normalizedEmail);
+    const found = data.users?.find((u) => (u.email ?? '').toLowerCase() === normalizedEmail);
     if (found) {
       return found;
     }
@@ -120,7 +131,7 @@ export async function POST(req: NextRequest) {
     if (existingUser) {
       console.log('[E2E] existing user found, syncing credentials and ensuring board membership');
 
-      const { error: updateError } = await withAuthRetry<any>(() =>
+      const { error: updateError } = await withAuthRetry<{ data: unknown; error: unknown }>(() =>
         supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
           password,
           email_confirm: true,
@@ -159,7 +170,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create user with email confirmation pre-approved
-    const { data, error } = await withAuthRetry<any>(() =>
+    const { data, error } = await withAuthRetry<{ data: CreateUserResult; error: unknown }>(() =>
       supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -196,7 +207,7 @@ export async function POST(req: NextRequest) {
       { created: true, user: { id: data.user.id, email: data.user.email } },
       { status: 201 }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e instanceof Error && e.message === 'E2E_NOT_FOUND') {
       return NextResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Not found' } },
@@ -204,7 +215,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const status = typeof e?.status === 'number' ? e.status : null;
+    const status = typeof e === 'object' && e !== null && 'status' in e && typeof (e as { status?: unknown }).status === 'number'
+      ? (e as { status: number }).status
+      : null;
     if (status === 400 || status === 401 || status === 403) {
       console.error('[E2E] ensure-user authentication failed');
       return errorResponse(ApiErrorCode.UNAUTHENTICATED, 'Unauthorized', 401);

@@ -139,7 +139,7 @@ export async function GET(
     }
 
     // Transform data
-    const transformedComments: CommentWithAuthor[] = (comments || []).map((comment: any) => ({
+    const transformedComments: CommentWithAuthor[] = (comments || []).map((comment: CommentWithAuthor) => ({
       id: comment.id,
       card_id: comment.card_id,
       author_id: comment.author_id,

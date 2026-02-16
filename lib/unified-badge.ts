@@ -48,7 +48,10 @@ function isStandaloneDisplayMode(): boolean {
   }
 
   const matchMedia = window.matchMedia?.('(display-mode: standalone)');
-  const standalone = Boolean(matchMedia?.matches || (window.navigator as any)?.standalone);
+  const standalone = Boolean(
+    matchMedia?.matches
+    || (window.navigator as Navigator & { standalone?: boolean }).standalone
+  );
   cachedStandaloneMode = standalone;
   return standalone;
 }

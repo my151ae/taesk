@@ -14,6 +14,16 @@ export const runtime = "nodejs";
 
 const MAX_RANGE_DAYS = 130;
 
+type GoogleApiError = {
+  code?: string;
+  response?: { status?: number };
+};
+
+const toGoogleApiError = (error: unknown): GoogleApiError => {
+  if (!error || typeof error !== "object") return {};
+  return error as GoogleApiError;
+};
+
 const parseDateParam = (value: string | null) => {
   if (!value) return null;
   const date = new Date(value);
@@ -45,7 +55,7 @@ export async function GET(request: NextRequest) {
       const { account } = await getGoogleCalendarClientForUser(user.id, { supabase });
       const canWrite = hasCalendarWritePermission(account.scope);
       return NextResponse.json({ connected: true, canWrite, events: [] }, { status: 200 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof GoogleCalendarNotConnectedError) {
         return NextResponse.json({ connected: false, events: [] }, { status: 200 });
       }
@@ -111,13 +121,14 @@ export async function GET(request: NextRequest) {
   try {
     const { events, canWrite } = await listEventsForRange(user.id, start, end, { supabase, origin: request.nextUrl.origin });
     return NextResponse.json({ connected: true, canWrite, events: applyLinkedFilter(events, linkedEventIds) }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof GoogleCalendarNotConnectedError) {
       return NextResponse.json({ connected: false, events: [] }, { status: 200 });
     }
 
-    const status = error?.response?.status;
-    const errorCode = error?.code;
+    const parsed = toGoogleApiError(error);
+    const status = parsed.response?.status;
+    const errorCode = parsed.code;
 
     if (status === 401 || status === 403 || errorCode === "invalid_grant") {
       await disconnectGoogleCalendarAccount(user.id, supabase);

@@ -47,7 +47,7 @@ export async function getCardByShortId(shortId: string): Promise<Card | null> {
   return {
     ...card,
     checklist: normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST),
-    content: normalizeContent((card as any).content),
+    content: normalizeContent(card.content),
   };
 }
 

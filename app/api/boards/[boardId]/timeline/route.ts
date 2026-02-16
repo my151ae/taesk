@@ -8,6 +8,32 @@ const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const TIMELINE_DAY_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
 
+type TimelineCardRow = {
+  id: string;
+  title: string;
+  checklist: unknown;
+  content: unknown;
+  excerpt: string | null;
+  tags: string[] | null;
+  due_date: string | null;
+  due_start: string | null;
+  due_end: string | null;
+  start_reminder_enabled?: boolean;
+  start_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  end_reminder_enabled?: boolean;
+  end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  due_bucket: 'a' | 'b' | null;
+  due_bucket_position: number | null;
+  priority: 'low' | 'medium' | 'high' | null;
+  checked: boolean;
+  assignee_id: string | null;
+  assignee_ids: string[] | null;
+  assigned_to: string | null;
+  duration: number | null;
+  short_id: string | null;
+  slug: string | null;
+};
+
 const formatDateJst = (base: Date, offsetDays = 0): string => {
   const utcMs = base.getTime();
   const jstMs = utcMs + JST_OFFSET_MS + offsetDays * MS_PER_DAY;
@@ -87,7 +113,7 @@ export async function GET(
     'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
-  let cards = null;
+  let cards: TimelineCardRow[] | null = null;
   let fetchError = null;
 
   const initial = await supabase
@@ -110,7 +136,7 @@ export async function GET(
     fetchError = fallback.error;
     cards =
       fallback.data
-        ? (fallback.data as any[]).map((card) => ({
+        ? (fallback.data as unknown as TimelineCardRow[]).map((card) => ({
           ...card,
           checklist: EMPTY_CHECKLIST,
           content: null,
@@ -143,7 +169,7 @@ export async function GET(
   }, {} as Record<string, TimelineBucketItem[]>);
 
   cards?.forEach((card) => {
-    const checklist = normalizeChecklist((card as any).checklist ?? EMPTY_CHECKLIST);
+    const checklist = normalizeChecklist((card.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof normalizeChecklist>[0]);
     const dateOnly = toJstDate(card.due_date);
     const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
 
@@ -165,7 +191,7 @@ export async function GET(
         end_reminder_minutes: card.end_reminder_minutes ?? 0,
         durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
         title: card.title,
-        content: (card as any).content ?? null,
+        content: card.content ?? null,
         excerpt: card.excerpt ?? null,
         tags: card.tags ?? [],
         priority: card.priority,
@@ -192,7 +218,7 @@ export async function GET(
       abBuckets[key].push({
         card_id: card.id,
         title: card.title,
-        content: (card as any).content ?? null,
+        content: card.content ?? null,
         excerpt: card.excerpt ?? null,
         due_date: dateOnly,
         due_start: card.due_start,

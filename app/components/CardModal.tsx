@@ -18,6 +18,7 @@ import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
 import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
 import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
 import CardModalSidebar from "@/app/components/card-modal/CardModalSidebar";
+import type { CardModalSavePayload, ReminderMinuteOption } from "@/app/components/card-modal/types";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -25,36 +26,12 @@ const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
     { value: 'b', label: 'B (if possible)' },
 ];
 const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
-type ReminderMinuteOption = typeof REMINDER_MINUTE_OPTIONS[number];
 
 interface CardModalProps {
     card: Card;
     boards: Board[];
     profiles: ProfileSummary[];
-    onSave: (payload: {
-        id: string;
-        title: string;
-        content: JSONContent | Record<string, any> | any[];
-        excerpt: string;
-        tags?: string[];
-        due_date?: string | null;
-        priority?: Priority;
-        assigneeIds?: string[];
-        assigneeTouched?: boolean;
-        due_start?: string | null;
-        due_end?: string | null;
-        start_reminder_enabled?: boolean;
-        start_reminder_minutes?: ReminderMinuteOption;
-        end_reminder_enabled?: boolean;
-        end_reminder_minutes?: ReminderMinuteOption;
-        due_bucket?: DueBucket | null;
-        due_bucket_position?: number | null;
-        duration?: number;
-        checked?: boolean;
-        isAutoSave?: boolean;
-        restoreFromHistory?: boolean;
-        historySourceId?: string;
-    }) => void;
+    onSave: (payload: CardModalSavePayload) => void;
     onDelete: (id: string) => void;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
     onClose: () => void;
@@ -816,7 +793,9 @@ export function CardModal({
     // Google Calendar Integration
     const { connected: googleConnected, canWrite: googleCanWrite } = useGoogleCalendar();
     // Handle calendar_sync possibly being an array or object due to Supabase join
-    const syncData = (card as any).calendar_sync;
+    const syncData = (card as Card & {
+        calendar_sync?: { status?: "active" | "unlinked" | "deleted"; last_google_event_id?: string | null } | Array<{ status?: "active" | "unlinked" | "deleted"; last_google_event_id?: string | null }>;
+    }).calendar_sync;
     const syncStatusFromCard = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
     const lastGoogleEventIdFromCard = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
 
@@ -1162,7 +1141,7 @@ export function CardModal({
                                             <TiptapEditor
                                                 key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                 containerRef={editorContainerRef}
-                                                initialContent={(isHistoryPreviewing ? previewHistoryContent : content) as any}
+                                                initialContent={isHistoryPreviewing ? previewHistoryContent : content}
                                                 editable={!isHistoryPreviewing}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;

@@ -13,8 +13,8 @@ import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, b
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
-  checklist: z.any().optional(),
-  content: z.any().optional(),
+  checklist: z.unknown().optional(),
+  content: z.unknown().optional(),
   excerpt: z.string().max(500).optional(),
   list_id: z.string().uuid().optional(),
   position: z.number().int().min(0).optional(),
@@ -253,8 +253,8 @@ export async function PATCH(
         const description = buildGoogleEventDescription({
           id: ensuredCard.id,
           short_id: ensuredCard.short_id,
-          slug: (ensuredCard as any).slug ?? null,
-          id_short: (ensuredCard as any).id_short ?? null,
+          slug: ensuredCard.slug ?? null,
+          id_short: ensuredCard.id_short ?? null,
           title: ensuredCard.title,
           description: ensuredCard.excerpt ?? "",
         }, origin);

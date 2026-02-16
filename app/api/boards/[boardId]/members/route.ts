@@ -8,6 +8,14 @@ import {
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
 
+type BoardMemberRow = {
+  board_id: string;
+  profile_id: string;
+  role: MemberRole;
+  created_at: string;
+  profiles: ProfileSummary | ProfileSummary[] | null;
+};
+
 async function getActorMembership(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   boardId: string,
@@ -65,11 +73,11 @@ export async function GET(
     }
 
     // Filter by search query if provided
-    let results = members || [];
+    let results: BoardMemberRow[] = (members as BoardMemberRow[] | null) ?? [];
     if (query && query.trim()) {
       const lowerQuery = query.toLowerCase();
-      results = results.filter((member: any) => {
-        const profile = member.profiles;
+      results = results.filter((member) => {
+        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
         if (!profile) return false;
         const username = profile.username?.toLowerCase() ?? '';
         const displayName = profile.display_name?.toLowerCase() ?? '';
@@ -85,13 +93,18 @@ export async function GET(
     }
 
     // Transform to include profile data
-    const transformedMembers = results.map((member: any) => ({
+    const transformedMembers = results
+      .map((member) => {
+        const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+        return {
       board_id: member.board_id,
       profile_id: member.profile_id,
       role: member.role,
       created_at: member.created_at,
-      profile: member.profiles as ProfileSummary,
-    }));
+      profile: profile ?? null,
+    };
+      })
+      .filter((member): member is { board_id: string; profile_id: string; role: MemberRole; created_at: string; profile: ProfileSummary } => Boolean(member.profile));
 
     return NextResponse.json({ members: transformedMembers });
   } catch (error) {

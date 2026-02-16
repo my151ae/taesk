@@ -59,7 +59,7 @@ export function useRealtimeBoard(
 
         const channel = supabase.channel(`board:${currentBoardId}`);
 
-        const listHandler = (payload: any) => {
+        const listHandler = (payload: RealtimePostgresChangesPayload<List>) => {
             if (realtimeState.token !== token) return;
             console.log('List change detected:', payload);
 
@@ -87,7 +87,7 @@ export function useRealtimeBoard(
             }
         };
 
-        const cardHandler = (payload: any) => {
+        const cardHandler = (payload: RealtimePostgresChangesPayload<Card>) => {
             if (realtimeState.token !== token) return;
             console.log('[Realtime] Card change detected:', {
                 eventType: payload.eventType,
@@ -105,8 +105,8 @@ export function useRealtimeBoard(
                     setBoardData((prev) => {
                         const newCard = {
                             ...(payload.new as Card),
-                            checklist: normalizeChecklist((payload.new as any).checklist ?? EMPTY_CHECKLIST),
-                            content: normalizeContent((payload.new as any).content),
+                            checklist: normalizeChecklist(payload.new.checklist ?? EMPTY_CHECKLIST),
+                            content: normalizeContent(payload.new.content),
                         } as Card;
                         const idx = prev.cards.findIndex(card => card.id === newCard.id);
 
@@ -140,7 +140,7 @@ export function useRealtimeBoard(
         channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cards', filter: cardFilter }, cardHandler);
 
         if (process.env.NEXT_PUBLIC_DEBUG_REALTIME === 'true') {
-            const bindings = (channel as any).bindings?.postgres_changes;
+            const bindings = (channel as unknown as { bindings?: { postgres_changes?: unknown[] } }).bindings?.postgres_changes;
             console.log('[Realtime][debug] postgres_changes bindings registered:', {
                 boardId: currentBoardId,
                 count: Array.isArray(bindings) ? bindings.length : 0,

@@ -5,6 +5,7 @@ import type { JSONContent } from "@tiptap/react";
 import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { getTiptapPlainText, normalizeContent } from "@/lib/tiptap";
 import { flattenChecklistText } from "@/lib/checklist";
+import type { Checklist } from "@/lib/checklist";
 import type { TimelineBucketItem, TimelineResponse, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
 
 export function useTimelineFiltering(data: TimelineResponse | null) {
@@ -28,9 +29,9 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
             title: string;
             tags: string[];
             priority?: string | null;
-            content?: JSONContent | Record<string, any> | null;
+            content?: JSONContent | Record<string, unknown> | null;
             excerpt?: string | null;
-            checklist?: unknown;
+            checklist?: Checklist | null;
         }) => {
             // Priority
             if (selectedPriority !== 'all' && item.priority !== selectedPriority) return false;
@@ -48,7 +49,7 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
                 if (item.content) {
                     contentText = getTiptapPlainText(normalizeContent(item.content));
                 }
-                const checklistText = flattenChecklistText((item as any).checklist ?? null);
+                const checklistText = flattenChecklistText(item.checklist ?? null);
                 const source = `${item.title ?? ''} ${(item.tags ?? []).join(' ')} ${item.excerpt ?? ''} ${contentText} ${checklistText}`.toLowerCase();
                 if (!source.includes(query)) return false;
             }
