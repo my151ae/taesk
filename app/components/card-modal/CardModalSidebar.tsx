@@ -73,7 +73,7 @@ export default function CardModalSidebar({
   return (
     <div
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
-      className="border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 min-h-0 w-full sm:w-[var(--sidebar-width)]"
+      className="flex-1 min-h-0 border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 w-full sm:flex-none sm:w-[var(--sidebar-width)]"
     >
       <div className="p-6 space-y-5 border-b border-slate-100 dark:border-gray-700/50 bg-slate-50/30 dark:bg-gray-800/20">
         {/* Tags Section */}

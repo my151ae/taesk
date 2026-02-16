@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
@@ -418,6 +418,9 @@ export default function MobileTimelineView({
   boardMembers,
   onOpenShareDialog,
 }: MobileTimelineViewProps) {
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const swipeLockedRef = useRef(false);
 
   useEffect(() => {
     onMount?.();
@@ -523,6 +526,39 @@ export default function MobileTimelineView({
 
   if (!activeDay) return null;
 
+  const handleSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (activeDrag || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+    swipeLockedRef.current = false;
+  };
+
+  const handleSwipeMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (activeDrag || swipeLockedRef.current || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const startX = touchStartXRef.current;
+    const startY = touchStartYRef.current;
+    if (!touch || startX == null || startY == null) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    if (Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      swipeLockedRef.current = true;
+      if (dx > 0) {
+        onPrevDay();
+      } else {
+        onNextDay();
+      }
+    }
+  };
+
+  const handleSwipeEnd = () => {
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+    swipeLockedRef.current = false;
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -541,7 +577,11 @@ export default function MobileTimelineView({
       }}
     >
       <div
-        className="relative flex h-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
+        className="relative flex h-full w-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
+        onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
+        onTouchEnd={handleSwipeEnd}
+        onTouchCancel={handleSwipeEnd}
       >
         {(status === "loading" || !days.length) && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">

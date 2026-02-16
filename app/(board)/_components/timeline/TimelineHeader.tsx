@@ -105,10 +105,12 @@ export default function TimelineHeader({
     const [newBoardName, setNewBoardName] = useState('');
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showMobileActions, setShowMobileActions] = useState(false);
     const [showDayRangeDropdown, setShowDayRangeDropdown] = useState(false);
     const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
     const filtersDropdownRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
+    const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
 
@@ -169,6 +171,7 @@ export default function TimelineHeader({
     useClickOutside(filtersDropdownRef, () => setShowFilters(false));
     useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
     useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
+    useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
 
     const getRealtimeStatusColor = () => {
         switch (realtimeStatus) {
@@ -190,8 +193,8 @@ export default function TimelineHeader({
 
     return (
         <>
-            <header className="flex items-center justify-between gap-2 md:gap-3 py-2 px-4 border-b border-slate-200">
-                <div className="flex items-center gap-2 md:gap-3">
+            <header className="flex items-center gap-2 border-b border-slate-200 px-2 py-2 md:gap-3 md:px-4">
+                <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
                     {/* Board Switch */}
                     <div ref={boardMenuRef} className="relative shrink-0">
                         <button
@@ -347,8 +350,129 @@ export default function TimelineHeader({
                     </div>
                 </div>
 
-                {/* Spacer to push right items */}
-                <div className="flex-1" />
+                <div className="ml-auto flex items-center gap-2 md:hidden">
+                    <button
+                        onClick={onTodayClick}
+                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                    >
+                        Today
+                    </button>
+                    <div ref={mobileActionsRef} className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setShowMobileActions((prev) => !prev)}
+                        aria-expanded={showMobileActions}
+                        aria-label="ヘッダーメニュー"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                    </button>
+                    {showMobileActions && (
+                        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-slate-100 bg-white p-2 shadow-lg ring-1 ring-black/5">
+                            <div className="space-y-1">
+                                <button
+                                    onClick={() => {
+                                        onShortcutsClick();
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <span>Shortcuts</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setViewMode(viewMode === 'timeline' ? 'list' : 'timeline');
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <span>{viewMode === 'timeline' ? 'Listに切替' : 'Timelineに切替'}</span>
+                                </button>
+                                <div className="rounded-lg px-3 py-2 text-sm text-slate-700">
+                                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Range</p>
+                                    <select
+                                        value={dayRange}
+                                        onChange={(event) => {
+                                            onDayRangeChange(Number(event.target.value));
+                                            setShowMobileActions(false);
+                                        }}
+                                        className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                    >
+                                        {viewMode === 'list'
+                                            ? [30, 60, 90, 120].map((days) => (
+                                                <option key={days} value={days}>
+                                                    {days / 30} month{days / 30 > 1 ? 's' : ''}
+                                                </option>
+                                            ))
+                                            : [1, 2, 3, 4, 5, 6, 7].map((days) => (
+                                                <option key={days} value={days}>
+                                                    {days} day{days > 1 ? 's' : ''}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowFilters((prev) => !prev);
+                                        setShowMobileActions(false);
+                                    }}
+                                    className={clsx(
+                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
+                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
+                                    )}
+                                >
+                                    <span>Filters</span>
+                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowProfileSettings(true);
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Profile Settings
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowNotificationSettings(true);
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Notifications
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowBoardSettings(true);
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Board Settings
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            await signOut();
+                                            window.location.href = '/login';
+                                        } catch (error) {
+                                            console.error('Failed to sign out', error);
+                                        }
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                >
+                                    Sign out
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                </div>
+
+                <div className="hidden items-center gap-2 md:flex">
 
                 {/* Shortcuts Button */}
                 <button
@@ -636,6 +760,7 @@ export default function TimelineHeader({
                             </div>
                         </div>
                     )}
+                </div>
                 </div>
             </header>
         </>

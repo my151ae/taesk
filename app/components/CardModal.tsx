@@ -965,7 +965,7 @@ export function CardModal({
     }, [previewHistoryContent, selectedHistoryId, handleSave]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:items-center sm:p-4" role="presentation">
             <div
                 aria-hidden="true"
                 className="absolute inset-0 bg-black/50"
@@ -975,7 +975,7 @@ export function CardModal({
             <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="relative z-10 max-h-[95vh] sm:h-[90vh] sm:max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
+                className="relative z-10 h-full max-h-[100dvh] sm:h-[90vh] sm:max-h-[90vh] w-full max-w-6xl rounded-none sm:rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="modal-title"
