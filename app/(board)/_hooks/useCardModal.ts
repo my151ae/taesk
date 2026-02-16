@@ -30,6 +30,8 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
     const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
 
     const cardModalShortIdRef = useRef<string | null>(null);
+    const cardModalStatusRef = useRef<CardModalStatus>('idle');
+    const hasFallbackCardRef = useRef(false);
     const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
     const loadComments = useCommentsStore(state => state.loadComments);
 
@@ -158,6 +160,14 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         [modalCardOverride, modalCardFromData]
     );
 
+    useEffect(() => {
+        hasFallbackCardRef.current = Boolean(modalCardOverride ?? modalCardFromData);
+    }, [modalCardOverride, modalCardFromData]);
+
+    useEffect(() => {
+        cardModalStatusRef.current = cardModalStatus;
+    }, [cardModalStatus]);
+
     // 1. Initial Data Sync: Keep local state in sync with timeline data if available
     useEffect(() => {
         if (targetShortId && modalCardFromData) {
@@ -181,9 +191,11 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
             else return;
         }
 
-        // REMOVED: Blocking guard clause that caused the reload issue
-        // The previous check (cardModalShortIdRef.current === targetShortId && status === loading/ready)
-        // prevented re-fetching when React Strict Mode cancelled the first attempt but left the status as 'loading'.
+        // 同一カードで既に full data が取れている場合は再取得しない
+        // (保存後の timeline setData による不要な loading 再表示を防ぐ)
+        if (cardModalShortIdRef.current === targetShortId && cardModalStatusRef.current === 'ready') {
+            return;
+        }
 
         cardModalShortIdRef.current = targetShortId;
 
@@ -191,7 +203,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
 
         const loadCard = async () => {
             console.log('[useCardModal] fetching full data', targetShortId);
-            setCardModalStatus('loading');
+            setCardModalStatus(hasFallbackCardRef.current ? 'ready' : 'loading');
             setCardModalError(null);
 
             try {
@@ -218,7 +230,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                     loadComments(nextCard.id);
                 } else {
                     setCardModalError('Card not found');
-                    if (modalCardFromData) {
+                    if (hasFallbackCardRef.current) {
                         setCardModalStatus('ready');
                     } else {
                         setCardModalStatus('error');
@@ -233,7 +245,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
                 console.error('[useCardModal] fetch failed', error);
                 const message = error instanceof Error ? error.message : 'Failed to load card';
                 setCardModalError(message);
-                if (modalCardFromData) {
+                if (hasFallbackCardRef.current) {
                     setCardModalStatus('ready');
                 } else {
                     setCardModalStatus('error');
@@ -246,7 +258,7 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isModalClosing, activeCardId, modalCardFromData, loadComments]);
+    }, [targetShortId, isModalClosing, activeCardId, loadComments]);
 
     // Load Board Members
     useEffect(() => {

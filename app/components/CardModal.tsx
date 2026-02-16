@@ -551,6 +551,7 @@ export function CardModal({
                 clearTimeout(autoSaveMaxTimeoutRef.current);
                 autoSaveMaxTimeoutRef.current = null;
             }
+            setIsDirty(false);
             handleSave(true);
         }, 2000);
         if (!autoSaveMaxTimeoutRef.current) {
@@ -559,6 +560,7 @@ export function CardModal({
                     clearTimeout(autoSaveTimeoutRef.current);
                 }
                 autoSaveMaxTimeoutRef.current = null;
+                setIsDirty(false);
                 handleSave(true);
             }, 15000);
         }
@@ -973,7 +975,7 @@ export function CardModal({
             <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="relative z-10 max-h-[95vh] sm:max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
+                className="relative z-10 max-h-[95vh] sm:h-[90vh] sm:max-h-[90vh] w-full max-w-6xl rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="modal-title"
