@@ -53,8 +53,6 @@ type CardModalHeaderProps = {
     onRequestClose: () => void;
     showSidebar: boolean;
     onToggleSidebar: () => void;
-    onOpenHistory: () => void;
-    historyActive: boolean;
 };
 
 export default function CardModalHeader({
@@ -92,13 +90,32 @@ export default function CardModalHeader({
     onRequestClose,
     showSidebar,
     onToggleSidebar,
-    onOpenHistory,
-    historyActive,
 }: CardModalHeaderProps) {
     return (
-        <div className="flex flex-col p-3 sm:p-4 pb-2 sm:pb-3 border-b border-slate-200 dark:border-gray-700">
+        <div className="relative flex flex-col p-3 sm:p-4 pb-2 sm:pb-3 border-b border-slate-200 dark:border-gray-700">
+            <div className="absolute right-3 top-3 sm:right-4 sm:top-4 z-10 flex items-center gap-1 sm:gap-2">
+                <button
+                    onClick={onToggleSidebar}
+                    className={clsx(
+                        "p-2 rounded-lg transition-all duration-200",
+                        showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/40 ring-1 ring-sky-200 dark:ring-sky-800" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
+                    )}
+                    title={showSidebar ? "Hide details" : "Show details"}
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </button>
+                <button
+                    onClick={onRequestClose}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Close modal"
+                >
+                    <span className="text-xl leading-none">✕</span>
+                </button>
+            </div>
             {/* Schedule Section in Header */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-6 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-6 text-sm pr-20 sm:pr-24">
                 <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest">Date</span>
                     <input
@@ -347,40 +364,6 @@ export default function CardModalHeader({
                         </div>
                     </div>
                 )}
-                <div className="flex items-center gap-1 sm:gap-2 ml-auto">
-                    <button
-                        onClick={onOpenHistory}
-                        className={clsx(
-                            "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
-                            historyActive
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                                : "text-slate-500 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                        )}
-                        title="履歴を表示"
-                    >
-                        履歴
-                    </button>
-                    <button
-                        onClick={onToggleSidebar}
-                        className={clsx(
-                            "p-2 rounded-lg transition-all duration-200",
-                            showSidebar ? "text-sky-500 bg-sky-50 dark:bg-sky-900/40 ring-1 ring-sky-200 dark:ring-sky-800" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
-                        )}
-                        title={showSidebar ? "Hide details" : "Show details"}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </button>
-                    <div className="w-px h-6 bg-slate-200 dark:bg-gray-700 mx-1 hidden sm:block" />
-                    <button
-                        onClick={onRequestClose}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-gray-200 flex items-center justify-center w-9 h-9 rounded-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
-                        aria-label="Close modal"
-                    >
-                        <span className="text-xl leading-none">✕</span>
-                    </button>
-                </div>
             </div>
         </div>
     );

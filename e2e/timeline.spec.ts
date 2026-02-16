@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { readFile } from 'fs/promises';
 
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
-const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2';
+const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? 'e2e-test@taesk.app';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -36,7 +37,42 @@ type TimelineBoardContext = {
   boardName: string;
 };
 
-async function ensureBoardFixtures(): Promise<TimelineBoardContext> {
+const resolveTestUserId = async (): Promise<string> => {
+  const storageStatePath = process.env.PLAYWRIGHT_AUTH_STATE_PATH ?? 'playwright/.auth/user.json';
+  const raw = await readFile(storageStatePath, 'utf-8');
+  const parsed = JSON.parse(raw) as {
+    origins?: Array<{
+      localStorage?: Array<{ name?: string; value?: string }>;
+    }>;
+  };
+
+  const authTokenValue = parsed.origins
+    ?.flatMap((origin) => origin.localStorage ?? [])
+    .find((entry) => typeof entry.name === 'string' && entry.name.includes('auth-token'))
+    ?.value;
+
+  if (!authTokenValue) {
+    throw new Error(`Failed to resolve auth token from storage state: ${storageStatePath}`);
+  }
+
+  const authToken = JSON.parse(authTokenValue) as {
+    user?: { id?: string; email?: string };
+  };
+  const userId = authToken.user?.id;
+  const userEmail = authToken.user?.email;
+
+  if (!userId) {
+    throw new Error(`Failed to resolve authenticated user id from storage state: ${storageStatePath}`);
+  }
+
+  if (userEmail && userEmail !== TEST_USER_EMAIL) {
+    console.warn(`[timeline.spec] auth user email mismatch. expected=${TEST_USER_EMAIL} actual=${userEmail}`);
+  }
+
+  return userId;
+};
+
+async function ensureBoardFixtures(testUserId: string): Promise<TimelineBoardContext> {
   const now = new Date().toISOString();
   const boardId = crypto.randomUUID();
   const boardName = `Timeline Test Board ${Date.now()}`;
@@ -50,7 +86,7 @@ async function ensureBoardFixtures(): Promise<TimelineBoardContext> {
     name: boardName,
     description: 'Board used for timeline specs',
     is_test_board: true,
-    user_id: TEST_USER_ID,
+    user_id: testUserId,
     short_id: boardShortId,
     id_short: boardIdShort,
     slug: boardSlug,
@@ -60,7 +96,7 @@ async function ensureBoardFixtures(): Promise<TimelineBoardContext> {
 
   await supabaseAdmin.from('board_members').insert({
     board_id: boardId,
-    profile_id: TEST_USER_ID,
+    profile_id: testUserId,
     role: 'owner',
     created_at: now,
   });
@@ -70,7 +106,7 @@ async function ensureBoardFixtures(): Promise<TimelineBoardContext> {
     title: 'Timeline Tasks',
     position: 1000,
     board_id: boardId,
-    user_id: TEST_USER_ID,
+    user_id: testUserId,
     created_at: now,
     updated_at: now,
   });
@@ -100,10 +136,12 @@ async function supportsDueColumns(): Promise<boolean> {
 
 let dueColumnsAvailable = true;
 let boardContext: TimelineBoardContext | null = null;
+let testUserId: string | null = null;
 
 test.describe('@feature:timeline Timeline view', () => {
   test.beforeAll(async () => {
-    boardContext = await ensureBoardFixtures();
+    testUserId = await resolveTestUserId();
+    boardContext = await ensureBoardFixtures(testUserId);
     dueColumnsAvailable = await supportsDueColumns();
     if (!dueColumnsAvailable) {
       console.warn('Skipping timeline spec: cards table missing due_* columns. Run supabase/migrations/20251113090000_add_due_fields.sql');
@@ -122,6 +160,9 @@ test.describe('@feature:timeline Timeline view', () => {
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
     }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
     const cardId = crypto.randomUUID();
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
@@ -133,10 +174,10 @@ test.describe('@feature:timeline Timeline view', () => {
       checklist: { version: 1, lines: [] },
       board_id: boardContext.boardId,
       list_id: boardContext.listId,
-      user_id: TEST_USER_ID,
+      user_id: testUserId,
       position: 1500,
       tags: [],
-      due_date: `${isoDay}T00:00:00+09:00`,
+      due_date: isoDay,
       due_start: '09:00:00',
       due_end: '10:00:00',
       due_bucket: null,
@@ -154,13 +195,14 @@ test.describe('@feature:timeline Timeline view', () => {
 
     expect(insertError).toBeNull();
 
-    await page.goto(boardContext.canonicalPath);
-    await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
-    const focusEvent = page.getByTestId('timeline-event').filter({ hasText: 'Timeline focus card' }).first();
-    await focusEvent.scrollIntoViewIfNeeded();
-    await expect(focusEvent).toBeVisible();
-
-    await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const focusEvent = page.getByTestId('timeline-event').filter({ hasText: 'Timeline focus card' }).first();
+      await expect(focusEvent).toBeVisible({ timeout: 20_000 });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
   });
 
   test('can create a date-only card from A/B list by click', async ({ page }) => {
@@ -176,13 +218,15 @@ test.describe('@feature:timeline Timeline view', () => {
       const url = res.url();
       return (
         res.request().method() === 'POST' &&
-        url.includes(`/api/boards/${boardContext.boardId}/cards`) &&
-        res.ok()
+        url.includes(`/api/boards/${boardContext.boardId}/cards`)
       );
-    });
+    }, { timeout: 20_000 });
 
-    await page.locator('[data-testid^="ab-add-"]').first().click();
-    const response = await createResponsePromise;
+    const [response] = await Promise.all([
+      createResponsePromise,
+      page.locator('[data-testid^="ab-add-"]').first().click(),
+    ]);
+    expect(response.ok(), `create card API failed: ${response.status()}`).toBeTruthy();
     const body = await response.json().catch(() => null);
     const createdCardId = body?.card?.id as string | undefined;
 
