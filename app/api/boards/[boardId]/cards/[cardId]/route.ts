@@ -139,7 +139,7 @@ export async function PATCH(
       // content から title/checked/excerpt を派生（生成列化）
       const extracted = extractTitleTask(normalizedPayload.content as Record<string, unknown>);
       normalizedPayload.title = extracted.text || (parsed.data.title ?? '');
-      normalizedPayload.checked = extracted.checked;
+      normalizedPayload.checked = parsed.data.checked ?? extracted.checked;
       normalizedPayload.excerpt = deriveExcerptFromContent(normalizedPayload.content as Record<string, unknown>);
     }
 

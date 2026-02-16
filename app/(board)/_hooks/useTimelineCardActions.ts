@@ -152,6 +152,7 @@ export function useTimelineCardActions({
           }
           : {
             title: savePayload.title,
+            checked: savePayload.checked,
             content: normalizedContent,
             excerpt: savePayload.excerpt ?? "",
             tags: savePayload.tags,

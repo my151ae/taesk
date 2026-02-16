@@ -124,6 +124,7 @@ export function CardModal({
     const previousLoadingRef = useRef<boolean | null>(null);
     const onCloseRef = useRef(onClose);
     const requestCloseRef = useRef<() => void>(() => { });
+    const dirtyRef = useRef(false);
     const memberButtonRef = useRef<HTMLButtonElement | null>(null);
     const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -484,6 +485,9 @@ export function CardModal({
         const nextChecked = extracted.checked;
         const nextExcerpt = deriveExcerptFromContent(correctedContent);
 
+        dirtyRef.current = false;
+        setIsDirty(false);
+
         if (!isAutoSave) {
             setEditorError(null);
         }
@@ -542,6 +546,7 @@ export function CardModal({
 
     const triggerAutoSave = useCallback(() => {
         if (isHistoryPreviewing) return;
+        dirtyRef.current = true;
         setIsDirty(true);
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
@@ -551,7 +556,6 @@ export function CardModal({
                 clearTimeout(autoSaveMaxTimeoutRef.current);
                 autoSaveMaxTimeoutRef.current = null;
             }
-            setIsDirty(false);
             handleSave(true);
         }, 2000);
         if (!autoSaveMaxTimeoutRef.current) {
@@ -560,7 +564,6 @@ export function CardModal({
                     clearTimeout(autoSaveTimeoutRef.current);
                 }
                 autoSaveMaxTimeoutRef.current = null;
-                setIsDirty(false);
                 handleSave(true);
             }, 15000);
         }
@@ -571,7 +574,7 @@ export function CardModal({
             cancelHistoryPreview();
             return;
         }
-        if (isDirty) {
+        if (isDirty || dirtyRef.current) {
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
             }
@@ -579,7 +582,9 @@ export function CardModal({
                 clearTimeout(autoSaveMaxTimeoutRef.current);
                 autoSaveMaxTimeoutRef.current = null;
             }
-            handleSave(false);
+            // 閉じる操作は待たずに反映し、保存は即時 autosave として送信する
+            handleSave(true);
+            onCloseRef.current();
             return;
         }
         onCloseRef.current();
