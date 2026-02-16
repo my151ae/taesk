@@ -104,7 +104,6 @@ export function CardModal({
     const editorContainerRef = useRef<HTMLDivElement>(null);
     const [assigneeTouched, setAssigneeTouched] = useState(false);
     const [targetBoardId, setTargetBoardId] = useState(card.board_id);
-    const [isDirty, setIsDirty] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
     const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history">("comments");
     const [historyItems, setHistoryItems] = useState<CardContentHistoryMeta[]>([]);
@@ -115,7 +114,6 @@ export function CardModal({
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [editorError, setEditorError] = useState<string | null>(null);
-    const [showDirtyDialog, setShowDirtyDialog] = useState(false);
     const lastTitleVisibilityRef = useRef<number | null>(null);
 
     const dialogRef = useRef<HTMLDivElement>(null);
@@ -124,7 +122,7 @@ export function CardModal({
     const previousLoadingRef = useRef<boolean | null>(null);
     const onCloseRef = useRef(onClose);
     const requestCloseRef = useRef<() => void>(() => { });
-    const dirtyRef = useRef(false);
+    const hasPendingChangesRef = useRef(false);
     const memberButtonRef = useRef<HTMLButtonElement | null>(null);
     const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -288,8 +286,7 @@ export function CardModal({
             setAssigneeTouched(false);
             setTargetBoardId(card.board_id);
             setEditorError(null);
-            setShowDirtyDialog(false);
-            setIsDirty(false);
+            hasPendingChangesRef.current = false;
             setActiveSidebarTab('comments');
             setHistoryItems([]);
             setHistoryError(null);
@@ -310,7 +307,7 @@ export function CardModal({
         const loadingNow = Boolean(isLoading);
         const wasLoading = previousLoadingRef.current;
         previousLoadingRef.current = loadingNow;
-        if (isDirty) return;
+        if (hasPendingChangesRef.current) return;
         if (loadingNow) return;
         if (hasAppliedInitialLoadRef.current) return;
         if (wasLoading !== true) return;
@@ -322,7 +319,7 @@ export function CardModal({
         setChecked(extracted.checked);
         setEditorError(null);
         hasAppliedInitialLoadRef.current = true;
-    }, [card.content, card.id, isDirty, isLoading]);
+    }, [card.content, card.id, isLoading]);
 
     // 保存後のリセット対応は 各ハンドラーと card prop の同期にて行う
     // (重い JSON.stringify 比較は行わない)
@@ -485,8 +482,7 @@ export function CardModal({
         const nextChecked = extracted.checked;
         const nextExcerpt = deriveExcerptFromContent(correctedContent);
 
-        dirtyRef.current = false;
-        setIsDirty(false);
+        hasPendingChangesRef.current = false;
 
         if (!isAutoSave) {
             setEditorError(null);
@@ -546,8 +542,7 @@ export function CardModal({
 
     const triggerAutoSave = useCallback(() => {
         if (isHistoryPreviewing) return;
-        dirtyRef.current = true;
-        setIsDirty(true);
+        hasPendingChangesRef.current = true;
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
         }
@@ -574,11 +569,7 @@ export function CardModal({
             cancelHistoryPreview();
             return;
         }
-        const hasHeaderDiff =
-            checked !== Boolean(card.checked) ||
-            title !== (card.title || "");
-
-        if (isDirty || dirtyRef.current || hasHeaderDiff) {
+        if (hasPendingChangesRef.current) {
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
             }
@@ -592,7 +583,7 @@ export function CardModal({
             return;
         }
         onCloseRef.current();
-    }, [isDirty, handleSave, isHistoryPreviewing, cancelHistoryPreview, checked, card.checked, title, card.title]);
+    }, [handleSave, isHistoryPreviewing, cancelHistoryPreview]);
 
     useEffect(() => {
         requestCloseRef.current = requestClose;
@@ -965,7 +956,7 @@ export function CardModal({
         setContent(previewHistoryContent);
         setTitle(extracted.text);
         setChecked(extracted.checked);
-        setIsDirty(false);
+        hasPendingChangesRef.current = false;
         handleSave(false, {
             restoreFromHistory: true,
             historySourceId: selectedHistoryId,
