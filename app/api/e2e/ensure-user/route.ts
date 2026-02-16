@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { assertE2EEnabled } from '../guards';
 
+async function findUserByEmail(
+  supabaseAdmin: any,
+  email: string
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const perPage = 200;
+  const maxPages = 25;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const found = data.users?.find((u: any) => (u.email ?? '').toLowerCase() === normalizedEmail);
+    if (found) {
+      return found;
+    }
+
+    if (!data.users || data.users.length < perPage) {
+      break;
+    }
+  }
+
+  return null;
+}
+
 /**
  * E2E Test User Creation Endpoint
  *
@@ -36,8 +67,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers.users?.find((u) => u.email === email);
+    const existingUser = await findUserByEmail(supabaseAdmin, email);
 
     const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 

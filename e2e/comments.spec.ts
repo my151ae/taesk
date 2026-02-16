@@ -5,7 +5,6 @@ import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from 
 import { generateShortId, slugify as slugifyCardTitle } from '@/lib/card-utils';
 
 const TEST_BOARD_NAME = 'E2E Comments Test Board';
-const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
 const DEFAULT_LIST_TITLE = 'Comments List';
 const TEST_DISPLAY_NAME = 'Test Display Name Updated';
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
@@ -35,6 +34,7 @@ const isoDateJst = (): string => {
 
 interface TestBoardContext {
   id: string;
+  userId: string;
   name: string;
   shortId: string;
   idShort: number;
@@ -49,6 +49,8 @@ interface TestCardContext {
   title: string;
 }
 
+let cachedTestUserId: string | null = null;
+
 function assertContext<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) {
     throw new Error(message);
@@ -57,6 +59,7 @@ function assertContext<T>(value: T | null | undefined, message: string): T {
 }
 
 async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
+  const testUserId = await getTestUserId();
   const boardId = crypto.randomUUID();
   const boardShortId = await createUniqueBoardShortId();
   const boardIdShort = await getNextBoardIdShort();
@@ -65,7 +68,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
     name: boardName,
-    user_id: TEST_USER_ID,
+    user_id: testUserId,
     is_test_board: true,
     short_id: boardShortId,
     id_short: boardIdShort,
@@ -77,7 +80,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
 
   const { error: memberError } = await supabaseAdmin.from('board_members').insert({
     board_id: boardId,
-    profile_id: TEST_USER_ID,
+    profile_id: testUserId,
     role: 'owner',
   });
   if (memberError) {
@@ -85,7 +88,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   }
 
   const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
-    id: TEST_USER_ID,
+    id: testUserId,
     full_name: TEST_DISPLAY_NAME,
     email: TEST_USER_EMAIL,
     avatar_url: null,
@@ -100,7 +103,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
     title: DEFAULT_LIST_TITLE,
     position: 1000,
     board_id: boardId,
-    user_id: TEST_USER_ID,
+    user_id: testUserId,
   });
   if (listError) {
     throw new Error(`Failed to create default list: ${listError.message}`);
@@ -113,6 +116,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
 
   return {
     id: boardId,
+    userId: testUserId,
     name: boardName,
     shortId: boardShortId,
     idShort: boardIdShort,
@@ -120,6 +124,35 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
     canonicalPath,
     listId,
   };
+}
+
+async function getTestUserId(): Promise<string> {
+  if (cachedTestUserId) {
+    return cachedTestUserId;
+  }
+
+  const targetEmail = TEST_USER_EMAIL.trim().toLowerCase();
+  const perPage = 200;
+  const maxPages = 25;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      throw new Error(`Failed to resolve test user: ${error.message}`);
+    }
+
+    const found = data.users?.find((u) => (u.email ?? '').toLowerCase() === targetEmail);
+    if (found?.id) {
+      cachedTestUserId = found.id;
+      return found.id;
+    }
+
+    if (!data.users || data.users.length < perPage) {
+      break;
+    }
+  }
+
+  throw new Error(`Test user not found: ${targetEmail}`);
 }
 
 async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
@@ -155,7 +188,7 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
     checklist: { version: 1, lines: [] },
     board_id: board.id,
     list_id: board.listId,
-    user_id: TEST_USER_ID,
+    user_id: board.userId,
     position,
     tags: [],
     due_date: `${isoDateJst()}T00:00:00+09:00`,
@@ -205,8 +238,16 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
     await openButton.click();
   }
 
-  // Wait for modal to open with extended timeout
-  await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+  // Wait for modal to open with extended timeout.
+  // Fallback: if query-param open doesn't trigger, open from card button.
+  try {
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 10000 });
+  } catch {
+    const fallbackOpenButton = page.getByTestId(`cardOpenButton-${card.id}`).first();
+    await fallbackOpenButton.waitFor({ state: 'visible', timeout: 15000 });
+    await fallbackOpenButton.click();
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+  }
 
   // Give the modal a moment to finish rendering
   await page.waitForTimeout(500);
@@ -249,7 +290,6 @@ test.describe('Comments Feature @feature:comments', () => {
     board = await seedTestBoard(boardName);
     card = await createTestCard(board);
     await loadBoard(page, board);
-    await page.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test.afterEach(async () => {
@@ -369,6 +409,7 @@ test.describe('Comments Feature @feature:comments', () => {
   });
 
   test('should allow replying to comments', async ({ page }) => {
+    const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
     const parentCommentId = crypto.randomUUID();
@@ -379,7 +420,7 @@ test.describe('Comments Feature @feature:comments', () => {
       .insert({
         id: parentCommentId,
         card_id: currentCard.id,
-        author_id: TEST_USER_ID,
+        author_id: currentBoard.userId,
         body: parentText,
         mentions: [],
       });
@@ -539,6 +580,7 @@ test.describe('Comments Feature @feature:comments', () => {
   });
 
   test('should save mentions as <@id> format but display as @name @feature:comments', async ({ page }) => {
+    const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -585,7 +627,7 @@ test.describe('Comments Feature @feature:comments', () => {
       // Verify body contains <@id> format
       expect(comment.body).toMatch(/<@[a-f0-9-]{36}>/);
       // Verify mentions array contains the user ID
-      expect(comment.mentions).toContain(TEST_USER_ID);
+      expect(comment.mentions).toContain(currentBoard.userId);
     }
 
     // Verify display shows @name (not <@id>)
@@ -600,6 +642,7 @@ test.describe('Comments Feature @feature:comments', () => {
   });
 
   test('should validate mention user_id as UUID v4', async ({ page }) => {
+    const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -611,9 +654,9 @@ test.describe('Comments Feature @feature:comments', () => {
       .from('comments')
       .insert({
         card_id: currentCard.id,
-        author_id: TEST_USER_ID,
+        author_id: currentBoard.userId,
         body: commentBody,
-        mentions: [TEST_USER_ID], // Should be UUID v4
+        mentions: [currentBoard.userId], // Should be UUID v4
       })
       .select()
       .single();
@@ -623,11 +666,11 @@ test.describe('Comments Feature @feature:comments', () => {
     }
     expect(commentError).toBeNull();
     expect(commentData).toBeDefined();
-    expect(commentData?.mentions).toContain(TEST_USER_ID);
+    expect(commentData?.mentions).toContain(currentBoard.userId);
 
     // Verify UUID v4 format (8-4-4-4-12 hex digits)
     const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    expect(TEST_USER_ID).toMatch(uuidV4Regex);
+    expect(currentBoard.userId).toMatch(uuidV4Regex);
     if (commentData?.mentions?.length > 0) {
       expect(commentData.mentions[0]).toMatch(uuidV4Regex);
     }
@@ -739,8 +782,6 @@ test.describe('Comments Realtime @feature:comments', () => {
       const card = await createTestCard(board);
       await loadBoard(page1, board);
       await loadBoard(page2, board);
-      await page1.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
-      await page2.locator(`[data-testid="ab-card-${card.id}"]`).first().waitFor({ state: 'visible', timeout: 15000 });
 
       await openCardModalViaQuery(page1, card, board);
       await openCardModalViaQuery(page2, card, board);

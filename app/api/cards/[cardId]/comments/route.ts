@@ -25,10 +25,17 @@ async function assertCardMemberAccess(
   supabase: SupabaseClient,
   cardId: string,
   userId: string
-): Promise<string> {
+): Promise<{
+  boardId: string;
+  cardMeta: {
+    title: string | null;
+    short_id: string | null;
+    slug: string | null;
+  };
+}> {
   const { data: card, error: cardError } = await supabase
     .from('cards')
-    .select('board_id')
+    .select('board_id, title, short_id, slug')
     .eq('id', cardId)
     .maybeSingle();
 
@@ -55,7 +62,14 @@ async function assertCardMemberAccess(
     throw new Error('FORBIDDEN');
   }
 
-  return card.board_id;
+  return {
+    boardId: card.board_id,
+    cardMeta: {
+      title: card.title ?? null,
+      short_id: card.short_id ?? null,
+      slug: card.slug ?? null,
+    },
+  };
 }
 
 // GET /api/cards/[cardId]/comments - List comments for a card
@@ -166,8 +180,11 @@ export async function POST(
     }
 
     let boardId: string;
+    let cardMeta: { title: string | null; short_id: string | null; slug: string | null } | null = null;
     try {
-      boardId = await assertCardMemberAccess(supabase, cardId, user.id);
+      const access = await assertCardMemberAccess(supabase, cardId, user.id);
+      boardId = access.boardId;
+      cardMeta = access.cardMeta;
     } catch (accessError) {
       const reason = accessError instanceof Error ? accessError.message : 'UNKNOWN';
       if (reason === 'CARD_NOT_FOUND') {
@@ -315,13 +332,6 @@ export async function POST(
       );
     }
 
-    // Get card's board_id for notifications
-    const { data: cardData } = await supabase
-      .from('cards')
-      .select('board_id, title, short_id, slug')
-      .eq('id', cardId)
-      .single();
-
     // Get sender name
     const { data: senderProfile } = await supabase
       .from('profiles')
@@ -363,7 +373,7 @@ export async function POST(
     }
 
     // Create notifications
-    if (cardData) {
+    if (cardMeta) {
       try {
         const mentionRecipients =
           parent_id && replyToAuthorId
@@ -381,8 +391,8 @@ export async function POST(
               senderId: user.id,
               recipientIds: mentionRecipients,
               commentBody: notificationBody,
-              cardShortId: cardData.short_id,
-              cardSlug: cardData.slug,
+              cardShortId: cardMeta.short_id,
+              cardSlug: cardMeta.slug,
             },
             senderName
           );
@@ -396,21 +406,21 @@ export async function POST(
           const payload = {
             comment_id: newComment.id,
             card_id: cardId,
-            card_short_id: cardData.short_id ?? null,
-            card_slug: cardData.slug ?? null,
+            card_short_id: cardMeta.short_id ?? null,
+            card_slug: cardMeta.slug ?? null,
             board_id: boardId,
             sender_id: user.id,
             sender_name: senderName,
-            card_title: cardData.title || 'Untitled',
+            card_title: cardMeta.title || 'Untitled',
             comment_body: notificationBody,
             message: preview
               ? `${generateNotificationMessage('comment_replied', {
                   sender_name: senderName,
-                  card_title: cardData.title,
+                  card_title: cardMeta.title,
                 })}: ${preview}`
               : generateNotificationMessage('comment_replied', {
                   sender_name: senderName,
-                  card_title: cardData.title,
+                  card_title: cardMeta.title,
                 }),
           };
 
