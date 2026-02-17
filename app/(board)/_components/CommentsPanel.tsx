@@ -243,6 +243,20 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
   }, [cardId, loadComments]);
 
   useEffect(() => {
+    if (!featureFlags.comments || !cardId) return;
+
+    const intervalId = window.setInterval(() => {
+      loadComments(cardId, true).catch((error) => {
+        console.warn('[comments] polling refresh failed', error);
+      });
+    }, 5000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [cardId, loadComments]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleFocusMentions = () => {

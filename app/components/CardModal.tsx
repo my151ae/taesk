@@ -129,6 +129,7 @@ export function CardModal({
     // Debounce and max-wait for auto-save
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
 
     const filteredProfiles = useMemo(() => {
         const query = memberSearch.trim().toLowerCase();
@@ -540,9 +541,12 @@ export function CardModal({
             onMoveToBoard,
     ]);
 
-    const triggerAutoSave = useCallback(() => {
+    const triggerAutoSave = useCallback((contentOverride?: JSONContent) => {
         if (isHistoryPreviewing) return;
         hasPendingChangesRef.current = true;
+        if (contentOverride) {
+            pendingAutoSaveContentRef.current = contentOverride;
+        }
         if (autoSaveTimeoutRef.current) {
             clearTimeout(autoSaveTimeoutRef.current);
         }
@@ -551,7 +555,9 @@ export function CardModal({
                 clearTimeout(autoSaveMaxTimeoutRef.current);
                 autoSaveMaxTimeoutRef.current = null;
             }
-            handleSave(true);
+            const latestContent = pendingAutoSaveContentRef.current ?? undefined;
+            pendingAutoSaveContentRef.current = null;
+            handleSave(true, { contentOverride: latestContent });
         }, 2000);
         if (!autoSaveMaxTimeoutRef.current) {
             autoSaveMaxTimeoutRef.current = setTimeout(() => {
@@ -559,7 +565,9 @@ export function CardModal({
                     clearTimeout(autoSaveTimeoutRef.current);
                 }
                 autoSaveMaxTimeoutRef.current = null;
-                handleSave(true);
+                const latestContent = pendingAutoSaveContentRef.current ?? undefined;
+                pendingAutoSaveContentRef.current = null;
+                handleSave(true, { contentOverride: latestContent });
             }, 15000);
         }
     }, [handleSave, isHistoryPreviewing]);
@@ -578,7 +586,9 @@ export function CardModal({
                 autoSaveMaxTimeoutRef.current = null;
             }
             // 閉じる操作は待たずに反映し、保存は即時 autosave として送信する
-            handleSave(true);
+            const latestContent = pendingAutoSaveContentRef.current ?? undefined;
+            pendingAutoSaveContentRef.current = null;
+            handleSave(true, { contentOverride: latestContent });
             onCloseRef.current();
             return;
         }
@@ -1065,7 +1075,7 @@ export function CardModal({
                                             if (changed) {
                                                 setContent(newContent);
                                             }
-                                            triggerAutoSave();
+                                            triggerAutoSave(newContent);
                                         }}
                                         className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
                                     />
@@ -1081,7 +1091,7 @@ export function CardModal({
                                             if (changed) {
                                                 setContent(newContent);
                                             }
-                                            triggerAutoSave();
+                                            triggerAutoSave(newContent);
                                         }}
                                         onBlur={() => {
                                             if (isHistoryPreviewing) return;
@@ -1150,7 +1160,7 @@ export function CardModal({
                                                     if (newChecked !== checked) {
                                                         setChecked(newChecked);
                                                     }
-                                                    triggerAutoSave();
+                                                    triggerAutoSave(val);
                                                     if (editorError) {
                                                         setEditorError(null);
                                                     }

@@ -155,23 +155,35 @@ export default function TiptapEditor({
                     let taskDepth = 0;
 
                     for (let d = $pos.depth; d > 0; d--) {
-                        if (state.doc.nodeAt($pos.before(d))?.type.name === 'taskItem') {
+                        if ($pos.node(d)?.type.name === 'taskItem') {
                             isInsideTask = true;
                             taskDepth = d;
                             break;
                         }
                     }
 
-                    if (isInsideTask && bodyLines.length > 0) {
-                        console.log('[Tiptap] multiline paste in list detected, escaping list for body lines');
+                    const taskListDepth = taskDepth > 0 ? taskDepth - 1 : 0;
+                    const isFirstTaskInTaskList =
+                        isInsideTask &&
+                        taskListDepth > 0 &&
+                        $pos.node(taskListDepth).type.name === 'taskList' &&
+                        $pos.index(taskListDepth) === 0;
+                    const isTitleTask =
+                        isFirstTaskInTaskList &&
+                        taskListDepth === 1 &&
+                        $pos.index(0) === 0;
+
+                    if (isTitleTask && bodyLines.length > 0) {
+                        console.log('[Tiptap] multiline paste in title task detected, escaping body lines out of title taskList');
 
                         // 1行目を現在位置へ挿入（選択範囲を置換）
                         tr = tr.insertText(firstLine, selection.from, selection.to);
 
-                        // 2行目以降は現在の taskItem を抜けてその直後に挿入
+                        // 2行目以降は「タイトル taskItem 直後」ではなく
+                        // 先頭 taskList の直後（本文）へ挿入する
                         // 1行目挿入後の selection.to から解決し直すと安全
                         const $newPos = tr.doc.resolve(tr.mapping.map(selection.to));
-                        const insertPos = $newPos.after(taskDepth);
+                        const insertPos = $newPos.after(taskListDepth);
 
                         const newParagraphs = bodyLines.map(line =>
                             schema.nodes.paragraph.create({}, line ? schema.text(line) : [])
@@ -179,6 +191,10 @@ export default function TiptapEditor({
 
                         tr = tr.insert(insertPos, newParagraphs);
                         dispatch(tr);
+                        // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
+                        if (onChange) {
+                            onChange(tr.doc.toJSON() as JSONContent);
+                        }
                         return true;
                     }
 

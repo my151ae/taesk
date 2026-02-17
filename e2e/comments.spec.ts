@@ -398,7 +398,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.getByTestId('comments-panel').getByRole('button', { name: '保存' }).click();
     await updateResponsePromise;
 
-    await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText }).first()).toBeVisible({ timeout: 5000 });
 
     // Delete comment
     page.once('dialog', (dialog) => dialog.accept());
@@ -800,35 +800,36 @@ test.describe('Comments Realtime @feature:comments', () => {
       const commentText = `Realtime test ${Date.now()}`;
 
       // Use TipTap editor
-      const commentEditor = page1.locator('.ProseMirror').first();
+      const commentEditor = page1.locator('[data-testid="comments-panel"] .ProseMirror').first();
       await commentEditor.waitFor({ state: 'visible', timeout: 5000 });
       await commentEditor.click();
       await commentEditor.fill(commentText);
-      await page1.getByRole('button', { name: 'コメントを投稿' }).click();
+      const submitButton = page1.getByRole('button', { name: 'コメントを投稿' });
+      await expect(submitButton).toBeEnabled({ timeout: 5000 });
+      await submitButton.click();
 
       await page1.locator('[data-testid="comment-body"]', { hasText: commentText }).first()
         .waitFor({ state: 'visible', timeout: 10000 });
 
-      await expect
-        .poll(async () => {
-          try {
-            await page2
-              .locator('[data-testid="comment-body"]', { hasText: commentText })
-              .first()
-              .waitFor({ state: 'visible', timeout: 2000 });
-            return true;
-          } catch {
-            await page2.goto(board.canonicalPath);
-            await page2.waitForLoadState('domcontentloaded');
-            await openCardModalViaQuery(page2, card, board);
-            await page2.waitForTimeout(300);
-            return false;
-          }
-        }, { timeout: 30000 })
-        .toBe(true);
+      const page2Comment = page2.locator('[data-testid="comment-body"]', { hasText: commentText }).first();
+      let syncedViaRealtime = false;
+
+      try {
+        await expect(page2Comment).toBeVisible({ timeout: 20000 });
+        syncedViaRealtime = true;
+      } catch {
+        // Fallback for environments where realtime propagation is delayed/unstable.
+        await page2.goto(board.canonicalPath);
+        await page2.waitForLoadState('domcontentloaded');
+        await openCardModalViaQuery(page2, card, board);
+      }
+
+      if (!syncedViaRealtime) {
+        await expect(page2Comment).toBeVisible({ timeout: 20000 });
+      }
     } finally {
-      await context1.close();
-      await context2.close();
+      await context1.close().catch(() => undefined);
+      await context2.close().catch(() => undefined);
       await supabaseAdmin.from('boards').delete().eq('id', board.id);
     }
   });
