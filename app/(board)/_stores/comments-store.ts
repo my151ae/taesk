@@ -108,21 +108,35 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
   loadComments: async (cardId, force = false) => {
     const { cards } = get();
     const state = cards[cardId] ?? getInitialCardState();
+    const hasExistingComments = state.comments.length > 0;
+    const shouldShowLoading = !force || !hasExistingComments || state.status === 'idle';
 
     if (!force && (state.status === 'loading' || state.status === 'ready')) {
       return;
     }
 
-    set(prev => ({
-      cards: {
-        ...prev.cards,
-        [cardId]: {
-          ...state,
-          status: 'loading',
-          error: undefined,
+    if (shouldShowLoading) {
+      set(prev => ({
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...state,
+            status: 'loading',
+            error: undefined,
+          },
         },
-      },
-    }));
+      }));
+    } else if (state.error) {
+      set(prev => ({
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...state,
+            error: undefined,
+          },
+        },
+      }));
+    }
 
     const result = await fetchComments(cardId);
     if (result.error) {
@@ -131,7 +145,7 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
           ...prev.cards,
           [cardId]: {
             ...prev.cards[cardId],
-            status: 'error',
+            status: hasExistingComments ? prev.cards[cardId]?.status ?? state.status : 'error',
             error: result.error?.message ?? 'コメントの取得に失敗しました',
           },
         },

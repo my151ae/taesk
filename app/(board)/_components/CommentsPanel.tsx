@@ -33,6 +33,7 @@ const buildThreads = (comments: BoardComment[]): CommentThread[] => {
 };
 
 const EMPTY_COMMENTS: BoardComment[] = [];
+const POLLING_INTERVAL_MS = 30000;
 
 /**
  * Parse UUID mention tokens (<@uuid>) from comment body
@@ -70,6 +71,7 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const realtimeHealthyRef = useRef(false);
 
   // Performance measurement
   useEffect(() => {
@@ -208,6 +210,7 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
   useEffect(() => {
     if (!featureFlags.comments || !cardId) return;
 
+    realtimeHealthyRef.current = false;
     const channel = supabase
       .channel(`comments-${cardId}`)
       .on(
@@ -226,7 +229,13 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
       );
 
     channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        realtimeHealthyRef.current = true;
+        return;
+      }
+
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeHealthyRef.current = false;
         console.warn('[comments] realtime subscription issue:', status);
         loadComments(cardId, true).catch((error) => {
           console.warn('[comments] failed to refresh after subscription issue', error);
@@ -235,6 +244,7 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
     });
 
     return () => {
+      realtimeHealthyRef.current = false;
       channel.unsubscribe();
       supabase.removeChannel(channel).catch((error) => {
         console.warn('[comments] failed to remove realtime channel', error);
@@ -246,10 +256,12 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
     if (!featureFlags.comments || !cardId) return;
 
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (realtimeHealthyRef.current) return;
       loadComments(cardId, true).catch((error) => {
         console.warn('[comments] polling refresh failed', error);
       });
-    }, 5000);
+    }, POLLING_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
@@ -486,7 +498,9 @@ export default function CommentsPanel({ cardId, boardId, initialProfiles }: Comm
     <div className="space-y-4" data-testid="comments-panel">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">コメント</h3>
-        {commentStatus === 'loading' && <span className="text-xs text-gray-500">読み込み中...</span>}
+        {commentStatus === 'loading' && comments.length === 0 && (
+          <span className="text-xs text-gray-500">読み込み中...</span>
+        )}
       </div>
 
       {bannerMessage && (
