@@ -58,7 +58,7 @@ export function DesktopListView({
 }: DesktopListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-    const [showGoogle, setShowGoogle] = useState(true);
+    const [showGoogle, setShowGoogle] = useState(false);
     const [showChecked, setShowChecked] = useState(true);
     const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
     const [draftBaseDate, setDraftBaseDate] = useState(baseDateValue);

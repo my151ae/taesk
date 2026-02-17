@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -55,14 +55,26 @@ export default function MobileListView({
 }: MobileListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-    const [showGoogle, setShowGoogle] = useState(true);
+    const [showGoogle, setShowGoogle] = useState(false);
     const [showChecked, setShowChecked] = useState(true);
+    const [showMonthMenu, setShowMonthMenu] = useState(false);
     const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
     const [draftBaseDate, setDraftBaseDate] = useState(baseDateValue);
+    const monthMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setDraftBaseDate(baseDateValue);
     }, [baseDateValue]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (monthMenuRef.current && !monthMenuRef.current.contains(event.target as Node)) {
+                setShowMonthMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
@@ -134,21 +146,37 @@ export default function MobileListView({
                         className="h-7 w-[110px] shrink-0 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700"
                         aria-label="基準日"
                     />
-                    <div className="relative shrink-0">
-                        <select
-                            value={String(listMonthDirection)}
-                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as 1 | 2 | 3 | -1 | -2 | -3)}
-                            className="h-8 w-[90px] appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
-                            aria-label="表示期間"
+                    <div ref={monthMenuRef} className="relative shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setShowMonthMenu((prev) => !prev)}
+                            className="h-7 w-[78px] rounded-full border border-slate-200 bg-white pl-2 pr-5 text-[11px] font-medium text-slate-700 text-left"
+                            aria-haspopup="listbox"
+                            aria-expanded={showMonthMenu}
                         >
-                            <option value="3">+3 mo.</option>
-                            <option value="2">+2 mo.</option>
-                            <option value="1">+1 mo.</option>
-                            <option value="-1">-1 mo.</option>
-                            <option value="-2">-2 mo.</option>
-                            <option value="-3">-3 mo.</option>
-                        </select>
-                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
+                            {listMonthDirection > 0 ? `+${listMonthDirection} mo.` : `${listMonthDirection} mo.`}
+                            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
+                        </button>
+                        {showMonthMenu && (
+                            <div className="absolute left-0 top-full z-30 mt-1 w-[92px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                                {[3, 2, 1, -1, -2, -3].map((value) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => {
+                                            onListMonthDirectionChange?.(value as 1 | 2 | 3 | -1 | -2 | -3);
+                                            setShowMonthMenu(false);
+                                        }}
+                                        className={clsx(
+                                            "block w-full px-2 py-1 text-left text-[12px]",
+                                            listMonthDirection === value ? "bg-sky-50 text-sky-700" : "text-slate-700 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {value > 0 ? `+${value} mo.` : `${value} mo.`}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={() => onNextDay?.()}
