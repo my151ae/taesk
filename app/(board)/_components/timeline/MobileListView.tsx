@@ -27,7 +27,6 @@ type MobileListViewProps = {
     onNextDay?: () => void;
     onPrevWeek?: () => void;
     onNextWeek?: () => void;
-    onToday?: () => void;
     listBaseDate?: string | null;
     listMonthDirection?: 1 | 2 | 3 | -1 | -2 | -3;
     onListMonthDirectionChange?: (direction: 1 | 2 | 3 | -1 | -2 | -3) => void;
@@ -49,7 +48,6 @@ export default function MobileListView({
     onNextDay,
     onPrevWeek,
     onNextWeek,
-    onToday,
     listBaseDate,
     listMonthDirection = 1,
     onListMonthDirectionChange,
@@ -103,27 +101,20 @@ export default function MobileListView({
     return (
         <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
-                <div className="flex items-center gap-2 overflow-x-auto">
+                <div className="flex flex-nowrap items-center gap-1">
                     <button
                         onClick={() => onPrevWeek?.()}
-                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        className="h-7 w-7 shrink-0 rounded-full border border-slate-200 text-[11px] font-medium text-slate-600"
                         aria-label="7日前へ"
                     >
                         {'<<'}
                     </button>
                     <button
                         onClick={() => onPrevDay?.()}
-                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        className="h-7 w-7 shrink-0 rounded-full border border-slate-200 text-[11px] font-medium text-slate-600"
                         aria-label="前日へ"
                     >
                         {'<'}
-                    </button>
-                    <button
-                        onClick={() => onToday?.()}
-                        className="h-8 shrink-0 rounded-full border border-slate-200 px-2 text-xs font-medium text-slate-600"
-                        aria-label="Today"
-                    >
-                        Today
                     </button>
                     <input
                         type="date"
@@ -140,48 +131,50 @@ export default function MobileListView({
                                 (e.currentTarget as HTMLInputElement).blur();
                             }
                         }}
-                        className="h-8 shrink-0 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        className="h-7 w-[110px] shrink-0 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700"
                         aria-label="基準日"
                     />
                     <div className="relative shrink-0">
                         <select
                             value={String(listMonthDirection)}
                             onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as 1 | 2 | 3 | -1 | -2 | -3)}
-                            className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
+                            className="h-8 w-[90px] appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
                             aria-label="表示期間"
                         >
-                            <option value="3">+3 month</option>
-                            <option value="2">+2 month</option>
-                            <option value="1">+1 month</option>
-                            <option value="-1">-1 month</option>
-                            <option value="-2">-2 month</option>
-                            <option value="-3">-3 month</option>
+                            <option value="3">+3 mo.</option>
+                            <option value="2">+2 mo.</option>
+                            <option value="1">+1 mo.</option>
+                            <option value="-1">-1 mo.</option>
+                            <option value="-2">-2 mo.</option>
+                            <option value="-3">-3 mo.</option>
                         </select>
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
                     </div>
                     <button
                         onClick={() => onNextDay?.()}
-                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        className="h-7 w-7 shrink-0 rounded-full border border-slate-200 text-[11px] font-medium text-slate-600"
                         aria-label="翌日へ"
                     >
                         {'>'}
                     </button>
                     <button
                         onClick={() => onNextWeek?.()}
-                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        className="h-7 w-7 shrink-0 rounded-full border border-slate-200 text-[11px] font-medium text-slate-600"
                         aria-label="7日後へ"
                     >
                         {'>>'}
                     </button>
-                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                </div>
+                <div className="mt-2 flex flex-wrap justify-start gap-1.5">
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
                         <input type="checkbox" checked={showUnchecked} onChange={(e) => setShowUnchecked(e.target.checked)} />
                         Unchecked
                     </label>
-                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
                         <input type="checkbox" checked={showChecked} onChange={(e) => setShowChecked(e.target.checked)} />
                         Checked
                     </label>
-                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
                         <input type="checkbox" checked={showGoogle} onChange={(e) => setShowGoogle(e.target.checked)} />
                         Google
                     </label>
@@ -271,11 +264,14 @@ export default function MobileListView({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            {(event.duration != null || event.durationMinutes != null) && (
-                                                <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
-                                                    &gt; {formatDuration((event.duration || event.durationMinutes)!)}
-                                                </span>
-                                            )}
+                                                    {(event.duration != null || event.durationMinutes != null) && (
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <div className="h-6 w-px bg-slate-200" />
+                                                            <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                                                                {formatDuration((event.duration || event.durationMinutes)!)}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                             <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
                                                 {event.due_start?.slice(0, 5) ?? '--:--'}
                                             </span>
@@ -363,9 +359,12 @@ export default function MobileListView({
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     {item.duration != null && (
-                                                        <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
-                                                            &gt; {formatDuration(item.duration)}
-                                                        </span>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <div className="h-6 w-px bg-slate-200" />
+                                                            <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                                                                {formatDuration(item.duration)}
+                                                            </span>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -421,9 +420,12 @@ export default function MobileListView({
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     {item.duration != null && (
-                                                        <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
-                                                            &gt; {formatDuration(item.duration)}
-                                                        </span>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <div className="h-6 w-px bg-slate-200" />
+                                                            <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                                                                {formatDuration(item.duration)}
+                                                            </span>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

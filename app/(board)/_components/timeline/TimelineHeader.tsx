@@ -357,6 +357,12 @@ export default function TimelineHeader({
                     >
                         Today
                     </button>
+                    <button
+                        onClick={() => setViewMode(viewMode === 'timeline' ? 'list' : 'timeline')}
+                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                    >
+                        {viewMode === 'timeline' ? 'List' : 'Timeline'}
+                    </button>
                     <div ref={mobileActionsRef} className="relative">
                     <button
                         type="button"

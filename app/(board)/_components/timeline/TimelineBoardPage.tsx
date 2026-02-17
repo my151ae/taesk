@@ -599,7 +599,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           selectedTags={selectedTags} setSelectedTags={setSelectedTags}
           selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority}
           availableTags={availableTags} dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
-          onTodayClick={handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
+          onTodayClick={viewMode === 'list' ? handleListToday : handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
           onUpdateBoard={handleUpdateBoard}
           googleStatusText={googleStatusText}
           googleCalendarStatus={googleCalendarStatus} googleCalendarError={googleCalendarError}
@@ -751,7 +751,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onNextDay={handleListNextDay}
                 onPrevWeek={handleListPrevWeek}
                 onNextWeek={handleListNextWeek}
-                onToday={handleListToday}
                 listBaseDate={listBaseDate}
                 listMonthDirection={listMonthDirection}
                 onListMonthDirectionChange={handleListMonthDirectionChange}

@@ -151,12 +151,12 @@ export function DesktopListView({
                             className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
                             aria-label="表示期間"
                         >
-                            <option value="3">+3 month</option>
-                            <option value="2">+2 month</option>
-                            <option value="1">+1 month</option>
-                            <option value="-1">-1 month</option>
-                            <option value="-2">-2 month</option>
-                            <option value="-3">-3 month</option>
+                            <option value="3">+3 mo.</option>
+                            <option value="2">+2 mo.</option>
+                            <option value="1">+1 mo.</option>
+                            <option value="-1">-1 mo.</option>
+                            <option value="-2">-2 mo.</option>
+                            <option value="-3">-3 mo.</option>
                         </select>
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
                     </div>
@@ -283,8 +283,11 @@ export function DesktopListView({
                                         </div>
                                     </div>
                                     {(event.duration != null || event.durationMinutes != null) ? (
-                                        <div className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
-                                            &gt; {formatDuration((event.duration || event.durationMinutes)!)}
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <div className="h-6 w-px bg-slate-200" />
+                                            <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                                                {formatDuration((event.duration || event.durationMinutes)!)}
+                                            </span>
                                         </div>
                                     ) : null}
                                 </div>
@@ -365,8 +368,11 @@ export function DesktopListView({
                                                 </div>
                                             </div>
                                             {(item.duration != null) ? (
-                                                <div className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
-                                                    &gt; {formatDuration(item.duration)}
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <div className="h-6 w-px bg-slate-200" />
+                                                    <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                                                        {formatDuration(item.duration)}
+                                                    </span>
                                                 </div>
                                             ) : null}
                                         </div>
