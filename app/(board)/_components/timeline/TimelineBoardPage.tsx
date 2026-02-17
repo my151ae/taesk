@@ -47,6 +47,11 @@ type TimelineBoardPageProps = {
 
 const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
 const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
+const dayDiffFromIso = (fromIso: string, toIso: string) => {
+  const from = new Date(`${fromIso}T00:00:00Z`);
+  const to = new Date(`${toIso}T00:00:00Z`);
+  return Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+};
 
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
@@ -74,6 +79,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   // Individual ranges for each view mode
   const [timelineRange, setTimelineRange] = useState(initialBoard.day_range || 2);
   const [listRange, setListRange] = useState(initialBoard.list_range || 30);
+  const [listBaseOffset, setListBaseOffset] = useState(0);
+  const [listMonthDirection, setListMonthDirection] = useState<1 | 2 | 3 | -1 | -2 | -3>(1);
 
   // View Mode: timeline or list
   const initialViewMode = useMemo(() => {
@@ -398,19 +405,60 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, [viewMode, handleDayRangeChange, handleUpdateBoard]);
 
-  const shiftListWindow = useCallback(async (delta: number) => {
+  const fetchListWindow = useCallback(async (baseOffset: number, monthDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
     if (status === "loading") return;
-    const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-    const payload = await fetchTimeline(baseStart + delta);
-    const nextStartDay = payload?.days?.[0] ?? data?.days?.[0];
-    if (nextStartDay) {
-      updateUrl(nextStartDay.isoDate, intendedDayRange, null);
+    const range = Math.abs(monthDirection) * 30;
+    if (listRange !== range) {
+      setListRange(range);
+      handleUpdateBoard({ list_range: range });
     }
+    const startOffset = monthDirection > 0 ? baseOffset : baseOffset - (range - 1);
+    const payload = await fetchTimeline(startOffset, { range });
+    const anchorIndex = monthDirection > 0 ? 0 : Math.max(0, range - 1);
+    const anchorDay = payload?.days?.[Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0))] ?? data?.days?.[0];
+    if (anchorDay) updateUrl(anchorDay.isoDate, range, null);
     setActiveDayIndex(0);
-  }, [status, data?.startOffset, data?.days, dayWindowStartRef, fetchTimeline, updateUrl, intendedDayRange]);
+  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl]);
+
+  const shiftListWindow = useCallback((delta: number) => {
+    const nextBaseOffset = listBaseOffset + delta;
+    setListBaseOffset(nextBaseOffset);
+    void fetchListWindow(nextBaseOffset, listMonthDirection);
+  }, [listBaseOffset, fetchListWindow, listMonthDirection]);
 
   const handleListPrevDay = useCallback(() => shiftListWindow(-1), [shiftListWindow]);
   const handleListNextDay = useCallback(() => shiftListWindow(1), [shiftListWindow]);
+  const handleListPrevWeek = useCallback(() => shiftListWindow(-7), [shiftListWindow]);
+  const handleListNextWeek = useCallback(() => shiftListWindow(7), [shiftListWindow]);
+  const handleListToday = useCallback(() => {
+    setListBaseOffset(0);
+    void fetchListWindow(0, listMonthDirection);
+  }, [fetchListWindow, listMonthDirection]);
+  const handleListMonthDirectionChange = useCallback((nextDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
+    setListMonthDirection(nextDirection);
+    void fetchListWindow(listBaseOffset, nextDirection);
+  }, [listBaseOffset, fetchListWindow]);
+
+  useEffect(() => {
+    if (viewMode !== 'list') return;
+    const startOffset = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+    const range = Math.abs(listMonthDirection) * 30;
+    const baseOffset = listMonthDirection > 0 ? startOffset : startOffset + (range - 1);
+    setListBaseOffset(baseOffset);
+  }, [viewMode, data?.startOffset, dayWindowStartRef, listMonthDirection]);
+
+  const listBaseDate = useMemo(() => {
+    const days = data?.days ?? [];
+    if (!days.length) return urlDate ?? null;
+    return listMonthDirection > 0 ? days[0].isoDate : days[days.length - 1].isoDate;
+  }, [data?.days, listMonthDirection, urlDate]);
+  const handleListBaseDateChange = useCallback((nextIsoDate: string) => {
+    if (!nextIsoDate || !listBaseDate) return;
+    const delta = dayDiffFromIso(listBaseDate, nextIsoDate);
+    const nextBaseOffset = listBaseOffset + delta;
+    setListBaseOffset(nextBaseOffset);
+    void fetchListWindow(nextBaseOffset, listMonthDirection);
+  }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection]);
 
   const handleSetViewMode = useCallback((mode: 'timeline' | 'list') => {
     setViewMode(mode);
@@ -558,7 +606,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onShortcutsClick={() => setShowShortcutsModal(true)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
-          listStartDate={data?.days?.[0]?.isoDate ?? urlDate ?? null}
+          listStartDate={listBaseDate}
         />
 
         {viewMode === 'timeline' ? (
@@ -672,6 +720,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onExternalEventClick={handleExternalEventClick}
                 onCardContextMenu={handleCardContextMenu}
                 status={status}
+                onPrevDay={handleListPrevDay}
+                onNextDay={handleListNextDay}
+                onPrevWeek={handleListPrevWeek}
+                onNextWeek={handleListNextWeek}
+                onToday={handleListToday}
+                listBaseDate={listBaseDate}
+                listMonthDirection={listMonthDirection}
+                onListMonthDirectionChange={handleListMonthDirectionChange}
+                onListBaseDateChange={handleListBaseDateChange}
               />
             </div>
             <div className="flex-1 overflow-hidden md:hidden">
@@ -686,6 +743,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onExternalEventClick={handleExternalEventClick}
                 onCardContextMenu={handleCardContextMenu}
                 status={status}
+                onPrevDay={handleListPrevDay}
+                onNextDay={handleListNextDay}
+                onPrevWeek={handleListPrevWeek}
+                onNextWeek={handleListNextWeek}
+                onToday={handleListToday}
+                listBaseDate={listBaseDate}
+                listMonthDirection={listMonthDirection}
+                onListMonthDirectionChange={handleListMonthDirectionChange}
+                onListBaseDateChange={handleListBaseDateChange}
               />
             </div>
           </>

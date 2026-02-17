@@ -39,9 +39,10 @@ export const useTimelineData = ({
   }, []);
 
   const fetchTimeline = useCallback(
-    async (start?: number, options?: { silent?: boolean }) => {
+    async (start?: number, options?: { silent?: boolean; range?: number }) => {
       if (!initialBoard?.id) return null;
       const effectiveStart = typeof start === "number" ? start : dayWindowStartRef.current;
+      const effectiveRange = options?.range ?? dayRange;
 
       if (!options?.silent) {
         setStatus("loading");
@@ -51,7 +52,7 @@ export const useTimelineData = ({
         traceRef.current?.mark("fetch:start");
         const params = new URLSearchParams({
           start: String(effectiveStart),
-          range: String(dayRange),
+          range: String(effectiveRange),
         });
         const response = await fetch(`/api/boards/${initialBoard.id}/timeline?${params.toString()}`, {
           cache: "no-store",

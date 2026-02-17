@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -24,6 +24,15 @@ type DesktopListViewProps = {
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
     status?: string;
+    onPrevDay?: () => void;
+    onNextDay?: () => void;
+    onPrevWeek?: () => void;
+    onNextWeek?: () => void;
+    onToday?: () => void;
+    listBaseDate?: string | null;
+    listMonthDirection?: 1 | 2 | 3 | -1 | -2 | -3;
+    onListMonthDirectionChange?: (direction: 1 | 2 | 3 | -1 | -2 | -3) => void;
+    onListBaseDateChange?: (isoDate: string) => void;
 };
 
 export function DesktopListView({
@@ -37,17 +46,51 @@ export function DesktopListView({
     onExternalEventClick,
     onCardContextMenu,
     status,
+    onPrevDay,
+    onNextDay,
+    onPrevWeek,
+    onNextWeek,
+    onToday,
+    listBaseDate,
+    listMonthDirection = 1,
+    onListMonthDirectionChange,
+    onListBaseDateChange,
 }: DesktopListViewProps) {
+    const [showUnchecked, setShowUnchecked] = useState(true);
+    const [showGoogle, setShowGoogle] = useState(true);
+    const [showChecked, setShowChecked] = useState(true);
+
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
-            const hasTimelineEvents = (eventsByDay[day.isoDate]?.length ?? 0) > 0;
-            const hasAbItems = (abBuckets[`${day.key}_a`]?.length ?? 0) > 0 ||
-                (abBuckets[`${day.key}_b`]?.length ?? 0) > 0;
-            const hasGoogleEvents = (calendarEventsByDay[day.isoDate]?.length ?? 0) > 0 ||
-                (calendarAllDayEventsByDay[day.isoDate]?.length ?? 0) > 0;
-            return hasTimelineEvents || hasAbItems || hasGoogleEvents;
+            const timelineEvents = eventsByDay[day.isoDate] ?? [];
+            const bucketItems = [...(abBuckets[`${day.key}_a`] ?? []), ...(abBuckets[`${day.key}_b`] ?? [])];
+            const googleEvents = [
+                ...(calendarEventsByDay[day.isoDate] ?? []),
+                ...(calendarAllDayEventsByDay[day.isoDate] ?? []),
+            ];
+
+            const hasUncheckedItems = showUnchecked && (
+                timelineEvents.some((event) => !event.checked) ||
+                bucketItems.some((item) => !item.checked)
+            );
+            const hasCheckedItems = showChecked && (
+                timelineEvents.some((event) => event.checked) ||
+                bucketItems.some((item) => item.checked)
+            );
+            const hasGoogleEvents = showGoogle && googleEvents.length > 0;
+
+            return hasUncheckedItems || hasCheckedItems || hasGoogleEvents;
         });
-    }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
+    }, [
+        days,
+        eventsByDay,
+        abBuckets,
+        calendarEventsByDay,
+        calendarAllDayEventsByDay,
+        showUnchecked,
+        showGoogle,
+        showChecked,
+    ]);
 
     if (status === 'loading') {
         return (
@@ -66,12 +109,91 @@ export function DesktopListView({
         );
     }
 
+    const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
+
+    const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+
     return (
         <div className="flex flex-col gap-6 px-4 pb-20">
-            {daysWithEvents.map((day) => {
+            <div className="sticky top-0 z-20 -mx-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={() => onPrevWeek?.()}
+                        className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label="7日前へ"
+                    >
+                        {'<<'}
+                    </button>
+                    <button
+                        onClick={() => onPrevDay?.()}
+                        className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label="前日へ"
+                    >
+                        {'<'}
+                    </button>
+                    <button
+                        onClick={() => onToday?.()}
+                        className="h-8 rounded-full border border-slate-200 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label="Today"
+                    >
+                        Today
+                    </button>
+                    <input
+                        type="date"
+                        value={baseDateValue}
+                        onChange={(e) => onListBaseDateChange?.(e.target.value)}
+                        className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        aria-label="基準日"
+                    />
+                    <div className="relative">
+                        <select
+                            value={String(listMonthDirection)}
+                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as 1 | 2 | 3 | -1 | -2 | -3)}
+                            className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
+                            aria-label="表示期間"
+                        >
+                            <option value="-3">-3 month</option>
+                            <option value="-2">-2 month</option>
+                            <option value="-1">-1 month</option>
+                            <option value="1">+1 month</option>
+                            <option value="2">+2 month</option>
+                            <option value="3">+3 month</option>
+                        </select>
+                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
+                    </div>
+                    <button
+                        onClick={() => onNextDay?.()}
+                        className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label="翌日へ"
+                    >
+                        {'>'}
+                    </button>
+                    <button
+                        onClick={() => onNextWeek?.()}
+                        className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label="7日後へ"
+                    >
+                        {'>>'}
+                    </button>
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showUnchecked} onChange={(e) => setShowUnchecked(e.target.checked)} />
+                        Unchecked
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showGoogle} onChange={(e) => setShowGoogle(e.target.checked)} />
+                        Google
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showChecked} onChange={(e) => setShowChecked(e.target.checked)} />
+                        Checked
+                    </label>
+                </div>
+            </div>
+            {displayDays.map((day) => {
                 const timelineEvents = eventsByDay[day.isoDate] || [];
                 const bucketA = abBuckets[`${day.key}_a`] || [];
                 const bucketB = abBuckets[`${day.key}_b`] || [];
+                const allGoogleEvents = [...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])];
 
                 // Combine and sort events
                 const allDayEvents = [...timelineEvents].sort((a, b) => {
@@ -79,6 +201,12 @@ export function DesktopListView({
                     const bStart = b.due_start || '00:00';
                     return aStart.localeCompare(bStart);
                 });
+                const filteredTimelineEvents = allDayEvents.filter((event) => (event.checked ? showChecked : showUnchecked));
+                const filteredGoogleEvents = showGoogle ? allGoogleEvents : [];
+                const filteredBucketItems = [
+                    ...bucketA.map(i => ({ ...i, bkey: 'a' as const })),
+                    ...bucketB.map(i => ({ ...i, bkey: 'b' as const })),
+                ].filter((item) => (item.checked ? showChecked : showUnchecked));
 
                 return (
                     <div key={day.isoDate} className="flex gap-6 group">
@@ -100,7 +228,7 @@ export function DesktopListView({
                         {/* Events Column */}
                         <div className="flex-1 space-y-1">
                             {/* Taesk Events with Checkboxes */}
-                            {allDayEvents.map((event) => (
+                            {filteredTimelineEvents.map((event) => (
                                 <div
                                     key={event.card_id}
                                     tabIndex={0}
@@ -156,7 +284,7 @@ export function DesktopListView({
                             ))}
 
                             {/* Google Events */}
-                            {([...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])]).map((gEvent) => (
+                            {filteredGoogleEvents.map((gEvent) => (
                                 <div
                                     key={gEvent.id}
                                     onClick={() => onExternalEventClick?.(gEvent)}
@@ -180,9 +308,9 @@ export function DesktopListView({
                             ))}
 
                             {/* A/B Items unified style and width */}
-                            {(bucketA.length > 0 || bucketB.length > 0) && (
+                            {filteredBucketItems.length > 0 && (
                                 <div className="space-y-1">
-                                    {[...bucketA.map(i => ({ ...i, bkey: 'a' })), ...bucketB.map(i => ({ ...i, bkey: 'b' }))].map((item) => (
+                                    {filteredBucketItems.map((item) => (
                                         <div
                                             key={item.card_id}
                                             tabIndex={0}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -23,6 +23,15 @@ type MobileListViewProps = {
     onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
     onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
     status?: string;
+    onPrevDay?: () => void;
+    onNextDay?: () => void;
+    onPrevWeek?: () => void;
+    onNextWeek?: () => void;
+    onToday?: () => void;
+    listBaseDate?: string | null;
+    listMonthDirection?: 1 | 2 | 3 | -1 | -2 | -3;
+    onListMonthDirectionChange?: (direction: 1 | 2 | 3 | -1 | -2 | -3) => void;
+    onListBaseDateChange?: (isoDate: string) => void;
 };
 
 export default function MobileListView({
@@ -36,17 +45,51 @@ export default function MobileListView({
     onExternalEventClick,
     onCardContextMenu,
     status,
+    onPrevDay,
+    onNextDay,
+    onPrevWeek,
+    onNextWeek,
+    onToday,
+    listBaseDate,
+    listMonthDirection = 1,
+    onListMonthDirectionChange,
+    onListBaseDateChange,
 }: MobileListViewProps) {
+    const [showUnchecked, setShowUnchecked] = useState(true);
+    const [showGoogle, setShowGoogle] = useState(true);
+    const [showChecked, setShowChecked] = useState(true);
+
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
-            const hasTimelineEvents = (eventsByDay[day.isoDate]?.length ?? 0) > 0;
-            const hasAbItems = (abBuckets[`${day.key}_a`]?.length ?? 0) > 0 ||
-                (abBuckets[`${day.key}_b`]?.length ?? 0) > 0;
-            const hasGoogleEvents = (calendarEventsByDay[day.isoDate]?.length ?? 0) > 0 ||
-                (calendarAllDayEventsByDay[day.isoDate]?.length ?? 0) > 0;
-            return hasTimelineEvents || hasAbItems || hasGoogleEvents;
+            const timelineEvents = eventsByDay[day.isoDate] ?? [];
+            const bucketItems = [...(abBuckets[`${day.key}_a`] ?? []), ...(abBuckets[`${day.key}_b`] ?? [])];
+            const googleEvents = [
+                ...(calendarEventsByDay[day.isoDate] ?? []),
+                ...(calendarAllDayEventsByDay[day.isoDate] ?? []),
+            ];
+
+            const hasUncheckedItems = showUnchecked && (
+                timelineEvents.some((event) => !event.checked) ||
+                bucketItems.some((item) => !item.checked)
+            );
+            const hasCheckedItems = showChecked && (
+                timelineEvents.some((event) => event.checked) ||
+                bucketItems.some((item) => item.checked)
+            );
+            const hasGoogleEvents = showGoogle && googleEvents.length > 0;
+
+            return hasUncheckedItems || hasCheckedItems || hasGoogleEvents;
         });
-    }, [days, eventsByDay, abBuckets, calendarEventsByDay, calendarAllDayEventsByDay]);
+    }, [
+        days,
+        eventsByDay,
+        abBuckets,
+        calendarEventsByDay,
+        calendarAllDayEventsByDay,
+        showUnchecked,
+        showGoogle,
+        showChecked,
+    ]);
 
     if (status === 'loading') {
         return (
@@ -66,18 +109,101 @@ export default function MobileListView({
         );
     }
 
+    const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
+
+    const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+
     return (
         <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {daysWithEvents.map((day) => {
+            <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
+                <div className="flex items-center gap-2 overflow-x-auto">
+                    <button
+                        onClick={() => onPrevWeek?.()}
+                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        aria-label="7日前へ"
+                    >
+                        {'<<'}
+                    </button>
+                    <button
+                        onClick={() => onPrevDay?.()}
+                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        aria-label="前日へ"
+                    >
+                        {'<'}
+                    </button>
+                    <button
+                        onClick={() => onToday?.()}
+                        className="h-8 shrink-0 rounded-full border border-slate-200 px-2 text-xs font-medium text-slate-600"
+                        aria-label="Today"
+                    >
+                        Today
+                    </button>
+                    <input
+                        type="date"
+                        value={baseDateValue}
+                        onChange={(e) => onListBaseDateChange?.(e.target.value)}
+                        className="h-8 shrink-0 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        aria-label="基準日"
+                    />
+                    <div className="relative shrink-0">
+                        <select
+                            value={String(listMonthDirection)}
+                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as 1 | 2 | 3 | -1 | -2 | -3)}
+                            className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
+                            aria-label="表示期間"
+                        >
+                            <option value="-3">-3 month</option>
+                            <option value="-2">-2 month</option>
+                            <option value="-1">-1 month</option>
+                            <option value="1">+1 month</option>
+                            <option value="2">+2 month</option>
+                            <option value="3">+3 month</option>
+                        </select>
+                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
+                    </div>
+                    <button
+                        onClick={() => onNextDay?.()}
+                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        aria-label="翌日へ"
+                    >
+                        {'>'}
+                    </button>
+                    <button
+                        onClick={() => onNextWeek?.()}
+                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 text-xs font-medium text-slate-600"
+                        aria-label="7日後へ"
+                    >
+                        {'>>'}
+                    </button>
+                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showUnchecked} onChange={(e) => setShowUnchecked(e.target.checked)} />
+                        Unchecked
+                    </label>
+                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showGoogle} onChange={(e) => setShowGoogle(e.target.checked)} />
+                        Google
+                    </label>
+                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showChecked} onChange={(e) => setShowChecked(e.target.checked)} />
+                        Checked
+                    </label>
+                </div>
+            </div>
+            {displayDays.map((day) => {
                 const timelineEvents = eventsByDay[day.isoDate] || [];
                 const bucketA = abBuckets[`${day.key}_a`] || [];
                 const bucketB = abBuckets[`${day.key}_b`] || [];
+                const allGoogleEvents = [...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])];
 
                 const allTimelineEvents = [...timelineEvents].sort((a, b) => {
                     const aStart = a.due_start || '00:00';
                     const bStart = b.due_start || '00:00';
                     return aStart.localeCompare(bStart);
                 });
+                const filteredTimelineEvents = allTimelineEvents.filter((event) => (event.checked ? showChecked : showUnchecked));
+                const filteredGoogleEvents = showGoogle ? allGoogleEvents : [];
+                const filteredBucketA = bucketA.filter((item) => (item.checked ? showChecked : showUnchecked));
+                const filteredBucketB = bucketB.filter((item) => (item.checked ? showChecked : showUnchecked));
 
                 return (
                     <div key={day.isoDate} className="mb-8 last:mb-0">
@@ -89,7 +215,7 @@ export default function MobileListView({
 
                         <div className="px-4 mt-3 space-y-2">
                             {/* Timeline Events */}
-                            {allTimelineEvents.map((event) => (
+                            {filteredTimelineEvents.map((event) => (
                                 <div
                                     key={event.card_id}
                                     className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
@@ -150,7 +276,7 @@ export default function MobileListView({
                             ))}
 
                             {/* Google Events */}
-                            {([...(calendarAllDayEventsByDay[day.isoDate] || []), ...(calendarEventsByDay[day.isoDate] || [])]).map((gEvent) => (
+                            {filteredGoogleEvents.map((gEvent) => (
                                 <div
                                     key={gEvent.id}
                                     onClick={() => onExternalEventClick?.(gEvent)}
@@ -176,10 +302,10 @@ export default function MobileListView({
                             ))}
 
                             {/* A/B Items unified style */}
-                            {(bucketA.length > 0 || bucketB.length > 0) && (
+                            {(filteredBucketA.length > 0 || filteredBucketB.length > 0) && (
                                 <div className="space-y-2 pt-1">
                                     {/* Bucket A */}
-                                    {bucketA.map(item => (
+                                    {filteredBucketA.map(item => (
                                         <div
                                             key={item.card_id}
                                             className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
@@ -236,7 +362,7 @@ export default function MobileListView({
                                         </div>
                                     ))}
                                     {/* Bucket B */}
-                                    {bucketB.map(item => (
+                                    {filteredBucketB.map(item => (
                                         <div
                                             key={item.card_id}
                                             className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
