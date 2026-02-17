@@ -52,6 +52,13 @@ const dayDiffFromIso = (fromIso: string, toIso: string) => {
   const to = new Date(`${toIso}T00:00:00Z`);
   return Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
 };
+const todayJstIso = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
@@ -79,6 +86,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   // Individual ranges for each view mode
   const [timelineRange, setTimelineRange] = useState(initialBoard.day_range || 2);
   const [listRange, setListRange] = useState(initialBoard.list_range || 30);
+  const [listBaseDate, setListBaseDate] = useState<string>(() => todayJstIso());
   const [listBaseOffset, setListBaseOffset] = useState(0);
   const [listMonthDirection, setListMonthDirection] = useState<1 | 2 | 3 | -1 | -2 | -3>(1);
 
@@ -423,6 +431,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const shiftListWindow = useCallback((delta: number) => {
     const nextBaseOffset = listBaseOffset + delta;
     setListBaseOffset(nextBaseOffset);
+    setListBaseDate((prev) => {
+      const base = prev || todayJstIso();
+      const d = new Date(`${base}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + delta);
+      return d.toISOString().slice(0, 10);
+    });
     void fetchListWindow(nextBaseOffset, listMonthDirection);
   }, [listBaseOffset, fetchListWindow, listMonthDirection]);
 
@@ -431,7 +445,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleListPrevWeek = useCallback(() => shiftListWindow(-7), [shiftListWindow]);
   const handleListNextWeek = useCallback(() => shiftListWindow(7), [shiftListWindow]);
   const handleListToday = useCallback(() => {
+    const today = todayJstIso();
     setListBaseOffset(0);
+    setListBaseDate(today);
     void fetchListWindow(0, listMonthDirection);
   }, [fetchListWindow, listMonthDirection]);
   const handleListMonthDirectionChange = useCallback((nextDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
@@ -439,24 +455,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     void fetchListWindow(listBaseOffset, nextDirection);
   }, [listBaseOffset, fetchListWindow]);
 
-  useEffect(() => {
-    if (viewMode !== 'list') return;
-    const startOffset = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-    const range = Math.abs(listMonthDirection) * 30;
-    const baseOffset = listMonthDirection > 0 ? startOffset : startOffset + (range - 1);
-    setListBaseOffset(baseOffset);
-  }, [viewMode, data?.startOffset, dayWindowStartRef, listMonthDirection]);
-
-  const listBaseDate = useMemo(() => {
-    const days = data?.days ?? [];
-    if (!days.length) return urlDate ?? null;
-    return listMonthDirection > 0 ? days[0].isoDate : days[days.length - 1].isoDate;
-  }, [data?.days, listMonthDirection, urlDate]);
   const handleListBaseDateChange = useCallback((nextIsoDate: string) => {
     if (!nextIsoDate || !listBaseDate) return;
     const delta = dayDiffFromIso(listBaseDate, nextIsoDate);
     const nextBaseOffset = listBaseOffset + delta;
     setListBaseOffset(nextBaseOffset);
+    setListBaseDate(nextIsoDate);
     void fetchListWindow(nextBaseOffset, listMonthDirection);
   }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection]);
 
@@ -606,7 +610,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onShortcutsClick={() => setShowShortcutsModal(true)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
-          listStartDate={listBaseDate}
+          listStartDate={listBaseDate ?? null}
         />
 
         {viewMode === 'timeline' ? (

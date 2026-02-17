@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
     TimelineDay,
@@ -56,8 +56,15 @@ export default function MobileListView({
     onListBaseDateChange,
 }: MobileListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
+    const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [showGoogle, setShowGoogle] = useState(true);
     const [showChecked, setShowChecked] = useState(true);
+    const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
+    const [draftBaseDate, setDraftBaseDate] = useState(baseDateValue);
+
+    useEffect(() => {
+        setDraftBaseDate(baseDateValue);
+    }, [baseDateValue]);
 
     const daysWithEvents = useMemo(() => {
         return days.filter(day => {
@@ -91,26 +98,6 @@ export default function MobileListView({
         showChecked,
     ]);
 
-    if (status === 'loading') {
-        return (
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center min-h-[400px]">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 mb-4" />
-                <p className="text-slate-500 font-medium">読み込み中...</p>
-            </div>
-        );
-    }
-
-    if (daysWithEvents.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-2xl">📅</div>
-                <p className="text-slate-500 font-medium">予定が入っている日はありません</p>
-            </div>
-        );
-    }
-
-    const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
-
     const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
 
     return (
@@ -140,8 +127,19 @@ export default function MobileListView({
                     </button>
                     <input
                         type="date"
-                        value={baseDateValue}
-                        onChange={(e) => onListBaseDateChange?.(e.target.value)}
+                        value={draftBaseDate}
+                        onChange={(e) => setDraftBaseDate(e.target.value)}
+                        onBlur={() => {
+                            if (draftBaseDate && draftBaseDate !== baseDateValue) {
+                                onListBaseDateChange?.(draftBaseDate);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                (e.currentTarget as HTMLInputElement).blur();
+                            }
+                        }}
                         className="h-8 shrink-0 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
                         aria-label="基準日"
                     />
@@ -152,12 +150,12 @@ export default function MobileListView({
                             className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
                             aria-label="表示期間"
                         >
-                            <option value="-3">-3 month</option>
-                            <option value="-2">-2 month</option>
-                            <option value="-1">-1 month</option>
-                            <option value="1">+1 month</option>
-                            <option value="2">+2 month</option>
                             <option value="3">+3 month</option>
+                            <option value="2">+2 month</option>
+                            <option value="1">+1 month</option>
+                            <option value="-1">-1 month</option>
+                            <option value="-2">-2 month</option>
+                            <option value="-3">-3 month</option>
                         </select>
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
                     </div>
@@ -180,16 +178,26 @@ export default function MobileListView({
                         Unchecked
                     </label>
                     <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
-                        <input type="checkbox" checked={showGoogle} onChange={(e) => setShowGoogle(e.target.checked)} />
-                        Google
-                    </label>
-                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
                         <input type="checkbox" checked={showChecked} onChange={(e) => setShowChecked(e.target.checked)} />
                         Checked
                     </label>
+                    <label className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                        <input type="checkbox" checked={showGoogle} onChange={(e) => setShowGoogle(e.target.checked)} />
+                        Google
+                    </label>
                 </div>
             </div>
-            {displayDays.map((day) => {
+            {status === 'loading' ? (
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center min-h-[400px]">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500 mb-4" />
+                    <p className="text-slate-500 font-medium">読み込み中...</p>
+                </div>
+            ) : displayDays.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-2xl">📅</div>
+                    <p className="text-slate-500 font-medium">予定が入っている日はありません</p>
+                </div>
+            ) : displayDays.map((day) => {
                 const timelineEvents = eventsByDay[day.isoDate] || [];
                 const bucketA = abBuckets[`${day.key}_a`] || [];
                 const bucketB = abBuckets[`${day.key}_b`] || [];
@@ -218,7 +226,14 @@ export default function MobileListView({
                             {filteredTimelineEvents.map((event) => (
                                 <div
                                     key={event.card_id}
-                                    className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
+                                    onClick={() => setSelectedCardId(event.card_id)}
+                                    onDoubleClick={() => openCardModal(event.short_id, 'mobile-list-view')}
+                                    className={clsx(
+                                        "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
+                                        selectedCardId === event.card_id
+                                            ? "border-sky-300 ring-sky-300/60"
+                                            : "border-slate-50 ring-black/5"
+                                    )}
                                 >
                                     <div className="flex justify-between items-center">
                                         <div
@@ -257,13 +272,7 @@ export default function MobileListView({
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             {(event.duration != null || event.durationMinutes != null) && (
-                                                <span
-                                                    className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openCardModal(event.short_id, 'mobile-list-view');
-                                                    }}
-                                                >
+                                                <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
                                                     &gt; {formatDuration((event.duration || event.durationMinutes)!)}
                                                 </span>
                                             )}
@@ -308,7 +317,14 @@ export default function MobileListView({
                                     {filteredBucketA.map(item => (
                                         <div
                                             key={item.card_id}
-                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
+                                            onClick={() => setSelectedCardId(item.card_id)}
+                                            onDoubleClick={() => openCardModal(item.short_id, 'mobile-list-view')}
+                                            className={clsx(
+                                                "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
+                                                selectedCardId === item.card_id
+                                                    ? "border-sky-300 ring-sky-300/60"
+                                                    : "border-slate-50 ring-black/5"
+                                            )}
                                         >
                                             <div className="flex justify-between items-center">
                                                 <div
@@ -347,13 +363,7 @@ export default function MobileListView({
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     {item.duration != null && (
-                                                        <span
-                                                            className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openCardModal(item.short_id, 'mobile-list-view');
-                                                            }}
-                                                        >
+                                                        <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
                                                             &gt; {formatDuration(item.duration)}
                                                         </span>
                                                     )}
@@ -365,7 +375,14 @@ export default function MobileListView({
                                     {filteredBucketB.map(item => (
                                         <div
                                             key={item.card_id}
-                                            className="flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border border-slate-50 ring-1 ring-black/5 active:scale-[0.98] transition-all"
+                                            onClick={() => setSelectedCardId(item.card_id)}
+                                            onDoubleClick={() => openCardModal(item.short_id, 'mobile-list-view')}
+                                            className={clsx(
+                                                "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
+                                                selectedCardId === item.card_id
+                                                    ? "border-sky-300 ring-sky-300/60"
+                                                    : "border-slate-50 ring-black/5"
+                                            )}
                                         >
                                             <div className="flex justify-between items-center">
                                                 <div
@@ -404,13 +421,7 @@ export default function MobileListView({
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     {item.duration != null && (
-                                                        <span
-                                                            className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm hover:bg-slate-50 transition-all lowercase leading-none min-w-[32px] text-center cursor-pointer"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openCardModal(item.short_id, 'mobile-list-view');
-                                                            }}
-                                                        >
+                                                        <span className="text-[10px] font-bold text-slate-700 bg-white px-2 h-4 rounded ring-1 ring-slate-200 shadow-sm lowercase leading-none min-w-[32px] text-center">
                                                             &gt; {formatDuration(item.duration)}
                                                         </span>
                                                     )}
