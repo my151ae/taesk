@@ -380,21 +380,16 @@ export default function TimelineHeader({
                             <div className="space-y-1">
                                 <button
                                     onClick={() => {
-                                        onShortcutsClick();
+                                        setShowFilters((prev) => !prev);
                                         setShowMobileActions(false);
                                     }}
-                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    className={clsx(
+                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
+                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
+                                    )}
                                 >
-                                    <span>Shortcuts</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setViewMode(viewMode === 'timeline' ? 'list' : 'timeline');
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>{viewMode === 'timeline' ? 'Listに切替' : 'Timelineに切替'}</span>
+                                    <span>Filters</span>
+                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
                                 </button>
                                 {viewMode === 'timeline' && (
                                     <div className="rounded-lg px-3 py-2 text-sm text-slate-700">
@@ -415,19 +410,6 @@ export default function TimelineHeader({
                                         </select>
                                     </div>
                                 )}
-                                <button
-                                    onClick={() => {
-                                        setShowFilters((prev) => !prev);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className={clsx(
-                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
-                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
-                                    )}
-                                >
-                                    <span>Filters</span>
-                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
-                                </button>
                                 <button
                                     onClick={() => {
                                         setShowProfileSettings(true);
@@ -455,6 +437,22 @@ export default function TimelineHeader({
                                 >
                                     Board Settings
                                 </button>
+                                <Link
+                                    href="/playground"
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    onClick={() => setShowMobileActions(false)}
+                                >
+                                    Playground
+                                </Link>
+                                <button
+                                    onClick={() => {
+                                        onShortcutsClick();
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Shortcuts
+                                </button>
                                 <button
                                     onClick={async () => {
                                         try {
@@ -475,14 +473,6 @@ export default function TimelineHeader({
                 </div>
 
                 <div className="hidden items-center gap-2 md:flex">
-
-                {/* Shortcuts Button */}
-                <button
-                    onClick={onShortcutsClick}
-                    className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 shrink-0"
-                >
-                    Shortcuts
-                </button>
 
                 {/* List Toggle Button */}
                 <button
@@ -676,6 +666,19 @@ export default function TimelineHeader({
                             <div className="p-1">
                                 <button
                                     onClick={() => {
+                                        setShowFilters((prev) => !prev);
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className={clsx(
+                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
+                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
+                                    )}
+                                >
+                                    <span className="flex items-center gap-2"><span>🔎</span> Filters</span>
+                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
+                                </button>
+                                <button
+                                    onClick={() => {
                                         setShowProfileSettings(true);
                                         setShowProfileMenu(false);
                                     }}
@@ -692,6 +695,15 @@ export default function TimelineHeader({
                                 >
                                     <span>🔔</span> Notifications
                                 </button>
+                                <button
+                                    onClick={() => {
+                                        setShowBoardSettings(true);
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <span>⚙️</span> Board Settings
+                                </button>
                                 <Link
                                     href="/playground"
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -699,6 +711,15 @@ export default function TimelineHeader({
                                 >
                                     <span>🧪</span> Playground
                                 </Link>
+                                <button
+                                    onClick={() => {
+                                        onShortcutsClick();
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <span>⌨️</span> Shortcuts
+                                </button>
                             </div>
 
                             <div className="border-t border-slate-100 p-1">
