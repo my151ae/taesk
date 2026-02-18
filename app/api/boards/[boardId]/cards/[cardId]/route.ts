@@ -2,15 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 import { normalizeContent, extractTitleTask, deriveExcerptFromContent } from '@/lib/tiptap';
-import { syncCardToCalendar, deleteCardFromCalendar, buildGoogleDateTimeRange, buildGoogleEventDescription, resolveAppOrigin } from '@/lib/calendarSyncService';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
 import {
-  isMissingColumnError,
-  missingCardColumnResponse,
   runCardMutationWithFallback,
   stripUndefinedValues,
 } from '@/lib/server/card-mutation';
+import {
+  cardMutationErrorResponse,
+  getCardUpdateFallbackColumns,
+  validationFailedResponse,
+} from '@/lib/server/cards-api-service';
+import {
+  deleteCardFromCalendarBestEffort,
+  logCardActivity,
+  syncPatchedCardToCalendar,
+} from '@/lib/server/card-side-effects';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -72,16 +79,7 @@ const patchHandler = async (
   const parsed = UpdateCardSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INVALID_BODY',
-          message: 'Validation failed',
-          details: parsed.error.flatten(),
-        },
-      },
-      { status: 422 }
-    );
+    return validationFailedResponse(parsed.error.flatten());
   }
 
   const performUpdate = async (body: Record<string, unknown>) => {
@@ -126,23 +124,12 @@ const patchHandler = async (
   const { data: updatedCard, error, payload: payloadToSend } = await runCardMutationWithFallback(
     performUpdate,
     normalizedPayload,
-    ['due_bucket_position', 'assignee_ids']
+    getCardUpdateFallbackColumns()
   );
 
-  if (isMissingColumnError(error, 'checklist') && 'checklist' in payloadToSend) {
-    const response = missingCardColumnResponse('checklist');
-    if (response) return response;
-  }
-  if (isMissingColumnError(error, 'content') && 'content' in payloadToSend) {
-    const response = missingCardColumnResponse('content');
-    if (response) return response;
-  }
-
-  if (error) {
-    return NextResponse.json(
-      { error: { code: 'DB_ERROR', message: error.message } },
-      { status: 500 }
-    );
+  const mutationError = cardMutationErrorResponse({ error, payload: payloadToSend });
+  if (mutationError) {
+    return mutationError;
   }
 
   let ensuredCard = updatedCard ?? null;
@@ -173,47 +160,24 @@ const patchHandler = async (
     // isContentOnlyUpdate と triggersCalendarSync は元リクエストキーで事前判定済み
 
     if (!isContentOnlyUpdate) {
-      // Independent async logging
-      supabase.from('activity_logs').insert({
-        board_id: boardId,
-        user_id: user.id,
+      logCardActivity(supabase, {
+        boardId,
+        userId: user.id,
         action,
-        entity_type: 'card',
-        entity_id: cardId,
-        entity_title: ensuredCard?.title ?? parsed.data.title ?? null,
-      }).then(({ error: logError }) => {
-        if (logError) console.error('Activity log failed:', logError);
+        cardId,
+        cardTitle: ensuredCard.title ?? parsed.data.title ?? null,
       });
     }
 
-    // Google Calendar Sync Trigger (Fire and forget or await without blocking response error?)
-    // We await it to ensure consistency, but catch errors to avoid failing the UI update.
-    if (triggersCalendarSync && ensuredCard.due_start && ensuredCard.due_end) {
-      const { startDateTime, endDateTime } = buildGoogleDateTimeRange({
-        due_date: ensuredCard.due_date,
-        due_start: ensuredCard.due_start,
-        due_end: ensuredCard.due_end,
+    if (triggersCalendarSync) {
+      void syncPatchedCardToCalendar({
+        supabase,
+        userId: user.id,
+        card: ensuredCard,
+        requestOrigin: request.nextUrl?.origin,
+      }).catch((syncError) => {
+        console.error('[cards PATCH] google sync failed', { cardId, error: syncError });
       });
-
-      const origin = request.nextUrl?.origin ?? resolveAppOrigin();
-      const description = buildGoogleEventDescription({
-        id: ensuredCard.id,
-        short_id: ensuredCard.short_id,
-        slug: ensuredCard.slug ?? null,
-        id_short: ensuredCard.id_short ?? null,
-        title: ensuredCard.title,
-        description: ensuredCard.excerpt ?? "",
-      }, origin);
-
-      if (startDateTime && endDateTime) {
-        syncCardToCalendar(supabase, user.id, ensuredCard.id, {
-          summary: ensuredCard.title,
-          description,
-          start: { dateTime: startDateTime, timeZone: "Asia/Tokyo" },
-          end: { dateTime: endDateTime, timeZone: "Asia/Tokyo" },
-        }, { onlyUpdate: true })
-          .catch(err => console.error("[card-patch] google sync failed", err));
-      }
     }
   }
 
@@ -245,12 +209,7 @@ const deleteHandler = async (
     .single();
 
   if (card) {
-    // Attempt to delete from Google Calendar if synced.
-    // We do this BEFORE DB delete, but we don't block on failure (best effort).
-    // Actually, if we delete local card, CASCADE deletes sync record, losing the google_event_id.
-    // So we MUST try to delete from Google first.
-    await deleteCardFromCalendar(supabase, user.id, cardId)
-      .catch(err => console.error("[card-delete] google sync delete failed", err));
+    await deleteCardFromCalendarBestEffort(supabase, user.id, cardId);
   }
 
   const { error } = await supabase
@@ -268,15 +227,12 @@ const deleteHandler = async (
 
   // Log activity
   if (card) {
-    supabase.from('activity_logs').insert({
-      board_id: boardId,
-      user_id: user.id,
+    logCardActivity(supabase, {
+      boardId,
+      userId: user.id,
       action: 'deleted',
-      entity_type: 'card',
-      entity_id: cardId,
-      entity_title: card.title,
-    }).then(({ error: logError }) => {
-      if (logError) console.error('Activity log failed:', logError);
+      cardId,
+      cardTitle: card.title ?? null,
     });
   }
 

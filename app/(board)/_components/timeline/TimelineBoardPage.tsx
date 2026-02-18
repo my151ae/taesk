@@ -37,10 +37,10 @@ import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigatio
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
 import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
 import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
-import { findTimelineCardById } from "@/app/(board)/_utils/timeline-card-lookup";
 import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
 import { useTimelineBoardShell } from "@/app/(board)/_hooks/useTimelineBoardShell";
 import { useSpatialArrowFocus } from "@/app/(board)/_hooks/useSpatialArrowFocus";
+import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -434,6 +434,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     return result;
   }, [filteredData?.events]);
 
+  const registerAbScrollContainer = useCallback(
+    (iso: string, el: HTMLDivElement | null, bucket?: "a" | "b") => {
+      const key = bucket ? `${iso}:${bucket}` : iso;
+      abScrollContainersRef.current[key] = el;
+    },
+    []
+  );
+
+  const { items: contextMenuItems } = useTimelineCardContextMenuItems({
+    contextMenuCardId: contextMenu.cardId,
+    data,
+    openCardModal,
+    handleToggleCardChecked,
+    moveCardByDayOffset,
+    handleCardModalDelete,
+  });
+
   // グローバルな空間ナビゲーション（物理的な位置に基づいた移動）
   const handleArrowKeyFocus = useSpatialArrowFocus();
 
@@ -485,10 +502,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onExternalEventClick={handleExternalEventClick}
                 timelineStartHour={timelineStartHour}
                 timelineHeaderRef={timelineHeaderRef}
-                registerAbScrollContainer={(iso, el, bucket) => {
-                  const key = bucket ? `${iso}:${bucket}` : iso;
-                  abScrollContainersRef.current[key] = el;
-                }}
+                registerAbScrollContainer={registerAbScrollContainer}
                 status={status}
                 handlePrevDay={handlePrevDay}
                 handleNextDay={handleNextDay}
@@ -528,10 +542,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                 onNextDay={handleNextDay}
                 onMount={handleTimelineViewMount}
                 onScroll={debouncedHandleScroll}
-                registerAbScrollContainer={(iso, el, bucket) => {
-                  const key = bucket ? `${iso}:${bucket}` : iso;
-                  abScrollContainersRef.current[key] = el;
-                }}
+                registerAbScrollContainer={registerAbScrollContainer}
                 eventsByDay={eventsByDay}
                 abBuckets={filteredData?.abBuckets ?? {}}
                 calendarEventsByDay={calendarEventsByDay}
@@ -649,63 +660,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
             x={contextMenu.x}
             y={contextMenu.y}
             onClose={closeContextMenu}
-            items={[
-              {
-                label: "カードを開く",
-                onClick: () => {
-                  const targetId = contextMenu.cardId;
-                  if (!targetId) return;
-                  const match = findTimelineCardById(data, targetId);
-                  const card = match.event ?? match.bucketItem;
-                  if (card?.short_id) openCardModal(card.short_id, "context-menu");
-                }
-              },
-              {
-                label: (
-                  (() => {
-                    const targetId = contextMenu.cardId;
-                    if (!targetId) return false;
-                    const match = findTimelineCardById(data, targetId);
-                    return Boolean(match.event?.checked ?? match.bucketItem?.checked);
-                  })()
-                    ? "未完了に戻す" : "完了にする"
-                ),
-                onClick: () => {
-                  const targetId = contextMenu.cardId;
-                  if (!targetId) return;
-                  const match = findTimelineCardById(data, targetId);
-                  const isChecked = Boolean(match.event?.checked ?? match.bucketItem?.checked);
-                  handleToggleCardChecked(contextMenu.cardId!, !isChecked);
-                }
-              },
-              {
-                label: "Todayへ",
-                onClick: () => {
-                  moveCardByDayOffset(contextMenu.cardId!, 0);
-                }
-              },
-              {
-                label: "翌日へ",
-                onClick: () => {
-                  moveCardByDayOffset(contextMenu.cardId!, 1);
-                }
-              },
-              {
-                label: "翌週へ",
-                onClick: () => {
-                  moveCardByDayOffset(contextMenu.cardId!, 7);
-                }
-              },
-              {
-                label: "削除",
-                variant: "danger",
-                onClick: () => {
-                  if (confirm("カードを削除しますか？")) {
-                    handleCardModalDelete(contextMenu.cardId!);
-                  }
-                }
-              }
-            ]}
+            items={contextMenuItems}
           />
         )}
       </div>

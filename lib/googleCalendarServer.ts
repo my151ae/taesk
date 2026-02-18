@@ -1,30 +1,31 @@
 import "server-only";
 
-import { google, type calendar_v3 } from "googleapis";
+import type { calendar_v3 } from "googleapis";
 import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import { randomUUID } from "crypto";
+import {
+  getGoogleCalendarClientForUser,
+  hasCalendarWritePermission,
+  type SupabaseClient,
+} from "@/lib/google-calendar/oauth-server";
+import {
+  startCalendarWatch,
+  stopCalendarWatch,
+} from "@/lib/google-calendar/watch-server";
+export { startCalendarWatch, stopCalendarWatch };
+export {
+  GOOGLE_CALENDAR_SCOPE,
+  GOOGLE_CALENDAR_READONLY_SCOPE,
+  hasCalendarWritePermission,
+  resolveGoogleRedirectUri,
+  createGoogleOAuthClient,
+  getGoogleCalendarClientForUser,
+  GoogleCalendarNotConnectedError,
+} from "@/lib/google-calendar/oauth-server";
 
-export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
-export const GOOGLE_CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-const TOKEN_EXPIRY_BUFFER_MS = 60_000;
 const DEFAULT_DISPLAY_TZ = "Asia/Tokyo";
 const PAST_WINDOW_DAYS = 28;   // 4 weeks
 const FUTURE_WINDOW_DAYS = 84; // 12 weeks
-
-
-type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
-
-type GoogleAccountRow = {
-  id: string;
-  user_id: string;
-  google_sub: string;
-  email: string;
-  access_token: string;
-  refresh_token: string;
-  scope: string;
-  token_expires_at: string;
-};
 
 type NormalizedGoogleEvent = GoogleCalendarEvent & {
   startUtc: string;
@@ -106,134 +107,6 @@ type GoogleApiErrorShape = {
 function toGoogleApiError(error: unknown): GoogleApiErrorShape {
   if (!error || typeof error !== "object") return {};
   return error as GoogleApiErrorShape;
-}
-
-export function hasCalendarWritePermission(scope: string): boolean {
-  return scope.includes("calendar.events") || scope.includes("https://www.googleapis.com/auth/calendar") || scope.includes("https://www.googleapis.com/auth/calendar.events");
-}
-
-export class GoogleCalendarNotConnectedError extends Error {
-  code = "GOOGLE_CALENDAR_NOT_CONNECTED";
-  constructor(message?: string) {
-    super(message ?? "Google Calendar is not connected");
-    this.name = "GoogleCalendarNotConnectedError";
-  }
-}
-
-function getAppOrigin() {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
-}
-
-export function resolveGoogleRedirectUri(origin?: string) {
-  const base = origin ?? getAppOrigin();
-  const url = new URL("/api/integrations/google-calendar/callback", base);
-  return url.toString();
-}
-
-function assertGoogleEnv() {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
-  }
-}
-
-export function createGoogleOAuthClient(redirectUri?: string) {
-  assertGoogleEnv();
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri
-  );
-}
-
-function isExpired(tokenExpiresAt: string) {
-  const expiresMs = new Date(tokenExpiresAt).getTime();
-  if (!Number.isFinite(expiresMs)) return true;
-  return expiresMs <= Date.now() + TOKEN_EXPIRY_BUFFER_MS;
-}
-
-async function fetchAccount(supabase: SupabaseClient, userId: string): Promise<GoogleAccountRow | null> {
-  const { data, error } = await supabase
-    .from("google_calendar_accounts")
-    .select(
-      "id, user_id, google_sub, email, access_token, refresh_token, scope, token_expires_at"
-    )
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[googleCalendar] failed to load account", error);
-    throw error;
-  }
-
-  return data ?? null;
-}
-
-async function updateAccountTokens(
-  supabase: SupabaseClient,
-  account: GoogleAccountRow,
-  tokens: {
-    access_token: string;
-    refresh_token: string;
-    scope: string;
-    token_expires_at: string;
-  }
-) {
-  const { error } = await supabase
-    .from("google_calendar_accounts")
-    .update(tokens)
-    .eq("user_id", account.user_id)
-    .eq("google_sub", account.google_sub);
-
-  if (error) {
-    console.error("[googleCalendar] failed to update tokens", error);
-    throw error;
-  }
-}
-
-async function ensureAuthorizedClient(
-  account: GoogleAccountRow,
-  supabase: SupabaseClient,
-  redirectUri?: string
-) {
-  const oauth2Client = createGoogleOAuthClient(redirectUri);
-  oauth2Client.setCredentials({
-    access_token: account.access_token,
-    refresh_token: account.refresh_token,
-    expiry_date: new Date(account.token_expires_at).getTime(),
-  });
-
-  if (!isExpired(account.token_expires_at)) {
-    return oauth2Client;
-  }
-
-  // Refresh token if expired or close to expiry
-  const { credentials } = await oauth2Client.refreshAccessToken();
-  const nextAccess = credentials.access_token ?? account.access_token;
-  const nextRefresh = credentials.refresh_token ?? account.refresh_token;
-  const expiresAtIso = credentials.expiry_date
-    ? new Date(credentials.expiry_date).toISOString()
-    : account.token_expires_at;
-  const scope = credentials.scope ?? account.scope;
-
-  await updateAccountTokens(supabase, account, {
-    access_token: nextAccess,
-    refresh_token: nextRefresh,
-    scope,
-    token_expires_at: expiresAtIso,
-  });
-
-  oauth2Client.setCredentials({
-    access_token: nextAccess,
-    refresh_token: nextRefresh,
-    expiry_date: credentials.expiry_date ?? new Date(expiresAtIso).getTime(),
-  });
-
-  return oauth2Client;
 }
 
 function buildAllDayIso(dateStr: string, timeZone: string): string {
@@ -596,100 +469,6 @@ function isRangeCovered(
   return windowStart <= start.getTime() && windowEnd >= end.getTime();
 }
 
-export async function startCalendarWatch(
-  userId: string,
-  calendarId: string,
-  address: string,
-  options?: { supabase?: SupabaseClient; redirectUri?: string; ttlMs?: number }
-) {
-  const supabase = options?.supabase ?? await createServerSupabaseClient();
-  const { calendar, account } = await getGoogleCalendarClientForUser(userId, {
-    supabase,
-    redirectUri: options?.redirectUri,
-  });
-
-  const channelId = randomUUID();
-  const channelToken = randomUUID();
-  const expiration = Date.now() + (options?.ttlMs ?? 86_400_000); // default 24h
-
-  const res = await calendar.events.watch({
-    calendarId,
-    requestBody: {
-      id: channelId,
-      type: "web_hook",
-      address,
-      token: channelToken,
-      params: {
-        ttl: Math.floor((options?.ttlMs ?? 86_400_000) / 1000).toString(),
-      },
-      expiration: expiration.toString(),
-    },
-  });
-
-  await supabase
-    .from("google_calendar_sync_states")
-    .upsert({
-      google_account_id: account.id,
-      calendar_id: calendarId,
-      watch_channel_id: res.data.id ?? channelId,
-      watch_channel_token: channelToken,
-      watch_resource_id: res.data.resourceId ?? null,
-      watch_expiration: res.data.expiration ? new Date(Number(res.data.expiration)).toISOString() : new Date(expiration).toISOString(),
-      watch_status: "active",
-      watch_ttl_seconds: Math.floor((options?.ttlMs ?? 86_400_000) / 1000),
-      watch_checked_at: new Date().toISOString(),
-    }, { onConflict: "google_account_id,calendar_id" });
-
-  return {
-    channelId: res.data.id ?? channelId,
-    resourceId: res.data.resourceId ?? null,
-    expiration: res.data.expiration ?? expiration,
-  };
-}
-
-export async function stopCalendarWatch(
-  userId: string,
-  calendarId: string,
-  options?: { supabase?: SupabaseClient; redirectUri?: string }
-) {
-  const supabase = options?.supabase ?? await createServerSupabaseClient();
-  const { calendar, account } = await getGoogleCalendarClientForUser(userId, {
-    supabase,
-    redirectUri: options?.redirectUri,
-  });
-
-  const state = await getSyncState(supabase, account.id, calendarId);
-  if (!state?.watch_channel_id || !state.watch_resource_id) {
-    return { stopped: false, reason: "no-active-watch" };
-  }
-
-  try {
-    await calendar.channels.stop({
-      requestBody: {
-        id: state.watch_channel_id,
-        resourceId: state.watch_resource_id,
-      },
-    });
-  } catch (error) {
-    console.error("[googleCalendar] stop watch failed", error);
-  }
-
-  await supabase
-    .from("google_calendar_sync_states")
-    .update({
-      watch_channel_id: null,
-      watch_channel_token: null,
-      watch_resource_id: null,
-      watch_expiration: null,
-      watch_status: "inactive",
-      watch_checked_at: new Date().toISOString(),
-    })
-    .eq("google_account_id", account.id)
-    .eq("calendar_id", calendarId);
-
-  return { stopped: true };
-}
-
 async function fetchAndCacheRange(
   calendar: calendar_v3.Calendar,
   supabase: SupabaseClient,
@@ -843,22 +622,6 @@ async function markWatchHeartbeat(
     })
     .eq("google_account_id", state.google_account_id)
     .eq("calendar_id", state.calendar_id);
-}
-
-export async function getGoogleCalendarClientForUser(
-  userId: string,
-  options?: { supabase?: SupabaseClient; redirectUri?: string }
-) {
-  const supabase = options?.supabase ?? await createServerSupabaseClient();
-  const account = await fetchAccount(supabase, userId);
-  if (!account) {
-    throw new GoogleCalendarNotConnectedError();
-  }
-
-  const oauth2Client = await ensureAuthorizedClient(account, supabase, options?.redirectUri);
-  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
-
-  return { calendar, account };
 }
 
 export async function syncGoogleCalendarToTaesk(

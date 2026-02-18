@@ -19,14 +19,12 @@ import {
   minuteToPixels,
   pixelsToMinutes,
   getTimelineHeight,
-  timeLabel,
-  formatDuration,
 } from "@/app/(board)/_utils/timeline-helpers";
 import {
   buildOverlayCardData,
   findOverlayBucketEntry,
 } from "@/app/(board)/_utils/timeline-overlay";
-import { TimelineCard } from "./TimelineCard";
+import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import {
   useTimelineZoomStore,
   MIN_HOUR_HEIGHT,
@@ -623,34 +621,12 @@ export function DesktopTimelineView({
       </div>
 
       <DragOverlay dropAnimation={null} zIndex={50}>
-        {overlayCardData ? (
-          <div
-            className="shadow-xl opacity-90 rounded-md overflow-hidden bg-white"
-            style={{
-              width: 240,
-              height: overlayTimelineEvent
-                ? Math.max(minuteToPixels(overlayTimelineEvent.durationMinutes ?? 60, 0), 20)
-                : undefined,
-            }}
-          >
-            <TimelineCard
-              title={overlayCardData.title}
-              badgeLabel={overlayCardData.badge?.toUpperCase()}
-              timeText={overlayTimelineEvent
-                ? timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)
-                : overlayCardData.timeText}
-              note={overlayCardData.note ?? undefined}
-              noteClampClass="line-clamp-2"
-              rightMeta={overlayTimelineEvent ? formatDuration(overlayTimelineEvent.durationMinutes ?? 60) : undefined}
-              checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? false}
-              onToggleCheck={() => { }}
-              onOpen={() => { }}
-              timePlacement="out-top"
-              className="w-full h-full border-none shadow-none"
-              paddingClass="py-2"
-            />
-          </div>
-        ) : null}
+        <TimelineDragOverlayCard
+          variant="desktop"
+          overlayCardData={overlayCardData}
+          overlayTimelineEvent={overlayTimelineEvent}
+          overlayBucketCard={overlayBucketCard}
+        />
       </DragOverlay>
     </DndContext>
   );

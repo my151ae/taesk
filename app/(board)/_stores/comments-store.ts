@@ -18,6 +18,7 @@ import {
   persistPendingQueue,
   randomId,
 } from '@/app/(board)/_stores/comments-pending-queue';
+import { retryPendingCommentsQueue } from '@/app/(board)/_stores/comments-pending-retry';
 
 type CommentStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -400,34 +401,33 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
     const { pendingQueue } = get();
     if (pendingQueue.length === 0) return;
 
-    const stillPending: PendingComment[] = [];
-
-    for (const entry of pendingQueue) {
-      const { params, tempId, idempotencyKey, authorProfile } = entry;
-      const result = await createComment(params);
-      if (result?.comment) {
-        get().upsertComment(params.cardId, { ...result.comment, idempotencyKey });
+    const stillPending = await retryPendingCommentsQueue({
+      queue: pendingQueue,
+      onSuccess: ({ entry, comment }) => {
+        const { params, tempId, idempotencyKey } = entry;
+        get().upsertComment(params.cardId, { ...comment, idempotencyKey });
         set(prev => ({
           cards: {
             ...prev.cards,
             [params.cardId]: {
               ...(prev.cards[params.cardId] ?? getInitialCardState()),
-              comments: (prev.cards[params.cardId]?.comments ?? []).filter(comment => comment.id !== tempId),
+              comments: (prev.cards[params.cardId]?.comments ?? []).filter((item) => item.id !== tempId),
             },
           },
         }));
-      } else {
-        stillPending.push(entry);
+      },
+      onFailure: ({ entry, errorMessage }) => {
+        const { params, tempId, authorProfile } = entry;
         set(prev => ({
           cards: {
             ...prev.cards,
             [params.cardId]: {
               ...(prev.cards[params.cardId] ?? getInitialCardState()),
-              comments: (prev.cards[params.cardId]?.comments ?? []).map(comment =>
+              comments: (prev.cards[params.cardId]?.comments ?? []).map((comment) =>
                 comment.id === tempId
                   ? {
                       ...comment,
-                      errorMessage: result?.error?.message ?? '再送信に失敗しました',
+                      errorMessage,
                       author: authorProfile ?? comment.author,
                     }
                   : comment,
@@ -435,8 +435,8 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
             },
           },
         }));
-      }
-    }
+      },
+    });
 
     persistPendingQueue(stillPending);
     set({ pendingQueue: stillPending });

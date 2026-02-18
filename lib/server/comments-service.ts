@@ -14,6 +14,47 @@ export type CardAccessMeta = {
   };
 };
 
+export type CreateCommentInput = {
+  body: string;
+  mentions: string[];
+  parentId: string | null;
+};
+
+export function parseCreateCommentBody(rawBody: unknown):
+  | { ok: true; data: CreateCommentInput }
+  | { ok: false; response: NextResponse } {
+  const input = (rawBody ?? {}) as {
+    body?: unknown;
+    mentions?: unknown;
+    parent_id?: unknown;
+  };
+
+  const commentBody = typeof input.body === "string" ? input.body : "";
+  const parentId = typeof input.parent_id === "string" ? input.parent_id : null;
+  const mentions = Array.isArray(input.mentions)
+    ? input.mentions.filter((item): item is string => typeof item === "string")
+    : [];
+
+  if (!commentBody.trim()) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "Comment body is required" } },
+        { status: 400 }
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      body: commentBody,
+      mentions,
+      parentId,
+    },
+  };
+}
+
 export function replaceMentionsForNotification(
   body: string,
   profilesById: Map<string, ProfileSummary>

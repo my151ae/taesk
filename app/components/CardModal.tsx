@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
@@ -19,6 +19,8 @@ import CardModalSidebar from "@/app/components/card-modal/CardModalSidebar";
 import type { CardModalSavePayload, ReminderMinuteOption } from "@/app/components/card-modal/types";
 import { useCardModalHistory } from "@/app/components/card-modal/hooks/useCardModalHistory";
 import { useCardModalGoogleSync } from "@/app/components/card-modal/hooks/useCardModalGoogleSync";
+import { useCardModalDraft } from "@/app/components/card-modal/hooks/useCardModalDraft";
+import { useCardModalResize } from "@/app/components/card-modal/hooks/useCardModalResize";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -54,59 +56,65 @@ export function CardModal({
     onRetryHistorySave,
     onCloseWithoutHistory,
 }: CardModalProps) {
-    const [content, setContent] = useState<JSONContent>(() =>
-        normalizeContent(card.content)
-    );
-    const [title, setTitle] = useState(card.title || "");
-    const [tags, setTags] = useState<string[]>(card.tags || []);
-    const [tagInput, setTagInput] = useState('');
-    const [dueDate, setDueDate] = useState(card.due_date || '');
-    const [dueStart, setDueStart] = useState(card.due_start ? card.due_start.slice(0, 5) : '');
-    const [dueEnd, setDueEnd] = useState(card.due_end ? card.due_end.slice(0, 5) : '');
-    const [startReminderEnabled, setStartReminderEnabled] = useState(Boolean(card.start_reminder_enabled));
-    const [startReminderMinutes, setStartReminderMinutes] = useState<ReminderMinuteOption>(
-        REMINDER_MINUTE_OPTIONS.includes((card.start_reminder_minutes ?? 0) as ReminderMinuteOption)
-            ? (card.start_reminder_minutes ?? 0) as ReminderMinuteOption
-            : 0
-    );
-    const [endReminderEnabled, setEndReminderEnabled] = useState(Boolean(card.end_reminder_enabled));
-    const [endReminderMinutes, setEndReminderMinutes] = useState<ReminderMinuteOption>(
-        REMINDER_MINUTE_OPTIONS.includes((card.end_reminder_minutes ?? 0) as ReminderMinuteOption)
-            ? (card.end_reminder_minutes ?? 0) as ReminderMinuteOption
-            : 0
-    );
-    const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
-    const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
-    const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
-    const [priority, setPriority] = useState<Priority>(card.priority || 'medium');
-    const [checked, setChecked] = useState(card.checked || false);
-    // Initialize assigneeIds from card.assignee_ids (array) or card.assignee_id (single, legacy)
-    const [assigneeIds, setAssigneeIds] = useState<string[]>(() => {
-        if (card.assignee_ids && card.assignee_ids.length > 0) {
-            return card.assignee_ids;
-        }
-        if (card.assignee_id) {
-            return [card.assignee_id];
-        }
-        return [];
-    });
-    const [showMemberDropdown, setShowMemberDropdown] = useState(false);
-    const [memberSearch, setMemberSearch] = useState('');
-    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+    const {
+        content,
+        setContent,
+        title,
+        setTitle,
+        tags,
+        setTags,
+        tagInput,
+        setTagInput,
+        dueDate,
+        setDueDate,
+        dueStart,
+        setDueStart,
+        dueEnd,
+        setDueEnd,
+        startReminderEnabled,
+        setStartReminderEnabled,
+        startReminderMinutes,
+        setStartReminderMinutes,
+        endReminderEnabled,
+        setEndReminderEnabled,
+        endReminderMinutes,
+        setEndReminderMinutes,
+        dueBucket,
+        setDueBucket,
+        dueBucketPosition,
+        setDueBucketPosition,
+        duration,
+        setDuration,
+        priority,
+        setPriority,
+        checked,
+        setChecked,
+        assigneeIds,
+        setAssigneeIds,
+        showMemberDropdown,
+        setShowMemberDropdown,
+        memberSearch,
+        setMemberSearch,
+        assigneeTouched,
+        setAssigneeTouched,
+        targetBoardId,
+        setTargetBoardId,
+        showSidebar,
+        setShowSidebar,
+        activeSidebarTab,
+        setActiveSidebarTab,
+        editorError,
+        setEditorError,
+        filteredProfiles,
+        selectedAssignees,
+        resetDraft,
+    } = useCardModalDraft({ card, profiles });
     const [stickyOpacity, setStickyOpacity] = useState(0);
 
-    // Sidebar resize state
-    const [sidebarWidth, setSidebarWidth] = useState(384); // Default w-96 = 384px
-    const [isResizing, setIsResizing] = useState(false);
-
     const resizeRef = useRef<HTMLDivElement>(null);
+    const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
     const contentScrollRef = useRef<HTMLDivElement>(null);
     const editorContainerRef = useRef<HTMLDivElement>(null);
-    const [assigneeTouched, setAssigneeTouched] = useState(false);
-    const [targetBoardId, setTargetBoardId] = useState(card.board_id);
-    const [showSidebar, setShowSidebar] = useState(false);
-    const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history">("comments");
-    const [editorError, setEditorError] = useState<string | null>(null);
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardIdRef = useRef(card.id);
@@ -141,33 +149,6 @@ export function CardModal({
         showSidebar,
         activeSidebarTab,
     });
-
-    const filteredProfiles = useMemo(() => {
-        const query = memberSearch.trim().toLowerCase();
-        const base = !query
-            ? profiles
-            : profiles.filter((profile) => {
-                const username = profile.username?.toLowerCase() ?? '';
-                const display = profile.display_name?.toLowerCase() ?? '';
-                const name = profile.full_name?.toLowerCase() ?? '';
-                const email = profile.email?.toLowerCase() ?? '';
-                return (
-                    username.includes(query) ||
-                    display.includes(query) ||
-                    name.includes(query) ||
-                    email.includes(query)
-                );
-            });
-
-        // Filter out already assigned members
-        return base.filter((profile) => !assigneeIds.includes(profile.id));
-    }, [profiles, memberSearch, assigneeIds]);
-
-    const selectedAssignees = useMemo(() => {
-        return profiles.filter((profile) => assigneeIds.includes(profile.id));
-    }, [profiles, assigneeIds]);
-
-    const titlePreview = title || card.title || "";
 
     // onClose ref を最新に保つ
     useEffect(() => {
@@ -254,50 +235,14 @@ export function CardModal({
             cardIdRef.current = card.id;
             hasAppliedInitialLoadRef.current = false;
             previousLoadingRef.current = null;
-            const incomingContent = normalizeContent(card.content);
-            // ステートのリセット（TiptapEditor は key={card.id} でリマウントされる）
-            setContent(incomingContent);
-            setTitle(card.title || "");
-            setTags(card.tags || []);
-            setDueDate(card.due_date || '');
-            setDueStart(card.due_start ? card.due_start.slice(0, 5) : '');
-            setDueEnd(card.due_end ? card.due_end.slice(0, 5) : '');
-            setStartReminderEnabled(Boolean(card.start_reminder_enabled));
-            setStartReminderMinutes(
-                REMINDER_MINUTE_OPTIONS.includes((card.start_reminder_minutes ?? 0) as ReminderMinuteOption)
-                    ? (card.start_reminder_minutes ?? 0) as ReminderMinuteOption
-                    : 0
-            );
-            setEndReminderEnabled(Boolean(card.end_reminder_enabled));
-            setEndReminderMinutes(
-                REMINDER_MINUTE_OPTIONS.includes((card.end_reminder_minutes ?? 0) as ReminderMinuteOption)
-                    ? (card.end_reminder_minutes ?? 0) as ReminderMinuteOption
-                    : 0
-            );
-            setDueBucket(card.due_bucket ?? null);
-            setDueBucketPosition(card.due_bucket_position ?? null);
-            setDuration(card.duration ?? 60);
-            setPriority(card.priority || 'medium');
-            setChecked(card.checked || false);
-
-            const newAssigneeIds = card.assignee_ids && card.assignee_ids.length > 0
-                ? card.assignee_ids
-                : card.assignee_id
-                    ? [card.assignee_id]
-                    : [];
-            setAssigneeIds(newAssigneeIds);
-            setMemberSearch('');
-            setAssigneeTouched(false);
-            setTargetBoardId(card.board_id);
-            setEditorError(null);
+            resetDraft(card);
             hasPendingChangesRef.current = false;
-            setActiveSidebarTab('comments');
             resetHistoryState();
         }
         // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
         // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
     // eslint-disable-next-line react-hooks/exhaustive-deps -- カード切替時のみ初期化する設計
-    }, [card.id, resetHistoryState]); // id 変化のみを監視
+    }, [card.id, resetDraft, resetHistoryState]); // id 変化のみを監視
 
     // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
     useEffect(() => {
@@ -702,45 +647,6 @@ export function CardModal({
         triggerAutoSave();
     }, [isHistoryPreviewing, triggerAutoSave]);
 
-    // Resize handlers
-    const startResizing = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        setIsResizing(true);
-    }, []);
-
-    const stopResizing = useCallback(() => {
-        setIsResizing(false);
-    }, []);
-
-    const resize = useCallback(
-        (e: MouseEvent) => {
-            if (isResizing && resizeRef.current) {
-                const containerRect = resizeRef.current.getBoundingClientRect();
-                // Calculate new width relative to the container’s right edge
-                const newWidth = containerRect.right - e.clientX;
-                // Clamp between 250px and 600px
-                if (newWidth >= 250 && newWidth <= 600) {
-                    setSidebarWidth(newWidth);
-                }
-            }
-        },
-        [isResizing]
-    );
-
-    useEffect(() => {
-        if (isResizing) {
-            window.addEventListener('mousemove', resize);
-            window.addEventListener('mouseup', stopResizing);
-        } else {
-            window.removeEventListener('mousemove', resize);
-            window.removeEventListener('mouseup', stopResizing);
-        }
-        return () => {
-            window.removeEventListener('mousemove', resize);
-            window.removeEventListener('mouseup', stopResizing);
-        };
-    }, [isResizing, resize, stopResizing]);
-
     const handleBucketChange = (next: DueBucket) => {
         if (isHistoryPreviewing) return;
         setDueBucket(next);
@@ -772,12 +678,6 @@ export function CardModal({
         googleConnected,
         googleCanWrite,
     });
-
-    const handleDelete = () => {
-        if (confirm('Delete this card?')) {
-            onDelete(card.id);
-        }
-    };
 
     const handleApplyHistory = useCallback(() => {
         if (!previewHistoryContent || !selectedHistoryId) return;
@@ -999,6 +899,13 @@ export function CardModal({
 
                     {/* Right Column - Sidebar (integrated conditionally on mobile) */}
                     {showSidebar && (
+                        <>
+                            <div
+                                role="separator"
+                                aria-orientation="vertical"
+                                onMouseDown={startResizing}
+                                className="hidden sm:block w-1 cursor-col-resize bg-slate-100 hover:bg-sky-100"
+                            />
                         <CardModalSidebar
                             sidebarWidth={sidebarWidth}
                             tagInput={tagInput}
@@ -1035,6 +942,7 @@ export function CardModal({
                                 onStatusChange: setSyncStatus,
                             }}
                         />
+                        </>
                     )}
                 </div>
             </div>

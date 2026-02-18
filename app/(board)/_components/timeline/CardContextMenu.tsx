@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface ContextMenuItem {
+export interface ContextMenuItem {
     label: string;
     onClick: () => void;
     variant?: "default" | "danger";

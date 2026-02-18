@@ -1,20 +1,18 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { CommentWithAuthor } from '@/lib/supabase';
-import {
-  createCommentNotifications,
-  createNotification,
-  generateNotificationMessage,
-} from '@/lib/server/notifications';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import {
   accessErrorResponse,
   assertCardMemberAccess,
+  parseCreateCommentBody,
   resolveNotificationBody,
   resolveReplyAuthorId,
   resolveSenderName,
   validateMentionsForBoard,
 } from '@/lib/server/comments-service';
+import { notifyCommentCreated } from '@/lib/server/comments-notifications';
+import { requireAuthenticatedUser } from '@/lib/server/api-security';
 
 // GET /api/cards/[cardId]/comments - List comments for a card
 const getHandler = async (
@@ -24,9 +22,9 @@ const getHandler = async (
   const supabase = await createServerSupabaseClient();
   const { cardId } = await params;
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return NextResponse.json(
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json(
       { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
       { status: 401 }
     );
@@ -90,9 +88,9 @@ const postHandler = async (
   const supabase = await createServerSupabaseClient();
   const { cardId } = await params;
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return NextResponse.json(
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json(
       { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
       { status: 401 }
     );
@@ -134,19 +132,11 @@ const postHandler = async (
     }
   }
 
-  const body = await request.json();
-  const { body: commentBody, mentions = [], parent_id = null } = body as {
-    body: string;
-    mentions?: string[];
-    parent_id?: string | null;
-  };
-
-  if (!commentBody || !commentBody.trim()) {
-    return NextResponse.json(
-      { error: { code: 'VALIDATION_ERROR', message: 'Comment body is required' } },
-      { status: 400 }
-    );
+  const parsedBody = parseCreateCommentBody(await request.json());
+  if (!parsedBody.ok) {
+    return parsedBody.response;
   }
+  const { body: commentBody, mentions, parentId } = parsedBody.data;
 
   const mentionValidation = await validateMentionsForBoard(supabase, boardId, mentions);
   if (!mentionValidation.ok) {
@@ -159,7 +149,7 @@ const postHandler = async (
     .insert({
       card_id: cardId,
       author_id: user.id,
-      parent_id,
+      parent_id: parentId,
       body: commentBody,
       mentions,
       idempotency_key: idempotencyKey || null,
@@ -187,66 +177,22 @@ const postHandler = async (
 
   const senderName = await resolveSenderName(supabase, user.id);
   const notificationBody = await resolveNotificationBody(supabase, commentBody, mentions);
-  const replyToAuthorId = await resolveReplyAuthorId(supabase, parent_id, cardId);
+  const replyToAuthorId = await resolveReplyAuthorId(supabase, parentId, cardId);
 
-  // Create notifications
   if (cardMeta) {
     try {
-      const mentionRecipients =
-        parent_id && replyToAuthorId
-          ? mentions.filter((id) => id !== replyToAuthorId)
-          : mentions;
-
-      // Mention notifications (new comments + replies)
-      if (mentionRecipients && mentionRecipients.length > 0) {
-        await createCommentNotifications(
-          {
-            event: 'mention',
-            commentId: newComment.id,
-            cardId,
-            boardId: boardId,
-            senderId: user.id,
-            recipientIds: mentionRecipients,
-            commentBody: notificationBody,
-            cardShortId: cardMeta.short_id,
-            cardSlug: cardMeta.slug,
-          },
-          senderName
-        );
-      }
-
-      // Reply notification (reply target only)
-      if (parent_id && replyToAuthorId && replyToAuthorId !== user.id) {
-        const snippet = notificationBody.replace(/\s+/g, ' ').trim();
-        const preview =
-          snippet.length > 140 ? `${snippet.slice(0, 140).trim()}…` : snippet;
-        const payload = {
-          comment_id: newComment.id,
-          card_id: cardId,
-          card_short_id: cardMeta.short_id ?? null,
-          card_slug: cardMeta.slug ?? null,
-          board_id: boardId,
-          sender_id: user.id,
-          sender_name: senderName,
-          card_title: cardMeta.title || 'Untitled',
-          comment_body: notificationBody,
-          message: preview
-            ? `${generateNotificationMessage('comment_replied', {
-                sender_name: senderName,
-                card_title: cardMeta.title,
-              })}: ${preview}`
-            : generateNotificationMessage('comment_replied', {
-                sender_name: senderName,
-                card_title: cardMeta.title,
-              }),
-        };
-
-        await createNotification({
-          type: 'comment_replied',
-          recipientId: replyToAuthorId,
-          payload,
-        });
-      }
+      await notifyCommentCreated({
+        cardId,
+        boardId,
+        commentId: newComment.id,
+        senderId: user.id,
+        senderName,
+        mentions,
+        parentId,
+        replyToAuthorId,
+        notificationBody,
+        cardMeta,
+      });
     } catch (_notifError) {
       // Log but don't fail the comment creation
       console.error('[comments:post] notification creation failed');

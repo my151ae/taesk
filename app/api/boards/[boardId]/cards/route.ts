@@ -6,11 +6,16 @@ import { buildContentFromTitle, deriveExcerptFromContent, normalizeContent, extr
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
 import {
-  isMissingColumnError,
-  missingCardColumnResponse,
   runCardMutationWithFallback,
   stripUndefinedValues,
 } from '@/lib/server/card-mutation';
+import {
+  cardInsertResultMissingResponse,
+  cardMutationErrorResponse,
+  getCardCreateFallbackColumns,
+  validationFailedResponse,
+} from '@/lib/server/cards-api-service';
+import { logCardActivity } from '@/lib/server/card-side-effects';
 
 const CreateCardSchema = z.object({
   id: z.string().uuid().optional(),
@@ -77,16 +82,7 @@ const postHandler = async (
   const parsed = CreateCardSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INVALID_BODY',
-          message: 'Validation failed',
-          details: parsed.error.flatten(),
-        },
-      },
-      { status: 422 }
-    );
+    return validationFailedResponse(parsed.error.flatten());
   }
 
   let listId = parsed.data.list_id;
@@ -219,42 +215,24 @@ const postHandler = async (
   const { data: createdCard, error, payload: payloadToSend } = await runCardMutationWithFallback(
     performInsert,
     payload,
-    ['due_bucket_position']
+    getCardCreateFallbackColumns()
   );
 
-  if (isMissingColumnError(error, 'checklist') && 'checklist' in payloadToSend) {
-    const response = missingCardColumnResponse('checklist');
-    if (response) return response;
-  }
-  if (isMissingColumnError(error, 'content') && 'content' in payloadToSend) {
-    const response = missingCardColumnResponse('content');
-    if (response) return response;
-  }
-
-  if (error) {
-    return NextResponse.json(
-      { error: { code: 'DB_ERROR', message: error.message } },
-      { status: 500 }
-    );
+  const mutationError = cardMutationErrorResponse({ error, payload: payloadToSend });
+  if (mutationError) {
+    return mutationError;
   }
 
   if (!createdCard) {
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Card was not returned after insert' } },
-      { status: 500 }
-    );
+    return cardInsertResultMissingResponse();
   }
 
-  // Log activity
-  supabase.from('activity_logs').insert({
-    board_id: boardId,
-    user_id: user.id,
+  logCardActivity(supabase, {
+    boardId,
+    userId: user.id,
     action: 'created',
-    entity_type: 'card',
-    entity_id: createdCard.id,
-    entity_title: createdCard.title,
-  }).then(({ error: logError }) => {
-    if (logError) console.error('Activity log failed:', logError);
+    cardId: createdCard.id,
+    cardTitle: createdCard.title ?? null,
   });
 
   return NextResponse.json({ card: createdCard }, { status: 201 });
