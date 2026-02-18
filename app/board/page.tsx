@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getBoardById } from "@/lib/server/boards";
 import { buildBoardUrl } from "@/lib/board-url";
-import { MAIN_BOARD_ID } from "@/lib/board-defaults";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient, type Board } from "@/lib/supabase";
+import { isAdminUser } from "@/lib/admins";
+import { createServiceRoleSupabaseClient } from "@/lib/server/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
@@ -15,25 +16,50 @@ export default async function BoardDefaultPage() {
     redirect("/login");
   }
 
-  // ユーザーが所属しているボードを1つ取得
-  const { data: membership } = await supabase
+  if (isAdminUser({ id: user.id, email: user.email })) {
+    const adminSupabase = createServiceRoleSupabaseClient();
+    const { data: adminBoards, error: adminBoardsError } = await adminSupabase
+      .from('boards')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (adminBoardsError) {
+      console.error("[board-default] failed to fetch boards for admin", adminBoardsError);
+    } else if (adminBoards && adminBoards.length > 0) {
+      const adminBoard = adminBoards[0] as Board;
+      const adminCanonicalUrl = buildBoardUrl(adminBoard);
+      if (adminCanonicalUrl) {
+        redirect(adminCanonicalUrl);
+      }
+      if (adminBoard.short_id) {
+        redirect(`/b/${adminBoard.short_id}`);
+      }
+    }
+  }
+
+  // ユーザーが所属しているボードを最大20件取得（古い順）
+  const { data: memberships } = await supabase
     .from('board_members')
     .select('board_id')
     .eq('profile_id', user.id)
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .limit(20);
 
-  let targetBoardId = MAIN_BOARD_ID;
-  if (membership) {
-    targetBoardId = membership.board_id;
+  const membershipBoardIds = (memberships ?? [])
+    .map((row) => row.board_id)
+    .filter((value): value is string => Boolean(value));
+
+  const boardCandidateIds = Array.from(new Set(membershipBoardIds));
+
+  let board = null;
+  for (const boardId of boardCandidateIds) {
+    board = await getBoardById(boardId);
+    if (board) break;
   }
 
-  const board = await getBoardById(targetBoardId);
-
   if (!board) {
-    // ボードが1つもない場合は、ログイン直後の画面などへ飛ばすか、エラーを表示
-    throw new Error("No boards found for user");
+    redirect("/playground");
   }
 
   // Redirect to canonical URL

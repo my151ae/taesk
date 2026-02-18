@@ -21,6 +21,10 @@ import {
   formatDuration,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
+import {
+  buildOverlayCardData,
+  findOverlayBucketEntry,
+} from "@/app/(board)/_utils/timeline-overlay";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
@@ -491,38 +495,20 @@ export default function MobileTimelineView({
     return Object.fromEntries(entries);
   }, [abBuckets, activeDay]);
   const activeDragCardId = activeDrag?.cardId ?? null;
-  const overlayBucketEntry = useMemo(() => {
-    const entries = Object.entries(activeBuckets);
-    for (const [key, items] of entries) {
-      const found = items.find((item) => item.card_id === activeDragCardId);
-      if (found) return { key, item: found };
-    }
-    return null;
-  }, [activeBuckets, activeDragCardId]);
-  const overlayBucketCard = overlayBucketEntry?.item ?? null;
-  const overlayBucketKey = overlayBucketEntry?.key ?? null;
+  const overlayBucketEntry = useMemo(
+    () => findOverlayBucketEntry(activeBuckets, activeDragCardId),
+    [activeBuckets, activeDragCardId]
+  );
   const overlayTimelineEvent = eventsForDay.find((event) => event.card_id === activeDragCardId);
-  const overlayCardData = useMemo(() => {
-    if (overlayTimelineEvent) {
-      return {
-        title: overlayTimelineEvent.title || "",
-        badge: overlayTimelineEvent.due_bucket ?? "a",
-        timeText: `${timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)} :${formatDuration(overlayTimelineEvent.durationMinutes ?? 0)}`,
-        note: overlayTimelineEvent.excerpt ?? null,
-      };
-    }
-    if (overlayBucketCard) {
-      return {
-        title: overlayBucketCard.title || "",
-        badge: overlayBucketKey ? bucketKeyToDueBucket(overlayBucketKey) : "a",
-        timeText: overlayBucketCard.duration != null
-          ? `:${formatDuration(overlayBucketCard.duration)} ${overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : ""}`
-          : (overlayBucketCard.due_start ? timeLabel(overlayBucketCard.due_start, overlayBucketCard.due_end) : null),
-        note: overlayBucketCard.excerpt ?? null,
-      };
-    }
-    return null;
-  }, [overlayBucketCard, overlayBucketKey, overlayTimelineEvent]);
+  const overlayCardData = useMemo(
+    () =>
+      buildOverlayCardData({
+        timelineEvent: overlayTimelineEvent,
+        bucketEntry: overlayBucketEntry,
+        defaultTimelineDuration: 0,
+      }),
+    [overlayBucketEntry, overlayTimelineEvent]
+  );
 
   if (!activeDay) return null;
 

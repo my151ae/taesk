@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
-import type { Card, Board, Priority, ProfileSummary, DueBucket, CardContentHistoryMeta } from "@/lib/supabase";
+import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -14,11 +14,11 @@ import {
     normalizeContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
-import { GoogleSyncToggle } from "@/app/(board)/_components/GoogleSyncToggle";
-import { ResyncCandidate, fetchResyncCandidates } from "@/app/(board)/_utils/resync";
 import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
 import CardModalSidebar from "@/app/components/card-modal/CardModalSidebar";
 import type { CardModalSavePayload, ReminderMinuteOption } from "@/app/components/card-modal/types";
+import { useCardModalHistory } from "@/app/components/card-modal/hooks/useCardModalHistory";
+import { useCardModalGoogleSync } from "@/app/components/card-modal/hooks/useCardModalGoogleSync";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -106,15 +106,7 @@ export function CardModal({
     const [targetBoardId, setTargetBoardId] = useState(card.board_id);
     const [showSidebar, setShowSidebar] = useState(false);
     const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history">("comments");
-    const [historyItems, setHistoryItems] = useState<CardContentHistoryMeta[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [historyError, setHistoryError] = useState<string | null>(null);
-    const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
-    const [previewHistoryContent, setPreviewHistoryContent] = useState<JSONContent | null>(null);
-    const [previewLoading, setPreviewLoading] = useState(false);
-    const [previewError, setPreviewError] = useState<string | null>(null);
     const [editorError, setEditorError] = useState<string | null>(null);
-    const lastTitleVisibilityRef = useRef<number | null>(null);
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardIdRef = useRef(card.id);
@@ -130,6 +122,25 @@ export function CardModal({
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
+
+    const {
+        historyItems,
+        historyLoading,
+        historyError,
+        selectedHistoryId,
+        previewHistoryContent,
+        previewLoading,
+        previewError,
+        isHistoryPreviewing,
+        resetHistoryState,
+        selectHistory: handleSelectHistory,
+        cancelHistoryPreview,
+    } = useCardModalHistory({
+        boardId: card.board_id,
+        cardId: card.id,
+        showSidebar,
+        activeSidebarTab,
+    });
 
     const filteredProfiles = useMemo(() => {
         const query = memberSearch.trim().toLowerCase();
@@ -178,10 +189,6 @@ export function CardModal({
         const dialog = dialogRef.current;
         const editorWrap = editorContainerRef.current;
         const proseMirror = editorWrap?.querySelector<HTMLElement>('.ProseMirror') ?? null;
-        const getDebugName = (el: Element | null) =>
-            el
-                ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${el.className ? `.${String(el.className).trim().replace(/\\s+/g, ".")}` : ""}`
-                : "null";
         if ((!root && !dialog) || isLoading || typeof window === "undefined") {
             setStickyOpacity(0);
             return;
@@ -209,13 +216,9 @@ export function CardModal({
 
         const updateVisibility = () => {
             rafId = 0;
-            const { maxTop, rootTop, dialogTop, editorTop, proseTop, docTop } = getScrollTop();
+            const { maxTop } = getScrollTop();
             const progress = Math.min(1, Math.max(0, maxTop / fadeDistance));
             setStickyOpacity(progress);
-            if (lastTitleVisibilityRef.current !== progress) {
-                console.log("[CardModal][StickyTitle] scrollTop:", maxTop, "opacity:", progress);
-                lastTitleVisibilityRef.current = progress;
-            }
         };
 
         const onScroll = () => {
@@ -289,18 +292,12 @@ export function CardModal({
             setEditorError(null);
             hasPendingChangesRef.current = false;
             setActiveSidebarTab('comments');
-            setHistoryItems([]);
-            setHistoryError(null);
-            setHistoryLoading(false);
-            setSelectedHistoryId(null);
-            setPreviewHistoryContent(null);
-            setPreviewError(null);
-            setPreviewLoading(false);
+            resetHistoryState();
         }
         // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
         // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
     // eslint-disable-next-line react-hooks/exhaustive-deps -- カード切替時のみ初期化する設計
-    }, [card.id]); // id 変化のみを監視
+    }, [card.id, resetHistoryState]); // id 変化のみを監視
 
     // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
     useEffect(() => {
@@ -414,52 +411,6 @@ export function CardModal({
 
     // Close member dropdown when clicking outside
     useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
-
-    const isHistoryPreviewing = previewHistoryContent !== null;
-
-    const fetchHistoryList = useCallback(async () => {
-        setHistoryLoading(true);
-        setHistoryError(null);
-        try {
-            const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/history?limit=50`);
-            const body = await response.json().catch(() => null);
-            if (!response.ok) {
-                throw new Error(body?.error?.message || '履歴の取得に失敗しました');
-            }
-            setHistoryItems(Array.isArray(body?.history) ? body.history : []);
-        } catch (error) {
-            setHistoryError(error instanceof Error ? error.message : '履歴の取得に失敗しました');
-        } finally {
-            setHistoryLoading(false);
-        }
-    }, [card.board_id, card.id]);
-
-    const handleSelectHistory = useCallback(async (historyId: string) => {
-        setSelectedHistoryId(historyId);
-        setPreviewLoading(true);
-        setPreviewError(null);
-        try {
-            const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/history/${historyId}`);
-            const body = await response.json().catch(() => null);
-            if (!response.ok) {
-                throw new Error(body?.error?.message || '履歴の取得に失敗しました');
-            }
-            const historyContent = normalizeContent(body?.history?.content);
-            setPreviewHistoryContent(historyContent);
-        } catch (error) {
-            setPreviewError(error instanceof Error ? error.message : '履歴の取得に失敗しました');
-            setPreviewHistoryContent(null);
-        } finally {
-            setPreviewLoading(false);
-        }
-    }, [card.board_id, card.id]);
-
-    const cancelHistoryPreview = useCallback(() => {
-        setSelectedHistoryId(null);
-        setPreviewHistoryContent(null);
-        setPreviewError(null);
-        setPreviewLoading(false);
-    }, []);
 
     const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; }) => {
         const normalizedDueDate = dueDate || null;
@@ -598,11 +549,6 @@ export function CardModal({
     useEffect(() => {
         requestCloseRef.current = requestClose;
     }, [requestClose]);
-
-    useEffect(() => {
-        if (!showSidebar || activeSidebarTab !== 'history') return;
-        void fetchHistoryList();
-    }, [activeSidebarTab, showSidebar, fetchHistoryList]);
 
 
     const handleAddMember = (profileId: string) => {
@@ -804,155 +750,28 @@ export function CardModal({
 
     // Google Calendar Integration
     const { connected: googleConnected, canWrite: googleCanWrite } = useGoogleCalendar();
-    // Handle calendar_sync possibly being an array or object due to Supabase join
-    const syncData = (card as Card & {
-        calendar_sync?: { status?: "active" | "unlinked" | "deleted"; last_google_event_id?: string | null } | Array<{ status?: "active" | "unlinked" | "deleted"; last_google_event_id?: string | null }>;
-    }).calendar_sync;
-    const syncStatusFromCard = Array.isArray(syncData) ? syncData[0]?.status : syncData?.status;
-    const lastGoogleEventIdFromCard = Array.isArray(syncData) ? syncData[0]?.last_google_event_id : syncData?.last_google_event_id;
-
-    const [syncStatus, setSyncStatus] = useState<"active" | "unlinked" | "deleted" | undefined>(syncStatusFromCard);
-    const [lastGoogleEventId, setLastGoogleEventId] = useState<string | undefined | null>(lastGoogleEventIdFromCard);
-
-    useEffect(() => {
-        setSyncStatus(syncStatusFromCard);
-        setLastGoogleEventId(lastGoogleEventIdFromCard);
-    }, [syncStatusFromCard, lastGoogleEventIdFromCard, card.id]);
-
-    useEffect(() => {
-        console.log("[CardModal][GoogleSync] state", {
-            cardId: card.id,
-            syncStatus,
-            lastGoogleEventId,
-            googleConnected,
-            googleCanWrite,
-        });
-    }, [card.id, syncStatus, lastGoogleEventId, googleConnected, googleCanWrite]);
-
-    useEffect(() => {
-        let cancelled = false;
-        const loadSyncStatus = async () => {
-            try {
-                const res = await fetch(`/api/calendar-sync/${card.id}`);
-                const body = await res.json().catch(() => null);
-                if (!res.ok) {
-                    console.warn("[CardModal][GoogleSync] status fetch failed", { cardId: card.id, status: res.status, body });
-                    return;
-                }
-                if (cancelled) return;
-                const nextStatus = body?.status as "active" | "unlinked" | "deleted" | undefined;
-                const nextLast = body?.last_google_event_id ?? body?.google_event_id ?? null;
-                setSyncStatus(nextStatus);
-                setLastGoogleEventId(nextLast);
-                console.log("[CardModal][GoogleSync] status fetched", { cardId: card.id, status: nextStatus, last: nextLast });
-            } catch (error) {
-                if (cancelled) return;
-                console.warn("[CardModal][GoogleSync] status fetch error", { cardId: card.id, error });
-            }
-        };
-        loadSyncStatus();
-        return () => {
-            cancelled = true;
-        };
-    }, [card.id]);
-
-    const [resyncCandidates, setResyncCandidates] = useState<ResyncCandidate[]>([]);
-    const [resyncLoading, setResyncLoading] = useState(false);
-    const [resyncError, setResyncError] = useState<string | null>(null);
-    const [resyncFetched, setResyncFetched] = useState(false);
-    const [syncNowLoading, setSyncNowLoading] = useState(false);
-    const [syncToast, setSyncToast] = useState<string | null>(null);
-
-    const handleResyncRequest = useCallback(async () => {
-        // deriveTitleFromContent here
-        const nextTitle = extractTitleTask(ensureTitleTask(content).content).text;
-        if (!nextTitle) return;
-        setResyncLoading(true);
-        setResyncError(null);
-        setResyncFetched(false);
-        try {
-            const candidates = await fetchResyncCandidates({
-                title: nextTitle,
-                start: dueDate ?? undefined,
-                end: dueDate ?? undefined,
-            });
-            setResyncCandidates(candidates);
-            setResyncFetched(true);
-            console.log("[CardModal][GoogleSync] resync candidates", {
-                cardId: card.id,
-                title: nextTitle,
-                start: dueDate,
-                end: dueDate,
-                count: candidates.length,
-            });
-        } catch (error) {
-            console.error("resync candidates error", error);
-            setResyncError(error instanceof Error ? error.message : "候補の取得に失敗しました");
-            setResyncCandidates([]);
-            setResyncFetched(true);
-        } finally {
-            setResyncLoading(false);
-        }
-    }, [content, dueDate, card.id]);
-
-    const handleResyncSelect = useCallback(async (googleEventId?: string) => {
-        setResyncLoading(true);
-        setResyncError(null);
-        setSyncToast("Google同期中...");
-        try {
-            const url = googleEventId
-                ? `/api/calendar-sync/${card.id}?google_event_id=${encodeURIComponent(googleEventId)}`
-                : `/api/calendar-sync/${card.id}`;
-            const res = await fetch(url, { method: "POST" });
-            const body = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(body?.error?.message || "再シンクに失敗しました");
-            }
-            setSyncStatus("active");
-            setLastGoogleEventId((prev) => googleEventId ?? prev ?? lastGoogleEventIdFromCard ?? null);
-            setSyncToast("Google同期が完了しました");
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "再シンクに失敗しました";
-            setResyncError(message);
-            setSyncToast(message);
-        } finally {
-            setResyncLoading(false);
-            window.setTimeout(() => setSyncToast(null), 3000);
-        }
-    }, [card.id, lastGoogleEventIdFromCard, setSyncStatus]);
-
-    const handleSyncNow = useCallback(async () => {
-        if (!dueDate || !dueStart || !dueEnd) {
-            setSyncToast("開始・終了時刻を設定してください");
-            window.setTimeout(() => setSyncToast(null), 2500);
-            return;
-        }
-        if (!googleConnected || !googleCanWrite || syncStatus !== "active") {
-            setSyncToast("Googleとシンクを有効にしてください");
-            window.setTimeout(() => setSyncToast(null), 2500);
-            return;
-        }
-        setSyncNowLoading(true);
-        setSyncToast("Google同期中...");
-        try {
-            const res = await fetch(`/api/calendar-sync/${card.id}`, { method: "POST" });
-            const body = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(body?.error?.message || "同期に失敗しました");
-            }
-            if (body?.pullStats) {
-                // Show pull-side diagnostics in console for debugging Google→Taesk
-                // pullStats: { matched, updated }
-                console.info("[GoogleSync][syncNow] pull stats", body.pullStats);
-            }
-            setSyncToast("Google同期が完了しました");
-        } catch (error) {
-            setSyncToast(error instanceof Error ? error.message : "同期に失敗しました");
-        } finally {
-            setSyncNowLoading(false);
-            window.setTimeout(() => setSyncToast(null), 3000);
-        }
-    }, [card.id, dueDate, dueEnd, dueStart, googleCanWrite, googleConnected, syncStatus]);
+    const {
+        syncStatus,
+        setSyncStatus,
+        lastGoogleEventId,
+        resyncCandidates,
+        resyncLoading,
+        resyncError,
+        resyncFetched,
+        syncNowLoading,
+        syncToast,
+        handleResyncRequest,
+        handleResyncSelect,
+        handleSyncNow,
+    } = useCardModalGoogleSync({
+        card,
+        content,
+        dueDate,
+        dueStart,
+        dueEnd,
+        googleConnected,
+        googleCanWrite,
+    });
 
     const handleDelete = () => {
         if (confirm('Delete this card?')) {

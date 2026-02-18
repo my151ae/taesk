@@ -26,6 +26,11 @@ import {
     withJstMidnight,
 } from '@/app/(board)/_utils/timeline-helpers';
 import type { DueBucket } from '@/lib/supabase';
+import {
+    extractClientPoint,
+    resolvePointerClientX,
+    resolvePointerClientY,
+} from '@/app/(board)/_hooks/timeline-dnd-pointer';
 
 export type ActiveDragState = {
     cardId: string;
@@ -167,23 +172,6 @@ export function useTimelineDragAndDrop({
     const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
     const pointerTrackingHandlerRef = useRef<((e: globalThis.PointerEvent) => void) | null>(null);
     const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
-
-    const extractClientPoint = (evt: unknown): { x: number; y: number } | null => {
-        if (!evt || typeof evt !== 'object') return null;
-        if ('clientX' in evt && 'clientY' in evt) {
-            const x = (evt as { clientX?: unknown }).clientX;
-            const y = (evt as { clientY?: unknown }).clientY;
-            if (typeof x === 'number' && typeof y === 'number') return { x, y };
-        }
-        if ('touches' in evt || 'changedTouches' in evt) {
-            const anyEvt = evt as TouchEvent;
-            const touch = anyEvt.touches?.[0] ?? anyEvt.changedTouches?.[0] ?? null;
-            if (touch && typeof touch.clientX === 'number' && typeof touch.clientY === 'number') {
-                return { x: touch.clientX, y: touch.clientY };
-            }
-        }
-        return null;
-    };
 
     const sensors = useSensors(
         useSensor(MouseSensor, {
@@ -336,7 +324,6 @@ export function useTimelineDragAndDrop({
             window.addEventListener('pointermove', handler, { passive: true });
         }
         const kind = event.active.data.current?.kind as 'event' | 'bucket';
-        console.log('[timeline] drag start', { cardId, kind });
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
             const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
@@ -355,45 +342,6 @@ export function useTimelineDragAndDrop({
     };
 
     const [isOverABList, setIsOverABList] = useState(false);
-
-    const resolvePointerClientY = (event: DragMoveEvent | DragEndEvent): number | null => {
-        const latest = latestPointerRef.current;
-        if (latest) return latest.y;
-        const activeRect = event.active.rect.current;
-        if (activeRect?.translated) {
-            return activeRect.translated.top + (activeRect.translated.height ?? 0) / 2;
-        }
-        if (activeRect?.initial) {
-            return activeRect.initial.top + (activeRect.initial.height ?? 0) / 2 + (event.delta?.y ?? 0);
-        }
-        const start = dragStartPointerRef.current;
-        if (start) return start.y + (event.delta?.y ?? 0);
-
-        const activator = event.activatorEvent as unknown;
-        if (activator && typeof activator === 'object' && 'clientY' in activator) {
-            const val = (activator as { clientY?: unknown }).clientY;
-            if (typeof val === 'number') {
-                return val;
-            }
-        }
-        return null;
-    };
-
-    const resolvePointerClientX = (event: DragMoveEvent | DragEndEvent): number | null => {
-        const latest = latestPointerRef.current;
-        if (latest) return latest.x;
-
-        const activeRect = event.active.rect.current;
-        if (activeRect?.translated) {
-            return activeRect.translated.left + (activeRect.translated.width ?? 0) / 2;
-        }
-        if (activeRect?.initial) {
-            return activeRect.initial.left + (activeRect.initial.width ?? 0) / 2 + (event.delta?.x ?? 0);
-        }
-        const start = dragStartPointerRef.current;
-        if (start) return start.x + (event.delta?.x ?? 0);
-        return null;
-    };
 
     const resolveTimelineTargetAtPointer = useCallback(
         (pointerX: number | null, pointerY: number | null) => {
@@ -482,8 +430,8 @@ export function useTimelineDragAndDrop({
 
     const updateDragAutoScroll = useCallback(
         (event: DragMoveEvent) => {
-            const pointerX = resolvePointerClientX(event);
-            const pointerY = resolvePointerClientY(event);
+            const pointerX = resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current);
+            const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
             if (pointerX == null || pointerY == null) {
                 stopDragAutoScroll();
                 return;
@@ -589,8 +537,8 @@ export function useTimelineDragAndDrop({
         }
         const overType = event.over?.data.current?.type;
 
-        const pointerX = resolvePointerClientX(event);
-        const pointerY = resolvePointerClientY(event);
+            const pointerX = resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current);
+            const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
         const visualTimelineTarget = resolveTimelineTargetAtPointer(pointerX, pointerY);
         const hoveredAbEl =
             pointerX != null && pointerY != null ? findAbScrollContainerAtPointer(pointerX, pointerY) : null;
@@ -607,7 +555,7 @@ export function useTimelineDragAndDrop({
             const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
             const items = bucketKey && data?.abBuckets ? data.abBuckets[bucketKey] ?? [] : [];
             if (bucketKey && items.length) {
-                const pointerY = resolvePointerClientY(event);
+                    const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
                 const bucketRect = event.over?.rect;
                 let targetIndex = 0;
                 if (bucketRect && pointerY != null) {
@@ -656,8 +604,8 @@ export function useTimelineDragAndDrop({
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over, delta } = event;
-        const pointerX = resolvePointerClientX(event);
-        const pointerY = resolvePointerClientY(event);
+        const pointerX = resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current);
+        const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
         const visualTimelineTarget = resolveTimelineTargetAtPointer(pointerX, pointerY);
         stopDragAutoScroll();
         stopPointerTracking();
@@ -675,13 +623,6 @@ export function useTimelineDragAndDrop({
         const sourceBucketItem = active.data.current?.item as TimelineBucketItem | undefined;
 
         const overType = visualTimelineTarget ? 'timeline-column' : over?.data.current?.type;
-
-        console.log('[timeline] drag end', {
-            cardId,
-            overType,
-            from: active.data.current?.kind,
-            data: active.data.current,
-        });
 
         if (overType === 'bucket-item-top' || overType === 'bucket-item-bottom') {
             const bucketKey = over?.data.current?.bucketKey as string | undefined;

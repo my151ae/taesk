@@ -7,6 +7,69 @@ const TABLE_LISTS = "lists";
 const TABLE_CARDS = "cards";
 
 type BoardRecord = Board;
+type BoardQueryError = {
+  name?: string;
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  status?: number;
+  raw?: string;
+};
+
+const MAX_BOARD_FETCH_RETRIES = 3;
+
+function toBoardQueryError(error: unknown): BoardQueryError {
+  if (!error || typeof error !== "object") {
+    if (typeof error === "string") return { message: error, raw: error };
+    return { raw: String(error) };
+  }
+  const value = error as Record<string, unknown>;
+  const ownKeys = Reflect.ownKeys(value).map((key) => String(key));
+  const status = typeof value.status === "number"
+    ? value.status
+    : typeof (value.response as { status?: unknown } | undefined)?.status === "number"
+      ? ((value.response as { status?: unknown }).status as number)
+      : undefined;
+  let raw: string | undefined;
+  if (error instanceof Error) {
+    raw = `${error.name}: ${error.message}`;
+  } else {
+    try {
+      const json = JSON.stringify(value);
+      raw = json && json !== "{}"
+        ? json
+        : `${Object.prototype.toString.call(error)} keys=[${ownKeys.join(", ")}]`;
+    } catch {
+      raw = `${Object.prototype.toString.call(error)} keys=[${ownKeys.join(", ")}]`;
+    }
+  }
+  return {
+    name: typeof value.name === "string" ? value.name : undefined,
+    message: typeof value.message === "string" ? value.message : undefined,
+    code: typeof value.code === "string" ? value.code : undefined,
+    details: typeof value.details === "string" ? value.details : undefined,
+    hint: typeof value.hint === "string" ? value.hint : undefined,
+    status,
+    raw,
+  };
+}
+
+function isRetryableBoardQueryError(error: BoardQueryError): boolean {
+  if (error.status != null) {
+    if (error.status === 408 || error.status === 429) return true;
+    if (error.status >= 500) return true;
+    return false;
+  }
+
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("fetch") ||
+    message.includes("connection")
+  );
+}
 
 export async function getBoardByShortId(shortId: string): Promise<BoardRecord | null> {
   if (!shortId) return null;
@@ -19,8 +82,12 @@ export async function getBoardByShortId(shortId: string): Promise<BoardRecord | 
     .maybeSingle();
 
   if (error) {
-    console.error("[boards] getBoardByShortId error:", error);
-    throw error;
+    const normalizedError = toBoardQueryError(error);
+    console.warn("[boards] getBoardByShortId failed:", {
+      shortId,
+      error: normalizedError,
+    });
+    return null;
   }
 
   return data ?? null;
@@ -31,8 +98,7 @@ export async function getBoardById(boardId: string): Promise<BoardRecord | null>
 
   const supabase = await createServerSupabaseClient();
 
-  // Simple retry logic for transient errors
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAX_BOARD_FETCH_RETRIES; i++) {
     const { data, error } = await supabase
       .from(TABLE_BOARDS)
       .select("*")
@@ -43,10 +109,24 @@ export async function getBoardById(boardId: string): Promise<BoardRecord | null>
       return data ?? null;
     }
 
-    // If it's the last attempt, log and throw
-    if (i === 2) {
-      console.error("[boards] getBoardById error after retries:", error);
-      // Return null instead of throwing to allow graceful handling
+    const normalizedError = toBoardQueryError(error);
+    const shouldRetry = isRetryableBoardQueryError(normalizedError);
+
+    if (!shouldRetry) {
+      console.warn("[boards] getBoardById non-retryable:", {
+        boardId,
+        attempt: i + 1,
+        error: normalizedError,
+      });
+      return null;
+    }
+
+    if (i === MAX_BOARD_FETCH_RETRIES - 1) {
+      console.warn("[boards] getBoardById retry exhausted:", {
+        boardId,
+        attempt: i + 1,
+        error: normalizedError,
+      });
       return null;
     }
 

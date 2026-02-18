@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Board, Card } from "@/lib/supabase";
-import { buildBoardUrl } from "@/lib/board-url";
 
 import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -37,9 +36,11 @@ import { useTimelineFiltering } from "@/app/(board)/_hooks/useTimelineFiltering"
 import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigation";
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
 import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
-import { useBoardMembersStore, type BoardMember } from "@/app/(board)/_stores/board-members-store";
+import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { findTimelineCardById } from "@/app/(board)/_utils/timeline-card-lookup";
 import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
+import { useTimelineBoardShell } from "@/app/(board)/_hooks/useTimelineBoardShell";
+import { useSpatialArrowFocus } from "@/app/(board)/_hooks/useSpatialArrowFocus";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -63,8 +64,6 @@ const todayJstIso = () =>
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
@@ -112,27 +111,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     closeContextMenu,
   } = useTimelineContextMenu({ focusCardById });
 
-  // Fetch profile and boards
-  const fetchProfile = useCallback(async () => {
-    if (!user) return;
-    try {
-      const response = await fetch('/api/profiles');
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-        if (data?.timeline_start_hour !== undefined) {
-          setTimelineStartHour(data.timeline_start_hour);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
   // 1. URL State
   const {
     urlDate,
@@ -153,9 +131,26 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   // Compute effective range based on mode
   const effectiveDayRange = viewMode === 'timeline' ? Math.min(intendedDayRange, 7) : intendedDayRange;
 
-  const currentBoard = availableBoards.find(b => b.id === initialBoard.id) || initialBoard;
-  const { boardMembers, setBoardMembers } = useBoardMembers(currentBoard?.id ?? null);
+  const { boardMembers, setBoardMembers } = useBoardMembers(initialBoard.id);
   const { setMembers: setStoredMembers } = useBoardMembersStore();
+  const {
+    profile,
+    availableBoards,
+    setAvailableBoards,
+    fetchProfile,
+    refreshBoardMembers,
+    handleBoardNavigate: navigateBoard,
+    handleUpdateBoard,
+  } = useTimelineBoardShell({
+    initialBoard,
+    currentBoardId: initialBoard.id,
+    userId: user?.id,
+    router,
+    onTimelineStartHour: setTimelineStartHour,
+    setBoardMembers,
+    setStoredMembers,
+  });
+  const currentBoard = availableBoards.find((b) => b.id === initialBoard.id) || initialBoard;
 
   // 2. Data Fetching
   const {
@@ -344,31 +339,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     hourHeight, // [NEW]
   });
 
-  // Fetch profile and boards
-  useEffect(() => {
-    fetch('/api/boards').then(r => r.json()).then(b => setAvailableBoards(b.boards || [])).catch(console.error);
-  }, [user]);
-
-  const refreshBoardMembers = useCallback(async () => {
-    if (!currentBoard?.id) return;
-    try {
-      const response = await fetch(`/api/boards/${currentBoard.id}/members`);
-      if (!response.ok) {
-        console.warn('[timeline] failed to refresh board members', { status: response.status });
-        return;
-      }
-      const { members } = await response.json();
-      const nextMembers: BoardMember[] = (members || []).map((m: { profile: BoardMember["profile"]; role: BoardMember["role"] }) => ({
-        profile: m.profile,
-        role: m.role,
-      }));
-      setBoardMembers(nextMembers.map((m) => m.profile));
-      setStoredMembers(currentBoard.id, nextMembers);
-    } catch (error) {
-      console.error('[timeline] failed to refresh board members', error);
-    }
-  }, [currentBoard?.id, setBoardMembers, setStoredMembers]);
-
   // Click outside board menu
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -379,28 +349,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, []);
 
   const handleBoardNavigate = useCallback((board: Board) => {
-    const target = buildBoardUrl(board);
-    router.push(target || `/b/${board.short_id}` || `/board?boardId=${board.id}`);
+    navigateBoard(board);
     setShowBoardMenu(false);
-  }, [router]);
-
-  const handleUpdateBoard = useCallback(async (updates: Partial<Board>) => {
-    try {
-      const response = await fetch(`/api/boards/${currentBoard.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error("Failed to update board");
-      const { board: updatedBoard } = await response.json();
-      setAvailableBoards((prev) =>
-        prev.map((b) => (b.id === updatedBoard.id ? updatedBoard : b)),
-      );
-    } catch (error) {
-      console.error("Failed to update board", error);
-      alert("Failed to update board");
-    }
-  }, [currentBoard.id]);
+  }, [navigateBoard]);
 
   const handleDayRangeUpdate = useCallback((newRange: number) => {
     handleDayRangeChange(newRange);
@@ -484,106 +435,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [filteredData?.events]);
 
   // グローバルな空間ナビゲーション（物理的な位置に基づいた移動）
-  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-
-    const target = event.target as HTMLElement;
-    const tagName = target.tagName;
-
-    // コンテキストメニュー等、独自の矢印操作を持つUIでは介入しない
-    if (target.closest('[data-arrow-skip="true"]')) return;
-
-    // テキスト入力フィールドでのみ矢印キーの標準動作を許可
-    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable) {
-      return;
-    }
-
-    const container = event.currentTarget;
-    const active = document.activeElement as HTMLElement | null;
-    if (!active || active === document.body) return;
-
-    // フォーカス可能な要素を取得
-    const tabStops = Array.from(container.querySelectorAll(
-      'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"]):not([disabled])'
-    )).filter((el): el is HTMLElement => {
-      if (!(el instanceof HTMLElement)) return false;
-      const style = window.getComputedStyle(el);
-      return style.display !== 'none' &&
-        style.visibility !== 'hidden' &&
-        style.opacity !== '0' &&
-        el.getBoundingClientRect().width > 0;
-    });
-
-    if (!tabStops.length) return;
-
-    // 現在の要素の矩形情報を取得
-    const activeRect = active.getBoundingClientRect();
-    const activeCenter = {
-      x: activeRect.left + activeRect.width / 2,
-      y: activeRect.top + activeRect.height / 2
-    };
-
-    let bestCandidate: HTMLElement | null = null;
-    let minScore = Infinity;
-
-    for (const candidate of tabStops) {
-      if (candidate === active) continue;
-
-      const rect = candidate.getBoundingClientRect();
-      const center = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-      };
-
-      const dx = center.x - activeCenter.x;
-      const dy = center.y - activeCenter.y;
-
-      // キーの方向と一致するか確認
-      let isCorrectDirection = false;
-      let primaryDist = 0;
-      let secondaryDist = 0;
-
-      switch (event.key) {
-        case 'ArrowRight':
-          isCorrectDirection = dx > 0 && Math.abs(dx) > Math.abs(dy) * 0.5;
-          primaryDist = dx;
-          secondaryDist = dy;
-          break;
-        case 'ArrowLeft':
-          isCorrectDirection = dx < 0 && Math.abs(dx) > Math.abs(dy) * 0.5;
-          primaryDist = -dx;
-          secondaryDist = dy;
-          break;
-        case 'ArrowDown':
-          isCorrectDirection = dy > 0 && Math.abs(dy) > Math.abs(dx) * 0.5;
-          primaryDist = dy;
-          secondaryDist = dx;
-          break;
-        case 'ArrowUp':
-          isCorrectDirection = dy < 0 && Math.abs(dy) > Math.abs(dx) * 0.5;
-          primaryDist = -dy;
-          secondaryDist = dx;
-          break;
-      }
-
-      if (isCorrectDirection) {
-        // スコア計算: 直進方向の距離 + 垂直方向のズレ（重み付け）
-        const score = primaryDist + (Math.abs(secondaryDist) * 2.5);
-        if (score < minScore) {
-          minScore = score;
-          bestCandidate = candidate;
-        }
-      }
-    }
-
-    if (bestCandidate) {
-      event.preventDefault();
-      event.stopPropagation();
-      bestCandidate.focus();
-      bestCandidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
-  }, []);
+  const handleArrowKeyFocus = useSpatialArrowFocus();
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>

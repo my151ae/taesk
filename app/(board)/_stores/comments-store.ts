@@ -10,6 +10,14 @@ import {
   type CreateCommentParams,
   type UpdateCommentParams,
 } from '@/lib/api/comments';
+import {
+  type PendingComment,
+  getTempId,
+  isOffline,
+  loadPendingQueue,
+  persistPendingQueue,
+  randomId,
+} from '@/app/(board)/_stores/comments-pending-queue';
 
 type CommentStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -23,15 +31,6 @@ interface CardCommentState {
   comments: BoardComment[];
   status: CommentStatus;
   error?: string;
-}
-
-interface PendingComment {
-  tempId: string;
-  idempotencyKey: string;
-  params: CreateCommentParams;
-  authorProfile: ProfileSummary | null;
-  authorId: string | null;
-  addedAt: number;
 }
 
 interface SubmitCommentInput extends CreateCommentParams {
@@ -57,49 +56,11 @@ interface CommentsStore {
   clearError: (cardId: string) => void;
 }
 
-const COMMENT_QUEUE_KEY = 'taesk-comments-pending-comments';
-
-const isBrowser = typeof window !== 'undefined';
-
-const loadPendingQueue = (): PendingComment[] => {
-  if (!isBrowser) return [];
-
-  try {
-    const raw = window.localStorage.getItem(COMMENT_QUEUE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as PendingComment[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.warn('[comments-store] Failed to parse pending queue', error);
-    return [];
-  }
-};
-
-const persistPendingQueue = (queue: PendingComment[]) => {
-  if (!isBrowser) return;
-  try {
-    window.localStorage.setItem(COMMENT_QUEUE_KEY, JSON.stringify(queue));
-  } catch (error) {
-    console.warn('[comments-store] Failed to persist pending queue', error);
-  }
-};
-
 const getInitialCardState = (): CardCommentState => ({
   comments: [],
   status: 'idle',
   error: undefined,
 });
-
-const isOffline = () => (typeof navigator !== 'undefined' ? !navigator.onLine : false);
-
-const randomId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
-};
-
-const getTempId = () => `temp-${randomId()}`;
 
 export const useCommentsStore = create<CommentsStore>((set, get) => ({
   cards: {},
@@ -511,7 +472,7 @@ export const useCommentsStore = create<CommentsStore>((set, get) => ({
 let listenersRegistered = false;
 
 export const initializeCommentsStore = () => {
-  if (!isBrowser || listenersRegistered) return;
+  if (typeof window === 'undefined' || listenersRegistered) return;
   listenersRegistered = true;
 
   window.addEventListener('online', () => {
