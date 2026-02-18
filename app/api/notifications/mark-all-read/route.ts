@@ -1,13 +1,13 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 /**
  * POST /api/notifications/mark-all-read
  * Marks all notifications as read for the authenticated user
  */
-export async function POST() {
-  try {
-    const supabase = await createServerSupabaseClient();
+const postHandler = async () => {
+  const supabase = await createServerSupabaseClient();
 
     // Get authenticated user
     const {
@@ -34,9 +34,7 @@ export async function POST() {
       );
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Unexpected error in mark-all-read:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ success: true });
+};
+
+export const POST = withErrorHandling(postHandler, 'notifications-mark-all-read-post');

@@ -7,6 +7,7 @@ import {
   requireAuthenticatedUser,
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 type BoardMemberRow = {
   board_id: string;
@@ -25,21 +26,19 @@ async function getActorMembership(
 }
 
 // GET /api/boards/[boardId]/members - List members with optional search
-export async function GET(
+const getHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
   const supabase = await createServerSupabaseClient();
   const { boardId } = await params;
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
-
-  try {
-    // Get current user
-    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-    if (errorResponse || !user) {
-      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // Get current user
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     const actorMembership = await getActorMembership(supabase, boardId, user.id);
     if (!actorMembership) {
@@ -106,18 +105,14 @@ export async function GET(
       })
       .filter((member): member is { board_id: string; profile_id: string; role: MemberRole; created_at: string; profile: ProfileSummary } => Boolean(member.profile));
 
-    return NextResponse.json({ members: transformedMembers });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/boards/[boardId]/members:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ members: transformedMembers });
+};
 
 // POST /api/boards/[boardId]/members - Add member
-export async function POST(
+const postHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
   const originError = validateMutationRequestOrigin(request);
   if (originError) {
     return originError;
@@ -125,12 +120,10 @@ export async function POST(
 
   const supabase = await createServerSupabaseClient();
   const { boardId } = await params;
-
-  try {
-    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-    if (errorResponse || !user) {
-      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     const actorMembership = await getActorMembership(supabase, boardId, user.id);
     if (!actorMembership || !hasAnyRole(actorMembership.role, ['owner', 'editor'])) {
@@ -167,9 +160,8 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ member: newMember }, { status: 201 });
-  } catch (error) {
-    console.error('Unexpected error in POST /api/boards/[boardId]/members:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ member: newMember }, { status: 201 });
+};
+
+export const GET = withErrorHandling(getHandler, 'board-members-get');
+export const POST = withErrorHandling(postHandler, 'board-members-post');

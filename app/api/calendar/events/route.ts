@@ -9,6 +9,7 @@ import {
   hasCalendarWritePermission,
 } from "@/lib/googleCalendarServer";
 import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ const parseDateParam = (value: string | null) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -166,4 +167,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
+
+export const GET = withErrorHandling(getHandler, "calendar-events-get");

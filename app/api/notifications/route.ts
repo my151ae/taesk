@@ -1,16 +1,15 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import { Notification } from '@/lib/supabase';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 // GET /api/notifications - List notifications for current user
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     // Fetch notifications
     const { data: notifications, error } = await supabase
@@ -25,22 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ notifications: notifications || [] });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/notifications:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ notifications: notifications || [] });
+};
 
 // POST /api/notifications - Create a notification
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     const body = await request.json();
     const { recipient_id, type, payload } = body as {
@@ -79,9 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ notification }, { status: 201 });
-  } catch (error) {
-    console.error('Unexpected error in POST /api/notifications:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ notification }, { status: 201 });
+};
+
+export const GET = withErrorHandling(getHandler, 'notifications-get');
+export const POST = withErrorHandling(postHandler, 'notifications-post');

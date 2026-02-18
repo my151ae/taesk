@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { GoogleCalendarNotConnectedError, listCachedEventsForRange } from "@/lib/googleCalendarServer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 // Lightweight Jaro-Winkler implementation (ASCII only)
 function jaroWinkler(a: string, b: string): number {
@@ -62,7 +63,7 @@ export const runtime = "nodejs";
  * - start/end: ISO（日付範囲）省略時は過去4週〜未来12週のデフォルトを利用
  * レスポンス: 類似度0.75以上の Googleキャッシュイベントを返す（最大50件）
  */
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -110,4 +111,6 @@ export async function GET(request: NextRequest) {
     console.error("[resync-candidates] error", error);
     return NextResponse.json({ error: { code: "INTERNAL_ERROR" } }, { status: 500 });
   }
-}
+};
+
+export const GET = withErrorHandling(getHandler, "calendar-resync-candidates-get");

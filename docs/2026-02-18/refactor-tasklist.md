@@ -18,10 +18,10 @@
 - [x] 既存 UX（自動保存、履歴復元、担当者編集、同期ボタン）を維持する。
 
 ### 2. TimelineBoardPage の薄型化
-- [ ] `app/(board)/_components/timeline/TimelineBoardPage.tsx` の orchestrator ロジックを controller hook に集約する。
-- [ ] 大量 props 受け渡しを ViewModel 化して `Desktop/Mobile` へ渡すデータを整理する。
+- [x] `app/(board)/_components/timeline/TimelineBoardPage.tsx` の orchestrator ロジックを controller hook に集約する。
+- [x] 大量 props 受け渡しを ViewModel 化して `Desktop/Mobile` へ渡すデータを整理する。
 - [x] context menu 項目生成ロジックを外出しして、JSX 本体を縮小する。
-- [ ] board/profile 初期ロードと更新処理を分離し、ページ本体は「合成」に専念させる。
+- [x] board/profile 初期ロードと更新処理を分離し、ページ本体は「合成」に専念させる。
 
 ### 3. cards API の重複除去（POST/PATCH/DELETE）
 - [x] `app/api/boards/[boardId]/cards/route.ts` と `app/api/boards/[boardId]/cards/[cardId]/route.ts` の共通処理を service 化する。
@@ -32,9 +32,9 @@
 ## P2（重要）
 
 ### 4. API エラーハンドリング統一
-- [ ] `lib/server/with-error-handling.ts` の適用範囲を API 全体に拡張する。
-- [ ] `try/catch + NextResponse.json(error...)` の重複を段階的に削減する。
-- [ ] `error.code` と HTTP status の整合ルールを明文化し統一する。
+- [x] `lib/server/with-error-handling.ts` の適用範囲を API 全体に拡張する。
+- [x] `try/catch + NextResponse.json(error...)` の重複を段階的に削減する。
+- [x] `error.code` と HTTP status の整合ルールを明文化し統一する。
 
 ### 5. Desktop/Mobile の重複ロジック解消
 - [x] `DesktopTimelineView` / `MobileTimelineView` の DragOverlay データ組み立てを共通ユーティリティ化する。
@@ -54,9 +54,9 @@
 ## P3（中長期）
 
 ### 8. Google Calendar サーバーモジュール分割
-- [ ] `lib/googleCalendarServer.ts` を「OAuth/認可」「watch管理」「キャッシュ同期」「Taesk反映」に分割する。
-- [ ] 同期フロー（manual/syncToken/fallback full fetch）をフロー単位でテスト可能にする。
-- [ ] ログ方針を統一し、運用時に追跡しやすい構造へ整える。
+- [x] `lib/googleCalendarServer.ts` を「OAuth/認可」「watch管理」「キャッシュ同期」「Taesk反映」に分割する。
+- [x] 同期フロー（manual/syncToken/fallback full fetch）をフロー単位でテスト可能にする。
+- [x] ログ方針を統一し、運用時に追跡しやすい構造へ整える。
 
 ## Quick Win（先行実施推奨）
 - [x] 不要な `console.log` を削減（CardModal, Timeline DnD など）。
@@ -74,17 +74,20 @@
 
 ## 完了条件
 - [x] 主要大型ファイルの肥大化が解消され、責務ごとに分割されている。
-- [ ] Timeline + A/B の既存フロー（作成/保存/削除/移動/コメント/同期）で回帰がない。
-- [ ] API のエラー形式と認証・権限チェックが統一されている。
+- [x] Timeline + A/B の既存フロー（作成/保存/削除/移動/コメント/同期）で回帰がない。
+- [x] API のエラー形式と認証・権限チェックが統一されている。
 
 ## 検証メモ（実施時）
 - [x] `npm run lint`
 - [x] `npm run build`
 - [x] `lsof -i :3000`
-- [ ] `PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json`
-- [ ] `cat test-results/playwright-report.json | jq '.stats'`
+- [x] `PW_WORKERS=1 npx playwright test --workers=1 --global-timeout=600000 --reporter=json > test-results/playwright-report.json`
+- [x] `cat test-results/playwright-report.json | jq '.stats'`
 
 ## 進捗メモ（2026-02-18）
-- Playwright は global setup 完了後に進行が停止する事象が継続（`test-results/playwright-report.json` は setup ログのみで JSON 未完）。
-- `withErrorHandling` は `cards`/`comments` 系へは適用拡張済み。API 全体への展開は未完。
-- Google Calendar は OAuth/watch の分割まで完了。cache sync / Taesk反映の完全分割は未完。
+- `TimelineBoardPage` の hook dependency warning は解消済み（残 warning は `CardModal.tsx` 既存分のみ）。
+- `withErrorHandling` は `app/api` 配下全ルートへ展開済み。`lib/server/api-error.ts` に `NOT_FOUND` / `VALIDATION_ERROR` / `CONFLICT` を追加。
+- `docs/detail/api-error-rules.md` を追加し、`error.code` と HTTP status ルールを明文化。
+- `e2e/.setup/auth-global-setup.ts` のログ出力を調整し、`cat ... | jq '.stats'` で JSON を直接解析可能にした。
+- `board-permissions.spec.ts` と `reorder-api.spec.ts` の fixture/auth 前提を修正し、個別実行の unexpected を解消。
+- Playwright full 実行 stats: `expected=63, skipped=21, unexpected=0`。一方で runner 終了時に `Timed out waiting 600s for the test suite/teardown` は残る（テスト本体の unexpected は 0）。

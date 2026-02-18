@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { Board, Card } from "@/lib/supabase";
+import type { Board } from "@/lib/supabase";
 
 import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -35,12 +35,12 @@ import { useTimelineViewport } from "@/app/(board)/_hooks/useTimelineViewport";
 import { useTimelineFiltering } from "@/app/(board)/_hooks/useTimelineFiltering";
 import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigation";
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
-import { useBoardMembers } from "@/app/(board)/_hooks/useBoardMembers";
-import { useBoardMembersStore } from "@/app/(board)/_stores/board-members-store";
 import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
-import { useTimelineBoardShell } from "@/app/(board)/_hooks/useTimelineBoardShell";
 import { useSpatialArrowFocus } from "@/app/(board)/_hooks/useSpatialArrowFocus";
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
+import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimelineBoardInitialization";
+import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
+import { useTimelineBoardController } from "@/app/(board)/_hooks/useTimelineBoardController";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -64,38 +64,11 @@ const todayJstIso = () =>
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const [showBoardMenu, setShowBoardMenu] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [showBoardSettings, setShowBoardSettings] = useState(false);
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
-  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
-
-  const [activeDayIndex, setActiveDayIndex] = useState(0);
-  const [calendarPreset, setCalendarPreset] = useState<'visible' | 'this-week' | 'next-week'>('visible');
-
-  // Timeline UI specific settings from profile (fallback to 5)
-  const [timelineStartHour, setTimelineStartHour] = useState(5);
 
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight); // [NEW]
 
   const searchParams = useSearchParams();
-
-  // Individual ranges for each view mode
-  const [timelineRange, setTimelineRange] = useState(initialBoard.day_range || 2);
-  const [listRange, setListRange] = useState(initialBoard.list_range || 30);
-  const [listBaseDate, setListBaseDate] = useState<string>(() => todayJstIso());
-  const [listBaseOffset, setListBaseOffset] = useState(0);
-  const [listMonthDirection, setListMonthDirection] = useState<1 | 2 | 3 | -1 | -2 | -3>(1);
-
-  // View Mode: timeline or list
-  const initialViewMode = useMemo(() => {
-    const range = searchParams.get('range');
-    return range && parseInt(range, 10) >= 30 ? 'list' : 'timeline';
-  }, [searchParams]);
-
-  const [viewMode, setViewMode] = useState<'timeline' | 'list'>(initialViewMode);
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
     const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
@@ -122,18 +95,49 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialRange: dayRange,
   } = useTimelineUrlState({ initialDayRange: initialBoard.day_range });
 
-  // Compute intended day range based on current viewMode state immediately
-  // This avoids flashing when viewMode changes but URL has not yet updated
-  const intendedDayRange = useMemo(() => {
-    return viewMode === 'timeline' ? timelineRange : listRange;
-  }, [viewMode, timelineRange, listRange]);
-
-  // Compute effective range based on mode
-  const effectiveDayRange = viewMode === 'timeline' ? Math.min(intendedDayRange, 7) : intendedDayRange;
-
-  const { boardMembers, setBoardMembers } = useBoardMembers(initialBoard.id);
-  const { setMembers: setStoredMembers } = useBoardMembersStore();
   const {
+    showBoardMenu,
+    setShowBoardMenu,
+    showShareDialog,
+    setShowShareDialog,
+    showNotificationSettings,
+    setShowNotificationSettings,
+    showProfileSettings,
+    setShowProfileSettings,
+    showBoardSettings,
+    setShowBoardSettings,
+    showShortcutsModal,
+    setShowShortcutsModal,
+    activeDayIndex,
+    setActiveDayIndex,
+    calendarPreset,
+    setCalendarPreset,
+    timelineStartHour,
+    setTimelineStartHour,
+    viewMode,
+    timelineRange,
+    setTimelineRange,
+    listRange,
+    setListRange,
+    listBaseDate,
+    setListBaseDate,
+    listBaseOffset,
+    setListBaseOffset,
+    listMonthDirection,
+    setListMonthDirection,
+    intendedDayRange,
+    effectiveDayRange,
+    handleSetViewMode,
+  } = useTimelineBoardController({
+    searchParams,
+    initialTimelineRange: initialBoard.day_range,
+    initialListRange: initialBoard.list_range,
+    urlDate,
+    updateUrl,
+  });
+
+  const {
+    boardMembers,
     profile,
     availableBoards,
     setAvailableBoards,
@@ -141,16 +145,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     refreshBoardMembers,
     handleBoardNavigate: navigateBoard,
     handleUpdateBoard,
-  } = useTimelineBoardShell({
+    currentBoard,
+  } = useTimelineBoardInitialization({
     initialBoard,
     currentBoardId: initialBoard.id,
     userId: user?.id,
     router,
     onTimelineStartHour: setTimelineStartHour,
-    setBoardMembers,
-    setStoredMembers,
   });
-  const currentBoard = availableBoards.find((b) => b.id === initialBoard.id) || initialBoard;
 
   // 2. Data Fetching
   const {
@@ -346,12 +348,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  }, [setShowBoardMenu]);
 
   const handleBoardNavigate = useCallback((board: Board) => {
     navigateBoard(board);
     setShowBoardMenu(false);
-  }, [navigateBoard]);
+  }, [navigateBoard, setShowBoardMenu]);
 
   const handleDayRangeUpdate = useCallback((newRange: number) => {
     handleDayRangeChange(newRange);
@@ -362,7 +364,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       setListRange(newRange);
       handleUpdateBoard({ list_range: newRange });
     }
-  }, [viewMode, handleDayRangeChange, handleUpdateBoard]);
+  }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange, setListRange]);
 
   const fetchListWindow = useCallback(async (baseOffset: number, monthDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
     if (status === "loading") return;
@@ -377,7 +379,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     const anchorDay = payload?.days?.[Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0))] ?? data?.days?.[0];
     if (anchorDay) updateUrl(anchorDay.isoDate, range, null);
     setActiveDayIndex(0);
-  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl]);
+  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl, setListRange, setActiveDayIndex]);
 
   const shiftListWindow = useCallback((delta: number) => {
     const nextBaseOffset = listBaseOffset + delta;
@@ -389,7 +391,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       return d.toISOString().slice(0, 10);
     });
     void fetchListWindow(nextBaseOffset, listMonthDirection);
-  }, [listBaseOffset, fetchListWindow, listMonthDirection]);
+  }, [listBaseOffset, fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
 
   const handleListPrevDay = useCallback(() => shiftListWindow(-1), [shiftListWindow]);
   const handleListNextDay = useCallback(() => shiftListWindow(1), [shiftListWindow]);
@@ -400,11 +402,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setListBaseOffset(0);
     setListBaseDate(today);
     void fetchListWindow(0, listMonthDirection);
-  }, [fetchListWindow, listMonthDirection]);
+  }, [fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
   const handleListMonthDirectionChange = useCallback((nextDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
     setListMonthDirection(nextDirection);
     void fetchListWindow(listBaseOffset, nextDirection);
-  }, [listBaseOffset, fetchListWindow]);
+  }, [listBaseOffset, fetchListWindow, setListMonthDirection]);
 
   const handleListBaseDateChange = useCallback((nextIsoDate: string) => {
     if (!nextIsoDate || !listBaseDate) return;
@@ -413,17 +415,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setListBaseOffset(nextBaseOffset);
     setListBaseDate(nextIsoDate);
     void fetchListWindow(nextBaseOffset, listMonthDirection);
-  }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection]);
-
-  const handleSetViewMode = useCallback((mode: 'timeline' | 'list') => {
-    setViewMode(mode);
-    const targetRange = mode === 'timeline' ? timelineRange : listRange;
-
-    // Direct URL update to be more reliable than handleDayRangeChange
-    // which might guard against missing data
-    const currentDayIso = data?.days?.[activeDayIndex]?.isoDate || urlDate || new Date().toISOString().split('T')[0];
-    updateUrl(currentDayIso, targetRange, null);
-  }, [timelineRange, listRange, updateUrl, data?.days, activeDayIndex, urlDate]);
+  }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
@@ -454,6 +446,63 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   // グローバルな空間ナビゲーション（物理的な位置に基づいた移動）
   const handleArrowKeyFocus = useSpatialArrowFocus();
 
+  const { timelineViewModel, listViewModel } = useTimelineBoardViewModels({
+    days: data?.days ?? [],
+    activeDayIndex,
+    effectiveDayRange,
+    timelineScrollRefDesktop: desktopTimelineScrollRef,
+    timelineScrollRefMobile: mobileTimelineScrollRef,
+    timelineHeaderRef,
+    debouncedHandleScroll,
+    handleTimelineViewMount,
+    openCardModal,
+    handleToggleCardChecked,
+    activeResize,
+    handleResizeStart,
+    handleResizeMove,
+    handleResizeEnd,
+    calendarEventsByDay,
+    calendarAllDayEventsByDay,
+    handleExternalEventClick,
+    timelineStartHour,
+    registerAbScrollContainer,
+    status,
+    handlePrevDay,
+    handleNextDay,
+    eventsByDay,
+    abBuckets: filteredData?.abBuckets ?? {},
+    indicatorTop,
+    liveNowIsoDate,
+    timelineViewportHeight,
+    activeDrag,
+    pointerPreview,
+    bucketIndicator,
+    handleEventKeyDown,
+    handleColumnClick,
+    handleBucketClick,
+    sensors,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDragCancel,
+    isOverABList,
+    timelineHeaderHeight,
+    handleCardContextMenu,
+    handleCardContextMenuByKeyboard,
+    contextMenuCardId: contextMenu.cardId,
+    boardMembers,
+    onOpenShareDialog: () => setShowShareDialog(true),
+    listBaseDate,
+    listMonthDirection,
+    handleListMonthDirectionChange,
+    handleListBaseDateChange,
+    handleListPrevDay,
+    handleListNextDay,
+    handleListPrevWeek,
+    handleListNextWeek,
+    handleListToday,
+  });
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-2 pt-4 md:px-0 md:pt-6">
@@ -477,6 +526,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
           viewMode={viewMode} setViewMode={handleSetViewMode}
           onShortcutsClick={() => setShowShortcutsModal(true)}
+          onOpenShareDialog={() => setShowShareDialog(true)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
           listStartDate={listBaseDate ?? null}
@@ -485,140 +535,20 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         {viewMode === 'timeline' ? (
           <>
             <div className="hidden md:block">
-              <DesktopTimelineView
-                days={data?.days ?? []}
-                activeDayIndex={activeDayIndex}
-                dayRange={effectiveDayRange}
-                timelineScrollRef={desktopTimelineScrollRef}
-                onScroll={debouncedHandleScroll}
-                onMount={handleTimelineViewMount}
-                openCardModal={openCardModal}
-                onToggleCheck={handleToggleCardChecked}
-                activeResize={activeResize}
-                handleResizeStart={handleResizeStart}
-                handleResizeMove={handleResizeMove}
-                handleResizeEnd={handleResizeEnd}
-                calendarEventsByDay={calendarEventsByDay}
-                onExternalEventClick={handleExternalEventClick}
-                timelineStartHour={timelineStartHour}
-                timelineHeaderRef={timelineHeaderRef}
-                registerAbScrollContainer={registerAbScrollContainer}
-                status={status}
-                handlePrevDay={handlePrevDay}
-                handleNextDay={handleNextDay}
-                eventsByDay={eventsByDay}
-                abBuckets={filteredData?.abBuckets ?? {}}
-                indicatorTop={indicatorTop}
-                indicatorDayIso={liveNowIsoDate}
-                timelineViewportHeight={timelineViewportHeight}
-                activeDrag={activeDrag}
-                pointerPreview={pointerPreview}
-                bucketIndicator={bucketIndicator}
-                handleEventKeyDown={handleEventKeyDown}
-                handleColumnClick={handleColumnClick}
-                onCreateBucketCard={handleBucketClick}
-                sensors={sensors}
-                handleDragStart={handleDragStart}
-                handleDragMove={handleDragMove}
-                handleDragEnd={handleDragEnd}
-                handleDragCancel={handleDragCancel}
-                isOverABList={isOverABList}
-                floatingLayerTop={timelineHeaderHeight}
-                calendarAllDayByDay={calendarAllDayEventsByDay}
-                onCardContextMenu={handleCardContextMenu}
-                onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
-                contextMenuCardId={contextMenu.cardId}
-                boardMembers={boardMembers}
-                onOpenShareDialog={() => setShowShareDialog(true)}
-              />
+              <DesktopTimelineView {...timelineViewModel.desktop} />
             </div>
 
             <div className="flex-1 overflow-hidden md:hidden">
-              <MobileTimelineView
-                timelineScrollRef={mobileTimelineScrollRef}
-                days={data?.days ?? []}
-                activeDayIndex={activeDayIndex}
-                onPrevDay={handlePrevDay}
-                onNextDay={handleNextDay}
-                onMount={handleTimelineViewMount}
-                onScroll={debouncedHandleScroll}
-                registerAbScrollContainer={registerAbScrollContainer}
-                eventsByDay={eventsByDay}
-                abBuckets={filteredData?.abBuckets ?? {}}
-                calendarEventsByDay={calendarEventsByDay}
-                calendarAllDayByDay={calendarAllDayEventsByDay}
-                indicatorTop={indicatorTop}
-                indicatorDayIso={liveNowIsoDate}
-                timelineViewportHeight={timelineViewportHeight}
-                openCardModal={openCardModal}
-                onCreateBucketCard={handleBucketClick}
-                onToggleCheck={handleToggleCardChecked}
-                status={status}
-                activeDrag={activeDrag}
-                sensors={sensors}
-                handleDragStart={handleDragStart}
-                handleDragMove={handleDragMove}
-                handleDragEnd={handleDragEnd}
-                handleDragCancel={handleDragCancel}
-                bucketIndicator={bucketIndicator}
-                isOverABList={isOverABList}
-                pointerPreview={pointerPreview}
-                onExternalEventClick={handleExternalEventClick}
-                timelineStartHour={timelineStartHour}
-                onCardContextMenu={handleCardContextMenu}
-                onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
-                contextMenuCardId={contextMenu.cardId}
-                boardMembers={boardMembers}
-                onOpenShareDialog={() => setShowShareDialog(true)}
-              />
+              <MobileTimelineView {...timelineViewModel.mobile} />
             </div>
           </>
         ) : (
           <>
             <div className="hidden md:block">
-              <DesktopListView
-                days={data?.days ?? []}
-                eventsByDay={eventsByDay}
-                abBuckets={filteredData?.abBuckets ?? {}}
-                calendarEventsByDay={calendarEventsByDay}
-                calendarAllDayEventsByDay={calendarAllDayEventsByDay}
-                openCardModal={openCardModal}
-                onToggleCheck={handleToggleCardChecked}
-                onExternalEventClick={handleExternalEventClick}
-                onCardContextMenu={handleCardContextMenu}
-                status={status}
-                onPrevDay={handleListPrevDay}
-                onNextDay={handleListNextDay}
-                onPrevWeek={handleListPrevWeek}
-                onNextWeek={handleListNextWeek}
-                onToday={handleListToday}
-                listBaseDate={listBaseDate}
-                listMonthDirection={listMonthDirection}
-                onListMonthDirectionChange={handleListMonthDirectionChange}
-                onListBaseDateChange={handleListBaseDateChange}
-              />
+              <DesktopListView {...listViewModel.desktop} />
             </div>
             <div className="flex-1 overflow-hidden md:hidden">
-              <MobileListView
-                days={data?.days ?? []}
-                eventsByDay={eventsByDay}
-                abBuckets={filteredData?.abBuckets ?? {}}
-                calendarEventsByDay={calendarEventsByDay}
-                calendarAllDayEventsByDay={calendarAllDayEventsByDay}
-                openCardModal={openCardModal}
-                onToggleCheck={handleToggleCardChecked}
-                onExternalEventClick={handleExternalEventClick}
-                onCardContextMenu={handleCardContextMenu}
-                status={status}
-                onPrevDay={handleListPrevDay}
-                onNextDay={handleListNextDay}
-                onPrevWeek={handleListPrevWeek}
-                onNextWeek={handleListNextWeek}
-                listBaseDate={listBaseDate}
-                listMonthDirection={listMonthDirection}
-                onListMonthDirectionChange={handleListMonthDirectionChange}
-                onListBaseDateChange={handleListBaseDateChange}
-              />
+              <MobileListView {...listViewModel.mobile} />
             </div>
           </>
         )}

@@ -3,15 +3,15 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { normalizeUsername } from '@/lib/usernames';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { getClientIp } from '@/lib/server/api-security';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 /**
  * GET /api/profiles/search?board_id={boardId}&query={query}
  *
  * Search user profiles for board sharing.
  */
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createServerSupabaseClient();
+const getHandler = async (request: NextRequest) => {
+  const supabase = await createServerSupabaseClient();
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -146,11 +146,7 @@ export async function GET(request: NextRequest) {
       return aDisplay.localeCompare(bDisplay);
     });
 
-    return NextResponse.json({ profiles: results, profile: results[0] ?? null }, { status: 200 });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/profiles/search:', error);
-    return NextResponse.json({
-      error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
-    }, { status: 500 });
-  }
-}
+  return NextResponse.json({ profiles: results, profile: results[0] ?? null }, { status: 200 });
+};
+
+export const GET = withErrorHandling(getHandler, 'profiles-search-get');

@@ -6,6 +6,7 @@ import {
   resolveGoogleRedirectUri,
 } from "@/lib/googleCalendarServer";
 import { sanitizeProviderError } from "@/lib/server/log-sanitizer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,7 @@ const buildRedirect = (value?: string | null) => {
   return "/board";
 };
 
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -168,4 +169,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
+
+export const GET = withErrorHandling(getHandler, "google-calendar-callback-get");

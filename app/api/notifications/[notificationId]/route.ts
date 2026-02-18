@@ -1,19 +1,18 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 // PATCH /api/notifications/[notificationId] - Mark notification as read
-export async function PATCH(
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ notificationId: string }> }
-) {
+) => {
   const supabase = await createServerSupabaseClient();
   const { notificationId } = await params;
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     // Mark as read
     const { data: notification, error } = await supabase
@@ -31,9 +30,7 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ notification });
-  } catch (error) {
-    console.error('Unexpected error in PATCH /api/notifications/[notificationId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ notification });
+};
+
+export const PATCH = withErrorHandling(patchHandler, 'notifications-by-id-patch');

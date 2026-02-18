@@ -6,11 +6,12 @@ import {
   isNormalizedUsernameValid,
   isReservedUsername,
 } from '@/lib/usernames';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 /**
  * PATCH /api/profiles - Update current user's profile
  */
-export async function PATCH(request: NextRequest) {
+const patchHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
 
   // Get current user
@@ -150,12 +151,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json(profile, { status: 200 });
-}
+};
 
 /**
  * GET /api/profiles - Get current user's profile
  */
-export async function GET() {
+const getHandler = async () => {
   const supabase = await createServerSupabaseClient();
 
   // Get current user
@@ -177,4 +178,7 @@ export async function GET() {
   }
 
   return NextResponse.json(profile, { status: 200 });
-}
+};
+
+export const PATCH = withErrorHandling(patchHandler, 'profiles-patch');
+export const GET = withErrorHandling(getHandler, 'profiles-get');

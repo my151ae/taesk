@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const RenumberSchema = z.object({
   listId: z.string().uuid(),
@@ -12,15 +13,13 @@ const RenumberSchema = z.object({
  * Renumbers all cards in a specific list using position gap strategy (1000, 1010, 1020, ...)
  * Should be called when position density is detected (gaps <= 2).
  */
-export async function POST(
+const postHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
   const startTime = Date.now();
   const { boardId } = await params;
-
-  try {
-    const supabase = await createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
     // Auth check
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -117,12 +116,7 @@ export async function POST(
       })
     );
 
-    return NextResponse.json({ updated: updatedCount, durationMs }, { status: 200 });
-  } catch (error) {
-    console.error('[cards/renumber] Unexpected error:', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({ updated: updatedCount, durationMs }, { status: 200 });
+};
+
+export const POST = withErrorHandling(postHandler, 'cards-renumber-post');

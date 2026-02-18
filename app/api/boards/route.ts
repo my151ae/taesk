@@ -5,6 +5,7 @@ import { isAdminUser } from '@/lib/admins';
 import { requireAuthenticatedUser, validateMutationRequestOrigin } from '@/lib/server/api-security';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const CreateBoardSchema = z.object({
   name: z.string().min(1).max(255),
@@ -17,7 +18,7 @@ const CreateBoardSchema = z.object({
  *
  * Get all boards the user has access to.
  */
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   try {
     const supabase = await createServerSupabaseClient();
 
@@ -87,14 +88,14 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
 /**
  * POST /api/boards
  *
  * Create a new board and automatically add the creator as owner.
  */
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   try {
     const originError = validateMutationRequestOrigin(request);
     if (originError) {
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
       .from('boards')
       .insert({
         ...parsed.data,
+        user_id: user.id,
         short_id,
         id_short,
         slug,
@@ -179,4 +181,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'boards-get');
+export const POST = withErrorHandling(postHandler, 'boards-post');

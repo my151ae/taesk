@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
-export async function GET(
+const getHandler = async (
   _request: Request,
   { params }: { params: Promise<{ boardId: string; cardId: string; historyId: string }> }
-) {
-  try {
+) => {
     const supabase = await createServerSupabaseClient();
     const { boardId, cardId, historyId } = await params;
 
@@ -85,11 +85,6 @@ export async function GET(
     }
 
     return NextResponse.json({ history }, { status: 200 });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/boards/[boardId]/cards/[cardId]/history/[historyId]:', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    );
-  }
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'card-history-by-id-get');

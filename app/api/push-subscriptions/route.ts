@@ -1,13 +1,13 @@
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 /**
  * POST /api/push-subscriptions
  * Save or update a push subscription for the authenticated user
  */
-export async function POST(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient();
+const postHandler = async (request: Request) => {
+  const supabase = await createServerSupabaseClient();
 
     // Get authenticated user
     const {
@@ -59,20 +59,15 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error('Unexpected error in POST /api/push-subscriptions:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ success: true, data });
+};
 
 /**
  * DELETE /api/push-subscriptions
  * Delete a push subscription by endpoint
  */
-export async function DELETE(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient();
+const deleteHandler = async (request: Request) => {
+  const supabase = await createServerSupabaseClient();
 
     // Get authenticated user
     const {
@@ -105,20 +100,15 @@ export async function DELETE(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Unexpected error in DELETE /api/push-subscriptions:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ success: true });
+};
 
 /**
  * GET /api/push-subscriptions
  * Get all push subscriptions for the authenticated user
  */
-export async function GET() {
-  try {
-    const supabase = await createServerSupabaseClient();
+const getHandler = async () => {
+  const supabase = await createServerSupabaseClient();
 
     // Get authenticated user
     const {
@@ -145,9 +135,9 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ subscriptions: data });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/push-subscriptions:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ subscriptions: data });
+};
+
+export const POST = withErrorHandling(postHandler, 'push-subscriptions-post');
+export const DELETE = withErrorHandling(deleteHandler, 'push-subscriptions-delete');
+export const GET = withErrorHandling(getHandler, 'push-subscriptions-get');

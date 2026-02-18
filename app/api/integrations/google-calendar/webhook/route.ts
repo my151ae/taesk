@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleSupabaseClient } from "@/lib/server/supabaseAdmin";
 import { syncGoogleCalendarToTaesk } from "@/lib/googleCalendarServer";
 import { sanitizeProviderError } from "@/lib/server/log-sanitizer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   // Google sends headers only; body is usually empty. We just ack and log minimal info.
   const channelId = request.headers.get("x-goog-channel-id") ?? null;
   const channelToken = request.headers.get("x-goog-channel-token") ?? null;
@@ -129,4 +130,6 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
-}
+};
+
+export const POST = withErrorHandling(postHandler, "google-calendar-webhook-post");

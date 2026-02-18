@@ -44,7 +44,7 @@ const TEST_USER = {
  * 3. Save storageState for all tests to reuse
  */
 export default async function globalSetup() {
-  console.log('[Global Setup] Starting authentication setup...');
+  console.error('[Global Setup] Starting authentication setup...');
 
   const browser = await chromium.launch();
   const context = await browser.newContext();
@@ -65,7 +65,7 @@ export default async function globalSetup() {
 
   try {
     // 1. Ensure test user exists
-    console.log(`[Global Setup] Ensuring test user exists: ${TEST_USER.email}`);
+    console.error(`[Global Setup] Ensuring test user exists: ${TEST_USER.email}`);
 
     const ensureUserResponse = await postWithRetry(`${BASE_URL}/api/e2e/ensure-user`, {
       headers: {
@@ -78,16 +78,16 @@ export default async function globalSetup() {
 
     if (!ensureUserResponse.ok()) {
       const errorText = await ensureUserResponse.text();
-      console.warn(
+      console.error(
         `[Global Setup] ensure-user failed (${ensureUserResponse.status()}), continuing with login-as fallback: ${errorText}`
       );
     } else {
       const ensureResult = await ensureUserResponse.json();
-      console.log('[Global Setup] User status:', ensureResult.created ? 'created' : 'already exists');
+      console.error('[Global Setup] User status:', ensureResult.created ? 'created' : 'already exists');
     }
 
     // 2. Sign in programmatically
-    console.log('[Global Setup] Signing in...');
+    console.error('[Global Setup] Signing in...');
 
     const loginResponse = await postWithRetry(`${BASE_URL}/api/e2e/login-as`, {
       headers: {
@@ -104,12 +104,12 @@ export default async function globalSetup() {
     }
 
     const loginResult = await loginResponse.json();
-    console.log('[Global Setup] Sign-in successful:', loginResult.session.user.email);
+    console.error('[Global Setup] Sign-in successful:', loginResult.session.user.email);
 
     const session = loginResult.session;
 
     // 4. Ensure MAIN_BOARD exists for tests (before hitting /board)
-    console.log('[Global Setup] Ensuring MAIN_BOARD exists...');
+    console.error('[Global Setup] Ensuring MAIN_BOARD exists...');
 
     const MAIN_BOARD_ID = '00000000-0000-0000-0000-000000000001';
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
@@ -142,10 +142,10 @@ export default async function globalSetup() {
       if (insertError) {
         console.error('[Global Setup] Warning: Failed to create MAIN_BOARD:', insertError);
       } else {
-        console.log('[Global Setup] ✅ MAIN_BOARD created');
+        console.error('[Global Setup] ✅ MAIN_BOARD created');
       }
     } else {
-      console.log('[Global Setup] ✅ MAIN_BOARD already exists');
+      console.error('[Global Setup] ✅ MAIN_BOARD already exists');
     }
 
     // 5. Inject Supabase session into cookies (required for @supabase/ssr)
@@ -164,19 +164,18 @@ export default async function globalSetup() {
     };
 
     await context.addCookies([accessTokenCookie]);
-    console.log('[Global Setup] Session stored in cookies');
+    console.error('[Global Setup] Session stored in cookies');
 
     // 6. Navigate to app and set localStorage (requires same origin)
     await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.evaluate(({ key, sessionData }) => {
       localStorage.setItem(key, JSON.stringify(sessionData));
-      console.log('[Global Setup] Session stored in localStorage with key:', key);
     }, { key: storageKey, sessionData: session });
 
     // 7. Save storage state
     const authFile = path.join(__dirname, '../../playwright/.auth/user.json');
     await context.storageState({ path: authFile });
-    console.log(`[Global Setup] Storage state saved to: ${authFile}`);
+    console.error(`[Global Setup] Storage state saved to: ${authFile}`);
 
     // 8. Verify authentication works
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -188,7 +187,7 @@ export default async function globalSetup() {
       throw new Error('Authentication failed - redirected to login page');
     }
 
-    console.log('[Global Setup] ✅ Authentication setup complete');
+    console.error('[Global Setup] ✅ Authentication setup complete');
   } catch (error) {
     console.error('[Global Setup] ❌ Setup failed:', error);
     throw error;

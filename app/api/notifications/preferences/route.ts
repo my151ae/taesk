@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createServerSupabaseClient } from '@/lib/supabase';
 import type { NotificationPreferences, QuietHoursPreference } from '@/lib/supabase';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const TimePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -29,7 +30,7 @@ function buildDefaultPreferences(profileId: string): NotificationPreferences {
   };
 }
 
-export async function GET() {
+const getHandler = async () => {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -53,9 +54,9 @@ export async function GET() {
   const preferences = data ?? buildDefaultPreferences(user.id);
 
   return NextResponse.json(preferences, { status: 200 });
-}
+};
 
-export async function PUT(request: Request) {
+const putHandler = async (request: Request) => {
   const supabase = await createServerSupabaseClient();
   const body = await request.json().catch(() => null);
 
@@ -111,4 +112,7 @@ export async function PUT(request: Request) {
   }
 
   return NextResponse.json(updated, { status: 200 });
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'notifications-preferences-get');
+export const PUT = withErrorHandling(putHandler, 'notifications-preferences-put');

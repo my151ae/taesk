@@ -5,12 +5,13 @@ import {
   GOOGLE_CALENDAR_SCOPE,
   resolveGoogleRedirectUri,
 } from "@/lib/googleCalendarServer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
 const STATE_COOKIE_NAME = "gc_oauth_state";
 
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -63,4 +64,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
+
+export const GET = withErrorHandling(getHandler, "google-calendar-connect-get");

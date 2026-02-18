@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay } from '@/lib/api-types/timeline';
 import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -69,10 +70,10 @@ const buildDays = (base: Date, startOffset: number, range: number): TimelineDay[
   });
 };
 
-export async function GET(
+const getHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
   const supabase = await createServerSupabaseClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -272,4 +273,6 @@ export async function GET(
   };
 
   return NextResponse.json(responseBody, { status: 200 });
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'board-timeline-get');

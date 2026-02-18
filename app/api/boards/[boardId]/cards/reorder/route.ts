@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { z } from 'zod';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const CardReorderUpdateSchema = z.object({
   id: z.string().uuid(),
@@ -33,15 +34,13 @@ function hashBoardId(boardId: string): number {
   return Math.abs(hash);
 }
 
-export async function PATCH(
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
   const { boardId } = await params;
   const supabase = await createServerSupabaseClient();
-
-  try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json(
         { error: { code: 'UNAUTHENTICATED', message: 'Login required' } },
@@ -201,15 +200,10 @@ export async function PATCH(
       })
     );
 
-    return NextResponse.json(
-      { updated: updatedCount, unchanged: unchangedCount, durationMs },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Unexpected error in PATCH /api/boards/[boardId]/cards/reorder:', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json(
+    { updated: updatedCount, unchanged: unchangedCount, durationMs },
+    { status: 200 }
+  );
+};
+
+export const PATCH = withErrorHandling(patchHandler, 'cards-reorder-patch');

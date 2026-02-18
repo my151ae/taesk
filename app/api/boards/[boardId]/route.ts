@@ -8,16 +8,17 @@ import {
     requireAuthenticatedUser,
     validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 /**
  * DELETE /api/boards/[boardId]
  *
  * Delete a board. Only the owner can delete a board.
  */
-export async function DELETE(
+const deleteHandler = async (
     request: NextRequest,
     { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
     try {
         const originError = validateMutationRequestOrigin(request);
         if (originError) {
@@ -119,17 +120,17 @@ export async function DELETE(
             { status: 500 }
         );
     }
-}
+};
 
 /**
  * PATCH /api/boards/[boardId]
  *
  * Update a board.
  */
-export async function PATCH(
+const patchHandler = async (
     request: NextRequest,
     { params }: { params: Promise<{ boardId: string }> }
-) {
+) => {
     try {
         const originError = validateMutationRequestOrigin(request);
         if (originError) {
@@ -209,4 +210,7 @@ export async function PATCH(
             { status: 500 }
         );
     }
-}
+};
+
+export const DELETE = withErrorHandling(deleteHandler, 'board-by-id-delete');
+export const PATCH = withErrorHandling(patchHandler, 'board-by-id-patch');

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import { createClient } from '@supabase/supabase-js';
 
-const TEST_USER_ID = 'f6baf5d0-ac5b-491a-aa47-3bc5c05243f2'; // e2e.taesk.test@gmail.com
+const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
 const MOCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -25,7 +25,22 @@ interface TestBoard {
   slug: string;
 }
 
-async function createTestBoard(boardName: string): Promise<TestBoard> {
+async function resolveTestUserId(): Promise<string> {
+  const { data: profiles, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('email', TEST_USER_EMAIL)
+    .limit(1);
+
+  const profileId = profiles?.[0]?.id;
+  if (error || !profileId) {
+    throw new Error(`Failed to resolve test user id for ${TEST_USER_EMAIL}: ${error?.message ?? 'not found'}`);
+  }
+
+  return profileId;
+}
+
+async function createTestBoard(boardName: string, ownerUserId: string): Promise<TestBoard> {
   const boardId = crypto.randomUUID();
   const shortId = await createUniqueBoardShortId();
   const idShort = await getNextBoardIdShort();
@@ -34,7 +49,7 @@ async function createTestBoard(boardName: string): Promise<TestBoard> {
   const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
     name: boardName,
-    user_id: TEST_USER_ID,
+    user_id: ownerUserId,
     is_test_board: true,
     short_id: shortId,
     id_short: idShort,
@@ -48,7 +63,7 @@ async function createTestBoard(boardName: string): Promise<TestBoard> {
   // Add owner member
   const { error: memberError } = await supabaseAdmin.from('board_members').insert({
     board_id: boardId,
-    profile_id: TEST_USER_ID,
+    profile_id: ownerUserId,
     role: 'owner',
   });
 
@@ -61,22 +76,27 @@ async function createTestBoard(boardName: string): Promise<TestBoard> {
 
 test.describe('Board Permissions @feature:boards', () => {
   let testBoard: TestBoard | null = null;
+  let testUserId = '';
+
+  test.beforeAll(async () => {
+    testUserId = await resolveTestUserId();
+  });
 
   test.beforeEach(async ({ page }) => {
     const boardName = `Permissions Test ${Date.now()}`;
-    testBoard = await createTestBoard(boardName);
+    testBoard = await createTestBoard(boardName, testUserId);
 
     const mockMembers: BoardMemberWithProfile[] = [
       {
         board_id: testBoard!.id,
-        profile_id: TEST_USER_ID,
+        profile_id: testUserId,
         role: 'owner',
         created_at: new Date().toISOString(),
         profile: {
-          id: TEST_USER_ID,
+          id: testUserId,
           full_name: 'Test Owner',
           avatar_url: null,
-          email: 'owner@example.com',
+          email: TEST_USER_EMAIL,
         },
       },
       {

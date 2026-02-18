@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { deriveExcerptFromContent, normalizeContent } from '@/lib/tiptap';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 async function ensureBoardAccess(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -41,11 +42,10 @@ async function ensureBoardAccess(
   return { ok: true as const };
 }
 
-export async function GET(
+const getHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; cardId: string }> }
-) {
-  try {
+) => {
     const supabase = await createServerSupabaseClient();
     const { boardId, cardId } = await params;
 
@@ -104,20 +104,12 @@ export async function GET(
     }
 
     return NextResponse.json({ history: history ?? [] }, { status: 200 });
-  } catch (error) {
-    console.error('Unexpected error in GET /api/boards/[boardId]/cards/[cardId]/history:', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    );
-  }
-}
+};
 
-export async function POST(
+const postHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; cardId: string }> }
-) {
-  try {
+) => {
     const supabase = await createServerSupabaseClient();
     const { boardId, cardId } = await params;
 
@@ -208,11 +200,7 @@ export async function POST(
     }
 
     return NextResponse.json({ history: inserted }, { status: 201 });
-  } catch (error) {
-    console.error('Unexpected error in POST /api/boards/[boardId]/cards/[cardId]/history:', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-      { status: 500 }
-    );
-  }
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'card-history-get');
+export const POST = withErrorHandling(postHandler, 'card-history-post');

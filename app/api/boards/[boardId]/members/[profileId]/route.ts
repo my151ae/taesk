@@ -6,12 +6,13 @@ import {
   requireAuthenticatedUser,
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 // PATCH /api/boards/[boardId]/members/[profileId] - Update member role
-export async function PATCH(
+const patchHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
-) {
+) => {
   const originError = validateMutationRequestOrigin(request);
   if (originError) {
     return originError;
@@ -19,12 +20,10 @@ export async function PATCH(
 
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
-
-  try {
-    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-    if (errorResponse || !user) {
-      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     const actorMembership = await getBoardMembership(supabase, boardId, user.id);
 
@@ -76,18 +75,14 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ member: updatedMember });
-  } catch (error) {
-    console.error('Unexpected error in PATCH /api/boards/[boardId]/members/[profileId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ member: updatedMember });
+};
 
 // DELETE /api/boards/[boardId]/members/[profileId] - Remove member
-export async function DELETE(
+const deleteHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
-) {
+) => {
   const originError = validateMutationRequestOrigin(request);
   if (originError) {
     return originError;
@@ -95,12 +90,10 @@ export async function DELETE(
 
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
-
-  try {
-    const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-    if (errorResponse || !user) {
-      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
+  if (errorResponse || !user) {
+    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
     const actorMembership = await getBoardMembership(supabase, boardId, user.id);
 
@@ -144,9 +137,8 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error) {
-    console.error('Unexpected error in DELETE /api/boards/[boardId]/members/[profileId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ success: true }, { status: 200 });
+};
+
+export const PATCH = withErrorHandling(patchHandler, 'board-members-by-profile-patch');
+export const DELETE = withErrorHandling(deleteHandler, 'board-members-by-profile-delete');

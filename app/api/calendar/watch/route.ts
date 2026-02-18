@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { startCalendarWatch, stopCalendarWatch } from "@/lib/googleCalendarServer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,7 @@ function resolveWebhookAddress(origin: string) {
   return `${origin}/api/integrations/google-calendar/webhook`;
 }
 
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -35,9 +36,9 @@ export async function POST(request: NextRequest) {
     console.error("[calendar/watch] start failed", error);
     return NextResponse.json({ error: { code: "WATCH_START_FAILED", message: "Failed to start watch" } }, { status: 500 });
   }
-}
+};
 
-export async function DELETE(request: NextRequest) {
+const deleteHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -54,4 +55,7 @@ export async function DELETE(request: NextRequest) {
     console.error("[calendar/watch] stop failed", error);
     return NextResponse.json({ error: { code: "WATCH_STOP_FAILED", message: "Failed to stop watch" } }, { status: 500 });
   }
-}
+};
+
+export const POST = withErrorHandling(postHandler, "calendar-watch-post");
+export const DELETE = withErrorHandling(deleteHandler, "calendar-watch-delete");

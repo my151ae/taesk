@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getGoogleCalendarClientForUser, startCalendarWatch, stopCalendarWatch } from "@/lib/googleCalendarServer";
+import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ function resolveWebhookAddress(origin: string) {
   return `${origin}/api/integrations/google-calendar/webhook`;
 }
 
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -71,4 +72,6 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   return NextResponse.json({ success: true, state: latestState });
-}
+};
+
+export const POST = withErrorHandling(postHandler, "calendar-watch-status-post");

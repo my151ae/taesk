@@ -9,11 +9,12 @@ import {
 } from '@/lib/usernames';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { getClientIp } from '@/lib/server/api-security';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_COUNT = 20;
 
-export async function GET(request: NextRequest) {
+const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -83,4 +84,6 @@ export async function GET(request: NextRequest) {
   response.headers.set('X-RateLimit-Reset', rateLimit.resetAt.toString());
 
   return response;
-}
+};
+
+export const GET = withErrorHandling(getHandler, 'profiles-check-username-get');

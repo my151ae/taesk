@@ -50,6 +50,7 @@ type TimelineBoardHeaderProps = {
   onPrevDay?: () => void;
   onNextDay?: () => void;
   listStartDate?: string | null;
+  onOpenShareDialog?: () => void;
 };
 
 export default function TimelineBoardHeader({
@@ -96,6 +97,7 @@ export default function TimelineBoardHeader({
   onPrevDay,
   onNextDay,
   listStartDate,
+  onOpenShareDialog,
 }: TimelineBoardHeaderProps) {
   return (
     <>
@@ -142,6 +144,7 @@ export default function TimelineBoardHeader({
         onPrevDay={onPrevDay}
         onNextDay={onNextDay}
         listStartDate={listStartDate}
+        onOpenShareDialog={onOpenShareDialog}
       />
       {googleToast && (
         <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">

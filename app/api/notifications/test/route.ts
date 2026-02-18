@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { createNotification } from '@/lib/server/notifications';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
-export async function POST() {
+const postHandler = async () => {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -32,4 +33,6 @@ export async function POST() {
       { status: 500 }
     );
   }
-}
+};
+
+export const POST = withErrorHandling(postHandler, 'notifications-test-post');

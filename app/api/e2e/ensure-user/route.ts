@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { assertE2EEnabled } from '../guards';
 import { errorResponse, ApiErrorCode } from '@/lib/server/api-error';
+import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 type AdminUser = { id: string; email?: string | null };
 type ListUsersResult = { users?: AdminUser[] };
@@ -91,7 +92,7 @@ function getErrorDetails(error: unknown) {
  * Requires E2E_ENABLED=true and correct x-e2e-secret header.
  * Uses SUPABASE_SERVICE_ROLE_KEY (never exposed to client).
  */
-export async function POST(req: NextRequest) {
+const postHandler = async (req: NextRequest) => {
   try {
     // Guard: Only allow in E2E mode with correct secret
     assertE2EEnabled(req);
@@ -231,4 +232,6 @@ export async function POST(req: NextRequest) {
       getErrorDetails(e)
     );
   }
-}
+};
+
+export const POST = withErrorHandling(postHandler, 'e2e-ensure-user-post');

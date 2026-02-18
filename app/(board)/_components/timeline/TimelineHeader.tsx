@@ -55,6 +55,7 @@ type TimelineHeaderProps = {
     onPrevDay?: () => void;
     onNextDay?: () => void;
     listStartDate?: string | null;
+    onOpenShareDialog?: () => void;
 };
 
 export default function TimelineHeader({
@@ -100,6 +101,7 @@ export default function TimelineHeader({
     onPrevDay,
     onNextDay,
     listStartDate,
+    onOpenShareDialog,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
@@ -351,6 +353,15 @@ export default function TimelineHeader({
                 </div>
 
                 <div className="ml-auto flex items-center gap-2 md:hidden">
+                    {onOpenShareDialog && (
+                        <button
+                            onClick={onOpenShareDialog}
+                            data-testid="share-button-mobile"
+                            className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        >
+                            Share
+                        </button>
+                    )}
                     <button
                         onClick={onTodayClick}
                         className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
@@ -636,6 +647,15 @@ export default function TimelineHeader({
                 </div>
 
                 {/* Notifications Bell */}
+                {onOpenShareDialog && (
+                    <button
+                        onClick={onOpenShareDialog}
+                        data-testid="share-button"
+                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 shrink-0"
+                    >
+                        Share
+                    </button>
+                )}
                 <NotificationsBell />
 
                 {/* Profile Menu */}
