@@ -44,5 +44,11 @@ cat test-results/playwright-report.json | jq '.stats'
 - テスト実行前に `lsof -i :3000` で Next.js dev サーバーが残っていないか確認すること。
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
 
+## Supabase MCP 接続手順（運用）
+- Supabase MCP の認証・疎通手順は `docs/setup/supabase-mcp-auth.md` を SSOT とする。
+- 認証が切れた場合は `codex mcp login supabase` を実行し、ブラウザで OAuth を完了する。
+- 接続確認は `mcp__supabase__list_projects`（MCP ツール呼び出し）を最初に実行する。
+- `list_mcp_resources(server=\"supabase\")` は Supabase 側で未実装のため `Method not found` でも異常とは限らない。
+
 ## Commit & Pull Request Guidelines
 短い命令形のコミットメッセージを推奨。ユーザーの承認なしで push しない。破壊的な git コマンドはユーザー指示がある場合のみ実行すること。

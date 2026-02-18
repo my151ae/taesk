@@ -258,6 +258,7 @@ taesk/
 - [Storage Strategy](./detail/storage.md)
 - [Routing & Modal Flow](./detail/routing.md)
 - [Notifications & Audio](./detail/notifications.md)
+- [Supabase MCP 認証手順](./setup/supabase-mcp-auth.md)
 - [Testing Playbook](./detail/testing.md)
 - [Deployment Guide](./detail/deployment.md)
 - [Setup Guide](./setup/local-dev.md)
