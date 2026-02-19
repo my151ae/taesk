@@ -8,16 +8,28 @@ type BoardSettingsProps = {
 };
 
 export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
+    const [boardName, setBoardName] = useState(board.name ?? '');
     const [dayRange, setDayRange] = useState(board.day_range ?? 2);
     const [isSaving, setIsSaving] = useState(false);
 
-    const hasChanges = dayRange !== (board.day_range ?? 2);
+    const trimmedName = boardName.trim();
+    const hasNameChanged = trimmedName !== (board.name ?? '').trim();
+    const hasChanges = hasNameChanged || dayRange !== (board.day_range ?? 2);
+    const canSave = hasChanges && trimmedName.length > 0;
 
     const handleSave = async () => {
+        if (!canSave) return;
         setIsSaving(true);
         try {
+            const updates: Partial<Board> = {};
+            if (hasNameChanged) {
+                updates.name = trimmedName;
+            }
+            if (dayRange !== (board.day_range ?? 2)) {
+                updates.day_range = dayRange;
+            }
             await onUpdate({
-                day_range: dayRange
+                ...updates
             });
         } catch (error) {
             console.error('Failed to update board settings', error);
@@ -30,6 +42,18 @@ export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
     return (
         <div className="space-y-6">
             <div className="space-y-4">
+                <div>
+                    <h3 className="text-sm font-medium text-slate-900">Board Name</h3>
+                    <p className="text-xs text-slate-500">Rename this board.</p>
+                    <input
+                        type="text"
+                        value={boardName}
+                        onChange={(event) => setBoardName(event.target.value)}
+                        className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                        placeholder="Board name"
+                        maxLength={255}
+                    />
+                </div>
                 <div>
                     <h3 className="text-sm font-medium text-slate-900">Timeline View Range</h3>
                     <p className="text-xs text-slate-500">Configure how many days are visible on the timeline.</p>
@@ -58,10 +82,10 @@ export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
             <div className="flex justify-end pt-4 border-t border-slate-100">
                 <button
                     onClick={handleSave}
-                    disabled={isSaving || !hasChanges}
+                    disabled={isSaving || !canSave}
                     className={clsx(
                         "rounded-lg px-4 py-2 text-sm font-semibold text-white transition",
-                        isSaving || !hasChanges
+                        isSaving || !canSave
                             ? "bg-slate-300 cursor-not-allowed"
                             : "bg-sky-500 hover:bg-sky-600"
                     )}

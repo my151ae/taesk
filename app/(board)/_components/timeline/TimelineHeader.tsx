@@ -18,6 +18,11 @@ function canCreateBoardInTeam(team: TeamWithRole): boolean {
         || (team.role === 'member' && team.allow_member_create_board);
 }
 
+function canEditBoard(board: Board): boolean {
+    if (!board.membership_role) return true;
+    return board.membership_role === 'owner' || board.membership_role === 'editor';
+}
+
 type TimelineHeaderProps = {
     board: Board;
     modalBoards: Board[];
@@ -42,7 +47,7 @@ type TimelineHeaderProps = {
     selectedPriority: 'all' | Priority;
     setSelectedPriority: (priority: 'all' | Priority) => void;
     availableTags: string[];
-    setShowBoardSettings: (show: boolean) => void;
+    onOpenBoardSettings: (boardId: string | null | undefined) => void;
     dayRange: number;
     onDayRangeChange: (days: number) => void;
     onTodayClick: () => void;
@@ -91,7 +96,7 @@ export default function TimelineHeader({
     selectedPriority,
     setSelectedPriority,
     availableTags,
-    setShowBoardSettings,
+    onOpenBoardSettings,
     dayRange,
     onDayRangeChange,
     onTodayClick,
@@ -217,12 +222,24 @@ export default function TimelineHeader({
     }, [modalBoards]);
 
     const teamSections = useMemo(() => {
-        const sections = modalTeams.map((team) => ({
+        const sortedTeams = [...modalTeams].sort((a, b) => {
+            if (a.id === board.team_id && b.id !== board.team_id) return -1;
+            if (b.id === board.team_id && a.id !== board.team_id) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        const sections = sortedTeams.map((team) => ({
             team,
-            boards: (boardsByTeamId.get(team.id) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+            boards: (boardsByTeamId.get(team.id) ?? [])
+                .slice()
+                .sort((a, b) => {
+                    if (a.id === board.id && b.id !== board.id) return -1;
+                    if (b.id === board.id && a.id !== board.id) return 1;
+                    return a.name.localeCompare(b.name);
+                }),
         }));
         return sections;
-    }, [boardsByTeamId, modalTeams]);
+    }, [board.id, board.team_id, boardsByTeamId, modalTeams]);
 
     const getRealtimeStatusColor = () => {
         switch (realtimeStatus) {
@@ -290,6 +307,23 @@ export default function TimelineHeader({
                                                         >
                                                             <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
                                                             <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (!canEditBoard(b)) return;
+                                                                onOpenBoardSettings(b.id);
+                                                            }}
+                                                            className={clsx(
+                                                                "hidden h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-medium group-hover:flex",
+                                                                canEditBoard(b)
+                                                                    ? "text-slate-600 hover:bg-slate-50"
+                                                                    : "cursor-not-allowed text-slate-300"
+                                                            )}
+                                                            title="Board settings"
+                                                            disabled={!canEditBoard(b)}
+                                                        >
+                                                            Edit
                                                         </button>
                                                         <button
                                                             onClick={(e) => {
@@ -519,15 +553,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     Team Management
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowBoardSettings(true);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    Board Settings
                                 </button>
                                 <Link
                                     href="/playground"
@@ -804,15 +829,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     <span>👥</span> Team Management
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowBoardSettings(true);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>⚙️</span> Board Settings
                                 </button>
                                 <Link
                                     href="/playground"

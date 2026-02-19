@@ -106,6 +106,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setShowProfileSettings,
     showBoardSettings,
     setShowBoardSettings,
+    boardSettingsBoardId,
+    setBoardSettingsBoardId,
     showTeamSettings,
     setShowTeamSettings,
     teamSettingsTeamId,
@@ -366,6 +368,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setShowTeamSettings(true);
   }, [setShowTeamSettings, setTeamSettingsTeamId]);
 
+  const handleOpenBoardSettings = useCallback((boardId: string | null | undefined) => {
+    setShowBoardMenu(false);
+    setBoardSettingsBoardId(boardId ?? currentBoard.id);
+    setShowBoardSettings(true);
+  }, [currentBoard.id, setBoardSettingsBoardId, setShowBoardMenu, setShowBoardSettings]);
+
   const handleDayRangeUpdate = useCallback((newRange: number) => {
     handleDayRangeChange(newRange);
     if (viewMode === 'timeline') {
@@ -521,7 +529,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           board={currentBoard} modalBoards={availableBoards} modalTeams={availableTeams} handleBoardNavigate={handleBoardNavigate}
           showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
           setShowNotificationSettings={setShowNotificationSettings}
-          setShowProfileSettings={setShowProfileSettings} setShowBoardSettings={setShowBoardSettings}
+          setShowProfileSettings={setShowProfileSettings}
+          onOpenBoardSettings={handleOpenBoardSettings}
           onOpenTeamSettings={handleOpenTeamSettings}
           profile={profile} user={user} signOut={signOut}
           showFilters={showFilters} setShowFilters={setShowFilters} hasActiveFilters={hasActiveFilters}
@@ -570,9 +579,13 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           showNotificationSettings={showNotificationSettings} setShowNotificationSettings={setShowNotificationSettings}
           showProfileSettings={showProfileSettings} setShowProfileSettings={setShowProfileSettings}
           showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
+          boardSettingsBoardId={boardSettingsBoardId}
           showTeamSettings={showTeamSettings} setShowTeamSettings={setShowTeamSettings}
           teamSettingsTeamId={teamSettingsTeamId}
-          initialBoard={currentBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
+          initialBoard={currentBoard}
+          availableBoards={availableBoards}
+          fetchProfile={fetchProfile}
+          setAvailableBoards={setAvailableBoards}
           setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
           onMemberAdded={refreshBoardMembers}
         />

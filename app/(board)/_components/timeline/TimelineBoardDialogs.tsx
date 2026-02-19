@@ -17,10 +17,12 @@ type TimelineBoardDialogsProps = {
   setShowProfileSettings: (show: boolean) => void;
   showBoardSettings: boolean;
   setShowBoardSettings: (show: boolean) => void;
+  boardSettingsBoardId?: string | null;
   showTeamSettings: boolean;
   setShowTeamSettings: (show: boolean) => void;
   teamSettingsTeamId?: string | null;
   initialBoard: Board;
+  availableBoards: Board[];
   fetchProfile: () => Promise<void>;
   setAvailableBoards: Dispatch<SetStateAction<Board[]>>;
   setActiveDayIndex: (value: number) => void;
@@ -37,16 +39,22 @@ export default function TimelineBoardDialogs({
   setShowProfileSettings,
   showBoardSettings,
   setShowBoardSettings,
+  boardSettingsBoardId,
   showTeamSettings,
   setShowTeamSettings,
   teamSettingsTeamId,
   initialBoard,
+  availableBoards,
   fetchProfile,
   setAvailableBoards,
   setActiveDayIndex,
   fetchTimeline,
   onMemberAdded,
 }: TimelineBoardDialogsProps) {
+  const targetBoard =
+    availableBoards.find((candidate) => candidate.id === (boardSettingsBoardId ?? initialBoard.id))
+    ?? initialBoard;
+
   return (
     <>
       {showShareDialog && (
@@ -121,15 +129,26 @@ export default function TimelineBoardDialogs({
               </button>
             </div>
             <BoardSettings
-              board={initialBoard}
+              board={targetBoard}
               onUpdate={async (updates) => {
                 try {
-                  const response = await fetch(`/api/boards/${initialBoard.id}`, {
+                  const response = await fetch(`/api/boards/${targetBoard.id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates),
                   });
-                  if (!response.ok) throw new Error("Failed to update board");
+                  if (!response.ok) {
+                    let message = "Failed to update board";
+                    try {
+                      const body = await response.json() as { error?: { message?: string } };
+                      if (body?.error?.message) {
+                        message = body.error.message;
+                      }
+                    } catch {
+                      // ignore JSON parse errors and fallback to generic message
+                    }
+                    throw new Error(message);
+                  }
                   const { board: updatedBoard } = await response.json();
 
                   Object.assign(initialBoard, updatedBoard);
@@ -139,11 +158,13 @@ export default function TimelineBoardDialogs({
                   );
 
                   setShowBoardSettings(false);
-                  setActiveDayIndex(0);
-                  await fetchTimeline();
+                  if (targetBoard.id === initialBoard.id) {
+                    setActiveDayIndex(0);
+                    await fetchTimeline();
+                  }
                 } catch (error) {
                   console.error("Failed to update board", error);
-                  alert("Failed to update board");
+                  alert(error instanceof Error ? error.message : "Failed to update board");
                 }
               }}
             />

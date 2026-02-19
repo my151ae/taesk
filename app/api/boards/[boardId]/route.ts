@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
     getBoardMembership,
     hasAnyRole,
@@ -146,18 +147,19 @@ const patchHandler = async (
             return NextResponse.json({ success: true }); // Nothing to update
         }
 
-        const { data: updatedBoard, error: updateError } = await supabase
+        const admin = createServiceRoleSupabaseClient();
+        const { data: updatedBoard, error: updateError } = await admin
             .from('boards')
             .update(updates)
             .eq('id', boardId)
             .select()
-            .single();
+            .maybeSingle();
 
-        if (updateError) {
+        if (updateError || !updatedBoard) {
             console.error('Error updating board:', updateError);
             return NextResponse.json(
-                { error: { code: 'DB_ERROR', message: updateError.message } },
-                { status: 500 }
+                { error: { code: 'DB_ERROR', message: updateError?.message ?? 'Failed to update board' } },
+                { status: updateError ? 500 : 404 }
             );
         }
 

@@ -60,6 +60,7 @@ export async function createServerSupabaseClient() {
 export interface Board {
   id: string;
   team_id?: string | null;
+  membership_role?: MemberRole;
   name: string;
   description?: string;
   is_test_board: boolean;

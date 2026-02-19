@@ -35,7 +35,7 @@ const getHandler = async (request: NextRequest) => {
     // Get boards where user is a member
     const { data: memberships } = await supabase
       .from('board_members')
-      .select('board_id')
+      .select('board_id, role')
       .eq('profile_id', user.id);
 
     if (!memberships || memberships.length === 0) {
@@ -43,6 +43,7 @@ const getHandler = async (request: NextRequest) => {
     }
 
     const boardIds = memberships.map(m => m.board_id);
+    const roleByBoardId = new Map(memberships.map((membership) => [membership.board_id, membership.role]));
 
     let boardsQuery = supabase
       .from('boards')
@@ -63,8 +64,13 @@ const getHandler = async (request: NextRequest) => {
       );
     }
 
+    const normalizedBoards = (boards || []).map((board) => ({
+      ...board,
+      membership_role: roleByBoardId.get(board.id) ?? undefined,
+    }));
+
     return NextResponse.json(
-      { boards: boards || [] },
+      { boards: normalizedBoards },
       { status: 200, headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
