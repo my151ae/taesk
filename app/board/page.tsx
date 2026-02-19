@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { getBoardById } from "@/lib/server/boards";
 import { buildBoardUrl } from "@/lib/board-url";
-import { createServerSupabaseClient, type Board } from "@/lib/supabase";
-import { isAdminUser } from "@/lib/admins";
-import { createServiceRoleSupabaseClient } from "@/lib/server/supabaseAdmin";
+import { createServerSupabaseClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
@@ -14,28 +12,6 @@ export default async function BoardDefaultPage() {
 
   if (authError || !user) {
     redirect("/login");
-  }
-
-  if (isAdminUser({ id: user.id, email: user.email })) {
-    const adminSupabase = createServiceRoleSupabaseClient();
-    const { data: adminBoards, error: adminBoardsError } = await adminSupabase
-      .from('boards')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(1);
-
-    if (adminBoardsError) {
-      console.error("[board-default] failed to fetch boards for admin", adminBoardsError);
-    } else if (adminBoards && adminBoards.length > 0) {
-      const adminBoard = adminBoards[0] as Board;
-      const adminCanonicalUrl = buildBoardUrl(adminBoard);
-      if (adminCanonicalUrl) {
-        redirect(adminCanonicalUrl);
-      }
-      if (adminBoard.short_id) {
-        redirect(`/b/${adminBoard.short_id}`);
-      }
-    }
   }
 
   // ユーザーが所属しているボードを最大20件取得（古い順）

@@ -106,6 +106,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setShowProfileSettings,
     showBoardSettings,
     setShowBoardSettings,
+    showTeamSettings,
+    setShowTeamSettings,
+    teamSettingsTeamId,
+    setTeamSettingsTeamId,
     showShortcutsModal,
     setShowShortcutsModal,
     activeDayIndex,
@@ -140,6 +144,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     boardMembers,
     profile,
     availableBoards,
+    availableTeams,
     setAvailableBoards,
     fetchProfile,
     refreshBoardMembers,
@@ -355,6 +360,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setShowBoardMenu(false);
   }, [navigateBoard, setShowBoardMenu]);
 
+  const handleOpenTeamSettings = useCallback((teamId: string | null | undefined) => {
+    if (!teamId) return;
+    setTeamSettingsTeamId(teamId);
+    setShowTeamSettings(true);
+  }, [setShowTeamSettings, setTeamSettingsTeamId]);
+
   const handleDayRangeUpdate = useCallback((newRange: number) => {
     handleDayRangeChange(newRange);
     if (viewMode === 'timeline') {
@@ -507,10 +518,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-2 pt-4 md:px-0 md:pt-6">
         <TimelineBoardHeader
-          board={currentBoard} modalBoards={availableBoards} handleBoardNavigate={handleBoardNavigate}
+          board={currentBoard} modalBoards={availableBoards} modalTeams={availableTeams} handleBoardNavigate={handleBoardNavigate}
           showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
           setShowNotificationSettings={setShowNotificationSettings}
           setShowProfileSettings={setShowProfileSettings} setShowBoardSettings={setShowBoardSettings}
+          onOpenTeamSettings={handleOpenTeamSettings}
           profile={profile} user={user} signOut={signOut}
           showFilters={showFilters} setShowFilters={setShowFilters} hasActiveFilters={hasActiveFilters}
           searchQuery={searchQuery} setSearchQuery={setSearchQuery}
@@ -558,6 +570,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           showNotificationSettings={showNotificationSettings} setShowNotificationSettings={setShowNotificationSettings}
           showProfileSettings={showProfileSettings} setShowProfileSettings={setShowProfileSettings}
           showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
+          showTeamSettings={showTeamSettings} setShowTeamSettings={setShowTeamSettings}
+          teamSettingsTeamId={teamSettingsTeamId}
           initialBoard={currentBoard} fetchProfile={fetchProfile} setAvailableBoards={setAvailableBoards}
           setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
           onMemberAdded={refreshBoardMembers}

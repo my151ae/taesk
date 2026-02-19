@@ -1,8 +1,8 @@
 import { clsx } from 'clsx';
 import Link from 'next/link';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
-import { Board } from '@/lib/supabase';
+import { Board, Team, TeamRole } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
@@ -10,9 +10,18 @@ import type { Priority } from '@/lib/supabase';
 import type { ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 
+type TeamWithRole = Team & { role: TeamRole };
+
+function canCreateBoardInTeam(team: TeamWithRole): boolean {
+    return team.role === 'owner'
+        || team.role === 'admin'
+        || (team.role === 'member' && team.allow_member_create_board);
+}
+
 type TimelineHeaderProps = {
     board: Board;
     modalBoards: Board[];
+    modalTeams: TeamWithRole[];
     handleBoardNavigate: (board: Board) => void;
     showBoardMenu: boolean;
     setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
@@ -56,11 +65,13 @@ type TimelineHeaderProps = {
     onNextDay?: () => void;
     listStartDate?: string | null;
     onOpenShareDialog?: () => void;
+    onOpenTeamSettings: (teamId: string | null | undefined) => void;
 };
 
 export default function TimelineHeader({
     board,
     modalBoards,
+    modalTeams,
     handleBoardNavigate,
     showBoardMenu,
     setShowBoardMenu,
@@ -102,8 +113,10 @@ export default function TimelineHeader({
     onNextDay,
     listStartDate,
     onOpenShareDialog,
+    onOpenTeamSettings,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+    const [createBoardTeamId, setCreateBoardTeamId] = useState<string | null>(board.team_id ?? null);
     const [newBoardName, setNewBoardName] = useState('');
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -122,16 +135,19 @@ export default function TimelineHeader({
 
         try {
             setIsSubmittingBoard(true);
+            if (!createBoardTeamId) {
+                throw new Error('Current board has no team_id');
+            }
             const response = await fetch('/api/boards', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newBoardName.trim() }),
+                body: JSON.stringify({ name: newBoardName.trim(), team_id: createBoardTeamId }),
             });
 
             if (!response.ok) throw new Error('Failed to create board');
 
-            const { board } = await response.json();
-            window.location.href = `/b/${board.short_id}`;
+            const { board: createdBoard } = await response.json();
+            window.location.href = `/b/${createdBoard.short_id}`;
         } catch (error) {
             console.error('Failed to create board:', error);
             alert('Failed to create board');
@@ -140,6 +156,12 @@ export default function TimelineHeader({
             setIsCreatingBoard(false);
             setNewBoardName('');
         }
+    };
+
+    const handleStartCreateBoard = (teamId: string) => {
+        setCreateBoardTeamId(teamId);
+        setIsCreatingBoard(true);
+        setNewBoardName('');
     };
 
     const handleDeleteBoard = async (boardId: string, boardName: string) => {
@@ -174,6 +196,33 @@ export default function TimelineHeader({
     useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
     useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
     useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
+
+    useEffect(() => {
+        if (!showBoardMenu) {
+            setIsCreatingBoard(false);
+            setNewBoardName('');
+            setCreateBoardTeamId(board.team_id ?? null);
+        }
+    }, [board.team_id, showBoardMenu]);
+
+    const boardsByTeamId = useMemo(() => {
+        const groups = new Map<string, Board[]>();
+        for (const b of modalBoards) {
+            const teamId = b.team_id ?? '__no_team__';
+            const list = groups.get(teamId) ?? [];
+            list.push(b);
+            groups.set(teamId, list);
+        }
+        return groups;
+    }, [modalBoards]);
+
+    const teamSections = useMemo(() => {
+        const sections = modalTeams.map((team) => ({
+            team,
+            boards: (boardsByTeamId.get(team.id) ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+        }));
+        return sections;
+    }, [boardsByTeamId, modalTeams]);
 
     const getRealtimeStatusColor = () => {
         switch (realtimeStatus) {
@@ -212,71 +261,94 @@ export default function TimelineHeader({
                             </svg>
                         </button>
                         {showBoardMenu && (
-                            <div className="absolute left-0 z-40 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Switch board</p>
-                                <div className="max-h-64 overflow-y-auto space-y-1">
-                                    {modalBoards.map((b) => (
-                                        <div key={b.id} className="group flex items-center gap-1 pr-2">
-                                            <button
-                                                onClick={() => handleBoardNavigate(b)}
-                                                className={clsx(
-                                                    'flex-1 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-slate-50',
-                                                    b.id === board.id && 'bg-slate-100 text-slate-900'
-                                                )}
-                                            >
-                                                <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
-                                                <p className="text-xs text-slate-500">
-                                                    {b.description || 'Standard board'} • {b.day_range ?? 2} days
-                                                </p>
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteBoard(b.id, b.name);
-                                                }}
-                                                className="hidden group-hover:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                                title="Delete board"
-                                            >
-                                                🗑️
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-2 border-t border-slate-100 pt-2 px-2">
-                                    {isCreatingBoard ? (
-                                        <form onSubmit={handleCreateBoard} className="space-y-2">
-                                            <input
-                                                type="text"
-                                                value={newBoardName}
-                                                onChange={(e) => setNewBoardName(e.target.value)}
-                                                placeholder="New board name"
-                                                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                                autoFocus
-                                            />
-                                            <div className="flex gap-2">
+                            <div className="absolute left-0 z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams & Boards</p>
+                                <div className="max-h-[70vh] space-y-3 overflow-y-auto px-1 pb-1">
+                                    {teamSections.map(({ team, boards }) => (
+                                        <div key={team.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                                            <div className="mb-1 flex items-center justify-between gap-2 px-1">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-semibold text-slate-800">{team.name}</p>
+                                                    <p className="truncate text-[11px] text-slate-500">{team.team_type} • {team.role}</p>
+                                                </div>
                                                 <button
-                                                    type="submit"
-                                                    disabled={isSubmittingBoard || !newBoardName.trim()}
-                                                    className="flex-1 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
+                                                    onClick={() => onOpenTeamSettings(team.id)}
+                                                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                                                 >
-                                                    Create
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsCreatingBoard(false)}
-                                                    className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
-                                                >
-                                                    Cancel
+                                                    Team
                                                 </button>
                                             </div>
-                                        </form>
-                                    ) : (
-                                        <button
-                                            onClick={() => setIsCreatingBoard(true)}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
-                                        >
-                                            + Create new board
-                                        </button>
+                                            <div className="space-y-1">
+                                                {boards.map((b) => (
+                                                    <div key={b.id} className="group flex items-center gap-1 pr-1">
+                                                        <button
+                                                            onClick={() => handleBoardNavigate(b)}
+                                                            className={clsx(
+                                                                'flex-1 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white',
+                                                                b.id === board.id && 'bg-white text-slate-900 ring-1 ring-slate-200'
+                                                            )}
+                                                        >
+                                                            <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
+                                                            <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteBoard(b.id, b.name);
+                                                            }}
+                                                            className="hidden h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 group-hover:flex"
+                                                            title="Delete board"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {boards.length === 0 && (
+                                                    <p className="px-2 py-1 text-xs text-slate-500">No boards in this team</p>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 border-t border-slate-200 pt-2">
+                                                {isCreatingBoard && createBoardTeamId === team.id && canCreateBoardInTeam(team) ? (
+                                                    <form onSubmit={handleCreateBoard} className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            value={newBoardName}
+                                                            onChange={(e) => setNewBoardName(e.target.value)}
+                                                            placeholder="New board name"
+                                                            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="submit"
+                                                                disabled={isSubmittingBoard || !newBoardName.trim()}
+                                                                className="flex-1 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
+                                                            >
+                                                                Create
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsCreatingBoard(false)}
+                                                                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleStartCreateBoard(team.id)}
+                                                        disabled={!canCreateBoardInTeam(team)}
+                                                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
+                                                    >
+                                                        {canCreateBoardInTeam(team) ? `+ Create board in ${team.name}` : 'No permission to create board'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {teamSections.length === 0 && (
+                                        <p className="px-2 py-3 text-sm text-slate-500">No teams available</p>
                                     )}
                                 </div>
                             </div>
@@ -438,6 +510,15 @@ export default function TimelineHeader({
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     Notifications
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onOpenTeamSettings(board.team_id);
+                                        setShowMobileActions(false);
+                                    }}
+                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Team Management
                                 </button>
                                 <button
                                     onClick={() => {
@@ -714,6 +795,15 @@ export default function TimelineHeader({
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     <span>🔔</span> Notifications
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onOpenTeamSettings(board.team_id);
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <span>👥</span> Team Management
                                 </button>
                                 <button
                                     onClick={() => {

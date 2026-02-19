@@ -2,13 +2,14 @@
 
 import type { RefObject } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Board, Priority } from "@/lib/supabase";
+import type { Board, Priority, Team, TeamRole } from "@/lib/supabase";
 import type { UserProfile } from "@/app/(board)/_utils/timeline-helpers";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 
 type TimelineBoardHeaderProps = {
   board: Board;
   modalBoards: Board[];
+  modalTeams: Array<Team & { role: TeamRole }>;
   handleBoardNavigate: (board: Board) => void;
   showBoardMenu: boolean;
   setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
@@ -16,6 +17,7 @@ type TimelineBoardHeaderProps = {
   setShowNotificationSettings: (show: boolean) => void;
   setShowProfileSettings: (show: boolean) => void;
   setShowBoardSettings: (show: boolean) => void;
+  onOpenTeamSettings: (teamId: string | null | undefined) => void;
   profile: UserProfile | null;
   user: User | null;
   signOut: () => Promise<void>;
@@ -56,6 +58,7 @@ type TimelineBoardHeaderProps = {
 export default function TimelineBoardHeader({
   board,
   modalBoards,
+  modalTeams,
   handleBoardNavigate,
   showBoardMenu,
   setShowBoardMenu,
@@ -63,6 +66,7 @@ export default function TimelineBoardHeader({
   setShowNotificationSettings,
   setShowProfileSettings,
   setShowBoardSettings,
+  onOpenTeamSettings,
   profile,
   user,
   signOut,
@@ -104,6 +108,7 @@ export default function TimelineBoardHeader({
       <TimelineHeader
         board={board}
         modalBoards={modalBoards}
+        modalTeams={modalTeams}
         handleBoardNavigate={handleBoardNavigate}
         showBoardMenu={showBoardMenu}
         setShowBoardMenu={setShowBoardMenu}
@@ -111,6 +116,7 @@ export default function TimelineBoardHeader({
         setShowNotificationSettings={setShowNotificationSettings}
         setShowProfileSettings={setShowProfileSettings}
         setShowBoardSettings={setShowBoardSettings}
+        onOpenTeamSettings={onOpenTeamSettings}
         profile={profile}
         user={user}
         signOut={signOut}

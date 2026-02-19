@@ -6,6 +6,7 @@ import { readFile } from 'fs/promises';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
 const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? 'e2e-test@taesk.app';
+const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -73,6 +74,15 @@ const resolveTestUserId = async (): Promise<string> => {
 };
 
 async function ensureBoardFixtures(testUserId: string): Promise<TimelineBoardContext> {
+  const { data: seedBoard, error: seedBoardError } = await supabaseAdmin
+    .from('boards')
+    .select('team_id')
+    .eq('id', MAIN_TEST_BOARD_ID)
+    .maybeSingle();
+  if (seedBoardError || !seedBoard?.team_id) {
+    throw new Error(`Failed to resolve test team_id: ${seedBoardError?.message ?? 'missing team_id'}`);
+  }
+
   const now = new Date().toISOString();
   const boardId = crypto.randomUUID();
   const boardName = `Timeline Test Board ${Date.now()}`;
@@ -83,6 +93,7 @@ async function ensureBoardFixtures(testUserId: string): Promise<TimelineBoardCon
 
   await supabaseAdmin.from('boards').insert({
     id: boardId,
+    team_id: seedBoard.team_id,
     name: boardName,
     description: 'Board used for timeline specs',
     is_test_board: true,

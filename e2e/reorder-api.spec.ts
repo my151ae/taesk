@@ -5,6 +5,7 @@ import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
+const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 const API_HEADERS = { 'x-e2e-secret': E2E_SECRET } as const;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -19,6 +20,7 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 let cachedTestUserId: string | null = null;
+let cachedTestTeamId: string | null = null;
 
 async function getTestUserId(): Promise<string> {
   if (cachedTestUserId) return cachedTestUserId;
@@ -47,6 +49,24 @@ async function getTestUserId(): Promise<string> {
   throw new Error(`Test user not found for email: ${TEST_USER_EMAIL}`);
 }
 
+async function getTestTeamId(): Promise<string> {
+  if (cachedTestTeamId) return cachedTestTeamId;
+
+  const { data, error } = await supabaseAdmin
+    .from('boards')
+    .select('team_id')
+    .eq('id', MAIN_TEST_BOARD_ID)
+    .maybeSingle();
+
+  const teamId = data?.team_id;
+  if (error || !teamId) {
+    throw new Error(`Failed to resolve test team_id: ${error?.message ?? 'missing team_id'}`);
+  }
+
+  cachedTestTeamId = teamId;
+  return teamId;
+}
+
 async function createReorderFixture(ownerId: string): Promise<{ boardId: string; listId: string; cardIds: string[] }> {
   const now = new Date().toISOString();
   const boardId = crypto.randomUUID();
@@ -55,9 +75,11 @@ async function createReorderFixture(ownerId: string): Promise<{ boardId: string;
   const idShort = await getNextBoardIdShort();
   const slug = slugifyBoardName(boardName);
   const listId = crypto.randomUUID();
+  const teamId = await getTestTeamId();
 
   const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
+    team_id: teamId,
     name: boardName,
     user_id: ownerId,
     short_id: shortId,

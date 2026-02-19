@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
 const MOCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001';
+const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -40,14 +41,36 @@ async function resolveTestUserId(): Promise<string> {
   return profileId;
 }
 
+let cachedTestTeamId: string | null = null;
+
+async function resolveTestTeamId(): Promise<string> {
+  if (cachedTestTeamId) return cachedTestTeamId;
+
+  const { data, error } = await supabaseAdmin
+    .from('boards')
+    .select('team_id')
+    .eq('id', MAIN_TEST_BOARD_ID)
+    .maybeSingle();
+
+  const teamId = data?.team_id;
+  if (error || !teamId) {
+    throw new Error(`Failed to resolve test team id: ${error?.message ?? 'missing team_id'}`);
+  }
+
+  cachedTestTeamId = teamId;
+  return teamId;
+}
+
 async function createTestBoard(boardName: string, ownerUserId: string): Promise<TestBoard> {
   const boardId = crypto.randomUUID();
   const shortId = await createUniqueBoardShortId();
   const idShort = await getNextBoardIdShort();
   const slug = slugifyBoardName(boardName);
+  const teamId = await resolveTestTeamId();
 
   const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
+    team_id: teamId,
     name: boardName,
     user_id: ownerUserId,
     is_test_board: true,

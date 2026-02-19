@@ -33,6 +33,8 @@ export function useTimelineBoardController({
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
+  const [showTeamSettings, setShowTeamSettings] = useState(false);
+  const [teamSettingsTeamId, setTeamSettingsTeamId] = useState<string | null>(null);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const [activeDayIndex, setActiveDayIndex] = useState(0);
@@ -80,6 +82,10 @@ export function useTimelineBoardController({
     setShowProfileSettings,
     showBoardSettings,
     setShowBoardSettings,
+    showTeamSettings,
+    setShowTeamSettings,
+    teamSettingsTeamId,
+    setTeamSettingsTeamId,
     showShortcutsModal,
     setShowShortcutsModal,
     activeDayIndex,

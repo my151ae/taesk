@@ -7,6 +7,7 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 type AdminUser = { id: string; email?: string | null };
 type ListUsersResult = { users?: AdminUser[] };
 type CreateUserResult = { user?: AdminUser | null };
+type TeamRow = { id: string };
 
 function isRetryableAuthError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -85,6 +86,113 @@ function getErrorDetails(error: unknown) {
   return undefined;
 }
 
+function getOpsAdminUserId(): string | null {
+  const ids = (process.env.ADMIN_USER_IDS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return ids[0] ?? null;
+}
+
+async function ensureTestTeam(
+  supabaseAdmin: any,
+  ownerUserId: string
+): Promise<string | null> {
+  const admin = supabaseAdmin as any;
+  const teamSlug = 'e2e-test-team';
+  const { data: existing, error: existingError } = await admin
+    .from('teams')
+    .select('id')
+    .eq('slug', teamSlug)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error('[E2E] failed to lookup Test Team', existingError);
+    return null;
+  }
+
+  const teamId = (existing as TeamRow | null)?.id;
+  if (teamId) {
+    return teamId;
+  }
+
+  const { data: created, error: createError } = await admin
+    .from('teams')
+    .insert({
+      name: 'Test Team',
+      slug: teamSlug,
+      team_type: 'test',
+      allow_member_create_board: true,
+      created_by: ownerUserId,
+    })
+    .select('id')
+    .single();
+
+  if (createError || !created) {
+    console.error('[E2E] failed to create Test Team', createError);
+    return null;
+  }
+
+  return (created as TeamRow).id;
+}
+
+async function ensureTeamMember(
+  supabaseAdmin: any,
+  teamId: string,
+  profileId: string,
+  role: 'owner' | 'admin' | 'member' | 'guest'
+) {
+  const admin = supabaseAdmin as any;
+  const rank = { guest: 1, member: 2, admin: 3, owner: 4 } as const;
+  const { data: existing, error: lookupError } = await admin
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('profile_id', profileId)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error('[E2E] failed to lookup team member role', { teamId, profileId, role, error: lookupError });
+    return;
+  }
+
+  const existingRole = existing?.role as keyof typeof rank | undefined;
+  const nextRole = existingRole && rank[existingRole] > rank[role]
+    ? existingRole
+    : role;
+
+  const { error } = await admin
+    .from('team_members')
+    .upsert(
+      {
+        team_id: teamId,
+        profile_id: profileId,
+        role: nextRole,
+      },
+      { onConflict: 'team_id,profile_id', ignoreDuplicates: false }
+    );
+
+  if (error) {
+    console.error('[E2E] failed to ensure team member', { teamId, profileId, role, error });
+  }
+}
+
+async function ensureBoardTeam(
+  supabaseAdmin: any,
+  boardId: string,
+  teamId: string
+) {
+  const admin = supabaseAdmin as any;
+  const { error } = await admin
+    .from('boards')
+    .update({ team_id: teamId })
+    .eq('id', boardId);
+
+  if (error) {
+    console.error('[E2E] failed to set team_id for test board', { boardId, teamId, error });
+  }
+}
+
 /**
  * E2E Test User Creation Endpoint
  *
@@ -128,6 +236,7 @@ const postHandler = async (req: NextRequest) => {
     const existingUser = await findUserByEmail(supabaseAdmin, email);
 
     const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
+    const opsAdminUserId = getOpsAdminUserId();
 
     if (existingUser) {
       console.log('[E2E] existing user found, syncing credentials and ensuring board membership');
@@ -167,6 +276,16 @@ const postHandler = async (req: NextRequest) => {
         }
       }
 
+      const teamOwnerId = opsAdminUserId ?? existingUser.id;
+      const testTeamId = await ensureTestTeam(supabaseAdmin, teamOwnerId);
+      if (testTeamId) {
+        await ensureTeamMember(supabaseAdmin, testTeamId, existingUser.id, 'owner');
+        if (opsAdminUserId) {
+          await ensureTeamMember(supabaseAdmin, testTeamId, opsAdminUserId, 'admin');
+        }
+        await ensureBoardTeam(supabaseAdmin, MAIN_TEST_BOARD_ID, testTeamId);
+      }
+
       return NextResponse.json({ created: false, exists: true }, { status: 200 });
     }
 
@@ -201,6 +320,16 @@ const postHandler = async (req: NextRequest) => {
       // Continue anyway - user was created successfully
     } else {
       console.log('[E2E] new user added to test board');
+    }
+
+    const teamOwnerId = opsAdminUserId ?? data.user.id;
+    const testTeamId = await ensureTestTeam(supabaseAdmin, teamOwnerId);
+    if (testTeamId) {
+      await ensureTeamMember(supabaseAdmin, testTeamId, data.user.id, 'owner');
+      if (opsAdminUserId) {
+        await ensureTeamMember(supabaseAdmin, testTeamId, opsAdminUserId, 'admin');
+      }
+      await ensureBoardTeam(supabaseAdmin, MAIN_TEST_BOARD_ID, testTeamId);
     }
 
     console.log('[E2E] test user created');

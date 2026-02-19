@@ -59,6 +59,7 @@ export async function createServerSupabaseClient() {
 // Database types
 export interface Board {
   id: string;
+  team_id?: string | null;
   name: string;
   description?: string;
   is_test_board: boolean;
@@ -219,6 +220,8 @@ export interface ActivityLog {
 // Phase 3: Collaboration types
 
 export type MemberRole = 'owner' | 'editor' | 'commenter' | 'viewer';
+export type TeamRole = 'owner' | 'admin' | 'member' | 'guest';
+export type TeamType = 'personal' | 'ops' | 'test' | 'custom';
 
 export interface BoardMember {
   board_id: string;
@@ -231,11 +234,46 @@ export interface BoardInvite {
   id: string;
   board_id: string;
   email: string;
+  email_normalized?: string | null;
   role: MemberRole;
-  token: string;
+  token_hash?: string | null;
   expires_at: string;
   accepted_at: string | null;
+  revoked_at?: string | null;
   created_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  slug: string | null;
+  team_type: TeamType;
+  allow_member_create_board: boolean;
+  personal_for_profile_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  profile_id: string;
+  role: TeamRole;
+  created_at: string;
+}
+
+export interface TeamInvite {
+  id: string;
+  team_id: string;
+  email: string;
+  email_normalized: string | null;
+  role: Exclude<TeamRole, 'owner'>;
+  token_hash: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Comment {

@@ -8,6 +8,14 @@ import {
 } from '@/lib/server/api-security';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
+function asConflictIfLastOwner(message?: string | null) {
+  if (!message) return null;
+  if (message.includes('last board owner')) {
+    return NextResponse.json({ error: 'Cannot modify the last owner' }, { status: 409 });
+  }
+  return null;
+}
+
 // PATCH /api/boards/[boardId]/members/[profileId] - Update member role
 const patchHandler = async (
   request: NextRequest,
@@ -71,6 +79,8 @@ const patchHandler = async (
       .single();
 
     if (error) {
+      const conflict = asConflictIfLastOwner(error.message);
+      if (conflict) return conflict;
       console.error('Error updating member role:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -133,6 +143,8 @@ const deleteHandler = async (
       .eq('profile_id', profileId);
 
     if (error) {
+      const conflict = asConflictIfLastOwner(error.message);
+      if (conflict) return conflict;
       console.error('Error removing member:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

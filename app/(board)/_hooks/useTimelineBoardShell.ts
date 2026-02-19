@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-import type { Board, ProfileSummary } from "@/lib/supabase";
+import type { Board, ProfileSummary, Team, TeamRole } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 
 type ProfileResponse = ProfileSummary | null;
+type TeamWithRole = Team & { role: TeamRole };
 
 type UseTimelineBoardShellProps = {
   initialBoard: Board;
@@ -30,6 +31,7 @@ export function useTimelineBoardShell({
 }: UseTimelineBoardShellProps) {
   const [profile, setProfile] = useState<ProfileResponse>(null);
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
+  const [availableTeams, setAvailableTeams] = useState<TeamWithRole[]>([]);
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
@@ -59,6 +61,18 @@ export function useTimelineBoardShell({
     }
   }, [userId]);
 
+  const fetchTeams = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const response = await fetch("/api/teams");
+      if (!response.ok) return;
+      const body = (await response.json()) as { teams?: TeamWithRole[] };
+      setAvailableTeams(body.teams || []);
+    } catch (error) {
+      console.error("[timeline-shell] failed to fetch teams", error);
+    }
+  }, [userId]);
+
   useEffect(() => {
     void fetchProfile();
   }, [fetchProfile]);
@@ -66,6 +80,10 @@ export function useTimelineBoardShell({
   useEffect(() => {
     void fetchBoards();
   }, [fetchBoards]);
+
+  useEffect(() => {
+    void fetchTeams();
+  }, [fetchTeams]);
 
   const refreshBoardMembers = useCallback(async () => {
     if (!currentBoardId) return;
@@ -121,6 +139,7 @@ export function useTimelineBoardShell({
   return {
     profile,
     availableBoards,
+    availableTeams,
     setAvailableBoards,
     fetchProfile,
     refreshBoardMembers,

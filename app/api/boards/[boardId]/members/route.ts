@@ -160,6 +160,25 @@ const postHandler = async (
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Team sync fallback (DB trigger is source of truth; keep API fallback for compatibility).
+    const { data: board } = await supabase
+      .from('boards')
+      .select('team_id')
+      .eq('id', boardId)
+      .maybeSingle();
+    if (board?.team_id) {
+      await supabase
+        .from('team_members')
+        .upsert(
+          {
+            team_id: board.team_id,
+            profile_id,
+            role: 'guest',
+          },
+          { onConflict: 'team_id,profile_id', ignoreDuplicates: true }
+        );
+    }
+
   return NextResponse.json({ member: newMember }, { status: 201 });
 };
 

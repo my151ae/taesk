@@ -8,6 +8,7 @@ const TEST_BOARD_NAME = 'E2E Comments Test Board';
 const DEFAULT_LIST_TITLE = 'Comments List';
 const TEST_DISPLAY_NAME = 'Test Display Name Updated';
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e.taesk.test@gmail.com';
+const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -50,6 +51,7 @@ interface TestCardContext {
 }
 
 let cachedTestUserId: string | null = null;
+let cachedTestTeamId: string | null = null;
 
 function assertContext<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) {
@@ -60,6 +62,7 @@ function assertContext<T>(value: T | null | undefined, message: string): T {
 
 async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   const testUserId = await getTestUserId();
+  const testTeamId = await getTestTeamId();
   const boardId = crypto.randomUUID();
   const boardShortId = await createUniqueBoardShortId();
   const boardIdShort = await getNextBoardIdShort();
@@ -67,6 +70,7 @@ async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
 
   const { error: boardError } = await supabaseAdmin.from('boards').insert({
     id: boardId,
+    team_id: testTeamId,
     name: boardName,
     user_id: testUserId,
     is_test_board: true,
@@ -153,6 +157,26 @@ async function getTestUserId(): Promise<string> {
   }
 
   throw new Error(`Test user not found: ${targetEmail}`);
+}
+
+async function getTestTeamId(): Promise<string> {
+  if (cachedTestTeamId) {
+    return cachedTestTeamId;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('boards')
+    .select('team_id')
+    .eq('id', MAIN_TEST_BOARD_ID)
+    .maybeSingle();
+
+  const teamId = data?.team_id;
+  if (error || !teamId) {
+    throw new Error(`Failed to resolve test team_id: ${error?.message ?? 'missing team_id'}`);
+  }
+
+  cachedTestTeamId = teamId;
+  return teamId;
 }
 
 async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
-import { isAdminUser } from '@/lib/admins';
 import { requireAuthenticatedUser, validateMutationRequestOrigin } from '@/lib/server/api-security';
 import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
+import { canCreateBoardInTeam } from '@/lib/server/team-security';
 
 const CreateBoardSchema = z.object({
+  team_id: z.string().uuid(),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   is_test_board: z.boolean().optional(),
@@ -30,26 +30,7 @@ const getHandler = async (request: NextRequest) => {
       );
     }
 
-    if (isAdminUser({ id: user.id, email: user.email })) {
-      const adminSupabase = createServiceRoleSupabaseClient();
-      const { data: boards, error } = await adminSupabase
-        .from('boards')
-        .select('id, name, description, short_id, id_short, slug, is_test_board, day_range, created_at, updated_at')
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching boards for admin:', error);
-        return NextResponse.json(
-          { error: { code: 'DB_ERROR', message: error.message } },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json(
-        { boards: boards || [] },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
-      );
-    }
+    const teamIdFilter = request.nextUrl.searchParams.get('team_id');
 
     // Get boards where user is a member
     const { data: memberships } = await supabase
@@ -63,11 +44,16 @@ const getHandler = async (request: NextRequest) => {
 
     const boardIds = memberships.map(m => m.board_id);
 
-    const { data: boards, error } = await supabase
+    let boardsQuery = supabase
       .from('boards')
-      .select('id, name, description, short_id, id_short, slug, is_test_board, day_range, created_at, updated_at')
-      .in('id', boardIds)
-      .order('created_at', { ascending: true });
+      .select('id, team_id, name, description, short_id, id_short, slug, is_test_board, day_range, list_range, created_at, updated_at')
+      .in('id', boardIds);
+
+    if (teamIdFilter) {
+      boardsQuery = boardsQuery.eq('team_id', teamIdFilter);
+    }
+
+    const { data: boards, error } = await boardsQuery.order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching boards:', error);
@@ -126,6 +112,11 @@ const postHandler = async (request: NextRequest) => {
         },
         { status: 422 }
       );
+    }
+
+    const createPermission = await canCreateBoardInTeam(supabase, parsed.data.team_id, user.id);
+    if (!createPermission.ok) {
+      return createPermission.response;
     }
 
     // Generate short_id, id_short, and slug
