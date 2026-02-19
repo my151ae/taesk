@@ -78,19 +78,21 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
       }
       const nextTeams = body.teams || [];
       setTeams(nextTeams);
-
-      const preferredTeamId =
-        (initialTeamId && nextTeams.some((team) => team.id === initialTeamId) ? initialTeamId : null) ||
-        selectedTeamId ||
-        nextTeams[0]?.id ||
-        "";
-      setSelectedTeamId(preferredTeamId);
+      setSelectedTeamId((currentSelectedTeamId) => {
+        if (currentSelectedTeamId && nextTeams.some((team) => team.id === currentSelectedTeamId)) {
+          return currentSelectedTeamId;
+        }
+        if (initialTeamId && nextTeams.some((team) => team.id === initialTeamId)) {
+          return initialTeamId;
+        }
+        return nextTeams[0]?.id || "";
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load teams");
     } finally {
       setLoading(false);
     }
-  }, [initialTeamId, resetNotice, selectedTeamId]);
+  }, [initialTeamId, resetNotice]);
 
   const fetchSelectedTeam = useCallback(async (teamId: string) => {
     if (!teamId) {

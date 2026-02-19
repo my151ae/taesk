@@ -292,7 +292,7 @@ export default function TimelineHeader({
                                                     onClick={() => onOpenTeamSettings(team.id)}
                                                     className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                                                 >
-                                                    Team
+                                                    Edit
                                                 </button>
                                             </div>
                                             <div className="space-y-1">
@@ -544,15 +544,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     Notifications
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenTeamSettings(board.team_id);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    Team Management
                                 </button>
                                 <Link
                                     href="/playground"
@@ -820,15 +811,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     <span>🔔</span> Notifications
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenTeamSettings(board.team_id);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>👥</span> Team Management
                                 </button>
                                 <Link
                                     href="/playground"
