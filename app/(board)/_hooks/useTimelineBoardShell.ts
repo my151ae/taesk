@@ -16,7 +16,7 @@ type UseTimelineBoardShellProps = {
   userId?: string;
   router: AppRouterInstance;
   onTimelineStartHour?: (hour: number) => void;
-  setBoardMembers: (members: ProfileSummary[]) => void;
+  setBoardMembers: (members: BoardMember[]) => void;
   setStoredMembers: (boardId: string, members: BoardMember[]) => void;
 };
 
@@ -100,7 +100,7 @@ export function useTimelineBoardShell({
         profile: m.profile,
         role: m.role,
       }));
-      setBoardMembers(nextMembers.map((m) => m.profile));
+      setBoardMembers(nextMembers);
       setStoredMembers(currentBoardId, nextMembers);
     } catch (error) {
       console.error("[timeline-shell] failed to refresh board members", error);

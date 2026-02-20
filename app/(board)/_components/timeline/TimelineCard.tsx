@@ -84,6 +84,25 @@ export function TimelineCard({
         }
     }, [onOpen]);
 
+    const renderRightMeta = useCallback(() => {
+        if (typeof rightMeta === "string") {
+            const match = rightMeta.match(/^(\d+h)(\d+m)$/);
+            if (match) {
+                return (
+                    <span className="text-[10px] font-semibold text-slate-600 leading-[1.05] text-center">
+                        [{match[1]}<br />{match[2]}]
+                    </span>
+                );
+            }
+        }
+
+        return (
+            <span className="text-[10px] font-semibold text-slate-600 leading-none">
+                [{rightMeta}]
+            </span>
+        );
+    }, [rightMeta]);
+
     return (
         <div
             ref={containerRef}
@@ -287,9 +306,7 @@ export function TimelineCard({
                 )}>
                     <div className="h-full w-px bg-slate-200" />
                     <div className="flex items-center justify-center px-1">
-                        <span className="text-[10px] font-semibold text-slate-600 leading-none">
-                            [{rightMeta}]
-                        </span>
+                        {renderRightMeta()}
                     </div>
                 </div>
             ) : null}

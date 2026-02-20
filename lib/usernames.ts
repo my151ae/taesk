@@ -121,6 +121,29 @@ export function resolveProfileIdentity(
   };
 }
 
+export function resolveProfileDisplayName(
+  profile?: ProfileSummary | null,
+  fallbackEmail?: string | null
+): string {
+  const normalizedProfile = profile ?? null;
+  const displayName = normalizedProfile?.display_name?.trim();
+  if (displayName) return displayName;
+
+  const fullName = normalizedProfile?.full_name?.trim();
+  if (fullName) return fullName;
+
+  const username = normalizedProfile?.username?.trim();
+  if (username) return `@${username}`;
+
+  const email = normalizedProfile?.email?.trim();
+  if (email) return email;
+
+  const fallback = fallbackEmail?.trim();
+  if (fallback) return fallback;
+
+  return "Unknown user";
+}
+
 export function getProfileInitial(
   profile?: ProfileSummary | null,
   fallbackEmail?: string | null

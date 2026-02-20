@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useBoardMembersStore, type BoardMember } from '@/app/(board)/_stores/board-members-store';
-import { type ProfileSummary } from '@/lib/supabase';
 import { useAuth } from '@/app/contexts/AuthContext';
 
 export function useBoardMembers(currentBoardId: string | null) {
     const { user } = useAuth();
-    const [boardMembers, setBoardMembers] = useState<ProfileSummary[]>([]);
+    const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
     const { setMembers: setStoredMembers, getMembers: getStoredMembers, shouldRefetch } = useBoardMembersStore();
 
     useEffect(() => {
@@ -23,7 +22,7 @@ export function useBoardMembers(currentBoardId: string | null) {
             const cached = getStoredMembers(currentBoardId);
             if (cached && !shouldRefetch(currentBoardId)) {
                 if (!isDisposed) {
-                    setBoardMembers(cached.map(m => m.profile));
+                    setBoardMembers(cached);
                 }
                 return;
             }
@@ -39,16 +38,15 @@ export function useBoardMembers(currentBoardId: string | null) {
                     return;
                 }
 
-                const { members } = await response.json() as { members: Array<{ profile: ProfileSummary; role: BoardMember['role'] }> };
-                const boardMembers: BoardMember[] = members.map((m) => ({
+                const { members } = await response.json() as { members: Array<{ profile: BoardMember['profile']; role: BoardMember['role'] }> };
+                const nextBoardMembers: BoardMember[] = members.map((m) => ({
                     profile: m.profile,
                     role: m.role
                 }));
-                const profiles: ProfileSummary[] = boardMembers.map(m => m.profile);
 
                 if (!isDisposed) {
-                    setBoardMembers(profiles);
-                    setStoredMembers(currentBoardId, boardMembers); // Save to store
+                    setBoardMembers(nextBoardMembers);
+                    setStoredMembers(currentBoardId, nextBoardMembers); // Save to store
                 }
             } catch (error) {
                 console.error('Unexpected error loading board members:', error);

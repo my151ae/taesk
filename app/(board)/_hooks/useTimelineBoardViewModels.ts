@@ -11,7 +11,7 @@ import type {
 import type { ExternalCalendarEntry, TimelineBucketItem, TimelineDay, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
 import type { ActiveDragState, ActiveResizeState, BucketIndicator, PointerPreviewState } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import type { ProfileSummary } from "@/lib/supabase";
+import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -59,7 +59,7 @@ type UseTimelineBoardViewModelsArgs = {
   handleCardContextMenu: (e: MouseEvent, cardId: string) => void;
   handleCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers: ProfileSummary[];
+  boardMembers: BoardMember[];
   onOpenShareDialog: () => void;
   listBaseDate: string;
   listMonthDirection: 1 | 2 | 3 | -1 | -2 | -3;

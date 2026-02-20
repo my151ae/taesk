@@ -31,8 +31,10 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP,
 } from "@/app/(board)/_stores/timeline-zoom-store";
-import type { ProfileSummary } from "@/lib/supabase";
-import { getProfileInitial, resolveProfileIdentity } from "@/lib/usernames";
+import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
+import type { MemberRole } from "@/lib/supabase";
+import { getProfileInitial, resolveProfileDisplayName } from "@/lib/usernames";
+import { resolveTimeZoneDisplay } from "@/lib/timezone-display";
 
 const ALL_DAY_ROW_HEIGHT = 36;
 const AXIS_WIDTH_PX = 120;
@@ -40,6 +42,14 @@ const AXIS_WIDTH_PX = 120;
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
 const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
+const ROLE_ORDER: MemberRole[] = ["owner", "editor", "commenter", "viewer"];
+const ROLE_LABELS: Record<MemberRole, string> = {
+  owner: "Owner",
+  editor: "Editor",
+  commenter: "Commenter",
+  viewer: "Viewer",
+};
+const SYSTEM_TIME_ZONE = "Asia/Tokyo";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -86,7 +96,7 @@ type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers?: ProfileSummary[];
+  boardMembers?: BoardMember[];
   onOpenShareDialog?: () => void;
 };
 
@@ -353,11 +363,23 @@ export function DesktopTimelineView({
   const sortedMembers = useMemo(() => {
     if (!boardMembers?.length) return [];
     return [...boardMembers].sort((a, b) => {
-      const aLabel = resolveProfileIdentity(a, a.email ?? null).label;
-      const bLabel = resolveProfileIdentity(b, b.email ?? null).label;
+      const aLabel = resolveProfileDisplayName(a.profile, a.profile.email ?? null);
+      const bLabel = resolveProfileDisplayName(b.profile, b.profile.email ?? null);
       return aLabel.localeCompare(bLabel, "ja");
     });
   }, [boardMembers]);
+
+  const systemTimeZone = useMemo(() => resolveTimeZoneDisplay(SYSTEM_TIME_ZONE), []);
+
+  const membersByRole = useMemo(
+    () =>
+      ROLE_ORDER.map((role) => ({
+        role,
+        label: ROLE_LABELS[role],
+        members: sortedMembers.filter((member) => member.role === role),
+      })),
+    [sortedMembers]
+  );
 
   useEffect(() => {
     onMount?.();
@@ -391,7 +413,10 @@ export function DesktopTimelineView({
             }}
           >
             <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
-              <span className="leading-none text-[10px] text-slate-400">閲覧メンバー</span>
+              <div className="flex flex-col items-center leading-none">
+                <span className="text-[10px] font-semibold text-slate-500">{systemTimeZone.abbreviation}</span>
+                <span className="mt-0.5 text-[9px] text-slate-400">{systemTimeZone.offset}</span>
+              </div>
             </div>
             {visibleDays.map((day, index) => (
               <div
@@ -529,49 +554,52 @@ export function DesktopTimelineView({
               {/* 時間軸 */}
               <aside className="timeline-axis relative border-r border-slate-100 text-xs text-slate-500">
                 <div className="sticky top-0 z-10 bg-white/95 px-2.5 py-3 backdrop-blur">
-                  <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    <span>閲覧可</span>
-                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">
-                      {sortedMembers.length}
-                    </span>
+                  <div className="space-y-3">
+                    {membersByRole.map((section) => (
+                      <div key={section.role}>
+                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500">
+                          <span>{section.label}</span>
+                          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">
+                            {section.members.length}
+                          </span>
+                        </div>
+                        {section.members.length > 0 && (
+                          <ul className="mt-2 space-y-2">
+                            {section.members.map(({ profile }) => {
+                              const displayName = resolveProfileDisplayName(profile, profile.email ?? null);
+                              const initial = getProfileInitial(profile, profile.email ?? null);
+                              return (
+                                <li key={profile.id} className="flex items-center gap-2 text-[11px] text-slate-700">
+                                  {profile.avatar_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
+                                    <img
+                                      src={profile.avatar_url}
+                                      alt={displayName}
+                                      className="h-6 w-6 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                                      {initial}
+                                    </div>
+                                  )}
+                                  <span className="min-w-0 truncate" title={displayName}>
+                                    {displayName}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {sortedMembers.length ? (
-                    <ul className="mt-3 space-y-2">
-                      {sortedMembers.map((member) => {
-                        const identity = resolveProfileIdentity(member, member.email ?? null);
-                        const initial = getProfileInitial(member, member.email ?? null);
-                        return (
-                          <li key={member.id} className="flex items-center gap-2 text-[11px] text-slate-700">
-                            {member.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
-                              <img
-                                src={member.avatar_url}
-                                alt={identity.label}
-                                className="h-6 w-6 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
-                                {initial}
-                              </div>
-                            )}
-                            <span className="min-w-0 truncate" title={identity.label}>
-                              {identity.label}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <div className="mt-3 text-[10px] text-slate-400">メンバーなし</div>
-                  )}
                   <button
                     type="button"
                     onClick={onOpenShareDialog}
                     data-testid="share-button"
                     className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
                   >
-                    <span className="text-sm leading-none">＋</span>
-                    追加
+                    Edit
                   </button>
                 </div>
               </aside>

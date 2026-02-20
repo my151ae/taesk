@@ -55,6 +55,24 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
     }
   };
 
+  const readErrorMessage = async (
+    response: Response,
+    fallbackMessage: string
+  ): Promise<string> => {
+    try {
+      const body = await response.json() as { error?: string | { message?: string } };
+      if (typeof body.error === 'string' && body.error.trim()) {
+        return body.error;
+      }
+      if (body.error && typeof body.error === 'object' && body.error.message) {
+        return body.error.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return fallbackMessage;
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     const rawInput = inviteIdentifier.trim();
@@ -116,7 +134,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       });
 
       if (!addRes.ok) {
-        alert('メンバー追加に失敗しました');
+        alert(await readErrorMessage(addRes, 'メンバー追加に失敗しました'));
         return;
       }
 
@@ -153,7 +171,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
           )
         );
       } else {
-        alert('Failed to update role');
+        alert(await readErrorMessage(response, 'Failed to update role'));
       }
     } catch (error) {
       console.error('Error updating role:', error);
@@ -172,7 +190,7 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
       if (response.ok) {
         setMembers(members.filter((m) => m.profile_id !== profileId));
       } else {
-        alert('Failed to remove member');
+        alert(await readErrorMessage(response, 'Failed to remove member'));
       }
     } catch (error) {
       console.error('Error removing member:', error);
@@ -267,7 +285,6 @@ export default function ShareDialog({ boardId, onClose, onMemberAdded }: ShareDi
                           value={member.role}
                           onChange={(e) => handleRoleChange(member.profile_id, e.target.value as MemberRole)}
                           className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          disabled={member.role === 'owner'}
                         >
                           <option value="owner">Owner</option>
                           <option value="editor">Editor</option>

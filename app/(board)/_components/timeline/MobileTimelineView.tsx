@@ -34,10 +34,20 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP
 } from "@/app/(board)/_stores/timeline-zoom-store";
-import type { ProfileSummary } from "@/lib/supabase";
-import { getProfileInitial, resolveProfileIdentity } from "@/lib/usernames";
+import type { MemberRole } from "@/lib/supabase";
+import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
+import { getProfileInitial, resolveProfileDisplayName } from "@/lib/usernames";
+import { resolveTimeZoneDisplay } from "@/lib/timezone-display";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
+const ROLE_ORDER: MemberRole[] = ["owner", "editor", "commenter", "viewer"];
+const ROLE_LABELS: Record<MemberRole, string> = {
+  owner: "Owner",
+  editor: "Editor",
+  commenter: "Commenter",
+  viewer: "Viewer",
+};
+const SYSTEM_TIME_ZONE = "Asia/Tokyo";
 
 
 
@@ -381,7 +391,7 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers?: ProfileSummary[];
+  boardMembers?: BoardMember[];
   onOpenShareDialog?: () => void;
 };
 
@@ -435,11 +445,23 @@ export default function MobileTimelineView({
   const sortedMembers = useMemo(() => {
     if (!boardMembers?.length) return [];
     return [...boardMembers].sort((a, b) => {
-      const aLabel = resolveProfileIdentity(a, a.email ?? null).label;
-      const bLabel = resolveProfileIdentity(b, b.email ?? null).label;
+      const aLabel = resolveProfileDisplayName(a.profile, a.profile.email ?? null);
+      const bLabel = resolveProfileDisplayName(b.profile, b.profile.email ?? null);
       return aLabel.localeCompare(bLabel, "ja");
     });
   }, [boardMembers]);
+
+  const systemTimeZone = useMemo(() => resolveTimeZoneDisplay(SYSTEM_TIME_ZONE), []);
+
+  const membersByRole = useMemo(
+    () =>
+      ROLE_ORDER.map((role) => ({
+        role,
+        label: ROLE_LABELS[role],
+        members: sortedMembers.filter((member) => member.role === role),
+      })),
+    [sortedMembers]
+  );
 
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -627,7 +649,9 @@ export default function MobileTimelineView({
               {/* Date Info */}
               <div className="flex flex-col items-center gap-0">
                 <span>{activeDay.label}</span>
-                <span className="text-[10px] text-slate-400 normal-case tracking-normal">{activeDay.isoDate} · GMT+09</span>
+                <span className="text-[10px] text-slate-400 normal-case tracking-normal">
+                  {activeDay.isoDate} · {systemTimeZone.label}
+                </span>
               </div>
             </div>
             <button
@@ -697,46 +721,48 @@ export default function MobileTimelineView({
               >
                 <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
                   <div className="sticky top-0 z-10 bg-white/95 px-1.5 py-2 backdrop-blur">
-                    <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                      <span>閲覧</span>
-                      <span className="rounded-full bg-slate-100 px-1 py-0.5 text-[9px] text-slate-500">
-                        {sortedMembers.length}
-                      </span>
+                    <div className="space-y-2">
+                      {membersByRole.map((section) => (
+                        <div key={section.role} className="rounded border border-slate-100 bg-slate-50 px-1 py-1">
+                          <div className="flex items-center justify-between text-[9px] font-semibold text-slate-500">
+                            <span>{section.label}</span>
+                            <span>{section.members.length}</span>
+                          </div>
+                          {section.members.length > 0 && (
+                            <ul className="mt-1 space-y-1">
+                              {section.members.map(({ profile }) => {
+                                const displayName = resolveProfileDisplayName(profile, profile.email ?? null);
+                                const initial = getProfileInitial(profile, profile.email ?? null);
+                                return (
+                                  <li key={profile.id} className="flex items-center justify-center">
+                                    {profile.avatar_url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
+                                      <img
+                                        src={profile.avatar_url}
+                                        alt={displayName}
+                                        className="h-5 w-5 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
+                                        {initial}
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    {sortedMembers.length ? (
-                      <ul className="mt-2 space-y-2">
-                        {sortedMembers.map((member) => {
-                          const identity = resolveProfileIdentity(member, member.email ?? null);
-                          const initial = getProfileInitial(member, member.email ?? null);
-                          return (
-                            <li key={member.id} className="flex items-center justify-center">
-                              {member.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
-                                <img
-                                  src={member.avatar_url}
-                                  alt={identity.label}
-                                  className="h-6 w-6 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
-                                  {initial}
-                                </div>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <div className="mt-2 text-center text-[9px] text-slate-400">なし</div>
-                    )}
                     <button
                       type="button"
                       onClick={onOpenShareDialog}
                       data-testid="share-button"
                       className="mt-2 flex h-7 w-full items-center justify-center rounded-md border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                      aria-label="メンバー追加"
+                      aria-label="メンバー編集"
                     >
-                      ＋
+                      Edit
                     </button>
                   </div>
                 </div>
