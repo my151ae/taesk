@@ -9,6 +9,7 @@ import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
 import type { Priority } from '@/lib/supabase';
 import type { ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
+import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 
 type TeamWithRole = Team & { role: TeamRole };
 
@@ -21,6 +22,10 @@ function canCreateBoardInTeam(team: TeamWithRole): boolean {
 function canEditBoard(board: Board): boolean {
     if (!board.membership_role) return true;
     return board.membership_role === 'owner' || board.membership_role === 'editor';
+}
+
+function isProtectedBoard(board: Board): boolean {
+    return board.id === MAIN_BOARD_ID;
 }
 
 type TimelineHeaderProps = {
@@ -170,6 +175,10 @@ export default function TimelineHeader({
     };
 
     const handleDeleteBoard = async (boardId: string, boardName: string) => {
+        if (boardId === MAIN_BOARD_ID) {
+            alert('E2E core board cannot be deleted');
+            return;
+        }
         if (!confirm(`Are you sure you want to delete "${boardName}"? This cannot be undone.`)) return;
 
         try {
@@ -328,10 +337,17 @@ export default function TimelineHeader({
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                if (isProtectedBoard(b)) return;
                                                                 handleDeleteBoard(b.id, b.name);
                                                             }}
-                                                            className="hidden h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 group-hover:flex"
-                                                            title="Delete board"
+                                                            className={clsx(
+                                                                "hidden h-8 w-8 items-center justify-center rounded-lg group-hover:flex",
+                                                                isProtectedBoard(b)
+                                                                    ? "cursor-not-allowed text-slate-300"
+                                                                    : "text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                            )}
+                                                            title={isProtectedBoard(b) ? "Protected E2E board" : "Delete board"}
+                                                            disabled={isProtectedBoard(b)}
                                                         >
                                                             🗑️
                                                         </button>

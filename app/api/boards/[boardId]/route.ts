@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
     getBoardMembership,
@@ -25,6 +26,14 @@ const deleteHandler = async (
         }
 
         const { boardId } = await params;
+
+        if (boardId === MAIN_BOARD_ID) {
+            return NextResponse.json(
+                { error: { code: 'CONFLICT', message: 'E2E core board cannot be deleted' } },
+                { status: 409 }
+            );
+        }
+
         const supabase = await createServerSupabaseClient();
 
         const { user, errorResponse } = await requireAuthenticatedUser(supabase);
