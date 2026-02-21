@@ -2,14 +2,22 @@
 
 import { Extension, useEditor, EditorContent, JSONContent } from '@tiptap/react';
 import { TextSelection, Plugin, PluginKey, EditorState, Transaction } from '@tiptap/pm/state';
+import type { Selection } from '@tiptap/pm/state';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
 import styles from './TiptapEditor.module.css';
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { ensureTitleTask } from '@/lib/tiptap';
+import {
+    CARD_IMAGE_MAX_BYTES,
+    applySignedUrlsToContent,
+    collectImageStoragePaths,
+    isSupportedCardImageMimeType,
+} from '@/lib/tiptap-images';
 
 /**
  * 先頭ブロックが空でないテキストを持つ場合、自動的に taskItem に変換する拡張
@@ -87,15 +95,70 @@ type TiptapEditorProps = {
     onChange?: (content: JSONContent) => void;
     placeholder?: string;
     editable?: boolean;
+    boardId?: string;
+    cardId?: string;
+    onEditorError?: (message: string | null) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
+
+type PasteTaskContext = {
+    isTitleTask: boolean;
+    taskListDepth: number;
+};
+
+const resolvePasteTaskContext = (selection: Selection): PasteTaskContext => {
+    const $pos = selection.$from;
+
+    let isInsideTask = false;
+    let taskDepth = 0;
+
+    for (let d = $pos.depth; d > 0; d--) {
+        if ($pos.node(d)?.type.name === 'taskItem') {
+            isInsideTask = true;
+            taskDepth = d;
+            break;
+        }
+    }
+
+    const taskListDepth = taskDepth > 0 ? taskDepth - 1 : 0;
+    const isFirstTaskInTaskList =
+        isInsideTask &&
+        taskListDepth > 0 &&
+        $pos.node(taskListDepth).type.name === 'taskList' &&
+        $pos.index(taskListDepth) === 0;
+
+    const isTitleTask =
+        isFirstTaskInTaskList &&
+        taskListDepth === 1 &&
+        $pos.index(0) === 0;
+
+    return {
+        isTitleTask,
+        taskListDepth,
+    };
+};
+
+async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
+    try {
+        const body = await response.json() as { error?: { message?: unknown } };
+        if (typeof body?.error?.message === 'string' && body.error.message.trim()) {
+            return body.error.message;
+        }
+    } catch {
+        // ignore parse error
+    }
+    return fallback;
+}
 
 export default function TiptapEditor({
     initialContent,
     onChange,
     placeholder = "Type '/' for commands…",
     editable = true,
+    boardId,
+    cardId,
+    onEditorError,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -103,6 +166,7 @@ export default function TiptapEditor({
     const isUpdatingRef = useRef(false);
     const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
+    const signedUrlRequestIdRef = useRef(0);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -117,6 +181,22 @@ export default function TiptapEditor({
             TaskItem.configure({
                 nested: true,
             }),
+            Image.extend({
+                addAttributes() {
+                    return {
+                        ...this.parent?.(),
+                        storagePath: {
+                            default: null,
+                            parseHTML: (element) => element.getAttribute('data-storage-path'),
+                            renderHTML: (attributes) => {
+                                const value = attributes.storagePath;
+                                if (typeof value !== 'string' || !value) return {};
+                                return { 'data-storage-path': value };
+                            },
+                        },
+                    };
+                },
+            }),
             AutoTaskFirstLine,
             Placeholder.configure({
                 placeholder: ({ node }) => {
@@ -124,7 +204,7 @@ export default function TiptapEditor({
                         return `H${node.attrs.level ?? 1}`;
                     }
                     if (node.type.name === 'paragraph') {
-                        return 'Text';
+                        return placeholder;
                     }
                     return '';
                 },
@@ -138,6 +218,93 @@ export default function TiptapEditor({
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handlePaste: (view, event, slice) => {
+                const imageFiles = Array.from(event.clipboardData?.items ?? [])
+                    .filter((item) => item.kind === 'file')
+                    .map((item) => item.getAsFile())
+                    .filter((file): file is File => !!file && file.type.startsWith('image/'));
+
+                if (imageFiles.length > 0) {
+                    if (!boardId || !cardId) {
+                        onEditorError?.('画像貼り付けはこの画面では利用できません。');
+                        return true;
+                    }
+
+                    const imageType = view.state.schema.nodes.image;
+                    if (!imageType) {
+                        onEditorError?.('画像ノードが初期化されていません。');
+                        return true;
+                    }
+
+                    void (async () => {
+                        for (const file of imageFiles) {
+                            const mimeType = file.type.trim().toLowerCase();
+                            if (!isSupportedCardImageMimeType(mimeType)) {
+                                onEditorError?.('画像形式は PNG / JPEG / WebP のみ対応しています。');
+                                continue;
+                            }
+
+                            if (!Number.isFinite(file.size) || file.size > CARD_IMAGE_MAX_BYTES) {
+                                onEditorError?.('画像サイズは 10MB 以下にしてください。');
+                                continue;
+                            }
+
+                            const formData = new FormData();
+                            formData.append('file', file);
+
+                            const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images`, {
+                                method: 'POST',
+                                body: formData,
+                            });
+
+                            if (!response.ok) {
+                                const message = await parseErrorMessage(response, '画像のアップロードに失敗しました。');
+                                onEditorError?.(message);
+                                continue;
+                            }
+
+                            const body = await response.json() as { storagePath?: unknown; signedUrl?: unknown };
+                            if (typeof body.storagePath !== 'string' || typeof body.signedUrl !== 'string') {
+                                onEditorError?.('画像アップロード応答が不正です。');
+                                continue;
+                            }
+
+                            const { state, dispatch } = view;
+                            const { selection } = state;
+                            const taskContext = resolvePasteTaskContext(selection);
+
+                            let tr = state.tr;
+                            const imageNode = imageType.create({
+                                src: body.signedUrl,
+                                storagePath: body.storagePath,
+                                alt: file.name || 'pasted image',
+                            });
+
+                            if (taskContext.isTitleTask && taskContext.taskListDepth > 0) {
+                                const mappedSelectionTo = tr.mapping.map(selection.to);
+                                const $newPos = tr.doc.resolve(mappedSelectionTo);
+                                const insertPos = $newPos.after(taskContext.taskListDepth);
+                                tr = tr.insert(insertPos, imageNode);
+                            } else {
+                                tr = tr.replaceSelectionWith(imageNode, false);
+                            }
+
+                            tr = tr.scrollIntoView();
+                            dispatch(tr);
+                            onEditorError?.(null);
+
+                            // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
+                            if (onChange) {
+                                onChange(tr.doc.toJSON() as JSONContent);
+                            }
+                        }
+                    })().catch((error) => {
+                        console.error('[Tiptap] image paste failed', error);
+                        onEditorError?.('画像の貼り付けに失敗しました。');
+                    });
+
+                    return true;
+                }
+
                 const text = event.clipboardData?.getData('text/plain');
                 if (text && (text.includes('\n') || text.includes('\r'))) {
                     const lines = text.split(/\r\n|\r|\n/);
@@ -146,35 +313,12 @@ export default function TiptapEditor({
 
                     const { state, dispatch } = view;
                     const { selection, schema } = state;
-                    const $pos = selection.$from;
+                    const taskContext = resolvePasteTaskContext(selection);
 
-                    // 1. リスト内でのペーストか判定 (taskItem の中か)
-                    // depth が 0 の場合はドキュメントトップなので除外
-                    let tr = state.tr;
-                    let isInsideTask = false;
-                    let taskDepth = 0;
-
-                    for (let d = $pos.depth; d > 0; d--) {
-                        if ($pos.node(d)?.type.name === 'taskItem') {
-                            isInsideTask = true;
-                            taskDepth = d;
-                            break;
-                        }
-                    }
-
-                    const taskListDepth = taskDepth > 0 ? taskDepth - 1 : 0;
-                    const isFirstTaskInTaskList =
-                        isInsideTask &&
-                        taskListDepth > 0 &&
-                        $pos.node(taskListDepth).type.name === 'taskList' &&
-                        $pos.index(taskListDepth) === 0;
-                    const isTitleTask =
-                        isFirstTaskInTaskList &&
-                        taskListDepth === 1 &&
-                        $pos.index(0) === 0;
-
-                    if (isTitleTask && bodyLines.length > 0) {
+                    if (taskContext.isTitleTask && bodyLines.length > 0) {
                         console.log('[Tiptap] multiline paste in title task detected, escaping body lines out of title taskList');
+
+                        let tr = state.tr;
 
                         // 1行目を現在位置へ挿入（選択範囲を置換）
                         tr = tr.insertText(firstLine, selection.from, selection.to);
@@ -183,7 +327,7 @@ export default function TiptapEditor({
                         // 先頭 taskList の直後（本文）へ挿入する
                         // 1行目挿入後の selection.to から解決し直すと安全
                         const $newPos = tr.doc.resolve(tr.mapping.map(selection.to));
-                        const insertPos = $newPos.after(taskListDepth);
+                        const insertPos = $newPos.after(taskContext.taskListDepth);
 
                         const newParagraphs = bodyLines.map(line =>
                             schema.nodes.paragraph.create({}, line ? schema.text(line) : [])
@@ -191,6 +335,7 @@ export default function TiptapEditor({
 
                         tr = tr.insert(insertPos, newParagraphs);
                         dispatch(tr);
+
                         // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
                         if (onChange) {
                             onChange(tr.doc.toJSON() as JSONContent);
@@ -246,21 +391,60 @@ export default function TiptapEditor({
     useEffect(() => {
         if (!editor) return;
 
-        // 外部更新は doc.eq で比較して必要時のみ適用（setContent ループを避ける）
-        const nextContent = initialContent ?? { type: 'doc', content: [] };
-        let nextDoc: ProseMirrorNode | null = null;
-        try {
-            nextDoc = editor.schema.nodeFromJSON(nextContent);
-        } catch {
-            return;
-        }
-        lastAppliedDocRef.current = nextDoc;
-        if (!editor.state.doc.eq(nextDoc)) {
-            isUpdatingRef.current = true;
-            editor.commands.setContent(nextContent, { emitUpdate: false });
-            isUpdatingRef.current = false;
-        }
-    }, [initialContent, editor]);
+        const requestId = ++signedUrlRequestIdRef.current;
+        let cancelled = false;
+
+        const hydrateContent = async () => {
+            const nextContent = initialContent ?? { type: 'doc', content: [] };
+            let hydratedContent = nextContent;
+
+            const paths = collectImageStoragePaths(nextContent);
+            if (paths.length > 0 && boardId && cardId) {
+                try {
+                    const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images/sign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ paths }),
+                    });
+
+                    if (response.ok) {
+                        const body = await response.json() as { urls?: Record<string, string> };
+                        const nextUrls = body?.urls && typeof body.urls === 'object' ? body.urls : {};
+                        hydratedContent = applySignedUrlsToContent(nextContent, nextUrls).content;
+                        onEditorError?.(null);
+                    } else {
+                        const message = await parseErrorMessage(response, '画像URLの再取得に失敗しました。');
+                        onEditorError?.(message);
+                    }
+                } catch (error) {
+                    console.error('[Tiptap] failed to hydrate image signed URLs', error);
+                    onEditorError?.('画像URLの再取得に失敗しました。');
+                }
+            }
+
+            if (cancelled || requestId !== signedUrlRequestIdRef.current) return;
+
+            let nextDoc: ProseMirrorNode | null = null;
+            try {
+                nextDoc = editor.schema.nodeFromJSON(hydratedContent);
+            } catch {
+                return;
+            }
+
+            lastAppliedDocRef.current = nextDoc;
+            if (!editor.state.doc.eq(nextDoc)) {
+                isUpdatingRef.current = true;
+                editor.commands.setContent(hydratedContent, { emitUpdate: false });
+                isUpdatingRef.current = false;
+            }
+        };
+
+        void hydrateContent();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [initialContent, editor, boardId, cardId, onEditorError]);
 
     // Update editable state
     useEffect(() => {

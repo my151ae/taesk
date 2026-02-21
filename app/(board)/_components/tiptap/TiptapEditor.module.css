@@ -207,3 +207,15 @@
 .editor :global(.ProseMirror:focus) {
     outline: none;
 }
+
+.editor :global(.ProseMirror img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 0.5rem 0;
+    border: 1px solid #e5e7eb;
+}
+
+:global(.dark) .editor :global(.ProseMirror img) {
+    border-color: #374151;
+}

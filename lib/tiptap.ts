@@ -246,11 +246,22 @@ export const ensureTitleTask = (
         ]
     };
 
+    const firstNodeType = firstNode?.type ?? "";
+    const shouldPreserveFirstNode =
+        !!firstNode &&
+        nodeText === "" &&
+        firstNodeType !== "paragraph" &&
+        firstNodeType !== "heading";
+
+    const tailContent = shouldPreserveFirstNode
+        ? (Array.isArray(content.content) ? content.content.slice(0) : [])
+        : (Array.isArray(content.content) ? content.content.slice(1) : []);
+
     const newContent: JSONContent = {
         ...content,
         content: [
             titleTask,
-            ...(Array.isArray(content.content) ? content.content.slice(1) : [])
+            ...tailContent
         ]
     };
 

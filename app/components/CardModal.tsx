@@ -869,6 +869,9 @@ export function CardModal({
                                                 containerRef={editorContainerRef}
                                                 initialContent={isHistoryPreviewing ? previewHistoryContent : content}
                                                 editable={!isHistoryPreviewing}
+                                                boardId={card.board_id}
+                                                cardId={card.id}
+                                                onEditorError={setEditorError}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;
                                                     setContent(val);
