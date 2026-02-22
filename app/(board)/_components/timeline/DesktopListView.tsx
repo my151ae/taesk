@@ -100,6 +100,13 @@ export function DesktopListView({
     ]);
 
     const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const handleCardClick = (cardId: string, shortId: string | null) => {
+        if (selectedCardId === cardId) {
+            openCardModal(shortId, 'list-view');
+            return;
+        }
+        setSelectedCardId(cardId);
+    };
 
     return (
         <div className="flex flex-col gap-6 px-4 pb-20">
@@ -240,8 +247,7 @@ export function DesktopListView({
                                 <div
                                     key={event.card_id}
                                     tabIndex={0}
-                                    onClick={() => setSelectedCardId(event.card_id)}
-                                    onDoubleClick={() => openCardModal(event.short_id, 'list-view')}
+                                    onClick={() => handleCardClick(event.card_id, event.short_id)}
                                     onContextMenu={(e) => onCardContextMenu?.(e, event.card_id)}
                                     className={clsx(
                                         "flex w-full items-center gap-1 p-3 bg-white rounded-xl border hover:border-sky-200 hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item",
@@ -324,8 +330,7 @@ export function DesktopListView({
                                         <div
                                             key={item.card_id}
                                             tabIndex={0}
-                                            onClick={() => setSelectedCardId(item.card_id)}
-                                            onDoubleClick={() => openCardModal(item.short_id, 'list-view')}
+                                            onClick={() => handleCardClick(item.card_id, item.short_id)}
                                             onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
                                             className={clsx(
                                                 "flex w-full items-center gap-1 p-3 bg-white rounded-xl border hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item",

@@ -109,6 +109,13 @@ export default function MobileListView({
     ]);
 
     const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const handleCardClick = (cardId: string, shortId: string | null) => {
+        if (selectedCardId === cardId) {
+            openCardModal(shortId, 'mobile-list-view');
+            return;
+        }
+        setSelectedCardId(cardId);
+    };
 
     return (
         <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -247,8 +254,7 @@ export default function MobileListView({
                             {filteredTimelineEvents.map((event) => (
                                 <div
                                     key={event.card_id}
-                                    onClick={() => setSelectedCardId(event.card_id)}
-                                    onDoubleClick={() => openCardModal(event.short_id, 'mobile-list-view')}
+                                    onClick={() => handleCardClick(event.card_id, event.short_id)}
                                     className={clsx(
                                         "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
                                         selectedCardId === event.card_id
@@ -341,8 +347,7 @@ export default function MobileListView({
                                     {filteredBucketA.map(item => (
                                         <div
                                             key={item.card_id}
-                                            onClick={() => setSelectedCardId(item.card_id)}
-                                            onDoubleClick={() => openCardModal(item.short_id, 'mobile-list-view')}
+                                            onClick={() => handleCardClick(item.card_id, item.short_id)}
                                             className={clsx(
                                                 "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
                                                 selectedCardId === item.card_id
@@ -402,8 +407,7 @@ export default function MobileListView({
                                     {filteredBucketB.map(item => (
                                         <div
                                             key={item.card_id}
-                                            onClick={() => setSelectedCardId(item.card_id)}
-                                            onDoubleClick={() => openCardModal(item.short_id, 'mobile-list-view')}
+                                            onClick={() => handleCardClick(item.card_id, item.short_id)}
                                             className={clsx(
                                                 "flex flex-col gap-1 p-3 bg-white rounded-xl shadow-sm border ring-1 active:scale-[0.98] transition-all",
                                                 selectedCardId === item.card_id
