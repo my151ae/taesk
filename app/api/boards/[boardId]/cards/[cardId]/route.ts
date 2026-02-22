@@ -4,6 +4,7 @@ import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 import { normalizeContent, extractTitleTask, deriveExcerptFromContent } from '@/lib/tiptap';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
   runCardMutationWithFallback,
   stripUndefinedValues,
@@ -18,6 +19,7 @@ import {
   logCardActivity,
   syncPatchedCardToCalendar,
 } from '@/lib/server/card-side-effects';
+import { CARD_IMAGE_BUCKET, buildCardImageStoragePrefix } from '@/lib/tiptap-images';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -58,6 +60,57 @@ const UpdateCardSchema = z.object({
   slug: z.string().max(255).optional(),
   duration: z.number().int().min(0).nullable().optional(),
 });
+
+const STORAGE_LIST_PAGE_SIZE = 100;
+
+const deleteCardImagesBestEffort = async (boardId: string, cardId: string) => {
+  const admin = createServiceRoleSupabaseClient();
+  const prefix = buildCardImageStoragePrefix(boardId, cardId);
+  const targetPaths: string[] = [];
+  let offset = 0;
+
+  try {
+    while (true) {
+      const { data, error } = await admin.storage.from(CARD_IMAGE_BUCKET).list(prefix, {
+        limit: STORAGE_LIST_PAGE_SIZE,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      });
+
+      if (error) {
+        console.warn('[cards DELETE] failed to list card images', { boardId, cardId, error });
+        return;
+      }
+
+      if (!data || data.length === 0) break;
+
+      for (const item of data) {
+        if (!item?.name) continue;
+        targetPaths.push(`${prefix}${item.name}`);
+      }
+
+      if (data.length < STORAGE_LIST_PAGE_SIZE) break;
+      offset += data.length;
+    }
+
+    if (targetPaths.length === 0) return;
+
+    for (let i = 0; i < targetPaths.length; i += STORAGE_LIST_PAGE_SIZE) {
+      const chunk = targetPaths.slice(i, i + STORAGE_LIST_PAGE_SIZE);
+      const { error } = await admin.storage.from(CARD_IMAGE_BUCKET).remove(chunk);
+      if (error) {
+        console.warn('[cards DELETE] failed to remove card images', {
+          boardId,
+          cardId,
+          count: chunk.length,
+          error,
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('[cards DELETE] unexpected storage cleanup failure', { boardId, cardId, error });
+  }
+};
 
 /**
  * PATCH /api/boards/[boardId]/cards/[cardId]
@@ -235,6 +288,8 @@ const deleteHandler = async (
       cardTitle: card.title ?? null,
     });
   }
+
+  await deleteCardImagesBestEffort(boardId, cardId);
 
   return new NextResponse(null, { status: 204 });
 };

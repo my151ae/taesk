@@ -227,7 +227,9 @@ export function useTimelineCardActions({
           setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
         }
 
-        if (!savePayload.isAutoSave) {
+        const shouldCreateHistorySnapshot = !savePayload.isAutoSave || Boolean(savePayload.forceHistorySnapshot);
+
+        if (shouldCreateHistorySnapshot) {
           const historyContent = body?.card?.content ?? normalizedContent;
           try {
             await postHistorySnapshot({
@@ -251,7 +253,7 @@ export function useTimelineCardActions({
           historyRetryContextRef.current = null;
           setHistorySaveWarning(null);
 
-          if (!isRestoreFromHistory) {
+          if (!isRestoreFromHistory && !savePayload.isAutoSave) {
             const titleChanged = targetCard.title !== savePayload.title;
             const dateChanged = targetCard.due_date !== normalizedDueDate;
             const startChanged = (targetCard.due_start?.slice(0, 5)) !== (savePayload.due_start?.slice(0, 5));

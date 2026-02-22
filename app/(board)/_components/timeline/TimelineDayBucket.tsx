@@ -31,7 +31,7 @@ const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver:
     return (
         <div
             ref={setNodeRef}
-            className={highlight}
+            className={`flex min-h-0 flex-1 flex-col ${highlight}`}
             data-dnd="ab-bucket"
             data-bucket-key={bucketKey}
         >
@@ -61,10 +61,10 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     return (
         <div
             data-ab-day={day.isoDate}
-            className="pointer-events-auto w-full min-w-0 border-l border-slate-100 md:border-slate-200 bg-white overflow-hidden"
+            className="pointer-events-auto w-full min-w-0 min-h-0 border-l border-slate-100 bg-white overflow-hidden md:border-slate-200"
             style={{ height: viewportHeight ? `${viewportHeight}px` : `calc(100vh - ${floatingLayerTop}px)` }}
         >
-            <div className="flex min-h-full flex-col gap-0.5">
+            <div className="flex h-full min-h-0 flex-col gap-0.5">
                 {meta.sections.map((section) => {
                     const items = section.bucket.endsWith('_a') ? bucketsA : bucketsB;
                     const isA = section.bucket.endsWith('_a');
@@ -72,7 +72,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     return (
                         <DroppableBucket key={section.bucket} bucketKey={section.bucket} disabled={status === 'loading'}>
                             {(isOver) => (
-                                <div className="border border-slate-100 bg-slate-50/70 py-2 shadow-inner flex flex-col min-h-0 flex-1 min-w-0">
+                                <div className="flex h-full min-h-0 min-w-0 flex-col border border-slate-100 bg-slate-50/70 py-2 shadow-inner">
                                     <div className="flex items-center justify-between px-3">
                                         <p className="text-[10px] font-semibold text-slate-600">{section.label}</p>
                                         <button

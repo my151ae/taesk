@@ -24,6 +24,7 @@ export type CardModalSavePayload = {
   duration?: number;
   checked?: boolean;
   isAutoSave?: boolean;
+  forceHistorySnapshot?: boolean;
   restoreFromHistory?: boolean;
   historySourceId?: string;
 };

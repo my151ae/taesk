@@ -211,6 +211,71 @@ async function pasteImageBySize(
   }, args);
 }
 
+async function pasteImageToTitleInput(
+  page: Page,
+  args: { bytes: number[]; mimeType: string; fileName: string }
+): Promise<void> {
+  await page.evaluate(({ bytes, mimeType, fileName }) => {
+    const input = document.querySelector('[data-sticky-title] input[type="text"]');
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error('Missing sticky title input for paste');
+    }
+    input.focus();
+
+    const data = new DataTransfer();
+    const file = new File([new Uint8Array(bytes)], fileName, { type: mimeType });
+    data.items.add(file);
+
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: data,
+    });
+    input.dispatchEvent(event);
+  }, args);
+}
+
+async function pasteHtmlImageFromDataUrl(page: Page, dataUrl: string): Promise<void> {
+  await page.evaluate((src) => {
+    const target = document.querySelector('.ProseMirror[data-autofocus="true"]');
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Missing ProseMirror root for HTML image paste');
+    }
+    target.focus();
+    const data = new DataTransfer();
+    data.setData('text/html', `<img src="${src}" alt="pasted-html-image" />`);
+    data.setData('text/plain', '');
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: data,
+    });
+    target.dispatchEvent(event);
+  }, dataUrl);
+}
+
+async function pasteHtmlWithPlainText(
+  page: Page,
+  args: { plainText: string; html: string }
+): Promise<void> {
+  await page.evaluate(({ plainText, html }) => {
+    const target = document.querySelector('.ProseMirror[data-autofocus="true"]');
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Missing ProseMirror root for HTML paste');
+    }
+    target.focus();
+    const data = new DataTransfer();
+    data.setData('text/plain', plainText);
+    data.setData('text/html', html);
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: data,
+    });
+    target.dispatchEvent(event);
+  }, args);
+}
+
 function collectStoragePathsFromContent(content: unknown): string[] {
   const result = new Set<string>();
 
@@ -576,6 +641,637 @@ test.describe('@feature:timeline Timeline view', () => {
       if (uploadedPaths.length > 0) {
         await supabaseAdmin.storage.from('card-images').remove(uploadedPaths);
       }
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('pastes image from first checklist row when multiple checklist rows exist', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialTitle = 'Checklist image title';
+    let uploadedPaths: string[] = [];
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: initialTitle }],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'line 2' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1850,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5031,
+      slug: 'image-paste-multi-checklist',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await expect(firstChecklistLine).toBeVisible();
+
+      const uploadResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'POST' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${cardId}/images`)
+        );
+      }, { timeout: 20_000 });
+
+      await firstChecklistLine.click();
+      await pasteImageFromBytes(page, {
+        bytes: [
+          137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+          0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
+          0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0, 9,
+          251, 3, 253, 160, 157, 164, 70, 0, 0, 0, 0, 73, 69, 78, 68,
+          174, 66, 96, 130,
+        ],
+        mimeType: 'image/png',
+        fileName: 'paste-from-title-row.png',
+      });
+
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
+      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue(initialTitle);
+      await expect(bodyEditor.locator('img')).toHaveCount(1);
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('content')
+          .eq('id', cardId)
+          .eq('board_id', boardContext.boardId)
+          .maybeSingle();
+        return collectStoragePathsFromContent(data?.content).length;
+      }, { timeout: 20_000 }).toBeGreaterThan(0);
+
+      const { data: savedCard } = await supabaseAdmin
+        .from('cards')
+        .select('content')
+        .eq('id', cardId)
+        .eq('board_id', boardContext.boardId)
+        .maybeSingle();
+      uploadedPaths = collectStoragePathsFromContent(savedCard?.content);
+    } finally {
+      if (uploadedPaths.length > 0) {
+        await supabaseAdmin.storage.from('card-images').remove(uploadedPaths);
+      }
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('keeps existing body images when pasting on first checklist row', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialTitle = 'Keep existing images';
+    let uploadedPaths: string[] = [];
+
+    const tinyPngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+H7kAAAAASUVORK5CYII=';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: initialTitle }],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'line 2' }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'image',
+            attrs: { src: tinyPngDataUrl, alt: 'existing-image-1' },
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'between images' }],
+          },
+          {
+            type: 'image',
+            attrs: { src: tinyPngDataUrl, alt: 'existing-image-2' },
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1860,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5032,
+      slug: 'image-paste-keep-existing',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await expect(firstChecklistLine).toBeVisible();
+      await expect(bodyEditor.locator('img')).toHaveCount(2);
+
+      const uploadResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'POST' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${cardId}/images`)
+        );
+      }, { timeout: 20_000 });
+
+      await firstChecklistLine.click();
+      await pasteImageFromBytes(page, {
+        bytes: [
+          137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+          0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
+          0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0, 9,
+          251, 3, 253, 160, 157, 164, 70, 0, 0, 0, 0, 73, 69, 78, 68,
+          174, 66, 96, 130,
+        ],
+        mimeType: 'image/png',
+        fileName: 'keep-existing.png',
+      });
+
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
+      await expect(bodyEditor.locator('img')).toHaveCount(3);
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('content')
+          .eq('id', cardId)
+          .eq('board_id', boardContext.boardId)
+          .maybeSingle();
+        return collectStoragePathsFromContent(data?.content).length;
+      }, { timeout: 20_000 }).toBeGreaterThan(0);
+
+      const { data: savedCard } = await supabaseAdmin
+        .from('cards')
+        .select('content')
+        .eq('id', cardId)
+        .eq('board_id', boardContext.boardId)
+        .maybeSingle();
+      uploadedPaths = collectStoragePathsFromContent(savedCard?.content);
+    } finally {
+      if (uploadedPaths.length > 0) {
+        await supabaseAdmin.storage.from('card-images').remove(uploadedPaths);
+      }
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('keeps existing body images when pasting on sticky title input', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialTitle = 'Sticky title paste';
+    let uploadedPaths: string[] = [];
+
+    const tinyPngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+H7kAAAAASUVORK5CYII=';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: initialTitle }],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'line 2' }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'image',
+            attrs: { src: tinyPngDataUrl, alt: 'existing-image-1' },
+          },
+          {
+            type: 'image',
+            attrs: { src: tinyPngDataUrl, alt: 'existing-image-2' },
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1870,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5033,
+      slug: 'image-paste-sticky-title',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      await expect(bodyEditor.locator('img')).toHaveCount(2);
+
+      const uploadResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'POST' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${cardId}/images`)
+        );
+      }, { timeout: 20_000 });
+
+      await pasteImageToTitleInput(page, {
+        bytes: [
+          137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+          0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
+          0, 0, 0, 13, 73, 68, 65, 84, 120, 156, 99, 248, 15, 4, 0, 9,
+          251, 3, 253, 160, 157, 164, 70, 0, 0, 0, 0, 73, 69, 78, 68,
+          174, 66, 96, 130,
+        ],
+        mimeType: 'image/png',
+        fileName: 'sticky-title.png',
+      });
+
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
+      await expect(bodyEditor.locator('img')).toHaveCount(3);
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('content')
+          .eq('id', cardId)
+          .eq('board_id', boardContext.boardId)
+          .maybeSingle();
+        return collectStoragePathsFromContent(data?.content).length;
+      }, { timeout: 20_000 }).toBeGreaterThan(0);
+
+      const { data: savedCard } = await supabaseAdmin
+        .from('cards')
+        .select('content')
+        .eq('id', cardId)
+        .eq('board_id', boardContext.boardId)
+        .maybeSingle();
+      uploadedPaths = collectStoragePathsFromContent(savedCard?.content);
+    } finally {
+      if (uploadedPaths.length > 0) {
+        await supabaseAdmin.storage.from('card-images').remove(uploadedPaths);
+      }
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('pastes html image on first checklist row and keeps it', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialTitle = 'HTML image paste title row';
+    let uploadedPaths: string[] = [];
+
+    const tinyPngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+H7kAAAAASUVORK5CYII=';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: initialTitle }],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'line 2' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1880,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5034,
+      slug: 'image-paste-html-title-row',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await expect(firstChecklistLine).toBeVisible();
+
+      const uploadResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'POST' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${cardId}/images`)
+        );
+      }, { timeout: 20_000 });
+
+      await firstChecklistLine.click();
+      await pasteHtmlImageFromDataUrl(page, tinyPngDataUrl);
+
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
+      await expect(bodyEditor.locator('img')).toHaveCount(1);
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('content')
+          .eq('id', cardId)
+          .eq('board_id', boardContext.boardId)
+          .maybeSingle();
+        return collectStoragePathsFromContent(data?.content).length;
+      }, { timeout: 20_000 }).toBeGreaterThan(0);
+
+      const { data: savedCard } = await supabaseAdmin
+        .from('cards')
+        .select('content')
+        .eq('id', cardId)
+        .eq('board_id', boardContext.boardId)
+        .maybeSingle();
+      uploadedPaths = collectStoragePathsFromContent(savedCard?.content);
+    } finally {
+      if (uploadedPaths.length > 0) {
+        await supabaseAdmin.storage.from('card-images').remove(uploadedPaths);
+      }
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('preserves html image on first checklist row when plain text has multiple lines', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialTitle = 'HTML+text paste title row';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: initialTitle }],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'line 2' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1885,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5035,
+      slug: 'image-paste-html-multiline-title-row',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await expect(firstChecklistLine).toBeVisible();
+
+      await firstChecklistLine.click();
+      await pasteHtmlWithPlainText(page, {
+        plainText: 'Title line\nBody line 1\nBody line 2',
+        html: '<p>Title line</p><p>Body line 1</p><p>Body line 2</p><img src="/icon" alt="html-image" />',
+      });
+
+      await expect(bodyEditor.locator('img')).toHaveCount(1);
+    } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
   });

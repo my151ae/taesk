@@ -403,7 +403,7 @@ export function DesktopTimelineView({
       }}
     >
       <div
-        className="relative flex flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5"
+        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5"
       >
         <div ref={timelineHeaderRef} className="z-30">
           <div
@@ -536,7 +536,7 @@ export function DesktopTimelineView({
         <div
           ref={timelineScrollRef}
           onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-          className="relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
         >
           <div className="relative" style={{ minHeight: timelineViewportHeight }}>
             {(status === "loading" || !days.length) && (

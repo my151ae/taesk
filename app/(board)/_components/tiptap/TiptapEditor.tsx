@@ -9,12 +9,13 @@ import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import styles from './TiptapEditor.module.css';
-import { useEffect, useRef } from 'react';
-import type { RefObject } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
 import { ensureTitleTask } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
+    cardImageExtensionFromMimeType,
     collectImageStoragePaths,
     isSupportedCardImageMimeType,
 } from '@/lib/tiptap-images';
@@ -98,6 +99,7 @@ type TiptapEditorProps = {
     boardId?: string;
     cardId?: string;
     onEditorError?: (message: string | null) => void;
+    onRegisterImagePasteHandler?: ((handler: ((files: File[]) => Promise<void>) | null) => void);
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
@@ -151,6 +153,43 @@ async function parseErrorMessage(response: Response, fallback: string): Promise<
     return fallback;
 }
 
+function extractImageFilesFromClipboard(clipboardData: DataTransfer | null): File[] {
+    return Array.from(clipboardData?.items ?? [])
+        .filter((item) => item.kind === 'file')
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => !!file && file.type.startsWith('image/'));
+}
+
+function extractImageFilesFromClipboardHtml(html: string): File[] {
+    if (!html || typeof html !== 'string') return [];
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const imageSources = Array.from(doc.querySelectorAll('img'))
+        .map((element) => element.getAttribute('src') ?? '')
+        .filter((value) => value.startsWith('data:image/'));
+
+    const files: File[] = [];
+    imageSources.forEach((source, index) => {
+        const match = source.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=]+)$/i);
+        if (!match) return;
+        const mimeType = match[1].toLowerCase();
+        if (!isSupportedCardImageMimeType(mimeType)) return;
+
+        const extension = cardImageExtensionFromMimeType(mimeType) ?? 'img';
+        try {
+            const binary = atob(match[2]);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            files.push(new File([bytes], `pasted-html-${Date.now()}-${index}.${extension}`, { type: mimeType }));
+        } catch {
+            // ignore malformed data url
+        }
+    });
+
+    return files;
+}
+
 export default function TiptapEditor({
     initialContent,
     onChange,
@@ -159,6 +198,7 @@ export default function TiptapEditor({
     boardId,
     cardId,
     onEditorError,
+    onRegisterImagePasteHandler,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -167,6 +207,81 @@ export default function TiptapEditor({
     const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
+
+    const uploadAndInsertImages = useCallback(async (
+        view: { state: EditorState; dispatch: (tr: Transaction) => void },
+        imageFiles: File[],
+    ) => {
+        if (!boardId || !cardId) {
+            onEditorError?.('画像貼り付けはこの画面では利用できません。');
+            return;
+        }
+
+        const imageType = view.state.schema.nodes.image;
+        if (!imageType) {
+            onEditorError?.('画像ノードが初期化されていません。');
+            return;
+        }
+
+        for (const file of imageFiles) {
+            const mimeType = file.type.trim().toLowerCase();
+            if (!isSupportedCardImageMimeType(mimeType)) {
+                onEditorError?.('画像形式は PNG / JPEG / WebP のみ対応しています。');
+                continue;
+            }
+
+            if (!Number.isFinite(file.size) || file.size > CARD_IMAGE_MAX_BYTES) {
+                onEditorError?.('画像サイズは 10MB 以下にしてください。');
+                continue;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const message = await parseErrorMessage(response, '画像のアップロードに失敗しました。');
+                onEditorError?.(message);
+                continue;
+            }
+
+            const body = await response.json() as { storagePath?: unknown; signedUrl?: unknown };
+            if (typeof body.storagePath !== 'string' || typeof body.signedUrl !== 'string') {
+                onEditorError?.('画像アップロード応答が不正です。');
+                continue;
+            }
+
+            const { state, dispatch } = view;
+            let tr = state.tr;
+            const imageNode = imageType.create({
+                src: body.signedUrl,
+                storagePath: body.storagePath,
+                alt: file.name || 'pasted image',
+            });
+
+            // 画像貼り付けは貼り付け位置に依存せず同一挙動に統一する:
+            // 先頭が taskList の場合は本文先頭（先頭 taskList 直後）へ挿入する。
+            const firstNode = tr.doc.firstChild;
+            if (firstNode && firstNode.type.name === 'taskList') {
+                tr = tr.insert(firstNode.nodeSize, imageNode);
+            } else {
+                tr = tr.replaceSelectionWith(imageNode, false);
+            }
+
+            tr = tr.scrollIntoView();
+            dispatch(tr);
+            onEditorError?.(null);
+
+            // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
+            if (onChange) {
+                onChange(tr.doc.toJSON() as JSONContent);
+            }
+        }
+    }, [boardId, cardId, onEditorError, onChange]);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -218,93 +333,6 @@ export default function TiptapEditor({
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handlePaste: (view, event, slice) => {
-                const imageFiles = Array.from(event.clipboardData?.items ?? [])
-                    .filter((item) => item.kind === 'file')
-                    .map((item) => item.getAsFile())
-                    .filter((file): file is File => !!file && file.type.startsWith('image/'));
-
-                if (imageFiles.length > 0) {
-                    if (!boardId || !cardId) {
-                        onEditorError?.('画像貼り付けはこの画面では利用できません。');
-                        return true;
-                    }
-
-                    const imageType = view.state.schema.nodes.image;
-                    if (!imageType) {
-                        onEditorError?.('画像ノードが初期化されていません。');
-                        return true;
-                    }
-
-                    void (async () => {
-                        for (const file of imageFiles) {
-                            const mimeType = file.type.trim().toLowerCase();
-                            if (!isSupportedCardImageMimeType(mimeType)) {
-                                onEditorError?.('画像形式は PNG / JPEG / WebP のみ対応しています。');
-                                continue;
-                            }
-
-                            if (!Number.isFinite(file.size) || file.size > CARD_IMAGE_MAX_BYTES) {
-                                onEditorError?.('画像サイズは 10MB 以下にしてください。');
-                                continue;
-                            }
-
-                            const formData = new FormData();
-                            formData.append('file', file);
-
-                            const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images`, {
-                                method: 'POST',
-                                body: formData,
-                            });
-
-                            if (!response.ok) {
-                                const message = await parseErrorMessage(response, '画像のアップロードに失敗しました。');
-                                onEditorError?.(message);
-                                continue;
-                            }
-
-                            const body = await response.json() as { storagePath?: unknown; signedUrl?: unknown };
-                            if (typeof body.storagePath !== 'string' || typeof body.signedUrl !== 'string') {
-                                onEditorError?.('画像アップロード応答が不正です。');
-                                continue;
-                            }
-
-                            const { state, dispatch } = view;
-                            const { selection } = state;
-                            const taskContext = resolvePasteTaskContext(selection);
-
-                            let tr = state.tr;
-                            const imageNode = imageType.create({
-                                src: body.signedUrl,
-                                storagePath: body.storagePath,
-                                alt: file.name || 'pasted image',
-                            });
-
-                            if (taskContext.isTitleTask && taskContext.taskListDepth > 0) {
-                                const mappedSelectionTo = tr.mapping.map(selection.to);
-                                const $newPos = tr.doc.resolve(mappedSelectionTo);
-                                const insertPos = $newPos.after(taskContext.taskListDepth);
-                                tr = tr.insert(insertPos, imageNode);
-                            } else {
-                                tr = tr.replaceSelectionWith(imageNode, false);
-                            }
-
-                            tr = tr.scrollIntoView();
-                            dispatch(tr);
-                            onEditorError?.(null);
-
-                            // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
-                            if (onChange) {
-                                onChange(tr.doc.toJSON() as JSONContent);
-                            }
-                        }
-                    })().catch((error) => {
-                        console.error('[Tiptap] image paste failed', error);
-                        onEditorError?.('画像の貼り付けに失敗しました。');
-                    });
-
-                    return true;
-                }
-
                 const text = event.clipboardData?.getData('text/plain');
                 if (text && (text.includes('\n') || text.includes('\r'))) {
                     const lines = text.split(/\r\n|\r|\n/);
@@ -316,6 +344,12 @@ export default function TiptapEditor({
                     const taskContext = resolvePasteTaskContext(selection);
 
                     if (taskContext.isTitleTask && bodyLines.length > 0) {
+                        const html = event.clipboardData?.getData('text/html') ?? '';
+                        // HTML に画像を含む貼り付けは既定の HTML paste に委譲し、画像欠落を避ける
+                        if (/<img[\s>]/i.test(html)) {
+                            return false;
+                        }
+
                         console.log('[Tiptap] multiline paste in title task detected, escaping body lines out of title taskList');
 
                         let tr = state.tr;
@@ -384,6 +418,40 @@ export default function TiptapEditor({
             }
         },
     });
+
+    useEffect(() => {
+        if (!onRegisterImagePasteHandler) return;
+        if (!editor) {
+            onRegisterImagePasteHandler(null);
+            return;
+        }
+
+        onRegisterImagePasteHandler((files: File[]) => uploadAndInsertImages(editor.view, files));
+
+        return () => {
+            onRegisterImagePasteHandler(null);
+        };
+    }, [editor, onRegisterImagePasteHandler, uploadAndInsertImages]);
+
+    const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
+        const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
+        const htmlImageFiles =
+            directImageFiles.length === 0
+                ? extractImageFilesFromClipboardHtml(event.clipboardData?.getData('text/html') ?? '')
+                : [];
+        const imageFiles = directImageFiles.length > 0 ? directImageFiles : htmlImageFiles;
+        if (imageFiles.length === 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!editor) {
+            onEditorError?.('画像エディタの初期化が完了していません。');
+            return;
+        }
+        void uploadAndInsertImages(editor.view, imageFiles).catch((error) => {
+            console.error('[Tiptap] image paste failed', error);
+            onEditorError?.('画像の貼り付けに失敗しました。');
+        });
+    }, [editor, onEditorError, uploadAndInsertImages]);
 
     // Handle external updates to initialContent
     // Note: Deep comparison might be expensive, so we trust React key="" or explicit reset
@@ -462,6 +530,7 @@ export default function TiptapEditor({
             ref={containerRef}
             className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
             onClick={() => editor.chain().focus().run()}
+            onPasteCapture={handleImagePasteCapture}
         >
             <EditorContent editor={editor} />
         </div>

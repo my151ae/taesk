@@ -123,6 +123,7 @@ export function CardModal({
     const onCloseRef = useRef(onClose);
     const requestCloseRef = useRef<() => void>(() => { });
     const hasPendingChangesRef = useRef(false);
+    const hasAutoSavedEditsRef = useRef(false);
     const memberButtonRef = useRef<HTMLButtonElement | null>(null);
     const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -130,6 +131,7 @@ export function CardModal({
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
+    const imagePasteHandlerRef = useRef<((files: File[]) => Promise<void>) | null>(null);
 
     const {
         historyItems,
@@ -237,6 +239,7 @@ export function CardModal({
             previousLoadingRef.current = null;
             resetDraft(card);
             hasPendingChangesRef.current = false;
+            hasAutoSavedEditsRef.current = false;
             resetHistoryState();
         }
         // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
@@ -357,7 +360,7 @@ export function CardModal({
     // Close member dropdown when clicking outside
     useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
 
-    const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; }) => {
+    const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; forceHistorySnapshot?: boolean; }) => {
         const normalizedDueDate = dueDate || null;
         const hasTime = dueStart && dueEnd; // Both must be present
         const normalizedStart = hasTime ? `${dueStart}:00` : null;
@@ -405,6 +408,7 @@ export function CardModal({
             due_bucket_position: normalizedBucketPosition,
             duration: Number(duration) || 0,
             isAutoSave,
+            forceHistorySnapshot: options?.forceHistorySnapshot,
             restoreFromHistory: options?.restoreFromHistory,
             historySourceId: options?.historySourceId,
         });
@@ -440,6 +444,7 @@ export function CardModal({
     const triggerAutoSave = useCallback((contentOverride?: JSONContent) => {
         if (isHistoryPreviewing) return;
         hasPendingChangesRef.current = true;
+        hasAutoSavedEditsRef.current = true;
         if (contentOverride) {
             pendingAutoSaveContentRef.current = contentOverride;
         }
@@ -473,7 +478,7 @@ export function CardModal({
             cancelHistoryPreview();
             return;
         }
-        if (hasPendingChangesRef.current) {
+        if (hasPendingChangesRef.current || hasAutoSavedEditsRef.current) {
             if (autoSaveTimeoutRef.current) {
                 clearTimeout(autoSaveTimeoutRef.current);
             }
@@ -484,7 +489,8 @@ export function CardModal({
             // 閉じる操作は待たずに反映し、保存は即時 autosave として送信する
             const latestContent = pendingAutoSaveContentRef.current ?? undefined;
             pendingAutoSaveContentRef.current = null;
-            handleSave(true, { contentOverride: latestContent });
+            hasAutoSavedEditsRef.current = false;
+            handleSave(true, { contentOverride: latestContent, forceHistorySnapshot: true });
             onCloseRef.current();
             return;
         }
@@ -494,6 +500,10 @@ export function CardModal({
     useEffect(() => {
         requestCloseRef.current = requestClose;
     }, [requestClose]);
+
+    const handleRegisterImagePasteHandler = useCallback((handler: ((files: File[]) => Promise<void>) | null) => {
+        imagePasteHandlerRef.current = handler;
+    }, []);
 
 
     const handleAddMember = (profileId: string) => {
@@ -818,6 +828,27 @@ export function CardModal({
                                             const { content: correctedContent } = ensureTitleTask(content, title, checked);
                                             setContent(correctedContent);
                                         }}
+                                        onPaste={(event) => {
+                                            if (isHistoryPreviewing) return;
+                                            const imageFiles = Array.from(event.clipboardData?.items ?? [])
+                                                .filter((item) => item.kind === "file")
+                                                .map((item) => item.getAsFile())
+                                                .filter((file): file is File => !!file && file.type.startsWith("image/"));
+                                            if (imageFiles.length === 0) {
+                                                return;
+                                            }
+
+                                            event.preventDefault();
+                                            const handler = imagePasteHandlerRef.current;
+                                            if (!handler) {
+                                                setEditorError("エディタの画像貼り付け処理が初期化されていません。");
+                                                return;
+                                            }
+                                            void handler(imageFiles).catch((error) => {
+                                                console.error("[CardModal] image paste via title input failed", error);
+                                                setEditorError("画像の貼り付けに失敗しました。");
+                                            });
+                                        }}
                                         placeholder="タイトルなし"
                                         className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
                                     />
@@ -872,6 +903,7 @@ export function CardModal({
                                                 boardId={card.board_id}
                                                 cardId={card.id}
                                                 onEditorError={setEditorError}
+                                                onRegisterImagePasteHandler={handleRegisterImagePasteHandler}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;
                                                     setContent(val);
