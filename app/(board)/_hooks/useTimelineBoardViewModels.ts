@@ -14,6 +14,7 @@ import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDra
 import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
+type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 type UseTimelineBoardViewModelsArgs = {
   days: TimelineDay[];
@@ -62,8 +63,8 @@ type UseTimelineBoardViewModelsArgs = {
   boardMembers: BoardMember[];
   onOpenShareDialog: () => void;
   listBaseDate: string;
-  listMonthDirection: 1 | 2 | 3 | -1 | -2 | -3;
-  handleListMonthDirectionChange: (nextDirection: 1 | 2 | 3 | -1 | -2 | -3) => void;
+  listMonthDirection: ListMonthDirection;
+  handleListMonthDirectionChange: (nextDirection: ListMonthDirection) => void;
   handleListBaseDateChange: (nextIsoDate: string) => void;
   handleListPrevDay: () => void;
   handleListNextDay: () => void;

@@ -13,6 +13,8 @@ import {
     ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
 
+type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+
 type DesktopListViewProps = {
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
@@ -30,8 +32,8 @@ type DesktopListViewProps = {
     onNextWeek?: () => void;
     onToday?: () => void;
     listBaseDate?: string | null;
-    listMonthDirection?: 1 | 2 | 3 | -1 | -2 | -3;
-    onListMonthDirectionChange?: (direction: 1 | 2 | 3 | -1 | -2 | -3) => void;
+    listMonthDirection?: ListMonthDirection;
+    onListMonthDirectionChange?: (direction: ListMonthDirection) => void;
     onListBaseDateChange?: (isoDate: string) => void;
 };
 
@@ -52,7 +54,7 @@ export function DesktopListView({
     onNextWeek,
     onToday,
     listBaseDate,
-    listMonthDirection = 1,
+    listMonthDirection = 0,
     onListMonthDirectionChange,
     onListBaseDateChange,
 }: DesktopListViewProps) {
@@ -99,7 +101,7 @@ export function DesktopListView({
         showChecked,
     ]);
 
-    const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const displayDays = listMonthDirection <= 0 ? [...daysWithEvents].reverse() : daysWithEvents;
     const handleCardClick = (cardId: string, shortId: string | null) => {
         if (selectedCardId === cardId) {
             openCardModal(shortId, 'list-view');
@@ -154,13 +156,14 @@ export function DesktopListView({
                     <div className="relative">
                         <select
                             value={String(listMonthDirection)}
-                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as 1 | 2 | 3 | -1 | -2 | -3)}
+                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as ListMonthDirection)}
                             className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
                             aria-label="表示期間"
                         >
                             <option value="3">+3 mo.</option>
                             <option value="2">+2 mo.</option>
                             <option value="1">+1 mo.</option>
+                            <option value="0">0 mo.</option>
                             <option value="-1">-1 mo.</option>
                             <option value="-2">-2 mo.</option>
                             <option value="-3">-3 mo.</option>

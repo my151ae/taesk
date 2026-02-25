@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import type { ReadonlyURLSearchParams } from "next/navigation";
 
+type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+
 type UseTimelineBoardControllerArgs = {
   searchParams: ReadonlyURLSearchParams;
   initialTimelineRange?: number | null;
@@ -52,7 +54,7 @@ export function useTimelineBoardController({
   const [listRange, setListRange] = useState(initialListRange || 30);
   const [listBaseDate, setListBaseDate] = useState<string>(() => todayJstIso());
   const [listBaseOffset, setListBaseOffset] = useState(0);
-  const [listMonthDirection, setListMonthDirection] = useState<1 | 2 | 3 | -1 | -2 | -3>(1);
+  const [listMonthDirection, setListMonthDirection] = useState<ListMonthDirection>(0);
 
   const intendedDayRange = useMemo(
     () => (viewMode === "timeline" ? timelineRange : listRange),

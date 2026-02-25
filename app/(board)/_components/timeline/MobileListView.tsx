@@ -12,6 +12,8 @@ import {
     minutesToTime
 } from '@/app/(board)/_utils/timeline-helpers';
 
+type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+
 type MobileListViewProps = {
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
@@ -28,8 +30,8 @@ type MobileListViewProps = {
     onPrevWeek?: () => void;
     onNextWeek?: () => void;
     listBaseDate?: string | null;
-    listMonthDirection?: 1 | 2 | 3 | -1 | -2 | -3;
-    onListMonthDirectionChange?: (direction: 1 | 2 | 3 | -1 | -2 | -3) => void;
+    listMonthDirection?: ListMonthDirection;
+    onListMonthDirectionChange?: (direction: ListMonthDirection) => void;
     onListBaseDateChange?: (isoDate: string) => void;
 };
 
@@ -49,7 +51,7 @@ export default function MobileListView({
     onPrevWeek,
     onNextWeek,
     listBaseDate,
-    listMonthDirection = 1,
+    listMonthDirection = 0,
     onListMonthDirectionChange,
     onListBaseDateChange,
 }: MobileListViewProps) {
@@ -108,7 +110,7 @@ export default function MobileListView({
         showChecked,
     ]);
 
-    const displayDays = listMonthDirection < 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const displayDays = listMonthDirection <= 0 ? [...daysWithEvents].reverse() : daysWithEvents;
     const handleCardClick = (cardId: string, shortId: string | null) => {
         if (selectedCardId === cardId) {
             openCardModal(shortId, 'mobile-list-view');
@@ -166,12 +168,12 @@ export default function MobileListView({
                         </button>
                         {showMonthMenu && (
                             <div className="absolute left-0 top-full z-30 mt-1 w-[92px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                                {[3, 2, 1, -1, -2, -3].map((value) => (
+                                {[3, 2, 1, 0, -1, -2, -3].map((value) => (
                                     <button
                                         key={value}
                                         type="button"
                                         onClick={() => {
-                                            onListMonthDirectionChange?.(value as 1 | 2 | 3 | -1 | -2 | -3);
+                                            onListMonthDirectionChange?.(value as ListMonthDirection);
                                             setShowMonthMenu(false);
                                         }}
                                         className={clsx(

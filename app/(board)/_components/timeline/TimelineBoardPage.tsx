@@ -45,8 +45,11 @@ import { useTimelineBoardController } from "@/app/(board)/_hooks/useTimelineBoar
 type TimelineBoardPageProps = {
   initialBoard: Board;
 };
+type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
+const ZERO_MONTH_DAY_RANGE = 31;
+const ZERO_MONTH_START_OFFSET = 15;
 const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
 const dayDiffFromIso = (fromIso: string, toIso: string) => {
   const from = new Date(`${fromIso}T00:00:00Z`);
@@ -141,6 +144,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     urlDate,
     updateUrl,
   });
+
+  const hasAppliedInitialListWindowRef = useRef(false);
+  const previousViewModeRef = useRef<"timeline" | "list">(viewMode);
 
   const {
     boardMembers,
@@ -385,20 +391,35 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     }
   }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange, setListRange]);
 
-  const fetchListWindow = useCallback(async (baseOffset: number, monthDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
+  const fetchListWindow = useCallback(async (baseOffset: number, monthDirection: ListMonthDirection) => {
     if (status === "loading") return;
-    const range = Math.abs(monthDirection) * 30;
+    const range = monthDirection === 0 ? ZERO_MONTH_DAY_RANGE : Math.abs(monthDirection) * 30;
+    const startOffset =
+      monthDirection > 0
+        ? baseOffset
+        : monthDirection < 0
+          ? baseOffset - (range - 1)
+          : baseOffset - ZERO_MONTH_START_OFFSET;
+    const anchorIndex =
+      monthDirection > 0
+        ? 0
+        : monthDirection < 0
+          ? Math.max(0, range - 1)
+          : ZERO_MONTH_START_OFFSET;
+
+    // keep shared window start in sync before list_range updates trigger any dependent refetch
+    setDayWindowStart(startOffset);
+    dayWindowStartRef.current = startOffset;
+
     if (listRange !== range) {
       setListRange(range);
       handleUpdateBoard({ list_range: range });
     }
-    const startOffset = monthDirection > 0 ? baseOffset : baseOffset - (range - 1);
     const payload = await fetchTimeline(startOffset, { range });
-    const anchorIndex = monthDirection > 0 ? 0 : Math.max(0, range - 1);
     const anchorDay = payload?.days?.[Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0))] ?? data?.days?.[0];
     if (anchorDay) updateUrl(anchorDay.isoDate, range, null);
     setActiveDayIndex(0);
-  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl, setListRange, setActiveDayIndex]);
+  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl, setListRange, setActiveDayIndex, setDayWindowStart, dayWindowStartRef]);
 
   const shiftListWindow = useCallback((delta: number) => {
     const nextBaseOffset = listBaseOffset + delta;
@@ -422,7 +443,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setListBaseDate(today);
     void fetchListWindow(0, listMonthDirection);
   }, [fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
-  const handleListMonthDirectionChange = useCallback((nextDirection: 1 | 2 | 3 | -1 | -2 | -3) => {
+  const handleListMonthDirectionChange = useCallback((nextDirection: ListMonthDirection) => {
     setListMonthDirection(nextDirection);
     void fetchListWindow(listBaseOffset, nextDirection);
   }, [listBaseOffset, fetchListWindow, setListMonthDirection]);
@@ -435,6 +456,31 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     setListBaseDate(nextIsoDate);
     void fetchListWindow(nextBaseOffset, listMonthDirection);
   }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
+
+  useEffect(() => {
+    if (viewMode !== "list") {
+      previousViewModeRef.current = "timeline";
+      return;
+    }
+
+    const isInitialListOpen = !hasAppliedInitialListWindowRef.current;
+    const switchedFromTimeline = previousViewModeRef.current === "timeline";
+    if (!isInitialListOpen && !switchedFromTimeline) {
+      previousViewModeRef.current = "list";
+      return;
+    }
+
+    // Wait until ongoing fetch settles; otherwise 0mo window fetch can be skipped.
+    if (status === "loading") return;
+
+    hasAppliedInitialListWindowRef.current = true;
+    if (listMonthDirection !== 0) {
+      setListMonthDirection(0);
+    }
+    void fetchListWindow(listBaseOffset, 0);
+
+    previousViewModeRef.current = "list";
+  }, [viewMode, listBaseOffset, listMonthDirection, fetchListWindow, setListMonthDirection, status]);
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
