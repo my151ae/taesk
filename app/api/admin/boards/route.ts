@@ -26,7 +26,7 @@ const getHandler = async () => {
   const adminClient = createServiceRoleSupabaseClient();
   const { data, error } = await adminClient
     .from('boards')
-    .select('id, team_id, name, description, short_id, id_short, slug, is_test_board, day_range, list_range, created_at, updated_at')
+    .select('id, team_id, name, description, short_id, id_short, slug, is_test_board, day_range, list_range, list_window_before_days, list_window_after_days, created_at, updated_at')
     .order('created_at', { ascending: true });
 
   if (error) {

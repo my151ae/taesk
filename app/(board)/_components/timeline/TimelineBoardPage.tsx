@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { Board } from "@/lib/supabase";
+import { buildBoardUrl } from "@/lib/board-url";
 
 import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -16,6 +17,7 @@ import {
   type TimelineEvent,
   minuteToPixels,
   getNowMinutesJst,
+  getDayDiff,
   DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
@@ -40,22 +42,20 @@ import { useSpatialArrowFocus } from "@/app/(board)/_hooks/useSpatialArrowFocus"
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimelineBoardInitialization";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
-import { useTimelineBoardController } from "@/app/(board)/_hooks/useTimelineBoardController";
+import {
+  LIST_WINDOW_PRESETS,
+  listWindowRange,
+  useTimelineBoardController,
+  type ListWindow,
+} from "@/app/(board)/_hooks/useTimelineBoardController";
+import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
 };
-type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
-const ZERO_MONTH_DAY_RANGE = 31;
-const ZERO_MONTH_START_OFFSET = 15;
 const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
-const dayDiffFromIso = (fromIso: string, toIso: string) => {
-  const from = new Date(`${fromIso}T00:00:00Z`);
-  const to = new Date(`${toIso}T00:00:00Z`);
-  return Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
-};
 const todayJstIso = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
@@ -64,6 +64,20 @@ const todayJstIso = () =>
     day: "2-digit",
   }).format(new Date());
 
+const deriveListWindowFromRange = (range?: number | null): ListWindow => {
+  const normalized = typeof range === "number" ? Math.max(1, Math.round(range)) : 30;
+  if (normalized === 31) return { before: 15, after: 15 };
+  if (normalized >= 90) return { before: 0, after: 89 };
+  if (normalized >= 60) return { before: 0, after: 59 };
+  return { before: 0, after: 29 };
+};
+
+const addDaysToIsoDate = (baseIsoDate: string, delta: number) => {
+  const d = new Date(`${baseIsoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+};
+
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -71,7 +85,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight); // [NEW]
 
-  const searchParams = useSearchParams();
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
     const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
@@ -88,15 +101,26 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   } = useTimelineContextMenu({ focusCardById });
 
   // 1. URL State
+  const basePath = buildBoardUrl(initialBoard) || (typeof window !== "undefined" ? window.location.pathname : `/b/${initialBoard.short_id ?? ""}`);
+  const defaultListWindow = {
+    before: initialBoard.list_window_before_days ?? deriveListWindowFromRange(initialBoard.list_range).before,
+    after: initialBoard.list_window_after_days ?? deriveListWindowFromRange(initialBoard.list_range).after,
+  };
   const {
-    urlDate,
-    urlRange,
-    urlTime,
+    parseResult,
+    resolvedState,
     dayWindowStartRef,
     setDayWindowStart,
-    updateUrl,
-    initialRange: dayRange,
-  } = useTimelineUrlState({ initialDayRange: initialBoard.day_range });
+    updateUrlForTimeline,
+    updateUrlForList,
+    setCard,
+  } = useTimelineUrlState({
+    basePath,
+    defaultTimelineRange: initialBoard.day_range,
+    defaultListBefore: defaultListWindow.before,
+    defaultListAfter: defaultListWindow.after,
+    defaultView: "timeline",
+  });
 
   const {
     showBoardMenu,
@@ -126,23 +150,23 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     viewMode,
     timelineRange,
     setTimelineRange,
+    listWindow,
+    setListWindow,
+    listWindowPresetKey,
+    setListWindowPresetKey,
+    listAnchorDate,
+    setListAnchorDate,
+    listAnchorOffset,
+    setListAnchorOffset,
     listRange,
-    setListRange,
-    listBaseDate,
-    setListBaseDate,
-    listBaseOffset,
-    setListBaseOffset,
-    listMonthDirection,
-    setListMonthDirection,
     intendedDayRange,
     effectiveDayRange,
     handleSetViewMode,
   } = useTimelineBoardController({
-    searchParams,
     initialTimelineRange: initialBoard.day_range,
-    initialListRange: initialBoard.list_range,
-    urlDate,
-    updateUrl,
+    resolvedState,
+    updateUrlForTimeline,
+    updateUrlForList,
   });
 
   const hasAppliedInitialListWindowRef = useRef(false);
@@ -198,6 +222,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     initialBoard,
     dataMode,
     data,
+    setCardInUrl: setCard,
   });
 
   // 4. Viewport & Timing
@@ -241,8 +266,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleTodayClick,
     handleDayRangeChange,
   } = useTimelineNavigation({
-    data, status, dayRange, activeDayIndex, setActiveDayIndex,
-    fetchTimeline, updateUrl, timelineScrollRef, router, dayWindowStartRef,
+    data, status, dayRange: timelineRange, activeDayIndex, setActiveDayIndex,
+    fetchTimeline, updateUrlForTimeline, timelineScrollRef, dayWindowStartRef,
     hourHeight // [NEW]
   });
 
@@ -342,14 +367,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     debouncedHandleScroll,
     handleTimelineViewMount,
   } = useTimelineScrollSync({
-    urlDate,
-    urlRange: (urlRange ?? currentBoard.day_range ?? 2).toString(),
-    urlTime,
+    viewMode,
+    urlDate: resolvedState.view === "timeline" ? resolvedState.date : null,
+    urlRange: resolvedState.view === "timeline" ? resolvedState.timelineRange : null,
+    urlTime: resolvedState.view === "timeline" ? resolvedState.time : null,
     data,
     activeDayIndex,
-    dayRange: effectiveDayRange,
+    dayRange: timelineRange,
     indicatorMinutes,
-    updateUrl,
+    updateUrlForTimeline,
     timelineStartHour,
     hourHeight, // [NEW]
   });
@@ -381,57 +407,63 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [currentBoard.id, setBoardSettingsBoardId, setShowBoardMenu, setShowBoardSettings]);
 
   const handleDayRangeUpdate = useCallback((newRange: number) => {
+    if (viewMode !== "timeline") return;
     handleDayRangeChange(newRange);
-    if (viewMode === 'timeline') {
-      setTimelineRange(newRange);
-      handleUpdateBoard({ day_range: newRange });
-    } else {
-      setListRange(newRange);
-      handleUpdateBoard({ list_range: newRange });
-    }
-  }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange, setListRange]);
+    setTimelineRange(newRange);
+    handleUpdateBoard({ day_range: newRange });
+  }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange]);
 
-  const fetchListWindow = useCallback(async (baseOffset: number, monthDirection: ListMonthDirection) => {
+  const getListWindowSpec = useCallback((anchorOffset: number, window: ListWindow) => {
+    const range = listWindowRange(window);
+    return {
+      range,
+      startOffset: anchorOffset - window.before,
+      anchorIndex: window.before,
+      reverse: window.before > 0,
+    };
+  }, []);
+
+  const fetchListWindow = useCallback(async (anchorOffset: number, window: ListWindow) => {
     if (status === "loading") return;
-    const range = monthDirection === 0 ? ZERO_MONTH_DAY_RANGE : Math.abs(monthDirection) * 30;
-    const startOffset =
-      monthDirection > 0
-        ? baseOffset
-        : monthDirection < 0
-          ? baseOffset - (range - 1)
-          : baseOffset - ZERO_MONTH_START_OFFSET;
-    const anchorIndex =
-      monthDirection > 0
-        ? 0
-        : monthDirection < 0
-          ? Math.max(0, range - 1)
-          : ZERO_MONTH_START_OFFSET;
+    const { range, startOffset, anchorIndex } = getListWindowSpec(anchorOffset, window);
 
     // keep shared window start in sync before list_range updates trigger any dependent refetch
     setDayWindowStart(startOffset);
     dayWindowStartRef.current = startOffset;
 
-    if (listRange !== range) {
-      setListRange(range);
-      handleUpdateBoard({ list_range: range });
+    const shouldUpdateBoard =
+      currentBoard.list_window_before_days !== window.before ||
+      currentBoard.list_window_after_days !== window.after ||
+      currentBoard.list_range !== range;
+    if (shouldUpdateBoard) {
+      handleUpdateBoard({
+        list_window_before_days: window.before,
+        list_window_after_days: window.after,
+        list_range: range,
+      });
     }
     const payload = await fetchTimeline(startOffset, { range });
     const anchorDay = payload?.days?.[Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0))] ?? data?.days?.[0];
-    if (anchorDay) updateUrl(anchorDay.isoDate, range, null);
+    if (anchorDay) {
+      setListAnchorDate(anchorDay.isoDate);
+      setListAnchorOffset(anchorOffset);
+      updateUrlForList({
+        before: window.before,
+        after: window.after,
+        date: anchorDay.isoDate,
+        time: null,
+      });
+    }
     setActiveDayIndex(0);
-  }, [status, listRange, handleUpdateBoard, fetchTimeline, data?.days, updateUrl, setListRange, setActiveDayIndex, setDayWindowStart, dayWindowStartRef]);
+  }, [status, getListWindowSpec, setDayWindowStart, dayWindowStartRef, currentBoard.list_window_before_days, currentBoard.list_window_after_days, currentBoard.list_range, handleUpdateBoard, fetchTimeline, data?.days, setListAnchorDate, setListAnchorOffset, updateUrlForList, setActiveDayIndex]);
 
   const shiftListWindow = useCallback((delta: number) => {
-    const nextBaseOffset = listBaseOffset + delta;
-    setListBaseOffset(nextBaseOffset);
-    setListBaseDate((prev) => {
-      const base = prev || todayJstIso();
-      const d = new Date(`${base}T00:00:00Z`);
-      d.setUTCDate(d.getUTCDate() + delta);
-      return d.toISOString().slice(0, 10);
-    });
-    void fetchListWindow(nextBaseOffset, listMonthDirection);
-  }, [listBaseOffset, fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
+    const nextAnchorOffset = listAnchorOffset + delta;
+    const nextAnchorDate = addDaysToIsoDate(listAnchorDate || todayJstIso(), delta);
+    setListAnchorOffset(nextAnchorOffset);
+    setListAnchorDate(nextAnchorDate);
+    void fetchListWindow(nextAnchorOffset, listWindow);
+  }, [fetchListWindow, listAnchorDate, listAnchorOffset, listWindow, setListAnchorDate, setListAnchorOffset]);
 
   const handleListPrevDay = useCallback(() => shiftListWindow(-1), [shiftListWindow]);
   const handleListNextDay = useCallback(() => shiftListWindow(1), [shiftListWindow]);
@@ -439,23 +471,24 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleListNextWeek = useCallback(() => shiftListWindow(7), [shiftListWindow]);
   const handleListToday = useCallback(() => {
     const today = todayJstIso();
-    setListBaseOffset(0);
-    setListBaseDate(today);
-    void fetchListWindow(0, listMonthDirection);
-  }, [fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
-  const handleListMonthDirectionChange = useCallback((nextDirection: ListMonthDirection) => {
-    setListMonthDirection(nextDirection);
-    void fetchListWindow(listBaseOffset, nextDirection);
-  }, [listBaseOffset, fetchListWindow, setListMonthDirection]);
+    setListAnchorOffset(0);
+    setListAnchorDate(today);
+    void fetchListWindow(0, listWindow);
+  }, [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset]);
+  const handleListWindowPresetChange = useCallback((nextPreset: ListWindowPresetKey) => {
+    const nextWindow = LIST_WINDOW_PRESETS[nextPreset];
+    setListWindowPresetKey(nextPreset);
+    setListWindow(nextWindow);
+    void fetchListWindow(listAnchorOffset, nextWindow);
+  }, [fetchListWindow, listAnchorOffset, setListWindow, setListWindowPresetKey]);
 
   const handleListBaseDateChange = useCallback((nextIsoDate: string) => {
-    if (!nextIsoDate || !listBaseDate) return;
-    const delta = dayDiffFromIso(listBaseDate, nextIsoDate);
-    const nextBaseOffset = listBaseOffset + delta;
-    setListBaseOffset(nextBaseOffset);
-    setListBaseDate(nextIsoDate);
-    void fetchListWindow(nextBaseOffset, listMonthDirection);
-  }, [listBaseDate, listBaseOffset, fetchListWindow, listMonthDirection, setListBaseOffset, setListBaseDate]);
+    if (!nextIsoDate) return;
+    const nextAnchorOffset = getDayDiff(nextIsoDate, todayJstIso());
+    setListAnchorOffset(nextAnchorOffset);
+    setListAnchorDate(nextIsoDate);
+    void fetchListWindow(nextAnchorOffset, listWindow);
+  }, [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset]);
 
   useEffect(() => {
     if (viewMode !== "list") {
@@ -474,13 +507,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (status === "loading") return;
 
     hasAppliedInitialListWindowRef.current = true;
-    if (listMonthDirection !== 0) {
-      setListMonthDirection(0);
-    }
-    void fetchListWindow(listBaseOffset, 0);
+    void fetchListWindow(listAnchorOffset, listWindow);
 
     previousViewModeRef.current = "list";
-  }, [viewMode, listBaseOffset, listMonthDirection, fetchListWindow, setListMonthDirection, status]);
+  }, [viewMode, listAnchorOffset, listWindow, fetchListWindow, status]);
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
@@ -557,9 +587,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     contextMenuCardId: contextMenu.cardId,
     boardMembers,
     onOpenShareDialog: () => setShowShareDialog(true),
-    listBaseDate,
-    listMonthDirection,
-    handleListMonthDirectionChange,
+    listBaseDate: listAnchorDate,
+    listWindowPresetKey,
+    handleListWindowPresetChange,
+    listReverse: listWindow.before > 0,
     handleListBaseDateChange,
     handleListPrevDay,
     handleListNextDay,
@@ -567,6 +598,55 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleListNextWeek,
     handleListToday,
   });
+
+  const handleResetInvalidUrl = useCallback(() => {
+    router.replace(basePath, { scroll: false });
+  }, [basePath, router]);
+
+  const handleMoveToCanonicalUrl = useCallback(() => {
+    if (viewMode === "timeline") {
+      const fallbackDate = data?.days?.[activeDayIndex]?.isoDate ?? todayJstIso();
+      updateUrlForTimeline({
+        date: fallbackDate,
+        range: timelineRange,
+        time: null,
+      });
+      return;
+    }
+    updateUrlForList({
+      before: listWindow.before,
+      after: listWindow.after,
+      date: listAnchorDate || todayJstIso(),
+      time: null,
+    });
+  }, [viewMode, data?.days, activeDayIndex, updateUrlForTimeline, timelineRange, updateUrlForList, listWindow.before, listWindow.after, listAnchorDate]);
+
+  if (!parseResult.ok) {
+    return (
+      <div className="min-h-screen bg-[#f4f5f7] p-6">
+        <div className="mx-auto max-w-xl rounded-xl border border-rose-200 bg-white p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-slate-900">Invalid/legacy URL</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            このURLは現在の契約に一致しません。reason: <span className="font-mono text-rose-600">{parseResult.code}</span>
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={handleResetInvalidUrl}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              URLをリセット
+            </button>
+            <button
+              onClick={handleMoveToCanonicalUrl}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
+            >
+              正規URLへ移動
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
@@ -596,7 +676,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onOpenShareDialog={() => setShowShareDialog(true)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
-          listStartDate={listBaseDate ?? null}
+          listStartDate={listAnchorDate ?? null}
         />
 
         {viewMode === 'timeline' ? (

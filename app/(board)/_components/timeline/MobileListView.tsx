@@ -11,8 +11,8 @@ import {
     ExternalCalendarEntry,
     minutesToTime
 } from '@/app/(board)/_utils/timeline-helpers';
-
-type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+import { getPresetLabel } from '@/app/(board)/_hooks/useTimelineBoardController';
+import type { ListWindowPresetKey } from '@/app/(board)/_hooks/useTimelineUrlState';
 
 type MobileListViewProps = {
     days: TimelineDay[];
@@ -30,8 +30,9 @@ type MobileListViewProps = {
     onPrevWeek?: () => void;
     onNextWeek?: () => void;
     listBaseDate?: string | null;
-    listMonthDirection?: ListMonthDirection;
-    onListMonthDirectionChange?: (direction: ListMonthDirection) => void;
+    listWindowPresetKey?: ListWindowPresetKey;
+    onListWindowPresetChange?: (preset: ListWindowPresetKey) => void;
+    listReverse?: boolean;
     onListBaseDateChange?: (isoDate: string) => void;
 };
 
@@ -51,8 +52,9 @@ export default function MobileListView({
     onPrevWeek,
     onNextWeek,
     listBaseDate,
-    listMonthDirection = 0,
-    onListMonthDirectionChange,
+    listWindowPresetKey = "zero",
+    onListWindowPresetChange,
+    listReverse = false,
     onListBaseDateChange,
 }: MobileListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
@@ -110,7 +112,7 @@ export default function MobileListView({
         showChecked,
     ]);
 
-    const displayDays = listMonthDirection <= 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const displayDays = listReverse ? [...daysWithEvents].reverse() : daysWithEvents;
     const handleCardClick = (cardId: string, shortId: string | null) => {
         if (selectedCardId === cardId) {
             openCardModal(shortId, 'mobile-list-view');
@@ -163,25 +165,25 @@ export default function MobileListView({
                             aria-haspopup="listbox"
                             aria-expanded={showMonthMenu}
                         >
-                            {listMonthDirection > 0 ? `+${listMonthDirection} mo.` : `${listMonthDirection} mo.`}
+                            {getPresetLabel(listWindowPresetKey)}
                             <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
                         </button>
                         {showMonthMenu && (
                             <div className="absolute left-0 top-full z-30 mt-1 w-[92px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                                {[3, 2, 1, 0, -1, -2, -3].map((value) => (
+                                {(["plus3", "plus2", "plus1", "zero", "minus1", "minus2", "minus3"] as ListWindowPresetKey[]).map((value) => (
                                     <button
                                         key={value}
                                         type="button"
                                         onClick={() => {
-                                            onListMonthDirectionChange?.(value as ListMonthDirection);
+                                            onListWindowPresetChange?.(value);
                                             setShowMonthMenu(false);
                                         }}
                                         className={clsx(
                                             "block w-full px-2 py-1 text-left text-[12px]",
-                                            listMonthDirection === value ? "bg-sky-50 text-sky-700" : "text-slate-700 hover:bg-slate-50"
+                                            listWindowPresetKey === value ? "bg-sky-50 text-sky-700" : "text-slate-700 hover:bg-slate-50"
                                         )}
                                     >
-                                        {value > 0 ? `+${value} mo.` : `${value} mo.`}
+                                        {getPresetLabel(value)}
                                     </button>
                                 ))}
                             </div>

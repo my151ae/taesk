@@ -2,21 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { minuteToPixels, pixelsToMinutes, type TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
+import type { UrlUpdateMethod } from "@/app/(board)/_hooks/useTimelineUrlState";
+
+type TimelineUrlUpdateArgs = {
+  date?: string | null;
+  range: number;
+  time?: number | null;
+  method?: UrlUpdateMethod;
+};
 
 type UseTimelineScrollSyncArgs = {
+  viewMode: "timeline" | "list";
   urlDate: string | null;
-  urlRange: string | null;
-  urlTime: string | null;
+  urlRange: number | null;
+  urlTime: number | null;
   data: TimelineResponse | null;
   activeDayIndex: number;
   dayRange: number;
   indicatorMinutes: number | null;
-  updateUrl: (date: string | null, range: number, time?: number | null) => void;
+  updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   timelineStartHour?: number;
   hourHeight?: number;
 };
 
 export const useTimelineScrollSync = ({
+  viewMode,
   urlDate,
   urlRange,
   urlTime,
@@ -24,7 +34,7 @@ export const useTimelineScrollSync = ({
   activeDayIndex,
   dayRange,
   indicatorMinutes,
-  updateUrl,
+  updateUrlForTimeline,
   timelineStartHour = 0,
   hourHeight = 40,
 }: UseTimelineScrollSyncArgs) => {
@@ -69,8 +79,8 @@ export const useTimelineScrollSync = ({
   }, [syncActiveTimelineScrollRef]);
 
   const urlTimeMinutes = useMemo(() => {
-    if (!urlTime) return null;
-    const timeMinutes = parseInt(urlTime, 10);
+    if (typeof urlTime !== "number") return null;
+    const timeMinutes = Math.round(urlTime);
     if (isNaN(timeMinutes) || timeMinutes < 0 || timeMinutes >= 24 * 60) return null;
     return timeMinutes;
   }, [urlTime]);
@@ -128,7 +138,7 @@ export const useTimelineScrollSync = ({
   }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, timelineStartHour, hourHeight]);
 
   useEffect(() => {
-    if (urlTime) {
+    if (urlTime != null) {
       if (!hasAutoScrolled) setHasAutoScrolled(true);
       return;
     }
@@ -151,8 +161,8 @@ export const useTimelineScrollSync = ({
     setHasAutoScrolled(true);
   }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, timelineStartHour, hourHeight]);
 
-  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrl, timelineStartHour, hourHeight });
-  stateRef.current = { data, activeDayIndex, dayRange, updateUrl, timelineStartHour, hourHeight };
+  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode });
+  stateRef.current = { data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode };
 
   const handleTimelineScroll = useCallback((arg?: number | React.UIEvent<HTMLDivElement>) => {
     let scrollTop: number | undefined;
@@ -168,13 +178,14 @@ export const useTimelineScrollSync = ({
     if (scrollTop == null) return;
     if (programmaticScrollRef.current) return;
 
-    const { data, activeDayIndex, dayRange, updateUrl, timelineStartHour, hourHeight } = stateRef.current;
+    const { data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode } = stateRef.current;
+    if (viewMode !== "timeline") return;
 
     const minutes = pixelsToMinutes(scrollTop, timelineStartHour, hourHeight);
     const currentDay = data?.days?.[activeDayIndex];
 
     if (currentDay) {
-      updateUrl(currentDay.isoDate, dayRange, minutes);
+      updateUrlForTimeline({ date: currentDay.isoDate, range: dayRange, time: minutes });
     }
   }, []);
 

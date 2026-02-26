@@ -12,9 +12,9 @@ import type { ExternalCalendarEntry, TimelineBucketItem, TimelineDay, TimelineEv
 import type { ActiveDragState, ActiveResizeState, BucketIndicator, PointerPreviewState } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
+import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
-type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
 
 type UseTimelineBoardViewModelsArgs = {
   days: TimelineDay[];
@@ -63,8 +63,9 @@ type UseTimelineBoardViewModelsArgs = {
   boardMembers: BoardMember[];
   onOpenShareDialog: () => void;
   listBaseDate: string;
-  listMonthDirection: ListMonthDirection;
-  handleListMonthDirectionChange: (nextDirection: ListMonthDirection) => void;
+  listWindowPresetKey: ListWindowPresetKey;
+  handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
+  listReverse: boolean;
   handleListBaseDateChange: (nextIsoDate: string) => void;
   handleListPrevDay: () => void;
   handleListNextDay: () => void;
@@ -182,8 +183,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onNextWeek: args.handleListNextWeek,
         onToday: args.handleListToday,
         listBaseDate: args.listBaseDate,
-        listMonthDirection: args.listMonthDirection,
-        onListMonthDirectionChange: args.handleListMonthDirectionChange,
+        listWindowPresetKey: args.listWindowPresetKey,
+        onListWindowPresetChange: args.handleListWindowPresetChange,
+        listReverse: args.listReverse,
         onListBaseDateChange: args.handleListBaseDateChange,
       },
       mobile: {
@@ -202,8 +204,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onPrevWeek: args.handleListPrevWeek,
         onNextWeek: args.handleListNextWeek,
         listBaseDate: args.listBaseDate,
-        listMonthDirection: args.listMonthDirection,
-        onListMonthDirectionChange: args.handleListMonthDirectionChange,
+        listWindowPresetKey: args.listWindowPresetKey,
+        onListWindowPresetChange: args.handleListWindowPresetChange,
+        listReverse: args.listReverse,
         onListBaseDateChange: args.handleListBaseDateChange,
       },
     }),

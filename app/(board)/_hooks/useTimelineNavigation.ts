@@ -1,9 +1,16 @@
 "use client";
 
 import { useCallback } from "react";
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { pixelsToMinutes } from "@/app/(board)/_utils/timeline-helpers";
 import type { TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
+import type { UrlUpdateMethod } from "@/app/(board)/_hooks/useTimelineUrlState";
+
+type TimelineUrlUpdateArgs = {
+    date?: string | null;
+    range: number;
+    time?: number | null;
+    method?: UrlUpdateMethod;
+};
 
 interface UseTimelineNavigationProps {
     data: TimelineResponse | null;
@@ -12,9 +19,8 @@ interface UseTimelineNavigationProps {
     activeDayIndex: number;
     setActiveDayIndex: (index: number) => void;
     fetchTimeline: (startOffset: number) => Promise<TimelineResponse | null>;
-    updateUrl: (date: string, range: number, time?: number) => void;
+    updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
     timelineScrollRef: React.RefObject<HTMLDivElement | null>;
-    router: AppRouterInstance;
     dayWindowStartRef: React.MutableRefObject<number>;
     timelineStartHour?: number;
     hourHeight?: number;
@@ -27,9 +33,8 @@ export function useTimelineNavigation({
     activeDayIndex,
     setActiveDayIndex,
     fetchTimeline,
-    updateUrl,
+    updateUrlForTimeline,
     timelineScrollRef,
-    router,
     dayWindowStartRef,
     timelineStartHour = 0,
     hourHeight = 40,
@@ -58,7 +63,9 @@ export function useTimelineNavigation({
             const newIndex = desiredIndex;
             setActiveDayIndex(newIndex);
             const targetDay = data?.days?.[newIndex];
-            if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+            if (targetDay) {
+                updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+            }
             return;
         }
 
@@ -68,8 +75,10 @@ export function useTimelineNavigation({
         const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
         setActiveDayIndex(newIndex);
         const targetDay = payload?.days?.[newIndex];
-        if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
-    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
+        if (targetDay) {
+            updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+        }
+    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrlForTimeline, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
 
     const handleNextDay = useCallback(async () => {
         if (status === 'loading' || !data?.days?.length) return;
@@ -80,7 +89,9 @@ export function useTimelineNavigation({
             const newIndex = desiredIndex;
             setActiveDayIndex(newIndex);
             const targetDay = data?.days?.[newIndex];
-            if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
+            if (targetDay) {
+                updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+            }
             return;
         }
 
@@ -90,29 +101,32 @@ export function useTimelineNavigation({
         const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
         setActiveDayIndex(newIndex);
         const targetDay = payload?.days?.[newIndex];
-        if (targetDay) updateUrl(targetDay.isoDate, dayRange, getCurrentTime());
-    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrl, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
+        if (targetDay) {
+            updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+        }
+    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrlForTimeline, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
 
     const handleTodayClick = useCallback(async () => {
         const payload = await fetchTimeline(0);
         setActiveDayIndex(0);
         const todayIso = payload?.days?.[0]?.isoDate ?? data?.days?.[0]?.isoDate;
         if (todayIso) {
-            const params = new URLSearchParams();
-            params.set('date', todayIso);
-            params.set('range', String(dayRange));
             const currentTime = getCurrentTime();
-            if (currentTime >= 0) params.set('time', String(currentTime));
-            router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+            updateUrlForTimeline({
+                date: todayIso,
+                range: dayRange,
+                time: currentTime,
+                method: 'push',
+            });
         }
-    }, [fetchTimeline, data, dayRange, router, getCurrentTime, setActiveDayIndex]);
+    }, [fetchTimeline, data, dayRange, updateUrlForTimeline, getCurrentTime, setActiveDayIndex]);
 
     const handleDayRangeChange = useCallback((newRange: number) => {
         const currentDay = data?.days?.[activeDayIndex];
         if (currentDay) {
-            updateUrl(currentDay.isoDate, newRange, getCurrentTime());
+            updateUrlForTimeline({ date: currentDay.isoDate, range: newRange, time: getCurrentTime() });
         }
-    }, [data, activeDayIndex, updateUrl, getCurrentTime]);
+    }, [data, activeDayIndex, updateUrlForTimeline, getCurrentTime]);
 
     return {
         handlePrevDay,

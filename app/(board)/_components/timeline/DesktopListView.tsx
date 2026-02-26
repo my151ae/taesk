@@ -12,8 +12,8 @@ import {
     formatDuration,
     ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
-
-type ListMonthDirection = -3 | -2 | -1 | 0 | 1 | 2 | 3;
+import { getPresetLabel } from '@/app/(board)/_hooks/useTimelineBoardController';
+import type { ListWindowPresetKey } from '@/app/(board)/_hooks/useTimelineUrlState';
 
 type DesktopListViewProps = {
     days: TimelineDay[];
@@ -32,8 +32,9 @@ type DesktopListViewProps = {
     onNextWeek?: () => void;
     onToday?: () => void;
     listBaseDate?: string | null;
-    listMonthDirection?: ListMonthDirection;
-    onListMonthDirectionChange?: (direction: ListMonthDirection) => void;
+    listWindowPresetKey?: ListWindowPresetKey;
+    onListWindowPresetChange?: (preset: ListWindowPresetKey) => void;
+    listReverse?: boolean;
     onListBaseDateChange?: (isoDate: string) => void;
 };
 
@@ -54,8 +55,9 @@ export function DesktopListView({
     onNextWeek,
     onToday,
     listBaseDate,
-    listMonthDirection = 0,
-    onListMonthDirectionChange,
+    listWindowPresetKey = "zero",
+    onListWindowPresetChange,
+    listReverse = false,
     onListBaseDateChange,
 }: DesktopListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
@@ -101,7 +103,7 @@ export function DesktopListView({
         showChecked,
     ]);
 
-    const displayDays = listMonthDirection <= 0 ? [...daysWithEvents].reverse() : daysWithEvents;
+    const displayDays = listReverse ? [...daysWithEvents].reverse() : daysWithEvents;
     const handleCardClick = (cardId: string, shortId: string | null) => {
         if (selectedCardId === cardId) {
             openCardModal(shortId, 'list-view');
@@ -155,18 +157,18 @@ export function DesktopListView({
                     />
                     <div className="relative">
                         <select
-                            value={String(listMonthDirection)}
-                            onChange={(e) => onListMonthDirectionChange?.(Number(e.target.value) as ListMonthDirection)}
+                            value={listWindowPresetKey}
+                            onChange={(e) => onListWindowPresetChange?.(e.target.value as ListWindowPresetKey)}
                             className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
                             aria-label="表示期間"
                         >
-                            <option value="3">+3 mo.</option>
-                            <option value="2">+2 mo.</option>
-                            <option value="1">+1 mo.</option>
-                            <option value="0">0 mo.</option>
-                            <option value="-1">-1 mo.</option>
-                            <option value="-2">-2 mo.</option>
-                            <option value="-3">-3 mo.</option>
+                            <option value="plus3">{getPresetLabel("plus3")}</option>
+                            <option value="plus2">{getPresetLabel("plus2")}</option>
+                            <option value="plus1">{getPresetLabel("plus1")}</option>
+                            <option value="zero">{getPresetLabel("zero")}</option>
+                            <option value="minus1">{getPresetLabel("minus1")}</option>
+                            <option value="minus2">{getPresetLabel("minus2")}</option>
+                            <option value="minus3">{getPresetLabel("minus3")}</option>
                         </select>
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
                     </div>

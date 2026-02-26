@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Card, Board, ProfileSummary } from '@/lib/supabase';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { buildBoardUrl } from '@/lib/board-url';
+import { useSearchParams } from 'next/navigation';
 import { TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store';
 import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 import { normalizeContent } from '@/lib/tiptap';
+import type { UrlUpdateMethod } from '@/app/(board)/_hooks/useTimelineUrlState';
 
 type CardModalStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -15,10 +15,10 @@ type UseCardModalProps = {
     initialBoard: Board;
     dataMode: 'api' | 'mock';
     data: TimelineResponse | null;
+    setCardInUrl: (card: string | null, options?: { method?: UrlUpdateMethod }) => void;
 };
 
-export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps) {
-    const router = useRouter();
+export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: UseCardModalProps) {
     const searchParams = useSearchParams();
     const cardIdFromUrl = searchParams?.get('card');
 
@@ -46,14 +46,8 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
 
         // Instant open via local state
         setActiveCardId(shortId);
-
-        const baseUrl = buildBoardUrl(initialBoard);
-        const params = new URLSearchParams(searchParams?.toString());
-        params.set('card', shortId);
-        const query = params.toString();
-        const url = query ? `${baseUrl}?${query}` : baseUrl;
-        router.push(url, { scroll: false });
-    }, [dataMode, initialBoard, router, searchParams]);
+        setCardInUrl(shortId, { method: 'push' });
+    }, [dataMode, setCardInUrl]);
 
     const closeCardModal = useCallback(() => {
         setIsModalClosing(true);
@@ -61,13 +55,8 @@ export function useCardModal({ initialBoard, dataMode, data }: UseCardModalProps
         cardModalShortIdRef.current = null;
         setModalCardOverride(null);
         setCardModalStatus('idle');
-        const baseUrl = buildBoardUrl(initialBoard);
-        const params = new URLSearchParams(searchParams?.toString());
-        params.delete('card');
-        const query = params.toString();
-        const url = query ? `${baseUrl}?${query}` : baseUrl;
-        router.push(url, { scroll: false });
-    }, [initialBoard, router, searchParams]);
+        setCardInUrl(null, { method: 'push' });
+    }, [setCardInUrl]);
 
 
 

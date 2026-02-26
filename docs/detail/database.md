@@ -48,6 +48,8 @@ CREATE TABLE public.boards (
   slug TEXT,
   day_range INTEGER DEFAULT 2,
   list_range INTEGER DEFAULT 30,
+  list_window_before_days INTEGER DEFAULT 15,
+  list_window_after_days INTEGER DEFAULT 15,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -56,7 +58,8 @@ CREATE TABLE public.boards (
 - `short_id` + `slug` は `/b/:short_id/:slug` や `/@modal/(...)c` などで使用。
 - `MAIN_BOARD_ID` (0000...0001) が `/board` のデフォルト対象。
 - `is_test_board` が true の場合、E2E 専用ボードとして扱い、初期データを制限。
-- `day_range` / `list_range` は Timeline/List の表示日数を制御。
+- `day_range` は Timeline の表示日数（1〜7日）を制御。
+- List は `list_window_before_days` / `list_window_after_days` を正本として扱い、`list_range` は `before + after + 1` の導出値を保持。
 
 ## board_members
 

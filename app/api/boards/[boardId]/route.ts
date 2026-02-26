@@ -139,7 +139,46 @@ const patchHandler = async (
         if (typeof payload.day_range === 'number') {
             updates.day_range = Math.max(1, Math.min(7, payload.day_range)); // Limit 1-7 days
         }
-        if (typeof payload.list_range === 'number') {
+        const hasListBefore = payload.list_window_before_days !== undefined;
+        const hasListAfter = payload.list_window_after_days !== undefined;
+        if (hasListBefore !== hasListAfter) {
+            return NextResponse.json(
+                {
+                    error: {
+                        code: 'INVALID_BODY',
+                        message: 'list_window_before_days and list_window_after_days must be provided together',
+                    },
+                },
+                { status: 422 }
+            );
+        }
+        if (hasListBefore && hasListAfter) {
+            const before = Number(payload.list_window_before_days);
+            const after = Number(payload.list_window_after_days);
+            if (!Number.isInteger(before) || before < 0) {
+                return NextResponse.json(
+                    { error: { code: 'INVALID_BODY', message: 'list_window_before_days must be an integer >= 0' } },
+                    { status: 422 }
+                );
+            }
+            if (!Number.isInteger(after) || after < 0) {
+                return NextResponse.json(
+                    { error: { code: 'INVALID_BODY', message: 'list_window_after_days must be an integer >= 0' } },
+                    { status: 422 }
+                );
+            }
+            const derivedRange = before + after + 1;
+            if (derivedRange > 120) {
+                return NextResponse.json(
+                    { error: { code: 'INVALID_BODY', message: 'list window must satisfy before + after + 1 <= 120' } },
+                    { status: 422 }
+                );
+            }
+            updates.list_window_before_days = before;
+            updates.list_window_after_days = after;
+            updates.list_range = derivedRange;
+        } else if (typeof payload.list_range === 'number') {
+            // Backward-compatible fallback until list_range input is removed.
             updates.list_range = Math.max(1, Math.min(120, payload.list_range)); // Limit 1-120 days
         }
         if (typeof payload.name === 'string' && payload.name.trim()) {
