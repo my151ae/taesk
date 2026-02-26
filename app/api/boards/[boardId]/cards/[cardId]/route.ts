@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { normalizeContent, extractTitleTask, deriveExcerptFromContent } from '@/lib/tiptap';
+import { normalizeContent, deriveExcerptFromContent } from '@/lib/tiptap';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
@@ -167,10 +167,6 @@ const patchHandler = async (
   }
   if ('content' in normalizedPayload) {
     normalizedPayload.content = normalizeContent(normalizedPayload.content);
-    // content から title/checked/excerpt を派生（生成列化）
-    const extracted = extractTitleTask(normalizedPayload.content as Record<string, unknown>);
-    normalizedPayload.title = extracted.text || (parsed.data.title ?? '');
-    normalizedPayload.checked = parsed.data.checked ?? extracted.checked;
     normalizedPayload.excerpt = deriveExcerptFromContent(normalizedPayload.content as Record<string, unknown>);
   }
 

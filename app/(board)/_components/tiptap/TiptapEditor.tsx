@@ -1,8 +1,7 @@
 'use client';
 
-import { Extension, useEditor, EditorContent, JSONContent } from '@tiptap/react';
-import { TextSelection, Plugin, PluginKey, EditorState, Transaction } from '@tiptap/pm/state';
-import type { Selection } from '@tiptap/pm/state';
+import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -11,7 +10,6 @@ import Image from '@tiptap/extension-image';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useRef } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
-import { ensureTitleTask } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -19,77 +17,6 @@ import {
     collectImageStoragePaths,
     isSupportedCardImageMimeType,
 } from '@/lib/tiptap-images';
-
-/**
- * 先頭ブロックが空でないテキストを持つ場合、自動的に taskItem に変換する拡張
- */
-const AutoTaskFirstLine = Extension.create({
-    name: 'autoTaskFirstLine',
-
-    addOptions() {
-        return {
-            enabled: true,
-        };
-    },
-
-    addGlobalAttributes() {
-        return [];
-    },
-
-    addProseMirrorPlugins() {
-        return [
-            new Plugin({
-                key: new PluginKey('autoTaskFirstLine'),
-                appendTransaction: (transactions: readonly Transaction[], oldState: EditorState, newState: EditorState) => {
-                    // 安全ガード: newState がない場合は何もしない
-                    if (!newState || !newState.doc) return;
-
-                    // 変更がない、またはメタフラグがある場合はスキップ
-                    if (!transactions.some(tr => tr.docChanged) || transactions.some(tr => tr.getMeta('autoTaskFirstLine'))) {
-                        return;
-                    }
-
-                    const { doc, schema } = newState;
-                    const firstNode = doc.firstChild;
-
-                    // 先頭が taskList 構造でない場合のみ変換対象
-                    if (firstNode && firstNode.type.name !== 'taskList') {
-                        const textContent = firstNode.textContent.trim();
-
-                        // 合意A: 空なら何もしない
-                        if (textContent !== "") {
-                            // 厳密仕様B: 先頭ブロックの内容を抽出し、taskItem(paragraph) に変換
-                            const tr = newState.tr;
-
-                            const newTaskItem = schema.nodes.taskItem.create(
-                                { checked: false },
-                                [schema.nodes.paragraph.create({}, schema.text(textContent))]
-                            );
-                            const newTaskList = schema.nodes.taskList.create({}, [newTaskItem]);
-
-                            // 先頭ブロックを置換
-                            tr.replaceWith(0, firstNode.nodeSize, newTaskList);
-
-                            // メタフラグ付与と履歴除外
-                            tr.setMeta('autoTaskFirstLine', true);
-                            tr.setMeta('addToHistory', false);
-
-                            // セレクションの復元（入力した文字の直後にカーソルを置く）
-                            try {
-                                const endOfFirstBlock = tr.doc.firstChild!.nodeSize - 1;
-                                tr.setSelection(TextSelection.near(tr.doc.resolve(endOfFirstBlock), -1));
-                            } catch (e) {
-                                // ignore
-                            }
-
-                            return tr;
-                        }
-                    }
-                },
-            }),
-        ];
-    },
-});
 
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
@@ -100,45 +27,10 @@ type TiptapEditorProps = {
     cardId?: string;
     onEditorError?: (message: string | null) => void;
     onRegisterImagePasteHandler?: ((handler: ((files: File[]) => Promise<void>) | null) => void);
+    onRegisterFocusBodyHandler?: ((handler: (() => void) | null) => void);
+    onRequestFocusTitle?: () => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
-};
-
-type PasteTaskContext = {
-    isTitleTask: boolean;
-    taskListDepth: number;
-};
-
-const resolvePasteTaskContext = (selection: Selection): PasteTaskContext => {
-    const $pos = selection.$from;
-
-    let isInsideTask = false;
-    let taskDepth = 0;
-
-    for (let d = $pos.depth; d > 0; d--) {
-        if ($pos.node(d)?.type.name === 'taskItem') {
-            isInsideTask = true;
-            taskDepth = d;
-            break;
-        }
-    }
-
-    const taskListDepth = taskDepth > 0 ? taskDepth - 1 : 0;
-    const isFirstTaskInTaskList =
-        isInsideTask &&
-        taskListDepth > 0 &&
-        $pos.node(taskListDepth).type.name === 'taskList' &&
-        $pos.index(taskListDepth) === 0;
-
-    const isTitleTask =
-        isFirstTaskInTaskList &&
-        taskListDepth === 1 &&
-        $pos.index(0) === 0;
-
-    return {
-        isTitleTask,
-        taskListDepth,
-    };
 };
 
 async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -199,6 +91,8 @@ export default function TiptapEditor({
     cardId,
     onEditorError,
     onRegisterImagePasteHandler,
+    onRegisterFocusBodyHandler,
+    onRequestFocusTitle,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -207,6 +101,29 @@ export default function TiptapEditor({
     const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
+
+    const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
+        let node: HTMLElement | null = start;
+        while (node && node.parentElement) {
+            node = node.parentElement;
+            if (!node) return null;
+            const style = window.getComputedStyle(node);
+            const overflowY = style.overflowY;
+            if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+                return node;
+            }
+        }
+        return null;
+    }, []);
+
+    const getLineScrollAmount = useCallback((element: HTMLElement): number => {
+        const style = window.getComputedStyle(element);
+        const lineHeight = Number.parseFloat(style.lineHeight);
+        if (Number.isFinite(lineHeight) && lineHeight > 0) {
+            return lineHeight;
+        }
+        return 24;
+    }, []);
 
     const uploadAndInsertImages = useCallback(async (
         view: { state: EditorState; dispatch: (tr: Transaction) => void },
@@ -263,14 +180,7 @@ export default function TiptapEditor({
                 alt: file.name || 'pasted image',
             });
 
-            // 画像貼り付けは貼り付け位置に依存せず同一挙動に統一する:
-            // 先頭が taskList の場合は本文先頭（先頭 taskList 直後）へ挿入する。
-            const firstNode = tr.doc.firstChild;
-            if (firstNode && firstNode.type.name === 'taskList') {
-                tr = tr.insert(firstNode.nodeSize, imageNode);
-            } else {
-                tr = tr.replaceSelectionWith(imageNode, false);
-            }
+            tr = tr.replaceSelectionWith(imageNode, false);
 
             tr = tr.scrollIntoView();
             dispatch(tr);
@@ -312,7 +222,6 @@ export default function TiptapEditor({
                     };
                 },
             }),
-            AutoTaskFirstLine,
             Placeholder.configure({
                 placeholder: ({ node }) => {
                     if (node.type.name === 'heading') {
@@ -332,56 +241,40 @@ export default function TiptapEditor({
                 class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-3 pb-3',
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
-            handlePaste: (view, event, slice) => {
-                const text = event.clipboardData?.getData('text/plain');
-                if (text && (text.includes('\n') || text.includes('\r'))) {
-                    const lines = text.split(/\r\n|\r|\n/);
-                    const firstLine = lines[0];
-                    const bodyLines = lines.slice(1);
+            handleKeyDown: (view, event) => {
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
+                if (!event.isTrusted) return false;
 
-                    const { state, dispatch } = view;
-                    const { selection, schema } = state;
-                    const taskContext = resolvePasteTaskContext(selection);
+                const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
+                if (!scrollContainer) return false;
+                const lineStep = getLineScrollAmount(view.dom as HTMLElement);
+                const beforeTop = scrollContainer.scrollTop;
 
-                    if (taskContext.isTitleTask && bodyLines.length > 0) {
-                        const html = event.clipboardData?.getData('text/html') ?? '';
-                        // HTML に画像を含む貼り付けは既定の HTML paste に委譲し、画像欠落を避ける
-                        if (/<img[\s>]/i.test(html)) {
-                            return false;
-                        }
-
-                        console.log('[Tiptap] multiline paste in title task detected, escaping body lines out of title taskList');
-
-                        let tr = state.tr;
-
-                        // 1行目を現在位置へ挿入（選択範囲を置換）
-                        tr = tr.insertText(firstLine, selection.from, selection.to);
-
-                        // 2行目以降は「タイトル taskItem 直後」ではなく
-                        // 先頭 taskList の直後（本文）へ挿入する
-                        // 1行目挿入後の selection.to から解決し直すと安全
-                        const $newPos = tr.doc.resolve(tr.mapping.map(selection.to));
-                        const insertPos = $newPos.after(taskContext.taskListDepth);
-
-                        const newParagraphs = bodyLines.map(line =>
-                            schema.nodes.paragraph.create({}, line ? schema.text(line) : [])
-                        );
-
-                        tr = tr.insert(insertPos, newParagraphs);
-                        dispatch(tr);
-
-                        // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
-                        if (onChange) {
-                            onChange(tr.doc.toJSON() as JSONContent);
-                        }
+                const { state } = view;
+                if (event.key === 'ArrowUp' && state.selection.empty) {
+                    if (scrollContainer.scrollTop <= 1) {
+                        event.preventDefault();
+                        onRequestFocusTitle?.();
                         return true;
                     }
 
-                    // リスト外の場合や1行のみの場合は標準挙動に任せる
-                    return false;
+                    const startPos = Selection.atStart(state.doc).from;
+                    if (state.selection.from === startPos) {
+                        event.preventDefault();
+                        scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - lineStep);
+                        return true;
+                    }
                 }
+
+                // ブラウザ既定のキャレット追従が「1画面ジャンプ」になるケースを1行に抑制
+                window.requestAnimationFrame(() => {
+                    const afterTop = scrollContainer.scrollTop;
+                    const delta = afterTop - beforeTop;
+                    if (Math.abs(delta) <= lineStep * 1.5) return;
+                    scrollContainer.scrollTop = beforeTop + Math.sign(delta) * lineStep;
+                });
                 return false;
-            }
+            },
         },
         onUpdate: ({ editor }) => {
             if (isUpdatingRef.current) return;
@@ -393,29 +286,9 @@ export default function TiptapEditor({
                 onChange(editor.getJSON());
             }
         },
-        autofocus: 'start', // 'start' に設定して初期化時に先頭へフォーカス
+        autofocus: 'start',
         onCreate: ({ editor }) => {
-            // 補正：先頭行をタイトルタスクに強制
-            const currentContent = editor.getJSON();
-            const { content: correctedContent, changed } = ensureTitleTask(currentContent);
-            if (changed) {
-                isUpdatingRef.current = true;
-                editor.commands.setContent(correctedContent, { emitUpdate: false });
-                isUpdatingRef.current = false;
-            }
             lastAppliedDocRef.current = editor.state.doc;
-
-            // 初期フォーカス位置を「1行目（タイトル行）の末尾」に設定
-            if (editor.state && editor.state.doc.firstChild) {
-                const firstNode = editor.state.doc.firstChild;
-                // TextSelection.near を使用して、1行目の末尾（ノードの内側）にフォーカス
-                // 1 + content.size はタイトル行の末尾の内部位置
-                const endOfFirstBlock = 1 + firstNode.content.size;
-                const tr = editor.state.tr.setSelection(
-                    TextSelection.near(editor.state.doc.resolve(Math.min(endOfFirstBlock, editor.state.doc.content.size)), -1)
-                );
-                editor.view.dispatch(tr);
-            }
         },
     });
 
@@ -432,6 +305,40 @@ export default function TiptapEditor({
             onRegisterImagePasteHandler(null);
         };
     }, [editor, onRegisterImagePasteHandler, uploadAndInsertImages]);
+
+    useEffect(() => {
+        if (!onRegisterFocusBodyHandler) return;
+        if (!editor) {
+            onRegisterFocusBodyHandler(null);
+            return;
+        }
+
+        onRegisterFocusBodyHandler(() => {
+            const view = editor.view;
+            const dom = view.dom as HTMLElement;
+            view.focus();
+            const placeCursorToVisibleBody = () => {
+                const rect = dom.getBoundingClientRect();
+                const scrollContainer = findScrollableAncestor(dom);
+                const containerRect = scrollContainer?.getBoundingClientRect() ?? rect;
+                const coords = {
+                    left: rect.left + 24,
+                    top: Math.max(rect.top + 8, containerRect.top + 8),
+                };
+                const resolved = view.posAtCoords(coords);
+                const fallbackPos = Selection.atStart(view.state.doc).from;
+                const nextPos = typeof resolved?.pos === 'number' ? resolved.pos : fallbackPos;
+                const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, nextPos));
+                view.dispatch(tr);
+            };
+            placeCursorToVisibleBody();
+            window.requestAnimationFrame(placeCursorToVisibleBody);
+        });
+
+        return () => {
+            onRegisterFocusBodyHandler(null);
+        };
+    }, [editor, onRegisterFocusBodyHandler]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);

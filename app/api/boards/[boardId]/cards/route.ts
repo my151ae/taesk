@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { generateShortId, slugify } from '@/lib/card-utils';
 import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { buildContentFromTitle, deriveExcerptFromContent, normalizeContent, extractTitleTask } from '@/lib/tiptap';
+import { buildDefaultBodyContent, deriveExcerptFromContent, normalizeContent } from '@/lib/tiptap';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
 import {
@@ -153,28 +153,15 @@ const postHandler = async (
   const normalizedContent =
     parsed.data.content
       ? normalizeContent(parsed.data.content)
-      : buildContentFromTitle(parsed.data.title);
-
-  // content が明示的に渡された場合は content から title/checked を派生
-  let derivedTitle = parsed.data.title;
-  let derivedChecked = parsed.data.checked ?? false;
-  if (parsed.data.content) {
-    const extracted = extractTitleTask(normalizedContent);
-    if (extracted.text) {
-      derivedTitle = extracted.text;
-      derivedChecked = extracted.checked;
-    }
-  }
+      : buildDefaultBodyContent();
 
   const normalizedExcerpt =
-    typeof parsed.data.excerpt === 'string'
-      ? parsed.data.excerpt
-      : deriveExcerptFromContent(normalizedContent);
+    deriveExcerptFromContent(normalizedContent);
 
   const payload = stripUndefinedValues({
     board_id: boardId,
     id: parsed.data.id,
-    title: derivedTitle,
+    title: parsed.data.title,
     checklist: clampChecklist((parsed.data.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof clampChecklist>[0]),
     content: normalizedContent,
     excerpt: normalizedExcerpt,
@@ -191,7 +178,7 @@ const postHandler = async (
     due_bucket: parsed.data.due_bucket ?? null,
     due_bucket_position: parsed.data.due_bucket_position ?? null,
     priority: parsed.data.priority ?? 'medium',
-    checked: derivedChecked,
+    checked: parsed.data.checked ?? false,
     assignee_id: parsed.data.assignee_id ?? null,
     assigned_to: parsed.data.assigned_to ?? null,
     user_id: parsed.data.user_id ?? user.id,

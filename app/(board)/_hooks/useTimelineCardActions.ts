@@ -4,10 +4,8 @@ import { useCallback, useRef, useState } from "react";
 import type { Card, DueBucket } from "@/lib/supabase";
 import {
   normalizeContent,
-  buildContentFromTitle,
+  buildDefaultBodyContent,
   deriveExcerptFromContent,
-  ensureTitleTask,
-  setTitleTask,
 } from "@/lib/tiptap";
 import { slugify } from "@/lib/card-utils";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
@@ -360,7 +358,7 @@ export function useTimelineCardActions({
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const title = "";
-    const content = buildContentFromTitle("");
+    const content = buildDefaultBodyContent();
     const excerpt = deriveExcerptFromContent(content);
     const payload: Partial<Card> = {
       title,
@@ -380,7 +378,7 @@ export function useTimelineCardActions({
     if (!isoDate) return;
 
     const title = "";
-    const content = buildContentFromTitle("");
+    const content = buildDefaultBodyContent();
     const excerpt = deriveExcerptFromContent(content);
     const dueBucket = bucketKeyToDueBucket(bucketKey);
     const currentItems = (data?.abBuckets?.[bucketKey] ?? []) as TimelineBucketItem[];
@@ -403,28 +401,20 @@ export function useTimelineCardActions({
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
     if (dataMode !== "api") return;
     try {
-      const match = findTimelineCardById(data, cardId);
-      const source = match.event ?? match.bucketItem;
-      const fallbackTitle = source?.title ?? "";
-      const baseContent = normalizeContent(source?.content ?? buildContentFromTitle(fallbackTitle));
-      const ensured = ensureTitleTask(baseContent, fallbackTitle, nextChecked);
-      const { content: nextContent } = setTitleTask(ensured.content, { checked: nextChecked });
-      const nextExcerpt = deriveExcerptFromContent(nextContent);
-
       setData((prev) => {
         if (!prev) return prev;
 
         return {
           ...prev,
           events: prev.events.map((event) => event.card_id === cardId
-            ? { ...event, checked: nextChecked, content: nextContent, excerpt: nextExcerpt }
+            ? { ...event, checked: nextChecked }
             : event
           ),
           abBuckets: Object.fromEntries(
             Object.entries(prev.abBuckets).map(([key, items]) => [
               key,
               items.map((item) => item.card_id === cardId
-                ? { ...item, checked: nextChecked, content: nextContent, excerpt: nextExcerpt }
+                ? { ...item, checked: nextChecked }
                 : item
               ),
             ])
@@ -432,29 +422,16 @@ export function useTimelineCardActions({
         };
       });
 
-      const payload = source ? { content: nextContent } : { checked: nextChecked };
       const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ checked: nextChecked }),
       });
       if (!res.ok) throw new Error();
-      const body = await res.json().catch(() => null) as { card?: Card } | null;
-      const historyContent = body?.card?.content ?? nextContent;
-      try {
-        await postHistorySnapshot({
-          boardId: initialBoardId,
-          cardId,
-          content: historyContent,
-        });
-      } catch (historyError) {
-        console.warn("[timeline] checked toggle saved but history snapshot failed", historyError);
-        setErrorMessage("チェック更新は保存されましたが、履歴の保存に失敗しました。");
-      }
     } catch {
       fetchTimeline();
     }
-  }, [dataMode, initialBoardId, setData, fetchTimeline, data, postHistorySnapshot, setErrorMessage]);
+  }, [dataMode, initialBoardId, setData, fetchTimeline]);
 
   const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
     try {

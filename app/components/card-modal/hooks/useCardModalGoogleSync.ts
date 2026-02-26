@@ -3,15 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { Card } from "@/lib/supabase";
-import { ensureTitleTask, extractTitleTask } from "@/lib/tiptap";
-import type { JSONContent } from "@tiptap/react";
 import { fetchResyncCandidates, type ResyncCandidate } from "@/app/(board)/_utils/resync";
 
 type SyncStatus = "active" | "unlinked" | "deleted" | undefined;
 
 type UseCardModalGoogleSyncProps = {
   card: Card;
-  content: JSONContent;
+  title: string;
   dueDate: string;
   dueStart: string;
   dueEnd: string;
@@ -21,7 +19,7 @@ type UseCardModalGoogleSyncProps = {
 
 export function useCardModalGoogleSync({
   card,
-  content,
+  title,
   dueDate,
   dueStart,
   dueEnd,
@@ -81,7 +79,7 @@ export function useCardModalGoogleSync({
   }, [card.id]);
 
   const handleResyncRequest = useCallback(async () => {
-    const nextTitle = extractTitleTask(ensureTitleTask(content).content).text;
+    const nextTitle = title.trim();
     if (!nextTitle) return;
     setResyncLoading(true);
     setResyncError(null);
@@ -102,7 +100,7 @@ export function useCardModalGoogleSync({
     } finally {
       setResyncLoading(false);
     }
-  }, [content, dueDate]);
+  }, [title, dueDate]);
 
   const handleResyncSelect = useCallback(
     async (googleEventId?: string) => {

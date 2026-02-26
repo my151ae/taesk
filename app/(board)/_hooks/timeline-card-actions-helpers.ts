@@ -1,10 +1,10 @@
 import type { Card } from '@/lib/supabase';
-import { buildContentFromTitle, deriveExcerptFromContent } from '@/lib/tiptap';
+import { buildDefaultBodyContent, deriveExcerptFromContent } from '@/lib/tiptap';
 import type { TimelineBucketItem } from '@/app/(board)/_utils/timeline-helpers';
 
 export function buildOptimisticCard(payload: Partial<Card>, boardId: string, optimisticId: string): Card {
   const nowIso = new Date().toISOString();
-  const optimisticContent = payload.content ?? buildContentFromTitle(payload.title ?? '');
+  const optimisticContent = payload.content ?? buildDefaultBodyContent();
   const optimisticExcerpt = payload.excerpt ?? deriveExcerptFromContent(optimisticContent);
 
   return {

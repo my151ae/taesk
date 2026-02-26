@@ -7,10 +7,6 @@ import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
-    extractTitleTask,
-    setTitleTask,
-    ensureTitleTask,
-    getTiptapPlainText,
     normalizeContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
@@ -109,12 +105,8 @@ export function CardModal({
         selectedAssignees,
         resetDraft,
     } = useCardModalDraft({ card, profiles });
-    const [stickyOpacity, setStickyOpacity] = useState(0);
-
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
-    const contentScrollRef = useRef<HTMLDivElement>(null);
-    const editorContainerRef = useRef<HTMLDivElement>(null);
 
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardIdRef = useRef(card.id);
@@ -132,6 +124,8 @@ export function CardModal({
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
     const imagePasteHandlerRef = useRef<((files: File[]) => Promise<void>) | null>(null);
+    const focusBodyHandlerRef = useRef<(() => void) | null>(null);
+    const titleInputRef = useRef<HTMLInputElement | null>(null);
 
     const {
         historyItems,
@@ -167,69 +161,6 @@ export function CardModal({
         }
     }, []);
 
-    useEffect(() => {
-        const root = contentScrollRef.current;
-        const dialog = dialogRef.current;
-        const editorWrap = editorContainerRef.current;
-        const proseMirror = editorWrap?.querySelector<HTMLElement>('.ProseMirror') ?? null;
-        if ((!root && !dialog) || isLoading || typeof window === "undefined") {
-            setStickyOpacity(0);
-            return;
-        }
-
-        let rafId = 0;
-        const fadeDistance = 40;
-
-        const getScrollTop = () => {
-            const rootTop = root?.scrollTop ?? 0;
-            const dialogTop = dialog?.scrollTop ?? 0;
-            const editorTop = editorWrap?.scrollTop ?? 0;
-            const proseTop = proseMirror?.scrollTop ?? 0;
-            const docTop = document.scrollingElement?.scrollTop ?? 0;
-            const maxTop = Math.max(rootTop, dialogTop, editorTop, proseTop, docTop);
-            return {
-                maxTop,
-                rootTop,
-                dialogTop,
-                editorTop,
-                proseTop,
-                docTop,
-            };
-        };
-
-        const updateVisibility = () => {
-            rafId = 0;
-            const { maxTop } = getScrollTop();
-            const progress = Math.min(1, Math.max(0, maxTop / fadeDistance));
-            setStickyOpacity(progress);
-        };
-
-        const onScroll = () => {
-            if (rafId) return;
-            rafId = window.requestAnimationFrame(updateVisibility);
-        };
-
-        updateVisibility();
-        root?.addEventListener("scroll", onScroll, { passive: true });
-        dialog?.addEventListener("scroll", onScroll, { passive: true });
-        editorWrap?.addEventListener("scroll", onScroll, { passive: true });
-        proseMirror?.addEventListener("scroll", onScroll, { passive: true });
-        document.addEventListener("scroll", onScroll, { passive: true, capture: true });
-        window.addEventListener("resize", onScroll);
-
-        return () => {
-            if (rafId) {
-                window.cancelAnimationFrame(rafId);
-            }
-            root?.removeEventListener("scroll", onScroll);
-            dialog?.removeEventListener("scroll", onScroll);
-            editorWrap?.removeEventListener("scroll", onScroll);
-            proseMirror?.removeEventListener("scroll", onScroll);
-            document.removeEventListener("scroll", onScroll, true);
-            window.removeEventListener("resize", onScroll);
-        };
-    }, [card.id, isLoading]);
-
     // card prop が変わったときの処理
     useEffect(() => {
         // カードIDが変わった場合は、エディタも含め全てリセット
@@ -260,12 +191,11 @@ export function CardModal({
 
         const incomingContent = normalizeContent(card.content);
         setContent(incomingContent);
-        const extracted = extractTitleTask(incomingContent);
-        setTitle(extracted.text);
-        setChecked(extracted.checked);
+        setTitle(card.title || "");
+        setChecked(card.checked || false);
         setEditorError(null);
         hasAppliedInitialLoadRef.current = true;
-    }, [card.content, card.id, isLoading]);
+    }, [card.content, card.id, card.title, card.checked, isLoading]);
 
     // 保存後のリセット対応は 各ハンドラーと card prop の同期にて行う
     // (重い JSON.stringify 比較は行わない)
@@ -371,16 +301,11 @@ export function CardModal({
         const normalizedBucketPosition: number | null =
             normalizedBucket != null ? dueBucketPosition ?? null : null;
 
-        // 保存時に構造を最終補正
         const sourceContent = options?.contentOverride ?? content;
-        const { content: correctedContent } = ensureTitleTask(sourceContent, title, checked);
-        // 重要：最新の content (エディタの中身) からタイトルとチェック状態を優先的に再抽出する
-        // これにより、onChange での同期と保存時の最終ステートを一致させる
-        const extracted = extractTitleTask(correctedContent);
-        // 合意A: 空文字も正当なタイトルとして受け入れる（復活バグの防止）
-        const nextTitle = extracted.text.trim();
-        const nextChecked = extracted.checked;
-        const nextExcerpt = deriveExcerptFromContent(correctedContent);
+        const normalizedContent = normalizeContent(sourceContent);
+        const nextTitle = title.trim();
+        const nextChecked = checked;
+        const nextExcerpt = deriveExcerptFromContent(normalizedContent);
 
         hasPendingChangesRef.current = false;
 
@@ -390,7 +315,7 @@ export function CardModal({
         onSave({
             id: card.id,
             title: nextTitle,
-            content: correctedContent,
+            content: normalizedContent,
             excerpt: nextExcerpt,
             checked: nextChecked,
             tags,
@@ -503,6 +428,18 @@ export function CardModal({
 
     const handleRegisterImagePasteHandler = useCallback((handler: ((files: File[]) => Promise<void>) | null) => {
         imagePasteHandlerRef.current = handler;
+    }, []);
+
+    const handleRegisterFocusBodyHandler = useCallback((handler: (() => void) | null) => {
+        focusBodyHandlerRef.current = handler;
+    }, []);
+
+    const handleRequestFocusTitle = useCallback(() => {
+        const input = titleInputRef.current;
+        if (!input) return;
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
     }, []);
 
 
@@ -681,7 +618,7 @@ export function CardModal({
         handleSyncNow,
     } = useCardModalGoogleSync({
         card,
-        content,
+        title,
         dueDate,
         dueStart,
         dueEnd,
@@ -691,10 +628,7 @@ export function CardModal({
 
     const handleApplyHistory = useCallback(() => {
         if (!previewHistoryContent || !selectedHistoryId) return;
-        const extracted = extractTitleTask(previewHistoryContent);
         setContent(previewHistoryContent);
-        setTitle(extracted.text);
-        setChecked(extracted.checked);
         hasPendingChangesRef.current = false;
         handleSave(false, {
             restoreFromHistory: true,
@@ -781,16 +715,14 @@ export function CardModal({
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
                 <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
                     {/* Left Column - Details (Note) */}
-                    <div className={`flex flex-col flex-1 min-h-0 p-0 relative ${showSidebar ? "hidden sm:flex" : "flex"}`}>
+                    <div className={`flex flex-col flex-1 min-h-0 p-0 ${showSidebar ? "hidden sm:flex" : "flex"}`}>
                         {!isLoading && (
                             <div
-                                className="absolute top-0 left-0 right-0 z-20"
-                                style={{ opacity: stickyOpacity, pointerEvents: stickyOpacity > 0 ? "auto" : "none" }}
-                                aria-hidden={stickyOpacity === 0}
+                                className="z-20"
                             >
                                 <div
                                     data-sticky-title
-                                    className="bg-white dark:bg-gray-800 border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3 transition-opacity"
+                                    className="bg-white dark:bg-gray-800 border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3"
                                 >
                                     <input
                                         type="checkbox"
@@ -800,15 +732,12 @@ export function CardModal({
                                             if (isHistoryPreviewing) return;
                                             const val = e.target.checked;
                                             setChecked(val);
-                                            const { content: newContent, changed } = setTitleTask(content, { checked: val });
-                                            if (changed) {
-                                                setContent(newContent);
-                                            }
-                                            triggerAutoSave(newContent);
+                                            triggerAutoSave();
                                         }}
                                         className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
                                     />
                                     <input
+                                        ref={titleInputRef}
                                         type="text"
                                         value={title}
                                         disabled={isHistoryPreviewing}
@@ -816,17 +745,14 @@ export function CardModal({
                                             if (isHistoryPreviewing) return;
                                             const val = e.target.value;
                                             setTitle(val);
-                                            const { content: newContent, changed } = setTitleTask(content, { text: val });
-                                            if (changed) {
-                                                setContent(newContent);
-                                            }
-                                            triggerAutoSave(newContent);
+                                            triggerAutoSave();
                                         }}
-                                        onBlur={() => {
+                                        onKeyDown={(event) => {
                                             if (isHistoryPreviewing) return;
-                                            // フォーカスアウト時に構造補正を確実に行う
-                                            const { content: correctedContent } = ensureTitleTask(content, title, checked);
-                                            setContent(correctedContent);
+                                            if (event.key !== "ArrowDown") return;
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            focusBodyHandlerRef.current?.();
                                         }}
                                         onPaste={(event) => {
                                             if (isHistoryPreviewing) return;
@@ -855,7 +781,7 @@ export function CardModal({
                                 </div>
                             </div>
                         )}
-                        <div ref={contentScrollRef} className="flex-1 overflow-y-auto min-h-0">
+                        <div className="flex-1 overflow-y-auto min-h-0">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center p-12 space-y-4">
                                     <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -897,23 +823,17 @@ export function CardModal({
                                         ) : (
                                             <TiptapEditor
                                                 key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
-                                                containerRef={editorContainerRef}
                                                 initialContent={isHistoryPreviewing ? previewHistoryContent : content}
                                                 editable={!isHistoryPreviewing}
                                                 boardId={card.board_id}
                                                 cardId={card.id}
                                                 onEditorError={setEditorError}
                                                 onRegisterImagePasteHandler={handleRegisterImagePasteHandler}
+                                                onRegisterFocusBodyHandler={handleRegisterFocusBodyHandler}
+                                                onRequestFocusTitle={handleRequestFocusTitle}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;
                                                     setContent(val);
-                                                    const { text: extractedText, checked: newChecked } = extractTitleTask(val);
-                                                    if (extractedText !== title) {
-                                                        setTitle(extractedText);
-                                                    }
-                                                    if (newChecked !== checked) {
-                                                        setChecked(newChecked);
-                                                    }
                                                     triggerAutoSave(val);
                                                     if (editorError) {
                                                         setEditorError(null);

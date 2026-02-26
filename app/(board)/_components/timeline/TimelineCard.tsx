@@ -228,23 +228,7 @@ export function TimelineCard({
                         >
                             {(() => {
                                 const lines = note.split(/\r?\n/);
-                                const processedTitle = title.trim().toLowerCase();
-
-                                // 先頭数行をチェックして、タイトルと実質的に同じ内容であればスキップ
-                                // content の 1行目が taskItem なので、excerpt の冒頭は通常 "[ ] タイトル" または "タイトル" になる
-                                let skipCount = 0;
-                                if (lines.length > 0) {
-                                    const firstLine = lines[0].trim();
-                                    // "[ ] title" または "title" そのものに一致するか判定
-                                    const taskMatch = firstLine.match(/^\[[ xX]\]\s?(.*)$/);
-                                    const firstLineContent = (taskMatch ? taskMatch[1] : firstLine).trim().toLowerCase();
-
-                                    if (firstLineContent === processedTitle || (processedTitle === "" && firstLineContent === "")) {
-                                        skipCount = 1;
-                                    }
-                                }
-
-                                return lines.slice(skipCount).map((line, idx) => {
+                                return lines.map((line, idx) => {
                                     const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
                                     const isTask = Boolean(taskMatch);
                                     const indentRaw = taskMatch?.[1] ?? '';

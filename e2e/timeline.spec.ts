@@ -407,7 +407,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('keeps title task on first line when multiline text is pasted', async ({ page }) => {
+  test('keeps card title independent when multiline text is pasted in body', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -438,7 +438,7 @@ test.describe('@feature:timeline Timeline view', () => {
                 content: [
                   {
                     type: 'paragraph',
-                    content: [{ type: 'text', text: initialTitle }],
+                    content: [],
                   },
                 ],
               },
@@ -478,32 +478,23 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
-      const titleTaskLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
-      await expect(titleTaskLine).toBeVisible();
       await bodyEditor.click();
       const selectAllModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
       await page.keyboard.press(`${selectAllModifier}+A`);
       await pastePlainText(page, 'A\nB\nC');
 
-      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue('A');
-      await expect(titleTaskLine).toHaveText('A');
+      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue(initialTitle);
 
       const nodeSummary = await bodyEditor.evaluate((root) => {
-        const topLevelNames = Array.from(root.childNodes).map((node) => node.nodeName.toLowerCase());
-        const secondNode = root.childNodes.item(1);
-        const thirdNode = root.childNodes.item(2);
+        const textContent = root.textContent ?? '';
         return {
-          topLevelNames,
-          secondText: secondNode?.textContent?.trim() ?? '',
-          thirdText: thirdNode?.textContent?.trim() ?? '',
+          textContent,
         };
       });
 
-      expect(nodeSummary.topLevelNames[0]).toBe('ul');
-      expect(nodeSummary.topLevelNames[1]).toBe('p');
-      expect(nodeSummary.topLevelNames[2]).toBe('p');
-      expect(nodeSummary.secondText).toBe('B');
-      expect(nodeSummary.thirdText).toBe('C');
+      expect(nodeSummary.textContent).toContain('A');
+      expect(nodeSummary.textContent).toContain('B');
+      expect(nodeSummary.textContent).toContain('C');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
