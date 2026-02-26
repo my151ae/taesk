@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
-import TiptapEditor from "@/app/(board)/_components/tiptap/TiptapEditor";
+import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
@@ -124,8 +124,9 @@ export function CardModal({
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
     const imagePasteHandlerRef = useRef<((files: File[]) => Promise<void>) | null>(null);
-    const focusBodyHandlerRef = useRef<(() => void) | null>(null);
+    const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLInputElement | null>(null);
+    const pendingTitleSelectionRef = useRef<number | null>(null);
 
     const {
         historyItems,
@@ -430,17 +431,117 @@ export function CardModal({
         imagePasteHandlerRef.current = handler;
     }, []);
 
-    const handleRegisterFocusBodyHandler = useCallback((handler: (() => void) | null) => {
-        focusBodyHandlerRef.current = handler;
+    const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
+        bodyBridgeRef.current = bridge;
     }, []);
 
-    const handleRequestFocusTitle = useCallback(() => {
+    const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
         const input = titleInputRef.current;
         if (!input) return;
+        let maxLength = input.value.length;
+        let targetPosition = input.value.length;
+
+        if (request.mode === 'merge-first-paragraph') {
+            const mergedTitle = `${title}${request.text}`;
+            setTitle(mergedTitle);
+            setContent(request.content);
+            triggerAutoSave(request.content);
+            maxLength = mergedTitle.length;
+            targetPosition = title.length;
+            pendingTitleSelectionRef.current = targetPosition;
+        }
+
         input.focus();
-        const len = input.value.length;
-        input.setSelectionRange(len, len);
-    }, []);
+        if (request.mode === 'column') {
+            const nextPos = Math.min(Math.max(request.column ?? maxLength, 0), maxLength);
+            input.setSelectionRange(nextPos, nextPos);
+            return;
+        }
+        if (request.mode === 'merge-first-paragraph') {
+            return;
+        }
+        const nextPos = Math.min(Math.max(targetPosition, 0), maxLength);
+        input.setSelectionRange(nextPos, nextPos);
+    }, [setContent, setTitle, title, triggerAutoSave]);
+
+    useEffect(() => {
+        const pending = pendingTitleSelectionRef.current;
+        const input = titleInputRef.current;
+        if (pending == null || !input) return;
+        if (document.activeElement !== input) return;
+        const nextPos = Math.min(Math.max(pending, 0), input.value.length);
+        input.setSelectionRange(nextPos, nextPos);
+        pendingTitleSelectionRef.current = null;
+    }, [title]);
+
+    const syncBodyContentAndAutosave = useCallback((nextContent: JSONContent | null) => {
+        if (!nextContent) return;
+        setContent(nextContent);
+        triggerAutoSave(nextContent);
+    }, [setContent, triggerAutoSave]);
+
+    const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (isHistoryPreviewing) return;
+        if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+
+        const bridge = bodyBridgeRef.current;
+        if (!bridge) return;
+
+        const input = event.currentTarget;
+        const selectionStart = input.selectionStart;
+        const selectionEnd = input.selectionEnd;
+        if (selectionStart == null || selectionEnd == null || selectionStart !== selectionEnd) {
+            return;
+        }
+
+        const caret = selectionStart;
+        const isCaretAtEnd = caret === title.length;
+
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            event.stopPropagation();
+            bridge.focusBody(caret);
+            return;
+        }
+
+        if (event.key === "ArrowRight") {
+            if (!isCaretAtEnd) return;
+            event.preventDefault();
+            event.stopPropagation();
+            bridge.focusBody(0);
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            const left = title.slice(0, caret);
+            const right = title.slice(caret);
+            const nextContent = bridge.insertParagraphAtDocStart(isCaretAtEnd ? '' : right);
+            if (!nextContent) return;
+            setTitle(left);
+            syncBodyContentAndAutosave(nextContent);
+            bridge.focusBody();
+            bridge.setCursorInFirstParagraph(0);
+            return;
+        }
+
+        if (event.key === "Delete") {
+            if (!isCaretAtEnd) return;
+            const firstBlock = bridge.getFirstBlockInfo();
+            if (!firstBlock.isPlainParagraph) return;
+            const nextContent = bridge.removeFirstParagraph();
+            if (!nextContent) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const mergedTitle = `${title}${firstBlock.text}`;
+            setTitle(mergedTitle);
+            syncBodyContentAndAutosave(nextContent);
+            input.focus();
+            const nextPos = mergedTitle.length;
+            input.setSelectionRange(nextPos, nextPos);
+        }
+    }, [isHistoryPreviewing, setTitle, syncBodyContentAndAutosave, title]);
 
 
     const handleAddMember = (profileId: string) => {
@@ -747,13 +848,7 @@ export function CardModal({
                                             setTitle(val);
                                             triggerAutoSave();
                                         }}
-                                        onKeyDown={(event) => {
-                                            if (isHistoryPreviewing) return;
-                                            if (event.key !== "ArrowDown") return;
-                                            event.preventDefault();
-                                            event.stopPropagation();
-                                            focusBodyHandlerRef.current?.();
-                                        }}
+                                        onKeyDown={handleTitleKeyDown}
                                         onPaste={(event) => {
                                             if (isHistoryPreviewing) return;
                                             const imageFiles = Array.from(event.clipboardData?.items ?? [])
@@ -829,7 +924,7 @@ export function CardModal({
                                                 cardId={card.id}
                                                 onEditorError={setEditorError}
                                                 onRegisterImagePasteHandler={handleRegisterImagePasteHandler}
-                                                onRegisterFocusBodyHandler={handleRegisterFocusBodyHandler}
+                                                onRegisterBodyBridge={handleRegisterBodyBridge}
                                                 onRequestFocusTitle={handleRequestFocusTitle}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;

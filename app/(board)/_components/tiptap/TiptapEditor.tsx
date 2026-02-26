@@ -18,6 +18,37 @@ import {
     isSupportedCardImageMimeType,
 } from '@/lib/tiptap-images';
 
+export type FirstBlockInfo = {
+    type: string | null;
+    text: string;
+    textLen: number;
+    isPlainParagraph: boolean;
+};
+
+export type FocusTitleRequest = {
+    mode: 'end';
+} | {
+    mode: 'column';
+    column?: number;
+} | {
+    mode: 'merge-first-paragraph';
+    text: string;
+    content: JSONContent;
+};
+
+export type BodyEditorBridge = {
+    focusBody: (offset?: number | null) => void;
+    getFirstBlockInfo: () => FirstBlockInfo;
+    insertParagraphAtDocStart: (text: string) => JSONContent | null;
+    removeFirstParagraph: () => JSONContent | null;
+    setCursorInFirstParagraph: (offset: number) => boolean;
+    isSelectionInFirstBlock: () => boolean;
+    getParentOffset: () => number | null;
+    endOfTextblock: (direction: 'up' | 'down' | 'left' | 'right') => boolean;
+    getScrollTop: () => number | null;
+    scrollByOneLine: (direction: 'up' | 'down') => boolean;
+};
+
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -28,7 +59,8 @@ type TiptapEditorProps = {
     onEditorError?: (message: string | null) => void;
     onRegisterImagePasteHandler?: ((handler: ((files: File[]) => Promise<void>) | null) => void);
     onRegisterFocusBodyHandler?: ((handler: (() => void) | null) => void);
-    onRequestFocusTitle?: () => void;
+    onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
+    onRequestFocusTitle?: (request: FocusTitleRequest) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
@@ -92,6 +124,7 @@ export default function TiptapEditor({
     onEditorError,
     onRegisterImagePasteHandler,
     onRegisterFocusBodyHandler,
+    onRegisterBodyBridge,
     onRequestFocusTitle,
     'data-autofocus': dataAutofocus,
     containerRef
@@ -104,26 +137,90 @@ export default function TiptapEditor({
 
     const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
         let node: HTMLElement | null = start;
-        while (node && node.parentElement) {
-            node = node.parentElement;
-            if (!node) return null;
+        while (node) {
+            if (node.parentElement === null) return null;
             const style = window.getComputedStyle(node);
             const overflowY = style.overflowY;
             if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
                 return node;
             }
+            node = node.parentElement;
         }
         return null;
     }, []);
 
     const getLineScrollAmount = useCallback((element: HTMLElement): number => {
+        const paragraphElement = element.querySelector('.ProseMirror p, p') as HTMLElement | null;
+        const baseElement = paragraphElement ?? element;
         const style = window.getComputedStyle(element);
-        const lineHeight = Number.parseFloat(style.lineHeight);
+        const paragraphStyle = window.getComputedStyle(baseElement);
+        const lineHeight = Number.parseFloat(paragraphStyle.lineHeight);
         if (Number.isFinite(lineHeight) && lineHeight > 0) {
             return lineHeight;
         }
+        const fontSize = Number.parseFloat(paragraphStyle.fontSize || style.fontSize);
+        if (Number.isFinite(fontSize) && fontSize > 0) {
+            return fontSize * 1.4;
+        }
         return 24;
     }, []);
+
+    const isPlainTextParagraph = useCallback((node: ProseMirrorNode | null): node is ProseMirrorNode => {
+        if (!node || node.type.name !== 'paragraph') return false;
+        for (let i = 0; i < node.childCount; i += 1) {
+            if (node.child(i).type.name !== 'text') return false;
+        }
+        return true;
+    }, []);
+
+    const getFirstBlockInfo = useCallback((state: EditorState): FirstBlockInfo => {
+        const first = state.doc.firstChild;
+        if (!first) {
+            return {
+                type: null,
+                text: '',
+                textLen: 0,
+                isPlainParagraph: false,
+            };
+        }
+        const text = first.textContent ?? '';
+        return {
+            type: first.type.name,
+            text,
+            textLen: text.length,
+            isPlainParagraph: isPlainTextParagraph(first),
+        };
+    }, [isPlainTextParagraph]);
+
+    const isSelectionInFirstBlockState = useCallback((state: EditorState): boolean => {
+        if (state.doc.childCount === 0) return false;
+        return state.selection.$from.index(0) === 0 && state.selection.$to.index(0) === 0;
+    }, []);
+
+    const setSelectionAtDocStart = useCallback((state: EditorState, dispatch: (tr: Transaction) => void): void => {
+        const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
+        dispatch(tr);
+    }, []);
+
+    const setCursorInFirstParagraphWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
+        const first = state.doc.firstChild;
+        if (!first || first.type.name !== 'paragraph') return false;
+        const textLength = (first.textContent ?? '').length;
+        const offset = Math.max(0, Math.min(rawOffset, textLength));
+        const position = 1 + offset;
+        const tr = state.tr.setSelection(TextSelection.create(state.doc, position)).scrollIntoView();
+        dispatch(tr);
+        return true;
+    }, []);
+
+    const scrollByOneLineInView = useCallback((view: { dom: Element }, direction: 'up' | 'down'): boolean => {
+        const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
+        if (!scrollContainer) return false;
+        const lineStep = getLineScrollAmount(view.dom as HTMLElement);
+        const delta = direction === 'up' ? -lineStep : lineStep;
+        scrollContainer.scrollBy({ top: delta });
+        return true;
+    }, [findScrollableAncestor, getLineScrollAmount]);
 
     const uploadAndInsertImages = useCallback(async (
         view: { state: EditorState; dispatch: (tr: Transaction) => void },
@@ -242,29 +339,63 @@ export default function TiptapEditor({
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handleKeyDown: (view, event) => {
-                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
-                if (!event.isTrusted) return false;
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft' && event.key !== 'Backspace') return false;
+                if (!event.isTrusted || event.isComposing) return false;
+
+                const { state } = view;
+                if (!state.selection.empty) return false;
+
+                if (event.key === 'Backspace') {
+                    const isAtFirstParagraphStart =
+                        isSelectionInFirstBlockState(state)
+                        && state.selection.$from.parentOffset === 0;
+                    const firstInfo = getFirstBlockInfo(state);
+                    if (!isAtFirstParagraphStart || !firstInfo.isPlainParagraph || !onRequestFocusTitle) {
+                        return false;
+                    }
+                    const first = state.doc.firstChild;
+                    if (!first || first.type.name !== 'paragraph') return false;
+                    event.preventDefault();
+                    const tr = state.tr.delete(0, first.nodeSize).scrollIntoView();
+                    view.dispatch(tr);
+                    onRequestFocusTitle({
+                        mode: 'merge-first-paragraph',
+                        text: firstInfo.text,
+                        content: tr.doc.toJSON() as JSONContent,
+                    });
+                    return true;
+                }
+
+                if (event.key === 'ArrowUp' && isSelectionInFirstBlockState(state) && view.endOfTextblock('up')) {
+                    const scrollTop = findScrollableAncestor(view.dom as HTMLElement)?.scrollTop;
+                    if (typeof scrollTop === 'number' && scrollTop <= 1 && onRequestFocusTitle) {
+                        event.preventDefault();
+                        onRequestFocusTitle({
+                            mode: 'column',
+                            column: state.selection.$from.parentOffset,
+                        });
+                        return true;
+                    }
+                    if (typeof scrollTop === 'number' && scrollTop > 1) {
+                        event.preventDefault();
+                        scrollByOneLineInView(view, 'up');
+                        return true;
+                    }
+                }
+
+                if (event.key === 'ArrowLeft') {
+                    if (isSelectionInFirstBlockState(state) && view.endOfTextblock('left') && onRequestFocusTitle) {
+                        event.preventDefault();
+                        onRequestFocusTitle({ mode: 'end' });
+                        return true;
+                    }
+                    return false;
+                }
 
                 const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
                 if (!scrollContainer) return false;
                 const lineStep = getLineScrollAmount(view.dom as HTMLElement);
                 const beforeTop = scrollContainer.scrollTop;
-
-                const { state } = view;
-                if (event.key === 'ArrowUp' && state.selection.empty) {
-                    if (scrollContainer.scrollTop <= 1) {
-                        event.preventDefault();
-                        onRequestFocusTitle?.();
-                        return true;
-                    }
-
-                    const startPos = Selection.atStart(state.doc).from;
-                    if (state.selection.from === startPos) {
-                        event.preventDefault();
-                        scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - lineStep);
-                        return true;
-                    }
-                }
 
                 // ブラウザ既定のキャレット追従が「1画面ジャンプ」になるケースを1行に抑制
                 window.requestAnimationFrame(() => {
@@ -292,6 +423,17 @@ export default function TiptapEditor({
         },
     });
 
+    const focusBody = useCallback((offset?: number | null) => {
+        if (!editor) return;
+        const view = editor.view;
+        view.focus();
+        const { state, dispatch } = view;
+        if (typeof offset === 'number' && Number.isFinite(offset)) {
+            if (setCursorInFirstParagraphWithOffset(state, dispatch, offset)) return;
+        }
+        setSelectionAtDocStart(state, dispatch);
+    }, [editor, setCursorInFirstParagraphWithOffset, setSelectionAtDocStart]);
+
     useEffect(() => {
         if (!onRegisterImagePasteHandler) return;
         if (!editor) {
@@ -314,31 +456,82 @@ export default function TiptapEditor({
         }
 
         onRegisterFocusBodyHandler(() => {
-            const view = editor.view;
-            const dom = view.dom as HTMLElement;
-            view.focus();
-            const placeCursorToVisibleBody = () => {
-                const rect = dom.getBoundingClientRect();
-                const scrollContainer = findScrollableAncestor(dom);
-                const containerRect = scrollContainer?.getBoundingClientRect() ?? rect;
-                const coords = {
-                    left: rect.left + 24,
-                    top: Math.max(rect.top + 8, containerRect.top + 8),
-                };
-                const resolved = view.posAtCoords(coords);
-                const fallbackPos = Selection.atStart(view.state.doc).from;
-                const nextPos = typeof resolved?.pos === 'number' ? resolved.pos : fallbackPos;
-                const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, nextPos));
-                view.dispatch(tr);
-            };
-            placeCursorToVisibleBody();
-            window.requestAnimationFrame(placeCursorToVisibleBody);
+            focusBody();
         });
 
         return () => {
             onRegisterFocusBodyHandler(null);
         };
-    }, [editor, onRegisterFocusBodyHandler]);
+    }, [editor, focusBody, onRegisterFocusBodyHandler]);
+
+    useEffect(() => {
+        if (!onRegisterBodyBridge) return;
+        if (!editor) {
+            onRegisterBodyBridge(null);
+            return;
+        }
+
+        onRegisterBodyBridge({
+            focusBody: (offset?: number | null) => focusBody(offset),
+            getFirstBlockInfo: () => getFirstBlockInfo(editor.view.state),
+            insertParagraphAtDocStart: (text: string) => {
+                const view = editor.view;
+                const paragraphType = view.state.schema.nodes.paragraph;
+                if (!paragraphType) return null;
+                const content = typeof text === 'string' && text.length > 0
+                    ? [view.state.schema.text(text)]
+                    : undefined;
+                const paragraphNode = paragraphType.create(null, content);
+                const tr = view.state.tr.insert(0, paragraphNode).scrollIntoView();
+                view.dispatch(tr);
+                return tr.doc.toJSON() as JSONContent;
+            },
+            removeFirstParagraph: () => {
+                const view = editor.view;
+                const first = view.state.doc.firstChild;
+                if (!first || first.type.name !== 'paragraph') return null;
+                const tr = view.state.tr.delete(0, first.nodeSize).scrollIntoView();
+                view.dispatch(tr);
+                return tr.doc.toJSON() as JSONContent;
+            },
+            setCursorInFirstParagraph: (offset: number) => {
+                const view = editor.view;
+                return setCursorInFirstParagraphWithOffset(view.state, view.dispatch, offset);
+            },
+            isSelectionInFirstBlock: () => isSelectionInFirstBlockState(editor.view.state),
+            getParentOffset: () => {
+                const { selection } = editor.view.state;
+                if (!selection.empty) return null;
+                return selection.$from.parentOffset;
+            },
+            endOfTextblock: (direction: 'up' | 'down' | 'left' | 'right') => {
+                const view = editor.view;
+                if (!view.state.selection.empty) return false;
+                return view.endOfTextblock(direction);
+            },
+            getScrollTop: () => {
+                const scrollContainer = findScrollableAncestor(editor.view.dom as HTMLElement);
+                if (!scrollContainer) return null;
+                return scrollContainer.scrollTop;
+            },
+            scrollByOneLine: (direction: 'up' | 'down') => {
+                return scrollByOneLineInView(editor.view, direction);
+            },
+        });
+
+        return () => {
+            onRegisterBodyBridge(null);
+        };
+    }, [
+        editor,
+        findScrollableAncestor,
+        focusBody,
+        getFirstBlockInfo,
+        isSelectionInFirstBlockState,
+        onRegisterBodyBridge,
+        scrollByOneLineInView,
+        setCursorInFirstParagraphWithOffset,
+    ]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
