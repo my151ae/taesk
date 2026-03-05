@@ -413,6 +413,36 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleUpdateBoard({ day_range: newRange });
   }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange]);
 
+  const handleViewModeChange = useCallback((mode: "timeline" | "list") => {
+    if (mode === viewMode) return;
+
+    if (mode === "timeline") {
+      const today = todayJstIso();
+      const targetDate =
+        listAnchorDate ||
+        data?.days?.[activeDayIndex]?.isoDate ||
+        resolvedState.date ||
+        today;
+      const targetOffset = getDayDiff(targetDate, today);
+      // Keep fetch start aligned before timeline range refetch happens on mode switch.
+      setDayWindowStart(targetOffset);
+      dayWindowStartRef.current = targetOffset;
+      setActiveDayIndex(0);
+    }
+
+    handleSetViewMode(mode);
+  }, [
+    viewMode,
+    listAnchorDate,
+    data?.days,
+    activeDayIndex,
+    resolvedState.date,
+    setDayWindowStart,
+    dayWindowStartRef,
+    setActiveDayIndex,
+    handleSetViewMode,
+  ]);
+
   const getListWindowSpec = useCallback((anchorOffset: number, window: ListWindow) => {
     const range = listWindowRange(window);
     return {
@@ -443,7 +473,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       });
     }
     const payload = await fetchTimeline(startOffset, { range });
-    const anchorDay = payload?.days?.[Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0))] ?? data?.days?.[0];
+    const anchorDayIndex = Math.min(anchorIndex, Math.max((payload?.days?.length ?? 1) - 1, 0));
+    const anchorDay = payload?.days?.[anchorDayIndex] ?? data?.days?.[0];
     if (anchorDay) {
       setListAnchorDate(anchorDay.isoDate);
       setListAnchorOffset(anchorOffset);
@@ -454,7 +485,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
         time: null,
       });
     }
-    setActiveDayIndex(0);
+    setActiveDayIndex(anchorDayIndex);
   }, [status, getListWindowSpec, setDayWindowStart, dayWindowStartRef, currentBoard.list_window_before_days, currentBoard.list_window_after_days, currentBoard.list_range, handleUpdateBoard, fetchTimeline, data?.days, setListAnchorDate, setListAnchorOffset, updateUrlForList, setActiveDayIndex]);
 
   const shiftListWindow = useCallback((delta: number) => {
@@ -671,7 +702,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           calendarPreset={calendarPreset} setCalendarPreset={setCalendarPreset}
           refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
-          viewMode={viewMode} setViewMode={handleSetViewMode}
+          viewMode={viewMode} setViewMode={handleViewModeChange}
           onShortcutsClick={() => setShowShortcutsModal(true)}
           onOpenShareDialog={() => setShowShareDialog(true)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
