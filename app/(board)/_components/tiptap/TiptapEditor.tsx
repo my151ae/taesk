@@ -197,6 +197,20 @@ export default function TiptapEditor({
         return state.selection.$from.index(0) === 0 && state.selection.$to.index(0) === 0;
     }, []);
 
+    const isSelectionInFirstTextLineState = useCallback((state: EditorState): boolean => {
+        if (state.doc.childCount === 0 || !state.selection.empty) return false;
+        const { $from, $to } = state.selection;
+        if (!$from.parent.isTextblock || !$to.parent.isTextblock) return false;
+
+        // 先頭行判定: doc から現在テキストブロック直前まで、すべて「先頭子」であること。
+        for (let depth = 0; depth < $from.depth; depth += 1) {
+            if ($from.index(depth) !== 0 || $to.index(depth) !== 0) {
+                return false;
+            }
+        }
+        return true;
+    }, []);
+
     const setSelectionAtDocStart = useCallback((state: EditorState, dispatch: (tr: Transaction) => void): void => {
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
@@ -366,7 +380,7 @@ export default function TiptapEditor({
                     return true;
                 }
 
-                if (event.key === 'ArrowUp' && isSelectionInFirstBlockState(state) && view.endOfTextblock('up')) {
+                if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(state) && view.endOfTextblock('up')) {
                     const scrollTop = findScrollableAncestor(view.dom as HTMLElement)?.scrollTop;
                     if (typeof scrollTop === 'number' && scrollTop <= 1 && onRequestFocusTitle) {
                         event.preventDefault();
@@ -384,7 +398,7 @@ export default function TiptapEditor({
                 }
 
                 if (event.key === 'ArrowLeft') {
-                    if (isSelectionInFirstBlockState(state) && view.endOfTextblock('left') && onRequestFocusTitle) {
+                    if (isSelectionInFirstTextLineState(state) && view.endOfTextblock('left') && onRequestFocusTitle) {
                         event.preventDefault();
                         onRequestFocusTitle({ mode: 'end' });
                         return true;

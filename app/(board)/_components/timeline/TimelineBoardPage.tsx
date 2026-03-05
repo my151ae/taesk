@@ -416,18 +416,28 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleViewModeChange = useCallback((mode: "timeline" | "list") => {
     if (mode === viewMode) return;
 
+    const today = todayJstIso();
+    const targetDate =
+      data?.days?.[activeDayIndex]?.isoDate ||
+      listAnchorDate ||
+      resolvedState.date ||
+      today;
+
     if (mode === "timeline") {
-      const today = todayJstIso();
-      const targetDate =
-        listAnchorDate ||
-        data?.days?.[activeDayIndex]?.isoDate ||
-        resolvedState.date ||
-        today;
       const targetOffset = getDayDiff(targetDate, today);
       // Keep fetch start aligned before timeline range refetch happens on mode switch.
       setDayWindowStart(targetOffset);
       dayWindowStartRef.current = targetOffset;
       setActiveDayIndex(0);
+    } else {
+      const anchorOffset = getDayDiff(targetDate, today);
+      const startOffset = anchorOffset - listWindow.before;
+      // Keep list window aligned even if the initial list-side refetch is delayed.
+      setDayWindowStart(startOffset);
+      dayWindowStartRef.current = startOffset;
+      setListAnchorOffset(anchorOffset);
+      setListAnchorDate(targetDate);
+      setActiveDayIndex(Math.max(0, listWindow.before));
     }
 
     handleSetViewMode(mode);
@@ -437,9 +447,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     data?.days,
     activeDayIndex,
     resolvedState.date,
+    listWindow.before,
     setDayWindowStart,
     dayWindowStartRef,
     setActiveDayIndex,
+    setListAnchorOffset,
+    setListAnchorDate,
     handleSetViewMode,
   ]);
 
