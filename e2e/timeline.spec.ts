@@ -1370,6 +1370,314 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('supports horizontal title-body arrow movement on task-list cards', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Arrow LR baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'body line' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1891,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:40:00',
+      due_end: '15:40:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5037,
+      slug: 'arrow-lr-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+
+      await expect(titleInput).toHaveValue('Arrow LR baseline');
+      await expect(firstChecklistLine).toHaveText('body line');
+
+      await titleInput.evaluate((input: HTMLInputElement) => {
+        const pos = input.value.length;
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      });
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.type('Q');
+      await expect(firstChecklistLine).toHaveText('Qbody line');
+
+      await page.evaluate(() => {
+        const editor = document.querySelector('.ProseMirror[data-autofocus="true"]');
+        if (!(editor instanceof HTMLElement)) {
+          throw new Error('Missing autofocus editor');
+        }
+        editor.focus();
+        const textNode = document.querySelector('.ProseMirror > ul[data-type="taskList"] > li:first-child p')?.firstChild;
+        if (!textNode) {
+          throw new Error('Missing first checklist text node');
+        }
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      });
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.type('Y');
+      await expect(titleInput).toHaveValue('Arrow LR baselineY');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('splits title into leading body paragraph on Enter', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'HelloWorld',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'body line' }],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1892,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:50:00',
+      due_end: '15:50:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5038,
+      slug: 'enter-split-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const firstParagraph = modal.locator('.ProseMirror > p').first();
+
+      await titleInput.evaluate((input: HTMLInputElement) => {
+        input.focus();
+        input.setSelectionRange(5, 5);
+      });
+      await page.keyboard.press('Enter');
+
+      await expect(titleInput).toHaveValue('Hello');
+      await expect(firstParagraph).toHaveText('World');
+
+      await page.keyboard.type('Z');
+      await expect(firstParagraph).toHaveText('ZWorld');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('merges first paragraph into title with Delete and Backspace', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const deleteCardId = crypto.randomUUID();
+    const backspaceCardId = crypto.randomUUID();
+    const deleteShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const backspaceShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const paragraphDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Body' }],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: deleteCardId,
+        title: 'DeleteTitle',
+        checklist: { version: 1, lines: [] },
+        content: paragraphDoc,
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1893,
+        tags: [],
+        due_date: isoDay,
+        due_start: '15:00:00',
+        due_end: '16:00:00',
+        due_bucket: null,
+        priority: 'medium',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: deleteShortId,
+        id_short: 5039,
+        slug: 'delete-merge-baseline',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: backspaceCardId,
+        title: 'BackspaceTitle',
+        checklist: { version: 1, lines: [] },
+        content: paragraphDoc,
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1894,
+        tags: [],
+        due_date: isoDay,
+        due_start: '16:00:00',
+        due_end: '17:00:00',
+        due_bucket: null,
+        priority: 'medium',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: backspaceShortId,
+        id_short: 5040,
+        slug: 'backspace-merge-baseline',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${deleteShortId}`);
+      let modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      let titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      let bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      await titleInput.evaluate((input: HTMLInputElement) => {
+        const pos = input.value.length;
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      });
+      await page.keyboard.press('Delete');
+      await expect(titleInput).toHaveValue('DeleteTitleBody');
+      await expect(bodyEditor).toHaveText('');
+
+      await page.goto(`${boardContext.canonicalPath}?card=${backspaceShortId}`);
+      modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstParagraph = modal.locator('.ProseMirror > p').first();
+      await expect(firstParagraph).toHaveText('Body');
+      await page.evaluate(() => {
+        const editor = document.querySelector('.ProseMirror[data-autofocus="true"]');
+        if (!(editor instanceof HTMLElement)) {
+          throw new Error('Missing autofocus editor');
+        }
+        editor.focus();
+        const textNode = document.querySelector('.ProseMirror > p')?.firstChild;
+        if (!textNode) {
+          throw new Error('Missing first paragraph text node');
+        }
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      });
+      await page.keyboard.press('Backspace');
+      await expect(titleInput).toHaveValue('BackspaceTitleBody');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [deleteCardId, backspaceCardId]);
+    }
+  });
+
   test('shows validation error when pasted image exceeds size limit', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

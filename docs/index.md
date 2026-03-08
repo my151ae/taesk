@@ -252,6 +252,7 @@ taesk/
 
 - [Architecture & Design](./detail/architecture.md)
 - [Design & Responsive Guidelines](./detail/design-guidelines.md)
+- [Keyboard Navigation](./detail/keyboard-navigation.md)
 - [Domain Model](./detail/domain-model.md)
 - [Component Breakdown](./detail/components.md)
 - [Database Schema](./detail/database.md)
@@ -286,6 +287,7 @@ taesk/
 ## 🔗 Quick Links
 
 - [docs/detail/architecture.md](./detail/architecture.md)
+- [docs/detail/keyboard-navigation.md](./detail/keyboard-navigation.md)
 - [docs/detail/testing.md](./detail/testing.md)
 - [Supabase Docs](https://supabase.com/docs)
 - [Next.js Docs](https://nextjs.org/docs)
