@@ -123,10 +123,8 @@ export function CardModal({
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
-    const imagePasteHandlerRef = useRef<((files: File[]) => Promise<void>) | null>(null);
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLInputElement | null>(null);
-    const pendingTitleSelectionRef = useRef<number | null>(null);
 
     const {
         historyItems,
@@ -427,10 +425,6 @@ export function CardModal({
         requestCloseRef.current = requestClose;
     }, [requestClose]);
 
-    const handleRegisterImagePasteHandler = useCallback((handler: ((files: File[]) => Promise<void>) | null) => {
-        imagePasteHandlerRef.current = handler;
-    }, []);
-
     const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
         bodyBridgeRef.current = bridge;
     }, []);
@@ -441,44 +435,15 @@ export function CardModal({
         let maxLength = input.value.length;
         let targetPosition = input.value.length;
 
-        if (request.mode === 'merge-first-paragraph') {
-            const mergedTitle = `${title}${request.text}`;
-            setTitle(mergedTitle);
-            setContent(request.content);
-            triggerAutoSave(request.content);
-            maxLength = mergedTitle.length;
-            targetPosition = title.length;
-            pendingTitleSelectionRef.current = targetPosition;
-        }
-
         input.focus();
         if (request.mode === 'column') {
             const nextPos = Math.min(Math.max(request.column ?? maxLength, 0), maxLength);
             input.setSelectionRange(nextPos, nextPos);
             return;
         }
-        if (request.mode === 'merge-first-paragraph') {
-            return;
-        }
         const nextPos = Math.min(Math.max(targetPosition, 0), maxLength);
         input.setSelectionRange(nextPos, nextPos);
-    }, [setContent, setTitle, title, triggerAutoSave]);
-
-    useEffect(() => {
-        const pending = pendingTitleSelectionRef.current;
-        const input = titleInputRef.current;
-        if (pending == null || !input) return;
-        if (document.activeElement !== input) return;
-        const nextPos = Math.min(Math.max(pending, 0), input.value.length);
-        input.setSelectionRange(nextPos, nextPos);
-        pendingTitleSelectionRef.current = null;
-    }, [title]);
-
-    const syncBodyContentAndAutosave = useCallback((nextContent: JSONContent | null) => {
-        if (!nextContent) return;
-        setContent(nextContent);
-        triggerAutoSave(nextContent);
-    }, [setContent, triggerAutoSave]);
+    }, []);
 
     const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
         if (isHistoryPreviewing) return;
@@ -511,37 +476,7 @@ export function CardModal({
             bridge.focusBody(0);
             return;
         }
-
-        if (event.key === "Enter") {
-            event.preventDefault();
-            event.stopPropagation();
-            const left = title.slice(0, caret);
-            const right = title.slice(caret);
-            const nextContent = bridge.insertParagraphAtDocStart(isCaretAtEnd ? '' : right);
-            if (!nextContent) return;
-            setTitle(left);
-            syncBodyContentAndAutosave(nextContent);
-            bridge.focusBody();
-            bridge.setCursorInFirstParagraph(0);
-            return;
-        }
-
-        if (event.key === "Delete") {
-            if (!isCaretAtEnd) return;
-            const firstBlock = bridge.getFirstBlockInfo();
-            if (!firstBlock.isPlainParagraph) return;
-            const nextContent = bridge.removeFirstParagraph();
-            if (!nextContent) return;
-            event.preventDefault();
-            event.stopPropagation();
-            const mergedTitle = `${title}${firstBlock.text}`;
-            setTitle(mergedTitle);
-            syncBodyContentAndAutosave(nextContent);
-            input.focus();
-            const nextPos = mergedTitle.length;
-            input.setSelectionRange(nextPos, nextPos);
-        }
-    }, [isHistoryPreviewing, setTitle, syncBodyContentAndAutosave, title]);
+    }, [isHistoryPreviewing, title]);
 
 
     const handleAddMember = (profileId: string) => {
@@ -849,27 +784,6 @@ export function CardModal({
                                             triggerAutoSave();
                                         }}
                                         onKeyDown={handleTitleKeyDown}
-                                        onPaste={(event) => {
-                                            if (isHistoryPreviewing) return;
-                                            const imageFiles = Array.from(event.clipboardData?.items ?? [])
-                                                .filter((item) => item.kind === "file")
-                                                .map((item) => item.getAsFile())
-                                                .filter((file): file is File => !!file && file.type.startsWith("image/"));
-                                            if (imageFiles.length === 0) {
-                                                return;
-                                            }
-
-                                            event.preventDefault();
-                                            const handler = imagePasteHandlerRef.current;
-                                            if (!handler) {
-                                                setEditorError("エディタの画像貼り付け処理が初期化されていません。");
-                                                return;
-                                            }
-                                            void handler(imageFiles).catch((error) => {
-                                                console.error("[CardModal] image paste via title input failed", error);
-                                                setEditorError("画像の貼り付けに失敗しました。");
-                                            });
-                                        }}
                                         placeholder="タイトルなし"
                                         className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
                                     />
@@ -923,7 +837,6 @@ export function CardModal({
                                                 boardId={card.board_id}
                                                 cardId={card.id}
                                                 onEditorError={setEditorError}
-                                                onRegisterImagePasteHandler={handleRegisterImagePasteHandler}
                                                 onRegisterBodyBridge={handleRegisterBodyBridge}
                                                 onRequestFocusTitle={handleRequestFocusTitle}
                                                 onChange={(val) => {

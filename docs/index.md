@@ -252,7 +252,7 @@ taesk/
 
 - [Architecture & Design](./detail/architecture.md)
 - [Design & Responsive Guidelines](./detail/design-guidelines.md)
-- [Keyboard Navigation](./detail/keyboard-navigation.md)
+- [Keyboard Navigation](./detail/keyboard-navigation.md) - CardModal のタイトル/本文境界は矢印移動のみ
 - [Domain Model](./detail/domain-model.md)
 - [Component Breakdown](./detail/components.md)
 - [Database Schema](./detail/database.md)
@@ -283,6 +283,9 @@ taesk/
 
 6. **JSON-Only Testing Flow**  
    Playwright は常に `--reporter=json` で実行し、`test-results/batches/*.json` をチケットへ添付。HTML レポートは `npx playwright show-report --port=0` で必要時のみ起動し、プロセスを残さない。
+
+7. **CardModal Boundary Is Focus-Only**  
+   CardModal のタイトル入力欄と本文先頭ブロックの境界は、`ArrowDown` / `ArrowRight` / `ArrowUp` / `ArrowLeft` によるフォーカス移動だけを持つ。`Enter` 分割や `Delete` / `Backspace` 結合、タイトルから本文への画像 paste 転送は持たない。
 
 ## 🔗 Quick Links
 

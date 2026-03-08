@@ -18,35 +18,15 @@ import {
     isSupportedCardImageMimeType,
 } from '@/lib/tiptap-images';
 
-export type FirstBlockInfo = {
-    type: string | null;
-    text: string;
-    textLen: number;
-    isPlainParagraph: boolean;
-};
-
 export type FocusTitleRequest = {
     mode: 'end';
 } | {
     mode: 'column';
     column?: number;
-} | {
-    mode: 'merge-first-paragraph';
-    text: string;
-    content: JSONContent;
 };
 
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
-    getFirstBlockInfo: () => FirstBlockInfo;
-    insertParagraphAtDocStart: (text: string) => JSONContent | null;
-    removeFirstParagraph: () => JSONContent | null;
-    setCursorInFirstParagraph: (offset: number) => boolean;
-    isSelectionInFirstBlock: () => boolean;
-    getParentOffset: () => number | null;
-    endOfTextblock: (direction: 'up' | 'down' | 'left' | 'right') => boolean;
-    getScrollTop: () => number | null;
-    scrollByOneLine: (direction: 'up' | 'down') => boolean;
 };
 
 type TiptapEditorProps = {
@@ -57,7 +37,6 @@ type TiptapEditorProps = {
     boardId?: string;
     cardId?: string;
     onEditorError?: (message: string | null) => void;
-    onRegisterImagePasteHandler?: ((handler: ((files: File[]) => Promise<void>) | null) => void);
     onRegisterFocusBodyHandler?: ((handler: (() => void) | null) => void);
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
@@ -122,7 +101,6 @@ export default function TiptapEditor({
     boardId,
     cardId,
     onEditorError,
-    onRegisterImagePasteHandler,
     onRegisterFocusBodyHandler,
     onRegisterBodyBridge,
     onRequestFocusTitle,
@@ -163,38 +141,6 @@ export default function TiptapEditor({
             return fontSize * 1.4;
         }
         return 24;
-    }, []);
-
-    const isPlainTextParagraph = useCallback((node: ProseMirrorNode | null): node is ProseMirrorNode => {
-        if (!node || node.type.name !== 'paragraph') return false;
-        for (let i = 0; i < node.childCount; i += 1) {
-            if (node.child(i).type.name !== 'text') return false;
-        }
-        return true;
-    }, []);
-
-    const getFirstBlockInfo = useCallback((state: EditorState): FirstBlockInfo => {
-        const first = state.doc.firstChild;
-        if (!first) {
-            return {
-                type: null,
-                text: '',
-                textLen: 0,
-                isPlainParagraph: false,
-            };
-        }
-        const text = first.textContent ?? '';
-        return {
-            type: first.type.name,
-            text,
-            textLen: text.length,
-            isPlainParagraph: isPlainTextParagraph(first),
-        };
-    }, [isPlainTextParagraph]);
-
-    const isSelectionInFirstBlockState = useCallback((state: EditorState): boolean => {
-        if (state.doc.childCount === 0) return false;
-        return state.selection.$from.index(0) === 0 && state.selection.$to.index(0) === 0;
     }, []);
 
     const getLeadingTextSelection = useCallback((state: EditorState): TextSelection | null => {
@@ -370,32 +316,11 @@ export default function TiptapEditor({
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handleKeyDown: (view, event) => {
-                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft' && event.key !== 'Backspace') return false;
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft') return false;
                 if (!event.isTrusted || event.isComposing) return false;
 
                 const { state } = view;
                 if (!state.selection.empty) return false;
-
-                if (event.key === 'Backspace') {
-                    const isAtFirstParagraphStart =
-                        isSelectionInFirstBlockState(state)
-                        && state.selection.$from.parentOffset === 0;
-                    const firstInfo = getFirstBlockInfo(state);
-                    if (!isAtFirstParagraphStart || !firstInfo.isPlainParagraph || !onRequestFocusTitle) {
-                        return false;
-                    }
-                    const first = state.doc.firstChild;
-                    if (!first || first.type.name !== 'paragraph') return false;
-                    event.preventDefault();
-                    const tr = state.tr.delete(0, first.nodeSize).scrollIntoView();
-                    view.dispatch(tr);
-                    onRequestFocusTitle({
-                        mode: 'merge-first-paragraph',
-                        text: firstInfo.text,
-                        content: tr.doc.toJSON() as JSONContent,
-                    });
-                    return true;
-                }
 
                 if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(view, state)) {
                     const scrollTop = findScrollableAncestor(view.dom as HTMLElement)?.scrollTop;
@@ -466,20 +391,6 @@ export default function TiptapEditor({
     }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
 
     useEffect(() => {
-        if (!onRegisterImagePasteHandler) return;
-        if (!editor) {
-            onRegisterImagePasteHandler(null);
-            return;
-        }
-
-        onRegisterImagePasteHandler((files: File[]) => uploadAndInsertImages(editor.view, files));
-
-        return () => {
-            onRegisterImagePasteHandler(null);
-        };
-    }, [editor, onRegisterImagePasteHandler, uploadAndInsertImages]);
-
-    useEffect(() => {
         if (!onRegisterFocusBodyHandler) return;
         if (!editor) {
             onRegisterFocusBodyHandler(null);
@@ -504,50 +415,6 @@ export default function TiptapEditor({
 
         onRegisterBodyBridge({
             focusBody: (offset?: number | null) => focusBody(offset),
-            getFirstBlockInfo: () => getFirstBlockInfo(editor.view.state),
-            insertParagraphAtDocStart: (text: string) => {
-                const view = editor.view;
-                const paragraphType = view.state.schema.nodes.paragraph;
-                if (!paragraphType) return null;
-                const content = typeof text === 'string' && text.length > 0
-                    ? [view.state.schema.text(text)]
-                    : undefined;
-                const paragraphNode = paragraphType.create(null, content);
-                const tr = view.state.tr.insert(0, paragraphNode).scrollIntoView();
-                view.dispatch(tr);
-                return tr.doc.toJSON() as JSONContent;
-            },
-            removeFirstParagraph: () => {
-                const view = editor.view;
-                const first = view.state.doc.firstChild;
-                if (!first || first.type.name !== 'paragraph') return null;
-                const tr = view.state.tr.delete(0, first.nodeSize).scrollIntoView();
-                view.dispatch(tr);
-                return tr.doc.toJSON() as JSONContent;
-            },
-            setCursorInFirstParagraph: (offset: number) => {
-                const view = editor.view;
-                return setCursorInLeadingTextblockWithOffset(view.state, view.dispatch, offset);
-            },
-            isSelectionInFirstBlock: () => isSelectionInFirstBlockState(editor.view.state),
-            getParentOffset: () => {
-                const { selection } = editor.view.state;
-                if (!selection.empty) return null;
-                return selection.$from.parentOffset;
-            },
-            endOfTextblock: (direction: 'up' | 'down' | 'left' | 'right') => {
-                const view = editor.view;
-                if (!view.state.selection.empty) return false;
-                return view.endOfTextblock(direction);
-            },
-            getScrollTop: () => {
-                const scrollContainer = findScrollableAncestor(editor.view.dom as HTMLElement);
-                if (!scrollContainer) return null;
-                return scrollContainer.scrollTop;
-            },
-            scrollByOneLine: (direction: 'up' | 'down') => {
-                return scrollByOneLineInView(editor.view, direction);
-            },
         });
 
         return () => {
@@ -557,10 +424,7 @@ export default function TiptapEditor({
         editor,
         findScrollableAncestor,
         focusBody,
-        getFirstBlockInfo,
-        isSelectionInFirstBlockState,
         onRegisterBodyBridge,
-        scrollByOneLineInView,
         setCursorInLeadingTextblockWithOffset,
     ]);
 

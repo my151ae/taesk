@@ -28,7 +28,7 @@
 現在の運用UIは **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
 - Kanban 関連（`KanbanBoardClient` 等）の修正・言及は、明示的な依頼がない限り行わない。
 - 不具合報告が `/b/...` に関する場合、Timeline 側のみを対象に調査・修正する。
-- CardModal のタイトル/本文境界のキーボード操作は `docs/detail/keyboard-navigation.md` を参照すること。
+- CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/detail/keyboard-navigation.md` を参照すること。
 
 ## Build, Test, and Development Commands
 - `npm run dev` は全面禁止。
