@@ -197,10 +197,21 @@ export default function TiptapEditor({
         return state.selection.$from.index(0) === 0 && state.selection.$to.index(0) === 0;
     }, []);
 
-    const isSelectionInFirstTextLineState = useCallback((state: EditorState): boolean => {
+    const getLeadingTextSelection = useCallback((state: EditorState): TextSelection | null => {
+        const leadingSelection = Selection.atStart(state.doc);
+        if (!(leadingSelection instanceof TextSelection)) return null;
+        if (!leadingSelection.$from.parent.isTextblock) return null;
+        return leadingSelection;
+    }, []);
+
+    const isSelectionInFirstTextLineState = useCallback((view: {
+        coordsAtPos: (pos: number) => { top: number };
+    }, state: EditorState): boolean => {
         if (state.doc.childCount === 0 || !state.selection.empty) return false;
         const { $from, $to } = state.selection;
         if (!$from.parent.isTextblock || !$to.parent.isTextblock) return false;
+        const leadingSelection = getLeadingTextSelection(state);
+        if (!leadingSelection) return false;
 
         // 先頭行判定: doc から現在テキストブロック直前まで、すべて「先頭子」であること。
         for (let depth = 0; depth < $from.depth; depth += 1) {
@@ -208,24 +219,30 @@ export default function TiptapEditor({
                 return false;
             }
         }
-        return true;
-    }, []);
+        try {
+            const currentCoords = view.coordsAtPos(state.selection.from);
+            const leadingCoords = view.coordsAtPos(leadingSelection.from);
+            return Math.abs(currentCoords.top - leadingCoords.top) <= 1;
+        } catch {
+            return false;
+        }
+    }, [getLeadingTextSelection]);
 
     const setSelectionAtDocStart = useCallback((state: EditorState, dispatch: (tr: Transaction) => void): void => {
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
     }, []);
 
-    const setCursorInFirstParagraphWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
-        const first = state.doc.firstChild;
-        if (!first || first.type.name !== 'paragraph') return false;
-        const textLength = (first.textContent ?? '').length;
+    const setCursorInLeadingTextblockWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
+        const leadingSelection = getLeadingTextSelection(state);
+        if (!leadingSelection) return false;
+        const textLength = leadingSelection.$from.parent.textContent.length;
         const offset = Math.max(0, Math.min(rawOffset, textLength));
-        const position = 1 + offset;
+        const position = leadingSelection.from + offset;
         const tr = state.tr.setSelection(TextSelection.create(state.doc, position)).scrollIntoView();
         dispatch(tr);
         return true;
-    }, []);
+    }, [getLeadingTextSelection]);
 
     const scrollByOneLineInView = useCallback((view: { dom: Element }, direction: 'up' | 'down'): boolean => {
         const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
@@ -380,9 +397,9 @@ export default function TiptapEditor({
                     return true;
                 }
 
-                if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(state) && view.endOfTextblock('up')) {
+                if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(view, state)) {
                     const scrollTop = findScrollableAncestor(view.dom as HTMLElement)?.scrollTop;
-                    if (typeof scrollTop === 'number' && scrollTop <= 1 && onRequestFocusTitle) {
+                    if ((typeof scrollTop !== 'number' || scrollTop <= 1) && onRequestFocusTitle) {
                         event.preventDefault();
                         onRequestFocusTitle({
                             mode: 'column',
@@ -398,7 +415,7 @@ export default function TiptapEditor({
                 }
 
                 if (event.key === 'ArrowLeft') {
-                    if (isSelectionInFirstTextLineState(state) && view.endOfTextblock('left') && onRequestFocusTitle) {
+                    if (isSelectionInFirstTextLineState(view, state) && view.endOfTextblock('left') && onRequestFocusTitle) {
                         event.preventDefault();
                         onRequestFocusTitle({ mode: 'end' });
                         return true;
@@ -443,10 +460,10 @@ export default function TiptapEditor({
         view.focus();
         const { state, dispatch } = view;
         if (typeof offset === 'number' && Number.isFinite(offset)) {
-            if (setCursorInFirstParagraphWithOffset(state, dispatch, offset)) return;
+            if (setCursorInLeadingTextblockWithOffset(state, dispatch, offset)) return;
         }
         setSelectionAtDocStart(state, dispatch);
-    }, [editor, setCursorInFirstParagraphWithOffset, setSelectionAtDocStart]);
+    }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
 
     useEffect(() => {
         if (!onRegisterImagePasteHandler) return;
@@ -510,7 +527,7 @@ export default function TiptapEditor({
             },
             setCursorInFirstParagraph: (offset: number) => {
                 const view = editor.view;
-                return setCursorInFirstParagraphWithOffset(view.state, view.dispatch, offset);
+                return setCursorInLeadingTextblockWithOffset(view.state, view.dispatch, offset);
             },
             isSelectionInFirstBlock: () => isSelectionInFirstBlockState(editor.view.state),
             getParentOffset: () => {
@@ -544,7 +561,7 @@ export default function TiptapEditor({
         isSelectionInFirstBlockState,
         onRegisterBodyBridge,
         scrollByOneLineInView,
-        setCursorInFirstParagraphWithOffset,
+        setCursorInLeadingTextblockWithOffset,
     ]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {

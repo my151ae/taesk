@@ -171,6 +171,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const hasAppliedInitialListWindowRef = useRef(false);
   const previousViewModeRef = useRef<"timeline" | "list">(viewMode);
+  const pendingTimelineAnchorDateRef = useRef<string | null>(null);
+  const pendingListWindowAutoSyncRef = useRef(false);
+  const pendingListWindowAutoSyncAttemptsRef = useRef(0);
 
   const {
     boardMembers,
@@ -428,13 +431,18 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       // Keep fetch start aligned before timeline range refetch happens on mode switch.
       setDayWindowStart(targetOffset);
       dayWindowStartRef.current = targetOffset;
-      setActiveDayIndex(0);
+      pendingTimelineAnchorDateRef.current = targetDate;
+      pendingListWindowAutoSyncRef.current = false;
+      pendingListWindowAutoSyncAttemptsRef.current = 0;
     } else {
       const anchorOffset = getDayDiff(targetDate, today);
       const startOffset = anchorOffset - listWindow.before;
       // Keep list window aligned even if the initial list-side refetch is delayed.
       setDayWindowStart(startOffset);
       dayWindowStartRef.current = startOffset;
+      pendingTimelineAnchorDateRef.current = null;
+      pendingListWindowAutoSyncRef.current = true;
+      pendingListWindowAutoSyncAttemptsRef.current = 0;
       setListAnchorOffset(anchorOffset);
       setListAnchorDate(targetDate);
       setActiveDayIndex(Math.max(0, listWindow.before));
@@ -535,6 +543,17 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset]);
 
   useEffect(() => {
+    if (viewMode !== "timeline") return;
+
+    const pendingAnchorDate = pendingTimelineAnchorDateRef.current;
+    if (!pendingAnchorDate) return;
+    if (data?.days?.[0]?.isoDate !== pendingAnchorDate) return;
+
+    setActiveDayIndex(0);
+    pendingTimelineAnchorDateRef.current = null;
+  }, [data?.days, setActiveDayIndex, viewMode]);
+
+  useEffect(() => {
     if (viewMode !== "list") {
       previousViewModeRef.current = "timeline";
       return;
@@ -547,14 +566,61 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       return;
     }
 
+    const { range, startOffset, anchorIndex } = getListWindowSpec(listAnchorOffset, listWindow);
+    if (pendingListWindowAutoSyncRef.current) {
+      if (data?.startOffset === startOffset && data?.range === range) {
+        pendingListWindowAutoSyncRef.current = false;
+        pendingListWindowAutoSyncAttemptsRef.current = 0;
+      } else if (status === "loading") {
+        return;
+      } else if (pendingListWindowAutoSyncAttemptsRef.current === 0) {
+        pendingListWindowAutoSyncAttemptsRef.current = 1;
+        return;
+      } else {
+        pendingListWindowAutoSyncRef.current = false;
+        pendingListWindowAutoSyncAttemptsRef.current = 0;
+      }
+    }
+
     // Wait until ongoing fetch settles; otherwise 0mo window fetch can be skipped.
     if (status === "loading") return;
+
+    if (data?.startOffset === startOffset && data?.range === range) {
+      const nextAnchorIndex = Math.min(anchorIndex, Math.max((data.days.length ?? 1) - 1, 0));
+      const anchorDay = data.days[nextAnchorIndex];
+      if (anchorDay) {
+        setListAnchorDate(anchorDay.isoDate);
+        setListAnchorOffset(getDayDiff(anchorDay.isoDate, todayJstIso()));
+        updateUrlForList({
+          before: listWindow.before,
+          after: listWindow.after,
+          date: anchorDay.isoDate,
+          time: null,
+        });
+      }
+      setActiveDayIndex(nextAnchorIndex);
+      hasAppliedInitialListWindowRef.current = true;
+      previousViewModeRef.current = "list";
+      return;
+    }
 
     hasAppliedInitialListWindowRef.current = true;
     void fetchListWindow(listAnchorOffset, listWindow);
 
     previousViewModeRef.current = "list";
-  }, [viewMode, listAnchorOffset, listWindow, fetchListWindow, status]);
+  }, [
+    viewMode,
+    listAnchorOffset,
+    listWindow,
+    fetchListWindow,
+    status,
+    data,
+    getListWindowSpec,
+    setActiveDayIndex,
+    setListAnchorDate,
+    setListAnchorOffset,
+    updateUrlForList,
+  ]);
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};

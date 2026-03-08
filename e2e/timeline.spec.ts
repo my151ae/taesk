@@ -1267,6 +1267,109 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('moves focus between title and first checklist line with arrow keys on task-list cards', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Arrow navigation baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'body line' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1890,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:30:00',
+      due_end: '15:30:00',
+      due_bucket: null,
+      priority: 'medium',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5036,
+      slug: 'arrow-navigation-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+
+      await expect(titleInput).toHaveValue('Arrow navigation baseline');
+      await expect(firstChecklistLine).toBeVisible();
+
+      await titleInput.evaluate((input: HTMLInputElement) => {
+        input.focus();
+        input.setSelectionRange(5, 5);
+      });
+      await page.keyboard.press('ArrowDown');
+
+      await expect.poll(async () => {
+        return page.evaluate(() => {
+          const active = document.activeElement;
+          return active instanceof HTMLElement && active.classList.contains('ProseMirror');
+        });
+      }).toBeTruthy();
+
+      await expect.poll(async () => {
+        return page.evaluate(() => {
+          const selection = window.getSelection();
+          const anchorNode = selection?.anchorNode;
+          const anchorOffset = selection?.anchorOffset ?? -1;
+          const lineText = anchorNode?.textContent ?? anchorNode?.parentElement?.textContent ?? '';
+          return { anchorOffset, lineText };
+        });
+      }).toEqual({ anchorOffset: 5, lineText: 'body line' });
+
+      await page.keyboard.press('ArrowUp');
+      await page.keyboard.type('Z');
+      await expect(titleInput).toHaveValue('ArrowZ navigation baseline');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('shows validation error when pasted image exceeds size limit', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
