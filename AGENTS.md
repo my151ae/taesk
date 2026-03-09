@@ -12,7 +12,7 @@
 # Repository Guidelines
 
 > **最優先ルール（テスト・ログ取得）**
-> - いかなる理由でも `npm run dev` および `NODE_ENV=test npm run dev` を **絶対に実行しない**（Playwright の `webServer.command` 起動のみ例外）。
+> - `npm run dev` / `NODE_ENV=test npm run dev` の起動前には、既存の Next.js 開発サーバーが残っていないか確認すること。意図せず `3001`, `3002` などへ退避起動させない。
 > - すべての検証・テストは `npx playwright test --reporter=json` のように **必ず JSON レポートを出力**して解析すること。
 > - テスト結果やログ確認で停止せずに済むよう、JSON ファイルを生成したうえで内容を確認し、失敗時は詳細を抽出する。
 
@@ -31,10 +31,11 @@
 - CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/detail/keyboard-navigation.md` を参照すること。
 
 ## Build, Test, and Development Commands
-- `npm run dev` は全面禁止。
+- `npm run dev` は使用可能。ただし起動前に既存プロセスを確認し、不要な dev サーバーを残したまま別ポートへ退避起動させないこと。
 - ビルドエラー確認のための `npm run build` は実行可能。
 
 ```bash
+lsof -i :3000
 npm run lint
 npm run build
 npx playwright test --reporter=json > test-results/playwright-report.json
@@ -42,7 +43,8 @@ cat test-results/playwright-report.json | jq '.stats'
 ```
 
 ## Testing Guidelines
-- テスト実行前に `lsof -i :3000` で Next.js dev サーバーが残っていないか確認すること。
+- `npm run dev` や Playwright 実行前に `lsof -i :3000` で Next.js サーバーが残っていないか確認すること。
+- 既存サーバーを使い回さない場合は、先に停止してから起動すること。`3001` 以降への自動退避を許容しない。
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
 
 ## Supabase MCP 接続手順（運用）

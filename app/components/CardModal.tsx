@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
-import type { Card, Board, Priority, ProfileSummary, DueBucket } from "@/lib/supabase";
+import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -82,7 +82,6 @@ export function CardModal({
         duration,
         setDuration,
         priority,
-        setPriority,
         checked,
         setChecked,
         assigneeIds,
@@ -515,6 +514,11 @@ export function CardModal({
         triggerAutoSave();
     };
 
+    const handleCopyLink = useCallback(() => {
+        if (!card.short_id || typeof window === "undefined") return;
+        navigator.clipboard.writeText(`${window.location.origin}/c/${card.short_id}`);
+    }, [card.short_id]);
+
     const handleTimeToggle = useCallback((isTimeEnabled: boolean) => {
         if (!isTimeEnabled) {
             setDueStart('');
@@ -566,12 +570,6 @@ export function CardModal({
 
         triggerAutoSave();
     }, [isHistoryPreviewing, dueStart, triggerAutoSave]);
-
-    const handlePriorityChange = useCallback((value: Priority) => {
-        if (isHistoryPreviewing) return;
-        setPriority(value);
-        triggerAutoSave();
-    }, [isHistoryPreviewing, triggerAutoSave]);
 
     const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
@@ -695,6 +693,8 @@ export function CardModal({
                     dueStart={dueStart}
                     dueEnd={dueEnd}
                     dueBucket={dueBucket}
+                    boards={boards}
+                    targetBoardId={targetBoardId}
                     bucketOptions={BUCKET_OPTIONS}
                     defaultBucket={DEFAULT_BUCKET}
                     selectedAssignees={selectedAssignees}
@@ -719,9 +719,24 @@ export function CardModal({
                     onStartReminderMinutesChange={handleStartReminderMinutesChange}
                     onEndReminderEnabledChange={handleEndReminderEnabledChange}
                     onEndReminderMinutesChange={handleEndReminderMinutesChange}
+                    onTargetBoardChange={handleTargetBoardChange}
                     duration={duration}
                     onDurationChange={handleDurationChange}
                     onBucketChange={handleBucketChange}
+                    tags={tags}
+                    tagInput={tagInput}
+                    onTagInputChange={setTagInput}
+                    onTagInputKeyDown={handleAddTag}
+                    onRemoveTag={handleRemoveTag}
+                    cardShortId={card.short_id ?? null}
+                    onCopyLink={handleCopyLink}
+                    googleSync={{
+                        cardId: card.id,
+                        connected: googleConnected,
+                        canWrite: googleCanWrite,
+                        status: syncStatus,
+                        onStatusChange: setSyncStatus,
+                    }}
                     onRequestClose={requestClose}
                     showSidebar={showSidebar}
                     onToggleSidebar={() => setShowSidebar((prev) => !prev)}
@@ -871,17 +886,6 @@ export function CardModal({
                             />
                         <CardModalSidebar
                             sidebarWidth={sidebarWidth}
-                            tagInput={tagInput}
-                            tags={tags}
-                            onTagInputChange={setTagInput}
-                            onTagInputKeyDown={handleAddTag}
-                            onRemoveTag={handleRemoveTag}
-                            priority={priority}
-                            onPriorityChange={handlePriorityChange}
-                            boards={boards}
-                            targetBoardId={targetBoardId}
-                            onTargetBoardChange={handleTargetBoardChange}
-                            cardShortId={card.short_id ?? null}
                             cardId={card.id}
                             boardId={card.board_id}
                             profiles={profiles}
@@ -897,13 +901,6 @@ export function CardModal({
                             historyError={historyError}
                             selectedHistoryId={selectedHistoryId}
                             onSelectHistory={handleSelectHistory}
-                            googleSync={{
-                                cardId: card.id,
-                                connected: googleConnected,
-                                canWrite: googleCanWrite,
-                                status: syncStatus,
-                                onStatusChange: setSyncStatus,
-                            }}
                         />
                         </>
                     )}

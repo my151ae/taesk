@@ -184,7 +184,7 @@ async function loadBoard(page: Page, board: TestBoardContext): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   // Wait for board to be ready - use timeline grid as reliable indicator
-  await page.locator('[data-testid="timeline-grid"]').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('[data-testid="timeline-grid"]').first().waitFor({ state: 'visible', timeout: 10000 });
 
   // Ensure network is settled
   await page.waitForLoadState('networkidle');
@@ -257,9 +257,10 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
     await page.waitForLoadState('domcontentloaded');
     await page.waitForURL(`**card=${card.shortId}**`, { timeout: 10000 });
   } else {
-    const openButton = page.getByTestId(`cardOpenButton-${card.id}`).first();
-    await openButton.waitFor({ state: 'visible', timeout: 10000 });
-    await openButton.click();
+    const cardElement = page.locator(`[data-card-id="${card.id}"]`).first();
+    await cardElement.waitFor({ state: 'visible', timeout: 10000 });
+    await cardElement.focus();
+    await page.keyboard.press('Enter');
   }
 
   // Wait for modal to open with extended timeout.
@@ -273,9 +274,10 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
       await page.waitForLoadState('domcontentloaded');
       await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
     } else {
-      const fallbackOpenButton = page.getByTestId(`cardOpenButton-${card.id}`).first();
-      await fallbackOpenButton.waitFor({ state: 'visible', timeout: 15000 });
-      await fallbackOpenButton.click();
+      const fallbackCardElement = page.locator(`[data-card-id="${card.id}"]`).first();
+      await fallbackCardElement.waitFor({ state: 'visible', timeout: 15000 });
+      await fallbackCardElement.focus();
+      await page.keyboard.press('Enter');
       await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
     }
   }
@@ -311,6 +313,23 @@ async function waitForMentionOptions(page: Page, filterText?: string) {
   }
 }
 
+async function installClipboardMock(page: Page) {
+  await page.evaluate(() => {
+    (window as Window & { __copiedText?: string | null }).__copiedText = null;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          (window as Window & { __copiedText?: string | null }).__copiedText = text;
+          return Promise.resolve();
+        },
+        readText: () =>
+          Promise.resolve((window as Window & { __copiedText?: string | null }).__copiedText ?? ''),
+      },
+    });
+  });
+}
+
 test.describe('Comments Feature @feature:comments', () => {
   let board: TestBoardContext | null = null;
   let card: TestCardContext | null = null;
@@ -342,6 +361,50 @@ test.describe('Comments Feature @feature:comments', () => {
     // TipTap editor uses .ProseMirror contenteditable div, not textarea
     const commentEditor = page.locator('[data-testid="comments-panel"] .ProseMirror').first();
     await expect(commentEditor).toBeVisible();
+  });
+
+  test('should edit tags from header actions and hide priority control in modal', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openCardModalViaQuery(page, currentCard);
+
+    const modal = page.getByRole('dialog');
+    await expect(modal.getByText('Priority', { exact: true })).toHaveCount(0);
+
+    const tagsButton = modal.getByTestId('card-modal-tags-button');
+    await expect(tagsButton).toBeVisible();
+  });
+
+  test('should move card modal actions into overflow menu on narrow width', async ({ page }) => {
+    const currentCard = assertContext(card, 'Card context not initialised');
+
+    await page.setViewportSize({ width: 820, height: 900 });
+    await openCardModalViaQuery(page, currentCard);
+    await installClipboardMock(page);
+
+    const modal = page.getByRole('dialog');
+    const overflowButton = modal.getByTestId('card-modal-overflow-button');
+    await expect(overflowButton).toBeVisible();
+    await overflowButton.evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
+
+    const overflowMenu = modal.getByTestId('card-modal-overflow-menu');
+    await expect(overflowMenu).toBeVisible();
+    await expect(overflowMenu.getByPlaceholder('+ Add tag...')).toBeVisible();
+    await expect(overflowMenu.getByText('Google Calendar', { exact: true })).toBeVisible();
+
+    const copyLinkButton = overflowMenu.getByTestId('card-modal-copy-link-overflow');
+    await expect(copyLinkButton).toBeVisible();
+    await copyLinkButton.evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
+
+    const copiedText = await page.evaluate(() => {
+      return (window as Window & { __copiedText?: string | null }).__copiedText ?? null;
+    });
+    expect(copiedText).toBe(`http://localhost:3000/c/${currentCard.shortId}`);
   });
 
   test('should preserve card modal state on reload with ?card= query', async ({ page }) => {
