@@ -123,14 +123,17 @@ export function useTimelineBoardShell({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updates),
         });
-        if (!response.ok) throw new Error("Failed to update board");
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+          throw new Error(body?.error?.message || "Failed to update board");
+        }
         const { board: updatedBoard } = (await response.json()) as { board: Board };
         setAvailableBoards((prev) =>
           prev.map((b) => (b.id === updatedBoard.id ? updatedBoard : b))
         );
       } catch (error) {
         console.error("[timeline-shell] failed to update board", error);
-        alert("Failed to update board");
+        alert(error instanceof Error ? error.message : "Failed to update board");
       }
     },
     [currentBoardId]

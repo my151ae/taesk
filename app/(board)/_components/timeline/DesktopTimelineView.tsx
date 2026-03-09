@@ -36,8 +36,6 @@ import {
 } from "@/app/(board)/_stores/timeline-zoom-store";
 
 const ALL_DAY_ROW_HEIGHT = 36;
-const DAY_SECTION_MIN_WIDTH_PX = 320;
-const OVERDUE_MIN_WIDTH_PX = DAY_SECTION_MIN_WIDTH_PX / 2;
 
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
@@ -139,8 +137,7 @@ export function DesktopTimelineView({
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
-  const desktopGridTemplateColumns = `minmax(${OVERDUE_MIN_WIDTH_PX}px, 0.5fr) repeat(${visibleDays.length}, minmax(${DAY_SECTION_MIN_WIDTH_PX}px, 1fr))`;
-  const desktopGridMinWidth = `${OVERDUE_MIN_WIDTH_PX + visibleDays.length * DAY_SECTION_MIN_WIDTH_PX}px`;
+  const desktopGridTemplateColumns = `minmax(0, 0.5fr) repeat(${visibleDays.length}, minmax(0, 1fr))`;
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
 
@@ -379,14 +376,13 @@ export function DesktopTimelineView({
       }}
     >
       <div
-        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-x-auto overflow-y-hidden bg-white shadow-sm ring-1 ring-black/5"
+        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-x-hidden overflow-y-hidden bg-white shadow-sm ring-1 ring-black/5"
       >
         <div ref={timelineHeaderRef} className="z-30">
           <div
             className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
             style={{
               gridTemplateColumns: desktopGridTemplateColumns,
-              minWidth: desktopGridMinWidth,
             }}
           >
             <div className="flex items-center justify-center px-4 py-3 text-center text-slate-800">
@@ -456,7 +452,6 @@ export function DesktopTimelineView({
               className="grid border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
               style={{
                 gridTemplateColumns: desktopGridTemplateColumns,
-                minWidth: desktopGridMinWidth,
               }}
             >
               <div
@@ -525,7 +520,6 @@ export function DesktopTimelineView({
               data-testid="timeline-grid"
               style={{
                 gridTemplateColumns: desktopGridTemplateColumns,
-                minWidth: desktopGridMinWidth,
               }}
             >
               <aside className="border-r border-slate-100 bg-amber-50/40">

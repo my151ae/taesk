@@ -78,6 +78,11 @@ const addDaysToIsoDate = (baseIsoDate: string, delta: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+const canPersistBoardPreferences = (board: Board) => {
+  if (!board.membership_role) return true;
+  return board.membership_role === "owner" || board.membership_role === "editor";
+};
+
 export default function TimelineBoardPage({ initialBoard }: TimelineBoardPageProps) {
   const router = useRouter();
   const { user, signOut } = useAuth();
@@ -411,8 +416,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     if (viewMode !== "timeline") return;
     handleDayRangeChange(newRange);
     setTimelineRange(newRange);
-    handleUpdateBoard({ day_range: newRange });
-  }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange]);
+    if (canPersistBoardPreferences(currentBoard)) {
+      void handleUpdateBoard({ day_range: newRange });
+    }
+  }, [viewMode, handleDayRangeChange, handleUpdateBoard, setTimelineRange, currentBoard]);
 
   const handleViewModeChange = useCallback((mode: "timeline" | "list") => {
     if (mode === viewMode) return;
