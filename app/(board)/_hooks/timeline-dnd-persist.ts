@@ -5,6 +5,7 @@ import {
   TimelineBucketItem,
   TimelineOverdueItem,
   TimelineResponse,
+  getIsoDateJst,
   getMinutesFromTime,
   toLocalDay,
 } from '@/app/(board)/_utils/timeline-helpers';
@@ -71,6 +72,79 @@ export function createPersistPlacement({
       const baseOverdueItem = removedOverdueItem ?? meta.sourceOverdueItem ?? null;
 
       const payloadDueDate = (payload.due_date as string | null) ?? null;
+      const nextChecked =
+        typeof payload.checked === 'boolean'
+          ? payload.checked
+          : (baseEvent?.checked ?? baseBucketItem?.checked ?? baseOverdueItem?.checked ?? false);
+      const upsertOverdueShortcut = (args: {
+        dueDate: string | null;
+        dueStart: string | null;
+        dueEnd: string | null;
+        dueBucket: DueBucket | null;
+        dueBucketPosition: number | null;
+      }) => {
+        const todayIso = getIsoDateJst(new Date().toISOString());
+        const isOverdue = Boolean(args.dueDate && args.dueDate < todayIso && !nextChecked);
+        if (!isOverdue) return;
+
+        nextOverdue.push({
+          card_id: cardId,
+          title: baseOverdueItem?.title ?? baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
+          content: baseOverdueItem?.content ?? baseEvent?.content ?? baseBucketItem?.content ?? null,
+          excerpt: baseOverdueItem?.excerpt ?? baseEvent?.excerpt ?? baseBucketItem?.excerpt ?? null,
+          due_date: args.dueDate,
+          due_start: args.dueStart,
+          due_end: args.dueEnd,
+          start_reminder_enabled:
+            baseOverdueItem?.start_reminder_enabled ??
+            baseEvent?.start_reminder_enabled ??
+            baseBucketItem?.start_reminder_enabled ??
+            false,
+          start_reminder_minutes:
+            baseOverdueItem?.start_reminder_minutes ??
+            baseEvent?.start_reminder_minutes ??
+            baseBucketItem?.start_reminder_minutes ??
+            0,
+          end_reminder_enabled:
+            baseOverdueItem?.end_reminder_enabled ??
+            baseEvent?.end_reminder_enabled ??
+            baseBucketItem?.end_reminder_enabled ??
+            false,
+          end_reminder_minutes:
+            baseOverdueItem?.end_reminder_minutes ??
+            baseEvent?.end_reminder_minutes ??
+            baseBucketItem?.end_reminder_minutes ??
+            0,
+          checked: nextChecked,
+          checklist: baseOverdueItem?.checklist ?? baseEvent?.checklist ?? baseBucketItem?.checklist ?? null,
+          tags: baseOverdueItem?.tags ?? baseEvent?.tags ?? baseBucketItem?.tags ?? [],
+          assignee_id: baseOverdueItem?.assignee_id ?? baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
+          assignee_ids:
+            baseOverdueItem?.assignee_ids ?? baseEvent?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
+          assigned_to:
+            baseOverdueItem?.assigned_to ?? baseEvent?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
+          duration:
+            baseOverdueItem?.duration ??
+            baseBucketItem?.duration ??
+            baseEvent?.duration ??
+            baseEvent?.durationMinutes ??
+            meta.defaultDuration ??
+            60,
+          due_bucket: args.dueBucket,
+          due_bucket_position: args.dueBucketPosition,
+          started_at: baseOverdueItem?.started_at ?? baseEvent?.started_at ?? baseBucketItem?.started_at ?? null,
+          short_id: baseOverdueItem?.short_id ?? baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
+          slug: baseOverdueItem?.slug ?? baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+        });
+        nextOverdue.sort((a, b) => {
+          const dateCompare = (a.due_date ?? '').localeCompare(b.due_date ?? '');
+          if (dateCompare !== 0) return dateCompare;
+          const aPos = a.due_bucket_position ?? 0;
+          const bPos = b.due_bucket_position ?? 0;
+          if (aPos !== bPos) return bPos - aPos;
+          return (a.title ?? '').localeCompare(b.title ?? '');
+        });
+      };
 
       if (meta.target === 'timeline') {
         const nextStart =
@@ -100,15 +174,27 @@ export function createPersistPlacement({
               baseEvent?.duration ??
               baseOverdueItem?.duration ??
               baseBucketItem?.duration ??
-              meta.defaultDuration ??
-              60;
+          meta.defaultDuration ??
+          60;
+        const nextDueBucket =
+          (payload.due_bucket as DueBucket | null) ??
+          baseEvent?.due_bucket ??
+          baseOverdueItem?.due_bucket ??
+          baseBucketItem?.due_bucket ??
+          null;
+        const nextDueBucketPosition =
+          (payload.due_bucket_position as number | null) ??
+          baseEvent?.due_bucket_position ??
+          baseOverdueItem?.due_bucket_position ??
+          baseBucketItem?.bucketPosition ??
+          null;
 
         const replacement: TimelineEvent = {
           card_id: cardId,
           due_date: nextDate ?? '',
           due_start: nextStart,
           due_end: nextEnd,
-          due_bucket: (payload.due_bucket as DueBucket | null) ?? baseEvent?.due_bucket ?? baseOverdueItem?.due_bucket ?? null,
+          due_bucket: nextDueBucket,
           durationMinutes,
           title: baseEvent?.title ?? baseOverdueItem?.title ?? baseBucketItem?.title ?? 'Untitled card',
           content: baseEvent?.content ?? baseOverdueItem?.content ?? baseBucketItem?.content ?? null,
@@ -133,6 +219,13 @@ export function createPersistPlacement({
           }
           return (a.due_date ?? '').localeCompare(b.due_date ?? '');
         });
+        upsertOverdueShortcut({
+          dueDate: nextDate,
+          dueStart: nextStart,
+          dueEnd: nextEnd,
+          dueBucket: nextDueBucket,
+          dueBucketPosition: nextDueBucketPosition,
+        });
 
         return { ...current, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
       }
@@ -144,12 +237,16 @@ export function createPersistPlacement({
 
         const bucketItems = nextBuckets[meta.bucketKey];
         const bucketPosition = (payload.due_bucket_position as number | null) ?? Date.now();
+        const nextDueDate =
+          meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? baseOverdueItem?.due_date ?? null;
+        const nextDueBucket =
+          (payload.due_bucket as DueBucket | null) ?? baseBucketItem?.due_bucket ?? baseOverdueItem?.due_bucket ?? null;
         const nextBucketItem: TimelineBucketItem = {
           card_id: cardId,
           title: baseBucketItem?.title ?? baseOverdueItem?.title ?? baseEvent?.title ?? 'Untitled card',
           content: baseBucketItem?.content ?? baseOverdueItem?.content ?? baseEvent?.content ?? null,
           excerpt: baseBucketItem?.excerpt ?? baseOverdueItem?.excerpt ?? baseEvent?.excerpt ?? null,
-          due_date: meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? baseOverdueItem?.due_date ?? null,
+          due_date: nextDueDate,
           due_start: (payload.due_start as string | null) ?? null,
           due_end: (payload.due_end as string | null) ?? null,
           checked: baseBucketItem?.checked ?? baseOverdueItem?.checked ?? baseEvent?.checked ?? false,
@@ -158,7 +255,7 @@ export function createPersistPlacement({
           assignee_id: baseBucketItem?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
           assignee_ids: baseBucketItem?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
           assigned_to: baseBucketItem?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
-          due_bucket: (payload.due_bucket as DueBucket | null) ?? baseBucketItem?.due_bucket ?? baseOverdueItem?.due_bucket ?? null,
+          due_bucket: nextDueBucket,
           started_at: baseBucketItem?.started_at ?? baseOverdueItem?.started_at ?? baseEvent?.started_at ?? null,
           short_id: baseBucketItem?.short_id ?? baseOverdueItem?.short_id ?? baseEvent?.short_id ?? null,
           slug: baseBucketItem?.slug ?? baseOverdueItem?.slug ?? baseEvent?.slug ?? null,
@@ -174,6 +271,13 @@ export function createPersistPlacement({
 
         bucketItems.unshift(nextBucketItem);
         bucketItems.sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
+        upsertOverdueShortcut({
+          dueDate: nextDueDate,
+          dueStart: nextBucketItem.due_start,
+          dueEnd: nextBucketItem.due_end,
+          dueBucket: nextDueBucket,
+          dueBucketPosition: bucketPosition,
+        });
         return { ...current, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
       }
 

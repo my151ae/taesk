@@ -179,6 +179,76 @@ const getHandler = async (
     const dateOnly = toJstDate(card.due_date);
     const isOverdue = Boolean(dateOnly && dateOnly < todayIso && !card.checked);
 
+    const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
+    const hasTime = card.due_start && card.due_end;
+
+    if (dayKey) {
+      if (hasTime) {
+        const start = toMinutes(card.due_start);
+        const end = toMinutes(card.due_end);
+        events.push({
+          card_id: card.id,
+          due_date: dateOnly!,
+          due_start: card.due_start,
+          due_end: card.due_end,
+          start_reminder_enabled: card.start_reminder_enabled ?? false,
+          start_reminder_minutes: card.start_reminder_minutes ?? 0,
+          end_reminder_enabled: card.end_reminder_enabled ?? false,
+          end_reminder_minutes: card.end_reminder_minutes ?? 0,
+          durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
+          title: card.title,
+          content: card.content ?? null,
+          excerpt: card.excerpt ?? null,
+          tags: card.tags ?? [],
+          checked: card.checked,
+          checklist,
+          due_bucket: card.due_bucket ?? null,
+          due_bucket_position: card.due_bucket_position ?? null,
+          assignee_id: card.assignee_id,
+          assignee_ids: card.assignee_ids ?? null,
+          assigned_to: card.assigned_to,
+          duration: card.duration ?? 60,
+          started_at: card.started_at,
+          short_id: card.short_id,
+          slug: card.slug,
+        });
+      } else {
+        // A/B List
+        // Default to 'b' if no bucket specified but has date
+        const bucket = card.due_bucket || 'b';
+        const key = `${dayKey}_${bucket}`;
+
+        if (!abBuckets[key]) {
+          abBuckets[key] = [];
+        }
+        abBuckets[key].push({
+          card_id: card.id,
+          title: card.title,
+          content: card.content ?? null,
+          excerpt: card.excerpt ?? null,
+          due_date: dateOnly,
+          due_start: card.due_start,
+          due_end: card.due_end,
+          start_reminder_enabled: card.start_reminder_enabled ?? false,
+          start_reminder_minutes: card.start_reminder_minutes ?? 0,
+          end_reminder_enabled: card.end_reminder_enabled ?? false,
+          end_reminder_minutes: card.end_reminder_minutes ?? 0,
+          checked: card.checked,
+          checklist,
+          tags: card.tags ?? [],
+          assignee_id: card.assignee_id,
+          assignee_ids: card.assignee_ids ?? null,
+          assigned_to: card.assigned_to,
+          duration: card.duration ?? 60,
+          due_bucket: card.due_bucket ?? bucket,
+          started_at: card.started_at,
+          short_id: card.short_id,
+          slug: card.slug,
+          bucketPosition: card.due_bucket_position ?? null,
+        });
+      }
+    }
+
     if (isOverdue) {
       overdue.push({
         card_id: card.id,
@@ -204,78 +274,6 @@ const getHandler = async (
         started_at: card.started_at,
         short_id: card.short_id,
         slug: card.slug,
-      });
-      return;
-    }
-
-    const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
-
-    if (!dayKey) return; // Skip cards outside the visible range
-
-    const hasTime = card.due_start && card.due_end;
-
-    if (hasTime) {
-      const start = toMinutes(card.due_start);
-      const end = toMinutes(card.due_end);
-      events.push({
-        card_id: card.id,
-        due_date: dateOnly!,
-        due_start: card.due_start,
-        due_end: card.due_end,
-        start_reminder_enabled: card.start_reminder_enabled ?? false,
-        start_reminder_minutes: card.start_reminder_minutes ?? 0,
-        end_reminder_enabled: card.end_reminder_enabled ?? false,
-        end_reminder_minutes: card.end_reminder_minutes ?? 0,
-        durationMinutes: start != null && end != null ? Math.max(end - start, 0) : null,
-        title: card.title,
-        content: card.content ?? null,
-        excerpt: card.excerpt ?? null,
-        tags: card.tags ?? [],
-        checked: card.checked,
-        checklist,
-        due_bucket: card.due_bucket ?? null,
-        due_bucket_position: card.due_bucket_position ?? null,
-        assignee_id: card.assignee_id,
-        assignee_ids: card.assignee_ids ?? null,
-        assigned_to: card.assigned_to,
-        duration: card.duration ?? 60,
-        started_at: card.started_at,
-        short_id: card.short_id,
-        slug: card.slug,
-      });
-    } else {
-      // A/B List
-      // Default to 'b' if no bucket specified but has date
-      const bucket = card.due_bucket || 'b';
-      const key = `${dayKey}_${bucket}`;
-
-      if (!abBuckets[key]) {
-        abBuckets[key] = [];
-      }
-      abBuckets[key].push({
-        card_id: card.id,
-        title: card.title,
-        content: card.content ?? null,
-        excerpt: card.excerpt ?? null,
-        due_date: dateOnly,
-        due_start: card.due_start,
-        due_end: card.due_end,
-        start_reminder_enabled: card.start_reminder_enabled ?? false,
-        start_reminder_minutes: card.start_reminder_minutes ?? 0,
-        end_reminder_enabled: card.end_reminder_enabled ?? false,
-        end_reminder_minutes: card.end_reminder_minutes ?? 0,
-        checked: card.checked,
-        checklist,
-        tags: card.tags ?? [],
-        assignee_id: card.assignee_id,
-        assignee_ids: card.assignee_ids ?? null,
-        assigned_to: card.assigned_to,
-        duration: card.duration ?? 60,
-        due_bucket: card.due_bucket ?? bucket,
-        started_at: card.started_at,
-        short_id: card.short_id,
-        slug: card.slug,
-        bucketPosition: card.due_bucket_position ?? null,
       });
     }
   });

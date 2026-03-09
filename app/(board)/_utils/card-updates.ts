@@ -57,46 +57,6 @@ export function applyCardUpdate(
     const todayIso = getIsoDateJst(new Date().toISOString());
     const isOverdue = Boolean(localDay && localDay < todayIso && !card.checked);
 
-    if (isOverdue) {
-        const overdueItem: TimelineOverdueItem = {
-            card_id: card.id,
-            title: card.title,
-            content: card.content ?? null,
-            excerpt: card.excerpt ?? null,
-            due_date: localDay,
-            due_start: card.due_start,
-            due_end: card.due_end,
-            start_reminder_enabled: card.start_reminder_enabled,
-            start_reminder_minutes: card.start_reminder_minutes,
-            end_reminder_enabled: card.end_reminder_enabled,
-            end_reminder_minutes: card.end_reminder_minutes,
-            checked: card.checked,
-            checklist,
-            tags: card.tags ?? [],
-            assignee_id: card.assignee_id,
-            assignee_ids: card.assignee_ids ?? null,
-            assigned_to: card.assigned_to,
-            duration: card.duration ?? null,
-            due_bucket: card.due_bucket ?? null,
-            due_bucket_position: card.due_bucket_position ?? null,
-            started_at: card.started_at ?? null,
-            short_id: card.short_id,
-            slug: card.slug,
-        };
-
-        nextOverdue.push(overdueItem);
-        nextOverdue.sort((a, b) => {
-            const dateCompare = (a.due_date ?? "").localeCompare(b.due_date ?? "");
-            if (dateCompare !== 0) return dateCompare;
-            const aPos = a.due_bucket_position ?? 0;
-            const bPos = b.due_bucket_position ?? 0;
-            if (aPos !== bPos) return bPos - aPos;
-            return (a.title ?? "").localeCompare(b.title ?? "");
-        });
-
-        return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
-    }
-
     // 2. Add new instance for INSERT/UPDATE
     // Keep the same logic as `app/api/boards/[boardId]/timeline/route.ts`:
     // - due_date + (due_start && due_end) => timeline event
@@ -159,13 +119,49 @@ export function applyCardUpdate(
         }
 
         const bucketKey = resolveBucketKey(prev.days, localDay, bucket);
-        if (!bucketKey) {
-            return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
+        if (bucketKey) {
+            if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
+
+            const newItem: TimelineBucketItem = {
+                card_id: card.id,
+                title: card.title,
+                content: card.content ?? null,
+                excerpt: card.excerpt ?? null,
+                due_date: localDay,
+                due_start: card.due_start,
+                due_end: card.due_end,
+                start_reminder_enabled: card.start_reminder_enabled,
+                start_reminder_minutes: card.start_reminder_minutes,
+                end_reminder_enabled: card.end_reminder_enabled,
+                end_reminder_minutes: card.end_reminder_minutes,
+                checked: card.checked,
+                checklist,
+                tags: card.tags ?? [],
+                assignee_id: card.assignee_id,
+                assignee_ids: card.assignee_ids ?? null,
+                assigned_to: card.assigned_to,
+                duration: card.duration ?? null,
+                due_bucket: card.due_bucket ?? bucket,
+                started_at: card.started_at ?? null,
+                short_id: card.short_id,
+                slug: card.slug,
+                bucketPosition: card.due_bucket_position,
+            };
+
+            nextBuckets[bucketKey].push(newItem);
+
+            // Sort bucket items (position desc, then title for stability)
+            nextBuckets[bucketKey].sort((a, b) => {
+                const aPos = a.bucketPosition ?? 0;
+                const bPos = b.bucketPosition ?? 0;
+                if (aPos !== bPos) return bPos - aPos;
+                return (a.title ?? "").localeCompare(b.title ?? "");
+            });
         }
+    }
 
-        if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
-
-        const newItem: TimelineBucketItem = {
+    if (isOverdue) {
+        const overdueItem: TimelineOverdueItem = {
             card_id: card.id,
             title: card.title,
             content: card.content ?? null,
@@ -184,19 +180,19 @@ export function applyCardUpdate(
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
             duration: card.duration ?? null,
-            due_bucket: card.due_bucket ?? bucket,
+            due_bucket: card.due_bucket ?? null,
+            due_bucket_position: card.due_bucket_position ?? null,
             started_at: card.started_at ?? null,
             short_id: card.short_id,
             slug: card.slug,
-            bucketPosition: card.due_bucket_position,
         };
 
-        nextBuckets[bucketKey].push(newItem);
-
-        // Sort bucket items (position desc, then title for stability)
-        nextBuckets[bucketKey].sort((a, b) => {
-            const aPos = a.bucketPosition ?? 0;
-            const bPos = b.bucketPosition ?? 0;
+        nextOverdue.push(overdueItem);
+        nextOverdue.sort((a, b) => {
+            const dateCompare = (a.due_date ?? "").localeCompare(b.due_date ?? "");
+            if (dateCompare !== 0) return dateCompare;
+            const aPos = a.due_bucket_position ?? 0;
+            const bPos = b.due_bucket_position ?? 0;
             if (aPos !== bPos) return bPos - aPos;
             return (a.title ?? "").localeCompare(b.title ?? "");
         });
