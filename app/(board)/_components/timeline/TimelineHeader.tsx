@@ -538,6 +538,17 @@ export default function TimelineHeader({
                                 >
                                     Profile Settings
                                 </button>
+                                {onOpenShareDialog && (
+                                    <button
+                                        onClick={() => {
+                                            onOpenShareDialog();
+                                            setShowMobileActions(false);
+                                        }}
+                                        className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        Share & Members
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => {
                                         setShowNotificationSettings(true);
@@ -783,6 +794,17 @@ export default function TimelineHeader({
                                 >
                                     <span>👤</span> Profile Settings
                                 </button>
+                                {onOpenShareDialog && (
+                                    <button
+                                        onClick={() => {
+                                            onOpenShareDialog();
+                                            setShowProfileMenu(false);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        <span>👥</span> Share & Members
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => {
                                         setShowNotificationSettings(true);

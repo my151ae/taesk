@@ -111,6 +111,7 @@ CREATE TABLE public.cards (
   due_bucket TEXT NULL
     CHECK (due_bucket IS NULL OR due_bucket IN ('a', 'b')),
   due_bucket_position DOUBLE PRECISION NULL,
+  started_at TIMESTAMPTZ NULL,
   checked BOOLEAN NOT NULL DEFAULT FALSE,
   checklist JSONB NOT NULL DEFAULT jsonb_build_object('version', 1, 'lines', '[]'::jsonb),
   content JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -133,8 +134,10 @@ CREATE INDEX idx_cards_due_bucket_position ON public.cards(due_bucket, due_bucke
 
 - `due_date` があり `due_start`/`due_end` が両方ある場合は Timeline イベントとして表示。  
 - `due_date` があり `due_start`/`due_end` が未設定の場合は A/B に入り、`due_bucket` と `due_bucket_position` で並ぶ。  
+- `due_date` が過去日で `checked = false` のカードは Overdue 投影へ回し、visible range 内でも `events` / `abBuckets` より優先して扱う。  
 - `due_bucket` が未指定の場合は UI 側で `b` をフォールバックとして扱う。  
 - `due_bucket_position` は降順で並ぶ floating number。DnD 時に `Date.now()` を使いユニーク値を割り当てる。
+- `started_at` は Overdue から外れた最初の時刻を保持し、自動ではクリアしない。
 - `checked` は Timeline の完了チェックボックスや A/B カードにもそのまま反映される。
 
 ## comments
@@ -192,7 +195,8 @@ CREATE TABLE public.activity_logs (
   1. Supabase SSR クライアントで `auth.getUser()` → 認可
   2. `board_members` をチェック（owner/editor/commenter/viewer 全員許可）
   3. `cards` を `board_id` で取得し、`due_date` + `due_start`/`due_end` の有無で events/abBuckets を振り分け
-  4. `events` / `abBuckets` / `serverNow` を整形し JSON で返却
+  4. 過去日かつ未完了のカードは `overdue` へ振り分け、visible range 内のカードだけを `events` / `abBuckets` に載せる
+  5. `events` / `abBuckets` / `overdue` / `serverNow` を整形し JSON で返却
 - `days` は `start`/`range` を元に JST (+09:00) で生成（1〜7日）。
 
 ## Migrations

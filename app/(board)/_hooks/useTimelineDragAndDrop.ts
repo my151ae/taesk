@@ -15,6 +15,7 @@ import { useState, useRef, useCallback, useMemo, KeyboardEvent, PointerEvent as 
 import {
     TimelineEvent,
     TimelineBucketItem,
+    TimelineOverdueItem,
     TimelineDay,
     TimelineResponse,
     minutesToTime,
@@ -204,7 +205,7 @@ export function useTimelineDragAndDrop({
             pointerTrackingHandlerRef.current = handler;
             window.addEventListener('pointermove', handler, { passive: true });
         }
-        const kind = event.active.data.current?.kind as 'event' | 'bucket';
+        const kind = event.active.data.current?.kind as 'event' | 'bucket' | 'overdue';
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
             const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
@@ -212,10 +213,17 @@ export function useTimelineDragAndDrop({
             const dragState: ActiveDragState = { cardId, startMinutes, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
-        } else {
+        } else if (kind === 'bucket') {
             const bucketItem = event.active.data.current?.item as TimelineBucketItem;
             const duration = Math.max(bucketItem?.duration ?? 60, 0);
             const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration };
+            setActiveDrag(dragState);
+            activeDragRef.current = dragState;
+        } else {
+            const overdueItem = event.active.data.current?.item as TimelineOverdueItem;
+            const startMinutes = getMinutesFromTime(overdueItem?.due_start ?? null) ?? 9 * 60;
+            const duration = Math.max(overdueItem?.duration ?? 60, 0);
+            const dragState: ActiveDragState = { cardId, startMinutes, duration };
             setActiveDrag(dragState);
             activeDragRef.current = dragState;
         }
@@ -392,8 +400,15 @@ export function useTimelineDragAndDrop({
         const cardId = active.data.current?.cardId as string | undefined;
         if (!cardId) return;
 
-        const sourceEvent = active.data.current?.event as TimelineEvent | undefined;
-        const sourceBucketItem = active.data.current?.item as TimelineBucketItem | undefined;
+        const sourceEvent = active.data.current?.kind === 'event'
+            ? (active.data.current?.event as TimelineEvent | undefined)
+            : undefined;
+        const sourceBucketItem = active.data.current?.kind === 'bucket'
+            ? (active.data.current?.item as TimelineBucketItem | undefined)
+            : undefined;
+        const sourceOverdueItem = active.data.current?.kind === 'overdue'
+            ? (active.data.current?.item as TimelineOverdueItem | undefined)
+            : undefined;
 
         const overType = visualTimelineTarget ? 'timeline-column' : over?.data.current?.type;
 
@@ -416,7 +431,7 @@ export function useTimelineDragAndDrop({
             const payload = buildBucketDropPayload({
                 bucketKey,
                 dayIso,
-                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceBucketItem?.duration ?? 60,
+                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
                 bucketPosition,
             });
             persistPlacement(cardId, payload, {
@@ -424,6 +439,7 @@ export function useTimelineDragAndDrop({
                 bucketKey,
                 sourceEvent,
                 sourceBucketItem,
+                sourceOverdueItem,
                 localDueDate: dayIso,
             });
             return;
@@ -449,6 +465,7 @@ export function useTimelineDragAndDrop({
             const sourceDueBucket = resolveSourceDueBucket({
                 sourceEvent,
                 sourceBucketItem,
+                sourceOverdueItem,
                 sourceBucketKey: active.data.current?.bucketKey as string | undefined,
             });
             const payload = buildTimelineDropPayload({
@@ -458,11 +475,13 @@ export function useTimelineDragAndDrop({
                 sourceDueBucket,
                 sourceEvent,
                 sourceBucketItem,
+                sourceOverdueItem,
             });
             persistPlacement(cardId, payload, {
                 target: 'timeline',
                 sourceEvent,
                 sourceBucketItem,
+                sourceOverdueItem,
                 defaultDuration: activeDrag.duration,
                 localDueDate: day.isoDate,
             });
@@ -485,7 +504,7 @@ export function useTimelineDragAndDrop({
             const payload = buildBucketDropPayload({
                 bucketKey,
                 dayIso,
-                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceBucketItem?.duration ?? 60,
+                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
                 bucketPosition,
             });
             persistPlacement(cardId, payload, {
@@ -493,6 +512,7 @@ export function useTimelineDragAndDrop({
                 bucketKey,
                 sourceEvent,
                 sourceBucketItem,
+                sourceOverdueItem,
                 localDueDate: dayIso,
                 defaultDuration: activeDrag?.duration,
             });

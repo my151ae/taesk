@@ -176,7 +176,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const pendingListWindowAutoSyncAttemptsRef = useRef(0);
 
   const {
-    boardMembers,
     profile,
     availableBoards,
     availableTeams,
@@ -675,6 +674,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleNextDay,
     eventsByDay,
     abBuckets: filteredData?.abBuckets ?? {},
+    overdue: filteredData?.overdue ?? [],
     indicatorTop,
     liveNowIsoDate,
     timelineViewportHeight,
@@ -694,8 +694,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleCardContextMenu,
     handleCardContextMenuByKeyboard,
     contextMenuCardId: contextMenu.cardId,
-    boardMembers,
-    onOpenShareDialog: () => setShowShareDialog(true),
     listBaseDate: listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange,

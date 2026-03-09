@@ -119,7 +119,10 @@ export function useTimelineCardActions({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error("Patch failed");
+        if (!response.ok) {
+          const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+          throw new Error(body?.error?.message || "Patch failed");
+        }
       } catch (error) {
         console.error("[timeline] update error", error);
         setErrorMessage(error instanceof Error ? error.message : "Failed to update card");
@@ -304,6 +307,8 @@ export function useTimelineCardActions({
           targetCardRef = { id: match.event.card_id, board_id: initialBoardId };
         } else if (match.bucketItem) {
           targetCardRef = { id: match.bucketItem.card_id, board_id: initialBoardId };
+        } else if (match.overdueItem) {
+          targetCardRef = { id: match.overdueItem.card_id, board_id: initialBoardId };
         }
       }
 
@@ -397,26 +402,39 @@ export function useTimelineCardActions({
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
     if (dataMode !== "api") return;
     try {
-      setData((prev) => {
-        if (!prev) return prev;
+      const match = findTimelineCardById(data, cardId);
+      const sourceEvent = match.event;
+      const sourceBucketItem = match.bucketItem;
+      const sourceOverdueItem = match.overdueItem;
+      const dueBucketFromKey = match.bucketKey ? (match.bucketKey.split("_")[1] as DueBucket) : null;
 
-        return {
-          ...prev,
-          events: prev.events.map((event) => event.card_id === cardId
-            ? { ...event, checked: nextChecked }
-            : event
-          ),
-          abBuckets: Object.fromEntries(
-            Object.entries(prev.abBuckets).map(([key, items]) => [
-              key,
-              items.map((item) => item.card_id === cardId
-                ? { ...item, checked: nextChecked }
-                : item
-              ),
-            ])
-          ),
-        };
-      });
+      const updatedCard = {
+        id: cardId,
+        title: sourceEvent?.title ?? sourceBucketItem?.title ?? sourceOverdueItem?.title ?? "Untitled card",
+        content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? null,
+        excerpt: sourceEvent?.excerpt ?? sourceBucketItem?.excerpt ?? sourceOverdueItem?.excerpt ?? null,
+        checklist: sourceEvent?.checklist ?? sourceBucketItem?.checklist ?? sourceOverdueItem?.checklist ?? null,
+        tags: sourceEvent?.tags ?? sourceBucketItem?.tags ?? sourceOverdueItem?.tags ?? [],
+        checked: nextChecked,
+        assignee_id: sourceEvent?.assignee_id ?? sourceBucketItem?.assignee_id ?? sourceOverdueItem?.assignee_id ?? null,
+        assignee_ids: sourceEvent?.assignee_ids ?? sourceBucketItem?.assignee_ids ?? sourceOverdueItem?.assignee_ids ?? null,
+        assigned_to: sourceEvent?.assigned_to ?? sourceBucketItem?.assigned_to ?? sourceOverdueItem?.assigned_to ?? null,
+        duration: sourceEvent?.duration ?? sourceBucketItem?.duration ?? sourceOverdueItem?.duration ?? sourceEvent?.durationMinutes ?? 60,
+        short_id: sourceEvent?.short_id ?? sourceBucketItem?.short_id ?? sourceOverdueItem?.short_id ?? null,
+        slug: sourceEvent?.slug ?? sourceBucketItem?.slug ?? sourceOverdueItem?.slug ?? null,
+        due_date: sourceEvent?.due_date ?? sourceBucketItem?.due_date ?? sourceOverdueItem?.due_date ?? null,
+        due_start: sourceEvent?.due_start ?? sourceBucketItem?.due_start ?? sourceOverdueItem?.due_start ?? null,
+        due_end: sourceEvent?.due_end ?? sourceBucketItem?.due_end ?? sourceOverdueItem?.due_end ?? null,
+        start_reminder_enabled: sourceEvent?.start_reminder_enabled ?? sourceBucketItem?.start_reminder_enabled ?? sourceOverdueItem?.start_reminder_enabled ?? false,
+        start_reminder_minutes: sourceEvent?.start_reminder_minutes ?? sourceBucketItem?.start_reminder_minutes ?? sourceOverdueItem?.start_reminder_minutes ?? 0,
+        end_reminder_enabled: sourceEvent?.end_reminder_enabled ?? sourceBucketItem?.end_reminder_enabled ?? sourceOverdueItem?.end_reminder_enabled ?? false,
+        end_reminder_minutes: sourceEvent?.end_reminder_minutes ?? sourceBucketItem?.end_reminder_minutes ?? sourceOverdueItem?.end_reminder_minutes ?? 0,
+        due_bucket: sourceEvent?.due_bucket ?? sourceBucketItem?.due_bucket ?? sourceOverdueItem?.due_bucket ?? dueBucketFromKey,
+        due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
+        started_at: sourceEvent?.started_at ?? sourceBucketItem?.started_at ?? sourceOverdueItem?.started_at ?? null,
+      } as Card;
+
+      setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
 
       const res = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
         method: "PATCH",
@@ -427,7 +445,7 @@ export function useTimelineCardActions({
     } catch {
       fetchTimeline();
     }
-  }, [dataMode, initialBoardId, setData, fetchTimeline]);
+  }, [data, dataMode, initialBoardId, setData, fetchTimeline]);
 
   const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
     try {
@@ -456,38 +474,40 @@ export function useTimelineCardActions({
     const match = findTimelineCardById(data, cardId);
     const event = match.event;
     const bucketItem = match.bucketItem;
+    const overdueItem = match.overdueItem;
     const bucketKey = match.bucketKey;
 
-    if (!event && !bucketItem) return;
+    if (!event && !bucketItem && !overdueItem) return;
 
-    const currentDueDate = event?.due_date ?? bucketItem?.due_date ?? null;
+    const currentDueDate = event?.due_date ?? bucketItem?.due_date ?? overdueItem?.due_date ?? null;
     const currentLocalDay = toLocalDay(currentDueDate);
     if (currentLocalDay === targetDay) return;
 
     const dueBucketFromKey = bucketKey ? (bucketKey.split("_")[1] as DueBucket) : null;
     const updatedCard = {
       id: cardId,
-      title: event?.title ?? bucketItem?.title ?? "Untitled card",
-      content: event?.content ?? bucketItem?.content ?? null,
-      excerpt: event?.excerpt ?? bucketItem?.excerpt ?? null,
-      checklist: event?.checklist ?? bucketItem?.checklist ?? null,
-      tags: event?.tags ?? bucketItem?.tags ?? [],
-      checked: event?.checked ?? bucketItem?.checked ?? false,
-      assignee_id: event?.assignee_id ?? bucketItem?.assignee_id ?? null,
-      assignee_ids: event?.assignee_ids ?? bucketItem?.assignee_ids ?? null,
-      assigned_to: event?.assigned_to ?? bucketItem?.assigned_to ?? null,
-      duration: event?.duration ?? bucketItem?.duration ?? event?.durationMinutes ?? 60,
-      short_id: event?.short_id ?? bucketItem?.short_id ?? null,
-      slug: event?.slug ?? bucketItem?.slug ?? null,
+      title: event?.title ?? bucketItem?.title ?? overdueItem?.title ?? "Untitled card",
+      content: event?.content ?? bucketItem?.content ?? overdueItem?.content ?? null,
+      excerpt: event?.excerpt ?? bucketItem?.excerpt ?? overdueItem?.excerpt ?? null,
+      checklist: event?.checklist ?? bucketItem?.checklist ?? overdueItem?.checklist ?? null,
+      tags: event?.tags ?? bucketItem?.tags ?? overdueItem?.tags ?? [],
+      checked: event?.checked ?? bucketItem?.checked ?? overdueItem?.checked ?? false,
+      assignee_id: event?.assignee_id ?? bucketItem?.assignee_id ?? overdueItem?.assignee_id ?? null,
+      assignee_ids: event?.assignee_ids ?? bucketItem?.assignee_ids ?? overdueItem?.assignee_ids ?? null,
+      assigned_to: event?.assigned_to ?? bucketItem?.assigned_to ?? overdueItem?.assigned_to ?? null,
+      duration: event?.duration ?? bucketItem?.duration ?? overdueItem?.duration ?? event?.durationMinutes ?? 60,
+      short_id: event?.short_id ?? bucketItem?.short_id ?? overdueItem?.short_id ?? null,
+      slug: event?.slug ?? bucketItem?.slug ?? overdueItem?.slug ?? null,
       due_date: withJstMidnight(targetDay),
-      due_start: event?.due_start ?? bucketItem?.due_start ?? null,
-      due_end: event?.due_end ?? bucketItem?.due_end ?? null,
-      start_reminder_enabled: event?.start_reminder_enabled ?? bucketItem?.start_reminder_enabled ?? false,
-      start_reminder_minutes: event?.start_reminder_minutes ?? bucketItem?.start_reminder_minutes ?? 0,
-      end_reminder_enabled: event?.end_reminder_enabled ?? bucketItem?.end_reminder_enabled ?? false,
-      end_reminder_minutes: event?.end_reminder_minutes ?? bucketItem?.end_reminder_minutes ?? 0,
-      due_bucket: event?.due_bucket ?? dueBucketFromKey,
-      due_bucket_position: event?.due_bucket_position ?? bucketItem?.bucketPosition ?? null,
+      due_start: event?.due_start ?? bucketItem?.due_start ?? overdueItem?.due_start ?? null,
+      due_end: event?.due_end ?? bucketItem?.due_end ?? overdueItem?.due_end ?? null,
+      start_reminder_enabled: event?.start_reminder_enabled ?? bucketItem?.start_reminder_enabled ?? overdueItem?.start_reminder_enabled ?? false,
+      start_reminder_minutes: event?.start_reminder_minutes ?? bucketItem?.start_reminder_minutes ?? overdueItem?.start_reminder_minutes ?? 0,
+      end_reminder_enabled: event?.end_reminder_enabled ?? bucketItem?.end_reminder_enabled ?? overdueItem?.end_reminder_enabled ?? false,
+      end_reminder_minutes: event?.end_reminder_minutes ?? bucketItem?.end_reminder_minutes ?? overdueItem?.end_reminder_minutes ?? 0,
+      due_bucket: event?.due_bucket ?? bucketItem?.due_bucket ?? overdueItem?.due_bucket ?? dueBucketFromKey,
+      due_bucket_position: event?.due_bucket_position ?? overdueItem?.due_bucket_position ?? bucketItem?.bucketPosition ?? null,
+      started_at: event?.started_at ?? bucketItem?.started_at ?? overdueItem?.started_at ?? null,
     } as Card;
 
     setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));

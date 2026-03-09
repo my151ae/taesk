@@ -223,6 +223,7 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
     days,
     events,
     abBuckets,
+    overdue: [],
     serverNow: new Date().toISOString(),
     startOffset: 0,
     range,

@@ -3,6 +3,7 @@ import type React from 'react';
 import {
   TimelineEvent,
   TimelineBucketItem,
+  TimelineOverdueItem,
   TimelineResponse,
   getMinutesFromTime,
   toLocalDay,
@@ -14,6 +15,7 @@ export type PlacementMeta = {
   bucketKey?: string;
   sourceEvent?: TimelineEvent;
   sourceBucketItem?: TimelineBucketItem;
+  sourceOverdueItem?: TimelineOverdueItem;
   defaultDuration?: number;
   localDueDate?: string | null;
 };
@@ -41,6 +43,7 @@ export function createPersistPlacement({
         },
         {} as Record<string, TimelineBucketItem[]>
       );
+      const nextOverdue = [...(current.overdue ?? [])];
 
       let removedBucketItem: TimelineBucketItem | null = null;
       Object.values(nextBuckets).forEach((items) => {
@@ -57,8 +60,15 @@ export function createPersistPlacement({
         removedEvent = nextEvents.splice(eventIndex, 1)[0];
       }
 
+      let removedOverdueItem: TimelineOverdueItem | null = null;
+      const overdueIndex = nextOverdue.findIndex((item) => item.card_id === cardId);
+      if (overdueIndex >= 0) {
+        removedOverdueItem = nextOverdue.splice(overdueIndex, 1)[0];
+      }
+
       const baseEvent = removedEvent ?? meta.sourceEvent ?? null;
       const baseBucketItem = removedBucketItem ?? meta.sourceBucketItem ?? null;
+      const baseOverdueItem = removedOverdueItem ?? meta.sourceOverdueItem ?? null;
 
       const payloadDueDate = (payload.due_date as string | null) ?? null;
 
@@ -71,12 +81,14 @@ export function createPersistPlacement({
         const nextEnd =
           (payload.due_end as string | null) ??
           baseEvent?.due_end ??
+          baseOverdueItem?.due_end ??
           baseBucketItem?.due_end ??
           null;
         const nextDate =
           meta.localDueDate ??
           toLocalDay(payloadDueDate) ??
           baseEvent?.due_date ??
+          baseOverdueItem?.due_date ??
           baseBucketItem?.due_date ??
           null;
         const startMinutes = getMinutesFromTime(nextStart);
@@ -86,6 +98,7 @@ export function createPersistPlacement({
             ? Math.max(endMinutes - startMinutes, 0)
             : baseEvent?.durationMinutes ??
               baseEvent?.duration ??
+              baseOverdueItem?.duration ??
               baseBucketItem?.duration ??
               meta.defaultDuration ??
               60;
@@ -95,19 +108,20 @@ export function createPersistPlacement({
           due_date: nextDate ?? '',
           due_start: nextStart,
           due_end: nextEnd,
-          due_bucket: (payload.due_bucket as DueBucket | null) ?? baseEvent?.due_bucket ?? null,
+          due_bucket: (payload.due_bucket as DueBucket | null) ?? baseEvent?.due_bucket ?? baseOverdueItem?.due_bucket ?? null,
           durationMinutes,
-          title: baseEvent?.title ?? baseBucketItem?.title ?? 'Untitled card',
-          content: baseEvent?.content ?? baseBucketItem?.content ?? null,
-          excerpt: baseEvent?.excerpt ?? baseBucketItem?.excerpt ?? null,
-          tags: baseEvent?.tags ?? baseBucketItem?.tags ?? [],
-          checklist: baseEvent?.checklist ?? baseBucketItem?.checklist ?? null,
-          checked: baseEvent?.checked ?? baseBucketItem?.checked ?? false,
-          assignee_id: baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
-          assignee_ids: baseEvent?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
-          assigned_to: baseEvent?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
-          short_id: baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
-          slug: baseEvent?.slug ?? baseBucketItem?.slug ?? null,
+          title: baseEvent?.title ?? baseOverdueItem?.title ?? baseBucketItem?.title ?? 'Untitled card',
+          content: baseEvent?.content ?? baseOverdueItem?.content ?? baseBucketItem?.content ?? null,
+          excerpt: baseEvent?.excerpt ?? baseOverdueItem?.excerpt ?? baseBucketItem?.excerpt ?? null,
+          tags: baseEvent?.tags ?? baseOverdueItem?.tags ?? baseBucketItem?.tags ?? [],
+          checklist: baseEvent?.checklist ?? baseOverdueItem?.checklist ?? baseBucketItem?.checklist ?? null,
+          checked: baseEvent?.checked ?? baseOverdueItem?.checked ?? baseBucketItem?.checked ?? false,
+          assignee_id: baseEvent?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
+          assignee_ids: baseEvent?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
+          assigned_to: baseEvent?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
+          started_at: baseEvent?.started_at ?? baseOverdueItem?.started_at ?? baseBucketItem?.started_at ?? null,
+          short_id: baseEvent?.short_id ?? baseOverdueItem?.short_id ?? baseBucketItem?.short_id ?? null,
+          slug: baseEvent?.slug ?? baseOverdueItem?.slug ?? baseBucketItem?.slug ?? null,
         };
 
         nextEvents.push(replacement);
@@ -120,7 +134,7 @@ export function createPersistPlacement({
           return (a.due_date ?? '').localeCompare(b.due_date ?? '');
         });
 
-        return { ...current, events: nextEvents, abBuckets: nextBuckets };
+        return { ...current, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
       }
 
       if (meta.target === 'bucket' && meta.bucketKey) {
@@ -132,22 +146,25 @@ export function createPersistPlacement({
         const bucketPosition = (payload.due_bucket_position as number | null) ?? Date.now();
         const nextBucketItem: TimelineBucketItem = {
           card_id: cardId,
-          title: baseBucketItem?.title ?? baseEvent?.title ?? 'Untitled card',
-          content: baseBucketItem?.content ?? baseEvent?.content ?? null,
-          excerpt: baseBucketItem?.excerpt ?? baseEvent?.excerpt ?? null,
-          due_date: meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? null,
+          title: baseBucketItem?.title ?? baseOverdueItem?.title ?? baseEvent?.title ?? 'Untitled card',
+          content: baseBucketItem?.content ?? baseOverdueItem?.content ?? baseEvent?.content ?? null,
+          excerpt: baseBucketItem?.excerpt ?? baseOverdueItem?.excerpt ?? baseEvent?.excerpt ?? null,
+          due_date: meta.localDueDate ?? toLocalDay(payloadDueDate) ?? baseBucketItem?.due_date ?? baseOverdueItem?.due_date ?? null,
           due_start: (payload.due_start as string | null) ?? null,
           due_end: (payload.due_end as string | null) ?? null,
-          checked: baseBucketItem?.checked ?? baseEvent?.checked ?? false,
-          checklist: baseBucketItem?.checklist ?? baseEvent?.checklist ?? null,
-          tags: baseBucketItem?.tags ?? baseEvent?.tags ?? [],
-          assignee_id: baseBucketItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
-          assignee_ids: baseBucketItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
-          assigned_to: baseBucketItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
-          short_id: baseBucketItem?.short_id ?? baseEvent?.short_id ?? null,
-          slug: baseBucketItem?.slug ?? baseEvent?.slug ?? null,
+          checked: baseBucketItem?.checked ?? baseOverdueItem?.checked ?? baseEvent?.checked ?? false,
+          checklist: baseBucketItem?.checklist ?? baseOverdueItem?.checklist ?? baseEvent?.checklist ?? null,
+          tags: baseBucketItem?.tags ?? baseOverdueItem?.tags ?? baseEvent?.tags ?? [],
+          assignee_id: baseBucketItem?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseEvent?.assignee_id ?? null,
+          assignee_ids: baseBucketItem?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
+          assigned_to: baseBucketItem?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
+          due_bucket: (payload.due_bucket as DueBucket | null) ?? baseBucketItem?.due_bucket ?? baseOverdueItem?.due_bucket ?? null,
+          started_at: baseBucketItem?.started_at ?? baseOverdueItem?.started_at ?? baseEvent?.started_at ?? null,
+          short_id: baseBucketItem?.short_id ?? baseOverdueItem?.short_id ?? baseEvent?.short_id ?? null,
+          slug: baseBucketItem?.slug ?? baseOverdueItem?.slug ?? baseEvent?.slug ?? null,
           duration:
             baseBucketItem?.duration ??
+            baseOverdueItem?.duration ??
             baseEvent?.durationMinutes ??
             baseEvent?.duration ??
             meta.defaultDuration ??
@@ -157,7 +174,7 @@ export function createPersistPlacement({
 
         bucketItems.unshift(nextBucketItem);
         bucketItems.sort((a, b) => (b.bucketPosition ?? 0) - (a.bucketPosition ?? 0));
-        return { ...current, events: nextEvents, abBuckets: nextBuckets };
+        return { ...current, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
       }
 
       return current;

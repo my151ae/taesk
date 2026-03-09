@@ -87,6 +87,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                 end_reminder_minutes: eventCard.end_reminder_minutes ?? 0,
                 due_bucket: eventCard.due_bucket ?? null,
                 due_bucket_position: eventCard.due_bucket_position ?? null,
+                started_at: eventCard.started_at ?? null,
                 board_id: initialBoard.id,
                 created_at: '',
                 updated_at: '',
@@ -124,6 +125,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                     end_reminder_minutes: bucketItem.end_reminder_minutes ?? 0,
                     due_bucket: bucketKeyToDueBucket(key),
                     due_bucket_position: bucketItem.bucketPosition,
+                    started_at: bucketItem.started_at ?? null,
                     board_id: initialBoard.id,
                     created_at: '',
                     updated_at: '',
@@ -137,6 +139,42 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                     id_short: null,
                 } as Card;
             }
+        }
+
+        const overdueItem = data.overdue.find((item) => item.short_id === targetShortId);
+        if (overdueItem) {
+            return {
+                id: overdueItem.card_id,
+                title: overdueItem.title,
+                content: normalizeContent(overdueItem.content),
+                excerpt: overdueItem.excerpt ?? null,
+                checklist: normalizeChecklist(overdueItem.checklist ?? EMPTY_CHECKLIST),
+                tags: overdueItem.tags,
+                checked: overdueItem.checked,
+                short_id: overdueItem.short_id,
+                slug: overdueItem.slug,
+                due_date: overdueItem.due_date,
+                due_start: overdueItem.due_start,
+                due_end: overdueItem.due_end,
+                start_reminder_enabled: Boolean(overdueItem.start_reminder_enabled),
+                start_reminder_minutes: overdueItem.start_reminder_minutes ?? 0,
+                end_reminder_enabled: Boolean(overdueItem.end_reminder_enabled),
+                end_reminder_minutes: overdueItem.end_reminder_minutes ?? 0,
+                due_bucket: overdueItem.due_bucket ?? null,
+                due_bucket_position: overdueItem.due_bucket_position ?? null,
+                started_at: overdueItem.started_at ?? null,
+                board_id: initialBoard.id,
+                created_at: '',
+                updated_at: '',
+                duration: overdueItem.duration ?? 60,
+                assignee_id: overdueItem.assignee_id ?? null,
+                assignee_ids: overdueItem.assignee_ids ?? null,
+                assigned_to: overdueItem.assigned_to ?? null,
+                list_id: '',
+                position: 0,
+                user_id: null,
+                id_short: null,
+            } as Card;
         }
 
         return null;

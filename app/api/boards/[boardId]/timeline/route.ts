@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay } from '@/lib/api-types/timeline';
+import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay, TimelineOverdueItem } from '@/lib/api-types/timeline';
 import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { isMissingColumnError } from '@/lib/server/card-mutation';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -25,6 +26,7 @@ type TimelineCardRow = {
   end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   due_bucket: 'a' | 'b' | null;
   due_bucket_position: number | null;
+  started_at: string | null;
   checked: boolean;
   assignee_id: string | null;
   assignee_ids: string[] | null;
@@ -110,7 +112,7 @@ const getHandler = async (
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
+    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, started_at';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards: TimelineCardRow[] | null = null;
@@ -121,14 +123,15 @@ const getHandler = async (
     .select(extendedSelect)
     .eq('board_id', boardId);
 
-  if (initial.error && initial.error.code === '42703') {
+  if (isMissingColumnError(initial.error, 'started_at')) {
     const fallbackSelect = baseSelect
       .replace('checklist, ', '')
       .replace('content, ', '')
       .replace('start_reminder_enabled, ', '')
       .replace('start_reminder_minutes, ', '')
       .replace('end_reminder_enabled, ', '')
-      .replace('end_reminder_minutes, ', '');
+      .replace('end_reminder_minutes, ', '')
+      .replace(', started_at', '');
     const fallback = await supabase
       .from('cards')
       .select(fallbackSelect)
@@ -146,6 +149,7 @@ const getHandler = async (
           end_reminder_enabled: false,
           end_reminder_minutes: 0,
           due_bucket_position: null,
+          started_at: null,
         }))
         : null;
   } else {
@@ -167,10 +171,43 @@ const getHandler = async (
     acc[`${day.key}_b`] = [];
     return acc;
   }, {} as Record<string, TimelineBucketItem[]>);
+  const overdue: TimelineOverdueItem[] = [];
+  const todayIso = formatDateJst(now, 0);
 
   cards?.forEach((card) => {
     const checklist = normalizeChecklist((card.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof normalizeChecklist>[0]);
     const dateOnly = toJstDate(card.due_date);
+    const isOverdue = Boolean(dateOnly && dateOnly < todayIso && !card.checked);
+
+    if (isOverdue) {
+      overdue.push({
+        card_id: card.id,
+        title: card.title,
+        content: card.content ?? null,
+        excerpt: card.excerpt ?? null,
+        due_date: dateOnly,
+        due_start: card.due_start,
+        due_end: card.due_end,
+        start_reminder_enabled: card.start_reminder_enabled ?? false,
+        start_reminder_minutes: card.start_reminder_minutes ?? 0,
+        end_reminder_enabled: card.end_reminder_enabled ?? false,
+        end_reminder_minutes: card.end_reminder_minutes ?? 0,
+        checked: card.checked,
+        checklist,
+        tags: card.tags ?? [],
+        assignee_id: card.assignee_id,
+        assignee_ids: card.assignee_ids ?? null,
+        assigned_to: card.assigned_to,
+        duration: card.duration ?? 60,
+        due_bucket: card.due_bucket ?? null,
+        due_bucket_position: card.due_bucket_position ?? null,
+        started_at: card.started_at,
+        short_id: card.short_id,
+        slug: card.slug,
+      });
+      return;
+    }
+
     const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
 
     if (!dayKey) return; // Skip cards outside the visible range
@@ -202,6 +239,7 @@ const getHandler = async (
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
         duration: card.duration ?? 60,
+        started_at: card.started_at,
         short_id: card.short_id,
         slug: card.slug,
       });
@@ -233,6 +271,8 @@ const getHandler = async (
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
         duration: card.duration ?? 60,
+        due_bucket: card.due_bucket ?? bucket,
+        started_at: card.started_at,
         short_id: card.short_id,
         slug: card.slug,
         bucketPosition: card.due_bucket_position ?? null,
@@ -260,10 +300,20 @@ const getHandler = async (
     return a.due_date.localeCompare(b.due_date);
   });
 
+  overdue.sort((a, b) => {
+    const dateCompare = (a.due_date ?? '').localeCompare(b.due_date ?? '');
+    if (dateCompare !== 0) return dateCompare;
+    const aPos = a.due_bucket_position ?? 0;
+    const bPos = b.due_bucket_position ?? 0;
+    if (aPos !== bPos) return bPos - aPos;
+    return (a.title ?? '').localeCompare(b.title ?? '');
+  });
+
   const responseBody: TimelineResponse = {
     days,
     events,
     abBuckets,
+    overdue,
     serverNow: new Date().toISOString(),
     startOffset,
     range,

@@ -8,10 +8,9 @@ import type {
   RefObject,
 } from "react";
 
-import type { ExternalCalendarEntry, TimelineBucketItem, TimelineDay, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
+import type { ExternalCalendarEntry, TimelineBucketItem, TimelineDay, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import type { ActiveDragState, ActiveResizeState, BucketIndicator, PointerPreviewState } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -41,6 +40,7 @@ type UseTimelineBoardViewModelsArgs = {
   handleNextDay: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
+  overdue: TimelineOverdueItem[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   timelineViewportHeight: number;
@@ -60,8 +60,6 @@ type UseTimelineBoardViewModelsArgs = {
   handleCardContextMenu: (e: MouseEvent, cardId: string) => void;
   handleCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers: BoardMember[];
-  onOpenShareDialog: () => void;
   listBaseDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -100,6 +98,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         handleNextDay: args.handleNextDay,
         eventsByDay: args.eventsByDay,
         abBuckets: args.abBuckets,
+        overdue: args.overdue,
         indicatorTop: args.indicatorTop,
         indicatorDayIso: args.liveNowIsoDate,
         timelineViewportHeight: args.timelineViewportHeight,
@@ -120,8 +119,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onCardContextMenu: args.handleCardContextMenu,
         onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
         contextMenuCardId: args.contextMenuCardId,
-        boardMembers: args.boardMembers,
-        onOpenShareDialog: args.onOpenShareDialog,
       },
       mobile: {
         timelineScrollRef: args.timelineScrollRefMobile,
@@ -134,6 +131,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         registerAbScrollContainer: args.registerAbScrollContainer,
         eventsByDay: args.eventsByDay,
         abBuckets: args.abBuckets,
+        overdue: args.overdue,
         calendarEventsByDay: args.calendarEventsByDay,
         calendarAllDayByDay: args.calendarAllDayEventsByDay,
         indicatorTop: args.indicatorTop,
@@ -157,8 +155,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onCardContextMenu: args.handleCardContextMenu,
         onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
         contextMenuCardId: args.contextMenuCardId,
-        boardMembers: args.boardMembers,
-        onOpenShareDialog: args.onOpenShareDialog,
       },
     }),
     [args]

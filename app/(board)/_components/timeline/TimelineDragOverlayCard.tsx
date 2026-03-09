@@ -3,7 +3,7 @@
 import clsx from "clsx";
 
 import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
-import type { TimelineBucketItem, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import { formatDuration, minuteToPixels, timeLabel } from "@/app/(board)/_utils/timeline-helpers";
 import type { OverlayCardData } from "@/app/(board)/_utils/timeline-overlay";
 
@@ -12,6 +12,7 @@ type TimelineDragOverlayCardProps = {
   overlayCardData: OverlayCardData | null;
   overlayTimelineEvent?: TimelineEvent | null;
   overlayBucketCard?: TimelineBucketItem | null;
+  overlayOverdueCard?: TimelineOverdueItem | null;
 };
 
 export function TimelineDragOverlayCard({
@@ -19,6 +20,7 @@ export function TimelineDragOverlayCard({
   overlayCardData,
   overlayTimelineEvent = null,
   overlayBucketCard = null,
+  overlayOverdueCard = null,
 }: TimelineDragOverlayCardProps) {
   if (!overlayCardData) return null;
 
@@ -75,7 +77,7 @@ export function TimelineDragOverlayCard({
             ? formatDuration(overlayTimelineEvent.durationMinutes ?? 60)
             : undefined
         }
-        checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? false}
+        checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? overlayOverdueCard?.checked ?? false}
         onToggleCheck={() => {}}
         onOpen={() => {}}
         timePlacement="out-top"

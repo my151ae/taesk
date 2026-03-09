@@ -1,8 +1,8 @@
 
-import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay } from "./timeline-helpers";
-import type { Card } from "@/lib/supabase";
+import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay, TimelineOverdueItem } from "./timeline-helpers";
+import type { Card, DueBucket } from "@/lib/supabase";
 import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
-import { getMinutesFromTime, toLocalDay } from "./timeline-helpers";
+import { getIsoDateJst, getMinutesFromTime, toLocalDay } from "./timeline-helpers";
 import { normalizeDueBucket } from "@/lib/bucket-normalization";
 
 const DEFAULT_AB_BUCKET = "b";
@@ -25,6 +25,7 @@ export function applyCardUpdate(
 ): TimelineResponse {
     const nextEvents = [...prev.events];
     const nextBuckets = { ...prev.abBuckets };
+    const nextOverdue = [...(prev.overdue ?? [])];
 
     // 1. Remove existing instance to avoid duplicates
     const removeCard = (cardId: string) => {
@@ -36,6 +37,9 @@ export function applyCardUpdate(
         Object.keys(nextBuckets).forEach(key => {
             nextBuckets[key] = nextBuckets[key].filter(item => item.card_id !== cardId);
         });
+
+        const overdueIdx = nextOverdue.findIndex((item) => item.card_id === cardId);
+        if (overdueIdx >= 0) nextOverdue.splice(overdueIdx, 1);
     };
 
     const cardId = card.id;
@@ -44,12 +48,54 @@ export function applyCardUpdate(
     removeCard(cardId);
 
     if (eventType === 'DELETE') {
-        return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+        return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
     }
 
     const checklist = normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST);
     const localDay = toLocalDay(card.due_date ?? null);
     const hasTime = Boolean(card.due_start && card.due_end);
+    const todayIso = getIsoDateJst(new Date().toISOString());
+    const isOverdue = Boolean(localDay && localDay < todayIso && !card.checked);
+
+    if (isOverdue) {
+        const overdueItem: TimelineOverdueItem = {
+            card_id: card.id,
+            title: card.title,
+            content: card.content ?? null,
+            excerpt: card.excerpt ?? null,
+            due_date: localDay,
+            due_start: card.due_start,
+            due_end: card.due_end,
+            start_reminder_enabled: card.start_reminder_enabled,
+            start_reminder_minutes: card.start_reminder_minutes,
+            end_reminder_enabled: card.end_reminder_enabled,
+            end_reminder_minutes: card.end_reminder_minutes,
+            checked: card.checked,
+            checklist,
+            tags: card.tags ?? [],
+            assignee_id: card.assignee_id,
+            assignee_ids: card.assignee_ids ?? null,
+            assigned_to: card.assigned_to,
+            duration: card.duration ?? null,
+            due_bucket: card.due_bucket ?? null,
+            due_bucket_position: card.due_bucket_position ?? null,
+            started_at: card.started_at ?? null,
+            short_id: card.short_id,
+            slug: card.slug,
+        };
+
+        nextOverdue.push(overdueItem);
+        nextOverdue.sort((a, b) => {
+            const dateCompare = (a.due_date ?? "").localeCompare(b.due_date ?? "");
+            if (dateCompare !== 0) return dateCompare;
+            const aPos = a.due_bucket_position ?? 0;
+            const bPos = b.due_bucket_position ?? 0;
+            if (aPos !== bPos) return bPos - aPos;
+            return (a.title ?? "").localeCompare(b.title ?? "");
+        });
+
+        return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
+    }
 
     // 2. Add new instance for INSERT/UPDATE
     // Keep the same logic as `app/api/boards/[boardId]/timeline/route.ts`:
@@ -85,6 +131,7 @@ export function applyCardUpdate(
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
             duration: card.duration ?? null,
+            started_at: card.started_at ?? null,
             short_id: card.short_id,
             slug: card.slug,
         };
@@ -103,7 +150,7 @@ export function applyCardUpdate(
 
     } else if (localDay) {
         // A/B list
-        let bucket = DEFAULT_AB_BUCKET;
+        let bucket: DueBucket = DEFAULT_AB_BUCKET;
         try {
             bucket = normalizeDueBucket(card.due_bucket) ?? DEFAULT_AB_BUCKET;
         } catch (error) {
@@ -113,7 +160,7 @@ export function applyCardUpdate(
 
         const bucketKey = resolveBucketKey(prev.days, localDay, bucket);
         if (!bucketKey) {
-            return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+            return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
         }
 
         if (!nextBuckets[bucketKey]) nextBuckets[bucketKey] = [];
@@ -137,6 +184,8 @@ export function applyCardUpdate(
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
             duration: card.duration ?? null,
+            due_bucket: card.due_bucket ?? bucket,
+            started_at: card.started_at ?? null,
             short_id: card.short_id,
             slug: card.slug,
             bucketPosition: card.due_bucket_position,
@@ -153,5 +202,5 @@ export function applyCardUpdate(
         });
     }
 
-    return { ...prev, events: nextEvents, abBuckets: nextBuckets };
+    return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
 }

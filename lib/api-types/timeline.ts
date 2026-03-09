@@ -39,6 +39,7 @@ export interface TimelineEvent {
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
   duration?: number | null;
+  started_at?: string | null;
   short_id: string | null;
   slug: string | null;
 }
@@ -62,15 +63,44 @@ export interface TimelineBucketItem {
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
   duration?: number | null;
+  due_bucket?: DueBucket | null;
+  started_at?: string | null;
   short_id: string | null;
   slug: string | null;
   bucketPosition: number | null;
+}
+
+export interface TimelineOverdueItem {
+  card_id: string;
+  title: string;
+  content?: JSONContent | null;
+  excerpt?: string | null;
+  due_date: string | null;
+  due_start: string | null;
+  due_end: string | null;
+  start_reminder_enabled?: boolean;
+  start_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  end_reminder_enabled?: boolean;
+  end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
+  checked: boolean;
+  checklist?: Checklist | null;
+  tags: string[];
+  assignee_id?: string | null;
+  assignee_ids?: string[] | null;
+  assigned_to?: string | null;
+  duration?: number | null;
+  due_bucket?: DueBucket | null;
+  due_bucket_position?: number | null;
+  started_at?: string | null;
+  short_id: string | null;
+  slug: string | null;
 }
 
 export interface TimelineResponse {
   days: TimelineDay[];
   events: TimelineEvent[];
   abBuckets: Record<string, TimelineBucketItem[]>;
+  overdue: TimelineOverdueItem[];
   serverNow: string;
   startOffset?: number;
   range?: number;

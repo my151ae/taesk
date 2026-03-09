@@ -2,8 +2,9 @@
 
 import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
+import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -15,6 +16,7 @@ import {
   type TimelineBucketItem,
   type TimelineDay,
   type TimelineEvent,
+  type TimelineOverdueItem,
   type ExternalCalendarEntry,
   minuteToPixels,
   pixelsToMinutes,
@@ -23,6 +25,7 @@ import {
 import {
   buildOverlayCardData,
   findOverlayBucketEntry,
+  findOverlayOverdueEntry,
 } from "@/app/(board)/_utils/timeline-overlay";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import {
@@ -31,25 +34,14 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP,
 } from "@/app/(board)/_stores/timeline-zoom-store";
-import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
-import type { MemberRole } from "@/lib/supabase";
-import { getProfileInitial, resolveProfileDisplayName } from "@/lib/usernames";
-import { resolveTimeZoneDisplay } from "@/lib/timezone-display";
 
 const ALL_DAY_ROW_HEIGHT = 36;
-const AXIS_WIDTH_PX = 120;
+const DAY_SECTION_MIN_WIDTH_PX = 320;
+const OVERDUE_MIN_WIDTH_PX = DAY_SECTION_MIN_WIDTH_PX / 2;
 
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
 const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
-const ROLE_ORDER: MemberRole[] = ["owner", "editor", "commenter", "viewer"];
-const ROLE_LABELS: Record<MemberRole, string> = {
-  owner: "Owner",
-  editor: "Editor",
-  commenter: "Commenter",
-  viewer: "Viewer",
-};
-const SYSTEM_TIME_ZONE = "Asia/Tokyo";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -65,6 +57,7 @@ type DesktopTimelineViewProps = {
   handleNextDay: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
+  overdue: TimelineOverdueItem[];
   indicatorTop: number | null;
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
@@ -96,8 +89,6 @@ type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers?: BoardMember[];
-  onOpenShareDialog?: () => void;
 };
 
 export function DesktopTimelineView({
@@ -113,6 +104,7 @@ export function DesktopTimelineView({
   handleNextDay,
   eventsByDay,
   abBuckets,
+  overdue,
   indicatorTop,
   indicatorDayIso,
   timelineViewportHeight,
@@ -143,13 +135,12 @@ export function DesktopTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  boardMembers,
-  onOpenShareDialog,
 }: DesktopTimelineViewProps) {
-
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
+  const desktopGridTemplateColumns = `minmax(${OVERDUE_MIN_WIDTH_PX}px, 0.5fr) repeat(${visibleDays.length}, minmax(${DAY_SECTION_MIN_WIDTH_PX}px, 1fr))`;
+  const desktopGridMinWidth = `${OVERDUE_MIN_WIDTH_PX + visibleDays.length * DAY_SECTION_MIN_WIDTH_PX}px`;
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
 
@@ -229,6 +220,11 @@ export function DesktopTimelineView({
     [abBuckets, activeDragCardId]
   );
   const overlayBucketCard = overlayBucketEntry?.item ?? null;
+  const overlayOverdueEntry = useMemo(
+    () => findOverlayOverdueEntry(overdue, activeDragCardId),
+    [overdue, activeDragCardId]
+  );
+  const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
 
   const allEvents = useMemo(() => Object.values(eventsByDay).flat(), [eventsByDay]);
   const overlayTimelineEvent = allEvents.find((event) => event.card_id === activeDragCardId);
@@ -238,9 +234,10 @@ export function DesktopTimelineView({
       buildOverlayCardData({
         timelineEvent: overlayTimelineEvent,
         bucketEntry: overlayBucketEntry,
+        overdueEntry: overlayOverdueEntry,
         defaultTimelineDuration: 60,
       }),
-    [overlayBucketEntry, overlayTimelineEvent]
+    [overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent]
   );
 
   const allDayLayout = useMemo(() => {
@@ -360,27 +357,6 @@ export function DesktopTimelineView({
 
   const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
 
-  const sortedMembers = useMemo(() => {
-    if (!boardMembers?.length) return [];
-    return [...boardMembers].sort((a, b) => {
-      const aLabel = resolveProfileDisplayName(a.profile, a.profile.email ?? null);
-      const bLabel = resolveProfileDisplayName(b.profile, b.profile.email ?? null);
-      return aLabel.localeCompare(bLabel, "ja");
-    });
-  }, [boardMembers]);
-
-  const systemTimeZone = useMemo(() => resolveTimeZoneDisplay(SYSTEM_TIME_ZONE), []);
-
-  const membersByRole = useMemo(
-    () =>
-      ROLE_ORDER.map((role) => ({
-        role,
-        label: ROLE_LABELS[role],
-        members: sortedMembers.filter((member) => member.role === role),
-      })),
-    [sortedMembers]
-  );
-
   useEffect(() => {
     onMount?.();
   }, [onMount]);
@@ -403,19 +379,20 @@ export function DesktopTimelineView({
       }}
     >
       <div
-        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-hidden bg-white shadow-sm ring-1 ring-black/5"
+        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-x-auto overflow-y-hidden bg-white shadow-sm ring-1 ring-black/5"
       >
         <div ref={timelineHeaderRef} className="z-30">
           <div
             className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
             style={{
-              gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: desktopGridTemplateColumns,
+              minWidth: desktopGridMinWidth,
             }}
           >
-            <div className="flex items-center justify-center border-r border-slate-100 px-3 py-3 text-left">
-              <div className="flex flex-col items-center leading-none">
-                <span className="text-[10px] font-semibold text-slate-500">{systemTimeZone.abbreviation}</span>
-                <span className="mt-0.5 text-[9px] text-slate-400">{systemTimeZone.offset}</span>
+            <div className="flex items-center justify-center px-4 py-3 text-center text-slate-800">
+              <div>
+                <p>Overdue</p>
+                <p className="text-[10px] text-slate-400 normal-case tracking-normal">{overdue.length} cards</p>
               </div>
             </div>
             {visibleDays.map((day, index) => (
@@ -478,17 +455,14 @@ export function DesktopTimelineView({
             <div
               className="grid border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
               style={{
-                gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))`,
+                gridTemplateColumns: desktopGridTemplateColumns,
+                minWidth: desktopGridMinWidth,
               }}
             >
               <div
-                className="flex items-start justify-end border-r border-emerald-100/70 px-3 py-2 text-[10px] uppercase tracking-wide text-emerald-700"
-                style={{
-                  minHeight: allDayMinHeight,
-                }}
-              >
-                終日
-              </div>
+                className="bg-amber-50/40"
+                style={{ minHeight: allDayMinHeight }}
+              />
               <div
                 className="relative px-2 py-2"
                 style={{
@@ -536,7 +510,7 @@ export function DesktopTimelineView({
         <div
           ref={timelineScrollRef}
           onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
         >
           <div className="relative" style={{ minHeight: timelineViewportHeight }}>
             {(status === "loading" || !days.length) && (
@@ -549,58 +523,27 @@ export function DesktopTimelineView({
             <div
               className="grid timeline-container"
               data-testid="timeline-grid"
-              style={{ gridTemplateColumns: `${AXIS_WIDTH_PX}px repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+              style={{
+                gridTemplateColumns: desktopGridTemplateColumns,
+                minWidth: desktopGridMinWidth,
+              }}
             >
-              {/* 時間軸 */}
-              <aside className="timeline-axis relative border-r border-slate-100 text-xs text-slate-500">
-                <div className="sticky top-0 z-10 bg-white/95 px-2.5 py-3 backdrop-blur">
-                  <div className="space-y-3">
-                    {membersByRole.map((section) => (
-                      <div key={section.role}>
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500">
-                          <span>{section.label}</span>
-                          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">
-                            {section.members.length}
-                          </span>
-                        </div>
-                        {section.members.length > 0 && (
-                          <ul className="mt-2 space-y-2">
-                            {section.members.map(({ profile }) => {
-                              const displayName = resolveProfileDisplayName(profile, profile.email ?? null);
-                              const initial = getProfileInitial(profile, profile.email ?? null);
-                              return (
-                                <li key={profile.id} className="flex items-center gap-2 text-[11px] text-slate-700">
-                                  {profile.avatar_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
-                                    <img
-                                      src={profile.avatar_url}
-                                      alt={displayName}
-                                      className="h-6 w-6 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
-                                      {initial}
-                                    </div>
-                                  )}
-                                  <span className="min-w-0 truncate" title={displayName}>
-                                    {displayName}
-                                  </span>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onOpenShareDialog}
-                    data-testid="share-button"
-                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                  >
-                    Edit
-                  </button>
+              <aside className="border-r border-slate-100 bg-amber-50/40">
+                <div
+                  className="sticky top-0 min-h-0"
+                  style={abViewportHeight > 0 ? { height: `${abViewportHeight}px` } : undefined}
+                >
+                  <OverduePanel
+                    items={overdue}
+                    variant="desktop"
+                    openCardModal={openCardModal}
+                    onToggleCheck={onToggleCheck}
+                    onCardContextMenu={onCardContextMenu}
+                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                    contextMenuCardId={contextMenuCardId}
+                    className="h-full border-0"
+                    contentClassName="space-y-1.5"
+                  />
                 </div>
               </aside>
 
@@ -654,6 +597,7 @@ export function DesktopTimelineView({
           overlayCardData={overlayCardData}
           overlayTimelineEvent={overlayTimelineEvent}
           overlayBucketCard={overlayBucketCard}
+          overlayOverdueCard={overlayOverdueCard}
         />
       </DragOverlay>
     </DndContext>

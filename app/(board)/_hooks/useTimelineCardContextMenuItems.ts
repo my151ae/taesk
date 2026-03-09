@@ -26,7 +26,7 @@ export function useTimelineCardContextMenuItems({
   const selectedCard = useMemo(() => {
     if (!contextMenuCardId) return null;
     const match = findTimelineCardById(data, contextMenuCardId);
-    return match.event ?? match.bucketItem ?? null;
+    return match.event ?? match.bucketItem ?? match.overdueItem ?? null;
   }, [contextMenuCardId, data]);
 
   const items = useMemo<ContextMenuItem[]>(() => {

@@ -14,6 +14,7 @@ import {
   TimelineBucketItem,
   TimelineDay,
   TimelineEvent,
+  TimelineOverdueItem,
   buildAbMeta,
   getMinutesFromTime,
   ExternalCalendarEntry,
@@ -23,10 +24,12 @@ import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import {
   buildOverlayCardData,
   findOverlayBucketEntry,
+  findOverlayOverdueEntry,
 } from "@/app/(board)/_utils/timeline-overlay";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
+import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import {
   useTimelineZoomStore,
@@ -34,20 +37,8 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP
 } from "@/app/(board)/_stores/timeline-zoom-store";
-import type { MemberRole } from "@/lib/supabase";
-import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
-import { getProfileInitial, resolveProfileDisplayName } from "@/lib/usernames";
-import { resolveTimeZoneDisplay } from "@/lib/timezone-display";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
-const ROLE_ORDER: MemberRole[] = ["owner", "editor", "commenter", "viewer"];
-const ROLE_LABELS: Record<MemberRole, string> = {
-  owner: "Owner",
-  editor: "Editor",
-  commenter: "Commenter",
-  viewer: "Viewer",
-};
-const SYSTEM_TIME_ZONE = "Asia/Tokyo";
 
 
 
@@ -367,6 +358,7 @@ type MobileTimelineViewProps = {
   registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
+  overdue: TimelineOverdueItem[];
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
   indicatorTop: number | null;
@@ -390,8 +382,6 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  boardMembers?: BoardMember[];
-  onOpenShareDialog?: () => void;
 };
 
 export default function MobileTimelineView({
@@ -405,6 +395,7 @@ export default function MobileTimelineView({
   registerAbScrollContainer,
   eventsByDay,
   abBuckets,
+  overdue,
   calendarEventsByDay,
   calendarAllDayByDay,
   indicatorTop,
@@ -428,8 +419,6 @@ export default function MobileTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  boardMembers,
-  onOpenShareDialog,
 }: MobileTimelineViewProps) {
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -440,27 +429,6 @@ export default function MobileTimelineView({
   }, [onMount]);
 
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
-
-  const sortedMembers = useMemo(() => {
-    if (!boardMembers?.length) return [];
-    return [...boardMembers].sort((a, b) => {
-      const aLabel = resolveProfileDisplayName(a.profile, a.profile.email ?? null);
-      const bLabel = resolveProfileDisplayName(b.profile, b.profile.email ?? null);
-      return aLabel.localeCompare(bLabel, "ja");
-    });
-  }, [boardMembers]);
-
-  const systemTimeZone = useMemo(() => resolveTimeZoneDisplay(SYSTEM_TIME_ZONE), []);
-
-  const membersByRole = useMemo(
-    () =>
-      ROLE_ORDER.map((role) => ({
-        role,
-        label: ROLE_LABELS[role],
-        members: sortedMembers.filter((member) => member.role === role),
-      })),
-    [sortedMembers]
-  );
 
   const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
 
@@ -520,16 +488,22 @@ export default function MobileTimelineView({
     () => findOverlayBucketEntry(activeBuckets, activeDragCardId),
     [activeBuckets, activeDragCardId]
   );
+  const overlayOverdueEntry = useMemo(
+    () => findOverlayOverdueEntry(overdue, activeDragCardId),
+    [overdue, activeDragCardId]
+  );
   const overlayTimelineEvent = eventsForDay.find((event) => event.card_id === activeDragCardId);
   const overlayCardData = useMemo(
     () =>
       buildOverlayCardData({
         timelineEvent: overlayTimelineEvent,
         bucketEntry: overlayBucketEntry,
+        overdueEntry: overlayOverdueEntry,
         defaultTimelineDuration: 0,
       }),
-    [overlayBucketEntry, overlayTimelineEvent]
+    [overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent]
   );
+  const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
 
   if (!activeDay) return null;
 
@@ -649,7 +623,7 @@ export default function MobileTimelineView({
               <div className="flex flex-col items-center gap-0">
                 <span>{activeDay.label}</span>
                 <span className="text-[10px] text-slate-400 normal-case tracking-normal">
-                  {activeDay.isoDate} · {systemTimeZone.label}
+                  {activeDay.isoDate}
                 </span>
               </div>
             </div>
@@ -704,6 +678,19 @@ export default function MobileTimelineView({
             </div>
           )}
 
+          <div className="border-b border-amber-100 bg-amber-50/40 px-3 py-3">
+            <OverduePanel
+              items={overdue}
+              variant="mobile"
+              openCardModal={openCardModal}
+              onToggleCheck={onToggleCheck}
+              onCardContextMenu={onCardContextMenu}
+              onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+              contextMenuCardId={contextMenuCardId}
+              className="max-h-56"
+            />
+          </div>
+
           <div
             className="grid flex-1 overflow-hidden"
             style={{ gridTemplateColumns: "1fr 1fr" }}
@@ -714,58 +701,10 @@ export default function MobileTimelineView({
               className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
             >
               <div
-                className="relative grid h-full grid-cols-[60px_1fr]"
+                className="relative grid h-full grid-cols-1"
                 data-testid="timeline-grid"
                 style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}
               >
-                <div className="relative border-r border-slate-100 text-[10px] font-semibold text-slate-500">
-                  <div className="sticky top-0 z-10 bg-white/95 px-1.5 py-2 backdrop-blur">
-                    <div className="space-y-2">
-                      {membersByRole.map((section) => (
-                        <div key={section.role} className="rounded border border-slate-100 bg-slate-50 px-1 py-1">
-                          <div className="flex items-center justify-between text-[9px] font-semibold text-slate-500">
-                            <span>{section.label}</span>
-                            <span>{section.members.length}</span>
-                          </div>
-                          {section.members.length > 0 && (
-                            <ul className="mt-1 space-y-1">
-                              {section.members.map(({ profile }) => {
-                                const displayName = resolveProfileDisplayName(profile, profile.email ?? null);
-                                const initial = getProfileInitial(profile, profile.email ?? null);
-                                return (
-                                  <li key={profile.id} className="flex items-center justify-center">
-                                    {profile.avatar_url ? (
-                                      // eslint-disable-next-line @next/next/no-img-element -- アバターURLは動的で軽量なため既存<img>を利用
-                                      <img
-                                        src={profile.avatar_url}
-                                        alt={displayName}
-                                        className="h-5 w-5 rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
-                                        {initial}
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onOpenShareDialog}
-                      data-testid="share-button"
-                      className="mt-2 flex h-7 w-full items-center justify-center rounded-md border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-sky-300 hover:text-sky-700"
-                      aria-label="メンバー編集"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-
                 <MobileTimelineColumn
                   day={activeDay}
                   events={eventsForDay}
@@ -825,6 +764,7 @@ export default function MobileTimelineView({
         <TimelineDragOverlayCard
           variant="mobile"
           overlayCardData={overlayCardData}
+          overlayOverdueCard={overlayOverdueCard}
         />
       </DragOverlay>
     </DndContext>

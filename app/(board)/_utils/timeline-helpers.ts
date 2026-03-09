@@ -1,6 +1,6 @@
 import type { DragEndEvent, DragMoveEvent } from "@dnd-kit/core";
-import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile } from '@/lib/api-types/timeline';
-export type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineResponse, UserProfile };
+import type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineOverdueItem, TimelineResponse, UserProfile } from '@/lib/api-types/timeline';
+export type { TimelineDay, TimelineEvent, TimelineBucketItem, TimelineOverdueItem, TimelineResponse, UserProfile };
 export type ExternalCalendarEntry = {
     id: string;
     eventId?: string;

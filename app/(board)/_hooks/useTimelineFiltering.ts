@@ -6,7 +6,7 @@ import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { getTiptapPlainText, normalizeContent } from "@/lib/tiptap";
 import { flattenChecklistText } from "@/lib/checklist";
 import type { Checklist } from "@/lib/checklist";
-import type { TimelineBucketItem, TimelineResponse, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineBucketItem, TimelineResponse, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 export function useTimelineFiltering(data: TimelineResponse | null) {
     const {
@@ -57,10 +57,13 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
             return acc;
         }, {} as Record<string, TimelineBucketItem[]>);
 
+        const filteredOverdue = data.overdue.filter((item: TimelineOverdueItem) => filterItem(item));
+
         return {
             ...data,
             events: filteredEvents,
             abBuckets: filteredBuckets,
+            overdue: filteredOverdue,
         };
     }, [data, searchQuery, selectedTags]);
 
@@ -76,8 +79,11 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         Object.values(data?.abBuckets ?? {}).forEach((items) => {
             (items ?? []).forEach((item) => (item.tags ?? []).forEach((tag) => tags.add(tag)));
         });
+        (data?.overdue ?? []).forEach((item) => {
+            (item.tags ?? []).forEach((tag) => tags.add(tag));
+        });
         return Array.from(tags).sort();
-    }, [data?.events, data?.abBuckets]);
+    }, [data?.events, data?.abBuckets, data?.overdue]);
 
     return {
         searchQuery,

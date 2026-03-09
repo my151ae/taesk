@@ -5,7 +5,7 @@ import {
 } from "@/lib/server/card-mutation";
 
 const CARD_CREATE_FALLBACK_COLUMNS = ["due_bucket_position"] as const;
-const CARD_UPDATE_FALLBACK_COLUMNS = ["due_bucket_position", "assignee_ids"] as const;
+const CARD_UPDATE_FALLBACK_COLUMNS = ["due_bucket_position", "assignee_ids", "started_at"] as const;
 
 export function getCardCreateFallbackColumns(): string[] {
   return [...CARD_CREATE_FALLBACK_COLUMNS];
@@ -32,6 +32,11 @@ export function cardMutationErrorResponse(args: {
 
   if (isMissingColumnError(error, "content") && "content" in payload) {
     const response = missingCardColumnResponse("content");
+    if (response) return response;
+  }
+
+  if (isMissingColumnError(error, "started_at") && "started_at" in payload) {
+    const response = missingCardColumnResponse("started_at");
     if (response) return response;
   }
 

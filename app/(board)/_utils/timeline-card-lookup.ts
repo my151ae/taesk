@@ -1,8 +1,9 @@
-import type { TimelineBucketItem, TimelineEvent, TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
+import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem, TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 
 type TimelineCardLookup = {
   event: TimelineEvent | null;
   bucketItem: TimelineBucketItem | null;
+  overdueItem: TimelineOverdueItem | null;
   bucketKey: string | null;
 };
 
@@ -26,14 +27,26 @@ export function findTimelineCardById(data: TimelineResponse | null, cardId: stri
     return {
       event,
       bucketItem: null,
+      overdueItem: null,
       bucketKey: null,
     };
   }
 
   const bucketMatch = findBucketItemByCardId(data, cardId);
+  if (bucketMatch) {
+    return {
+      event: null,
+      bucketItem: bucketMatch.item,
+      overdueItem: null,
+      bucketKey: bucketMatch.key,
+    };
+  }
+
+  const overdueItem = data?.overdue.find((item) => item.card_id === cardId) ?? null;
   return {
     event: null,
-    bucketItem: bucketMatch?.item ?? null,
-    bucketKey: bucketMatch?.key ?? null,
+    bucketItem: null,
+    overdueItem,
+    bucketKey: null,
   };
 }

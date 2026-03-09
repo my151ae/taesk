@@ -2,13 +2,19 @@ import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import {
   type TimelineBucketItem,
   type TimelineEvent,
+  type TimelineOverdueItem,
   formatDuration,
   timeLabel,
+  toLocalDay,
 } from "@/app/(board)/_utils/timeline-helpers";
 
 export type OverlayBucketEntry = {
   key: string;
   item: TimelineBucketItem;
+};
+
+export type OverlayOverdueEntry = {
+  item: TimelineOverdueItem;
 };
 
 export type OverlayCardData = {
@@ -31,12 +37,22 @@ export function findOverlayBucketEntry(
   return null;
 }
 
+export function findOverlayOverdueEntry(
+  overdue: TimelineOverdueItem[],
+  cardId: string | null
+): OverlayOverdueEntry | null {
+  if (!cardId) return null;
+  const item = overdue.find((entry) => entry.card_id === cardId);
+  return item ? { item } : null;
+}
+
 export function buildOverlayCardData(args: {
   timelineEvent: TimelineEvent | null | undefined;
   bucketEntry: OverlayBucketEntry | null;
+  overdueEntry?: OverlayOverdueEntry | null;
   defaultTimelineDuration?: number;
 }): OverlayCardData | null {
-  const { timelineEvent, bucketEntry, defaultTimelineDuration = 60 } = args;
+  const { timelineEvent, bucketEntry, overdueEntry = null, defaultTimelineDuration = 60 } = args;
   if (timelineEvent) {
     return {
       title: timelineEvent.title || "",
@@ -50,19 +66,33 @@ export function buildOverlayCardData(args: {
 
   const bucketCard = bucketEntry?.item ?? null;
   const bucketKey = bucketEntry?.key ?? null;
-  if (!bucketCard) return null;
+  if (bucketCard) {
+    return {
+      title: bucketCard.title || "",
+      badge: bucketKey ? bucketKeyToDueBucket(bucketKey) : "a",
+      timeText:
+        bucketCard.duration != null
+          ? `:${formatDuration(bucketCard.duration)} ${
+              bucketCard.due_start ? timeLabel(bucketCard.due_start, bucketCard.due_end) : ""
+            }`
+          : bucketCard.due_start
+          ? timeLabel(bucketCard.due_start, bucketCard.due_end)
+          : null,
+      note: bucketCard.excerpt ?? null,
+    };
+  }
 
+  const overdueItem = overdueEntry?.item ?? null;
+  if (!overdueItem) return null;
+
+  const overdueDay = toLocalDay(overdueItem.due_date ?? null);
+  const overdueLabel = overdueDay ? overdueDay.slice(5) : "Overdue";
   return {
-    title: bucketCard.title || "",
-    badge: bucketKey ? bucketKeyToDueBucket(bucketKey) : "a",
-    timeText:
-      bucketCard.duration != null
-        ? `:${formatDuration(bucketCard.duration)} ${
-            bucketCard.due_start ? timeLabel(bucketCard.due_start, bucketCard.due_end) : ""
-          }`
-        : bucketCard.due_start
-        ? timeLabel(bucketCard.due_start, bucketCard.due_end)
-        : null,
-    note: bucketCard.excerpt ?? null,
+    title: overdueItem.title || "",
+    badge: overdueItem.due_bucket ?? "o",
+    timeText: overdueItem.due_start
+      ? `${overdueLabel} ${timeLabel(overdueItem.due_start, overdueItem.due_end)}`
+      : overdueLabel,
+    note: overdueItem.excerpt ?? null,
   };
 }

@@ -1,6 +1,6 @@
 import type { DueBucket } from "@/lib/supabase";
 import { withJstMidnight } from "@/app/(board)/_utils/timeline-helpers";
-import type { TimelineBucketItem, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type BucketDropPositionInput = {
   bucketItems: TimelineBucketItem[];
@@ -12,11 +12,15 @@ type BucketDropPositionInput = {
 export function resolveSourceDueBucket(args: {
   sourceEvent?: TimelineEvent;
   sourceBucketItem?: TimelineBucketItem;
+  sourceOverdueItem?: TimelineOverdueItem;
   sourceBucketKey?: string;
 }): DueBucket | null {
-  const { sourceEvent, sourceBucketKey } = args;
+  const { sourceEvent, sourceOverdueItem, sourceBucketKey } = args;
   if (sourceEvent?.due_bucket) {
     return sourceEvent.due_bucket as DueBucket;
+  }
+  if (sourceOverdueItem?.due_bucket) {
+    return sourceOverdueItem.due_bucket as DueBucket;
   }
   if (sourceBucketKey) {
     const bucket = sourceBucketKey.split("_")[1];
@@ -83,15 +87,16 @@ export function buildTimelineDropPayload(args: {
   sourceDueBucket: DueBucket | null;
   sourceEvent?: TimelineEvent;
   sourceBucketItem?: TimelineBucketItem;
+  sourceOverdueItem?: TimelineOverdueItem;
 }) {
-  const { dayIso, nextStart, duration, sourceDueBucket, sourceEvent, sourceBucketItem } = args;
+  const { dayIso, nextStart, duration, sourceDueBucket, sourceEvent, sourceBucketItem, sourceOverdueItem } = args;
   const nextEnd = nextStart + duration;
   return {
     due_bucket: sourceDueBucket,
     due_date: withJstMidnight(dayIso),
     due_start: `${String(Math.floor(nextStart / 60) % 24).padStart(2, "0")}:${String(nextStart % 60).padStart(2, "0")}:00`,
     due_end: `${String(Math.floor(Math.min(nextEnd, 24 * 60 - 1) / 60) % 24).padStart(2, "0")}:${String(Math.min(nextEnd, 24 * 60 - 1) % 60).padStart(2, "0")}:00`,
-    due_bucket_position: sourceEvent?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
+    due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
   };
 }
 
