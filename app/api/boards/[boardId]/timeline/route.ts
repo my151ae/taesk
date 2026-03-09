@@ -3,7 +3,6 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay, TimelineOverdueItem } from '@/lib/api-types/timeline';
 import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { isMissingColumnError } from '@/lib/server/card-mutation';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -26,7 +25,6 @@ type TimelineCardRow = {
   end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   due_bucket: 'a' | 'b' | null;
   due_bucket_position: number | null;
-  started_at: string | null;
   checked: boolean;
   assignee_id: string | null;
   assignee_ids: string[] | null;
@@ -111,51 +109,13 @@ const getHandler = async (
   const days = buildDays(now, startOffset, range);
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
-  const baseSelect =
-    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, started_at';
-  const extendedSelect = `${baseSelect}, due_bucket_position`;
+  const cardsSelect =
+    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
 
-  let cards: TimelineCardRow[] | null = null;
-  let fetchError = null;
-
-  const initial = await supabase
+  const { data: cards, error: fetchError } = await supabase
     .from('cards')
-    .select(extendedSelect)
+    .select(cardsSelect)
     .eq('board_id', boardId);
-
-  if (isMissingColumnError(initial.error, 'started_at')) {
-    const fallbackSelect = baseSelect
-      .replace('checklist, ', '')
-      .replace('content, ', '')
-      .replace('start_reminder_enabled, ', '')
-      .replace('start_reminder_minutes, ', '')
-      .replace('end_reminder_enabled, ', '')
-      .replace('end_reminder_minutes, ', '')
-      .replace(', started_at', '');
-    const fallback = await supabase
-      .from('cards')
-      .select(fallbackSelect)
-      .eq('board_id', boardId);
-    fetchError = fallback.error;
-    cards =
-      fallback.data
-        ? (fallback.data as unknown as TimelineCardRow[]).map((card) => ({
-          ...card,
-          checklist: EMPTY_CHECKLIST,
-          content: null,
-          excerpt: card.excerpt ?? null,
-          start_reminder_enabled: false,
-          start_reminder_minutes: 0,
-          end_reminder_enabled: false,
-          end_reminder_minutes: 0,
-          due_bucket_position: null,
-          started_at: null,
-        }))
-        : null;
-  } else {
-    fetchError = initial.error;
-    cards = initial.data;
-  }
 
   if (fetchError) {
     console.error('[timeline] Failed to fetch cards', fetchError);
@@ -208,7 +168,6 @@ const getHandler = async (
           assignee_ids: card.assignee_ids ?? null,
           assigned_to: card.assigned_to,
           duration: card.duration ?? 60,
-          started_at: card.started_at,
           short_id: card.short_id,
           slug: card.slug,
         });
@@ -241,7 +200,6 @@ const getHandler = async (
           assigned_to: card.assigned_to,
           duration: card.duration ?? 60,
           due_bucket: card.due_bucket ?? bucket,
-          started_at: card.started_at,
           short_id: card.short_id,
           slug: card.slug,
           bucketPosition: card.due_bucket_position ?? null,
@@ -271,7 +229,6 @@ const getHandler = async (
         duration: card.duration ?? 60,
         due_bucket: card.due_bucket ?? null,
         due_bucket_position: card.due_bucket_position ?? null,
-        started_at: card.started_at,
         short_id: card.short_id,
         slug: card.slug,
       });

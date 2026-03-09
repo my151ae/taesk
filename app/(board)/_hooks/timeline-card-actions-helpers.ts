@@ -27,7 +27,6 @@ export function buildOptimisticCard(payload: Partial<Card>, boardId: string, opt
     end_reminder_minutes: payload.end_reminder_minutes ?? 0,
     due_bucket: payload.due_bucket ?? null,
     due_bucket_position: payload.due_bucket_position ?? null,
-    started_at: payload.started_at ?? null,
     duration: payload.duration ?? 60,
     checked: payload.checked ?? false,
     assigned_to: payload.assigned_to ?? null,

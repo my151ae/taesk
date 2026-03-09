@@ -132,7 +132,6 @@ export function createPersistPlacement({
             60,
           due_bucket: args.dueBucket,
           due_bucket_position: args.dueBucketPosition,
-          started_at: baseOverdueItem?.started_at ?? baseEvent?.started_at ?? baseBucketItem?.started_at ?? null,
           short_id: baseOverdueItem?.short_id ?? baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
           slug: baseOverdueItem?.slug ?? baseEvent?.slug ?? baseBucketItem?.slug ?? null,
         });
@@ -205,7 +204,6 @@ export function createPersistPlacement({
           assignee_id: baseEvent?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
           assignee_ids: baseEvent?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
           assigned_to: baseEvent?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
-          started_at: baseEvent?.started_at ?? baseOverdueItem?.started_at ?? baseBucketItem?.started_at ?? null,
           short_id: baseEvent?.short_id ?? baseOverdueItem?.short_id ?? baseBucketItem?.short_id ?? null,
           slug: baseEvent?.slug ?? baseOverdueItem?.slug ?? baseBucketItem?.slug ?? null,
         };
@@ -256,7 +254,6 @@ export function createPersistPlacement({
           assignee_ids: baseBucketItem?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseEvent?.assignee_ids ?? null,
           assigned_to: baseBucketItem?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseEvent?.assigned_to ?? null,
           due_bucket: nextDueBucket,
-          started_at: baseBucketItem?.started_at ?? baseOverdueItem?.started_at ?? baseEvent?.started_at ?? null,
           short_id: baseBucketItem?.short_id ?? baseOverdueItem?.short_id ?? baseEvent?.short_id ?? null,
           slug: baseBucketItem?.slug ?? baseOverdueItem?.slug ?? baseEvent?.slug ?? null,
           duration:

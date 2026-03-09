@@ -161,7 +161,6 @@ interface TimelineOverdueItem {
   due_end: string | null;
   due_bucket?: 'a' | 'b' | null;
   due_bucket_position?: number | null;
-  started_at?: string | null;
   title: string;
   checked: boolean;
   short_id: string | null;
@@ -171,7 +170,7 @@ interface TimelineOverdueItem {
 
 - `due_date` があり `due_start`/`due_end` が **両方ある** カードは Timeline イベントとして並び、`durationMinutes` を算出する
 - `due_date` があり `due_start`/`due_end` が **未設定** のカードは A/B に入り、`due_bucket`（未指定なら `b`）でグルーピングされる
-- `due_date` が過去日かつ `checked = false` のカードは visible range に関係なく `overdue` に入り、`events` / `abBuckets` には重複して出さない
+- `due_date` が過去日かつ `checked = false` のカードは visible range に関係なく `overdue` に入り、visible range 内では `events` / `abBuckets` にも重複して出る
 - A/B は `due_bucket_position` で降順ソート
 - `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
 - API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す

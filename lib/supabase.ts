@@ -98,7 +98,6 @@ export interface Card {
   end_reminder_minutes: 0 | 5 | 10 | 15 | 30 | 60;
   due_bucket: DueBucket | null;
   due_bucket_position: number | null;
-  started_at?: string | null;
   duration: number;
   checked: boolean;
   /** @deprecated legacy text-based assignee field */

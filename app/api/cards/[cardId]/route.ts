@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
-import { isMissingColumnError } from '@/lib/server/card-mutation';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const getHandler = async (
@@ -27,7 +26,7 @@ const getHandler = async (
     .select(`
         id, short_id, id_short, slug, title, checklist, tags, content, excerpt,
         list_id, board_id, position, user_id,
-        due_date, due_start, due_end, due_bucket, due_bucket_position, started_at,
+        due_date, due_start, due_end, due_bucket, due_bucket_position,
         start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes,
         checked, assignee_id, assignee_ids, assigned_to,
         created_at, updated_at, duration,
@@ -35,30 +34,8 @@ const getHandler = async (
       `)
     .eq('short_id', cardId)
     .maybeSingle();
-
-  let effectiveCard = card;
-  let effectiveCardError = cardError;
-
-  if (isMissingColumnError(cardError, 'started_at')) {
-    const fallback = await supabase
-      .from('cards')
-      .select(`
-        id, short_id, id_short, slug, title, checklist, tags, content, excerpt,
-        list_id, board_id, position, user_id,
-        due_date, due_start, due_end, due_bucket, due_bucket_position,
-        start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes,
-        checked, assignee_id, assignee_ids, assigned_to,
-        created_at, updated_at, duration,
-        calendar_sync ( status, last_synced_at, google_event_id, last_google_event_id )
-      `)
-      .eq('short_id', cardId)
-      .maybeSingle();
-
-    effectiveCard = fallback.data
-      ? { ...fallback.data, started_at: null }
-      : null;
-    effectiveCardError = fallback.error;
-  }
+  const effectiveCard = card;
+  const effectiveCardError = cardError;
 
   if (effectiveCardError) {
     console.error('[cards:get] failed to load card', effectiveCardError);

@@ -39,7 +39,6 @@ export interface TimelineEvent {
   assignee_ids?: string[] | null;
   assigned_to?: string | null;
   duration?: number | null;
-  started_at?: string | null;
   short_id: string | null;
   slug: string | null;
 }
@@ -64,7 +63,6 @@ export interface TimelineBucketItem {
   assigned_to?: string | null;
   duration?: number | null;
   due_bucket?: DueBucket | null;
-  started_at?: string | null;
   short_id: string | null;
   slug: string | null;
   bucketPosition: number | null;
@@ -91,7 +89,6 @@ export interface TimelineOverdueItem {
   duration?: number | null;
   due_bucket?: DueBucket | null;
   due_bucket_position?: number | null;
-  started_at?: string | null;
   short_id: string | null;
   slug: string | null;
 }

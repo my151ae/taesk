@@ -431,7 +431,6 @@ export function useTimelineCardActions({
         end_reminder_minutes: sourceEvent?.end_reminder_minutes ?? sourceBucketItem?.end_reminder_minutes ?? sourceOverdueItem?.end_reminder_minutes ?? 0,
         due_bucket: sourceEvent?.due_bucket ?? sourceBucketItem?.due_bucket ?? sourceOverdueItem?.due_bucket ?? dueBucketFromKey,
         due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
-        started_at: sourceEvent?.started_at ?? sourceBucketItem?.started_at ?? sourceOverdueItem?.started_at ?? null,
       } as Card;
 
       setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
@@ -507,7 +506,6 @@ export function useTimelineCardActions({
       end_reminder_minutes: event?.end_reminder_minutes ?? bucketItem?.end_reminder_minutes ?? overdueItem?.end_reminder_minutes ?? 0,
       due_bucket: event?.due_bucket ?? bucketItem?.due_bucket ?? overdueItem?.due_bucket ?? dueBucketFromKey,
       due_bucket_position: event?.due_bucket_position ?? overdueItem?.due_bucket_position ?? bucketItem?.bucketPosition ?? null,
-      started_at: event?.started_at ?? bucketItem?.started_at ?? overdueItem?.started_at ?? null,
     } as Card;
 
     setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));

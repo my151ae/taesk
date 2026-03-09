@@ -13,7 +13,7 @@ function resolveBucketKey(
     bucket: string
 ) {
     const matchedDay = days?.find((day) => toLocalDay(day.isoDate) === localDay);
-    const dayKey = matchedDay?.key ?? days?.[0]?.key ?? null;
+    const dayKey = matchedDay?.key ?? null;
     if (!dayKey) return null;
     return `${dayKey}_${bucket}`;
 }
@@ -91,7 +91,6 @@ export function applyCardUpdate(
             assignee_ids: card.assignee_ids ?? null,
             assigned_to: card.assigned_to,
             duration: card.duration ?? null,
-            started_at: card.started_at ?? null,
             short_id: card.short_id,
             slug: card.slug,
         };
@@ -142,7 +141,6 @@ export function applyCardUpdate(
                 assigned_to: card.assigned_to,
                 duration: card.duration ?? null,
                 due_bucket: card.due_bucket ?? bucket,
-                started_at: card.started_at ?? null,
                 short_id: card.short_id,
                 slug: card.slug,
                 bucketPosition: card.due_bucket_position,
@@ -182,7 +180,6 @@ export function applyCardUpdate(
             duration: card.duration ?? null,
             due_bucket: card.due_bucket ?? null,
             due_bucket_position: card.due_bucket_position ?? null,
-            started_at: card.started_at ?? null,
             short_id: card.short_id,
             slug: card.slug,
         };

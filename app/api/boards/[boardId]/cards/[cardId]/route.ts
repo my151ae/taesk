@@ -6,7 +6,6 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
-  isMissingColumnError,
   runCardMutationWithFallback,
   stripUndefinedValues,
 } from '@/lib/server/card-mutation';
@@ -21,9 +20,6 @@ import {
   syncPatchedCardToCalendar,
 } from '@/lib/server/card-side-effects';
 import { CARD_IMAGE_BUCKET, buildCardImageStoragePrefix } from '@/lib/tiptap-images';
-
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -56,7 +52,6 @@ const UpdateCardSchema = z.object({
   ]).optional(),
   due_bucket: z.enum(['a', 'b']).nullable().optional(),
   due_bucket_position: z.number().nullable().optional(),
-  started_at: z.string().datetime().nullable().optional(),
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),
@@ -66,31 +61,6 @@ const UpdateCardSchema = z.object({
 });
 
 const STORAGE_LIST_PAGE_SIZE = 100;
-type CurrentCardState = {
-  due_date: string | null;
-  checked: boolean;
-  started_at: string | null;
-};
-
-const formatDateJst = (base: Date, offsetDays = 0): string => {
-  const utcMs = base.getTime();
-  const jstMs = utcMs + JST_OFFSET_MS + offsetDays * MS_PER_DAY;
-  const jstDate = new Date(jstMs);
-  const year = jstDate.getUTCFullYear();
-  const month = `${jstDate.getUTCMonth() + 1}`.padStart(2, '0');
-  const day = `${jstDate.getUTCDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const toJstDate = (value: string | null | undefined) => {
-  if (!value) return null;
-  return formatDateJst(new Date(value));
-};
-
-const isOverdueState = (state: { due_date: string | null; checked: boolean }, todayIso: string) => {
-  const localDay = toJstDate(state.due_date);
-  return Boolean(localDay && localDay < todayIso && !state.checked);
-};
 
 const deleteCardImagesBestEffort = async (boardId: string, cardId: string) => {
   const admin = createServiceRoleSupabaseClient();
@@ -157,43 +127,6 @@ const patchHandler = async (
   }
   const { supabase, user } = auth.data;
 
-  const currentCardStateQuery = async (selectClause: string) =>
-    supabase
-      .from('cards')
-      .select(selectClause)
-      .eq('id', cardId)
-      .eq('board_id', boardId)
-      .maybeSingle();
-
-  const initialCardState = await currentCardStateQuery('due_date, checked, started_at');
-  const fallbackCardState =
-    isMissingColumnError(initialCardState.error, 'started_at')
-      ? await currentCardStateQuery('due_date, checked')
-      : null;
-  const fallbackCardStateData =
-    fallbackCardState?.data && typeof fallbackCardState.data === 'object'
-      ? (fallbackCardState.data as { due_date: string | null; checked: boolean })
-      : null;
-
-  const currentCardState: CurrentCardState | null = fallbackCardStateData
-    ? { ...fallbackCardStateData, started_at: null }
-    : (initialCardState.data as CurrentCardState | null);
-  const currentCardStateError = fallbackCardState?.error ?? initialCardState.error;
-
-  if (currentCardStateError) {
-    return NextResponse.json(
-      { error: { code: 'DB_ERROR', message: currentCardStateError.message } },
-      { status: 500 }
-    );
-  }
-
-  if (!currentCardState) {
-    return NextResponse.json(
-      { error: { code: 'NOT_FOUND', message: 'Card not found' } },
-      { status: 404 }
-    );
-  }
-
   const body = await request.json();
   const parsed = UpdateCardSchema.safeParse(body);
 
@@ -234,34 +167,6 @@ const patchHandler = async (
   if ('content' in normalizedPayload) {
     normalizedPayload.content = normalizeContent(normalizedPayload.content);
     normalizedPayload.excerpt = deriveExcerptFromContent(normalizedPayload.content as Record<string, unknown>);
-  }
-
-  const todayIso = formatDateJst(new Date(), 0);
-  const nextDueDate =
-    Object.prototype.hasOwnProperty.call(normalizedPayload, 'due_date')
-      ? (normalizedPayload.due_date as string | null)
-      : currentCardState.due_date;
-  const nextChecked =
-    Object.prototype.hasOwnProperty.call(normalizedPayload, 'checked')
-      ? Boolean(normalizedPayload.checked)
-      : Boolean(currentCardState.checked);
-  const wasOverdue = isOverdueState(
-    { due_date: currentCardState.due_date, checked: Boolean(currentCardState.checked) },
-    todayIso
-  );
-  const isOverdueNext = isOverdueState(
-    { due_date: nextDueDate, checked: nextChecked },
-    todayIso
-  );
-
-  if (
-    !Object.prototype.hasOwnProperty.call(normalizedPayload, 'started_at') &&
-    !currentCardState.started_at &&
-    wasOverdue &&
-    !isOverdueNext &&
-    nextChecked === false
-  ) {
-    normalizedPayload.started_at = new Date().toISOString();
   }
 
   const { data: updatedCard, error, payload: payloadToSend } = await runCardMutationWithFallback(

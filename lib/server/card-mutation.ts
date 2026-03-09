@@ -15,7 +15,6 @@ type MutationRunner<T> = (payload: Record<string, unknown>) => Promise<MutationR
 const CARD_COLUMN_MIGRATIONS: Record<string, string> = {
   checklist: "20251129090000_add_checklist_to_cards.sql",
   content: "20251220090000_add_card_content.sql",
-  started_at: "20260309120000_add_started_at_to_cards.sql",
 };
 
 export function isMissingColumnError(error: unknown, column: string): boolean {
