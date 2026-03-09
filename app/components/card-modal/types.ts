@@ -1,4 +1,4 @@
-import type { DueBucket, Priority } from '@/lib/supabase';
+import type { DueBucket } from '@/lib/supabase';
 import type { JSONContent } from '@tiptap/react';
 
 export type ReminderMinuteOption = 0 | 5 | 10 | 15 | 30 | 60;
@@ -10,7 +10,6 @@ export type CardModalSavePayload = {
   excerpt: string;
   tags?: string[];
   due_date?: string | null;
-  priority?: Priority;
   assigneeIds?: string[];
   assigneeTouched?: boolean;
   due_start?: string | null;

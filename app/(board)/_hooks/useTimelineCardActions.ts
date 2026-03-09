@@ -160,7 +160,6 @@ export function useTimelineCardActions({
           end_reminder_minutes: savePayload.end_reminder_minutes ?? 0,
           due_bucket: savePayload.due_bucket ?? null,
           due_bucket_position: savePayload.due_bucket_position ?? null,
-          priority: savePayload.priority ?? targetCard.priority ?? 'medium',
           duration: savePayload.duration ?? targetCard.duration ?? null,
           slug: slugify(savePayload.title),
         };
@@ -190,7 +189,6 @@ export function useTimelineCardActions({
             end_reminder_minutes: savePayload.end_reminder_minutes ?? 0,
             due_bucket: savePayload.due_bucket,
             due_bucket_position: savePayload.due_bucket_position,
-            priority: savePayload.priority,
             duration: savePayload.duration,
             slug: slugify(savePayload.title),
           };
@@ -368,7 +366,6 @@ export function useTimelineCardActions({
       due_date: withJstMidnight(day.isoDate),
       due_start: minutesToTime(minutes),
       due_end: minutesToTime(minutes + 60),
-      priority: "medium",
     };
     createCard(payload, { openModal: false });
   }, [createCard]);
@@ -392,7 +389,6 @@ export function useTimelineCardActions({
       due_date: withJstMidnight(isoDate),
       due_bucket: dueBucket,
       due_bucket_position: position,
-      priority: "medium",
     };
 
     createCard(payload, { openModal: false });
@@ -476,7 +472,6 @@ export function useTimelineCardActions({
       excerpt: event?.excerpt ?? bucketItem?.excerpt ?? null,
       checklist: event?.checklist ?? bucketItem?.checklist ?? null,
       tags: event?.tags ?? bucketItem?.tags ?? [],
-      priority: event?.priority ?? bucketItem?.priority ?? null,
       checked: event?.checked ?? bucketItem?.checked ?? false,
       assignee_id: event?.assignee_id ?? bucketItem?.assignee_id ?? null,
       assignee_ids: event?.assignee_ids ?? bucketItem?.assignee_ids ?? null,

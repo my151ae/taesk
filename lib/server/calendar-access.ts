@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { DueBucket, Priority } from '@/lib/supabase';
+import type { DueBucket } from '@/lib/supabase';
 import { getBoardMembership, hasAnyRole } from '@/lib/server/api-security';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
@@ -19,7 +19,6 @@ export type CalendarCardRecord = {
   slug: string | null;
   due_bucket: DueBucket | null;
   due_bucket_position: number | null;
-  priority: Priority | null;
   checked: boolean;
   duration: number | null;
 };
@@ -30,7 +29,7 @@ async function findCardByIdOrShortId(
 ): Promise<CalendarCardRecord | null> {
   const { data, error } = await supabase
     .from('cards')
-    .select('id, board_id, due_date, due_start, due_end, title, excerpt, short_id, id_short, slug, due_bucket, due_bucket_position, priority, checked, duration')
+    .select('id, board_id, due_date, due_start, due_end, title, excerpt, short_id, id_short, slug, due_bucket, due_bucket_position, checked, duration')
     .or(`id.eq.${cardIdentifier},short_id.eq.${cardIdentifier}`)
     .maybeSingle();
 

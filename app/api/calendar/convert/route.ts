@@ -182,7 +182,6 @@ const postHandler = async (request: NextRequest) => {
       due_end,
       due_bucket: event.is_all_day ? "a" : null,
       due_bucket_position: event.is_all_day ? positionValue : null,
-      priority: "medium",
       checked: false,
       assignee_id: null,
       assigned_to: null,

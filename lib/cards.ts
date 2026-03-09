@@ -16,7 +16,6 @@ type CardRow = {
   checklist: Checklist | null;
   tags: string[] | null;
   due_date: string | null;
-  priority: CardDetail['priority'] | null;
   assigned_to: string | null;
   assignee_id: string | null;
   created_at: string;
@@ -34,7 +33,6 @@ export type CardDetail = {
   checklist: Checklist | null;
   tags: string[];
   dueDate: string | null;
-  priority: 'low' | 'medium' | 'high';
   assignedTo: string | null;
   createdAt: string;
   updatedAt: string;
@@ -61,7 +59,6 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
         'checklist',
         'tags',
         'due_date',
-        'priority',
         'assigned_to',
         'assignee_id',
         'created_at',
@@ -94,7 +91,6 @@ export async function getCardByShortId(shortId: string): Promise<CardDetail | nu
     checklist: normalizeChecklist(data.checklist ?? EMPTY_CHECKLIST),
     tags: Array.isArray(data.tags) ? data.tags : [],
     dueDate: data.due_date ?? null,
-    priority: (data.priority ?? 'medium') as CardDetail['priority'],
     assignedTo: data.assignee_id ?? data.assigned_to ?? null,
     createdAt: data.created_at,
     updatedAt: data.updated_at,

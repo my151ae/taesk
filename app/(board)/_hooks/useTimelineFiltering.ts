@@ -14,8 +14,6 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         setSearchQuery,
         selectedTags,
         setSelectedTags,
-        selectedPriority,
-        setSelectedPriority,
         sortBy,
         setSortBy,
         showFilters,
@@ -28,14 +26,10 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         const filterItem = (item: {
             title: string;
             tags: string[];
-            priority?: string | null;
             content?: JSONContent | Record<string, unknown> | null;
             excerpt?: string | null;
             checklist?: Checklist | null;
         }) => {
-            // Priority
-            if (selectedPriority !== 'all' && item.priority !== selectedPriority) return false;
-
             // Tags
             if (selectedTags.length > 0) {
                 const tagSet = new Set(item.tags ?? []);
@@ -59,7 +53,7 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         const filteredEvents = data.events.filter(event => filterItem(event));
 
         const filteredBuckets = Object.entries(data.abBuckets).reduce((acc, [key, items]) => {
-            acc[key] = items.filter(item => filterItem({ ...item, priority: item.priority || 'all' }));
+            acc[key] = items.filter(item => filterItem(item));
             return acc;
         }, {} as Record<string, TimelineBucketItem[]>);
 
@@ -68,11 +62,11 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
             events: filteredEvents,
             abBuckets: filteredBuckets,
         };
-    }, [data, searchQuery, selectedTags, selectedPriority]);
+    }, [data, searchQuery, selectedTags]);
 
     const hasActiveFilters = useMemo(() => {
-        return searchQuery.trim() !== '' || selectedTags.length > 0 || selectedPriority !== 'all';
-    }, [searchQuery, selectedTags, selectedPriority]);
+        return searchQuery.trim() !== '' || selectedTags.length > 0;
+    }, [searchQuery, selectedTags]);
 
     const availableTags = useMemo(() => {
         const tags = new Set<string>();
@@ -90,8 +84,6 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         setSearchQuery,
         selectedTags,
         setSelectedTags,
-        selectedPriority,
-        setSelectedPriority,
         sortBy,
         setSortBy,
         showFilters,

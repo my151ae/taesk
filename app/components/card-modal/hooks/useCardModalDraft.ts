@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { JSONContent } from "@tiptap/react";
 
-import type { Card, DueBucket, Priority, ProfileSummary } from "@/lib/supabase";
+import type { Card, DueBucket, ProfileSummary } from "@/lib/supabase";
 import { normalizeContent } from "@/lib/tiptap";
 import type { ReminderMinuteOption } from "@/app/components/card-modal/types";
 
@@ -47,7 +47,6 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
   const [dueBucket, setDueBucket] = useState<DueBucket | null>(card.due_bucket ?? null);
   const [dueBucketPosition, setDueBucketPosition] = useState<number | null>(card.due_bucket_position ?? null);
   const [duration, setDuration] = useState<number | "">(card.duration ?? 60);
-  const [priority, setPriority] = useState<Priority>(card.priority || "medium");
   const [checked, setChecked] = useState(card.checked || false);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(() => resolveInitialAssigneeIds(card));
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
@@ -106,7 +105,6 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setDueBucket(nextCard.due_bucket ?? null);
     setDueBucketPosition(nextCard.due_bucket_position ?? null);
     setDuration(nextCard.duration ?? 60);
-    setPriority(nextCard.priority || "medium");
     setChecked(nextCard.checked || false);
     setAssigneeIds(resolveInitialAssigneeIds(nextCard));
     setShowMemberDropdown(false);
@@ -146,8 +144,6 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setDueBucketPosition,
     duration,
     setDuration,
-    priority,
-    setPriority,
     checked,
     setChecked,
     assigneeIds,

@@ -107,7 +107,6 @@ export const TimelineColumn = memo(function TimelineColumn({
             durationMinutes: entry.durationMinutes,
             title: entry.title,
             tags: [],
-            priority: null,
             checked: false,
             short_id: entry.eventId ?? entry.id,
             slug: null,

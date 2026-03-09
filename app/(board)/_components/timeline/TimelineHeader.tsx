@@ -6,7 +6,6 @@ import { Board, Team, TeamRole } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
-import type { Priority } from '@/lib/supabase';
 import type { ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 import { MAIN_BOARD_ID } from '@/lib/board-defaults';
@@ -49,8 +48,6 @@ type TimelineHeaderProps = {
     setSearchQuery: (query: string) => void;
     selectedTags: string[];
     setSelectedTags: (tags: string[] | ((prev: string[]) => string[])) => void;
-    selectedPriority: 'all' | Priority;
-    setSelectedPriority: (priority: 'all' | Priority) => void;
     availableTags: string[];
     onOpenBoardSettings: (boardId: string | null | undefined) => void;
     dayRange: number;
@@ -98,8 +95,6 @@ export default function TimelineHeader({
     setSearchQuery,
     selectedTags,
     setSelectedTags,
-    selectedPriority,
-    setSelectedPriority,
     availableTags,
     onOpenBoardSettings,
     dayRange,
@@ -689,18 +684,6 @@ export default function TimelineHeader({
                                             className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
                                         />
                                     </div>
-                                    <div className="w-24">
-                                        <select
-                                            value={selectedPriority}
-                                            onChange={(event) => setSelectedPriority(event.target.value as 'all' | Priority)}
-                                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                        >
-                                            <option value="all">Priority</option>
-                                            <option value="low">Low</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="high">High</option>
-                                        </select>
-                                    </div>
                                 </div>
 
                                 <div>
@@ -737,7 +720,6 @@ export default function TimelineHeader({
                                             onClick={() => {
                                                 setSearchQuery('');
                                                 setSelectedTags([]);
-                                                setSelectedPriority('all');
                                             }}
                                             className="text-xs font-medium text-slate-500 hover:text-slate-700"
                                         >

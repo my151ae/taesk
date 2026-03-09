@@ -142,7 +142,6 @@ interface TimelineEvent {
   durationMinutes: number | null;
   title: string;
   tags: string[];
-  priority: 'low' | 'medium' | 'high' | null;
   checked: boolean;
   due_bucket?: 'a' | 'b' | null;
   due_bucket_position?: number | null;

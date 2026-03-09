@@ -75,10 +75,6 @@ export default async function CardFullPage({
                 <dd className="mt-1 text-sm text-slate-800">#{card.id_short}</dd>
               </div>
             ) : null}
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Priority</dt>
-              <dd className="mt-1 capitalize text-sm text-slate-800">{card.priority}</dd>
-            </div>
             {card.due_date ? (
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Due Date</dt>

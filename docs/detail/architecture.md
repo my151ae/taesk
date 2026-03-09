@@ -43,7 +43,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ### Timeline Response Contract
 
 - `days`: JST ISO 日付 (`{ key: 'YYYY-MM-DD', label, isoDate }`)
-- `events`: `due_date` + `due_start` + `due_end` が揃うカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `priority`, `checked`, `due_bucket`, `due_bucket_position`, `assignee_id`, `assignee_ids`, `assigned_to`, `short_id`, `slug` を含む
+- `events`: `due_date` + `due_start` + `due_end` が揃うカード。`due_date`, `due_start`, `due_end`, `durationMinutes`, `tags`, `checked`, `due_bucket`, `due_bucket_position`, `assignee_id`, `assignee_ids`, `assigned_to`, `short_id`, `slug` を含む
 - `abBuckets`: `${isoDate}_a` / `${isoDate}_b` のキーで配列を保持。`due_bucket_position` で降順ソートし、`assignee_ids` を含めて返却
 - `serverNow`: API 生成時刻 (UTC ISO)。クライアントは JST に変換して Now ラインを描画
 
@@ -120,7 +120,7 @@ app/layout.tsx
 - Timeline DnD、CardModal 保存、コメント投稿など全てのミューテーションがここを通過するため、board state を直接書き換える場面でも API 反映との整合が保たれる。
 
 ### useTimelineFiltering
-- `searchQuery`, `selectedTags`, `selectedPriority`, `sortBy`, `showFilters` を管理し、`events` と `abBuckets` を同時にフィルタする。
+- `searchQuery`, `selectedTags`, `sortBy`, `showFilters` を管理し、`events` と `abBuckets` を同時にフィルタする。
 - 内部で `useBoardFilters` を利用し、`availableTags` / `hasActiveFilters` などの補助情報も返す。
 
 ### useCommentsStore
@@ -142,7 +142,7 @@ app/layout.tsx
 
 - `app/(board)/@modal/(...)c/[short_id]/[[...slug]]/page.tsx` が intercepting modal と standalone page の両方を担当。
 - Timeline 上でカードをクリックすると `router.push('?card=SHORTID')` を行い、parallel route が `CardModal` を描画。URL を直接開いた場合も同じモーダルが表示される。
-- `CardModal` 内では `due_start`, `due_end`, `due_bucket`, `priority`, `assignee_ids` などを編集可能。保存成功時はレスポンスをローカル状態へ即時反映し、`assignee_ids` を保持したままリアルタイム通知を待つ。
+- `CardModal` 内では `due_start`, `due_end`, `due_bucket`, `assignee_ids` などを編集可能。保存成功時はレスポンスをローカル状態へ即時反映し、`assignee_ids` を保持したままリアルタイム通知を待つ。
 - `CommentsPanel` は `CardModal` からタブ切り替えで開き、`useCommentsStore` 経由で投稿/削除/Realtime 反映を行う。
 
 ## Metrics & Observability

@@ -28,7 +28,6 @@ export function buildOptimisticCard(payload: Partial<Card>, boardId: string, opt
     due_bucket: payload.due_bucket ?? null,
     due_bucket_position: payload.due_bucket_position ?? null,
     duration: payload.duration ?? 60,
-    priority: payload.priority ?? 'medium',
     checked: payload.checked ?? false,
     assigned_to: payload.assigned_to ?? null,
     assignee_id: payload.assignee_id ?? null,

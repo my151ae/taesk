@@ -2,7 +2,7 @@
 
 import type { RefObject } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Board, Priority, Team, TeamRole } from "@/lib/supabase";
+import type { Board, Team, TeamRole } from "@/lib/supabase";
 import type { UserProfile } from "@/app/(board)/_utils/timeline-helpers";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 
@@ -28,8 +28,6 @@ type TimelineBoardHeaderProps = {
   setSearchQuery: (query: string) => void;
   selectedTags: string[];
   setSelectedTags: (tags: string[] | ((prev: string[]) => string[])) => void;
-  selectedPriority: "all" | Priority;
-  setSelectedPriority: (priority: "all" | Priority) => void;
   availableTags: string[];
   dayRange: number;
   onDayRangeChange: (days: number) => void;
@@ -77,8 +75,6 @@ export default function TimelineBoardHeader({
   setSearchQuery,
   selectedTags,
   setSelectedTags,
-  selectedPriority,
-  setSelectedPriority,
   availableTags,
   dayRange,
   onDayRangeChange,
@@ -127,8 +123,6 @@ export default function TimelineBoardHeader({
         setSearchQuery={setSearchQuery}
         selectedTags={selectedTags}
         setSelectedTags={setSelectedTags}
-        selectedPriority={selectedPriority}
-        setSelectedPriority={setSelectedPriority}
         availableTags={availableTags}
         dayRange={dayRange}
         onDayRangeChange={onDayRangeChange}

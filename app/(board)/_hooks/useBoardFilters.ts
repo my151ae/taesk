@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Priority } from '@/lib/supabase';
+import { Card } from '@/lib/supabase';
 import { flattenChecklistText } from '@/lib/checklist';
 import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
 
@@ -8,7 +8,6 @@ export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc';
 export function useBoardFilters() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedPriority, setSelectedPriority] = useState<Priority | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('none');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -17,8 +16,6 @@ export function useBoardFilters() {
     setSearchQuery,
     selectedTags,
     setSelectedTags,
-    selectedPriority,
-    setSelectedPriority,
     sortBy,
     setSortBy,
     showFilters,
@@ -30,7 +27,6 @@ export const filterAndSortCards = (
   cards: Card[],
   searchQuery: string,
   selectedTags: string[],
-  selectedPriority: Priority | 'all',
   sortBy: SortOption
 ): Card[] => {
   let filtered = [...cards];
@@ -52,11 +48,6 @@ export const filterAndSortCards = (
     filtered = filtered.filter((card) =>
       selectedTags.every((tag) => card.tags?.includes(tag))
     );
-  }
-
-  // Priority filter
-  if (selectedPriority !== 'all') {
-    filtered = filtered.filter((card) => card.priority === selectedPriority);
   }
 
   // Sort by due date

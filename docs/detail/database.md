@@ -111,7 +111,6 @@ CREATE TABLE public.cards (
   due_bucket TEXT NULL
     CHECK (due_bucket IS NULL OR due_bucket IN ('a', 'b')),
   due_bucket_position DOUBLE PRECISION NULL,
-  priority TEXT NOT NULL DEFAULT 'medium', -- enum: low / medium / high
   checked BOOLEAN NOT NULL DEFAULT FALSE,
   checklist JSONB NOT NULL DEFAULT jsonb_build_object('version', 1, 'lines', '[]'::jsonb),
   content JSONB NOT NULL DEFAULT '[]'::jsonb,

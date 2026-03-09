@@ -52,7 +52,6 @@ const UpdateCardSchema = z.object({
   ]).optional(),
   due_bucket: z.enum(['a', 'b']).nullable().optional(),
   due_bucket_position: z.number().nullable().optional(),
-  priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),

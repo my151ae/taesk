@@ -28,7 +28,7 @@ const getHandler = async (
         list_id, board_id, position, user_id,
         due_date, due_start, due_end, due_bucket, due_bucket_position,
         start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes,
-        priority, checked, assignee_id, assignee_ids, assigned_to,
+        checked, assignee_id, assignee_ids, assigned_to,
         created_at, updated_at, duration,
         calendar_sync ( status, last_synced_at, google_event_id, last_google_event_id )
       `)

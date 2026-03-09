@@ -76,7 +76,6 @@ export interface Board {
   updated_at: string;
 }
 
-export type Priority = 'low' | 'medium' | 'high';
 export type DueBucket = 'a' | 'b';
 
 export interface Card {
@@ -100,7 +99,6 @@ export interface Card {
   due_bucket: DueBucket | null;
   due_bucket_position: number | null;
   duration: number;
-  priority: Priority;
   checked: boolean;
   /** @deprecated legacy text-based assignee field */
   assigned_to: string | null;

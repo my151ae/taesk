@@ -241,7 +241,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const {
     searchQuery, setSearchQuery,
     selectedTags, setSelectedTags,
-    selectedPriority, setSelectedPriority,
     sortBy, setSortBy,
     showFilters, setShowFilters,
     filteredData,
@@ -772,7 +771,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           showFilters={showFilters} setShowFilters={setShowFilters} hasActiveFilters={hasActiveFilters}
           searchQuery={searchQuery} setSearchQuery={setSearchQuery}
           selectedTags={selectedTags} setSelectedTags={setSelectedTags}
-          selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority}
           availableTags={availableTags} dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
           onTodayClick={viewMode === 'list' ? handleListToday : handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
           onUpdateBoard={handleUpdateBoard}

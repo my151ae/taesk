@@ -1,5 +1,5 @@
 import type { Checklist } from '@/lib/checklist';
-import type { DueBucket, Priority } from '@/lib/supabase';
+import type { DueBucket } from '@/lib/supabase';
 import type { JSONContent } from '@tiptap/react';
 
 export interface UserProfile {
@@ -31,7 +31,6 @@ export interface TimelineEvent {
   content?: JSONContent | null;
   excerpt?: string | null;
   tags: string[];
-  priority: Priority | null;
   checked: boolean;
   checklist?: Checklist | null;
   due_bucket?: DueBucket | null;
@@ -59,7 +58,6 @@ export interface TimelineBucketItem {
   checked: boolean;
   checklist?: Checklist | null;
   tags: string[];
-  priority: Priority | null;
   assignee_id?: string | null;
   assignee_ids?: string[] | null;
   assigned_to?: string | null;

@@ -218,7 +218,6 @@ async function createTestCard(board: TestBoardContext): Promise<TestCardContext>
     due_date: `${isoDateJst()}T00:00:00+09:00`,
     due_bucket: 'a',
     due_bucket_position: 1000,
-    priority: 'medium',
     assigned_to: null,
     assignee_id: null,
     assignee_ids: null,
@@ -363,15 +362,13 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentEditor).toBeVisible();
   });
 
-  test('should edit tags from header actions and hide priority control in modal', async ({ page }) => {
+  test('should edit tags from header actions in modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await openCardModalViaQuery(page, currentCard);
 
     const modal = page.getByRole('dialog');
-    await expect(modal.getByText('Priority', { exact: true })).toHaveCount(0);
-
     const tagsButton = modal.getByTestId('card-modal-tags-button');
     await expect(tagsButton).toBeVisible();
   });

@@ -96,7 +96,6 @@ function MobileTimelineColumn({
       durationMinutes: entry.durationMinutes,
       title: entry.title,
       tags: [],
-      priority: null,
       checked: false,
       short_id: null,
       slug: null,

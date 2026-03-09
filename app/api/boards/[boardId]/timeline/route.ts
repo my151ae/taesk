@@ -25,7 +25,6 @@ type TimelineCardRow = {
   end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   due_bucket: 'a' | 'b' | null;
   due_bucket_position: number | null;
-  priority: 'low' | 'medium' | 'high' | null;
   checked: boolean;
   assignee_id: string | null;
   assignee_ids: string[] | null;
@@ -111,7 +110,7 @@ const getHandler = async (
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const baseSelect =
-    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, priority, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
+    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration';
   const extendedSelect = `${baseSelect}, due_bucket_position`;
 
   let cards: TimelineCardRow[] | null = null;
@@ -195,7 +194,6 @@ const getHandler = async (
         content: card.content ?? null,
         excerpt: card.excerpt ?? null,
         tags: card.tags ?? [],
-        priority: card.priority,
         checked: card.checked,
         checklist,
         due_bucket: card.due_bucket ?? null,
@@ -231,7 +229,6 @@ const getHandler = async (
         checked: card.checked,
         checklist,
         tags: card.tags ?? [],
-        priority: card.priority,
         assignee_id: card.assignee_id,
         assignee_ids: card.assignee_ids ?? null,
         assigned_to: card.assigned_to,
