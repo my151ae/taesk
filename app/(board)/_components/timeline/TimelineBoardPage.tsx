@@ -764,7 +764,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-2 pt-4 md:px-0 md:pt-6">
+      <div className="flex w-full flex-col gap-4 px-3 pt-4 md:px-4 md:pt-6 xl:px-6 2xl:px-8">
         <TimelineBoardHeader
           board={currentBoard} modalBoards={availableBoards} modalTeams={availableTeams} handleBoardNavigate={handleBoardNavigate}
           showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
