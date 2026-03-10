@@ -1,6 +1,10 @@
 import clsx from 'clsx';
 import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useRef, useCallback } from 'react';
 
+export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-3';
+const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
+const NOTE_PREVIEW_ROW_GAP_EM = 0.125;
+
 type TimelineCardProps = {
     title: string;
     checked: boolean;
@@ -26,6 +30,8 @@ type TimelineCardProps = {
     note?: string;
     /** 本文に適用する line-clamp 等のクラスを指定。未指定なら高さクリップのみ。 */
     noteClampClass?: string;
+    /** 本文プレビュー領域の最大行数。高さクリップ用に使う。 */
+    notePreviewLines?: number;
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
     onCreateNext?: () => void;
@@ -56,12 +62,18 @@ export function TimelineCard({
     childrenPosition = 'bottom',
     note,
     noteClampClass,
+    notePreviewLines = 2,
     backgroundClass = 'bg-white',
     onCreateNext,
     cardId,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
+    const resolvedNoteClampClass =
+        noteClampClass ?? (notePreviewLines >= 3 ? TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS : 'line-clamp-2');
+    const notePreviewMaxHeightEm = notePreviewLines > 0
+        ? (notePreviewLines * NOTE_PREVIEW_LINE_HEIGHT_EM) + ((notePreviewLines - 1) * NOTE_PREVIEW_ROW_GAP_EM)
+        : 0;
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
@@ -223,8 +235,9 @@ export function TimelineCard({
                     {note ? (
                         <div
                             className={clsx(
-                                "flex flex-col gap-0.5 text-[10px] text-slate-600 leading-tight min-w-0"
+                                "flex min-h-0 flex-col gap-0.5 overflow-hidden text-[10px] text-slate-600 leading-tight min-w-0"
                             )}
+                            style={{ maxHeight: `${notePreviewMaxHeightEm}em` }}
                         >
                             {(() => {
                                 const lines = note.split(/\r?\n/);
@@ -259,7 +272,7 @@ export function TimelineCard({
                                                     ) : null}
                                                 </span>
                                             ) : null}
-                                            <span className="line-clamp-2">{text || '\u00A0'}</span>
+                                            <span className={clsx(resolvedNoteClampClass)}>{text || '\u00A0'}</span>
                                         </div>
                                     );
                                 });

@@ -27,7 +27,10 @@ import {
   findOverlayOverdueEntry,
 } from "@/app/(board)/_utils/timeline-overlay";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
-import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
+import {
+  TimelineCard,
+  TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
+} from "@/app/(board)/_components/timeline/TimelineCard";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
@@ -764,6 +767,7 @@ export default function MobileTimelineView({
         <TimelineDragOverlayCard
           variant="mobile"
           overlayCardData={overlayCardData}
+          overlayBucketCard={overlayBucketEntry?.item ?? null}
           overlayOverdueCard={overlayOverdueCard}
         />
       </DragOverlay>
@@ -821,7 +825,8 @@ function MobileBucketCard({
           timeText={null}
           rightMeta={item.duration != null ? formatDuration(item.duration) : null}
           note={item.excerpt ?? undefined}
-          noteClampClass="line-clamp-2"
+          noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
+          notePreviewLines={3}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           timePlacement="inline"
           paddingClass="py-1"

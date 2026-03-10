@@ -3,7 +3,10 @@ import clsx from 'clsx';
 import { TimelineBucketItem, formatDuration } from '@/app/(board)/_utils/timeline-helpers';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
-import { TimelineCard } from './TimelineCard';
+import {
+    TimelineCard,
+    TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
+} from './TimelineCard';
 
 const DROP_ZONE_MARGIN_PX = 12;
 
@@ -30,8 +33,6 @@ export const TimelineBucketCard = ({
     isContextMenuOpen,
     onCreateBucketCard,
 }: TimelineBucketCardProps) => {
-    const NOTE_CLAMP_CLASS = "line-clamp-2";
-
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
         data: { type: 'bucket-item-top', bucketKey, cardId: item.card_id },
@@ -76,7 +77,8 @@ export const TimelineBucketCard = ({
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
                     timePlacement="inline"
                     note={item.excerpt ?? undefined}
-                    noteClampClass={NOTE_CLAMP_CLASS}
+                    noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
+                    notePreviewLines={3}
                     rightMeta={item.duration != null ? formatDuration(item.duration) : null}
                     onOpen={() => {
                         openCardModal(item.short_id);

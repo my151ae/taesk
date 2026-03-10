@@ -2,7 +2,10 @@
 
 import clsx from "clsx";
 
-import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
+import {
+  TimelineCard,
+  TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
+} from "@/app/(board)/_components/timeline/TimelineCard";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import { formatDuration, minuteToPixels, timeLabel } from "@/app/(board)/_utils/timeline-helpers";
 import type { OverlayCardData } from "@/app/(board)/_utils/timeline-overlay";
@@ -23,8 +26,10 @@ export function TimelineDragOverlayCard({
   overlayOverdueCard = null,
 }: TimelineDragOverlayCardProps) {
   if (!overlayCardData) return null;
+  const listOverlayCard = overlayBucketCard ?? overlayOverdueCard;
+  const isListOverlay = !overlayTimelineEvent && Boolean(listOverlayCard);
 
-  if (variant === "mobile") {
+  if (variant === "mobile" && !isListOverlay) {
     return (
       <div className="pointer-events-none w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
         <div className="flex items-start gap-2">
@@ -52,6 +57,28 @@ export function TimelineDragOverlayCard({
     );
   }
 
+  if (isListOverlay) {
+    return (
+      <div className="pointer-events-none w-[240px] max-w-[260px] overflow-hidden rounded-md bg-transparent shadow-xl opacity-90">
+        <TimelineCard
+          title={overlayCardData.title}
+          badgeLabel={overlayCardData.badge?.toUpperCase()}
+          timeText={overlayCardData.timeText}
+          note={overlayCardData.note ?? undefined}
+          noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
+          notePreviewLines={3}
+          rightMeta={listOverlayCard?.duration != null ? formatDuration(listOverlayCard.duration) : undefined}
+          checked={listOverlayCard?.checked ?? false}
+          onToggleCheck={() => {}}
+          onOpen={() => {}}
+          timePlacement="inline"
+          className="w-full border-none shadow-none"
+          paddingClass="py-1"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className="shadow-xl opacity-90 rounded-md overflow-hidden bg-white"
@@ -72,6 +99,7 @@ export function TimelineDragOverlayCard({
         }
         note={overlayCardData.note ?? undefined}
         noteClampClass="line-clamp-2"
+        notePreviewLines={2}
         rightMeta={
           overlayTimelineEvent
             ? formatDuration(overlayTimelineEvent.durationMinutes ?? 60)

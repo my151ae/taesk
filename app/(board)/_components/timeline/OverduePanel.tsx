@@ -1,7 +1,10 @@
 import clsx from "clsx";
 
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
-import { TimelineCard } from "@/app/(board)/_components/timeline/TimelineCard";
+import {
+  TimelineCard,
+  TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
+} from "@/app/(board)/_components/timeline/TimelineCard";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import { formatDuration, timeLabel, toLocalDay } from "@/app/(board)/_utils/timeline-helpers";
 
@@ -67,7 +70,8 @@ function OverdueCardRow({
           timeText={buildTimeText(item)}
           timePlacement="inline"
           note={item.excerpt ?? undefined}
-          noteClampClass="line-clamp-2"
+          noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
+          notePreviewLines={3}
           rightMeta={item.duration != null ? formatDuration(item.duration) : null}
           onOpen={() => openCardModal(item.short_id, "overdue")}
           openButtonTestId={`cardOpenButton-overdue-${item.card_id}`}

@@ -28,6 +28,16 @@ const isoDateJst = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+const shiftIsoDateJst = (offsetDays: number): string => {
+  const now = Date.now();
+  const jst = new Date(now + 9 * 60 * 60 * 1000);
+  const shifted = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + offsetDays));
+  const year = shifted.getUTCFullYear();
+  const month = `${shifted.getUTCMonth() + 1}`.padStart(2, '0');
+  const day = `${shifted.getUTCDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 type TimelineBoardContext = {
   boardId: string;
   boardShortId: string;
@@ -379,6 +389,94 @@ test.describe('@feature:timeline Timeline view', () => {
 
     if (createdCardId) {
       await supabaseAdmin.from('cards').delete().eq('id', createdCardId);
+    }
+  });
+
+  test('shows A/B and overdue previews up to 3 lines without fixed card height', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const todayIso = isoDateJst();
+    const yesterdayIso = shiftIsoDateJst(-1);
+    const abCardId = crypto.randomUUID();
+    const overdueCardId = crypto.randomUUID();
+    const abShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const overdueShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const baseIdShort = Math.floor(Math.random() * 100000) + 600;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: abCardId,
+        title: 'A/B preview height card',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'line 1\nline 2\nline 3\nline 4',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1600,
+        tags: [],
+        due_date: todayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: abShortId,
+        id_short: baseIdShort,
+        slug: 'ab-preview-height-card',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: overdueCardId,
+        title: 'Overdue preview height card',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'line 1\nline 2\nline 3\nline 4',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1650,
+        tags: [],
+        due_date: yesterdayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: overdueShortId,
+        id_short: baseIdShort + 1,
+        slug: 'overdue-preview-height-card',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const abCard = page.getByTestId(`ab-card-${abCardId}`).first();
+      const overdueCard = page.getByTestId(`overdue-card-${overdueCardId}`).first();
+      await expect(abCard).toBeVisible({ timeout: 20_000 });
+      await expect(overdueCard).toBeVisible({ timeout: 20_000 });
+
+      await expect(abCard.locator('.line-clamp-3').first()).toBeVisible();
+      await expect(overdueCard.locator('.line-clamp-3').first()).toBeVisible();
+
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [abCardId, overdueCardId]);
     }
   });
 
