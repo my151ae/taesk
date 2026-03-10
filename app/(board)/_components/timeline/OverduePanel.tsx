@@ -18,6 +18,9 @@ type OverduePanelProps = {
   contextMenuCardId: string | null;
   className?: string;
   contentClassName?: string;
+  hideHeader?: boolean;
+  compactEmptyState?: boolean;
+  emptyStateMessage?: string;
 };
 
 function formatOverdueLabel(value: string | null) {
@@ -99,8 +102,12 @@ export function OverduePanel({
   contextMenuCardId,
   className,
   contentClassName,
+  hideHeader = false,
+  compactEmptyState = false,
+  emptyStateMessage,
 }: OverduePanelProps) {
   const countLabel = `${items.length}`;
+  const resolvedEmptyStateMessage = emptyStateMessage ?? "Overdue card はありません";
 
   return (
     <section
@@ -110,15 +117,17 @@ export function OverduePanel({
         className
       )}
     >
-      <div className="flex items-center justify-between border-b border-amber-200 px-3 py-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Overdue</p>
-          <p className="text-[10px] text-amber-700/80">Past due and incomplete</p>
+      {!hideHeader ? (
+        <div className="flex items-center justify-between border-b border-amber-200 px-3 py-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Overdue</p>
+            <p className="text-[10px] text-amber-700/80">Past due and incomplete</p>
+          </div>
+          <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm">
+            {countLabel}
+          </span>
         </div>
-        <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm">
-          {countLabel}
-        </span>
-      </div>
+      ) : null}
 
       <div
         className={clsx(
@@ -127,8 +136,13 @@ export function OverduePanel({
         )}
       >
         {items.length === 0 ? (
-          <p className="rounded-md border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-[11px] text-amber-700/80">
-            Overdue card はありません
+          <p
+            className={clsx(
+              "rounded-md border border-dashed border-amber-200 bg-white/70 text-amber-700/80",
+              compactEmptyState ? "px-3 py-2 text-[10px]" : "px-3 py-4 text-[11px]"
+            )}
+          >
+            {resolvedEmptyStateMessage}
           </p>
         ) : (
           items.map((item) => (

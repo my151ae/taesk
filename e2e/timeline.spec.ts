@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { readFile } from 'fs/promises';
@@ -262,6 +262,25 @@ async function pasteHtmlWithPlainText(
   }, args);
 }
 
+async function dragLocatorToPoint(
+  page: Page,
+  locator: Locator,
+  target: { x: number; y: number }
+): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Failed to resolve draggable locator bounds');
+  }
+
+  const sourceX = box.x + Math.min(Math.max(box.width * 0.5, 24), box.width - 12);
+  const sourceY = box.y + Math.min(Math.max(box.height * 0.35, 18), box.height - 12);
+
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  await page.mouse.move(sourceX + 24, sourceY + 12, { steps: 4 });
+  await page.mouse.move(target.x, target.y, { steps: 16 });
+}
+
 function collectStoragePathsFromContent(content: unknown): string[] {
   const result = new Set<string>();
 
@@ -468,7 +487,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
       const abCard = page.getByTestId(`ab-card-${abCardId}`).first();
-      const overdueCard = page.getByTestId(`overdue-card-${overdueCardId}`).first();
+      const overdueCard = page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first();
       await expect(abCard).toBeVisible({ timeout: 20_000 });
       await expect(overdueCard).toBeVisible({ timeout: 20_000 });
 
@@ -477,6 +496,141 @@ test.describe('@feature:timeline Timeline view', () => {
 
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [abCardId, overdueCardId]);
+    }
+  });
+
+  test('collapses overdue into a mobile sheet and keeps overdue drag working', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const todayIso = isoDateJst();
+    const yesterdayIso = shiftIsoDateJst(-1);
+    const overdueCardId = crypto.randomUUID();
+    const overdueShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const idShort = Math.floor(Math.random() * 100000) + 900;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: overdueCardId,
+      title: 'Mobile overdue drag card',
+      checklist: { version: 1, lines: [] },
+      excerpt: 'mobile overdue card for drag regression',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1750,
+      tags: [],
+      due_date: yesterdayIso,
+      due_start: null,
+      due_end: null,
+      due_bucket: 'b',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: overdueShortId,
+      id_short: idShort,
+      slug: 'mobile-overdue-drag-card',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const overdueToggle = page.getByTestId('mobile-overdue-toggle');
+      const overdueSheet = page.getByTestId('mobile-overdue-sheet');
+      const overdueCount = page.getByTestId('mobile-overdue-count');
+
+      await expect(overdueToggle).toBeVisible();
+      await expect(overdueCount).toHaveText('1');
+      await expect(overdueSheet).toBeHidden();
+
+      await overdueToggle.click();
+      await expect(overdueSheet).toBeVisible();
+
+      const overdueCard = page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first();
+      await expect(overdueCard).toBeVisible();
+
+      const overdueBox = await overdueCard.boundingBox();
+      if (!overdueBox) {
+        throw new Error('Missing overdue card bounds');
+      }
+
+      await dragLocatorToPoint(page, overdueCard, {
+        x: overdueBox.x + overdueBox.width - 10,
+        y: overdueBox.y + Math.max(18, overdueBox.height * 0.5),
+      });
+      await expect(page.locator('[data-testid="timeline-drag-overlay-mobile"][data-overlay-kind="overdue"]')).toBeVisible();
+      await page.mouse.up();
+
+      await overdueToggle.click();
+      await expect(overdueSheet).toBeHidden();
+      await overdueToggle.click();
+      await expect(overdueSheet).toBeVisible();
+      await expect(overdueCard).toBeVisible();
+
+      const timelineGrid = page.locator('[data-testid="timeline-grid"]:visible').first();
+      const timelineBox = await timelineGrid.boundingBox();
+      if (!timelineBox) {
+        throw new Error('Missing mobile timeline grid bounds');
+      }
+
+      const patchResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'PATCH' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${overdueCardId}`)
+        );
+      }, { timeout: 20_000 });
+
+      await dragLocatorToPoint(page, overdueCard, {
+        x: timelineBox.x + timelineBox.width * 0.25,
+        y: timelineBox.y + 220,
+      });
+      await expect(page.locator('[data-testid="timeline-drag-overlay-mobile"][data-overlay-kind="overdue"]')).toBeVisible();
+      const [patchResponse] = await Promise.all([
+        patchResponsePromise,
+        page.mouse.up(),
+      ]);
+      expect(patchResponse.ok(), `mobile overdue PATCH failed: ${patchResponse.status()}`).toBeTruthy();
+
+      await expect.poll(async () => {
+        const { data, error } = await supabaseAdmin
+          .from('cards')
+          .select('due_date,due_start,due_end')
+          .eq('id', overdueCardId)
+          .maybeSingle();
+        if (error) return `error:${error.message}`;
+        if (!data?.due_start || !data?.due_end) return 'pending';
+        return `${data.due_date}|${data.due_start}|${data.due_end}`;
+      }, { timeout: 20_000 }).not.toBe('pending');
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('due_date,due_start,due_end')
+          .eq('id', overdueCardId)
+          .maybeSingle();
+        if (typeof data?.due_date !== 'string') return false;
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Tokyo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date(data.due_date)) === todayIso;
+      }, { timeout: 20_000 }).toBe(true);
+
+      await expect(page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Mobile overdue drag card' }).first()).toBeVisible();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', overdueCardId);
     }
   });
 

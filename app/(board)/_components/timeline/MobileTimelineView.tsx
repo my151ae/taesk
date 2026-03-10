@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   getDisplayHours,
@@ -248,6 +248,7 @@ function MobileTimelineColumn({
                   rightMeta={undefined}
                   timePlacement="out-top"
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
+                  dataTestId="timeline-event"
                   className="w-full h-full pt-0"
                   tabIndex={0}
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
@@ -257,6 +258,92 @@ function MobileTimelineColumn({
             </DraggableCard>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function MobileOverdueSection({
+  items,
+  expanded,
+  onToggle,
+  openCardModal,
+  onToggleCheck,
+  onCardContextMenu,
+  onCardContextMenuByKeyboard,
+  contextMenuCardId,
+}: {
+  items: TimelineOverdueItem[];
+  expanded: boolean;
+  onToggle: () => void;
+  openCardModal: (shortId: string | null, source: string) => void;
+  onToggleCheck: (cardId: string, checked: boolean) => void;
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
+  contextMenuCardId: string | null;
+}) {
+  return (
+    <div className="border-b border-amber-100 bg-amber-50/40 px-3 py-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="mobile-overdue-sheet"
+        data-testid="mobile-overdue-toggle"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-amber-100/70"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+            Overdue
+          </span>
+          <span
+            className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm"
+            data-testid="mobile-overdue-count"
+          >
+            {items.length}
+          </span>
+        </div>
+        <span
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-amber-200 bg-white/90 text-amber-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+          </svg>
+        </span>
+      </button>
+
+      <div
+        id="mobile-overdue-sheet"
+        data-testid="mobile-overdue-sheet"
+        aria-hidden={!expanded}
+        className="overflow-hidden transition-[max-height,opacity] duration-150 ease-out"
+        style={{
+          maxHeight: expanded ? "240px" : "0px",
+          opacity: expanded ? 1 : 0,
+        }}
+      >
+        <div
+          className="pt-2"
+          style={{
+            height: "clamp(168px, 28svh, 240px)",
+          }}
+        >
+          <OverduePanel
+            items={items}
+            variant="mobile"
+            openCardModal={openCardModal}
+            onToggleCheck={onToggleCheck}
+            onCardContextMenu={onCardContextMenu}
+            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+            contextMenuCardId={contextMenuCardId}
+            hideHeader
+            compactEmptyState
+            emptyStateMessage="未完了の期限超過カードはありません"
+            className="h-full border-amber-200 bg-amber-50/50"
+            contentClassName="space-y-3 px-2 pb-2 pt-2"
+          />
+        </div>
       </div>
     </div>
   );
@@ -426,6 +513,7 @@ export default function MobileTimelineView({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const swipeLockedRef = useRef(false);
+  const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
 
   useEffect(() => {
     onMount?.();
@@ -681,18 +769,16 @@ export default function MobileTimelineView({
             </div>
           )}
 
-          <div className="border-b border-amber-100 bg-amber-50/40 px-3 py-3">
-            <OverduePanel
-              items={overdue}
-              variant="mobile"
-              openCardModal={openCardModal}
-              onToggleCheck={onToggleCheck}
-              onCardContextMenu={onCardContextMenu}
-              onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-              contextMenuCardId={contextMenuCardId}
-              className="max-h-56"
-            />
-          </div>
+          <MobileOverdueSection
+            items={overdue}
+            expanded={isOverdueExpanded}
+            onToggle={() => setIsOverdueExpanded((current) => !current)}
+            openCardModal={openCardModal}
+            onToggleCheck={onToggleCheck}
+            onCardContextMenu={onCardContextMenu}
+            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+            contextMenuCardId={contextMenuCardId}
+          />
 
           <div
             className="grid flex-1 overflow-hidden"
