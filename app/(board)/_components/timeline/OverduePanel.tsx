@@ -28,11 +28,16 @@ function formatOverdueLabel(value: string | null) {
 }
 
 function buildTimeText(item: TimelineOverdueItem) {
+  const parts: string[] = [];
   const dateLabel = formatOverdueLabel(item.due_date ?? null);
+  parts.push(dateLabel);
   if (item.due_start) {
-    return `${dateLabel} ${timeLabel(item.due_start, item.due_end)}`;
+    parts.push(timeLabel(item.due_start, item.due_end));
   }
-  return dateLabel;
+  if (item.duration != null) {
+    parts.push(`[${formatDuration(item.duration)}]`);
+  }
+  return parts.join(" ");
 }
 
 function OverdueCardRow({
@@ -68,11 +73,10 @@ function OverdueCardRow({
           cardId={item.card_id}
           badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
           timeText={buildTimeText(item)}
-          timePlacement="inline"
+          timePlacement="out-top"
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={3}
-          rightMeta={item.duration != null ? formatDuration(item.duration) : null}
           onOpen={() => openCardModal(item.short_id, "overdue")}
           openButtonTestId={`cardOpenButton-overdue-${item.card_id}`}
           paddingClass="py-1"
@@ -118,7 +122,7 @@ export function OverduePanel({
 
       <div
         className={clsx(
-          "min-h-0 flex-1 space-y-2 overflow-y-auto p-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-amber-200",
+          "min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-2 pt-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-amber-200",
           contentClassName
         )}
       >

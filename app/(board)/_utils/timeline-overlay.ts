@@ -24,6 +24,13 @@ export type OverlayCardData = {
   note: string | null;
 };
 
+function formatOverdueDateLabel(value: string | null) {
+  const localDay = toLocalDay(value);
+  if (!localDay) return "No date";
+  const [, month, day] = localDay.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
 export function findOverlayBucketEntry(
   buckets: Record<string, TimelineBucketItem[]>,
   cardId: string | null
@@ -85,14 +92,19 @@ export function buildOverlayCardData(args: {
   const overdueItem = overdueEntry?.item ?? null;
   if (!overdueItem) return null;
 
-  const overdueDay = toLocalDay(overdueItem.due_date ?? null);
-  const overdueLabel = overdueDay ? overdueDay.slice(5) : "Overdue";
+  const overdueLabel = formatOverdueDateLabel(overdueItem.due_date ?? null);
+  const overdueParts: string[] = [];
+  overdueParts.push(overdueLabel);
+  if (overdueItem.due_start) {
+    overdueParts.push(timeLabel(overdueItem.due_start, overdueItem.due_end));
+  }
+  if (overdueItem.duration != null) {
+    overdueParts.push(`[${formatDuration(overdueItem.duration)}]`);
+  }
   return {
     title: overdueItem.title || "",
     badge: overdueItem.due_bucket ?? "o",
-    timeText: overdueItem.due_start
-      ? `${overdueLabel} ${timeLabel(overdueItem.due_start, overdueItem.due_end)}`
-      : overdueLabel,
+    timeText: overdueParts.join(" "),
     note: overdueItem.excerpt ?? null,
   };
 }

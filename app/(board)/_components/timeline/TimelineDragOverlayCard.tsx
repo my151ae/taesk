@@ -28,6 +28,7 @@ export function TimelineDragOverlayCard({
   if (!overlayCardData) return null;
   const listOverlayCard = overlayBucketCard ?? overlayOverdueCard;
   const isListOverlay = !overlayTimelineEvent && Boolean(listOverlayCard);
+  const isOverdueListOverlay = !overlayBucketCard && Boolean(overlayOverdueCard);
 
   if (variant === "mobile" && !isListOverlay) {
     return (
@@ -59,7 +60,12 @@ export function TimelineDragOverlayCard({
 
   if (isListOverlay) {
     return (
-      <div className="pointer-events-none w-[240px] max-w-[260px] overflow-hidden rounded-md bg-transparent shadow-xl opacity-90">
+      <div
+        className={clsx(
+          "pointer-events-none w-[240px] max-w-[260px] rounded-md bg-transparent shadow-xl opacity-90",
+          isOverdueListOverlay ? "overflow-visible pt-4" : "overflow-hidden"
+        )}
+      >
         <TimelineCard
           title={overlayCardData.title}
           badgeLabel={overlayCardData.badge?.toUpperCase()}
@@ -67,11 +73,15 @@ export function TimelineDragOverlayCard({
           note={overlayCardData.note ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={3}
-          rightMeta={listOverlayCard?.duration != null ? formatDuration(listOverlayCard.duration) : undefined}
+          rightMeta={
+            !isOverdueListOverlay && listOverlayCard?.duration != null
+              ? formatDuration(listOverlayCard.duration)
+              : undefined
+          }
           checked={listOverlayCard?.checked ?? false}
           onToggleCheck={() => {}}
           onOpen={() => {}}
-          timePlacement="inline"
+          timePlacement={isOverdueListOverlay ? "out-top" : "inline"}
           className="w-full border-none shadow-none"
           paddingClass="py-1"
         />

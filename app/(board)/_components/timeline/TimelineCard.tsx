@@ -290,7 +290,7 @@ export function TimelineCard({
                 ) : null}
 
                 {timePlacement === 'out-top' && timeText ? (
-                    <div className="absolute -top-4 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 whitespace-nowrap z-10 pointer-events-none">
+                    <div className="absolute -top-4 left-[6px] max-w-[calc(100%-32px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-10 pointer-events-none">
                         {timeText}
                     </div>
                 ) : null}
