@@ -87,6 +87,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 <TimelineCard
                     title={event.title || ""}
                     checked={event.checked}
+                    checklist={event.checklist}
+                    content={event.content ?? null}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     cardId={event.card_id}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}

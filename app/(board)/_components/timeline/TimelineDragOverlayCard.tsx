@@ -86,6 +86,8 @@ export function TimelineDragOverlayCard({
               : undefined
           }
           checked={listOverlayCard?.checked ?? false}
+          checklist={listOverlayCard?.checklist ?? null}
+          content={listOverlayCard?.content ?? null}
           onToggleCheck={() => {}}
           onOpen={() => {}}
           timePlacement={isOverdueListOverlay ? "out-top" : "inline"}
@@ -125,6 +127,8 @@ export function TimelineDragOverlayCard({
             : undefined
         }
         checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? overlayOverdueCard?.checked ?? false}
+        checklist={overlayTimelineEvent?.checklist ?? overlayBucketCard?.checklist ?? overlayOverdueCard?.checklist ?? null}
+        content={overlayTimelineEvent?.content ?? overlayBucketCard?.content ?? overlayOverdueCard?.content ?? null}
         onToggleCheck={() => {}}
         onOpen={() => {}}
         timePlacement="out-top"

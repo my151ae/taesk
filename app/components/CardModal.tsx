@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
+    getTiptapPlainText,
     normalizeContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
@@ -142,6 +143,23 @@ export function CardModal({
         showSidebar,
         activeSidebarTab,
     });
+
+    const stickyTitleChecklistProgress = useMemo(() => {
+        const plainText = getTiptapPlainText(normalizeContent(content));
+        const progress = plainText.split(/\r?\n/).reduce(
+            (acc, line) => {
+                const match = line.match(/^\s*\[([ xX])\]\s+(.*)$/);
+                if (!match || !match[2]?.trim()) return acc;
+                acc.total += 1;
+                if (match[1].toLowerCase() === "x") {
+                    acc.checked += 1;
+                }
+                return acc;
+            },
+            { checked: 0, total: 0 }
+        );
+        return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
+    }, [content]);
 
     // onClose ref を最新に保つ
     useEffect(() => {
@@ -770,7 +788,7 @@ export function CardModal({
                             >
                                 <div
                                     data-sticky-title
-                                    className="bg-white dark:bg-gray-800 border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-3"
+                                    className="bg-white dark:bg-gray-800 border-b border-slate-100 dark:border-gray-700 px-6 sm:px-8 py-3 flex items-center gap-2"
                                 >
                                     <input
                                         type="checkbox"
@@ -784,6 +802,11 @@ export function CardModal({
                                         }}
                                         className="h-5 w-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
                                     />
+                                    {stickyTitleChecklistProgress ? (
+                                        <span className="shrink-0 text-xs font-medium leading-none text-slate-500 tabular-nums">
+                                            {stickyTitleChecklistProgress}
+                                        </span>
+                                    ) : null}
                                     <input
                                         ref={titleInputRef}
                                         type="text"

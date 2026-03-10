@@ -241,6 +241,8 @@ function MobileTimelineColumn({
                 <TimelineCard
                   title={event.title || ""}
                   checked={event.checked}
+                  checklist={event.checklist}
+                  content={event.content ?? null}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   cardId={event.card_id}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
@@ -905,6 +907,8 @@ function MobileBucketCard({
         <TimelineCard
           title={item.title || ""}
           checked={item.checked}
+          checklist={item.checklist}
+          content={item.content ?? null}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           cardId={item.card_id}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}

@@ -1,5 +1,9 @@
 import clsx from 'clsx';
 import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useRef, useCallback } from 'react';
+import type { JSONContent } from '@tiptap/react';
+import type { Checklist } from '@/lib/checklist';
+import { countCheckedLines, countNonEmptyLines } from '@/lib/checklist';
+import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
 
 export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-3';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
@@ -8,6 +12,8 @@ const NOTE_PREVIEW_ROW_GAP_EM = 0.125;
 type TimelineCardProps = {
     title: string;
     checked: boolean;
+    checklist?: Checklist | null;
+    content?: JSONContent | null;
     onToggleCheck: (checked: boolean) => void;
     badgeLabel?: string | null;
     timeText?: ReactNode;
@@ -42,6 +48,8 @@ type TimelineCardProps = {
 export function TimelineCard({
     title,
     checked,
+    checklist,
+    content,
     onToggleCheck,
     badgeLabel,
     timeText,
@@ -74,6 +82,24 @@ export function TimelineCard({
     const notePreviewMaxHeightEm = notePreviewLines > 0
         ? (notePreviewLines * NOTE_PREVIEW_LINE_HEIGHT_EM) + ((notePreviewLines - 1) * NOTE_PREVIEW_ROW_GAP_EM)
         : 0;
+    const plainTextFromContent = content ? getTiptapPlainText(normalizeContent(content)) : '';
+    const contentChecklistProgress = plainTextFromContent
+        .split(/\r?\n/)
+        .reduce(
+            (acc, line) => {
+                const match = line.match(/^\s*\[([ xX])\]\s+(.*)$/);
+                if (!match || !match[2]?.trim()) return acc;
+                acc.total += 1;
+                if (match[1].toLowerCase() === 'x') {
+                    acc.checked += 1;
+                }
+                return acc;
+            },
+            { checked: 0, total: 0 }
+        );
+    const checklistTotalCount = countNonEmptyLines(checklist) || contentChecklistProgress.total;
+    const checklistCheckedCount = countCheckedLines(checklist) || contentChecklistProgress.checked;
+    const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
@@ -184,7 +210,7 @@ export function TimelineCard({
                 )}>
                     {childrenPosition === 'top' && children}
 
-                    <div className="flex items-center gap-1 pr-0 pt-0">
+                    <div className="flex items-center gap-0.5 pr-0 pt-0">
                         <div
                             role="checkbox"
                             aria-checked={checked}
@@ -211,8 +237,19 @@ export function TimelineCard({
                             )}
                         </div>
                         <div className={clsx(
-                            "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800 pt-0.5"
+                            "flex min-w-0 flex-1 items-center gap-1 pt-0.5"
                         )}>
+                            {checklistProgressLabel ? (
+                                <span
+                                    className="shrink-0 text-[10px] font-medium leading-none text-slate-500 tabular-nums"
+                                    aria-label={`チェックリスト ${checklistProgressLabel}`}
+                                >
+                                    {checklistProgressLabel}
+                                </span>
+                            ) : null}
+                            <div className={clsx(
+                                "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800"
+                            )}>
                             <div className="flex min-w-0 items-center gap-2">
                                 <span
                                     className={clsx(
@@ -229,6 +266,7 @@ export function TimelineCard({
                             {timePlacement === 'inline' && timeText ? (
                                 <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
                             ) : null}
+                        </div>
                         </div>
                     </div>
 
