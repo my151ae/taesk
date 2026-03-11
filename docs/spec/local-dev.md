@@ -68,9 +68,9 @@ PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/batches/$(date +%Y%m%d-%H%M%S)-notifica
 
 ## 7. 参考資料
 
-- `docs/detail/notifications.md` – 通知パイプライン全体
-- `docs/detail/storage.md` – `comment-queue` / `taesk-sync-queue` の挙動
-- `docs/detail/testing.md` – Playwright 実行ポリシー
+- `docs/spec/notifications.md` – 通知パイプライン全体
+- `docs/spec/storage.md` – `comment-queue` / `taesk-sync-queue` の挙動
+- `docs/spec/testing.md` – Playwright 実行ポリシー
 - `docs/tickets/2025-11-10/01-test-all-split-summary.md` – 通知バッチの最新ログ
 
 この手順に従うことで、Timeline ボード上の通知・音声・Web Push を JSON レポート付きで検証できます。

@@ -202,7 +202,7 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 ### Data Integrity & Observability
 - ⛳ **due_* Fields**: `due_start`, `due_end`, `due_bucket`, `due_bucket_position` をカードテーブルに追加し、時間あり/なしで Timeline と A/B を分岐
 - 📡 **Realtime + Offline Queue**: `useRealtimeBoard` が Supabase Realtime を購読、`useSyncQueue` が失敗時にロールバック
-- 📊 **Client Metrics**: `createClientTrace('timeline')` でロード時間・D&D 操作数を収集し、`docs/detail/architecture.md` で可視化ルールを管理
+- 📊 **Client Metrics**: `createClientTrace('timeline')` でロード時間・D&D 操作数を収集し、`docs/spec/architecture.md` で可視化ルールを管理
 - 🔐 **RLS**: Supabase RLS が board_id / profile_id に基づきカードアクセスを制限
 
 ### Testing & Reliability
@@ -255,7 +255,7 @@ taesk/
 │   ├── comments.spec.ts / notifications.spec.ts / ...    # 他バッチ
 │   └── utils/metrics.ts                 # dumpClientMetrics, createTrace helpers
 │
-├── docs/                                # 本ドキュメント + detail/
+├── docs/                                # 本ドキュメント + spec/
 ├── scripts/test-all-batches.sh          # PW_WORKERS=1 でバッチ実行
 ├── test-results/                        # JSON レポートとログ
 └── supabase/migrations/                 # due_* フィールド等の SQL
@@ -263,19 +263,19 @@ taesk/
 
 ## 📚 Detailed Documentation
 
-- [Architecture & Design](./detail/architecture.md)
-- [Design & Responsive Guidelines](./detail/design-guidelines.md)
-- [Keyboard Navigation](./detail/keyboard-navigation.md) - CardModal のタイトル/本文境界は矢印移動のみ
-- [Domain Model](./detail/domain-model.md)
-- [Component Breakdown](./detail/components.md)
-- [Database Schema](./detail/database.md)
-- [Storage Strategy](./detail/storage.md)
-- [Routing & Modal Flow](./detail/routing.md)
-- [Notifications & Audio](./detail/notifications.md)
-- [Supabase MCP 認証手順](./setup/supabase-mcp-auth.md)
-- [Testing Playbook](./detail/testing.md)
-- [Deployment Guide](./detail/deployment.md)
-- [Setup Guide](./setup/local-dev.md)
+- [Architecture & Design](./spec/architecture.md)
+- [Design & Responsive Guidelines](./spec/design-guidelines.md)
+- [Keyboard Navigation](./spec/keyboard-navigation.md) - CardModal のタイトル/本文境界は矢印移動のみ
+- [Domain Model](./spec/domain-model.md)
+- [Component Breakdown](./spec/components.md)
+- [Database Schema](./spec/database.md)
+- [Storage Strategy](./spec/storage.md)
+- [Routing & Modal Flow](./spec/routing.md)
+- [Notifications & Audio](./spec/notifications.md)
+- [Supabase MCP 認証手順](./spec/supabase-mcp-auth.md)
+- [Testing Playbook](./spec/testing.md)
+- [Deployment Guide](./spec/deployment.md)
+- [Setup Guide](./spec/local-dev.md)
 
 ## 🎯 Key Design Decisions
 
@@ -302,9 +302,9 @@ taesk/
 
 ## 🔗 Quick Links
 
-- [docs/detail/architecture.md](./detail/architecture.md)
-- [docs/detail/keyboard-navigation.md](./detail/keyboard-navigation.md)
-- [docs/detail/testing.md](./detail/testing.md)
+- [docs/spec/architecture.md](./spec/architecture.md)
+- [docs/spec/keyboard-navigation.md](./spec/keyboard-navigation.md)
+- [docs/spec/testing.md](./spec/testing.md)
 - [Supabase Docs](https://supabase.com/docs)
 - [Next.js Docs](https://nextjs.org/docs)
 

@@ -102,7 +102,7 @@ Chrome / Safari の Autoplay 制限を踏まえ、Taesk では **Web Audio API**
 - **Foreground sound:** `app/components/NotificationSoundPlayer.tsx`, `lib/notification-audio.ts`
 - **Playwright E2E:** `e2e/notifications.spec.ts`
 
-Playwright での検証とローカルセットアップは `docs/setup/local-dev.md` を参照。Timeline では通知トリガー用の UI（テスト通知、音声テスト）がヘッダーに統合されている。
+Playwright での検証とローカルセットアップは `docs/spec/local-dev.md` を参照。Timeline では通知トリガー用の UI（テスト通知、音声テスト）がヘッダーに統合されている。
 
 ## Badge Sync & Favicon Fallback
 

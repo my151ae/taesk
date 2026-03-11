@@ -19,7 +19,7 @@
 ## Design & Responsive Guidelines
 > **ハイドレーションエラー回避の鉄則**
 > - Next.js (App Router) では `window.innerWidth` による条件付きレンダリングを避け、**Tailwind CSS のユーティリティクラス (`hidden`, `md:block` 等)** で表示制御を行うこと。
-> - 詳細な実装パターンやAIへの指示テンプレートは [docs/design-guidelines.md](docs/design-guidelines.md) を参照。
+> - 詳細な実装パターンやAIへの指示テンプレートは [docs/spec/design-guidelines.md](docs/spec/design-guidelines.md) を参照。
 
 ## Communication Rules
 対話は常に日本語で回答してください。返信時に英語へ切り替えないよう徹底し、必要に応じて専門用語のみ英語を併記します。
@@ -28,7 +28,7 @@
 現在の運用UIは **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
 - Kanban 関連（`KanbanBoardClient` 等）の修正・言及は、明示的な依頼がない限り行わない。
 - 不具合報告が `/b/...` に関する場合、Timeline 側のみを対象に調査・修正する。
-- CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/detail/keyboard-navigation.md` を参照すること。
+- CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/spec/keyboard-navigation.md` を参照すること。
 
 ## Build, Test, and Development Commands
 - `npm run dev` は使用可能。ただし起動前に既存プロセスを確認し、不要な dev サーバーを残したまま別ポートへ退避起動させないこと。
@@ -48,7 +48,7 @@ cat test-results/playwright-report.json | jq '.stats'
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
 
 ## Supabase MCP 接続手順（運用）
-- Supabase MCP の認証・疎通手順は `docs/setup/supabase-mcp-auth.md` を SSOT とする。
+- Supabase MCP の認証・疎通手順は `docs/spec/supabase-mcp-auth.md` を SSOT とする。
 - 認証が切れた場合は `codex mcp login supabase` を実行し、ブラウザで OAuth を完了する。
 - 接続確認は `mcp__supabase__list_projects`（MCP ツール呼び出し）を最初に実行する。
 - `list_mcp_resources(server=\"supabase\")` は Supabase 側で未実装のため `Method not found` でも異常とは限らない。
