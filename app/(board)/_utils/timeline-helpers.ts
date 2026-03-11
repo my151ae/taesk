@@ -215,6 +215,296 @@ export type EventLayout = {
     width: string;
 };
 
+export type StackedTimelineItemKind = 'card' | 'calendar';
+
+export type StackedTimelineLayoutItem = {
+    id: string;
+    kind: StackedTimelineItemKind;
+    startMinutes: number;
+    durationMinutes: number;
+};
+
+export type StackedEventPresentationMode = 'full-width' | 'split' | 'half-overlap' | 'light-overlap';
+
+export type StackedEventLayout = EventLayout & {
+    stackIndex: number;
+    stackSize: number;
+    clusterColumns: number;
+    columnSpan: number;
+    baseZIndex: number;
+    presentationMode: StackedEventPresentationMode;
+};
+
+type StackedLayoutDevice = 'desktop' | 'mobile';
+
+type StackedLayoutOptions = {
+    device?: StackedLayoutDevice;
+};
+
+type ClusterLayoutItem = StackedTimelineLayoutItem & {
+    slotIndex: number;
+    endMinutes: number;
+};
+
+const HIGH_OVERLAP_MIN_RATIO = 0.82;
+const HIGH_OVERLAP_MAX_RATIO = 0.5;
+const MEDIUM_OVERLAP_MIN_RATIO = 0.38;
+const DESKTOP_SPLIT_START_DELTA_MINUTES = 10;
+const MOBILE_SPLIT_START_DELTA_MINUTES = 6;
+const DESKTOP_MEDIUM_START_DELTA_MINUTES = 40;
+const MOBILE_MEDIUM_START_DELTA_MINUTES = 32;
+const DESKTOP_MIN_EVENT_WIDTH_PERCENT = 24;
+const MOBILE_MIN_EVENT_WIDTH_PERCENT = 30;
+
+const PRESENTATION_FACTORS = {
+    desktop: {
+        split: { step: 1, width: 1 },
+        'half-overlap': { step: 0.5, width: 1.5 },
+        'light-overlap': { step: 0.72, width: 1.22 },
+        'full-width': { step: 0, width: 1 },
+    },
+    mobile: {
+        split: { step: 1, width: 1 },
+        'half-overlap': { step: 0.64, width: 1.28 },
+        'light-overlap': { step: 0.82, width: 1.12 },
+        'full-width': { step: 0, width: 1 },
+    },
+} as const;
+
+export const getStackedTimelineItemKey = (kind: StackedTimelineItemKind, id: string) => `${kind}:${id}`;
+
+export const compareStackedTimelineLayoutItems = (
+    a: StackedTimelineLayoutItem,
+    b: StackedTimelineLayoutItem
+) => {
+    if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
+    if (a.durationMinutes !== b.durationMinutes) return b.durationMinutes - a.durationMinutes;
+    if (a.kind !== b.kind) return a.kind === 'calendar' ? -1 : 1;
+    return a.id.localeCompare(b.id);
+};
+
+const getBaseZIndex = (kind: StackedTimelineItemKind) => (kind === 'card' ? 20 : 10);
+
+const eventsOverlap = (a: StackedTimelineLayoutItem, b: StackedTimelineLayoutItem) => {
+    const start = Math.max(a.startMinutes, b.startMinutes);
+    const end = Math.min(a.startMinutes + a.durationMinutes, b.startMinutes + b.durationMinutes);
+    return Math.max(0, end - start);
+};
+
+const getSplitStartDeltaMinutes = (device: StackedLayoutDevice) =>
+    device === 'mobile' ? MOBILE_SPLIT_START_DELTA_MINUTES : DESKTOP_SPLIT_START_DELTA_MINUTES;
+
+const getMediumStartDeltaMinutes = (device: StackedLayoutDevice) =>
+    device === 'mobile' ? MOBILE_MEDIUM_START_DELTA_MINUTES : DESKTOP_MEDIUM_START_DELTA_MINUTES;
+
+const getMinEventWidthPercent = (device: StackedLayoutDevice) =>
+    device === 'mobile' ? MOBILE_MIN_EVENT_WIDTH_PERCENT : DESKTOP_MIN_EVENT_WIDTH_PERCENT;
+
+const groupClusters = (sorted: ReadonlyArray<StackedTimelineLayoutItem>) => {
+    const clusters: StackedTimelineLayoutItem[][] = [];
+    let currentCluster: StackedTimelineLayoutItem[] = [];
+    let clusterEnd = -1;
+
+    sorted.forEach((item) => {
+        const end = item.startMinutes + item.durationMinutes;
+        if (currentCluster.length === 0) {
+            currentCluster.push(item);
+            clusterEnd = end;
+            return;
+        }
+
+        if (item.startMinutes < clusterEnd) {
+            currentCluster.push(item);
+            clusterEnd = Math.max(clusterEnd, end);
+            return;
+        }
+
+        clusters.push(currentCluster);
+        currentCluster = [item];
+        clusterEnd = end;
+    });
+
+    if (currentCluster.length > 0) {
+        clusters.push(currentCluster);
+    }
+
+    return clusters;
+};
+
+const assignClusterSlots = (cluster: ReadonlyArray<StackedTimelineLayoutItem>): ClusterLayoutItem[] => {
+    const slotEnds: number[] = [];
+    return cluster.map((item) => {
+        const slotIndex = slotEnds.findIndex((end) => end <= item.startMinutes);
+        const nextSlotIndex = slotIndex === -1 ? slotEnds.length : slotIndex;
+        slotEnds[nextSlotIndex] = item.startMinutes + item.durationMinutes;
+        return {
+            ...item,
+            slotIndex: nextSlotIndex,
+            endMinutes: item.startMinutes + item.durationMinutes,
+        };
+    });
+};
+
+const resolvePresentationMode = (
+    overlapMetrics: Array<{ minRatio: number; maxRatio: number; startDelta: number }>,
+    device: StackedLayoutDevice
+): StackedEventPresentationMode => {
+    if (overlapMetrics.length === 0) return 'full-width';
+
+    const hasStrongOverlap = overlapMetrics.some(
+        (metric) =>
+            metric.minRatio >= HIGH_OVERLAP_MIN_RATIO &&
+            metric.maxRatio >= HIGH_OVERLAP_MAX_RATIO &&
+            metric.startDelta <= getSplitStartDeltaMinutes(device)
+    );
+    if (hasStrongOverlap) return 'split';
+
+    const hasMediumOverlap = overlapMetrics.some(
+        (metric) =>
+            metric.minRatio >= MEDIUM_OVERLAP_MIN_RATIO &&
+            metric.startDelta <= getMediumStartDeltaMinutes(device)
+    );
+    if (hasMediumOverlap) return 'half-overlap';
+
+    return 'light-overlap';
+};
+
+const getMaxSafeColumnSpan = (
+    item: ClusterLayoutItem,
+    cluster: ReadonlyArray<ClusterLayoutItem>,
+    clusterColumns: number
+) => {
+    let span = 1;
+
+    for (let nextSlot = item.slotIndex + 1; nextSlot < clusterColumns; nextSlot += 1) {
+        const hasCollisionInSlot = cluster.some((candidate) => {
+            if (candidate.slotIndex !== nextSlot) return false;
+            if (candidate.id === item.id && candidate.kind === item.kind) return false;
+            return eventsOverlap(item, candidate) > 0;
+        });
+
+        if (hasCollisionInSlot) {
+            break;
+        }
+
+        span += 1;
+    }
+
+    return span;
+};
+
+const clampColumnSpanForDevice = (
+    columnSpan: number,
+    slotIndex: number,
+    clusterColumns: number,
+    device: StackedLayoutDevice
+) => {
+    if (device !== 'mobile') return columnSpan;
+
+    const remainingColumns = clusterColumns - slotIndex;
+    return Math.max(1, Math.min(columnSpan, remainingColumns));
+};
+
+const buildGridLayout = (
+    slotIndex: number,
+    clusterColumns: number,
+    columnSpan: number,
+    presentationMode: StackedEventPresentationMode,
+    device: StackedLayoutDevice
+): Pick<StackedEventLayout, 'left' | 'width' | 'presentationMode'> => {
+    if (clusterColumns <= 1 || presentationMode === 'full-width') {
+        return {
+            left: '0%',
+            width: '100%',
+            presentationMode: 'full-width',
+        };
+    }
+
+    const columnWidth = 100 / clusterColumns;
+    const baseLeftPercent = columnWidth * slotIndex;
+    const baseWidthPercent = columnWidth * columnSpan;
+
+    if (presentationMode === 'split') {
+        return {
+            left: `${baseLeftPercent}%`,
+            width: `${Math.max(Math.min(baseWidthPercent, 100 - baseLeftPercent), 0)}%`,
+            presentationMode,
+        };
+    }
+
+    const factors = PRESENTATION_FACTORS[device][presentationMode];
+    const overlapOffsetPercent = columnWidth * (1 - factors.step);
+    const leftPercent = Math.max(0, baseLeftPercent - overlapOffsetPercent);
+    const widthPercent = Math.min(100 - leftPercent, baseWidthPercent + overlapOffsetPercent);
+
+    return {
+        left: `${leftPercent}%`,
+        width: `${Math.max(widthPercent, 0)}%`,
+        presentationMode,
+    };
+};
+
+export const calculateStackedEventLayout = (
+    items: ReadonlyArray<StackedTimelineLayoutItem>,
+    options?: StackedLayoutOptions
+): Record<string, StackedEventLayout> => {
+    const device = options?.device ?? 'desktop';
+    const sorted = [...items].sort(compareStackedTimelineLayoutItems);
+    const clusters = groupClusters(sorted);
+    const layout: Record<string, StackedEventLayout> = {};
+
+    clusters.forEach((cluster) => {
+        const slottedCluster = assignClusterSlots(cluster);
+        const stackSize = slottedCluster.length;
+        const clusterColumns = slottedCluster.reduce((max, item) => Math.max(max, item.slotIndex + 1), 1);
+
+        slottedCluster.forEach((item) => {
+            const key = getStackedTimelineItemKey(item.kind, item.id);
+            const overlappingItems = slottedCluster.filter((candidate) => eventsOverlap(item, candidate) > 0);
+            const minWidthPercent = getMinEventWidthPercent(device);
+            const desiredColumnSpan = getMaxSafeColumnSpan(item, slottedCluster, clusterColumns);
+            const columnSpan = clampColumnSpanForDevice(desiredColumnSpan, item.slotIndex, clusterColumns, device);
+
+            const overlapMetrics = overlappingItems
+                .filter((candidate) => candidate.id !== item.id || candidate.kind !== item.kind)
+                .map((candidate) => {
+                    const overlapMinutes = eventsOverlap(item, candidate);
+                    const minRatio = overlapMinutes / Math.max(1, Math.min(item.durationMinutes, candidate.durationMinutes));
+                    const maxRatio = overlapMinutes / Math.max(item.durationMinutes, candidate.durationMinutes);
+                    const startDelta = Math.abs(candidate.startMinutes - item.startMinutes);
+                    return {
+                        overlapMinutes,
+                        minRatio,
+                        maxRatio,
+                        startDelta,
+                    };
+                });
+
+            let presentationMode = resolvePresentationMode(overlapMetrics, device);
+            if (presentationMode === 'split' && (100 / clusterColumns) < minWidthPercent) {
+                presentationMode = overlapMetrics.length > 0 ? 'half-overlap' : 'full-width';
+            }
+
+            let geometry = buildGridLayout(item.slotIndex, clusterColumns, columnSpan, presentationMode, device);
+            const resolvedWidth = Number.parseFloat(geometry.width);
+            if (Number.isFinite(resolvedWidth) && resolvedWidth < minWidthPercent && presentationMode !== 'light-overlap') {
+                geometry = buildGridLayout(item.slotIndex, clusterColumns, columnSpan, 'light-overlap', device);
+            }
+
+            layout[key] = {
+                ...geometry,
+                stackIndex: item.slotIndex,
+                stackSize,
+                clusterColumns,
+                columnSpan,
+                baseZIndex: getBaseZIndex(item.kind),
+            };
+        });
+    });
+
+    return layout;
+};
+
 export const calculateEventLayout = (events: ReadonlyArray<TimelineEvent>): Record<string, EventLayout> => {
     // 1. Sort events by start time, then by duration (longer first)
     const sorted = [...events].sort((a, b) => {

@@ -1,4 +1,4 @@
-import { ReactNode, memo, MouseEvent } from 'react';
+import { ReactNode, memo, MouseEvent, type Dispatch, type SetStateAction } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import clsx from 'clsx';
 import {
@@ -10,7 +10,10 @@ import {
     minuteToPixels,
     minutesToTime,
     getMinutesFromTime,
-    calculateEventLayout,
+    calculateStackedEventLayout,
+    compareStackedTimelineLayoutItems,
+    getStackedTimelineItemKey,
+    type StackedTimelineItemKind,
     timeLabel,
     ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
@@ -51,6 +54,8 @@ type TimelineColumnProps = {
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     hourHeight?: number;
+    activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
+    setActiveStackItem: Dispatch<SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -94,47 +99,40 @@ export const TimelineColumn = memo(function TimelineColumn({
     onCardContextMenuByKeyboard,
     contextMenuCardId,
     hourHeight,
+    activeStackItem,
+    setActiveStackItem,
 }: TimelineColumnProps) {
-    const layoutMap = calculateEventLayout(events);
     // Use default if undefined
     const currentHourHeight = hourHeight ?? HOUR_HEIGHT;
-    const calendarLayout = calculateEventLayout(
-        calendarEvents.map((entry) => ({
-            card_id: entry.id,
-            due_date: day.isoDate,
-            due_start: minutesToTime(entry.startMinutes),
-            due_end: minutesToTime(entry.startMinutes + entry.durationMinutes),
-            durationMinutes: entry.durationMinutes,
-            title: entry.title,
-            tags: [],
-            checked: false,
-            short_id: entry.eventId ?? entry.id,
-            slug: null,
-        }))
-    );
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
     const combinedItems = [
         ...calendarEvents.map((calendarEvent, listIndex) => ({
             kind: 'calendar' as const,
+            key: getStackedTimelineItemKey('calendar', calendarEvent.id),
             id: calendarEvent.id,
             listIndex,
             startMinutes: calendarEvent.startMinutes,
+            durationMinutes: calendarEvent.durationMinutes,
             entry: calendarEvent,
         })),
         ...events.map((event, listIndex) => ({
             kind: 'card' as const,
+            key: getStackedTimelineItemKey('card', event.card_id),
             id: event.card_id,
             listIndex,
             startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
+            durationMinutes: event.durationMinutes ?? 60,
             entry: event,
         })),
     ].sort((a, b) => {
-        if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-        if (a.kind !== b.kind) return a.kind === 'calendar' ? -1 : 1;
+        const compared = compareStackedTimelineLayoutItems(a, b);
+        if (compared !== 0) return compared;
         return a.listIndex - b.listIndex;
     });
+    const stackedLayout = calculateStackedEventLayout(combinedItems, { device: 'desktop' });
+    const interactionLocked = Boolean(activeDragCardId || activeResize || contextMenuCardId || selectedSlot);
 
     const handleSingleClick = (e: MouseEvent, dayIso: string) => {
         e.stopPropagation();
@@ -144,6 +142,7 @@ export const TimelineColumn = memo(function TimelineColumn({
         const snappedRelative = Math.round(minutesRelative / 5) * 5;
         // Convert relative minutes to absolute minutes
         const absoluteMinutes = (snappedRelative + timelineStartHour * 60) % (24 * 60);
+        setActiveStackItem(null);
         setSelectedSlot({ day: dayIso, minutes: absoluteMinutes });
     };
 
@@ -254,23 +253,42 @@ export const TimelineColumn = memo(function TimelineColumn({
                         {combinedItems.map((item) => {
                             if (item.kind === 'calendar') {
                                 const calendarEvent = item.entry;
-                                const layout = calendarLayout[calendarEvent.id];
+                                const layout = stackedLayout[item.key];
+                                const isActive = activeStackItem?.kind === 'calendar' && activeStackItem.id === calendarEvent.id;
                                 return (
                                     <button
                                         key={`calendar-${calendarEvent.id}`}
                                         type="button"
-                                        data-focus-group="timeline"
-                                        data-focus-part="card"
+                                        data-testid="timeline-calendar-event"
+                                        data-stack-mode={layout?.presentationMode ?? 'full-width'}
+                                        data-column-span={layout?.columnSpan ?? 1}
+                                        data-cluster-columns={layout?.clusterColumns ?? 1}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (!interactionLocked) {
+                                                setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
+                                            }
                                             onExternalEventClick?.(calendarEvent);
+                                        }}
+                                        onFocus={() => {
+                                            if (interactionLocked) return;
+                                            setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
+                                        }}
+                                        onBlur={() => {
+                                            setActiveStackItem((current) => {
+                                                if (current?.kind === 'calendar' && current.id === calendarEvent.id) {
+                                                    return null;
+                                                }
+                                                return current;
+                                            });
                                         }}
                                         className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
                                         style={{
                                             top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight),
                                             height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, currentHourHeight) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight), 18),
-                                            left: layout?.left ?? '0%',
+                                            left: layout?.left ?? '0px',
                                             width: layout?.width ?? '100%',
+                                            zIndex: isActive ? 30 : (layout?.baseZIndex ?? 10),
                                         }}
                                     >
                                         <div className="flex items-center gap-1">
@@ -294,10 +312,10 @@ export const TimelineColumn = memo(function TimelineColumn({
 
                             const event = item.entry;
                             return (
-                                <TimelineEventItem
+                <TimelineEventItem
                                     key={`card-${event.card_id}`}
                                     event={event}
-                                    layout={layoutMap[event.card_id]}
+                                    layout={stackedLayout[item.key]}
                                     activeResize={activeResize}
                                     openCardModal={openCardModal}
                                     handleEventKeyDown={handleEventKeyDown}
@@ -310,6 +328,25 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     onCardContextMenu={onCardContextMenu}
                                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                     isContextMenuOpen={contextMenuCardId === event.card_id}
+                                    isActive={activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id}
+                                    zIndex={
+                                        activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id
+                                            ? 30
+                                            : (stackedLayout[item.key]?.baseZIndex ?? 20)
+                                    }
+                                    onFocusCard={() => {
+                                        if (interactionLocked) return;
+                                        setActiveStackItem({ kind: 'card', id: event.card_id });
+                                    }}
+                                    onBlurCard={() => {
+                                        if (contextMenuCardId === event.card_id) return;
+                                        setActiveStackItem((current) => {
+                                            if (current?.kind === 'card' && current.id === event.card_id) {
+                                                return null;
+                                            }
+                                            return current;
+                                        });
+                                    }}
                                     onCreateNext={() => {
                                         const endMinutes = (getMinutesFromTime(event.due_start ?? null) ?? 0) + (event.durationMinutes ?? 60);
                                         handleColumnClick(day, endMinutes);

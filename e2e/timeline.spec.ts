@@ -375,6 +375,440 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('keeps fixed columns for 3-way overlaps and preserves overlap modes on desktop and mobile', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const cards = [
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap split 1',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1510,
+        tags: [],
+        due_date: isoDay,
+        due_start: '17:00:00',
+        due_end: '19:00:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 510,
+        slug: 'overlap-split-1',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap split 2',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1520,
+        tags: [],
+        due_date: isoDay,
+        due_start: '17:00:00',
+        due_end: '18:00:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 511,
+        slug: 'overlap-split-2',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap split 3',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1530,
+        tags: [],
+        due_date: isoDay,
+        due_start: '17:00:00',
+        due_end: '18:00:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 512,
+        slug: 'overlap-split-3',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap widen 1',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1535,
+        tags: [],
+        due_date: isoDay,
+        due_start: '18:10:00',
+        due_end: '18:50:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 5125,
+        slug: 'overlap-widen-1',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap half 1',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1540,
+        tags: [],
+        due_date: isoDay,
+        due_start: '19:00:00',
+        due_end: '20:00:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 513,
+        slug: 'overlap-half-1',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap half 2',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1550,
+        tags: [],
+        due_date: isoDay,
+        due_start: '19:25:00',
+        due_end: '20:10:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 514,
+        slug: 'overlap-half-2',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap light 1',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1560,
+        tags: [],
+        due_date: isoDay,
+        due_start: '20:30:00',
+        due_end: '21:30:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 515,
+        slug: 'overlap-light-1',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Overlap light 2',
+        checklist: { version: 1, lines: [] },
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1570,
+        tags: [],
+        due_date: isoDay,
+        due_start: '21:10:00',
+        due_end: '22:10:00',
+        due_bucket: null,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 516,
+        slug: 'overlap-light-2',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ];
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert(cards);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const split1 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap split 1' }).first();
+      const split2 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap split 2' }).first();
+      const split3 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap split 3' }).first();
+      const widen1 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap widen 1' }).first();
+      const half2 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap half 2' }).first();
+      const light2 = page.getByTestId('timeline-event').filter({ hasText: 'Overlap light 2' }).first();
+      await expect(split1).toBeVisible({ timeout: 20_000 });
+      await expect(split2).toBeVisible({ timeout: 20_000 });
+      await expect(split3).toBeVisible({ timeout: 20_000 });
+      await expect(widen1).toBeVisible({ timeout: 20_000 });
+      await expect(half2).toBeVisible({ timeout: 20_000 });
+      await expect(light2).toBeVisible({ timeout: 20_000 });
+
+      const desktopMetrics = await Promise.all([
+        split1.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+            zIndex: host ? window.getComputedStyle(host).zIndex : '',
+          };
+        }),
+        split2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+            zIndex: host ? window.getComputedStyle(host).zIndex : '',
+          };
+        }),
+        split3.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        widen1.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+            columnSpan: host?.dataset.columnSpan ?? '',
+            clusterColumns: host?.dataset.clusterColumns ?? '',
+          };
+        }),
+        half2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        light2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+      ]);
+
+      expect(desktopMetrics[0]?.mode).toBe('split');
+      expect(desktopMetrics[1]?.mode).toBe('split');
+      expect(desktopMetrics[2]?.mode).toBe('split');
+      expect(desktopMetrics[3]?.mode).toBe('light-overlap');
+      expect(desktopMetrics[4]?.mode).toBe('half-overlap');
+      expect(desktopMetrics[5]?.mode).toBe('light-overlap');
+
+      const splitLeftsDesktop = desktopMetrics.slice(0, 3).map((metric) => Number.parseFloat(metric.left));
+      const splitWidthsDesktop = desktopMetrics.slice(0, 3).map((metric) => Number.parseFloat(metric.width));
+      const sortedSplitLeftsDesktop = [...splitLeftsDesktop].sort((a, b) => a - b);
+
+      expect(sortedSplitLeftsDesktop[0]).toBeGreaterThanOrEqual(0);
+      expect(sortedSplitLeftsDesktop[1]).toBeGreaterThan(20);
+      expect(sortedSplitLeftsDesktop[2]).toBeGreaterThan(50);
+      splitWidthsDesktop.forEach((width) => {
+        expect(width).toBeGreaterThan(25);
+        expect(width).toBeLessThan(35);
+      });
+
+      const desktopWidenWidth = Number.parseFloat(desktopMetrics[3]?.width ?? '0');
+      const desktopWidenLeft = Number.parseFloat(desktopMetrics[3]?.left ?? '0');
+      expect(desktopMetrics[3]?.columnSpan).toBe('2');
+      expect(desktopMetrics[3]?.clusterColumns).toBe('3');
+      expect(desktopWidenLeft).toBeGreaterThan(20);
+      expect(desktopWidenLeft).toBeLessThan(28);
+      expect(desktopWidenWidth).toBeGreaterThan(70);
+
+      const desktopHalfLeft = Number.parseFloat(desktopMetrics[4]?.left ?? '0');
+      const desktopLightLeft = Number.parseFloat(desktopMetrics[5]?.left ?? '0');
+      expect(desktopHalfLeft).toBeGreaterThan(20);
+      expect(desktopHalfLeft).toBeLessThan(30);
+      expect(desktopLightLeft).toBeGreaterThan(30);
+      expect(desktopLightLeft).toBeLessThan(40);
+
+      await split1.click();
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 500 });
+
+      const split1AfterFocus = await split1.evaluate((el) => {
+        const host = el.parentElement as HTMLElement | null;
+        return host ? window.getComputedStyle(host).zIndex : '';
+      });
+      const split2AfterFocus = await split2.evaluate((el) => {
+        const host = el.parentElement as HTMLElement | null;
+        return host ? window.getComputedStyle(host).zIndex : '';
+      });
+
+      expect(Number(split1AfterFocus)).toBeGreaterThan(Number(split2AfterFocus));
+
+      await split1.click();
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(boardContext.canonicalPath);
+
+      const mobileSplit1 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap split 1' }).first();
+      const mobileSplit2 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap split 2' }).first();
+      const mobileSplit3 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap split 3' }).first();
+      const mobileWiden1 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap widen 1' }).first();
+      const mobileHalf2 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap half 2' }).first();
+      const mobileLight2 = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Overlap light 2' }).first();
+      await expect(mobileSplit1).toBeVisible({ timeout: 20_000 });
+      await expect(mobileSplit2).toBeVisible({ timeout: 20_000 });
+      await expect(mobileSplit3).toBeVisible({ timeout: 20_000 });
+      await expect(mobileWiden1).toBeVisible({ timeout: 20_000 });
+      await expect(mobileHalf2).toBeVisible({ timeout: 20_000 });
+      await expect(mobileLight2).toBeVisible({ timeout: 20_000 });
+
+      const mobileMetrics = await Promise.all([
+        mobileSplit1.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        mobileSplit2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        mobileSplit3.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        mobileWiden1.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+            columnSpan: host?.dataset.columnSpan ?? '',
+            clusterColumns: host?.dataset.clusterColumns ?? '',
+          };
+        }),
+        mobileHalf2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+        mobileLight2.evaluate((el) => {
+          const host = el.parentElement as HTMLElement | null;
+          return {
+            mode: host?.dataset.stackMode ?? '',
+            left: host?.style.left ?? '',
+            width: host?.style.width ?? '',
+          };
+        }),
+      ]);
+
+      expect(mobileMetrics[0]?.mode).toBe('split');
+      expect(mobileMetrics[1]?.mode).toBe('split');
+      expect(mobileMetrics[2]?.mode).toBe('split');
+      expect(mobileMetrics[3]?.mode).toBe('light-overlap');
+      expect(mobileMetrics[4]?.mode).toBe('half-overlap');
+      expect(mobileMetrics[5]?.mode).toBe('light-overlap');
+
+      const splitLeftsMobile = mobileMetrics.slice(0, 3).map((metric) => Number.parseFloat(metric.left));
+      const splitWidthsMobile = mobileMetrics.slice(0, 3).map((metric) => Number.parseFloat(metric.width));
+      const sortedSplitLeftsMobile = [...splitLeftsMobile].sort((a, b) => a - b);
+
+      expect(sortedSplitLeftsMobile[0]).toBeGreaterThanOrEqual(0);
+      expect(sortedSplitLeftsMobile[1]).toBeGreaterThan(20);
+      expect(sortedSplitLeftsMobile[2]).toBeGreaterThan(50);
+      splitWidthsMobile.forEach((width) => {
+        expect(width).toBeGreaterThan(25);
+        expect(width).toBeLessThan(35);
+      });
+
+      const mobileWidenWidth = Number.parseFloat(mobileMetrics[3]?.width ?? '0');
+      const mobileWidenLeft = Number.parseFloat(mobileMetrics[3]?.left ?? '0');
+      expect(mobileMetrics[3]?.columnSpan).toBe('2');
+      expect(mobileMetrics[3]?.clusterColumns).toBe('3');
+      expect(mobileWidenLeft).toBeGreaterThan(25);
+      expect(mobileWidenLeft).toBeLessThan(35);
+      expect(mobileWidenWidth).toBeGreaterThan(70);
+
+      const mobileHalfLeft = Number.parseFloat(mobileMetrics[4]?.left ?? '0');
+      const mobileLightLeft = Number.parseFloat(mobileMetrics[5]?.left ?? '0');
+      expect(mobileHalfLeft).toBeGreaterThan(30);
+      expect(mobileHalfLeft).toBeLessThan(35);
+      expect(mobileLightLeft).toBeGreaterThan(40);
+      expect(mobileLightLeft).toBeLessThan(45);
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
+    }
+  });
+
   test('can create a date-only card from A/B list by click', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

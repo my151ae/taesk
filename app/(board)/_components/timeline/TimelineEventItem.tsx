@@ -1,21 +1,20 @@
-import { KeyboardEvent, PointerEvent, memo } from 'react';
+import { FocusEvent, KeyboardEvent, PointerEvent, memo } from 'react';
+import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
 import {
     TimelineEvent,
     minuteToPixels,
     getMinutesFromTime,
-    timeLabel,
     detailedTimeLabel,
     minutesToTime,
-    formatDuration,
-    EventLayout
+    StackedEventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 
 type TimelineEventItemProps = {
     event: TimelineEvent;
-    layout?: EventLayout;
+    layout?: StackedEventLayout;
     activeResize: ActiveResizeState | null;
     openCardModal: (shortId: string | null, source: string) => void;
     handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
@@ -30,6 +29,10 @@ type TimelineEventItemProps = {
     isContextMenuOpen: boolean;
     onCreateNext?: () => void;
     hourHeight?: number;
+    zIndex?: number;
+    isActive?: boolean;
+    onFocusCard?: () => void;
+    onBlurCard?: (event: FocusEvent<HTMLDivElement>) => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -49,6 +52,10 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     isContextMenuOpen,
     onCreateNext,
     hourHeight,
+    zIndex,
+    isActive = false,
+    onFocusCard,
+    onBlurCard,
 }: TimelineEventItemProps) {
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
@@ -76,11 +83,15 @@ export const TimelineEventItem = memo(function TimelineEventItem({
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                data-stack-mode={layout?.presentationMode ?? 'full-width'}
+                data-column-span={layout?.columnSpan ?? 1}
+                data-cluster-columns={layout?.clusterColumns ?? 1}
                 style={{
                     top,
                     height,
                     left: layout?.left ?? '0%',
                     width: layout?.width ?? '100%',
+                    zIndex: zIndex ?? layout?.baseZIndex ?? 20,
                 }}
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
             >
@@ -104,8 +115,15 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     role="group"
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
-                    focusGroup="timeline"
-                    className="w-full h-full pt-0"
+                    onFocus={() => {
+                        onClearGhost();
+                        onFocusCard?.();
+                    }}
+                    onBlur={onBlurCard}
+                    className={clsx(
+                        "w-full h-full pt-0 transition-[box-shadow,transform,ring-color]",
+                        isActive && "ring-2 ring-sky-400 shadow-md"
+                    )}
                     backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
                     onCreateNext={onCreateNext}
                 />

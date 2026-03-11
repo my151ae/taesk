@@ -18,6 +18,7 @@ import {
   type TimelineEvent,
   type TimelineOverdueItem,
   type ExternalCalendarEntry,
+  type StackedTimelineItemKind,
   minuteToPixels,
   pixelsToMinutes,
   getTimelineHeight,
@@ -190,12 +191,29 @@ export function DesktopTimelineView({
 
   // Ghost card state for Timeline
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; minutes: number } | null>(null);
+  const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);
 
   useEffect(() => {
     const handleGlobalClick = () => setSelectedSlot(null);
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
+
+  useEffect(() => {
+    if (selectedSlot) {
+      setActiveStackItem(null);
+    }
+  }, [selectedSlot]);
+
+  useEffect(() => {
+    setActiveStackItem(null);
+  }, [activeDayIndex, dayRange, days.length]);
+
+  useEffect(() => {
+    if (contextMenuCardId) {
+      setActiveStackItem({ kind: "card", id: contextMenuCardId });
+    }
+  }, [contextMenuCardId]);
 
   useEffect(() => {
     const el = timelineScrollRef.current;
@@ -578,6 +596,8 @@ export function DesktopTimelineView({
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
                   hourHeight={hourHeight}
+                  activeStackItem={activeStackItem}
+                  setActiveStackItem={setActiveStackItem}
                 />
               ))}
             </div>

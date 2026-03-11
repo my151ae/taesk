@@ -5,12 +5,13 @@ import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-k
 import {
   getDisplayHours,
   getTimelineHeight,
-  calculateEventLayout,
+  calculateStackedEventLayout,
+  compareStackedTimelineLayoutItems,
   minuteToPixels,
   timeLabel,
   detailedTimeLabel,
   minutesToTime,
-  EventLayout,
+  getStackedTimelineItemKey,
   TimelineBucketItem,
   TimelineDay,
   TimelineEvent,
@@ -19,6 +20,7 @@ import {
   getMinutesFromTime,
   ExternalCalendarEntry,
   formatDuration,
+  type StackedTimelineItemKind,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import {
@@ -51,7 +53,6 @@ function MobileTimelineColumn({
   events,
   indicatorVisible,
   indicatorPosition,
-  layoutMap,
   openCardModal,
   onToggleCheck,
   pointerPreview,
@@ -63,12 +64,13 @@ function MobileTimelineColumn({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
   hourHeight,
+  activeStackItem,
+  setActiveStackItem,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
   indicatorVisible: boolean;
   indicatorPosition: number;
-  layoutMap: Record<string, EventLayout>;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   pointerPreview: DragAndDropBindings["pointerPreview"];
@@ -80,42 +82,36 @@ function MobileTimelineColumn({
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
   hourHeight: number;
+  activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
+  setActiveStackItem: React.Dispatch<React.SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
-  const calendarLayout = calculateEventLayout(
-    calendarEvents.map((entry) => ({
-      card_id: entry.id,
-      due_date: day.isoDate,
-      due_start: minutesToTime(entry.startMinutes),
-      due_end: minutesToTime(entry.startMinutes + entry.durationMinutes),
-      durationMinutes: entry.durationMinutes,
-      title: entry.title,
-      tags: [],
-      checked: false,
-      short_id: null,
-      slug: null,
-    }))
-  );
   const combinedItems = [
     ...calendarEvents.map((calendarEvent, listIndex) => ({
       kind: "calendar" as const,
+      key: getStackedTimelineItemKey("calendar", calendarEvent.id),
       id: calendarEvent.id,
       listIndex,
       startMinutes: calendarEvent.startMinutes,
+      durationMinutes: calendarEvent.durationMinutes,
       entry: calendarEvent,
     })),
     ...events.map((event, listIndex) => ({
       kind: "card" as const,
+      key: getStackedTimelineItemKey("card", event.card_id),
       id: event.card_id,
       listIndex,
       startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
+      durationMinutes: event.durationMinutes ?? 60,
       entry: event,
     })),
   ].sort((a, b) => {
-    if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-    if (a.kind !== b.kind) return a.kind === "calendar" ? -1 : 1;
+    const compared = compareStackedTimelineLayoutItems(a, b);
+    if (compared !== 0) return compared;
     return a.listIndex - b.listIndex;
   });
+  const stackedLayout = calculateStackedEventLayout(combinedItems, { device: "mobile" });
+  const interactionLocked = Boolean(activeDragCardId || contextMenuCardId || pointerPreview.visible);
 
   return (
     <div className="relative">
@@ -173,16 +169,34 @@ function MobileTimelineColumn({
         {combinedItems.map((item) => {
           if (item.kind === "calendar") {
             const calendarEvent = item.entry;
-            const layout = calendarLayout[calendarEvent.id];
+            const layout = stackedLayout[item.key];
+            const isActive = activeStackItem?.kind === "calendar" && activeStackItem.id === calendarEvent.id;
             return (
               <button
                 key={`calendar-${calendarEvent.id}`}
                 type="button"
-                data-focus-group="timeline"
-                data-focus-part="card"
+                data-testid="timeline-calendar-event"
+                data-stack-mode={layout?.presentationMode ?? "full-width"}
+                data-column-span={layout?.columnSpan ?? 1}
+                data-cluster-columns={layout?.clusterColumns ?? 1}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!interactionLocked) {
+                    setActiveStackItem({ kind: "calendar", id: calendarEvent.id });
+                  }
                   onExternalEventClick?.(calendarEvent);
+                }}
+                onFocus={() => {
+                  if (interactionLocked) return;
+                  setActiveStackItem({ kind: "calendar", id: calendarEvent.id });
+                }}
+                onBlur={() => {
+                  setActiveStackItem((current) => {
+                    if (current?.kind === "calendar" && current.id === calendarEvent.id) {
+                      return null;
+                    }
+                    return current;
+                  });
                 }}
                 className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
                 style={{
@@ -192,8 +206,9 @@ function MobileTimelineColumn({
                     minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
                     18
                   ),
-                  left: layout?.left ?? "0%",
+                  left: layout?.left ?? "0px",
                   width: layout?.width ?? "100%",
+                  zIndex: isActive ? 30 : (layout?.baseZIndex ?? 10),
                 }}
               >
                 <div className="flex items-center gap-1">
@@ -219,7 +234,7 @@ function MobileTimelineColumn({
           const duration = event.durationMinutes ?? 60;
           const top = minuteToPixels(start, timelineStartHour, hourHeight);
           const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 10);
-          const layout = layoutMap[event.card_id];
+          const layout = stackedLayout[item.key];
 
           return (
             <DraggableCard
@@ -231,11 +246,18 @@ function MobileTimelineColumn({
             >
               <div
                 className="absolute"
+                data-stack-mode={layout?.presentationMode ?? "full-width"}
+                data-column-span={layout?.columnSpan ?? 1}
+                data-cluster-columns={layout?.clusterColumns ?? 1}
                 style={{
                   top,
                   height,
-                  left: layout?.left ?? "0%",
+                  left: layout?.left ?? "0px",
                   width: layout?.width ?? "100%",
+                  zIndex:
+                    activeStackItem?.kind === "card" && activeStackItem.id === event.card_id
+                      ? 30
+                      : (layout?.baseZIndex ?? 20),
                 }}
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
               >
@@ -252,10 +274,22 @@ function MobileTimelineColumn({
                   timePlacement="out-top"
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   dataTestId="timeline-event"
-                  className="w-full h-full pt-0"
+                  className={`w-full h-full pt-0 ${activeStackItem?.kind === "card" && activeStackItem.id === event.card_id ? "ring-2 ring-sky-400 shadow-md" : ""}`}
                   tabIndex={0}
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
-                  focusGroup="timeline"
+                  onFocus={() => {
+                    if (interactionLocked) return;
+                    setActiveStackItem({ kind: "card", id: event.card_id });
+                  }}
+                  onBlur={() => {
+                    if (contextMenuCardId === event.card_id) return;
+                    setActiveStackItem((current) => {
+                      if (current?.kind === "card" && current.id === event.card_id) {
+                        return null;
+                      }
+                      return current;
+                    });
+                  }}
                 />
               </div>
             </DraggableCard>
@@ -517,6 +551,7 @@ export default function MobileTimelineView({
   const touchStartYRef = useRef<number | null>(null);
   const swipeLockedRef = useRef(false);
   const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
+  const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);
 
   useEffect(() => {
     onMount?.();
@@ -566,7 +601,6 @@ export default function MobileTimelineView({
     return [range, tzLabel].filter(Boolean).join(" · ");
   };
 
-  const layoutMap = useMemo(() => calculateEventLayout(eventsForDay), [eventsForDay]);
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
 
   const activeDayIso = activeDay?.isoDate ?? null;
@@ -598,6 +632,16 @@ export default function MobileTimelineView({
     [overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent]
   );
   const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
+
+  useEffect(() => {
+    setActiveStackItem(null);
+  }, [activeDay?.isoDate]);
+
+  useEffect(() => {
+    if (contextMenuCardId) {
+      setActiveStackItem({ kind: "card", id: contextMenuCardId });
+    }
+  }, [contextMenuCardId]);
 
   if (!activeDay) return null;
 
@@ -802,7 +846,6 @@ export default function MobileTimelineView({
                   events={eventsForDay}
                   indicatorVisible={indicatorVisible}
                   indicatorPosition={indicatorPosition}
-                  layoutMap={layoutMap}
                   openCardModal={openCardModal}
                   onToggleCheck={onToggleCheck}
                   pointerPreview={pointerPreview}
@@ -814,6 +857,8 @@ export default function MobileTimelineView({
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   contextMenuCardId={contextMenuCardId}
                   hourHeight={hourHeight}
+                  activeStackItem={activeStackItem}
+                  setActiveStackItem={setActiveStackItem}
                 />
               </div>
             </div>

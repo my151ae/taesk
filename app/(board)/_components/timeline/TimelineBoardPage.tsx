@@ -38,7 +38,6 @@ import { useTimelineFiltering } from "@/app/(board)/_hooks/useTimelineFiltering"
 import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigation";
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
 import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
-import { useSpatialArrowFocus } from "@/app/(board)/_hooks/useSpatialArrowFocus";
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimelineBoardInitialization";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
@@ -653,9 +652,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleCardModalDelete,
   });
 
-  // グローバルな空間ナビゲーション（物理的な位置に基づいた移動）
-  const handleArrowKeyFocus = useSpatialArrowFocus();
-
   const { timelineViewModel, listViewModel } = useTimelineBoardViewModels({
     days: data?.days ?? [],
     activeDayIndex,
@@ -763,7 +759,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]" onKeyDownCapture={handleArrowKeyFocus}>
+    <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]">
       <div className="flex w-full flex-col gap-4 px-3 pt-4 md:px-4 md:pt-6 xl:px-6 2xl:px-8">
         <TimelineBoardHeader
           board={currentBoard} modalBoards={availableBoards} modalTeams={availableTeams} handleBoardNavigate={handleBoardNavigate}

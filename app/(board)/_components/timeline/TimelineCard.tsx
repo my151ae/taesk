@@ -1,5 +1,12 @@
 import clsx from 'clsx';
-import { ReactNode, CSSProperties, KeyboardEvent as ReactKeyboardEvent, useRef, useCallback } from 'react';
+import {
+    ReactNode,
+    CSSProperties,
+    KeyboardEvent as ReactKeyboardEvent,
+    FocusEvent as ReactFocusEvent,
+    useRef,
+    useCallback
+} from 'react';
 import type { JSONContent } from '@tiptap/react';
 import type { Checklist } from '@/lib/checklist';
 import { countCheckedLines, countNonEmptyLines } from '@/lib/checklist';
@@ -37,6 +44,8 @@ type TimelineCardProps = {
     onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
     onOpenContextMenu?: (rect: DOMRect) => void;
     focusGroup?: 'timeline' | 'bucket';
+    onFocus?: (event: ReactFocusEvent<HTMLDivElement>) => void;
+    onBlur?: (event: ReactFocusEvent<HTMLDivElement>) => void;
     childrenPosition?: 'top' | 'bottom';
     /** 本文のプレビュー文字列 */
     note?: string;
@@ -73,6 +82,8 @@ export function TimelineCard({
     onKeyDown,
     onOpenContextMenu,
     focusGroup,
+    onFocus,
+    onBlur,
     childrenPosition = 'bottom',
     note,
     noteClampClass,
@@ -169,6 +180,8 @@ export function TimelineCard({
             data-focus-part={focusGroup ? 'card' : undefined}
             onMouseDown={handleMouseDown}
             onClick={handleContainerClick}
+            onFocus={onFocus}
+            onBlur={onBlur}
             onKeyDown={(event) => {
                 // Create next card: Shift+Enter
                 if (event.key === 'Enter' && event.shiftKey) {

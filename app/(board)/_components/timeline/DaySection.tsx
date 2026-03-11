@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type Dispatch, type SetStateAction } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { TimelineColumn } from './TimelineColumn';
 import { TimelineDayBucket } from './TimelineDayBucket';
@@ -7,6 +7,7 @@ import type {
     TimelineEvent,
     TimelineBucketItem,
     ExternalCalendarEntry,
+    StackedTimelineItemKind,
 } from '@/app/(board)/_utils/timeline-helpers';
 import type { ActiveResizeState, BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 
@@ -57,6 +58,8 @@ type DaySectionProps = {
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
     hourHeight?: number;
+    activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
+    setActiveStackItem: Dispatch<SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
 };
 
 export const DaySection = memo(function DaySection({
@@ -93,6 +96,8 @@ export const DaySection = memo(function DaySection({
     onCardContextMenuByKeyboard,
     contextMenuCardId,
     hourHeight,
+    activeStackItem,
+    setActiveStackItem,
 }: DaySectionProps) {
     return (
         <div className="day-section grid grid-cols-2 h-full min-w-0">
@@ -125,6 +130,8 @@ export const DaySection = memo(function DaySection({
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}
                     hourHeight={hourHeight}
+                    activeStackItem={activeStackItem}
+                    setActiveStackItem={setActiveStackItem}
                 />
             </div>
 
