@@ -6,12 +6,11 @@ import {
   getDisplayHours,
   getTimelineHeight,
   calculateStackedEventLayout,
-  compareStackedTimelineLayoutItems,
   minuteToPixels,
   timeLabel,
   detailedTimeLabel,
   minutesToTime,
-  getStackedTimelineItemKey,
+  normalizeTimelineItems,
   TimelineBucketItem,
   TimelineDay,
   TimelineEvent,
@@ -86,30 +85,7 @@ function MobileTimelineColumn({
   setActiveStackItem: React.Dispatch<React.SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
-  const combinedItems = [
-    ...calendarEvents.map((calendarEvent, listIndex) => ({
-      kind: "calendar" as const,
-      key: getStackedTimelineItemKey("calendar", calendarEvent.id),
-      id: calendarEvent.id,
-      listIndex,
-      startMinutes: calendarEvent.startMinutes,
-      durationMinutes: calendarEvent.durationMinutes,
-      entry: calendarEvent,
-    })),
-    ...events.map((event, listIndex) => ({
-      kind: "card" as const,
-      key: getStackedTimelineItemKey("card", event.card_id),
-      id: event.card_id,
-      listIndex,
-      startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
-      durationMinutes: event.durationMinutes ?? 60,
-      entry: event,
-    })),
-  ].sort((a, b) => {
-    const compared = compareStackedTimelineLayoutItems(a, b);
-    if (compared !== 0) return compared;
-    return a.listIndex - b.listIndex;
-  });
+  const combinedItems = normalizeTimelineItems(events, calendarEvents);
   const stackedLayout = calculateStackedEventLayout(combinedItems, { device: "mobile" });
   const interactionLocked = Boolean(activeDragCardId || contextMenuCardId || pointerPreview.visible);
 
@@ -168,7 +144,7 @@ function MobileTimelineColumn({
 
         {combinedItems.map((item) => {
           if (item.kind === "calendar") {
-            const calendarEvent = item.entry;
+            const calendarEvent = item.entry as ExternalCalendarEntry;
             const layout = stackedLayout[item.key];
             const isActive = activeStackItem?.kind === "calendar" && activeStackItem.id === calendarEvent.id;
             return (
@@ -229,7 +205,7 @@ function MobileTimelineColumn({
             );
           }
 
-          const event = item.entry;
+          const event = item.entry as TimelineEvent;
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = event.durationMinutes ?? 60;
           const top = minuteToPixels(start, timelineStartHour, hourHeight);

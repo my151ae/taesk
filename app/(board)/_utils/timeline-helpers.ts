@@ -227,12 +227,18 @@ export type StackedTimelineLayoutItem = {
 export type StackedEventPresentationMode = 'full-width' | 'split' | 'half-overlap' | 'light-overlap';
 
 export type StackedEventLayout = EventLayout & {
-    stackIndex: number;
+    slotIndex: number;
     stackSize: number;
     clusterColumns: number;
     columnSpan: number;
     baseZIndex: number;
     presentationMode: StackedEventPresentationMode;
+};
+
+export type NormalizedTimelineLayoutItem<TEntry = unknown> = StackedTimelineLayoutItem & {
+    key: string;
+    listIndex: number;
+    entry: TEntry;
 };
 
 type StackedLayoutDevice = 'desktop' | 'mobile';
@@ -273,7 +279,7 @@ const PRESENTATION_FACTORS = {
 
 export const getStackedTimelineItemKey = (kind: StackedTimelineItemKind, id: string) => `${kind}:${id}`;
 
-export const compareStackedTimelineLayoutItems = (
+export const compareTimelineLayoutItems = (
     a: StackedTimelineLayoutItem,
     b: StackedTimelineLayoutItem
 ) => {
@@ -281,6 +287,39 @@ export const compareStackedTimelineLayoutItems = (
     if (a.durationMinutes !== b.durationMinutes) return b.durationMinutes - a.durationMinutes;
     if (a.kind !== b.kind) return a.kind === 'calendar' ? -1 : 1;
     return a.id.localeCompare(b.id);
+};
+
+export const compareStackedTimelineLayoutItems = compareTimelineLayoutItems;
+
+export const normalizeTimelineItems = (
+    events: ReadonlyArray<TimelineEvent>,
+    calendarEvents: ReadonlyArray<ExternalCalendarEntry>
+): Array<NormalizedTimelineLayoutItem<TimelineEvent | ExternalCalendarEntry>> => {
+    return [
+        ...calendarEvents.map((calendarEvent, listIndex) => ({
+            kind: 'calendar' as const,
+            key: getStackedTimelineItemKey('calendar', calendarEvent.id),
+            id: calendarEvent.id,
+            listIndex,
+            startMinutes: calendarEvent.startMinutes,
+            durationMinutes: calendarEvent.durationMinutes,
+            entry: calendarEvent,
+        })),
+        ...events.map((event, listIndex) => ({
+            kind: 'card' as const,
+            key: getStackedTimelineItemKey('card', event.card_id),
+            id: event.card_id,
+            listIndex,
+            startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
+            durationMinutes: event.durationMinutes ?? 60,
+            entry: event,
+        })),
+    ].sort((a, b) => {
+        const compared = compareTimelineLayoutItems(a, b);
+        if (compared !== 0) return compared;
+        if (a.listIndex !== b.listIndex) return a.listIndex - b.listIndex;
+        return a.key.localeCompare(b.key);
+    });
 };
 
 const getBaseZIndex = (kind: StackedTimelineItemKind) => (kind === 'card' ? 20 : 10);
@@ -449,7 +488,7 @@ export const calculateStackedEventLayout = (
     options?: StackedLayoutOptions
 ): Record<string, StackedEventLayout> => {
     const device = options?.device ?? 'desktop';
-    const sorted = [...items].sort(compareStackedTimelineLayoutItems);
+    const sorted = [...items].sort(compareTimelineLayoutItems);
     const clusters = groupClusters(sorted);
     const layout: Record<string, StackedEventLayout> = {};
 
@@ -493,7 +532,7 @@ export const calculateStackedEventLayout = (
 
             layout[key] = {
                 ...geometry,
-                stackIndex: item.slotIndex,
+                slotIndex: item.slotIndex,
                 stackSize,
                 clusterColumns,
                 columnSpan,

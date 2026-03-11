@@ -11,8 +11,7 @@ import {
     minutesToTime,
     getMinutesFromTime,
     calculateStackedEventLayout,
-    compareStackedTimelineLayoutItems,
-    getStackedTimelineItemKey,
+    normalizeTimelineItems,
     type StackedTimelineItemKind,
     timeLabel,
     ExternalCalendarEntry
@@ -107,30 +106,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
-    const combinedItems = [
-        ...calendarEvents.map((calendarEvent, listIndex) => ({
-            kind: 'calendar' as const,
-            key: getStackedTimelineItemKey('calendar', calendarEvent.id),
-            id: calendarEvent.id,
-            listIndex,
-            startMinutes: calendarEvent.startMinutes,
-            durationMinutes: calendarEvent.durationMinutes,
-            entry: calendarEvent,
-        })),
-        ...events.map((event, listIndex) => ({
-            kind: 'card' as const,
-            key: getStackedTimelineItemKey('card', event.card_id),
-            id: event.card_id,
-            listIndex,
-            startMinutes: getMinutesFromTime(event.due_start ?? null) ?? 0,
-            durationMinutes: event.durationMinutes ?? 60,
-            entry: event,
-        })),
-    ].sort((a, b) => {
-        const compared = compareStackedTimelineLayoutItems(a, b);
-        if (compared !== 0) return compared;
-        return a.listIndex - b.listIndex;
-    });
+    const combinedItems = normalizeTimelineItems(events, calendarEvents);
     const stackedLayout = calculateStackedEventLayout(combinedItems, { device: 'desktop' });
     const interactionLocked = Boolean(activeDragCardId || activeResize || contextMenuCardId || selectedSlot);
 
@@ -252,7 +228,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                     <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
                         {combinedItems.map((item) => {
                             if (item.kind === 'calendar') {
-                                const calendarEvent = item.entry;
+                                const calendarEvent = item.entry as ExternalCalendarEntry;
                                 const layout = stackedLayout[item.key];
                                 const isActive = activeStackItem?.kind === 'calendar' && activeStackItem.id === calendarEvent.id;
                                 return (
@@ -310,7 +286,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 );
                             }
 
-                            const event = item.entry;
+                            const event = item.entry as TimelineEvent;
                             return (
                 <TimelineEventItem
                                     key={`card-${event.card_id}`}
