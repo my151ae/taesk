@@ -7,13 +7,12 @@ import {
     TimelineEvent,
     TimelineBucketItem,
     formatDayLabel,
-    timeLabel,
     minutesToTime,
-    formatDuration,
     ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
 import { getPresetLabel } from '@/app/(board)/_hooks/useTimelineBoardController';
 import type { ListWindowPresetKey } from '@/app/(board)/_hooks/useTimelineUrlState';
+import { TimelineListCard } from '@/app/(board)/_components/timeline/TimelineListCard';
 
 type DesktopListViewProps = {
     days: TimelineDay[];
@@ -61,7 +60,6 @@ export function DesktopListView({
     onListBaseDateChange,
 }: DesktopListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
-    const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [showGoogle, setShowGoogle] = useState(false);
     const [showChecked, setShowChecked] = useState(true);
     const baseDateValue = listBaseDate ?? days[0]?.isoDate ?? '';
@@ -104,13 +102,6 @@ export function DesktopListView({
     ]);
 
     const displayDays = listReverse ? [...daysWithEvents].reverse() : daysWithEvents;
-    const handleCardClick = (cardId: string, shortId: string | null) => {
-        if (selectedCardId === cardId) {
-            openCardModal(shortId, 'list-view');
-            return;
-        }
-        setSelectedCardId(cardId);
-    };
 
     return (
         <div className="flex flex-col gap-6 px-4 pb-20">
@@ -249,59 +240,16 @@ export function DesktopListView({
                         <div className="flex-1 space-y-1">
                             {/* Taesk Events with Checkboxes */}
                             {filteredTimelineEvents.map((event) => (
-                                <div
+                                <TimelineListCard
                                     key={event.card_id}
-                                    tabIndex={0}
-                                    onClick={() => handleCardClick(event.card_id, event.short_id)}
-                                    onContextMenu={(e) => onCardContextMenu?.(e, event.card_id)}
-                                    className={clsx(
-                                        "flex w-full items-center gap-1 p-3 bg-white rounded-xl border hover:border-sky-200 hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item",
-                                        selectedCardId === event.card_id ? "border-sky-400 ring-2 ring-sky-300" : "border-slate-100"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-2 min-w-[110px]">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
-                                        <div className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                                            {`${event.due_start?.slice(0, 5) ?? '--:--'} 〜 ${event.due_end?.slice(0, 5) ?? '--:--'}`}
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 flex items-center gap-1 min-w-0">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onToggleCheck(event.card_id, !event.checked);
-                                            }}
-                                            className="shrink-0"
-                                        >
-                                            <div className={clsx(
-                                                "w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all",
-                                                event.checked
-                                                    ? "bg-slate-400 border-slate-400"
-                                                    : "bg-white border-slate-300"
-                                            )}>
-                                                {event.checked && (
-                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                        </button>
-                                        <div className={clsx(
-                                            "font-medium text-sm transition-colors truncate pt-[2px]",
-                                            event.checked ? "text-slate-400 line-through" : "text-slate-700"
-                                        )}>
-                                            {event.title || 'Untitled'}
-                                        </div>
-                                    </div>
-                                    {(event.duration != null || event.durationMinutes != null) ? (
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <div className="h-6 w-px bg-slate-200" />
-                                            <span className="text-[10px] font-semibold text-slate-600 leading-none">
-                                                {formatDuration((event.duration || event.durationMinutes)!)}
-                                            </span>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                    item={event}
+                                    kind="event"
+                                    variant="desktop"
+                                    openSource="list-view"
+                                    openCardModal={openCardModal}
+                                    onToggleCheck={onToggleCheck}
+                                    onCardContextMenu={onCardContextMenu}
+                                />
                             ))}
 
                             {/* Google Events */}
@@ -332,60 +280,17 @@ export function DesktopListView({
                             {filteredBucketItems.length > 0 && (
                                 <div className="space-y-1">
                                     {filteredBucketItems.map((item) => (
-                                        <div
+                                        <TimelineListCard
                                             key={item.card_id}
-                                            tabIndex={0}
-                                            onClick={() => handleCardClick(item.card_id, item.short_id)}
-                                            onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
-                                            className={clsx(
-                                                "flex w-full items-center gap-1 p-3 bg-white rounded-xl border hover:shadow-sm transition-all outline-none focus:ring-2 focus:ring-sky-500 group/item",
-                                                selectedCardId === item.card_id ? "border-sky-400 ring-2 ring-sky-300" : "border-slate-100",
-                                                item.bkey === 'a' ? "hover:border-orange-200" : "hover:border-emerald-200"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-[110px]">
-                                                <div className={clsx(
-                                                    "w-2.5 h-2.5 rounded-full shrink-0",
-                                                    item.bkey === 'a' ? "bg-orange-400" : "bg-emerald-400"
-                                                )} />
-                                            </div>
-                                            <div className="flex-1 flex items-center gap-1 min-w-0">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onToggleCheck(item.card_id, !item.checked);
-                                                    }}
-                                                    className="shrink-0"
-                                                >
-                                                    <div className={clsx(
-                                                        "w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all",
-                                                        item.checked
-                                                            ? "bg-slate-400 border-slate-400"
-                                                            : "bg-white border-slate-300"
-                                                    )}>
-                                                        {item.checked && (
-                                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                                <div className={clsx(
-                                                    "font-medium text-sm transition-colors truncate pt-[2px]",
-                                                    item.checked ? "text-slate-400 line-through" : "text-slate-700"
-                                                )}>
-                                                    {item.title || 'Untitled'}
-                                                </div>
-                                            </div>
-                                            {(item.duration != null) ? (
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <div className="h-6 w-px bg-slate-200" />
-                                                    <span className="text-[10px] font-semibold text-slate-600 leading-none">
-                                                        {formatDuration(item.duration)}
-                                                    </span>
-                                                </div>
-                                            ) : null}
-                                        </div>
+                                            item={item}
+                                            kind="bucket"
+                                            variant="desktop"
+                                            openSource="list-view"
+                                            bucketLabel={item.bkey.toUpperCase()}
+                                            openCardModal={openCardModal}
+                                            onToggleCheck={onToggleCheck}
+                                            onCardContextMenu={onCardContextMenu}
+                                        />
                                     ))}
                                 </div>
                             )}

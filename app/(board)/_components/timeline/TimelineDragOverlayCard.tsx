@@ -6,6 +6,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
+import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import { formatDuration, minuteToPixels, timeLabel } from "@/app/(board)/_utils/timeline-helpers";
 import type { OverlayCardData } from "@/app/(board)/_utils/timeline-overlay";
@@ -76,21 +77,27 @@ export function TimelineDragOverlayCard({
         <TimelineCard
           title={overlayCardData.title}
           badgeLabel={overlayCardData.badge?.toUpperCase()}
-          timeText={overlayCardData.timeText}
+          timeText={
+            isOverdueListOverlay
+              ? overlayCardData.timeText
+              : listOverlayCard
+                ? buildTimelineCardTimeText(listOverlayCard, {
+                    includeDate: true,
+                    includeTime: false,
+                    includeDuration: true,
+                  })
+                : overlayCardData.timeText
+          }
           note={overlayCardData.note ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={3}
-          rightMeta={
-            !isOverdueListOverlay && listOverlayCard?.duration != null
-              ? formatDuration(listOverlayCard.duration)
-              : undefined
-          }
+          rightMeta={undefined}
           checked={listOverlayCard?.checked ?? false}
           checklist={listOverlayCard?.checklist ?? null}
           content={listOverlayCard?.content ?? null}
           onToggleCheck={() => {}}
           onOpen={() => {}}
-          timePlacement={isOverdueListOverlay ? "out-top" : "inline"}
+          timePlacement="out-top"
           className="w-full border-none shadow-none"
           paddingClass="py-1"
         />

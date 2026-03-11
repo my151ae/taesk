@@ -31,6 +31,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
+import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
@@ -901,7 +902,7 @@ function MobileBucketCard({
       disabled={isContextMenuOpen}
     >
       <div
-        className="relative flex w-full flex-col select-none"
+        className="relative flex w-full flex-col select-none pt-4"
         onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
       >
         <TimelineCard
@@ -912,13 +913,17 @@ function MobileBucketCard({
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           cardId={item.card_id}
           badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-          timeText={null}
-          rightMeta={item.duration != null ? formatDuration(item.duration) : null}
+          timeText={buildTimelineCardTimeText(item, {
+            includeDate: true,
+            includeTime: false,
+            includeDuration: true,
+          })}
+          rightMeta={null}
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={3}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
-          timePlacement="inline"
+          timePlacement="out-top"
           paddingClass="py-1"
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}

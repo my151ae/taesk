@@ -5,8 +5,8 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
+import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
-import { formatDuration, timeLabel, toLocalDay } from "@/app/(board)/_utils/timeline-helpers";
 
 type OverduePanelProps = {
   items: readonly TimelineOverdueItem[];
@@ -23,24 +23,11 @@ type OverduePanelProps = {
   emptyStateMessage?: string;
 };
 
-function formatOverdueLabel(value: string | null) {
-  const localDay = toLocalDay(value);
-  if (!localDay) return "No date";
-  const [, month, day] = localDay.split("-");
-  return `${Number(month)}/${Number(day)}`;
-}
-
 function buildTimeText(item: TimelineOverdueItem) {
-  const parts: string[] = [];
-  const dateLabel = formatOverdueLabel(item.due_date ?? null);
-  parts.push(dateLabel);
-  if (item.due_start) {
-    parts.push(timeLabel(item.due_start, item.due_end));
-  }
-  if (item.duration != null) {
-    parts.push(`[${formatDuration(item.duration)}]`);
-  }
-  return parts.join(" ");
+  return buildTimelineCardTimeText(item, {
+    includeDate: true,
+    includeDuration: true,
+  });
 }
 
 function OverdueCardRow({

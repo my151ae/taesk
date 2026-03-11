@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import clsx from 'clsx';
-import { TimelineBucketItem, formatDuration } from '@/app/(board)/_utils/timeline-helpers';
+import { TimelineBucketItem } from '@/app/(board)/_utils/timeline-helpers';
+import { buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import {
@@ -50,7 +51,7 @@ export const TimelineBucketCard = ({
             // コンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen}
         >
-            <div className="relative min-w-0 has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
+            <div className="relative min-w-0 pt-4 has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}
@@ -77,11 +78,16 @@ export const TimelineBucketCard = ({
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     cardId={item.card_id}
                     badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                    timePlacement="inline"
+                    timeText={buildTimelineCardTimeText(item, {
+                        includeDate: true,
+                        includeTime: false,
+                        includeDuration: true,
+                    })}
+                    timePlacement="out-top"
                     note={item.excerpt ?? undefined}
                     noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
                     notePreviewLines={3}
-                    rightMeta={item.duration != null ? formatDuration(item.duration) : null}
+                    rightMeta={null}
                     onOpen={() => {
                         openCardModal(item.short_id);
                     }}
