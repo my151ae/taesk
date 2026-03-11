@@ -100,6 +100,7 @@ export function TimelineCard({
     const checklistTotalCount = countNonEmptyLines(checklist) || contentChecklistProgress.total;
     const checklistCheckedCount = countCheckedLines(checklist) || contentChecklistProgress.checked;
     const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
+    const hasBodySection = Boolean(note || checklistProgressLabel);
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
@@ -204,119 +205,134 @@ export function TimelineCard({
             <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
                     "flex flex-1 flex-col gap-2 min-w-0 overflow-hidden min-h-0",
-                    "pl-[3px] pr-[3px]",
+                    "px-[3px]",
                     // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
-                    (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : (paddingClass === 'py-3' ? "pt-1 pb-3" : "pt-1 pb-1")
+                    (timePlacement === 'top' && timeText) ? "pt-4 pb-0.5" : (paddingClass === 'py-3' ? "pt-0.5 pb-1" : "py-0.5")
                 )}>
                     {childrenPosition === 'top' && children}
 
-                    <div className="flex items-center gap-0.5 pr-0 pt-0">
+                    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
                         <div
-                            role="checkbox"
-                            aria-checked={checked}
-                            ref={checkboxRef}
-                            data-focus-group={focusGroup}
-                            data-focus-part={focusGroup ? 'checkbox' : undefined}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleCheck(!checked);
+                            className="pointer-events-none absolute inset-y-0 left-[1.4rem] w-px"
+                            aria-hidden="true"
+                            style={{
+                                backgroundImage: "repeating-linear-gradient(to bottom, rgb(203 213 225) 0 8px, transparent 8px 12px)",
                             }}
-                            aria-label={checked ? '未完了に戻す' : '完了にする'}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className={clsx(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
-                                checked
-                                    ? "bg-slate-400 border-slate-400"
-                                    : "bg-white border-slate-300 hover:border-sky-400"
-                            )}
-                        >
-                            {checked && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                            )}
-                        </div>
-                        <div className={clsx(
-                            "flex min-w-0 flex-1 items-center gap-1 pt-0.5"
-                        )}>
-                            {checklistProgressLabel ? (
-                                <span
-                                    className="shrink-0 text-[10px] font-medium leading-none text-slate-500 tabular-nums"
-                                    aria-label={`チェックリスト ${checklistProgressLabel}`}
-                                >
-                                    {checklistProgressLabel}
-                                </span>
-                            ) : null}
-                            <div className={clsx(
-                                "flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-slate-800"
-                            )}>
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span
-                                    className={clsx(
-                                        "truncate leading-tight",
-                                        !title && "text-slate-400"
-                                    )}
-                                    data-focus-group={focusGroup}
-                                    data-focus-part={focusGroup ? 'title' : undefined}
-                                    tabIndex={-1}
-                                >
-                                    {title || "Untitled card"}
-                                </span>
+                        />
+                        <div className="grid min-w-0 grid-cols-[1.4rem_minmax(0,1fr)]">
+                            <div className="flex min-h-[1.35rem] items-center justify-center">
+                            <div
+                                role="checkbox"
+                                aria-checked={checked}
+                                ref={checkboxRef}
+                                data-focus-group={focusGroup}
+                                data-focus-part={focusGroup ? 'checkbox' : undefined}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleCheck(!checked);
+                                }}
+                                aria-label={checked ? '未完了に戻す' : '完了にする'}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className={clsx(
+                                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
+                                    checked
+                                        ? "border-slate-400 bg-slate-400"
+                                        : "border-slate-300 bg-white hover:border-sky-400"
+                                )}
+                            >
+                                {checked && (
+                                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
                             </div>
-                            {timePlacement === 'inline' && timeText ? (
-                                <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
-                            ) : null}
+                            </div>
+
+                            <div className="flex min-h-[1.35rem] min-w-0 items-center pl-1.5">
+                                <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
+                                    <span
+                                        className={clsx(
+                                            "truncate leading-tight",
+                                            !title && "text-slate-400"
+                                        )}
+                                        data-focus-group={focusGroup}
+                                        data-focus-part={focusGroup ? 'title' : undefined}
+                                        tabIndex={-1}
+                                    >
+                                        {title || "Untitled card"}
+                                    </span>
+                                    {timePlacement === 'inline' && timeText ? (
+                                        <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
+                                    ) : null}
+                                </div>
+                            </div>
                         </div>
-                        </div>
-                    </div>
 
-                    {note ? (
-                        <div
-                            className={clsx(
-                                "flex min-h-0 flex-col gap-0.5 overflow-hidden text-[10px] text-slate-600 leading-tight min-w-0"
-                            )}
-                            style={{ maxHeight: `${notePreviewMaxHeightEm}em` }}
-                        >
-                            {(() => {
-                                const lines = note.split(/\r?\n/);
-                                return lines.map((line, idx) => {
-                                    const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                    const isTask = Boolean(taskMatch);
-                                    const indentRaw = taskMatch?.[1] ?? '';
-                                    const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
-                                    const checked = taskMatch?.[2]?.toLowerCase() === 'x';
-                                    const text = isTask ? (taskMatch?.[3] ?? '') : line;
-
-                                    if (!text.trim() && !isTask) return null;
-
-                                    return (
+                        {hasBodySection ? (
+                            <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[1.4rem_minmax(0,1fr)] border-t border-slate-200">
+                                <div className="flex min-h-0 items-start justify-center pt-1">
+                                    {checklistProgressLabel ? (
                                         <div
-                                            key={`line-${idx}`}
-                                            className="flex items-start gap-1 w-full min-w-0"
-                                            style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                            className="flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none text-slate-500 tabular-nums"
+                                            aria-label={`チェックリスト ${checklistProgressLabel}`}
                                         >
-                                            {isTask ? (
-                                                <span
-                                                    className={clsx(
-                                                        "h-3 w-3 rounded-[3px] border flex items-center justify-center shrink-0 mt-[1px]",
-                                                        checked ? "bg-slate-500 border-slate-500" : "border-slate-400"
-                                                    )}
-                                                    aria-hidden="true"
-                                                >
-                                                    {checked ? (
-                                                        <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    ) : null}
-                                                </span>
-                                            ) : null}
-                                            <span className={clsx(resolvedNoteClampClass)}>{text || '\u00A0'}</span>
+                                            <span>{checklistCheckedCount}</span>
+                                            <span className="my-1 h-px w-3 bg-slate-300" aria-hidden="true" />
+                                            <span>{checklistTotalCount}</span>
                                         </div>
-                                    );
-                                });
-                            })()}
-                        </div>
-                    ) : null}
+                                    ) : null}
+                                </div>
+
+                                <div
+                                    className={clsx(
+                                        "flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pl-1.5 pt-1 text-[10px] leading-tight text-slate-600"
+                                    )}
+                                    style={note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : undefined}
+                                >
+                                    {note ? (() => {
+                                        const lines = note.split(/\r?\n/);
+                                        return lines.map((line, idx) => {
+                                            const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                            const isTask = Boolean(taskMatch);
+                                            const indentRaw = taskMatch?.[1] ?? '';
+                                            const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
+                                            const checked = taskMatch?.[2]?.toLowerCase() === 'x';
+                                            const text = isTask ? (taskMatch?.[3] ?? '') : line;
+
+                                            if (!text.trim() && !isTask) return null;
+
+                                            return (
+                                                <div
+                                                    key={`line-${idx}`}
+                                                    className="flex w-full min-w-0 items-start gap-1"
+                                                    style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                                >
+                                                    {isTask ? (
+                                                        <span
+                                                            className={clsx(
+                                                                "mt-[1px] flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
+                                                                checked ? "border-slate-500 bg-slate-500" : "border-slate-400"
+                                                            )}
+                                                            aria-hidden="true"
+                                                        >
+                                                            {checked ? (
+                                                                <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            ) : null}
+                                                        </span>
+                                                    ) : null}
+                                                    <span className={clsx(resolvedNoteClampClass)}>{text || '\u00A0'}</span>
+                                                </div>
+                                            );
+                                        });
+                                    })() : (
+                                        <div className="min-h-[3rem]" />
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
 
                     {childrenPosition === 'bottom' && children}
                 </div>
