@@ -447,6 +447,10 @@ export function useTimelineCardActions({
   }, [data, dataMode, initialBoardId, setData, fetchTimeline]);
 
   const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
+    // 変換機能を一時的に停止
+    setGoogleToast("予定の変換機能は現在停止しています");
+    return;
+    /*
     try {
       const googleEventId = entry.eventId ?? entry.id;
       const res = await fetch("/api/calendar/convert", {
@@ -463,7 +467,8 @@ export function useTimelineCardActions({
     } catch {
       alert("変換失敗");
     }
-  }, [fetchTimeline, refreshGoogleCalendar, openCardModal]);
+    */
+  }, [setGoogleToast]);
 
   const moveCardByDayOffset = useCallback((cardId: string, offsetDays: number) => {
     if (!data) return;
