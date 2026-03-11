@@ -448,7 +448,6 @@ export function useTimelineCardActions({
 
   const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
     // 変換機能を一時的に停止
-    setGoogleToast("予定の変換機能は現在停止しています");
     return;
     /*
     try {
