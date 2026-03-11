@@ -227,7 +227,7 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 ```
 taesk/
 ├── app/
-│   ├── board/page.tsx                # MAIN_BOARD_ID を読み込み TimelineBoardPage を描画
+│   ├── board/page.tsx                # 所属ボードを検索し正規URL (/b/...) へリダイレクト
 │   ├── (board)/
 │   │   ├── page.tsx                  # / → /board へ permanentRedirect
 │   │   ├── layout.tsx                # Parallel Routes (@modal) と AuthContext
@@ -237,7 +237,7 @@ taesk/
 │   │   ├── _hooks/                     # useRealtimeBoard, useSyncQueue, useBoardFilters
 │   │   ├── _stores/                    # comments-store など
 │   │   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # Timeline からカードモーダルを開く
-│   │   └── b/[short_id]/[[...slug]]/page.tsx             # 短縮 URL / slug 解決
+│   │   └── b/[short_id]/[[...slug]]/page.tsx             # メイン描画エントリーポイント (TimelineBoardPage)
 │   ├── api/boards/[boardId]/timeline/route.ts  # Timeline API
 │   ├── api/cards/* / comments/* / notifications/*        # CRUD + sync API
 │   ├── components/CardModal.tsx          # 共通カードモーダル

@@ -1,6 +1,6 @@
 # Googleイベント連携 仕様まとめ
 
-_最終更新: 2026-03-11_
+_最終更新: 2026-03-12_
 
 ## 対象機能
 Taesk における「Googleイベント連携」および「Google予定からTaeskカードへの変換」機能。
@@ -9,7 +9,12 @@ Taesk における「Googleイベント連携」および「Google予定からTa
 ## 仕様詳細
 
 ### 1. フロントエンドからの呼び出し (`useTimelineCardActions`)
-- タイムラインまたはモバイル一覧で表示されている外部イベント（Google予定）をクリックすると、`handleExternalEventClick` が発火する。
+
+> [!IMPORTANT]
+> **現在、変換機能は一時停止されています。**
+> `handleExternalEventClick` の実装において、後述する二重クリック問題への暫定対策として処理がコメントアウトされており、クリックしてもトーストメッセージが表示されるのみとなっています。
+
+- 通常時、タイムラインまたはモバイル一覧で表示されている外部イベント（Google予定）をクリックすると、`handleExternalEventClick` が発火する。
 - 選択された予定の `google_event_id` を用いて、`POST /api/calendar/convert` を呼び出す。
 - **処理フロー:**
   1. 変換APIへリクエスト送信。

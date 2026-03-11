@@ -77,11 +77,12 @@ export function toSlugBase(title: string): string {
 app/
 ├── (board)/
 │   ├── layout.tsx                    # @modal parallel route を提供
-│   ├── page.tsx                      # ルート / を canonical board へ permanent redirect
-│   ├── _components/timeline/TimelineBoardPage.tsx  # Timeline UI + モーダル制御
-│   └── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # body スクロール制御のみを行う hook
-├── board/page.tsx                    # MAIN_BOARD_ID を取得して TimelineBoardPage を描画
-├── b/[short_id]/[[...slug]]/page.tsx # ボード canonical ルート (SSR)
+│   ├── page.tsx                      # / → /board へ permanent redirect
+│   ├── _components/timeline/TimelineBoardPage.tsx  # Timeline UI 本体
+│   ├── @modal/(...)c/[short_id]/[[...slug]]/page.tsx  # body スクロール制御のみを行う hook
+│   └── b/[short_id]/[[...slug]]/page.tsx             # メイン描画エントリーポイント (TimelineBoardPage)
+├── board/page.tsx                    # 所属ボードを検索し正規URL (/b/...) へリダイレクト
+├── b/[short_id]/[[...slug]]/page.tsx # （リダイレクト用 / 実体は app/(board)/b/...）
 └── c/[short_id]/[[...slug]]/page.tsx # カードスタンドアロンページ
 ```
 
@@ -425,4 +426,4 @@ Edge Runtime ではなく Node.js Runtime を明示的に指定しています�
 
 ---
 
-**最終更新**: 2025-10-16
+**最終更新**: 2026-03-12

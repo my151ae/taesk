@@ -13,7 +13,9 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Timeline UI 向け
 | `comments` | カードコメント | CardModal / CommentsPanel |
 | `notifications`, `notification_preferences`, `notification_delivery_logs`, `push_subscriptions` | 通知系テーブル | NotificationSettings / Web Push |
 | `activity_logs` | 操作監査 | ボードレベルでの変更追跡 |
-| `profiles` | Supabase Auth ユーザーの拡張 | CardModal の担当者、Mention の候補 |
+| `google_calendar_accounts` | Google OAuth 連携 | カレンダー同期の認可情報 |
+| `calendar_sync` | カードと Google 予定の紐付け | 二重同期の防止、双方向更新 |
+| `profiles` | Supabase Auth ユーザーの拡張 | タイムライン開始時刻（`timeline_start_hour`）など |
 | `board_invites` | メール招待 | ShareDialog (ロールアウト中) |
 
 ## ER 図（簡易）
@@ -116,6 +118,11 @@ CREATE TABLE public.cards (
   content JSONB NOT NULL DEFAULT '[]'::jsonb,
   excerpt TEXT NOT NULL DEFAULT '',
   duration INTEGER DEFAULT 60,
+  start_reminder_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  start_reminder_minutes INTEGER NOT NULL DEFAULT 0,
+  end_reminder_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  end_reminder_minutes INTEGER NOT NULL DEFAULT 0,
+  started_at TIMESTAMPTZ NULL,
   assignee_id UUID NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
   assignee_ids UUID[] DEFAULT ARRAY[]::UUID[],
   assigned_to TEXT NULL, -- legacy fallback
@@ -185,6 +192,23 @@ CREATE TABLE public.activity_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
+
+## Google カレンダー連携
+
+Google カレンダーとの同期や通知のために、以下のテーブル群を使用します。
+
+- `google_calendar_accounts`: ユーザーごとの Google OAuth トークン、接続ステータス、対象カレンダーID を保持。
+- `google_calendar_events`: 同期対象の Google 予定のキャッシュ。
+- `calendar_sync`: Taesk の `card_id` と Google の `event_id` を1対1でリンク。`status` が `active` の場合に双方向同期が動作。
+- `reminders_queue`: リマインダー通知（Push/Web）の配信予定キュー。
+- `card_content_history`: カード本文（`content`）の変更履歴を保存。
+
+### profiles 拡張
+
+```sql
+ALTER TABLE public.profiles ADD COLUMN timeline_start_hour INTEGER DEFAULT 0;
+```
+- `timeline_start_hour`: タイムライン表示の開始時刻（0-23）。デフォルトは 0 (00:00)。
 
 ## Timeline API
 
