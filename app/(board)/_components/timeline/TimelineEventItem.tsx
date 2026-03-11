@@ -86,6 +86,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                 data-stack-mode={layout?.presentationMode ?? 'full-width'}
                 data-column-span={layout?.columnSpan ?? 1}
                 data-cluster-columns={layout?.clusterColumns ?? 1}
+                data-slot-index={layout?.slotIndex ?? 0}
                 style={{
                     top,
                     height,
@@ -103,7 +104,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     cardId={event.card_id}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    timeText={detailedTimeLabel(displayStart, displayEnd, duration)}
+                    timeText={
+                        layout && (layout.presentationMode === 'half-overlap' || layout.presentationMode === 'light-overlap') && layout.slotIndex > 0
+                            ? null
+                            : detailedTimeLabel(displayStart, displayEnd, duration)
+                    }
                     rightMeta={undefined}
                     timePlacement="out-top"
                     note={event.excerpt ?? undefined}

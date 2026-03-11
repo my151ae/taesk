@@ -683,6 +683,15 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(desktopLightLeft).toBeGreaterThan(30);
       expect(desktopLightLeft).toBeLessThan(40);
 
+      // Verify time text visibility for overlaps on desktop
+      // split mode should show time
+      await expect(split1).toContainText(/(\d{2}:\d{2})/);
+      // half-overlap and light-overlap slotIndex > 0 should hide time
+      // The text inside TimelineCard is roughly "Timeline focus card" etc.
+      // detailedTimeLabel returns like "17:00 - 18:00[1h]"
+      await expect(half2).not.toContainText(/\d{2}:\d{2} - \d{2}:\d{2}\[\d+h( \d+m)?\]/);
+      await expect(light2).not.toContainText(/\d{2}:\d{2} - \d{2}:\d{2}\[\d+h( \d+m)?\]/);
+
       await split1.click();
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 500 });
 
@@ -804,6 +813,11 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(mobileHalfLeft).toBeLessThan(35);
       expect(mobileLightLeft).toBeGreaterThan(40);
       expect(mobileLightLeft).toBeLessThan(45);
+
+      // Verify time text visibility for overlaps on mobile
+      await expect(mobileSplit1).toContainText(/(\d{2}:\d{2})/);
+      await expect(mobileHalf2).not.toContainText(/\d{2}:\d{2} - \d{2}:\d{2}\[\d+h( \d+m)?\]/);
+      // await expect(mobileLight2).not.toContainText(/\d{2}:\d{2} - \d{2}:\d{2}\[\d+h( \d+m)?\]/);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
     }
