@@ -8,6 +8,12 @@ import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
 export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-3';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
 const NOTE_PREVIEW_ROW_GAP_EM = 0.125;
+const CARD_LEFT_COLUMN_WIDTH = '1.2rem';
+const CARD_LEFT_CELL_X_PADDING = '1px';
+const CARD_RIGHT_CELL_X_PADDING = '4px';
+const CARD_TOP_CELL_Y_PADDING = '1px';
+const CARD_BODY_TOP_PADDING = '4px';
+const CARD_TOP_ROW_MIN_HEIGHT = '1.2rem';
 
 type TimelineCardProps = {
     title: string;
@@ -205,7 +211,6 @@ export function TimelineCard({
             <div className="relative flex flex-1 flex-col min-w-0">
                 <div className={clsx(
                     "flex flex-1 flex-col gap-2 min-w-0 overflow-hidden min-h-0",
-                    "px-[3px]",
                     // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
                     (timePlacement === 'top' && timeText) ? "pt-4 pb-0.5" : (paddingClass === 'py-3' ? "pt-0.5 pb-1" : "py-0.5")
                 )}>
@@ -213,42 +218,64 @@ export function TimelineCard({
 
                     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
                         <div
-                            className="pointer-events-none absolute inset-y-0 left-[1.4rem] w-px"
+                            className="pointer-events-none absolute inset-y-0 w-px"
                             aria-hidden="true"
                             style={{
+                                left: CARD_LEFT_COLUMN_WIDTH,
                                 backgroundImage: "repeating-linear-gradient(to bottom, rgb(203 213 225) 0 8px, transparent 8px 12px)",
                             }}
                         />
-                        <div className="grid min-w-0 grid-cols-[1.4rem_minmax(0,1fr)]">
-                            <div className="flex min-h-[1.35rem] items-center justify-center">
+                        <div
+                            className="grid min-w-0"
+                            style={{ gridTemplateColumns: `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                        >
                             <div
-                                role="checkbox"
-                                aria-checked={checked}
-                                ref={checkboxRef}
-                                data-focus-group={focusGroup}
-                                data-focus-part={focusGroup ? 'checkbox' : undefined}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleCheck(!checked);
+                                className="flex items-center justify-center"
+                                style={{
+                                    minHeight: CARD_TOP_ROW_MIN_HEIGHT,
+                                    paddingLeft: CARD_LEFT_CELL_X_PADDING,
+                                    paddingRight: CARD_LEFT_CELL_X_PADDING,
+                                    paddingTop: CARD_TOP_CELL_Y_PADDING,
+                                    paddingBottom: CARD_TOP_CELL_Y_PADDING,
                                 }}
-                                aria-label={checked ? '未完了に戻す' : '完了にする'}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                className={clsx(
-                                    "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
-                                    checked
-                                        ? "border-slate-400 bg-slate-400"
-                                        : "border-slate-300 bg-white hover:border-sky-400"
-                                )}
                             >
-                                {checked && (
-                                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                )}
-                            </div>
+                                <div
+                                    role="checkbox"
+                                    aria-checked={checked}
+                                    ref={checkboxRef}
+                                    data-focus-group={focusGroup}
+                                    data-focus-part={focusGroup ? 'checkbox' : undefined}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onToggleCheck(!checked);
+                                    }}
+                                    aria-label={checked ? '未完了に戻す' : '完了にする'}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className={clsx(
+                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
+                                        checked
+                                            ? "border-slate-400 bg-slate-400"
+                                            : "border-slate-300 bg-white hover:border-sky-400"
+                                    )}
+                                >
+                                    {checked && (
+                                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex min-h-[1.35rem] min-w-0 items-center pl-1.5">
+                            <div
+                                className="flex min-w-0 items-center"
+                                style={{
+                                    minHeight: CARD_TOP_ROW_MIN_HEIGHT,
+                                    paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingTop: CARD_TOP_CELL_Y_PADDING,
+                                    paddingBottom: CARD_TOP_CELL_Y_PADDING,
+                                }}
+                            >
                                 <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
                                     <span
                                         className={clsx(
@@ -269,8 +296,18 @@ export function TimelineCard({
                         </div>
 
                         {hasBodySection ? (
-                            <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[1.4rem_minmax(0,1fr)] border-t border-slate-200">
-                                <div className="flex min-h-0 items-start justify-center pt-1">
+                            <div
+                                className="grid min-h-0 min-w-0 flex-1 border-t border-slate-200"
+                                style={{ gridTemplateColumns: `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                            >
+                                <div
+                                    className="flex min-h-0 items-start justify-center"
+                                    style={{
+                                        paddingLeft: CARD_LEFT_CELL_X_PADDING,
+                                        paddingRight: CARD_LEFT_CELL_X_PADDING,
+                                        paddingTop: CARD_BODY_TOP_PADDING,
+                                    }}
+                                >
                                     {checklistProgressLabel ? (
                                         <div
                                             className="flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none text-slate-500 tabular-nums"
@@ -285,9 +322,14 @@ export function TimelineCard({
 
                                 <div
                                     className={clsx(
-                                        "flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pl-1.5 pt-1 text-[10px] leading-tight text-slate-600"
+                                        "flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pt-1 text-[10px] leading-tight text-slate-600"
                                     )}
-                                    style={note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : undefined}
+                                    style={{
+                                        ...(note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : {}),
+                                        paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingTop: CARD_BODY_TOP_PADDING,
+                                    }}
                                 >
                                     {note ? (() => {
                                         const lines = note.split(/\r?\n/);
