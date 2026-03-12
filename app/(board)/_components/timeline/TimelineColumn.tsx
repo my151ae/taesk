@@ -14,9 +14,11 @@ import {
     normalizeTimelineItems,
     type StackedTimelineItemKind,
     timeLabel,
-    ExternalCalendarEntry
+    ExternalCalendarEntry,
+    detailedTimeLabel
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
+import { TimelineCard } from './TimelineCard';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 
 type PointerPreviewState = {
@@ -232,57 +234,63 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 const layout = stackedLayout[item.key];
                                 const isActive = activeStackItem?.kind === 'calendar' && activeStackItem.id === calendarEvent.id;
                                 return (
-                                    <button
+                                    <div
                                         key={`calendar-${calendarEvent.id}`}
-                                        type="button"
-                                        data-testid="timeline-calendar-event"
+                                        className="absolute transition hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                                         data-stack-mode={layout?.presentationMode ?? 'full-width'}
                                         data-column-span={layout?.columnSpan ?? 1}
                                         data-cluster-columns={layout?.clusterColumns ?? 1}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!interactionLocked) {
-                                                setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
-                                            }
-                                            onExternalEventClick?.(calendarEvent);
-                                        }}
-                                        onFocus={() => {
-                                            if (interactionLocked) return;
-                                            setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
-                                        }}
-                                        onBlur={() => {
-                                            setActiveStackItem((current) => {
-                                                if (current?.kind === 'calendar' && current.id === calendarEvent.id) {
-                                                    return null;
-                                                }
-                                                return current;
-                                            });
-                                        }}
-                                        className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
+                                        data-slot-index={layout?.slotIndex ?? 0}
                                         style={{
                                             top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight),
-                                            height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, currentHourHeight) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight), 18),
-                                            left: layout?.left ?? '0px',
+                                            height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, currentHourHeight) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight), 20),
+                                            left: layout?.left ?? '0%',
                                             width: layout?.width ?? '100%',
                                             zIndex: isActive ? 30 : (layout?.baseZIndex ?? 10),
                                         }}
                                     >
-                                        <div className="flex items-center gap-1">
-                                            <span className="truncate font-semibold">{calendarEvent.title || 'Google予定'}</span>
-                                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                                                G
-                                            </span>
-                                        </div>
-                                        <p className="text-[9px] text-emerald-600">
-                                            {calendarEvent.isAllDay
-                                                ? '終日'
-                                                : timeLabel(
-                                                    minutesToTime(calendarEvent.startMinutes),
-                                                    minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                                                )
+                                        <TimelineCard
+                                            title={calendarEvent.title || "Google予定"}
+                                            checked={false}
+                                            onToggleCheck={() => {}}
+                                            badgeLabel="G"
+                                            timeText={
+                                                layout && (layout.presentationMode === 'half-overlap' || layout.presentationMode === 'light-overlap') && layout.slotIndex > 0
+                                                    ? null
+                                                    : detailedTimeLabel(minutesToTime(calendarEvent.startMinutes), minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes), calendarEvent.durationMinutes)
                                             }
-                                        </p>
-                                    </button>
+                                            timePlacement="out-top"
+                                            onOpen={() => {
+                                                if (!interactionLocked) {
+                                                    setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
+                                                }
+                                                onExternalEventClick?.(calendarEvent);
+                                            }}
+                                            dataTestId="timeline-calendar-event"
+                                            tabIndex={0}
+                                            role="group"
+                                            onFocus={() => {
+                                                if (interactionLocked) return;
+                                                setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
+                                            }}
+                                            onBlur={() => {
+                                                setActiveStackItem((current) => {
+                                                    if (current?.kind === 'calendar' && current.id === calendarEvent.id) {
+                                                        return null;
+                                                    }
+                                                    return current;
+                                                });
+                                            }}
+                                            className={clsx(
+                                                "w-full h-full pt-0 transition-[box-shadow,transform,ring-color] border-emerald-200",
+                                                isActive ? "ring-2 ring-sky-400 shadow-md" : "hover:ring-2 hover:ring-emerald-200 focus:ring-2 focus:ring-emerald-500"
+                                            )}
+                                            backgroundClass="bg-gradient-to-r from-emerald-50 from-40% to-emerald-50/10"
+                                            titleClassName="text-emerald-800"
+                                            hideLeftColumn={true}
+                                            cardId={`calendar-${calendarEvent.id}`}
+                                        />
+                                    </div>
                                 );
                             }
 

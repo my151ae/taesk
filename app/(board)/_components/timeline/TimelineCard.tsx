@@ -58,6 +58,10 @@ type TimelineCardProps = {
     onCreateNext?: () => void;
     /** フォーカス復帰用のカードID */
     cardId?: string;
+    /** タイトル部分に適用する追加のクラス */
+    titleClassName?: string;
+    /** 左側のチェックボックス列を非表示にするか */
+    hideLeftColumn?: boolean;
 };
 
 export function TimelineCard({
@@ -91,6 +95,8 @@ export function TimelineCard({
     backgroundClass = 'bg-white',
     onCreateNext,
     cardId,
+    titleClassName,
+    hideLeftColumn = false,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -240,44 +246,46 @@ export function TimelineCard({
                         />
                         <div
                             className="grid min-w-0"
-                            style={{ gridTemplateColumns: `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                            style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
                         >
-                            <div
-                                className="flex items-center justify-center"
-                                style={{
-                                    minHeight: CARD_TOP_ROW_MIN_HEIGHT,
-                                    paddingLeft: CARD_LEFT_CELL_X_PADDING,
-                                    paddingRight: CARD_LEFT_CELL_X_PADDING,
-                                    paddingTop: CARD_TOP_CELL_Y_PADDING,
-                                    paddingBottom: CARD_TOP_CELL_Y_PADDING,
-                                }}
-                            >
+                            {!hideLeftColumn && (
                                 <div
-                                    role="checkbox"
-                                    aria-checked={checked}
-                                    ref={checkboxRef}
-                                    data-focus-group={focusGroup}
-                                    data-focus-part={focusGroup ? 'checkbox' : undefined}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onToggleCheck(!checked);
+                                    className="flex items-center justify-center"
+                                    style={{
+                                        minHeight: CARD_TOP_ROW_MIN_HEIGHT,
+                                        paddingLeft: CARD_LEFT_CELL_X_PADDING,
+                                        paddingRight: CARD_LEFT_CELL_X_PADDING,
+                                        paddingTop: CARD_TOP_CELL_Y_PADDING,
+                                        paddingBottom: CARD_TOP_CELL_Y_PADDING,
                                     }}
-                                    aria-label={checked ? '未完了に戻す' : '完了にする'}
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className={clsx(
-                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
-                                        checked
-                                            ? "border-slate-400 bg-slate-400"
-                                            : "border-slate-300 bg-white hover:border-sky-400"
-                                    )}
                                 >
-                                    {checked && (
-                                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    )}
+                                    <div
+                                        role="checkbox"
+                                        aria-checked={checked}
+                                        ref={checkboxRef}
+                                        data-focus-group={focusGroup}
+                                        data-focus-part={focusGroup ? 'checkbox' : undefined}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onToggleCheck(!checked);
+                                        }}
+                                        aria-label={checked ? '未完了に戻す' : '完了にする'}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        className={clsx(
+                                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
+                                            checked
+                                                ? "border-slate-400 bg-slate-400"
+                                                : "border-slate-300 bg-white hover:border-sky-400"
+                                        )}
+                                    >
+                                        {checked && (
+                                            <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div
                                 className="flex min-w-0 items-center"
@@ -293,7 +301,8 @@ export function TimelineCard({
                                     <span
                                         className={clsx(
                                             "truncate leading-tight",
-                                            !title && "text-slate-400"
+                                            !title && "text-slate-400",
+                                            titleClassName
                                         )}
                                         data-focus-group={focusGroup}
                                         data-focus-part={focusGroup ? 'title' : undefined}
@@ -311,27 +320,29 @@ export function TimelineCard({
                         {hasBodySection ? (
                             <div
                                 className="grid min-h-0 min-w-0 flex-1 border-t border-slate-200"
-                                style={{ gridTemplateColumns: `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                                style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
                             >
-                                <div
-                                    className="flex min-h-0 items-start justify-center"
-                                    style={{
-                                        paddingLeft: CARD_LEFT_CELL_X_PADDING,
-                                        paddingRight: CARD_LEFT_CELL_X_PADDING,
-                                        paddingTop: CARD_BODY_TOP_PADDING,
-                                    }}
-                                >
-                                    {checklistProgressLabel ? (
-                                        <div
-                                            className="flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none text-slate-500 tabular-nums"
-                                            aria-label={`チェックリスト ${checklistProgressLabel}`}
-                                        >
-                                            <span>{checklistCheckedCount}</span>
-                                            <span className="my-1 h-px w-3 bg-slate-300" aria-hidden="true" />
-                                            <span>{checklistTotalCount}</span>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                {!hideLeftColumn && (
+                                    <div
+                                        className="flex min-h-0 items-start justify-center"
+                                        style={{
+                                            paddingLeft: CARD_LEFT_CELL_X_PADDING,
+                                            paddingRight: CARD_LEFT_CELL_X_PADDING,
+                                            paddingTop: CARD_BODY_TOP_PADDING,
+                                        }}
+                                    >
+                                        {checklistProgressLabel ? (
+                                            <div
+                                                className="flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none text-slate-500 tabular-nums"
+                                                aria-label={`チェックリスト ${checklistProgressLabel}`}
+                                            >
+                                                <span>{checklistCheckedCount}</span>
+                                                <span className="my-1 h-px w-3 bg-slate-300" aria-hidden="true" />
+                                                <span>{checklistTotalCount}</span>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
 
                                 <div
                                     className={clsx(
