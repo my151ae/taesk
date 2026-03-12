@@ -197,7 +197,7 @@ function MobileTimelineColumn({
                   </span>
                 </div>
                 <p className="text-[9px] text-emerald-600">
-                  {layout?.isTimeOverlapped
+                  {layout?.isTimeOverlapped && !isActive
                     ? null
                     : calendarEvent.isAllDay
                       ? "終日"
@@ -251,7 +251,7 @@ function MobileTimelineColumn({
                   cardId={event.card_id}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
                   timeText={
-                    layout?.isTimeOverlapped
+                    layout?.isTimeOverlapped && !(activeStackItem?.kind === "card" && activeStackItem.id === event.card_id)
                       ? null
                       : detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)
                   }

@@ -258,7 +258,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             onToggleCheck={() => {}}
                                             badgeLabel="G"
                                             timeText={
-                                                layout?.isTimeOverlapped
+                                                layout?.isTimeOverlapped && !isActive
                                                     ? null
                                                     : detailedTimeLabel(minutesToTime(calendarEvent.startMinutes), minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes), calendarEvent.durationMinutes)
                                             }
