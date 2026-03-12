@@ -109,7 +109,10 @@ export const TimelineColumn = memo(function TimelineColumn({
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
     const combinedItems = normalizeTimelineItems(events, calendarEvents);
-    const stackedLayout = calculateStackedEventLayout(combinedItems, { device: 'desktop' });
+    const stackedLayout = calculateStackedEventLayout(combinedItems, { 
+        device: 'desktop',
+        hourHeight: currentHourHeight
+    });
     const interactionLocked = Boolean(activeDragCardId || activeResize || contextMenuCardId || selectedSlot);
 
     const handleSingleClick = (e: MouseEvent, dayIso: string) => {
@@ -255,7 +258,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             onToggleCheck={() => {}}
                                             badgeLabel="G"
                                             timeText={
-                                                layout && (layout.presentationMode === 'half-overlap' || layout.presentationMode === 'light-overlap') && layout.slotIndex > 0
+                                                layout?.isTimeOverlapped
                                                     ? null
                                                     : detailedTimeLabel(minutesToTime(calendarEvent.startMinutes), minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes), calendarEvent.durationMinutes)
                                             }

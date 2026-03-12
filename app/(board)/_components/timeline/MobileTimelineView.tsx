@@ -86,7 +86,10 @@ function MobileTimelineColumn({
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const combinedItems = normalizeTimelineItems(events, calendarEvents);
-  const stackedLayout = calculateStackedEventLayout(combinedItems, { device: "mobile" });
+  const stackedLayout = calculateStackedEventLayout(combinedItems, { 
+    device: "mobile",
+    hourHeight
+  });
   const interactionLocked = Boolean(activeDragCardId || contextMenuCardId || pointerPreview.visible);
 
   return (
@@ -194,12 +197,14 @@ function MobileTimelineColumn({
                   </span>
                 </div>
                 <p className="text-[9px] text-emerald-600">
-                  {calendarEvent.isAllDay
-                    ? "終日"
-                    : timeLabel(
-                      minutesToTime(calendarEvent.startMinutes),
-                      minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                    )}
+                  {layout?.isTimeOverlapped
+                    ? null
+                    : calendarEvent.isAllDay
+                      ? "終日"
+                      : timeLabel(
+                        minutesToTime(calendarEvent.startMinutes),
+                        minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                      )}
                 </p>
               </button>
             );
@@ -245,7 +250,11 @@ function MobileTimelineColumn({
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   cardId={event.card_id}
                   badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
-                  timeText={detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)}
+                  timeText={
+                    layout?.isTimeOverlapped
+                      ? null
+                      : detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)
+                  }
                   rightMeta={undefined}
                   timePlacement="out-top"
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}

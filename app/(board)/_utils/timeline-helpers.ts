@@ -233,6 +233,7 @@ export type StackedEventLayout = EventLayout & {
     columnSpan: number;
     baseZIndex: number;
     presentationMode: StackedEventPresentationMode;
+    isTimeOverlapped: boolean;
 };
 
 export type NormalizedTimelineLayoutItem<TEntry = unknown> = StackedTimelineLayoutItem & {
@@ -245,6 +246,8 @@ type StackedLayoutDevice = 'desktop' | 'mobile';
 
 type StackedLayoutOptions = {
     device?: StackedLayoutDevice;
+    hourHeight?: number;
+    timeLabelHeightPx?: number;
 };
 
 type ClusterLayoutItem = StackedTimelineLayoutItem & {
@@ -530,6 +533,9 @@ export const calculateStackedEventLayout = (
                 geometry = buildGridLayout(item.slotIndex, clusterColumns, columnSpan, 'light-overlap', device);
             }
 
+            // 既存の水平方向の重なり判定 (UI側で行っていたロジックをここに集約)
+            const isHorizontalOverlap = (geometry.presentationMode === 'half-overlap' || geometry.presentationMode === 'light-overlap') && item.slotIndex > 0;
+
             layout[key] = {
                 ...geometry,
                 slotIndex: item.slotIndex,
@@ -537,8 +543,30 @@ export const calculateStackedEventLayout = (
                 clusterColumns,
                 columnSpan,
                 baseZIndex: getBaseZIndex(item.kind),
+                isTimeOverlapped: isHorizontalOverlap,
             };
         });
+    });
+
+    // クラスターを跨いだ垂直方向の重なり判定を追加
+    const hourHeight = options?.hourHeight ?? DEFAULT_HOUR_HEIGHT;
+    const timeLabelHeightPx = options?.timeLabelHeightPx ?? 16;
+    const thresholdMinutes = (timeLabelHeightPx / hourHeight) * 60;
+
+    let runningMaxEnd = -Infinity;
+    sorted.forEach((item) => {
+        const key = getStackedTimelineItemKey(item.kind, item.id);
+        const currentLayout = layout[key];
+        if (!currentLayout) return;
+
+        // すでに水平方向で true ならそのまま。垂直方向でもチェック。
+        if (!currentLayout.isTimeOverlapped) {
+            if (item.startMinutes < runningMaxEnd + thresholdMinutes) {
+                currentLayout.isTimeOverlapped = true;
+            }
+        }
+
+        runningMaxEnd = Math.max(runningMaxEnd, item.startMinutes + item.durationMinutes);
     });
 
     return layout;

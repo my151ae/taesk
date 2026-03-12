@@ -105,7 +105,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     cardId={event.card_id}
                     badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
                     timeText={
-                        layout && (layout.presentationMode === 'half-overlap' || layout.presentationMode === 'light-overlap') && layout.slotIndex > 0
+                        layout?.isTimeOverlapped
                             ? null
                             : detailedTimeLabel(displayStart, displayEnd, duration)
                     }
