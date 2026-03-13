@@ -45,6 +45,14 @@ export const getTiptapPlainText = (content: JSONContent): string => {
       case "paragraph":
       case "heading":
         return joinChildren(node, (n) => formatNode(n, level)).trimEnd() + "\n";
+      case "detailsSummary":
+        return joinChildren(node, (n) => formatNode(n, level)).trimEnd() + "\n";
+      case "detailsContent":
+        return joinChildren(node, (n) => formatNode(n, level));
+      case "details": {
+        const joined = joinChildren(node, (n) => formatNode(n, level)).replace(/\n{3,}/g, "\n\n");
+        return joined.endsWith("\n") ? joined : `${joined}\n`;
+      }
       case "bulletList":
       case "orderedList":
       case "taskList":

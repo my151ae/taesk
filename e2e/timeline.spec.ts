@@ -2087,6 +2087,265 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('inserts details, persists closed state, and updates excerpt text', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Details insert test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'before details' }] }],
+      },
+      excerpt: 'before details',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1892,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:45:00',
+      due_end: '15:45:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5039,
+      slug: 'details-insert-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await modal.getByTestId('card-modal-insert-details').click();
+      await page.keyboard.type('詳細');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('内側メモ');
+
+      const detailsToggle = modal.locator('.ProseMirror div[data-type="details"] > button').first();
+      await detailsToggle.click();
+
+      await page.waitForTimeout(2500);
+
+      const { data: savedCard, error: savedError } = await supabaseAdmin
+        .from('cards')
+        .select('content, excerpt')
+        .eq('id', cardId)
+        .maybeSingle();
+
+      expect(savedError).toBeNull();
+      expect(savedCard?.excerpt).toContain('詳細');
+      expect(savedCard?.excerpt).toContain('内側メモ');
+      const detailsNode = Array.isArray((savedCard?.content as { content?: Array<{ type?: string; attrs?: { open?: boolean } }> } | null)?.content)
+        ? (savedCard?.content as { content: Array<{ type?: string; attrs?: { open?: boolean } }> }).content.find((node) => node?.type === 'details')
+        : null;
+      expect(detailsNode?.attrs?.open).toBe(false);
+
+      await page.reload();
+      const reopenedModal = page.getByRole('dialog');
+      await expect(reopenedModal).toBeVisible();
+      await expect(reopenedModal.locator('.ProseMirror summary').first()).toContainText('詳細');
+      await expect(reopenedModal.locator('.ProseMirror div[data-type="detailsContent"][hidden]').first()).toBeAttached();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('wraps the current line into details content with empty summary', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Details wrap test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'トグルにする？' }] }],
+      },
+      excerpt: 'トグルにする？',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1894,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:45:00',
+      due_end: '15:45:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5041,
+      slug: 'details-wrap-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await page.evaluate(() => {
+        const paragraph = document.querySelector('.ProseMirror p');
+        const textNode = paragraph?.firstChild;
+        if (!textNode) {
+          throw new Error('Missing paragraph text node');
+        }
+        const textLength = textNode.textContent?.length ?? 0;
+        const range = document.createRange();
+        range.setStart(textNode, Math.min(3, textLength));
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      });
+
+      await modal.getByTestId('card-modal-insert-details').click();
+
+      const editorRoot = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      await expect(editorRoot.locator('summary').first()).toHaveText('');
+      await expect(editorRoot.locator('div[data-type="detailsContent"] p').first()).toHaveText('トグルにする？');
+
+      await page.waitForTimeout(2500);
+
+      const { data: savedCard, error: savedError } = await supabaseAdmin
+        .from('cards')
+        .select('content')
+        .eq('id', cardId)
+        .maybeSingle();
+
+      expect(savedError).toBeNull();
+      const detailsNode = Array.isArray((savedCard?.content as { content?: Array<{ type?: string; content?: unknown[] }> } | null)?.content)
+        ? (savedCard?.content as { content: Array<{ type?: string; content?: unknown[] }> }).content.find((node) => node?.type === 'details')
+        : null;
+      const detailsContentNode = Array.isArray(detailsNode?.content)
+        ? detailsNode.content.find((node) => (node as { type?: string })?.type === 'detailsContent') as { content?: Array<{ type?: string; content?: Array<{ text?: string }> }> } | undefined
+        : undefined;
+      const detailsSummaryNode = Array.isArray(detailsNode?.content)
+        ? detailsNode.content.find((node) => (node as { type?: string })?.type === 'detailsSummary') as { content?: Array<{ text?: string }> } | undefined
+        : undefined;
+      const wrappedParagraph = detailsContentNode?.content?.find((node) => node.type === 'paragraph');
+      expect(detailsSummaryNode?.content?.length ?? 0).toBe(0);
+      expect(wrappedParagraph?.content?.[0]?.text).toBe('トグルにする？');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('unsets details without losing summary or content', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Details unset test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '本文の前置き' }] }],
+      },
+      excerpt: '本文の前置き',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1893,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:46:00',
+      due_end: '15:46:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5040,
+      slug: 'details-unset-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await modal.getByTestId('card-modal-insert-details').click();
+      await page.keyboard.type('詳細セクション');
+      await expect(modal.getByTestId('card-modal-unset-details')).toBeVisible();
+      await modal.getByTestId('card-modal-unset-details').click();
+
+      await expect(modal.locator('.ProseMirror div[data-type="details"]')).toHaveCount(0);
+      await expect(modal.locator('.ProseMirror').first()).toContainText('詳細セクション');
+      await expect(modal.locator('.ProseMirror').first()).toContainText('本文の前置き');
+
+      await page.waitForTimeout(2500);
+
+      const { data: savedCard, error: savedError } = await supabaseAdmin
+        .from('cards')
+        .select('content, excerpt')
+        .eq('id', cardId)
+        .maybeSingle();
+
+      expect(savedError).toBeNull();
+      expect(savedCard?.excerpt).toContain('詳細セクション');
+      expect(savedCard?.excerpt).toContain('本文の前置き');
+      expect(savedCard?.content).not.toMatchObject({
+        content: expect.arrayContaining([expect.objectContaining({ type: 'details' })]),
+      });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('shows validation error when pasted image exceeds size limit', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

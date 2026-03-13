@@ -1,12 +1,13 @@
 'use client';
 
-import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
 import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
+import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useRef } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
@@ -27,6 +28,13 @@ export type FocusTitleRequest = {
 
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
+    insertDetails: () => void;
+    unsetDetails: () => void;
+};
+
+type DetailsContext = {
+    insideDetails: boolean;
+    hasDetails: boolean;
 };
 
 type TiptapEditorProps = {
@@ -41,6 +49,7 @@ type TiptapEditorProps = {
     onRegisterPrependTaskHandler?: ((handler: (() => void) | null) => void);
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
+    onDetailsContextChange?: (context: DetailsContext) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
@@ -106,6 +115,7 @@ export default function TiptapEditor({
     onRegisterPrependTaskHandler,
     onRegisterBodyBridge,
     onRequestFocusTitle,
+    onDetailsContextChange,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -180,6 +190,61 @@ export default function TiptapEditor({
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
     }, []);
+
+    const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
+        if (isUpdatingRef.current) return;
+        if (lastAppliedDocRef.current && nextDoc.eq(lastAppliedDocRef.current)) return;
+        if (lastEmittedDocRef.current && nextDoc.eq(lastEmittedDocRef.current)) return;
+        lastEmittedDocRef.current = nextDoc;
+        onChange?.(nextEditor.getJSON());
+    }, [onChange]);
+
+    const notifyDetailsContext = useCallback((nextEditor: Editor | null) => {
+        if (!onDetailsContextChange) return;
+        const insideDetails = (() => {
+            if (!nextEditor) return false;
+            const { $from } = nextEditor.state.selection;
+            for (let depth = $from.depth; depth >= 0; depth -= 1) {
+                if ($from.node(depth).type.name === 'details') {
+                    return true;
+                }
+            }
+            return false;
+        })();
+        let hasDetails = false;
+        nextEditor?.state.doc.descendants((node) => {
+            if (node.type.name === 'details') {
+                hasDetails = true;
+                return false;
+            }
+            return true;
+        });
+        onDetailsContextChange({
+            insideDetails,
+            hasDetails,
+        });
+    }, [onDetailsContextChange]);
+
+    const insertDetailsAtSelection = useCallback((nextEditor: Editor) => {
+        const inserted = nextEditor
+            .chain()
+            .focus()
+            .setDetails()
+            .run();
+
+        if (inserted) {
+            emitDocChange(nextEditor, nextEditor.state.doc);
+            notifyDetailsContext(nextEditor);
+        }
+    }, [emitDocChange, notifyDetailsContext]);
+
+    const unsetActiveDetails = useCallback((nextEditor: Editor) => {
+        const removed = nextEditor.chain().focus().unsetDetails().run();
+        if (removed) {
+            emitDocChange(nextEditor, nextEditor.state.doc);
+            notifyDetailsContext(nextEditor);
+        }
+    }, [emitDocChange, notifyDetailsContext]);
 
 
     const setCursorInLeadingTextblockWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
@@ -283,6 +348,11 @@ export default function TiptapEditor({
             TaskItem.configure({
                 nested: true,
             }),
+            Details.configure({
+                persist: true,
+            }),
+            DetailsSummary,
+            DetailsContent,
             Image.extend({
                 addAttributes() {
                     return {
@@ -367,18 +437,21 @@ export default function TiptapEditor({
             },
         },
         onUpdate: ({ editor }) => {
-            if (isUpdatingRef.current) return;
-            const currentDoc = editor.state.doc;
-            if (lastAppliedDocRef.current && currentDoc.eq(lastAppliedDocRef.current)) return;
-            if (lastEmittedDocRef.current && currentDoc.eq(lastEmittedDocRef.current)) return;
-            lastEmittedDocRef.current = currentDoc;
-            if (onChange) {
-                onChange(editor.getJSON());
-            }
+            emitDocChange(editor, editor.state.doc);
+            notifyDetailsContext(editor);
+        },
+        onTransaction: ({ editor, transaction }) => {
+            if (!transaction.docChanged) return;
+            emitDocChange(editor, editor.state.doc);
+            notifyDetailsContext(editor);
+        },
+        onSelectionUpdate: ({ editor }) => {
+            notifyDetailsContext(editor);
         },
         autofocus: 'start',
         onCreate: ({ editor }) => {
             lastAppliedDocRef.current = editor.state.doc;
+            notifyDetailsContext(editor);
         },
     });
 
@@ -427,6 +500,16 @@ export default function TiptapEditor({
         setSelectionAtDocStart(state, dispatch);
     }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
 
+    const insertDetails = useCallback(() => {
+        if (!editor) return;
+        insertDetailsAtSelection(editor);
+    }, [editor, insertDetailsAtSelection]);
+
+    const unsetDetailsNode = useCallback(() => {
+        if (!editor) return;
+        unsetActiveDetails(editor);
+    }, [editor, unsetActiveDetails]);
+
     useEffect(() => {
         if (!onRegisterFocusBodyHandler) return;
         if (!editor) {
@@ -466,6 +549,8 @@ export default function TiptapEditor({
 
         onRegisterBodyBridge({
             focusBody: (offset?: number | null) => focusBody(offset),
+            insertDetails,
+            unsetDetails: unsetDetailsNode,
         });
 
         return () => {
@@ -475,8 +560,10 @@ export default function TiptapEditor({
         editor,
         findScrollableAncestor,
         focusBody,
+        insertDetails,
         onRegisterBodyBridge,
         setCursorInLeadingTextblockWithOffset,
+        unsetDetailsNode,
     ]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
@@ -560,6 +647,10 @@ export default function TiptapEditor({
         };
     }, [initialContent, editor, boardId, cardId, onEditorError]);
 
+    useEffect(() => {
+        notifyDetailsContext(editor);
+    }, [editor, notifyDetailsContext]);
+
     // Update editable state
     useEffect(() => {
         if (editor && editor.isEditable !== editable) {
@@ -575,7 +666,11 @@ export default function TiptapEditor({
         <div
             ref={containerRef}
             className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
-            onClick={() => editor.chain().focus().run()}
+            onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                    editor.chain().focus().run();
+                }
+            }}
             onPasteCapture={handleImagePasteCapture}
         >
             <EditorContent editor={editor} />
