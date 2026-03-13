@@ -125,6 +125,7 @@ export function CardModal({
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLInputElement | null>(null);
 
+    const prependTaskHandlerRef = useRef<(() => void) | null>(null);
     const {
         historyItems,
         historyLoading,
@@ -443,6 +444,10 @@ export function CardModal({
         bodyBridgeRef.current = bridge;
     }, []);
 
+    const handleRegisterPrependTaskHandler = useCallback((handler: (() => void) | null) => {
+        prependTaskHandlerRef.current = handler;
+    }, []);
+
     const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
         const input = titleInputRef.current;
         if (!input) return;
@@ -475,6 +480,15 @@ export function CardModal({
 
         const caret = selectionStart;
         const isCaretAtEnd = caret === title.length;
+
+        if (event.key === "Enter") {
+            if (prependTaskHandlerRef.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                prependTaskHandlerRef.current();
+            }
+            return;
+        }
 
         if (event.key === "ArrowDown") {
             event.preventDefault();
@@ -873,6 +887,7 @@ export function CardModal({
                                                 cardId={card.id}
                                                 onEditorError={setEditorError}
                                                 onRegisterBodyBridge={handleRegisterBodyBridge}
+                                                onRegisterPrependTaskHandler={handleRegisterPrependTaskHandler}
                                                 onRequestFocusTitle={handleRequestFocusTitle}
                                                 onChange={(val) => {
                                                     if (isHistoryPreviewing) return;

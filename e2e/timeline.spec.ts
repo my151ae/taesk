@@ -1899,6 +1899,89 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+
+  test('prepends empty task item on Enter from title', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    // 先頭が taskList でない初期状態
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Enter from title test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'existing body text' }] }],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1895,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:50:00',
+      due_end: '15:50:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5038,
+      slug: 'enter-from-title-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      await expect(titleInput).toHaveValue('Enter from title test');
+
+      // 1. Enter を押下
+      await titleInput.focus();
+      await page.keyboard.press('Enter');
+
+      // 2. 本文先頭に空の taskItem が挿入され、フォーカスが移動していることを確認
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await expect(firstChecklistLine).toBeVisible();
+      
+      // 書き込めるか確認（フォーカスが移動していることの証明）
+      await page.keyboard.type('New item 1');
+      await expect(firstChecklistLine).toHaveText('New item 1');
+      await expect(titleInput).toHaveValue('Enter from title test'); // タイトルは不変
+
+      // 3. 再びタイトルから Enter
+      await titleInput.focus();
+      await page.keyboard.press('Enter');
+      
+      // 二重 taskList にならず、既存リストの先頭に追加されることを確認
+      const secondChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:nth-child(2) p').first();
+      await expect(secondChecklistLine).toHaveText('New item 1');
+      const newFirstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+      await page.keyboard.type('New item 2');
+      await expect(newFirstChecklistLine).toHaveText('New item 2');
+
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('supports horizontal title-body arrow movement on task-list cards', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

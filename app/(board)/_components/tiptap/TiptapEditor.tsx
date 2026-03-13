@@ -38,6 +38,7 @@ type TiptapEditorProps = {
     cardId?: string;
     onEditorError?: (message: string | null) => void;
     onRegisterFocusBodyHandler?: ((handler: (() => void) | null) => void);
+    onRegisterPrependTaskHandler?: ((handler: (() => void) | null) => void);
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
     'data-autofocus'?: boolean;
@@ -102,6 +103,7 @@ export default function TiptapEditor({
     cardId,
     onEditorError,
     onRegisterFocusBodyHandler,
+    onRegisterPrependTaskHandler,
     onRegisterBodyBridge,
     onRequestFocusTitle,
     'data-autofocus': dataAutofocus,
@@ -178,6 +180,7 @@ export default function TiptapEditor({
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
     }, []);
+
 
     const setCursorInLeadingTextblockWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
         const leadingSelection = getLeadingTextSelection(state);
@@ -379,6 +382,40 @@ export default function TiptapEditor({
         },
     });
 
+    const prependTask = useCallback(() => {
+        if (!editor) return;
+        const { state, dispatch } = editor.view;
+        const { doc, schema } = state;
+
+        let tr = state.tr;
+        const firstChild = doc.firstChild;
+
+        if (firstChild && firstChild.type.name === 'taskList') {
+            // すでに先頭が taskList なら、その最初にタスク項目を挿入
+            const taskItem = schema.nodes.taskItem.createAndFill({}, [
+                schema.nodes.paragraph.create()
+            ]);
+            if (taskItem) {
+                tr = tr.insert(1, taskItem);
+            }
+        } else {
+            // 先頭が taskList でないなら、新しい taskList を先頭に挿入
+            const newTaskItem = schema.nodes.taskItem.createAndFill({}, [
+                schema.nodes.paragraph.create()
+            ]);
+            const taskList = schema.nodes.taskList.create({}, [newTaskItem as ProseMirrorNode]);
+            tr = tr.insert(0, taskList);
+        }
+
+        // 挿入した項目の先頭にフォーカスを移動
+        const newDoc = tr.doc;
+        const leadingSelection = Selection.atStart(newDoc);
+        tr = tr.setSelection(leadingSelection).scrollIntoView();
+        
+        dispatch(tr);
+        editor.view.focus();
+    }, [editor]);
+
     const focusBody = useCallback((offset?: number | null) => {
         if (!editor) return;
         const view = editor.view;
@@ -405,6 +442,20 @@ export default function TiptapEditor({
             onRegisterFocusBodyHandler(null);
         };
     }, [editor, focusBody, onRegisterFocusBodyHandler]);
+
+    useEffect(() => {
+        if (!onRegisterPrependTaskHandler) return;
+        if (!editor) {
+            onRegisterPrependTaskHandler(null);
+            return;
+        }
+
+        onRegisterPrependTaskHandler(prependTask);
+
+        return () => {
+            onRegisterPrependTaskHandler(null);
+        };
+    }, [editor, prependTask, onRegisterPrependTaskHandler]);
 
     useEffect(() => {
         if (!onRegisterBodyBridge) return;
