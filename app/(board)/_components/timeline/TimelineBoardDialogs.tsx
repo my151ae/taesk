@@ -2,7 +2,6 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import type { Board } from "@/lib/supabase";
-import ShareDialog from "@/app/(board)/_components/ShareDialog";
 import NotificationSettings from "@/app/(board)/_components/NotificationSettings";
 import ProfileSettings from "@/app/(board)/_components/ProfileSettings";
 import BoardSettings from "@/app/(board)/_components/BoardSettings";
@@ -57,14 +56,6 @@ export default function TimelineBoardDialogs({
 
   return (
     <>
-      {showShareDialog && (
-        <ShareDialog
-          boardId={initialBoard.id}
-          onClose={() => setShowShareDialog(false)}
-          onMemberAdded={onMemberAdded}
-        />
-      )}
-
       {showNotificationSettings && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
@@ -118,7 +109,7 @@ export default function TimelineBoardDialogs({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setShowBoardSettings(false)}
         >
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Board Settings</h2>
               <button
@@ -130,6 +121,7 @@ export default function TimelineBoardDialogs({
             </div>
             <BoardSettings
               board={targetBoard}
+              onAccessUpdated={onMemberAdded}
               onUpdate={async (updates) => {
                 try {
                   const response = await fetch(`/api/boards/${targetBoard.id}`, {
@@ -182,7 +174,7 @@ export default function TimelineBoardDialogs({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Team Management</h2>
+              <h2 className="text-lg font-semibold">Workspace Settings</h2>
               <button
                 onClick={() => setShowTeamSettings(false)}
                 className="text-gray-500 hover:text-gray-700"

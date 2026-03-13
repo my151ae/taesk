@@ -63,6 +63,7 @@ export interface Board {
   membership_role?: MemberRole;
   name: string;
   description?: string;
+  is_personal?: boolean;
   is_test_board: boolean;
   user_id: string | null;
   short_id?: string | null;

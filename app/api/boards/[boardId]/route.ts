@@ -190,6 +190,12 @@ const patchHandler = async (
                 { status: 422 }
             );
         }
+        if (payload.is_personal !== undefined) {
+            return NextResponse.json(
+                { error: { code: 'INVALID_BODY', message: 'is_personal is immutable' } },
+                { status: 422 }
+            );
+        }
 
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ success: true }); // Nothing to update

@@ -47,7 +47,7 @@ const getHandler = async (request: NextRequest) => {
 
     let boardsQuery = supabase
       .from('boards')
-      .select('id, team_id, name, description, short_id, id_short, slug, is_test_board, day_range, list_range, list_window_before_days, list_window_after_days, created_at, updated_at')
+      .select('id, team_id, name, description, is_personal, short_id, id_short, slug, is_test_board, day_range, list_range, list_window_before_days, list_window_after_days, created_at, updated_at')
       .in('id', boardIds);
 
     if (teamIdFilter) {

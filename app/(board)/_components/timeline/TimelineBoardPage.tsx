@@ -782,7 +782,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
           viewMode={viewMode} setViewMode={handleViewModeChange}
           onShortcutsClick={() => setShowShortcutsModal(true)}
-          onOpenShareDialog={() => setShowShareDialog(true)}
+          onOpenShareDialog={() => handleOpenBoardSettings(currentBoard.id)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
           listStartDate={listAnchorDate ?? null}

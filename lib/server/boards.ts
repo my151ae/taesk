@@ -19,6 +19,33 @@ type BoardQueryError = {
 
 const MAX_BOARD_FETCH_RETRIES = 3;
 
+async function attachMembershipRole(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  board: BoardRecord | null
+): Promise<BoardRecord | null> {
+  if (!board) return null;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return board;
+  }
+
+  const { data: membership } = await supabase
+    .from("board_members")
+    .select("role")
+    .eq("board_id", board.id)
+    .eq("profile_id", user.id)
+    .maybeSingle();
+
+  return {
+    ...board,
+    membership_role: membership?.role ?? board.membership_role,
+  };
+}
+
 function toBoardQueryError(error: unknown): BoardQueryError {
   if (!error || typeof error !== "object") {
     if (typeof error === "string") return { message: error, raw: error };
@@ -90,7 +117,7 @@ export async function getBoardByShortId(shortId: string): Promise<BoardRecord | 
     return null;
   }
 
-  return data ?? null;
+  return attachMembershipRole(supabase, data ?? null);
 }
 
 export async function getBoardById(boardId: string): Promise<BoardRecord | null> {
@@ -106,7 +133,7 @@ export async function getBoardById(boardId: string): Promise<BoardRecord | null>
       .maybeSingle();
 
     if (!error) {
-      return data ?? null;
+      return attachMembershipRole(supabase, data ?? null);
     }
 
     const normalizedError = toBoardQueryError(error);

@@ -118,9 +118,8 @@ const deleteHandler = async (
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
-    const isSelfRemoval = user.id === profileId;
-    if (!isSelfRemoval && (!actorMembership || actorMembership.role !== 'owner')) {
-      return NextResponse.json({ error: 'Only owner can remove other members' }, { status: 403 });
+    if (!actorMembership || actorMembership.role !== 'owner') {
+      return NextResponse.json({ error: 'Only owner can remove members' }, { status: 403 });
     }
 
     if (targetMembership.role === 'owner') {

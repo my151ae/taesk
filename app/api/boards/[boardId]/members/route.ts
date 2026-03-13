@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MemberRole, ProfileSummary } from '@/lib/supabase';
 import {
   getBoardMembership,
-  hasAnyRole,
   requireAuthenticatedUser,
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
@@ -126,8 +125,8 @@ const postHandler = async (
   }
 
     const actorMembership = await getActorMembership(supabase, boardId, user.id);
-    if (!actorMembership || !hasAnyRole(actorMembership.role, ['owner', 'editor'])) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!actorMembership || actorMembership.role !== 'owner') {
+      return NextResponse.json({ error: 'Only owner can add members' }, { status: 403 });
     }
 
     const body = await request.json();

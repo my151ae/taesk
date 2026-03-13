@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { Board } from '@/lib/supabase';
 import clsx from 'clsx';
+import BoardAccessSettings from '@/app/(board)/_components/BoardAccessSettings';
 
 type BoardSettingsProps = {
     board: Board;
     onUpdate: (updates: Partial<Board>) => Promise<void>;
+    onAccessUpdated?: () => Promise<void> | void;
 };
 
-export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
+export default function BoardSettings({ board, onUpdate, onAccessUpdated }: BoardSettingsProps) {
     const [boardName, setBoardName] = useState(board.name ?? '');
     const [dayRange, setDayRange] = useState(board.day_range ?? 2);
     const [isSaving, setIsSaving] = useState(false);
+    const canManageAccess = board.membership_role === 'owner';
 
     const trimmedName = boardName.trim();
     const hasNameChanged = trimmedName !== (board.name ?? '').trim();
@@ -41,7 +44,7 @@ export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
 
     return (
         <div className="space-y-6">
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                 <div>
                     <h3 className="text-sm font-medium text-slate-900">Board Name</h3>
                     <p className="text-xs text-slate-500">Rename this board.</p>
@@ -78,6 +81,12 @@ export default function BoardSettings({ board, onUpdate }: BoardSettingsProps) {
                     </div>
                 </div>
             </div>
+
+            <BoardAccessSettings
+                boardId={board.id}
+                canManage={canManageAccess}
+                onUpdated={onAccessUpdated}
+            />
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
                 <button

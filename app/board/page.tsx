@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getBoardById } from "@/lib/server/boards";
 import { buildBoardUrl } from "@/lib/board-url";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { ensurePersonalWorkspaceAndBoard } from "@/lib/server/personal-workspace";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
@@ -13,6 +14,8 @@ export default async function BoardDefaultPage() {
   if (authError || !user) {
     redirect("/login");
   }
+
+  const ensured = await ensurePersonalWorkspaceAndBoard(user);
 
   // ユーザーが所属しているボードを最大20件取得（古い順）
   const { data: memberships } = await supabase
@@ -26,12 +29,24 @@ export default async function BoardDefaultPage() {
     .map((row) => row.board_id)
     .filter((value): value is string => Boolean(value));
 
-  const boardCandidateIds = Array.from(new Set(membershipBoardIds));
+  const boardCandidateIds = Array.from(new Set([
+    ...membershipBoardIds,
+    ensured.boardId,
+  ]));
 
   let board = null;
   for (const boardId of boardCandidateIds) {
     board = await getBoardById(boardId);
     if (board) break;
+  }
+
+  if (!board) {
+    const ensuredBoard = await getBoardById(ensured.boardId);
+    if (ensuredBoard) {
+      board = ensuredBoard;
+    } else {
+      redirect("/playground");
+    }
   }
 
   if (!board) {

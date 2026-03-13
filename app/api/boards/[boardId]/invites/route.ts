@@ -41,7 +41,7 @@ const getHandler = async (
   }
 
   const actorRole = await getActorRole(supabase, boardId, user.id);
-  if (!actorRole || (actorRole !== 'owner' && actorRole !== 'editor')) {
+  if (actorRole !== 'owner') {
     return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, { status: 403 });
   }
 
@@ -75,7 +75,7 @@ const postHandler = async (
   }
 
   const actorRole = await getActorRole(supabase, boardId, user.id);
-  if (!actorRole || (actorRole !== 'owner' && actorRole !== 'editor')) {
+  if (actorRole !== 'owner') {
     return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } }, { status: 403 });
   }
 
