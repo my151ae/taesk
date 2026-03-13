@@ -4,6 +4,70 @@
     margin: 0 !important;
 }
 
+.editor {
+    position: relative;
+}
+
+.blockActionHandle {
+    position: absolute;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.blockActionHandle:hover {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.blockActionHandleDots {
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.blockActionMenu {
+    position: absolute;
+    z-index: 30;
+    min-width: 180px;
+    padding: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.blockActionMenuItem {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+}
+
+.blockActionMenuItem:hover {
+    background: #f8fafc;
+}
+
+.blockActionMenuItemDanger {
+    color: #b91c1c;
+}
+
 .editor :global(ul[data-type="taskList"] li) {
     margin: 0 !important;
     padding: 0 !important;
@@ -232,4 +296,27 @@
 
 :global(.dark) .editor :global(.ProseMirror img) {
     border-color: #374151;
+}
+
+:global(.dark) .blockActionHandle:hover {
+    background: rgba(148, 163, 184, 0.18);
+    color: #e2e8f0;
+}
+
+:global(.dark) .blockActionMenu {
+    border-color: #334155;
+    background: #0f172a;
+    box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
+}
+
+:global(.dark) .blockActionMenuItem {
+    color: #e2e8f0;
+}
+
+:global(.dark) .blockActionMenuItem:hover {
+    background: rgba(148, 163, 184, 0.12);
+}
+
+:global(.dark) .blockActionMenuItemDanger {
+    color: #fca5a5;
 }

@@ -2,15 +2,17 @@
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
 import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
-import { useCallback, useEffect, useRef } from 'react';
-import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
+import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
+import { buildDefaultBodyContent } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -36,6 +38,26 @@ type DetailsContext = {
     insideDetails: boolean;
     hasDetails: boolean;
 };
+
+type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem';
+
+type BlockMenuTarget = {
+    pos: number;
+    nodeType: BlockNodeType;
+    rect: DOMRect;
+};
+
+type ResolvedBlockTarget = {
+    pos: number;
+    nodeType: BlockNodeType;
+    node: ProseMirrorNode;
+    depth: number;
+    parentListPos: number | null;
+    parentListNode: ProseMirrorNode | null;
+    itemIndex: number | null;
+};
+
+type BlockActionType = 'insert-above' | 'insert-below' | 'duplicate' | 'delete';
 
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
@@ -103,6 +125,56 @@ function extractImageFilesFromClipboardHtml(html: string): File[] {
     return files;
 }
 
+const BLOCK_ACTION_ITEMS: Array<{ action: BlockActionType; label: string; destructive?: boolean }> = [
+    { action: 'insert-above', label: '上に段落を追加' },
+    { action: 'insert-below', label: '下に段落を追加' },
+    { action: 'duplicate', label: '複製' },
+    { action: 'delete', label: '削除', destructive: true },
+];
+
+function BlockActionMenu({
+    top,
+    left,
+    onClose,
+    onSelect,
+}: {
+    top: number;
+    left: number;
+    onClose: () => void;
+    onSelect: (action: BlockActionType) => void;
+}) {
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
+    useClickOutside(menuRef, () => onClose());
+
+    return (
+        <div
+            ref={menuRef}
+            className={styles.blockActionMenu}
+            style={{ top, left }}
+            role="menu"
+            data-testid="tiptap-block-menu"
+            onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            }}
+        >
+            {BLOCK_ACTION_ITEMS.map((item) => (
+                <button
+                    key={item.action}
+                    type="button"
+                    role="menuitem"
+                    data-testid={`tiptap-block-menu-${item.action}`}
+                    className={`${styles.blockActionMenuItem} ${item.destructive ? styles.blockActionMenuItemDanger : ''}`}
+                    onClick={() => onSelect(item.action)}
+                >
+                    {item.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export default function TiptapEditor({
     initialContent,
     onChange,
@@ -124,6 +196,16 @@ export default function TiptapEditor({
     const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
+    const rootRef = useRef<HTMLDivElement | null>(null);
+    const [hoveredBlock, setHoveredBlock] = useState<BlockMenuTarget | null>(null);
+    const [menuTarget, setMenuTarget] = useState<BlockMenuTarget | null>(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
+
+    const closeBlockMenu = useCallback(() => {
+        setIsMenuOpen(false);
+        setMenuTarget(null);
+    }, []);
 
     const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
         let node: HTMLElement | null = start;
@@ -190,6 +272,316 @@ export default function TiptapEditor({
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
     }, []);
+
+    const clampSelectionPos = useCallback((doc: ProseMirrorNode, pos: number) => {
+        return Math.max(0, Math.min(pos, doc.content.size));
+    }, []);
+
+    const findSelectionNear = useCallback((doc: ProseMirrorNode, searchPos: number, direction: 1 | -1) => {
+        const resolved = doc.resolve(clampSelectionPos(doc, searchPos));
+        return Selection.findFrom(resolved, direction, true) ?? Selection.atStart(doc);
+    }, [clampSelectionPos]);
+
+    const resolveBlockTargetAtPos = useCallback((state: EditorState, pos: number): ResolvedBlockTarget | null => {
+        const clampedPos = Math.max(0, Math.min(pos, state.doc.content.size));
+        const $pos = state.doc.resolve(clampedPos);
+
+        for (let depth = $pos.depth; depth > 0; depth -= 1) {
+            const node = $pos.node(depth);
+            if (node.type.name === 'details') {
+                return null;
+            }
+
+            if ((node.type.name === 'taskItem' || node.type.name === 'listItem') && depth >= 2) {
+                const parentList = $pos.node(depth - 1);
+                const grandParent = $pos.node(depth - 2);
+                if (
+                    (parentList.type.name === 'taskList' || parentList.type.name === 'bulletList' || parentList.type.name === 'orderedList') &&
+                    grandParent.type.name === 'doc'
+                ) {
+                    return {
+                        pos: $pos.before(depth),
+                        nodeType: node.type.name as BlockNodeType,
+                        node,
+                        depth,
+                        parentListPos: $pos.before(depth - 1),
+                        parentListNode: parentList,
+                        itemIndex: $pos.index(depth - 1),
+                    };
+                }
+                return null;
+            }
+
+            if ((node.type.name === 'paragraph' || node.type.name === 'heading') && $pos.node(depth - 1).type.name === 'doc') {
+                return {
+                    pos: $pos.before(depth),
+                    nodeType: node.type.name as BlockNodeType,
+                    node,
+                    depth,
+                    parentListPos: null,
+                    parentListNode: null,
+                    itemIndex: null,
+                };
+            }
+        }
+
+        return null;
+    }, []);
+
+    const getBlockTargetRect = useCallback((view: Editor['view'], pos: number): DOMRect | null => {
+        const nodeDom = view.nodeDOM(pos);
+        if (!(nodeDom instanceof HTMLElement)) {
+            return null;
+        }
+        return nodeDom.getBoundingClientRect();
+    }, []);
+
+    const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): BlockMenuTarget | null => {
+        const target = resolveBlockTargetAtPos(state, pos);
+        if (!target) return null;
+        const rect = getBlockTargetRect(view, target.pos);
+        if (!rect) return null;
+        return {
+            pos: target.pos,
+            nodeType: target.nodeType,
+            rect,
+        };
+    }, [getBlockTargetRect, resolveBlockTargetAtPos]);
+
+    const findTargetPosFromDom = useCallback((view: Editor['view'], target: HTMLElement): number | null => {
+        const root = view.dom;
+        const typedCandidate = target.closest('[data-node-type]');
+        if (typedCandidate instanceof HTMLElement && root.contains(typedCandidate)) {
+            try {
+                return view.posAtDOM(typedCandidate, 0);
+            } catch {
+                // fall through
+            }
+        }
+
+        const fallbackCandidate = target.closest('li, p, h1, h2, h3');
+        if (!(fallbackCandidate instanceof HTMLElement) || !root.contains(fallbackCandidate)) {
+            return null;
+        }
+
+        try {
+            return view.posAtDOM(fallbackCandidate, 0);
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const updateHoveredBlockFromElement = useCallback((view: Editor['view'], target: HTMLElement | null) => {
+        if (!target || !editable || isImageUploadInFlight || !view.editable || !view.state.selection.empty) {
+            setHoveredBlock(null);
+            return false;
+        }
+
+        if (target.closest('[data-testid="tiptap-block-handle"]') || target.closest('[data-testid="tiptap-block-menu"]')) {
+            return false;
+        }
+
+        const nextPos = findTargetPosFromDom(view, target);
+        if (nextPos == null) {
+            setHoveredBlock(null);
+            return false;
+        }
+
+        const nextBlock = getBlockTargetAtPos(view, view.state, nextPos);
+        if (!nextBlock) {
+            setHoveredBlock(null);
+            return false;
+        }
+
+        setHoveredBlock((current) => {
+            if (
+                current &&
+                current.pos === nextBlock.pos &&
+                current.nodeType === nextBlock.nodeType &&
+                current.rect.top === nextBlock.rect.top &&
+                current.rect.left === nextBlock.rect.left
+            ) {
+                return current;
+            }
+            return nextBlock;
+        });
+        return true;
+    }, [editable, findTargetPosFromDom, getBlockTargetAtPos, isImageUploadInFlight]);
+
+    const getNodeChildren = useCallback((node: ProseMirrorNode) => {
+        const children: ProseMirrorNode[] = [];
+        node.forEach((child) => {
+            children.push(child);
+        });
+        return children;
+    }, []);
+
+    const splitListAroundItem = useCallback((
+        listNode: ProseMirrorNode,
+        itemIndex: number,
+        insertedParagraph: ProseMirrorNode,
+        mode: 'before' | 'after',
+    ): ProseMirrorNode[] => {
+        const children = getNodeChildren(listNode);
+        const beforeEnd = mode === 'before' ? itemIndex : itemIndex + 1;
+        const afterStart = mode === 'before' ? itemIndex : itemIndex + 1;
+        const beforeItems = children.slice(0, beforeEnd);
+        const afterItems = children.slice(afterStart);
+        const nextNodes: ProseMirrorNode[] = [];
+
+        if (beforeItems.length > 0) {
+            nextNodes.push(listNode.copy(Fragment.fromArray(beforeItems)));
+        }
+        nextNodes.push(insertedParagraph);
+        if (afterItems.length > 0) {
+            nextNodes.push(listNode.copy(Fragment.fromArray(afterItems)));
+        }
+
+        return nextNodes;
+    }, [getNodeChildren]);
+
+    const setSelectionForAction = useCallback((tr: Transaction, searchPos: number, direction: 1 | -1 = 1) => {
+        const selection = findSelectionNear(tr.doc, searchPos, direction);
+        return tr.setSelection(selection).scrollIntoView();
+    }, [findSelectionNear]);
+
+    const createDefaultDoc = useCallback((state: EditorState) => {
+        return state.schema.nodeFromJSON(buildDefaultBodyContent());
+    }, []);
+
+    const insertParagraphBeforeBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const paragraph = state.schema.nodes.paragraph.create();
+        let tr = state.tr;
+        let selectionPos = target.pos + 1;
+
+        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+            const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, 'before');
+            tr = tr.replaceWith(
+                target.parentListPos,
+                target.parentListPos + target.parentListNode.nodeSize,
+                Fragment.fromArray(replacement),
+            );
+            const beforeItemsCount = target.itemIndex;
+            const beforeListSize = beforeItemsCount > 0
+                ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
+                : 0;
+            selectionPos = target.parentListPos + beforeListSize + 1;
+        } else {
+            tr = tr.insert(target.pos, paragraph);
+            selectionPos = target.pos + 1;
+        }
+
+        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        editor.view.focus();
+        closeBlockMenu();
+        setHoveredBlock(null);
+        return true;
+    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
+
+    const insertParagraphAfterBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const paragraph = state.schema.nodes.paragraph.create();
+        let tr = state.tr;
+        let selectionPos = target.pos + target.node.nodeSize + 1;
+
+        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+            const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, 'after');
+            tr = tr.replaceWith(
+                target.parentListPos,
+                target.parentListPos + target.parentListNode.nodeSize,
+                Fragment.fromArray(replacement),
+            );
+            const beforeItemsCount = target.itemIndex + 1;
+            const beforeListSize = beforeItemsCount > 0
+                ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
+                : 0;
+            selectionPos = target.parentListPos + beforeListSize + 1;
+        } else {
+            tr = tr.insert(target.pos + target.node.nodeSize, paragraph);
+            selectionPos = target.pos + target.node.nodeSize + 1;
+        }
+
+        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        editor.view.focus();
+        closeBlockMenu();
+        setHoveredBlock(null);
+        return true;
+    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
+
+    const duplicateBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const clonedNode = target.node.type.create(target.node.attrs, target.node.content, target.node.marks);
+        let tr = state.tr;
+        let selectionPos = target.pos + target.node.nodeSize + 1;
+
+        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+            const children = getNodeChildren(target.parentListNode);
+            const nextChildren = [...children.slice(0, target.itemIndex + 1), clonedNode, ...children.slice(target.itemIndex + 1)];
+            tr = tr.replaceWith(
+                target.parentListPos,
+                target.parentListPos + target.parentListNode.nodeSize,
+                target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+            );
+            selectionPos = target.pos + target.node.nodeSize + 1;
+        } else {
+            tr = tr.insert(target.pos + target.node.nodeSize, clonedNode);
+            selectionPos = target.pos + target.node.nodeSize + 1;
+        }
+
+        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        editor.view.focus();
+        closeBlockMenu();
+        setHoveredBlock(null);
+        return true;
+    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
+
+    const deleteBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+
+        let tr = state.tr;
+
+        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+            const children = getNodeChildren(target.parentListNode);
+            const nextChildren = [...children.slice(0, target.itemIndex), ...children.slice(target.itemIndex + 1)];
+            if (nextChildren.length === 0) {
+                tr = tr.delete(target.parentListPos, target.parentListPos + target.parentListNode.nodeSize);
+            } else {
+                tr = tr.replaceWith(
+                    target.parentListPos,
+                    target.parentListPos + target.parentListNode.nodeSize,
+                    target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+                );
+            }
+        } else {
+            tr = tr.delete(target.pos, target.pos + target.node.nodeSize);
+        }
+
+        if (tr.doc.childCount === 0) {
+            const defaultDoc = createDefaultDoc(state);
+            tr = state.tr.replaceWith(0, state.doc.content.size, defaultDoc.content);
+            dispatch(setSelectionForAction(tr, 1, 1));
+        } else {
+            dispatch(setSelectionForAction(tr, target.pos, 1));
+        }
+
+        editor.view.focus();
+        closeBlockMenu();
+        setHoveredBlock(null);
+        return true;
+    }, [closeBlockMenu, createDefaultDoc, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
 
     const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
         if (isUpdatingRef.current) return;
@@ -282,58 +674,66 @@ export default function TiptapEditor({
             return;
         }
 
-        for (const file of imageFiles) {
-            const mimeType = file.type.trim().toLowerCase();
-            if (!isSupportedCardImageMimeType(mimeType)) {
-                onEditorError?.('画像形式は PNG / JPEG / WebP のみ対応しています。');
-                continue;
+        setIsImageUploadInFlight(true);
+        setHoveredBlock(null);
+        closeBlockMenu();
+
+        try {
+            for (const file of imageFiles) {
+                const mimeType = file.type.trim().toLowerCase();
+                if (!isSupportedCardImageMimeType(mimeType)) {
+                    onEditorError?.('画像形式は PNG / JPEG / WebP のみ対応しています。');
+                    continue;
+                }
+
+                if (!Number.isFinite(file.size) || file.size > CARD_IMAGE_MAX_BYTES) {
+                    onEditorError?.('画像サイズは 10MB 以下にしてください。');
+                    continue;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const message = await parseErrorMessage(response, '画像のアップロードに失敗しました。');
+                    onEditorError?.(message);
+                    continue;
+                }
+
+                const body = await response.json() as { storagePath?: unknown; signedUrl?: unknown };
+                if (typeof body.storagePath !== 'string' || typeof body.signedUrl !== 'string') {
+                    onEditorError?.('画像アップロード応答が不正です。');
+                    continue;
+                }
+
+                const { state, dispatch } = view;
+                let tr = state.tr;
+                const imageNode = imageType.create({
+                    src: body.signedUrl,
+                    storagePath: body.storagePath,
+                    alt: file.name || 'pasted image',
+                });
+
+                tr = tr.replaceSelectionWith(imageNode, false);
+
+                tr = tr.scrollIntoView();
+                dispatch(tr);
+                onEditorError?.(null);
+
+                // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
+                if (onChange) {
+                    onChange(tr.doc.toJSON() as JSONContent);
+                }
             }
-
-            if (!Number.isFinite(file.size) || file.size > CARD_IMAGE_MAX_BYTES) {
-                onEditorError?.('画像サイズは 10MB 以下にしてください。');
-                continue;
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/images`, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const message = await parseErrorMessage(response, '画像のアップロードに失敗しました。');
-                onEditorError?.(message);
-                continue;
-            }
-
-            const body = await response.json() as { storagePath?: unknown; signedUrl?: unknown };
-            if (typeof body.storagePath !== 'string' || typeof body.signedUrl !== 'string') {
-                onEditorError?.('画像アップロード応答が不正です。');
-                continue;
-            }
-
-            const { state, dispatch } = view;
-            let tr = state.tr;
-            const imageNode = imageType.create({
-                src: body.signedUrl,
-                storagePath: body.storagePath,
-                alt: file.name || 'pasted image',
-            });
-
-            tr = tr.replaceSelectionWith(imageNode, false);
-
-            tr = tr.scrollIntoView();
-            dispatch(tr);
-            onEditorError?.(null);
-
-            // カスタム paste 分岐では onUpdate 取りこぼし時にも autosave を確実に走らせる
-            if (onChange) {
-                onChange(tr.doc.toJSON() as JSONContent);
-            }
+        } finally {
+            setIsImageUploadInFlight(false);
         }
-    }, [boardId, cardId, onEditorError, onChange]);
+    }, [boardId, cardId, closeBlockMenu, onEditorError, onChange]);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -435,6 +835,24 @@ export default function TiptapEditor({
                 });
                 return false;
             },
+            handleDOMEvents: {
+                mouseover: (view, event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) return false;
+                    updateHoveredBlockFromElement(view, target);
+                    return false;
+                },
+                mousemove: (view, event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) return false;
+                    updateHoveredBlockFromElement(view, target);
+                    return false;
+                },
+                mouseleave: () => {
+                    setHoveredBlock(null);
+                    return false;
+                },
+            },
         },
         onUpdate: ({ editor }) => {
             emitDocChange(editor, editor.state.doc);
@@ -509,6 +927,8 @@ export default function TiptapEditor({
         if (!editor) return;
         unsetActiveDetails(editor);
     }, [editor, unsetActiveDetails]);
+
+    const suppressBlockUi = !editable || isImageUploadInFlight || !editor || !editor.state.selection.empty;
 
     useEffect(() => {
         if (!onRegisterFocusBodyHandler) return;
@@ -651,6 +1071,25 @@ export default function TiptapEditor({
         notifyDetailsContext(editor);
     }, [editor, notifyDetailsContext]);
 
+    useEffect(() => {
+        if (suppressBlockUi) {
+            setHoveredBlock(null);
+            closeBlockMenu();
+        }
+    }, [closeBlockMenu, suppressBlockUi]);
+
+    useEffect(() => {
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            closeBlockMenu();
+        };
+
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [closeBlockMenu]);
+
     // Update editable state
     useEffect(() => {
         if (editor && editor.isEditable !== editable) {
@@ -662,18 +1101,87 @@ export default function TiptapEditor({
         return null;
     }
 
+    const assignRootRef = (node: HTMLDivElement | null) => {
+        rootRef.current = node;
+        if (containerRef) {
+            (containerRef as { current: HTMLDivElement | null }).current = node;
+        }
+    };
+
+    const activeBlock = menuTarget ?? hoveredBlock;
+    const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
+    const handleTop = activeBlock && rootRect ? Math.max(activeBlock.rect.top - rootRect.top, 4) : 0;
+    const handleLeft = 4;
+    const menuTop = activeBlock && rootRect ? Math.max(activeBlock.rect.top - rootRect.top, 4) : 0;
+    const menuLeft = 36;
+
+    const handleMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if (suppressBlockUi) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        updateHoveredBlockFromElement(editor.view, target);
+    };
+
+    const handleBlockAction = (action: BlockActionType) => {
+        if (!menuTarget) return;
+        switch (action) {
+            case 'insert-above':
+                insertParagraphBeforeBlock(menuTarget.pos);
+                break;
+            case 'insert-below':
+                insertParagraphAfterBlock(menuTarget.pos);
+                break;
+            case 'duplicate':
+                duplicateBlock(menuTarget.pos);
+                break;
+            case 'delete':
+                deleteBlock(menuTarget.pos);
+                break;
+        }
+    };
+
     return (
         <div
-            ref={containerRef}
+            ref={assignRootRef}
             className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
             onClick={(event) => {
                 if (event.target === event.currentTarget) {
                     editor.chain().focus().run();
                 }
             }}
+            onMouseOver={handleMouseMove}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => {
+                setHoveredBlock(null);
+            }}
             onPasteCapture={handleImagePasteCapture}
         >
+            {activeBlock && !suppressBlockUi ? (
+                <button
+                    type="button"
+                    aria-label="ブロックメニューを開く"
+                    data-testid="tiptap-block-handle"
+                    className={styles.blockActionHandle}
+                    style={{ top: handleTop, left: handleLeft }}
+                    onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setMenuTarget(activeBlock);
+                        setIsMenuOpen(true);
+                    }}
+                >
+                    <span className={styles.blockActionHandleDots}>⋮⋮</span>
+                </button>
+            ) : null}
             <EditorContent editor={editor} />
+            {isMenuOpen && menuTarget && rootRect ? (
+                <BlockActionMenu
+                    top={menuTop}
+                    left={menuLeft}
+                    onClose={closeBlockMenu}
+                    onSelect={handleBlockAction}
+                />
+            ) : null}
         </div>
     );
 }
