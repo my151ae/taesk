@@ -97,7 +97,7 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 | `comments.spec.ts` | `@feature:comments` | CardModal コメント、返信、@mentions |
 | `notifications.spec.ts` | `@feature:notifications`, `@failure:notifications` | NotificationSettings、Web Push、quiet hours |
 | `reorder-api.spec.ts` | `@feature:lists`, `@failure:validation` | 並び替え API、DUPLICATE_POSITION/UNKNOWN_ID など |
-| `board-permissions.spec.ts` | `@feature:permissions` | ShareDialog、role 変更、board picker |
+| `board-permissions.spec.ts` | `@feature:permissions` | ShareDialog、role 変更、Team switcher / Board selector |
 | `rls.spec.ts` | `@e2e:essential` | Supabase RLS ポリシー |
 
 ### タグ指針

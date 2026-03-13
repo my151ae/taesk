@@ -21,7 +21,7 @@ Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中
 ```
 TimelineBoardPage
 ├── Header
-│   ├── Board Menu (board picker + Sign out)
+│   ├── Board Menu (team switcher + board selector + Sign out)
 │   ├── SearchBar + Filter toggles (useTimelineFiltering)
 │   ├── Metrics: realtimeStatus
 │   ├── Actions

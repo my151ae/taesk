@@ -97,9 +97,52 @@ async function createTestBoard(boardName: string, ownerUserId: string): Promise<
   return { id: boardId, name: boardName, shortId, idShort, slug };
 }
 
+async function createTeamFixture(name: string, ownerUserId: string, allowMemberCreateBoard: boolean): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from('teams')
+    .insert({
+      name,
+      slug: `${slugifyBoardName(name)}-${Date.now()}`,
+      team_type: 'custom',
+      allow_member_create_board: allowMemberCreateBoard,
+      created_by: ownerUserId,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error(`Failed to create team fixture: ${error?.message ?? 'missing team id'}`);
+  }
+
+  return data.id;
+}
+
+async function ensureTeamRole(
+  teamId: string,
+  profileId: string,
+  role: 'owner' | 'admin' | 'member' | 'guest'
+) {
+  const { error } = await supabaseAdmin
+    .from('team_members')
+    .upsert(
+      {
+        team_id: teamId,
+        profile_id: profileId,
+        role,
+      },
+      { onConflict: 'team_id,profile_id', ignoreDuplicates: false }
+    );
+
+  if (error) {
+    throw new Error(`Failed to ensure team role ${role}: ${error.message}`);
+  }
+}
+
 test.describe('Board Permissions @feature:boards', () => {
   let testBoard: TestBoard | null = null;
   let testUserId = '';
+  let createdTeamIds: string[] = [];
+  let createdBoardIds: string[] = [];
 
   test.beforeAll(async () => {
     testUserId = await resolveTestUserId();
@@ -195,6 +238,14 @@ test.describe('Board Permissions @feature:boards', () => {
     if (testBoard?.id) {
       await supabaseAdmin.from('boards').delete().eq('id', testBoard.id);
     }
+    if (createdBoardIds.length > 0) {
+      await supabaseAdmin.from('boards').delete().in('id', createdBoardIds);
+    }
+    if (createdTeamIds.length > 0) {
+      await supabaseAdmin.from('teams').delete().in('id', createdTeamIds);
+    }
+    createdBoardIds = [];
+    createdTeamIds = [];
     testBoard = null;
   });
 
@@ -311,5 +362,63 @@ test.describe('Board Permissions @feature:boards', () => {
     // Owner's role select should be disabled and have 'owner' value
     await expect(roleSelect).toBeDisabled();
     await expect(roleSelect).toHaveValue('owner');
+  });
+
+  test('should reject board creation without team_id @failure:validation', async ({ page }) => {
+    const response = await page.request.post('/api/boards', {
+      headers: { 'Content-Type': 'application/json' },
+      data: { name: 'Missing Team' },
+    });
+
+    expect(response.status()).toBe(422);
+    const body = await response.json();
+    expect(body?.error?.code).toBe('INVALID_BODY');
+  });
+
+  test('should reject board creation for guest team members @failure:permissions', async ({ page }) => {
+    const teamId = await createTeamFixture(`Guest Team ${Date.now()}`, testUserId, true);
+    createdTeamIds.push(teamId);
+    await ensureTeamRole(teamId, testUserId, 'guest');
+
+    const response = await page.request.post('/api/boards', {
+      headers: { 'Content-Type': 'application/json' },
+      data: { team_id: teamId, name: 'Guest Blocked Board' },
+    });
+
+    expect(response.status()).toBe(403);
+    const body = await response.json();
+    expect(body?.error?.code).toBe('FORBIDDEN');
+  });
+
+  test('should allow board creation for members when team setting permits it', async ({ page }) => {
+    const teamId = await createTeamFixture(`Member Team ${Date.now()}`, testUserId, true);
+    createdTeamIds.push(teamId);
+    await ensureTeamRole(teamId, testUserId, 'member');
+
+    const response = await page.request.post('/api/boards', {
+      headers: { 'Content-Type': 'application/json' },
+      data: { team_id: teamId, name: 'Member Created Board' },
+    });
+
+    expect(response.status()).toBe(201);
+    const body = await response.json();
+    expect(body?.board?.team_id).toBe(teamId);
+    if (body?.board?.id) {
+      createdBoardIds.push(body.board.id);
+    }
+  });
+
+  test('should reject board creation across team boundaries @failure:permissions', async ({ page }) => {
+    const teamId = await createTeamFixture(`Foreign Team ${Date.now()}`, testUserId, true);
+    createdTeamIds.push(teamId);
+
+    const response = await page.request.post('/api/boards', {
+      headers: { 'Content-Type': 'application/json' },
+      data: { team_id: teamId, name: 'Forbidden Team Board' },
+    });
+
+    expect(response.status()).toBe(403);
+    const body = await response.json();
+    expect(body?.error?.code).toBe('FORBIDDEN');
   });
 });

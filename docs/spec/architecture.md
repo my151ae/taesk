@@ -1,6 +1,6 @@
 # Architecture & Design (Timeline Edition)
 
-Taesk のボード体験は Kanban から Timeline へ完全移行済みです。本ドキュメントでは TimelineBoardPage を中心にした現在のアーキテクチャと、リアルタイム同期やメトリクス連携を含む全体構造を解説します。
+Taesk のユーザー向け上位概念は Team であり、Board は Team 配下の作業単位です。本ドキュメントでは Team-first な入口、TimelineBoardPage を中心にした現在のアーキテクチャ、リアルタイム同期やメトリクス連携を含む全体構造を解説します。
 
 ## System Architecture
 
@@ -8,7 +8,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ┌──────────────────────────────────────────────────────────────────┐
 │                        Presentation Layer                        │
 │  Next.js App Router (Server Components + Client Components)      │
-│  • `/board` -> `TimelineBoardPage`                               │
+│  • `/board` -> Team/Board bootstrap entry                        │
 │  • Parallel Routes (@modal) for CardModal                        │
 │  • AuthContext / NotificationSoundPlayer                         │
 └───────────────────────────────┬──────────────────────────────────┘
@@ -16,7 +16,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                        Timeline Application Layer                │
 │  TimelineBoardPage (client)                                      │
-│  • Header (board picker, share dialog, filters, notifications)   │
+│  • Header (team switcher, board selector, share, notifications)  │
 │  • day_range timeline grid (24h, 1-7日)                          │
 │  • A/B lists (YYYY-MM-DD_a/b)                                    │
 │  • CardModal / CommentsPanel (parallel routes + Zustand)         │
@@ -47,7 +47,7 @@ Taesk のボード体験は Kanban から Timeline へ完全移行済みです�
 - `abBuckets`: `${isoDate}_a` / `${isoDate}_b` のキーで配列を保持。`due_bucket_position` で降順ソートし、`assignee_ids` を含めて返却
 - `serverNow`: API 生成時刻 (UTC ISO)。クライアントは JST に変換して Now ラインを描画
 
-`GET /api/boards/[boardId]/timeline` はボードメンバーのみアクセス可能。`board_members` に存在しないユーザーは 403 を受け取り、未認証の場合は 401 となる。
+`GET /api/boards/[boardId]/timeline` は Team 配下の Board member のみアクセス可能。最終的な認可判定の正本は `board_members` で、未登録ユーザーは 403、未認証は 401 となる。
 
 ## Timeline UI Composition
 
@@ -60,7 +60,7 @@ app/layout.tsx
         └── app/board/page.tsx
             └── TimelineBoardPage (client)
                 ├── Header
-                │   ├── Board picker (fetch `/api/boards`)
+                │   ├── Team switcher + board selector (fetch `/api/teams`, `/api/boards`)
                 │   ├── ShareDialog / NotificationSettings / ProfileSettings
                 │   ├── Filters/SearchBar (useTimelineFiltering)
                 │   └── Status indicators (realtimeStatus)
@@ -87,7 +87,7 @@ app/layout.tsx
 ## Data Flow
 
 1. **Server-side boot**  
-   `app/board/page.tsx` が `getBoardById(MAIN_BOARD_ID)` を SSR で取得し、`<TimelineBoardPage initialBoard={board} />` を描画。
+   `app/board/page.tsx` が `/board` を Team/Board bootstrap 入口として扱い、最後に使った Board、または先頭アクセス可能 Board、未所属時は default Team + default Board を解決して `<TimelineBoardPage initialBoard={board} />` を描画。
 
 2. **Client hydration & initial fetch**  
    `TimelineBoardPage` が `fetch('/api/boards/:id/timeline')` を呼び、`setData(TimelineResponse)` で `days/events/abBuckets` をメモリへ保持。ロード中は skeleton、失敗時は `errorMessage` を表示。
@@ -216,7 +216,8 @@ sequenceDiagram
   - `due_start` / `due_end` (time without time zone, 1 分単位)
   - `due_bucket` (`a` | `b`)
   - `due_bucket_position` (numeric, 降順で並べ替え)
-- `board_members` でボードアクセスを制御し、全 API ルートが RLS で保護される。
+- Team は Board の上位コンテナとして存在し、Board access は Team 配下で成立する。
+- 実際の Board 単位アクセス制御は `board_members` を正本として行い、全 API ルートが RLS で保護される。
 - Realtime は `cards`, `comments`, `notifications` を購読。TimelineBoardPage では `cards` と `comments` のみ使用。
 
 Canonical type definitions: `lib/api-types/timeline.ts`（TimelineResponse/TimelineEvent/TODAY/TOMORROW の契約を統一）

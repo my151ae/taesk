@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { slugifyBoardName } from '@/lib/board-utils';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient, type TeamRole, type TeamView } from '@/lib/supabase';
 import { requireAuthenticatedUser, validateMutationRequestOrigin } from '@/lib/server/api-security';
 import { hasAnyTeamRole } from '@/lib/server/team-security';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
@@ -12,6 +12,20 @@ const UpdateTeamSchema = z.object({
   slug: z.string().min(1).max(255).optional(),
   allow_member_create_board: z.boolean().optional(),
 });
+
+type TeamRow = Pick<TeamView, 'id' | 'name' | 'slug' | 'allow_member_create_board' | 'created_at' | 'updated_at'>;
+
+function toTeamView(team: TeamRow, role: TeamRole): TeamView {
+  return {
+    id: team.id,
+    name: team.name,
+    slug: team.slug,
+    role,
+    allow_member_create_board: team.allow_member_create_board,
+    created_at: team.created_at,
+    updated_at: team.updated_at,
+  };
+}
 
 async function ensureUniqueSlug(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -68,7 +82,7 @@ const getHandler = async (
 
   const { data: team, error } = await supabase
     .from('teams')
-    .select('id, name, slug, team_type, allow_member_create_board, personal_for_profile_id, created_by, created_at, updated_at')
+    .select('id, name, slug, allow_member_create_board, created_at, updated_at')
     .eq('id', teamId)
     .maybeSingle();
 
@@ -86,7 +100,7 @@ const getHandler = async (
     );
   }
 
-  return NextResponse.json({ team: { ...team, role: membership.role } }, { status: 200 });
+  return NextResponse.json({ team: toTeamView(team as TeamRow, membership.role) }, { status: 200 });
 };
 
 const patchHandler = async (
@@ -181,7 +195,7 @@ const patchHandler = async (
     .from('teams')
     .update(updates)
     .eq('id', teamId)
-    .select('id, name, slug, team_type, allow_member_create_board, personal_for_profile_id, created_by, created_at, updated_at')
+    .select('id, name, slug, allow_member_create_board, created_at, updated_at')
     .single();
 
   if (updateError) {
@@ -191,7 +205,7 @@ const patchHandler = async (
     );
   }
 
-  return NextResponse.json({ team: { ...updated, role: membership.role } }, { status: 200 });
+  return NextResponse.json({ team: toTeamView(updated as TeamRow, membership.role) }, { status: 200 });
 };
 
 export const GET = withErrorHandling(getHandler, 'team-by-id-get');

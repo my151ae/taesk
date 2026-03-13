@@ -29,7 +29,7 @@ function deriveDisplayName(user: User): string {
 }
 
 function buildPersonalTeamName(user: User): string {
-  return `${deriveDisplayName(user)} Workspace`;
+  return `${deriveDisplayName(user)} Team`;
 }
 
 function buildPersonalBoardName(user: User): string {
@@ -58,7 +58,7 @@ async function ensureProfile(user: User) {
 
 async function ensureUniqueTeamSlug(baseName: string, profileId: string): Promise<string> {
   const admin = createServiceRoleSupabaseClient();
-  const baseSlug = toSlugBase(baseName) || `workspace-${profileId.slice(0, 8)}`;
+  const baseSlug = toSlugBase(baseName) || `team-${profileId.slice(0, 8)}`;
   let candidate = baseSlug;
 
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -79,7 +79,7 @@ async function ensureUniqueTeamSlug(baseName: string, profileId: string): Promis
     candidate = `${baseSlug}-${attempt + 2}`;
   }
 
-  throw new Error("Failed to generate personal workspace slug");
+  throw new Error("Failed to generate default team slug");
 }
 
 async function ensureUniqueBoardShortId(): Promise<string> {
@@ -131,7 +131,7 @@ async function ensurePersonalTeam(user: User): Promise<string> {
     .maybeSingle();
 
   if (lookupError) {
-    throw new Error(`Failed to lookup personal workspace: ${lookupError.message}`);
+    throw new Error(`Failed to lookup default team: ${lookupError.message}`);
   }
 
   if (existing?.id) {
@@ -163,7 +163,7 @@ async function ensurePersonalTeam(user: User): Promise<string> {
         return raced.id;
       }
     }
-    throw new Error(`Failed to create personal workspace: ${createError?.message ?? "unknown error"}`);
+    throw new Error(`Failed to create default team: ${createError?.message ?? "unknown error"}`);
   }
 
   return created.id;
@@ -183,7 +183,7 @@ async function ensurePersonalTeamOwner(teamId: string, profileId: string) {
     );
 
   if (error) {
-    throw new Error(`Failed to ensure personal workspace owner: ${error.message}`);
+    throw new Error(`Failed to ensure default team owner: ${error.message}`);
   }
 }
 
@@ -258,7 +258,7 @@ async function ensurePersonalBoardOwner(boardId: string, profileId: string) {
   }
 }
 
-export async function ensurePersonalWorkspaceAndBoard(user: User): Promise<EnsureResult> {
+export async function ensureDefaultTeamAndBoard(user: User): Promise<EnsureResult> {
   await ensureProfile(user);
 
   const teamId = await ensurePersonalTeam(user);
@@ -268,4 +268,8 @@ export async function ensurePersonalWorkspaceAndBoard(user: User): Promise<Ensur
   await ensurePersonalBoardOwner(boardId, user.id);
 
   return { teamId, boardId };
+}
+
+export async function ensurePersonalWorkspaceAndBoard(user: User): Promise<EnsureResult> {
+  return ensureDefaultTeamAndBoard(user);
 }

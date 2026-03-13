@@ -1,21 +1,24 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getBoardById } from "@/lib/server/boards";
 import { buildBoardUrl } from "@/lib/board-url";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import { ensurePersonalWorkspaceAndBoard } from "@/lib/server/personal-workspace";
+import { ensureDefaultTeamAndBoard } from "@/lib/server/personal-workspace";
 
 export const runtime = "nodejs";
 export const revalidate = 0;
+const LAST_BOARD_COOKIE = "taesk-last-board-id";
 
 export default async function BoardDefaultPage() {
   const supabase = await createServerSupabaseClient();
+  const cookieStore = await cookies();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
     redirect("/login");
   }
 
-  const ensured = await ensurePersonalWorkspaceAndBoard(user);
+  const lastBoardId = cookieStore.get(LAST_BOARD_COOKIE)?.value ?? null;
 
   // ユーザーが所属しているボードを最大20件取得（古い順）
   const { data: memberships } = await supabase
@@ -29,9 +32,16 @@ export default async function BoardDefaultPage() {
     .map((row) => row.board_id)
     .filter((value): value is string => Boolean(value));
 
+  let ensuredBoardId: string | null = null;
+  if (membershipBoardIds.length === 0) {
+    const ensured = await ensureDefaultTeamAndBoard(user);
+    ensuredBoardId = ensured.boardId;
+  }
+
   const boardCandidateIds = Array.from(new Set([
+    ...(lastBoardId ? [lastBoardId] : []),
     ...membershipBoardIds,
-    ensured.boardId,
+    ...(ensuredBoardId ? [ensuredBoardId] : []),
   ]));
 
   let board = null;
@@ -41,7 +51,7 @@ export default async function BoardDefaultPage() {
   }
 
   if (!board) {
-    const ensuredBoard = await getBoardById(ensured.boardId);
+    const ensuredBoard = ensuredBoardId ? await getBoardById(ensuredBoardId) : null;
     if (ensuredBoard) {
       board = ensuredBoard;
     } else {

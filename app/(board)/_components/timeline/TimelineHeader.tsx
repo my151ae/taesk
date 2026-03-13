@@ -2,7 +2,7 @@ import { clsx } from 'clsx';
 import Link from 'next/link';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
-import { Board, Team, TeamRole } from '@/lib/supabase';
+import { Board, TeamView } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
@@ -10,9 +10,7 @@ import type { ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 
-type TeamWithRole = Team & { role: TeamRole };
-
-function canCreateBoardInTeam(team: TeamWithRole): boolean {
+function canCreateBoardInTeam(team: TeamView): boolean {
     return team.role === 'owner'
         || team.role === 'admin'
         || (team.role === 'member' && team.allow_member_create_board);
@@ -30,7 +28,7 @@ function isProtectedBoard(board: Board): boolean {
 type TimelineHeaderProps = {
     board: Board;
     modalBoards: Board[];
-    modalTeams: TeamWithRole[];
+    modalTeams: TeamView[];
     handleBoardNavigate: (board: Board) => void;
     showBoardMenu: boolean;
     setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
@@ -275,7 +273,7 @@ export default function TimelineHeader({
                             aria-haspopup="true"
                             aria-expanded={showBoardMenu}
                             data-testid="board-menu-button"
-                            title="Switch Board"
+                            title="Switch Team or Board"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
@@ -283,20 +281,20 @@ export default function TimelineHeader({
                         </button>
                         {showBoardMenu && (
                             <div className="absolute left-0 z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Workspaces & Boards</p>
+                                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams</p>
                                 <div className="max-h-[70vh] space-y-3 overflow-y-auto px-1 pb-1">
                                     {teamSections.map(({ team, boards }) => (
                                         <div key={team.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2">
                                             <div className="mb-1 flex items-center justify-between gap-2 px-1">
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-semibold text-slate-800">{team.name}</p>
-                                                    <p className="truncate text-[11px] text-slate-500">{team.team_type} workspace • {team.role}</p>
+                                                    <p className="truncate text-[11px] text-slate-500">{team.role}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => onOpenTeamSettings(team.id)}
                                                     className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                                                 >
-                                                    Settings
+                                                    Team Settings
                                                 </button>
                                             </div>
                                             <div className="space-y-1">
@@ -310,7 +308,9 @@ export default function TimelineHeader({
                                                             )}
                                                         >
                                                             <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
-                                                            <p className="text-xs text-slate-500">{b.description || 'Standard board'}</p>
+                                                            {b.description ? (
+                                                                <p className="text-xs text-slate-500">{b.description}</p>
+                                                            ) : null}
                                                         </button>
                                                         <button
                                                             onClick={(e) => {
@@ -349,7 +349,7 @@ export default function TimelineHeader({
                                                     </div>
                                                 ))}
                                                 {boards.length === 0 && (
-                                                    <p className="px-2 py-1 text-xs text-slate-500">No boards in this team</p>
+                                                    <p className="px-2 py-1 text-xs text-slate-500">No boards yet</p>
                                                 )}
                                             </div>
                                             <div className="mt-2 border-t border-slate-200 pt-2">
@@ -386,7 +386,7 @@ export default function TimelineHeader({
                                                         disabled={!canCreateBoardInTeam(team)}
                                                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
                                                     >
-                                                        {canCreateBoardInTeam(team) ? `+ Create board in ${team.name}` : 'No permission to create board'}
+                                                        {canCreateBoardInTeam(team) ? '+ New Board' : 'No permission to create board'}
                                                     </button>
                                                 )}
                                             </div>
@@ -554,7 +554,7 @@ export default function TimelineHeader({
                                     }}
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
-                                    Workspace Settings
+                                    Team Settings
                                 </button>
                                 <button
                                     onClick={() => {
@@ -817,7 +817,7 @@ export default function TimelineHeader({
                                     }}
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
-                                    <span>🏢</span> Workspace Settings
+                                    <span>🏢</span> Team Settings
                                 </button>
                                 <button
                                     onClick={() => {

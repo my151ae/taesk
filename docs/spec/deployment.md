@@ -5,7 +5,7 @@ Taesk の Timeline ボードは **Next.js 16 + Vercel** をフロントエンド
 ## 1. Overview
 
 - **Hosting**: Vercel（Node.js runtime）。`npm run build` を実行し `.next/` を配備。
-- **Database/Auth**: Supabase。`cards` に `due_*` フィールドを持ち、`board_members` による認可を実施。
+- **Database/Auth**: Supabase。Team を上位コンテナ、Board を Team 配下として扱い、Board 単位の認可は `board_members` を正本として実施。
 - **Restrictions**: 手動 `npm run dev` 禁止。検証は Playwright JSON レポートと chrome-devtools MCP を利用。
 
 ## 2. Pre-flight Checklist
@@ -70,7 +70,7 @@ Timeline board available at taesk.vercel.app
 
 ### RLS ポリシー
 
-Timeline ではボードメンバーシップを基準にカード閲覧/編集を制限します。
+Timeline では Team 配下で Board access が成立し、最終的な Board 単位認可は `board_members` を基準にカード閲覧/編集を制限します。
 
 ```sql
 ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
@@ -95,7 +95,7 @@ CREATE POLICY "Members can manage cards"
   ));
 ```
 
-コメントや通知も同様に `board_id` や `recipient_id` をキーにポリシーを定義する。テスト専用ユーザー ID (`TEST_USER_ID`) には `board_members` への upsert を行い、Timeline API を通過できるようにする。
+コメントや通知も同様に `board_id` や `recipient_id` をキーにポリシーを定義する。Board 招待受諾時は DB 関数が Team 未所属ユーザーへ `team_members.role = guest` を自動付与し、その上で `board_members` を追加する。テスト専用ユーザー ID (`TEST_USER_ID`) には `board_members` への upsert を行い、Timeline API を通過できるようにする。
 
 ### Edge Functions / Push
 

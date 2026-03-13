@@ -4,7 +4,6 @@ import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
     getBoardMembership,
-    hasAnyRole,
     requireAuthenticatedUser,
     validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
@@ -127,16 +126,31 @@ const patchHandler = async (
             );
         }
 
-        // Only owner or editor can update settings
-        if (!hasAnyRole(membership.role, ['owner', 'editor'])) {
+        const canEditBoardName = membership.role === 'owner';
+        const canEditDisplaySettings = membership.role === 'owner' || membership.role === 'editor';
+        const wantsNameUpdate = typeof payload.name === 'string' && payload.name.trim().length > 0;
+        const wantsDayRangeUpdate = typeof payload.day_range === 'number';
+        const wantsListWindowUpdate =
+            payload.list_window_before_days !== undefined ||
+            payload.list_window_after_days !== undefined ||
+            typeof payload.list_range === 'number';
+
+        if (!canEditBoardName && wantsNameUpdate) {
             return NextResponse.json(
-                { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
+                { error: { code: 'FORBIDDEN', message: 'Only board owners can rename the board' } },
+                { status: 403 }
+            );
+        }
+
+        if (!canEditDisplaySettings && (wantsDayRangeUpdate || wantsListWindowUpdate)) {
+            return NextResponse.json(
+                { error: { code: 'FORBIDDEN', message: 'Insufficient permissions to update board display settings' } },
                 { status: 403 }
             );
         }
 
         const updates: Record<string, unknown> = {};
-        if (typeof payload.day_range === 'number') {
+        if (wantsDayRangeUpdate) {
             updates.day_range = Math.max(1, Math.min(7, payload.day_range)); // Limit 1-7 days
         }
         const hasListBefore = payload.list_window_before_days !== undefined;
@@ -181,7 +195,7 @@ const patchHandler = async (
             // Backward-compatible fallback until list_range input is removed.
             updates.list_range = Math.max(1, Math.min(120, payload.list_range)); // Limit 1-120 days
         }
-        if (typeof payload.name === 'string' && payload.name.trim()) {
+        if (wantsNameUpdate) {
             updates.name = payload.name.trim();
         }
         if (payload.team_id !== undefined) {

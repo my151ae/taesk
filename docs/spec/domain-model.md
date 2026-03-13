@@ -1,15 +1,22 @@
 # Domain Model
 
-Taesk のドメインモデルは、**Timeline** と **A/B Buckets** という2つの主要な概念を中心に構成されています。これらは、ユーザーが「いつ」「何を」すべきかを直感的に計画・実行するための基盤です。
+Taesk のユーザー向け上位概念は **Team** です。Board は Team の配下に存在し、Timeline と A/B Buckets は Board の表示モードとして提供されます。
 
 ## Core Concepts
 
-### 1. Board (ボード)
-プロジェクトやタスク管理の最上位コンテナです。
-- **Timeline View**: ボードは現在、Timeline View を唯一のインターフェースとして提供します。
-- **Members**: ボードには複数のメンバーが所属し、権限（Owner, Editor, Commenter, Viewer）によって操作が制限されます。
+### 1. Team
+- Team はメンバーと Board をまとめる上位コンテナです。
+- ユーザーは複数の Team に所属できます。
+- Team role は `owner`, `admin`, `member`, `guest` を使用します。
+- `allow_member_create_board` により、member の Board 作成可否を制御します。
 
-### 2. Card (カード)
+### 2. Board
+- Board は Team の中に存在する作業単位です。
+- Board は必ず 1 つの Team に所属し、Team なしでは存在しません。
+- Board role は `owner`, `editor`, `commenter`, `viewer` を使用します。
+- Board へのアクセス判定の正本は `board_members` です。
+
+### 3. Card
 タスクや予定を表す最小単位です。表示種別は `due_date` と `due_start` / `due_end` の有無で決まります。
 
 | Type | Description | UI Representation |
@@ -17,20 +24,23 @@ Taesk のドメインモデルは、**Timeline** と **A/B Buckets** という2�
 | **Timeline Event** | 日付 + 時間が決まっている予定 | Timeline の時間軸ブロック |
 | **A/B Item** | 日付はあるが時間が未設定のタスク | A/B バケット（`a` / `b`） |
 
-### 3. Timeline (タイムライン)
-「時間」を軸にした計画ビューです。
-- **Scope**: day_range に応じて 1〜7 日の範囲を表示します（デフォルトは Today/Tomorrow の2日）。
-- **Granularity**: 1分単位の精度を持ちますが、UI上は適度なスナップ（15分など）が適用されます。
-- **JST Canonical**: すべての日付・時刻計算は日本標準時 (JST) を基準に行われます。
+### 4. Timeline / A/B Buckets
+- Timeline は Board の時間軸ビューです。
+- A/B Buckets は同じ Board 内で時間未設定カードを整理する補助ビューです。
+- `day_range` は 1〜7 日、A/B は `due_bucket = a | b` で表現します。
 
-### 4. A/B Buckets (A/B バケット)
-「優先度」と「タイミング」を軸にしたタスクのグルーピングです。
-Timeline の隙間時間を埋めるタスクを管理するために使用します。
+## Access Model
 
-- **Bucket A**: その日に優先度が高いタスク
-- **Bucket B**: その日に余裕があれば取り組むタスク
+### Team と Board の関係
+- Board access は Team 所属の上に成り立ちます。
+- Team に所属しているだけでは、すべての Board へ自動アクセスできません。
+- 実際の Board access は `board_members` を正本として制御します。
+- Board に招待されたユーザーが Team 未所属だった場合、受諾時に Team へ `guest` として自動追加されます。
 
-カードはバケット内で `due_bucket_position` によって並び替えられます。日付は `due_date` で決まり、バケット自体は `a` / `b` のみを保持します。
+### Personal の扱い
+- `team_type`, `personal_for_profile_id`, `is_personal` などの内部フラグは残存可です。
+- ただし UI 上では Personal を独立概念として扱いません。
+- 1 人だけの Team も通常の Team として扱います。
 
 ## Data Flow & Synchronization
 
@@ -44,10 +54,11 @@ Supabase Realtime を利用して、他のユーザーの操作（カードの�
 
 ```mermaid
 erDiagram
+    TEAM ||--o{ BOARD : contains
+    TEAM ||--o{ TEAM_MEMBER : has
+    BOARD ||--o{ BOARD_MEMBER : has
     BOARD ||--o{ CARD : contains
-    BOARD ||--o{ MEMBER : has
     CARD ||--o{ COMMENT : has
-    MEMBER ||--o{ COMMENT : writes
 
     CARD {
         timestamp due_date

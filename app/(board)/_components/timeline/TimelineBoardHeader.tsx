@@ -2,14 +2,14 @@
 
 import type { RefObject } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Board, Team, TeamRole } from "@/lib/supabase";
+import type { Board, TeamView } from "@/lib/supabase";
 import type { UserProfile } from "@/app/(board)/_utils/timeline-helpers";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 
 type TimelineBoardHeaderProps = {
   board: Board;
   modalBoards: Board[];
-  modalTeams: Array<Team & { role: TeamRole }>;
+  modalTeams: TeamView[];
   handleBoardNavigate: (board: Board) => void;
   showBoardMenu: boolean;
   setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;

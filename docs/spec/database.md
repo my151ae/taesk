@@ -1,11 +1,13 @@
 # Database Schema (Timeline 2025-11)
 
-Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Timeline UI 向けの `due_*` フィールド群を中心に設計されています。ボード → カード → コメントのコア構造に加え、ボード権限・通知・Push 配信ログ・A/B バケット管理などをサポートします。
+Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コンテナ、Board を Team 配下の作業単位として扱います。Timeline UI 向けの `due_*` フィールド群に加え、Team 権限、Board 権限、通知、Push 配信ログ、A/B バケット管理をサポートします。
 
 ## テーブル一覧
 
 | テーブル | 役割 | Timeline との関係 |
 | --- | --- | --- |
+| `teams` | Team 本体。メンバーと Board を束ねる上位コンテナ | `/board` bootstrap, Team Settings |
+| `team_members` | Team メンバーと Team role | Team Settings, Board 作成可否判定 |
 | `boards` | ボード本体。short URL / slug 管理 | `/board` の初期ボードやボードピッカーに利用 |
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
 | `lists` | 旧 Kanban のリスト（A/B では未使用） | カードの `list_id` 互換のため残存 |
@@ -21,12 +23,13 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Timeline UI 向け
 ## ER 図（簡易）
 
 ```
-boards 1 ── n cards ──┬─ n comments
-  │                   │
-  │                   └─ n card.assignee_ids → profiles
-  ├─ n board_members ── profiles (role: owner/editor/commenter/viewer)
-  ├─ n activity_logs
-  └─ n board_invites
+teams 1 ── n boards 1 ── n cards ──┬─ n comments
+  │            │                   │
+  │            │                   └─ n card.assignee_ids → profiles
+  │            ├─ n board_members ── profiles (role: owner/editor/commenter/viewer)
+  │            ├─ n activity_logs
+  │            └─ n board_invites
+  └─ n team_members ── profiles (role: owner/admin/member/guest)
 
 profiles 1 ── n comments (author_id)
         ├─ n notifications (recipient_id)
@@ -58,7 +61,7 @@ CREATE TABLE public.boards (
 ```
 
 - `short_id` + `slug` は `/b/:short_id/:slug` や `/@modal/(...)c` などで使用。
-- `MAIN_BOARD_ID` (0000...0001) が `/board` のデフォルト対象。
+- `/board` は Team/Board bootstrap 入口であり、最後に使った Board、またはアクセス可能な Board へ遷移する。未所属時は default Team + default Board を生成する。
 - `is_test_board` が true の場合、E2E 専用ボードとして扱い、初期データを制限。
 - `day_range` は Timeline の表示日数（1〜7日）を制御。
 - List は `list_window_before_days` / `list_window_after_days` を正本として扱い、`list_range` は `before + after + 1` の導出値を保持。
@@ -77,8 +80,10 @@ CREATE TABLE public.board_members (
 );
 ```
 
+- Board access は Team 配下で成立するが、最終的な認可判定の正本は `board_members` である。
 - Timeline API (`GET /api/boards/:id/timeline`) は `board_members` に存在しない場合 403 を返す。
 - ShareDialog で role 編集・削除を行い、RLS ポリシーが連動。
+- Board 招待受諾時、Team 未所属ユーザーは Team に `guest` として自動追加される。
 
 ## lists
 
@@ -215,7 +220,7 @@ ALTER TABLE public.profiles ADD COLUMN timeline_start_hour INTEGER DEFAULT 0;
 - エンドポイント: `GET /api/boards/[boardId]/timeline`
 - ロジック:
   1. Supabase SSR クライアントで `auth.getUser()` → 認可
-  2. `board_members` をチェック（owner/editor/commenter/viewer 全員許可）
+  2. Team 配下の Board access を前提に、`board_members` をチェック（owner/editor/commenter/viewer 全員許可）
   3. `cards` を `board_id` で取得し、`due_date` + `due_start`/`due_end` の有無で events/abBuckets を振り分け
   4. 過去日かつ未完了のカードは `overdue` shortcut にも載せ、visible range 内のカードは本体の `events` / `abBuckets` にも載せる
   5. `events` / `abBuckets` / `overdue` / `serverNow` を整形し JSON で返却

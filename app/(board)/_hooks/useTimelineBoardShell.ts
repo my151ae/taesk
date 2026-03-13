@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-import type { Board, ProfileSummary, Team, TeamRole } from "@/lib/supabase";
+import type { Board, ProfileSummary, TeamView } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 
 type ProfileResponse = ProfileSummary | null;
-type TeamWithRole = Team & { role: TeamRole };
+const LAST_BOARD_COOKIE = "taesk-last-board-id";
 
 type UseTimelineBoardShellProps = {
   initialBoard: Board;
@@ -31,7 +31,7 @@ export function useTimelineBoardShell({
 }: UseTimelineBoardShellProps) {
   const [profile, setProfile] = useState<ProfileResponse>(null);
   const [availableBoards, setAvailableBoards] = useState<Board[]>([initialBoard]);
-  const [availableTeams, setAvailableTeams] = useState<TeamWithRole[]>([]);
+  const [availableTeams, setAvailableTeams] = useState<TeamView[]>([]);
 
   const fetchProfile = useCallback(async () => {
     if (!userId) return;
@@ -66,7 +66,7 @@ export function useTimelineBoardShell({
     try {
       const response = await fetch("/api/teams");
       if (!response.ok) return;
-      const body = (await response.json()) as { teams?: TeamWithRole[] };
+      const body = (await response.json()) as { teams?: TeamView[] };
       setAvailableTeams(body.teams || []);
     } catch (error) {
       console.error("[timeline-shell] failed to fetch teams", error);
@@ -84,6 +84,11 @@ export function useTimelineBoardShell({
   useEffect(() => {
     void fetchTeams();
   }, [fetchTeams]);
+
+  useEffect(() => {
+    if (!currentBoardId) return;
+    document.cookie = `${LAST_BOARD_COOKIE}=${currentBoardId}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  }, [currentBoardId]);
 
   const refreshBoardMembers = useCallback(async () => {
     if (!currentBoardId) return;

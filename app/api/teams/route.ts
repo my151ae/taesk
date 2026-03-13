@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { slugifyBoardName } from '@/lib/board-utils';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient, type TeamRole, type TeamView } from '@/lib/supabase';
 import { requireAuthenticatedUser, validateMutationRequestOrigin } from '@/lib/server/api-security';
 import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
@@ -12,6 +12,20 @@ const CreateTeamSchema = z.object({
   slug: z.string().min(1).max(255).optional(),
   allow_member_create_board: z.boolean().optional(),
 });
+
+type TeamRow = Pick<TeamView, 'id' | 'name' | 'slug' | 'allow_member_create_board' | 'created_at' | 'updated_at'>;
+
+function toTeamView(team: TeamRow, role: TeamRole): TeamView {
+  return {
+    id: team.id,
+    name: team.name,
+    slug: team.slug,
+    role,
+    allow_member_create_board: team.allow_member_create_board,
+    created_at: team.created_at,
+    updated_at: team.updated_at,
+  };
+}
 
 async function createUniqueTeamSlug(baseName: string, fallbackSlug?: string): Promise<string> {
   const admin = createServiceRoleSupabaseClient();
@@ -70,7 +84,7 @@ const getHandler = async () => {
 
   const { data: teams, error: teamsError } = await supabase
     .from('teams')
-    .select('id, name, slug, team_type, allow_member_create_board, personal_for_profile_id, created_by, created_at, updated_at')
+    .select('id, name, slug, allow_member_create_board, created_at, updated_at')
     .in('id', teamIds)
     .order('created_at', { ascending: true });
 
@@ -81,10 +95,9 @@ const getHandler = async () => {
     );
   }
 
-  const normalized = (teams ?? []).map((team) => ({
-    ...team,
-    role: roleByTeamId.get(team.id) ?? 'guest',
-  }));
+  const normalized = ((teams as TeamRow[] | null) ?? []).map((team) =>
+    toTeamView(team, roleByTeamId.get(team.id) ?? 'guest')
+  );
 
   return NextResponse.json({ teams: normalized }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 };
@@ -131,7 +144,7 @@ const postHandler = async (request: NextRequest) => {
       allow_member_create_board: parsed.data.allow_member_create_board ?? false,
       created_by: user.id,
     })
-    .select('id, name, slug, team_type, allow_member_create_board, personal_for_profile_id, created_by, created_at, updated_at')
+    .select('id, name, slug, allow_member_create_board, created_at, updated_at')
     .single();
 
   if (teamError || !team) {
@@ -157,7 +170,7 @@ const postHandler = async (request: NextRequest) => {
     );
   }
 
-  return NextResponse.json({ team: { ...team, role: 'owner' } }, { status: 201 });
+  return NextResponse.json({ team: toTeamView(team as TeamRow, 'owner') }, { status: 201 });
 };
 
 export const GET = withErrorHandling(getHandler, 'teams-get');

@@ -174,7 +174,7 @@ export default function TimelineBoardDialogs({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Workspace Settings</h2>
+              <h2 className="text-lg font-semibold">Team Settings</h2>
               <button
                 onClick={() => setShowTeamSettings(false)}
                 className="text-gray-500 hover:text-gray-700"

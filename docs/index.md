@@ -1,6 +1,6 @@
 # Taesk - Timeline Board Documentation
 
-> Today/Tomorrow の時間軸と A/B リストをひとつのビューで計画できる Next.js + Supabase 製 Timeline ボード
+> Team 配下の Board 上で Today/Tomorrow の時間軸と A/B リストをひとつのビューで計画できる Next.js + Supabase 製 Timeline ボード
 
 ## UI Scope
 
@@ -98,7 +98,7 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 │                   TimelineBoardPage (client)                 │
 │  - day_range 分のカラム (24h * 40px, 1-7日)                  │
 │  - A/B リスト (YYYY-MM-DD_a/b)                               │
-│  - フィルター/検索バー + ヘッダー (Share/Notifications etc.) │
+│  - Team switcher + board selector + Share/Notifications      │
 │  - CardModal / CommentsPanel (parallel routes)               │
 └──────────────┬───────────────────────────────────────────────┘
                │ suspense + optimistic updates
@@ -119,7 +119,7 @@ sed -n '/^{/,$p' test-results/playwright-report.json | jq '.stats'
 ┌──────────────▼───────────────────────────────────────────────┐
 │                       Supabase (Postgres)                     │
 │  cards.due_start / due_end / due_bucket / due_bucket_position │
-│  board_members + RLS + realtime subscription                  │
+│  teams / team_members / board_members + RLS + realtime       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +173,7 @@ interface TimelineOverdueItem {
 - `due_date` が過去日かつ `checked = false` のカードは visible range に関係なく `overdue` に入り、visible range 内では `events` / `abBuckets` にも重複して出る
 - A/B は `due_bucket_position` で降順ソート
 - `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
-- API は認証済みボードメンバーのみアクセス可能で、`board_members` テーブルに存在しない場合は 403 を返す
+- API は Team 配下の認証済みボードメンバーのみアクセス可能で、最終的な判定は `board_members` テーブルに存在しない場合 403 を返す
 
 Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サーバー/ドキュメントで共通参照）
 
@@ -196,14 +196,14 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 ### Collaboration & Editing
 - 💬 **CardModal + CommentsPanel**: Timeline から直接モーダルを開き、詳細・チェックリスト・コメント・@mentions を編集
 - 🔔 **Notifications**: NotificationSettings + NotificationsBell で通知音、quiet hours、Web Push を制御
-- 👥 **Board Header**: ShareDialog / board picker / profile menu を Timeline ヘッダーへ統合
+- 👥 **Board Header**: Team switcher / board selector / ShareDialog / profile menu を Timeline ヘッダーへ統合
 - ✍️ **Due Editor**: CardModal や Timeline DnD から `due_start`, `due_end`, `due_bucket` を編集
 
 ### Data Integrity & Observability
 - ⛳ **due_* Fields**: `due_start`, `due_end`, `due_bucket`, `due_bucket_position` をカードテーブルに追加し、時間あり/なしで Timeline と A/B を分岐
 - 📡 **Realtime + Offline Queue**: `useRealtimeBoard` が Supabase Realtime を購読、`useSyncQueue` が失敗時にロールバック
 - 📊 **Client Metrics**: `createClientTrace('timeline')` でロード時間・D&D 操作数を収集し、`docs/spec/architecture.md` で可視化ルールを管理
-- 🔐 **RLS**: Supabase RLS が board_id / profile_id に基づきカードアクセスを制限
+- 🔐 **RLS**: Supabase RLS が Team 配下の Board access を前提に、`board_members` を正本としてカードアクセスを制限
 
 ### Testing & Reliability
 - 🧪 **Playwright JSON Pipeline**: `npm run test:all-split` が 7 バッチを順番に実行し、`test-results/batches/*.json` を生成

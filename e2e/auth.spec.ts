@@ -55,7 +55,7 @@ test.describe('Authentication @e2e:essential', () => {
  * This is intentional design - not a security issue.
  *
  * RLS Policy: "Authenticated users can view all lists" (qual: true)
- * This means all authenticated users share the same workspace.
+ * This means authenticated users collaborate through shared teams and boards.
  */
 
 test.describe('Session Management @e2e:essential', () => {

@@ -257,6 +257,16 @@ export interface Team {
   updated_at: string;
 }
 
+export interface TeamView {
+  id: string;
+  name: string;
+  slug: string | null;
+  role: TeamRole;
+  allow_member_create_board: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TeamMember {
   team_id: string;
   profile_id: string;

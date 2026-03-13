@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Team, TeamInvite, TeamRole } from "@/lib/supabase";
-
-type TeamWithRole = Team & { role: TeamRole };
+import type { TeamInvite, TeamRole, TeamView } from "@/lib/supabase";
 
 type TeamMemberItem = {
   team_id: string;
@@ -36,9 +34,9 @@ function canManageTeam(role: TeamRole | null): boolean {
 }
 
 export default function TeamManagementDialog({ initialTeamId }: Props) {
-  const [teams, setTeams] = useState<TeamWithRole[]>([]);
+  const [teams, setTeams] = useState<TeamView[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<TeamWithRole | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamView | null>(null);
   const [members, setMembers] = useState<TeamMemberItem[]>([]);
   const [invites, setInvites] = useState<TeamInviteItem[]>([]);
   const [membersForbidden, setMembersForbidden] = useState(false);
@@ -72,7 +70,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
     resetNotice();
     try {
       const res = await fetch("/api/teams", { cache: "no-store" });
-      const body = (await res.json()) as { teams?: TeamWithRole[]; error?: { message?: string } };
+      const body = (await res.json()) as { teams?: TeamView[]; error?: { message?: string } };
       if (!res.ok) {
         throw new Error(body.error?.message || "Failed to load teams");
       }
@@ -106,7 +104,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
     setLoading(true);
     try {
       const detailRes = await fetch(`/api/teams/${teamId}`, { cache: "no-store" });
-      const detailBody = (await detailRes.json()) as { team?: TeamWithRole; error?: { message?: string } };
+      const detailBody = (await detailRes.json()) as { team?: TeamView; error?: { message?: string } };
       if (!detailRes.ok || !detailBody.team) {
         throw new Error(detailBody.error?.message || "Failed to load team detail");
       }
@@ -173,7 +171,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
           allow_member_create_board: newTeamAllowCreate,
         }),
       });
-      const body = (await res.json()) as { team?: TeamWithRole; error?: { message?: string } };
+      const body = (await res.json()) as { team?: TeamView; error?: { message?: string } };
       if (!res.ok || !body.team) {
         throw new Error(body.error?.message || "Failed to create team");
       }
@@ -204,7 +202,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
           allow_member_create_board: allowMemberCreateBoard,
         }),
       });
-      const body = (await res.json()) as { team?: TeamWithRole; error?: { message?: string } };
+      const body = (await res.json()) as { team?: TeamView; error?: { message?: string } };
       if (!res.ok || !body.team) {
         throw new Error(body.error?.message || "Failed to update team");
       }
@@ -321,7 +319,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
               }`}
             >
               <div className="font-medium">{team.name}</div>
-              <div className="text-xs text-slate-500">{team.team_type} / {team.role}</div>
+              <div className="text-xs text-slate-500">{team.role}</div>
             </button>
           ))}
           {teams.length === 0 && <p className="text-xs text-slate-500">No teams</p>}

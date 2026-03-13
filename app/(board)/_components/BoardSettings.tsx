@@ -13,11 +13,14 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
     const [boardName, setBoardName] = useState(board.name ?? '');
     const [dayRange, setDayRange] = useState(board.day_range ?? 2);
     const [isSaving, setIsSaving] = useState(false);
+    const canEditName = board.membership_role === 'owner';
+    const canEditDisplaySettings = !board.membership_role || board.membership_role === 'owner' || board.membership_role === 'editor';
     const canManageAccess = board.membership_role === 'owner';
 
     const trimmedName = boardName.trim();
-    const hasNameChanged = trimmedName !== (board.name ?? '').trim();
-    const hasChanges = hasNameChanged || dayRange !== (board.day_range ?? 2);
+    const hasNameChanged = canEditName && trimmedName !== (board.name ?? '').trim();
+    const hasDayRangeChanged = canEditDisplaySettings && dayRange !== (board.day_range ?? 2);
+    const hasChanges = hasNameChanged || hasDayRangeChanged;
     const canSave = hasChanges && trimmedName.length > 0;
 
     const handleSave = async () => {
@@ -28,7 +31,7 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
             if (hasNameChanged) {
                 updates.name = trimmedName;
             }
-            if (dayRange !== (board.day_range ?? 2)) {
+            if (hasDayRangeChanged) {
                 updates.day_range = dayRange;
             }
             await onUpdate({
@@ -47,7 +50,9 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
             <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                 <div>
                     <h3 className="text-sm font-medium text-slate-900">Board Name</h3>
-                    <p className="text-xs text-slate-500">Rename this board.</p>
+                    <p className="text-xs text-slate-500">
+                        {canEditName ? 'Rename this board.' : 'Only board owners can rename this board.'}
+                    </p>
                     <input
                         type="text"
                         value={boardName}
@@ -55,17 +60,20 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
                         className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                         placeholder="Board name"
                         maxLength={255}
+                        disabled={!canEditName}
                     />
                 </div>
                 <div>
                     <h3 className="text-sm font-medium text-slate-900">Timeline View Range</h3>
-                    <p className="text-xs text-slate-500">Configure how many days are visible on the timeline.</p>
+                    <p className="text-xs text-slate-500">
+                        {canEditDisplaySettings ? 'Configure how many days are visible on the timeline.' : 'You do not have permission to change display settings.'}
+                    </p>
                     <div className="mt-3 flex items-center gap-4">
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setDayRange(Math.max(1, dayRange - 1))}
                                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                                disabled={dayRange <= 1}
+                                disabled={!canEditDisplaySettings || dayRange <= 1}
                             >
                                 -
                             </button>
@@ -73,7 +81,7 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
                             <button
                                 onClick={() => setDayRange(Math.min(7, dayRange + 1))}
                                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                                disabled={dayRange >= 7}
+                                disabled={!canEditDisplaySettings || dayRange >= 7}
                             >
                                 +
                             </button>
