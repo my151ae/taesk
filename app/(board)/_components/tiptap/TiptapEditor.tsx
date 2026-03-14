@@ -1158,7 +1158,7 @@ export default function TiptapEditor({
                         data-block-index={index}
                         data-block-node-type={target.nodeType}
                         className={styles.blockActionHandle}
-                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 4 }}
+                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 12 }}
                         onMouseDown={(event) => {
                             event.preventDefault();
                             event.stopPropagation();

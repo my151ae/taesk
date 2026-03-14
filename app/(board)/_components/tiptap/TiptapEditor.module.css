@@ -22,10 +22,24 @@
     color: #64748b;
     cursor: pointer;
     transition: background-color 120ms ease, color 120ms ease;
+    isolation: isolate;
+}
+
+.blockActionHandle::before {
+    content: "";
+    position: absolute;
+    inset: 0 8px 0 0;
+    border-radius: 8px;
+    background: transparent;
+    transition: background-color 120ms ease;
+    z-index: -1;
+}
+
+.blockActionHandle:hover::before {
+    background: #f1f5f9;
 }
 
 .blockActionHandle:hover {
-    background: #f1f5f9;
     color: #334155;
 }
 
