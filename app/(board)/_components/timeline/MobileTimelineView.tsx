@@ -465,8 +465,6 @@ type MobileTimelineViewProps = {
   activeDayIndex: number;
   onPrevDay: () => void;
   onNextDay: () => void;
-  onPrevDayRange: () => void;
-  onNextDayRange: () => void;
   onMount?: () => void;
   onScroll?: (scrollTop: number) => void;
   registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
@@ -504,8 +502,6 @@ export default function MobileTimelineView({
   activeDayIndex,
   onPrevDay,
   onNextDay,
-  onPrevDayRange,
-  onNextDayRange,
   onMount,
   onScroll,
   registerAbScrollContainer,
@@ -699,32 +695,18 @@ export default function MobileTimelineView({
 
         <div className="flex h-full flex-col">
           <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                aria-label="前へ 表示日数-1日"
-                disabled={status === "loading"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPrevDayRange();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {'<<'}
-              </button>
-              <button
-                type="button"
-                aria-label="前へ 1日"
-                disabled={status === "loading"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPrevDay();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {'<1'}
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="前へ 1日"
+              disabled={status === "loading"}
+              onClick={(e) => {
+                e.preventDefault();
+                onPrevDay();
+              }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {'<1'}
+            </button>
             <div className="flex items-center gap-2 text-slate-800">
               {/* Zoom Controls (Left of date) */}
               <div className="flex items-center gap-1">
@@ -766,32 +748,18 @@ export default function MobileTimelineView({
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                aria-label="次へ 1日"
-                disabled={status === "loading"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onNextDay();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {'1>'}
-              </button>
-              <button
-                type="button"
-                aria-label="次へ 表示日数-1日"
-                disabled={status === "loading"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onNextDayRange();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {'>>'}
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="次へ 1日"
+              disabled={status === "loading"}
+              onClick={(e) => {
+                e.preventDefault();
+                onNextDay();
+              }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {'1>'}
+            </button>
           </div>
 
           {calendarAllDayForDay.length > 0 && (

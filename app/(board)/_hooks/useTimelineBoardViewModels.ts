@@ -130,8 +130,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         activeDayIndex: args.activeDayIndex,
         onPrevDay: args.handlePrevDay,
         onNextDay: args.handleNextDay,
-        onPrevDayRange: args.handlePrevDayRange,
-        onNextDayRange: args.handleNextDayRange,
         onMount: args.handleTimelineViewMount,
         onScroll: args.debouncedHandleScroll,
         registerAbScrollContainer: args.registerAbScrollContainer,
