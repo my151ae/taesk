@@ -262,25 +262,14 @@ async function pasteHtmlWithPlainText(
   }, args);
 }
 
-async function moveMouseToLocator(page: Page, target: Locator): Promise<void> {
-  const box = await target.boundingBox();
-  if (!box) {
-    throw new Error('Failed to resolve target bounds for block action hover');
-  }
-
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
-}
-
-async function openBlockActionMenu(page: Page, modal: Locator, target: Locator): Promise<void> {
-  await moveMouseToLocator(page, target);
-  const handle = modal.getByTestId('tiptap-block-handle');
+async function openBlockActionMenu(modal: Locator, handle: Locator): Promise<void> {
   await expect(handle).toBeVisible();
   await handle.click();
   await expect(modal.getByTestId('tiptap-block-menu')).toBeVisible();
 }
 
-async function triggerBlockAction(page: Page, modal: Locator, target: Locator, action: 'insert-above' | 'insert-below' | 'duplicate' | 'delete'): Promise<void> {
-  await openBlockActionMenu(page, modal, target);
+async function triggerBlockAction(modal: Locator, handle: Locator, action: 'insert-above' | 'insert-below' | 'duplicate' | 'delete'): Promise<void> {
+  await openBlockActionMenu(modal, handle);
   await modal.getByTestId(`tiptap-block-menu-${action}`).click();
 }
 
@@ -2435,21 +2424,19 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
+      const handles = modal.getByTestId('tiptap-block-handle');
+      await expect(handles).toHaveCount(4);
 
-      const firstParagraph = modal.locator('.ProseMirror > p').first();
-      await triggerBlockAction(page, modal, firstParagraph, 'insert-above');
+      await triggerBlockAction(modal, handles.nth(0), 'insert-above');
       await page.keyboard.type('Inserted above');
 
-      const heading = modal.locator('.ProseMirror > h2').first();
-      await triggerBlockAction(page, modal, heading, 'duplicate');
+      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first(), 'duplicate');
       await expect(modal.locator('.ProseMirror > h2')).toHaveCount(2);
 
-      const firstTask = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
-      await triggerBlockAction(page, modal, firstTask, 'insert-below');
+      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'insert-below');
       await page.keyboard.type('Task separator');
 
-      const secondTask = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').nth(1);
-      await triggerBlockAction(page, modal, secondTask, 'delete');
+      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'delete');
 
       await expect(modal.locator('.ProseMirror')).toContainText('Inserted above');
       await expect(modal.locator('.ProseMirror')).toContainText('Task separator');
@@ -2551,13 +2538,71 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const topLevelTask = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
-      await moveMouseToLocator(page, topLevelTask);
-      await expect(modal.getByTestId('tiptap-block-handle')).toBeVisible();
+      await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(1);
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
 
-      const nestedTask = modal.locator('.ProseMirror > ul[data-type="taskList"] > li ul[data-type="taskList"] > li').first();
-      await moveMouseToLocator(page, nestedTask);
-      await expect(modal.getByTestId('tiptap-block-handle')).toBeHidden();
+  test('pressing Escape closes block menu without closing modal', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action escape',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Escape target paragraph' }] },
+        ],
+      },
+      excerpt: 'Escape target paragraph',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1897,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:20:00',
+      due_end: '16:20:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5044,
+      slug: 'block-action-escape',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await openBlockActionMenu(modal, modal.getByTestId('tiptap-block-handle').first());
+      await page.keyboard.press('Escape');
+
+      await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+      await expect(modal).toBeVisible();
+      await expect(modal.getByRole('textbox', { name: 'タイトルなし' })).toBeVisible();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

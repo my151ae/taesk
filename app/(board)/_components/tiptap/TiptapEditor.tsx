@@ -10,7 +10,7 @@ import Image from '@tiptap/extension-image';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ClipboardEvent as ReactClipboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { buildDefaultBodyContent } from '@/lib/tiptap';
 import {
@@ -41,10 +41,10 @@ type DetailsContext = {
 
 type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem';
 
-type BlockMenuTarget = {
+type RenderableBlockActionTarget = {
     pos: number;
     nodeType: BlockNodeType;
-    rect: DOMRect;
+    rect: DOMRect | null;
 };
 
 type ResolvedBlockTarget = {
@@ -158,6 +158,12 @@ function BlockActionMenu({
                 event.preventDefault();
                 event.stopPropagation();
             }}
+            onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                event.preventDefault();
+                event.stopPropagation();
+                onClose();
+            }}
         >
             {BLOCK_ACTION_ITEMS.map((item) => (
                 <button
@@ -197,14 +203,19 @@ export default function TiptapEditor({
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const [hoveredBlock, setHoveredBlock] = useState<BlockMenuTarget | null>(null);
-    const [menuTarget, setMenuTarget] = useState<BlockMenuTarget | null>(null);
+    const [menuTarget, setMenuTarget] = useState<RenderableBlockActionTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
+    const [layoutVersion, setLayoutVersion] = useState(0);
+    const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
         setMenuTarget(null);
+    }, []);
+
+    const invalidateLayout = useCallback(() => {
+        setLayoutVersion((current) => current + 1);
     }, []);
 
     const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
@@ -336,77 +347,16 @@ export default function TiptapEditor({
         return nodeDom.getBoundingClientRect();
     }, []);
 
-    const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): BlockMenuTarget | null => {
+    const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): RenderableBlockActionTarget | null => {
         const target = resolveBlockTargetAtPos(state, pos);
         if (!target) return null;
         const rect = getBlockTargetRect(view, target.pos);
-        if (!rect) return null;
         return {
-            pos: target.pos,
+            pos,
             nodeType: target.nodeType,
             rect,
         };
     }, [getBlockTargetRect, resolveBlockTargetAtPos]);
-
-    const findTargetPosFromDom = useCallback((view: Editor['view'], target: HTMLElement): number | null => {
-        const root = view.dom;
-        const typedCandidate = target.closest('[data-node-type]');
-        if (typedCandidate instanceof HTMLElement && root.contains(typedCandidate)) {
-            try {
-                return view.posAtDOM(typedCandidate, 0);
-            } catch {
-                // fall through
-            }
-        }
-
-        const fallbackCandidate = target.closest('li, p, h1, h2, h3');
-        if (!(fallbackCandidate instanceof HTMLElement) || !root.contains(fallbackCandidate)) {
-            return null;
-        }
-
-        try {
-            return view.posAtDOM(fallbackCandidate, 0);
-        } catch {
-            return null;
-        }
-    }, []);
-
-    const updateHoveredBlockFromElement = useCallback((view: Editor['view'], target: HTMLElement | null) => {
-        if (!target || !editable || isImageUploadInFlight || !view.editable || !view.state.selection.empty) {
-            setHoveredBlock(null);
-            return false;
-        }
-
-        if (target.closest('[data-testid="tiptap-block-handle"]') || target.closest('[data-testid="tiptap-block-menu"]')) {
-            return false;
-        }
-
-        const nextPos = findTargetPosFromDom(view, target);
-        if (nextPos == null) {
-            setHoveredBlock(null);
-            return false;
-        }
-
-        const nextBlock = getBlockTargetAtPos(view, view.state, nextPos);
-        if (!nextBlock) {
-            setHoveredBlock(null);
-            return false;
-        }
-
-        setHoveredBlock((current) => {
-            if (
-                current &&
-                current.pos === nextBlock.pos &&
-                current.nodeType === nextBlock.nodeType &&
-                current.rect.top === nextBlock.rect.top &&
-                current.rect.left === nextBlock.rect.left
-            ) {
-                return current;
-            }
-            return nextBlock;
-        });
-        return true;
-    }, [editable, findTargetPosFromDom, getBlockTargetAtPos, isImageUploadInFlight]);
 
     const getNodeChildren = useCallback((node: ProseMirrorNode) => {
         const children: ProseMirrorNode[] = [];
@@ -478,7 +428,6 @@ export default function TiptapEditor({
         dispatch(setSelectionForAction(tr, selectionPos, 1));
         editor.view.focus();
         closeBlockMenu();
-        setHoveredBlock(null);
         return true;
     }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
 
@@ -511,7 +460,6 @@ export default function TiptapEditor({
         dispatch(setSelectionForAction(tr, selectionPos, 1));
         editor.view.focus();
         closeBlockMenu();
-        setHoveredBlock(null);
         return true;
     }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
 
@@ -541,7 +489,6 @@ export default function TiptapEditor({
         dispatch(setSelectionForAction(tr, selectionPos, 1));
         editor.view.focus();
         closeBlockMenu();
-        setHoveredBlock(null);
         return true;
     }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
 
@@ -579,7 +526,6 @@ export default function TiptapEditor({
 
         editor.view.focus();
         closeBlockMenu();
-        setHoveredBlock(null);
         return true;
     }, [closeBlockMenu, createDefaultDoc, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
 
@@ -675,7 +621,6 @@ export default function TiptapEditor({
         }
 
         setIsImageUploadInFlight(true);
-        setHoveredBlock(null);
         closeBlockMenu();
 
         try {
@@ -785,7 +730,7 @@ export default function TiptapEditor({
         content: initialContent || { type: 'doc', content: [] },
         editorProps: {
             attributes: {
-                class: 'prose prose-slate max-w-none focus:outline-none pl-6 pr-4 pt-3 pb-3',
+                class: 'prose prose-slate max-w-none focus:outline-none pl-10 pr-4 pt-3 pb-3',
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handleKeyDown: (view, event) => {
@@ -835,41 +780,27 @@ export default function TiptapEditor({
                 });
                 return false;
             },
-            handleDOMEvents: {
-                mouseover: (view, event) => {
-                    const target = event.target;
-                    if (!(target instanceof HTMLElement)) return false;
-                    updateHoveredBlockFromElement(view, target);
-                    return false;
-                },
-                mousemove: (view, event) => {
-                    const target = event.target;
-                    if (!(target instanceof HTMLElement)) return false;
-                    updateHoveredBlockFromElement(view, target);
-                    return false;
-                },
-                mouseleave: () => {
-                    setHoveredBlock(null);
-                    return false;
-                },
-            },
         },
         onUpdate: ({ editor }) => {
             emitDocChange(editor, editor.state.doc);
             notifyDetailsContext(editor);
+            invalidateLayout();
         },
         onTransaction: ({ editor, transaction }) => {
             if (!transaction.docChanged) return;
             emitDocChange(editor, editor.state.doc);
             notifyDetailsContext(editor);
+            invalidateLayout();
         },
         onSelectionUpdate: ({ editor }) => {
             notifyDetailsContext(editor);
+            invalidateLayout();
         },
         autofocus: 'start',
         onCreate: ({ editor }) => {
             lastAppliedDocRef.current = editor.state.doc;
             notifyDetailsContext(editor);
+            invalidateLayout();
         },
     });
 
@@ -928,7 +859,7 @@ export default function TiptapEditor({
         unsetActiveDetails(editor);
     }, [editor, unsetActiveDetails]);
 
-    const suppressBlockUi = !editable || isImageUploadInFlight || !editor || !editor.state.selection.empty;
+    const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
 
     useEffect(() => {
         if (!onRegisterFocusBodyHandler) return;
@@ -1073,22 +1004,41 @@ export default function TiptapEditor({
 
     useEffect(() => {
         if (suppressBlockUi) {
-            setHoveredBlock(null);
             closeBlockMenu();
         }
     }, [closeBlockMenu, suppressBlockUi]);
 
     useEffect(() => {
         const handleEscape = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
+            if (event.key !== 'Escape' || !isMenuOpen) return;
+            event.preventDefault();
+            event.stopPropagation();
             closeBlockMenu();
         };
 
-        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleEscape, true);
         return () => {
-            document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('keydown', handleEscape, true);
         };
-    }, [closeBlockMenu]);
+    }, [closeBlockMenu, isMenuOpen]);
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const root = rootRef.current;
+        const scrollParent = findScrollableAncestor(root);
+        const handleLayoutChange = () => {
+            invalidateLayout();
+        };
+
+        window.addEventListener('resize', handleLayoutChange);
+        scrollParent?.addEventListener('scroll', handleLayoutChange, { passive: true });
+
+        return () => {
+            window.removeEventListener('resize', handleLayoutChange);
+            scrollParent?.removeEventListener('scroll', handleLayoutChange);
+        };
+    }, [editor, findScrollableAncestor, invalidateLayout, layoutVersion]);
 
     // Update editable state
     useEffect(() => {
@@ -1097,30 +1047,75 @@ export default function TiptapEditor({
         }
     }, [editor, editable]);
 
-    if (!editor) {
-        return null;
-    }
+    useEffect(() => {
+        if (!editor || suppressBlockUi) {
+            setRenderableBlocks([]);
+            return;
+        }
 
-    const assignRootRef = (node: HTMLDivElement | null) => {
+        let frameId = 0;
+        const measureBlocks = () => {
+            const nextTargets: RenderableBlockActionTarget[] = [];
+            editor.state.doc.descendants((node, pos) => {
+                if (
+                    node.type.name !== 'paragraph' &&
+                    node.type.name !== 'heading' &&
+                    node.type.name !== 'taskItem' &&
+                    node.type.name !== 'listItem'
+                ) {
+                    return true;
+                }
+
+                const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
+                if (!target?.rect) {
+                    return node.type.name === 'taskItem' || node.type.name === 'listItem' ? false : true;
+                }
+
+                const isDuplicate = nextTargets.some((candidate) => candidate.pos === target.pos && candidate.nodeType === target.nodeType);
+                if (!isDuplicate) {
+                    nextTargets.push(target);
+                }
+
+                return node.type.name === 'taskItem' || node.type.name === 'listItem' ? false : true;
+            });
+            setRenderableBlocks(nextTargets);
+        };
+
+        frameId = window.requestAnimationFrame(measureBlocks);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
+
+    const assignRootRef = useCallback((node: HTMLDivElement | null) => {
+        if (rootRef.current === node) {
+            if (containerRef) {
+                (containerRef as { current: HTMLDivElement | null }).current = node;
+            }
+            return;
+        }
+
         rootRef.current = node;
         if (containerRef) {
             (containerRef as { current: HTMLDivElement | null }).current = node;
         }
-    };
+        invalidateLayout();
+    }, [containerRef, invalidateLayout]);
 
-    const activeBlock = menuTarget ?? hoveredBlock;
+    if (!editor) {
+        return null;
+    }
+
     const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
-    const handleTop = activeBlock && rootRect ? Math.max(activeBlock.rect.top - rootRect.top, 4) : 0;
-    const handleLeft = 4;
-    const menuTop = activeBlock && rootRect ? Math.max(activeBlock.rect.top - rootRect.top, 4) : 0;
-    const menuLeft = 36;
 
-    const handleMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
-        if (suppressBlockUi) return;
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) return;
-        updateHoveredBlockFromElement(editor.view, target);
-    };
+    const menuAnchor = (() => {
+        if (!editor || !menuTarget) return null;
+        return getBlockTargetAtPos(editor.view, editor.state, menuTarget.pos);
+    })();
+
+    const menuTop = menuAnchor?.rect && rootRect ? Math.max(menuAnchor.rect.top - rootRect.top, 4) : 0;
+    const menuLeft = 44;
 
     const handleBlockAction = (action: BlockActionType) => {
         if (!menuTarget) return;
@@ -1149,32 +1144,38 @@ export default function TiptapEditor({
                     editor.chain().focus().run();
                 }
             }}
-            onMouseOver={handleMouseMove}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => {
-                setHoveredBlock(null);
-            }}
             onPasteCapture={handleImagePasteCapture}
         >
-            {activeBlock && !suppressBlockUi ? (
-                <button
-                    type="button"
-                    aria-label="ブロックメニューを開く"
-                    data-testid="tiptap-block-handle"
-                    className={styles.blockActionHandle}
-                    style={{ top: handleTop, left: handleLeft }}
-                    onMouseDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setMenuTarget(activeBlock);
-                        setIsMenuOpen(true);
-                    }}
-                >
-                    <span className={styles.blockActionHandleDots}>⋮⋮</span>
-                </button>
-            ) : null}
+            {renderableBlocks.map((target, index) => {
+                if (!target.rect || !rootRect) return null;
+                return (
+                    <button
+                        key={`${target.pos}-${target.nodeType}`}
+                        type="button"
+                        tabIndex={-1}
+                        aria-label="ブロックメニューを開く"
+                        data-testid="tiptap-block-handle"
+                        data-block-index={index}
+                        data-block-node-type={target.nodeType}
+                        className={styles.blockActionHandle}
+                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 4 }}
+                        onMouseDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setMenuTarget(target);
+                            setIsMenuOpen(true);
+                        }}
+                    >
+                        <span className={styles.blockActionHandleDots}>⋮⋮</span>
+                    </button>
+                );
+            })}
             <EditorContent editor={editor} />
-            {isMenuOpen && menuTarget && rootRect ? (
+            {isMenuOpen && menuTarget && menuAnchor?.rect && rootRect ? (
                 <BlockActionMenu
                     top={menuTop}
                     left={menuLeft}
