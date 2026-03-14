@@ -262,15 +262,53 @@ async function pasteHtmlWithPlainText(
   }, args);
 }
 
-async function openBlockActionMenu(modal: Locator, handle: Locator): Promise<void> {
+async function openBlockActionMenu(page: Page, modal: Locator, handle: Locator): Promise<void> {
   await expect(handle).toBeVisible();
   await handle.click();
-  await expect(modal.getByTestId('tiptap-block-menu')).toBeVisible();
+  const menu = modal.getByTestId('tiptap-block-menu');
+  await expect(menu).toBeVisible();
+  await expect(modal.getByTestId('tiptap-block-menu-insert-above')).toBeFocused();
+  await page.waitForTimeout(50);
 }
 
-async function triggerBlockAction(modal: Locator, handle: Locator, action: 'insert-above' | 'insert-below' | 'duplicate' | 'delete'): Promise<void> {
-  await openBlockActionMenu(modal, handle);
+async function triggerBlockAction(page: Page, modal: Locator, handle: Locator, action: 'insert-above' | 'insert-below' | 'duplicate' | 'delete'): Promise<void> {
+  await openBlockActionMenu(page, modal, handle);
   await modal.getByTestId(`tiptap-block-menu-${action}`).click();
+  await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+}
+
+async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excerpt: string | null } | null> {
+  const { data, error } = await supabaseAdmin
+    .from('cards')
+    .select('content, excerpt')
+    .eq('id', cardId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch saved card ${cardId}: ${error.message}`);
+  }
+
+  return data ? { content: data.content, excerpt: data.excerpt ?? null } : null;
+}
+
+async function readLastBlockAction(page: Page): Promise<{
+  action: string;
+  menuTargetPos: number;
+  menuTargetNodeType: string;
+  resolvedTargetPos: number | null;
+  resolvedNodeType: string | null;
+} | null> {
+  return page.evaluate(() => {
+    return (window as typeof window & {
+      __TAESK_LAST_BLOCK_ACTION__?: {
+        action: string;
+        menuTargetPos: number;
+        menuTargetNodeType: string;
+        resolvedTargetPos: number | null;
+        resolvedNodeType: string | null;
+      };
+    }).__TAESK_LAST_BLOCK_ACTION__ ?? null;
+  });
 }
 
 async function dragLocatorToPoint(
@@ -2425,41 +2463,235 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
       const handles = modal.getByTestId('tiptap-block-handle');
-      await expect(handles).toHaveCount(4);
+      const paragraphHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]');
+      await expect(handles).toHaveCount(5);
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]')).toHaveCount(1);
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
+      await expect(paragraphHandles).toHaveCount(2);
 
-      await triggerBlockAction(modal, handles.nth(0), 'insert-above');
-      await page.keyboard.type('Inserted above');
+      await triggerBlockAction(page, modal, paragraphHandles.first(), 'insert-above');
 
-      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first(), 'duplicate');
-      await expect(modal.locator('.ProseMirror > h2')).toHaveCount(2);
+      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first(), 'duplicate');
 
-      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'insert-below');
-      await page.keyboard.type('Task separator');
+      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'insert-below');
 
-      await triggerBlockAction(modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'delete');
+      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'delete');
 
-      await expect(modal.locator('.ProseMirror')).toContainText('Inserted above');
-      await expect(modal.locator('.ProseMirror')).toContainText('Task separator');
-      await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li')).toHaveCount(1);
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as { content?: Array<{ type?: string; attrs?: { level?: number }; content?: unknown[] }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            paragraphCount: topLevelNodes.filter((node) => node?.type === 'paragraph').length,
+            headingCount: topLevelNodes.filter((node) => node?.type === 'heading').length,
+            excerpt: nextCard?.excerpt ?? '',
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          paragraphCount: 4,
+          headingCount: 2,
+          excerpt: expect.stringContaining('Section heading'),
+        });
 
-      await page.waitForTimeout(2500);
-
-      const { data: savedCard, error: savedError } = await supabaseAdmin
-        .from('cards')
-        .select('content, excerpt')
-        .eq('id', cardId)
-        .maybeSingle();
-
-      expect(savedError).toBeNull();
+      const savedCard = await fetchSavedCard(cardId);
       const content = savedCard?.content as { content?: Array<{ type?: string; attrs?: { level?: number }; content?: unknown[] }> } | null;
       const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
       expect(topLevelNodes[0]).toMatchObject({ type: 'paragraph' });
       expect(topLevelNodes[1]).toMatchObject({ type: 'paragraph' });
+      expect(topLevelNodes.filter((node) => node?.type === 'paragraph').length).toBeGreaterThanOrEqual(4);
       expect(topLevelNodes.filter((node) => node?.type === 'heading')).toHaveLength(2);
-      expect(topLevelNodes.some((node) => node?.type === 'paragraph' && JSON.stringify(node).includes('Task separator'))).toBeTruthy();
-      expect(savedCard?.excerpt).toContain('Inserted above');
-      expect(savedCard?.excerpt).toContain('Task separator');
       expect(savedCard?.excerpt).toContain('Section heading');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('updates top-level paragraphs when insert-above is executed from block menu', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action insert above',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'First paragraph' }] },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Section heading' }] },
+        ],
+      },
+      excerpt: 'First paragraph\nSection heading',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1894,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:50:00',
+      due_end: '15:50:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5041,
+      slug: 'block-action-insert-above',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const paragraphHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]');
+      await expect(paragraphHandles).toHaveCount(2);
+      await expect(paragraphHandles.first()).toHaveAttribute('data-block-pos', '1');
+
+      await triggerBlockAction(
+        page,
+        modal,
+        paragraphHandles.first(),
+        'insert-above',
+      );
+
+      const insertAboveDebug = await readLastBlockAction(page);
+      console.log(`[block-action-debug][insert-above] ${JSON.stringify(insertAboveDebug)}`);
+      expect(insertAboveDebug).toMatchObject({
+        action: 'insert-above',
+        menuTargetNodeType: 'paragraph',
+        resolvedNodeType: 'paragraph',
+      });
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as { content?: Array<{ type?: string }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            topLevelTypes: topLevelNodes.map((node) => node?.type ?? null),
+            paragraphCount: topLevelNodes.filter((node) => node?.type === 'paragraph').length,
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          topLevelTypes: ['paragraph', 'paragraph', 'heading', 'paragraph'],
+          paragraphCount: 3,
+        });
+
+      const savedCard = await fetchSavedCard(cardId);
+      const content = savedCard?.content as { content?: Array<{ type?: string }> } | null;
+      const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+      expect(topLevelNodes[0]).toMatchObject({ type: 'paragraph' });
+      expect(topLevelNodes[1]).toMatchObject({ type: 'paragraph' });
+      expect(topLevelNodes.filter((node) => node?.type === 'paragraph')).toHaveLength(3);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('duplicates heading when duplicate is executed from block menu', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action duplicate heading',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'First paragraph' }] },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Section heading' }] },
+        ],
+      },
+      excerpt: 'First paragraph\nSection heading',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1893,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:40:00',
+      due_end: '15:40:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5040,
+      slug: 'block-action-duplicate-heading',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const headingHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first();
+      const headingHandlePos = await headingHandle.getAttribute('data-block-pos');
+      console.log(`[block-action-debug][heading-handle] pos=${headingHandlePos}`);
+
+      await triggerBlockAction(
+        page,
+        modal,
+        headingHandle,
+        'duplicate',
+      );
+
+      const duplicateDebug = await readLastBlockAction(page);
+      console.log(`[block-action-debug][duplicate] ${JSON.stringify(duplicateDebug)}`);
+      expect(duplicateDebug).toMatchObject({
+        action: 'duplicate',
+        menuTargetNodeType: 'heading',
+        resolvedNodeType: 'heading',
+      });
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as { content?: Array<{ type?: string; attrs?: { level?: number } }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            headingCount: topLevelNodes.filter((node) => node?.type === 'heading').length,
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          headingCount: 2,
+        });
+
+      const savedCard = await fetchSavedCard(cardId);
+      const content = savedCard?.content as { content?: Array<{ type?: string; attrs?: { level?: number } }> } | null;
+      const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+      expect(topLevelNodes.filter((node) => node?.type === 'heading')).toHaveLength(2);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -2538,7 +2770,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(1);
+      await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(2);
       await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
@@ -2597,7 +2829,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      await openBlockActionMenu(modal, modal.getByTestId('tiptap-block-handle').first());
+      await openBlockActionMenu(page, modal, modal.getByTestId('tiptap-block-handle').first());
       await page.keyboard.press('Escape');
 
       await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);

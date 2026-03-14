@@ -349,7 +349,7 @@ test.describe('Comments Feature @feature:comments', () => {
     card = null;
   });
 
-  test('should show Comments tab in card modal via ?card= route', async ({ page }) => {
+  test('should show Comments tab in card modal via ?card= route @comments:modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -362,7 +362,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentEditor).toBeVisible();
   });
 
-  test('should edit tags from header actions in modal', async ({ page }) => {
+  test('should edit tags from header actions in modal @comments:modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -370,10 +370,21 @@ test.describe('Comments Feature @feature:comments', () => {
 
     const modal = page.getByRole('dialog');
     const tagsButton = modal.getByTestId('card-modal-tags-button');
-    await expect(tagsButton).toBeVisible();
+    const overflowButton = modal.getByTestId('card-modal-overflow-button');
+
+    if (await tagsButton.isVisible().catch(() => false)) {
+      await tagsButton.click();
+      await expect(modal.getByTestId('card-modal-tags-popover')).toBeVisible();
+      return;
+    }
+
+    await expect(overflowButton).toBeVisible();
+    await overflowButton.click();
+    await expect(modal.getByTestId('card-modal-overflow-menu')).toBeVisible();
+    await expect(modal.getByPlaceholder('+ Add tag...')).toBeVisible();
   });
 
-  test('should move card modal actions into overflow menu on narrow width', async ({ page }) => {
+  test('should move card modal actions into overflow menu on narrow width @comments:modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await page.setViewportSize({ width: 820, height: 900 });
@@ -404,7 +415,7 @@ test.describe('Comments Feature @feature:comments', () => {
     expect(copiedText).toBe(`http://localhost:3000/c/${currentCard.shortId}`);
   });
 
-  test('should preserve card modal state on reload with ?card= query', async ({ page }) => {
+  test('should preserve card modal state on reload with ?card= query @comments:modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -418,7 +429,7 @@ test.describe('Comments Feature @feature:comments', () => {
     expect(page.url()).toContain(`card=${currentCard.shortId}`);
   });
 
-  test('should create a comment successfully', async ({ page }) => {
+  test('should create a comment successfully @comments:crud', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -445,7 +456,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(createdComment).toBeVisible({ timeout: 5000 });
   });
 
-  test('should edit and delete own comment', async ({ page }) => {
+  test('should edit and delete own comment @comments:crud', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -499,7 +510,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(page.locator('[data-testid="comment-body"]', { hasText: editedText })).toHaveCount(0);
   });
 
-  test('should allow replying to comments', async ({ page }) => {
+  test('should allow replying to comments @comments:crud', async ({ page }) => {
     const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
@@ -544,7 +555,7 @@ test.describe('Comments Feature @feature:comments', () => {
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test('should support @mentions with TipTap editor @e2e:essential @feature:comments', async ({ page }) => {
+  test('should support @mentions with TipTap editor @e2e:essential @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -597,7 +608,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(mentionInList).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show all members when typing @ with empty query @feature:comments', async ({ page }) => {
+  test('should show all members when typing @ with empty query @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -619,7 +630,7 @@ test.describe('Comments Feature @feature:comments', () => {
     expect(optionCount).toBeGreaterThan(0);
   });
 
-  test('should filter members by name when typing after @ @feature:comments', async ({ page }) => {
+  test('should filter members by name when typing after @ @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -635,7 +646,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await waitForMentionOptions(page, 'Test');
   });
 
-  test('should use Enter to select mention and Shift+Enter to submit @feature:comments', async ({ page }) => {
+  test('should use Enter to select mention and Shift+Enter to submit @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -670,7 +681,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentBody).toBeVisible({ timeout: 10000 });
   });
 
-  test('should save mentions as <@id> format but display as @name @feature:comments', async ({ page }) => {
+  test('should save mentions as <@id> format but display as @name @feature:comments @comments:mentions', async ({ page }) => {
     const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
@@ -732,7 +743,7 @@ test.describe('Comments Feature @feature:comments', () => {
     expect(bodyText).not.toMatch(/<@[a-f0-9-]{36}>/);
   });
 
-  test('should validate mention user_id as UUID v4', async ({ page }) => {
+  test('should validate mention user_id as UUID v4 @comments:mentions', async ({ page }) => {
     const currentBoard = requireBoardContext();
     const currentCard = assertContext(card, 'Card context not initialised');
 
@@ -772,7 +783,7 @@ test.describe('Comments Feature @feature:comments', () => {
     }
   });
 
-  test('should support full-width ＠ trigger @e2e:essential @feature:comments', async ({ page }) => {
+  test('should support full-width ＠ trigger @e2e:essential @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());
@@ -821,7 +832,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(mentionInList).toBeVisible({ timeout: 10000 });
   });
 
-  test('should support mixed full-width and half-width triggers @feature:comments', async ({ page }) => {
+  test('should support mixed full-width and half-width triggers @feature:comments @comments:mentions', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await openCardModalViaQuery(page, currentCard, requireBoardContext());

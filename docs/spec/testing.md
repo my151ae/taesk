@@ -58,6 +58,7 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 
 - `test:timeline` は Timeline ビュー専用 spec を単体で実行。
 - その他の `test:*` スクリプトはバッチ実行時と同じ `--project=core` を使用。
+- 重い spec はタグで再分割して回す。現状は `test:comments:modal` / `test:comments:crud` / `test:comments:mentions` と `test:permissions:ui` / `test:permissions:api` を優先する。
 
 ---
 
@@ -114,6 +115,12 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 - `timeline.spec.ts` は Supabase へ直接カードを upsert し、Today/Tomorrow 列の描画と `dumpClientMetrics(page, ['timeline'])` を確認する。`due_*` カラムが存在しない場合は `test.skip`。
 - DnD や CardModal 操作は `useSyncQueue` を経由するため、Playwright で `waitForResponse('/api/cards/')` を観測し、`syncQueue` に pending が残らないか確認する。
 - コメント/通知テストは Timeline UI のヘッダーから開くコンポーネントを操作するため、`page.getByRole('button', { name: 'Share' })` など Timeline 固有のラベルへ更新済み。
+
+### 8.1 CardModal 本文 block action の補足
+
+- Tiptap / ProseMirror の本文 block action は見た目 DOM の `> p` / `> h2` 件数より、保存 JSON と handle metadata を優先して検証する。
+- autosave は debounce を前提に `expect.poll` で待ち、固定 `waitForTimeout` を検証の主手段にしない。
+- 詳細な切り分け手順と推奨 assertion は [`./tiptap-block-action-testing.md`](./tiptap-block-action-testing.md) を参照する。
 
 ---
 

@@ -46,6 +46,8 @@ cat test-results/playwright-report.json | jq '.stats'
 - `npm run dev` や Playwright 実行前に `lsof -i :3000` で Next.js サーバーが残っていないか確認すること。
 - 既存サーバーを使い回さない場合は、先に停止してから起動すること。`3001` 以降への自動退避を許容しない。
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
+- CardModal 本文の Tiptap / ProseMirror block action を検証するときは `docs/spec/tiptap-block-action-testing.md` を参照し、見た目 DOM 件数より handle metadata と保存 JSON を優先すること。
+- 一時的な実行結果や日時付きのテスト状況は `AGENTS.md` ではなく `docs/tickets/<date>/` に残すこと。`AGENTS.md` には恒久ルールだけを書く。
 
 ## Supabase MCP 接続手順（運用）
 - Supabase MCP の認証・疎通手順は `docs/spec/supabase-mcp-auth.md` を SSOT とする。

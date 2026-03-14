@@ -266,6 +266,7 @@ taesk/
 - [Architecture & Design](./spec/architecture.md)
 - [Design & Responsive Guidelines](./spec/design-guidelines.md)
 - [Keyboard Navigation](./spec/keyboard-navigation.md) - CardModal のタイトル/本文境界は矢印移動のみ
+- [Tiptap Block Action Testing](./spec/tiptap-block-action-testing.md) - 本文 block action の E2E 観測と autosave 検証メモ
 - [Domain Model](./spec/domain-model.md)
 - [Component Breakdown](./spec/components.md)
 - [Database Schema](./spec/database.md)
@@ -304,6 +305,7 @@ taesk/
 
 - [docs/spec/architecture.md](./spec/architecture.md)
 - [docs/spec/keyboard-navigation.md](./spec/keyboard-navigation.md)
+- [docs/spec/tiptap-block-action-testing.md](./spec/tiptap-block-action-testing.md)
 - [docs/spec/testing.md](./spec/testing.md)
 - [Supabase Docs](https://supabase.com/docs)
 - [Next.js Docs](https://nextjs.org/docs)

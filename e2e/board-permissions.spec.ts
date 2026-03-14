@@ -26,6 +26,22 @@ interface TestBoard {
   slug: string;
 }
 
+async function openBoardAccessSettings(page: import('@playwright/test').Page, boardName: string) {
+  await page.waitForLoadState('networkidle');
+  await page.getByTestId('board-menu-button').click();
+
+  const boardRow = page.locator('div.group').filter({ hasText: boardName }).first();
+  await expect(boardRow).toBeVisible({ timeout: 10000 });
+  await boardRow.hover();
+
+  const editButton = boardRow.getByRole('button', { name: 'Edit' });
+  await expect(editButton).toBeVisible({ timeout: 5000 });
+  await editButton.click();
+
+  await expect(page.getByText('Board Settings', { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('Board Access', { exact: true })).toBeVisible({ timeout: 10000 });
+}
+
 async function resolveTestUserId(): Promise<string> {
   const { data: profiles, error } = await supabaseAdmin
     .from('profiles')
@@ -249,45 +265,22 @@ test.describe('Board Permissions @feature:boards', () => {
     testBoard = null;
   });
 
-  test('should display ShareDialog when clicking share button @e2e:essential', async ({ page }) => {
-    // Wait for board to load
-    await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid="timeline-grid"]', { state: 'attached', timeout: 10000 }).catch(() => {
-      // Board might have no lists yet, that's OK
-    });
-
-    // Click share button
-    const shareButton = page.getByTestId('share-button').first();
-    await shareButton.waitFor({ state: 'visible', timeout: 10000 });
-    await shareButton.click();
-
-    // Verify ShareDialog is visible
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('Share Board')).toBeVisible();
-
-    // Verify members list is displayed (check for names as they are primary)
-    await expect(dialog.getByText('Test Owner')).toBeVisible();
-    await expect(dialog.getByText('Test Editor')).toBeVisible();
+  test('should display ShareDialog when clicking share button @e2e:essential @permissions:ui', async ({ page }) => {
+    await openBoardAccessSettings(page, testBoard!.name);
+    await expect(page.getByText('Test Owner')).toBeVisible();
+    await expect(page.getByText('Test Editor')).toBeVisible();
   });
 
-  test('should change member role', async ({ page }) => {
-    // Open ShareDialog
-    const shareButton = page.getByTestId('share-button').first();
-    await shareButton.click();
-    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
-
-    // Find editor member and change role
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Test Editor')).toBeVisible();
-    const editorRow = dialog.locator('div').filter({ hasText: 'Test Editor' }).first();
+  test('should change member role @permissions:ui', async ({ page }) => {
+    await openBoardAccessSettings(page, testBoard!.name);
+    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
     const roleSelect = editorRow.getByRole('combobox').first();
 
     await roleSelect.selectOption('commenter');
     await expect(roleSelect).toHaveValue('commenter');
   });
 
-  test('should remove board member', async ({ page }) => {
+  test('should remove board member @permissions:ui', async ({ page }) => {
     let memberRemoveCalled = false;
 
     await page.route('**/api/boards/*/members/*', async (route) => {
@@ -303,15 +296,8 @@ test.describe('Board Permissions @feature:boards', () => {
       await route.fallback();
     });
 
-    // Open ShareDialog
-    const shareButton = page.getByTestId('share-button').first();
-    await shareButton.click();
-    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
-
-    // Find editor member and click remove button
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Test Editor')).toBeVisible();
-    const editorRow = dialog.locator('div').filter({ hasText: 'Test Editor' }).first();
+    await openBoardAccessSettings(page, testBoard!.name);
+    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
     const removeButton = editorRow.getByRole('button', { name: /remove/i });
 
     // Handle confirmation dialog if present
@@ -321,11 +307,8 @@ test.describe('Board Permissions @feature:boards', () => {
     await expect.poll(() => memberRemoveCalled, { timeout: 5000 }).toBe(true);
   });
 
-  test('should display invite link section (Phase 3) @phase3', async ({ page }) => {
-    // Open ShareDialog
-    const shareButton = page.getByTestId('share-button').first();
-    await shareButton.click();
-    await expect(page.getByRole('dialog', { name: /share/i })).toBeVisible({ timeout: 10000 });
+  test('should display invite link section (Phase 3) @phase3 @permissions:ui', async ({ page }) => {
+    await openBoardAccessSettings(page, testBoard!.name);
 
     // Look for invite link section (may not be implemented yet)
     const inviteLinkSection = page.locator('text=/invite link|招待リンク/i');
@@ -341,18 +324,9 @@ test.describe('Board Permissions @feature:boards', () => {
     }
   });
 
-  test('should prevent non-owner from changing owner role @failure:permissions', async ({ page }) => {
-    // Open ShareDialog
-    const shareButton = page.getByTestId('share-button').first();
-    await shareButton.click();
-
-    // Wait for dialog and members list to load
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('Test Owner')).toBeVisible({ timeout: 10000 });
-
-    // Find owner member row using border class and email text
-    const ownerRow = dialog.locator('.border.rounded').filter({ hasText: 'Test Owner' }).first();
+  test('should prevent non-owner from changing owner role @failure:permissions @permissions:ui', async ({ page }) => {
+    await openBoardAccessSettings(page, testBoard!.name);
+    const ownerRow = page.locator('.border.rounded-lg').filter({ hasText: 'Test Owner' }).first();
     await expect(ownerRow).toBeVisible();
 
     // Find the select within that row
@@ -364,7 +338,7 @@ test.describe('Board Permissions @feature:boards', () => {
     await expect(roleSelect).toHaveValue('owner');
   });
 
-  test('should reject board creation without team_id @failure:validation', async ({ page }) => {
+  test('should reject board creation without team_id @failure:validation @permissions:api', async ({ page }) => {
     const response = await page.request.post('/api/boards', {
       headers: { 'Content-Type': 'application/json' },
       data: { name: 'Missing Team' },
@@ -375,7 +349,7 @@ test.describe('Board Permissions @feature:boards', () => {
     expect(body?.error?.code).toBe('INVALID_BODY');
   });
 
-  test('should reject board creation for guest team members @failure:permissions', async ({ page }) => {
+  test('should reject board creation for guest team members @failure:permissions @permissions:api', async ({ page }) => {
     const teamId = await createTeamFixture(`Guest Team ${Date.now()}`, testUserId, true);
     createdTeamIds.push(teamId);
     await ensureTeamRole(teamId, testUserId, 'guest');
@@ -390,7 +364,7 @@ test.describe('Board Permissions @feature:boards', () => {
     expect(body?.error?.code).toBe('FORBIDDEN');
   });
 
-  test('should allow board creation for members when team setting permits it', async ({ page }) => {
+  test('should allow board creation for members when team setting permits it @permissions:api', async ({ page }) => {
     const teamId = await createTeamFixture(`Member Team ${Date.now()}`, testUserId, true);
     createdTeamIds.push(teamId);
     await ensureTeamRole(teamId, testUserId, 'member');
@@ -408,7 +382,7 @@ test.describe('Board Permissions @feature:boards', () => {
     }
   });
 
-  test('should reject board creation across team boundaries @failure:permissions', async ({ page }) => {
+  test('should reject board creation across team boundaries @failure:permissions @permissions:api', async ({ page }) => {
     const teamId = await createTeamFixture(`Foreign Team ${Date.now()}`, testUserId, true);
     createdTeamIds.push(teamId);
 

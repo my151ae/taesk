@@ -9,7 +9,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { buildDefaultBodyContent } from '@/lib/tiptap';
@@ -43,6 +43,7 @@ type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem';
 
 type RenderableBlockActionTarget = {
     pos: number;
+    blockPos: number;
     nodeType: BlockNodeType;
     rect: DOMRect | null;
 };
@@ -52,6 +53,7 @@ type ResolvedBlockTarget = {
     nodeType: BlockNodeType;
     node: ProseMirrorNode;
     depth: number;
+    topLevelIndex: number | null;
     parentListPos: number | null;
     parentListNode: ProseMirrorNode | null;
     itemIndex: number | null;
@@ -144,8 +146,17 @@ function BlockActionMenu({
     onSelect: (action: BlockActionType) => void;
 }) {
     const menuRef = useRef<HTMLDivElement | null>(null);
+    const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
 
     useClickOutside(menuRef, () => onClose());
+
+    useEffect(() => {
+        setActiveIndex(0);
+        requestAnimationFrame(() => {
+            itemRefs.current[0]?.focus();
+        });
+    }, []);
 
     return (
         <div
@@ -155,24 +166,76 @@ function BlockActionMenu({
             role="menu"
             data-testid="tiptap-block-menu"
             onMouseDown={(event) => {
-                event.preventDefault();
                 event.stopPropagation();
             }}
             onKeyDown={(event) => {
-                if (event.key !== 'Escape') return;
-                event.preventDefault();
-                event.stopPropagation();
-                onClose();
+                if (!BLOCK_ACTION_ITEMS.length) return;
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onClose();
+                    return;
+                }
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const direction = event.key === 'ArrowDown' ? 1 : -1;
+                    const nextIndex = (activeIndex + direction + BLOCK_ACTION_ITEMS.length) % BLOCK_ACTION_ITEMS.length;
+                    setActiveIndex(nextIndex);
+                    itemRefs.current[nextIndex]?.focus();
+                    return;
+                }
+                if (event.key === 'Home') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setActiveIndex(0);
+                    itemRefs.current[0]?.focus();
+                    return;
+                }
+                if (event.key === 'End') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const lastIndex = BLOCK_ACTION_ITEMS.length - 1;
+                    setActiveIndex(lastIndex);
+                    itemRefs.current[lastIndex]?.focus();
+                    return;
+                }
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const activeItem = BLOCK_ACTION_ITEMS[activeIndex];
+                    if (activeItem) {
+                        onSelect(activeItem.action);
+                    }
+                }
             }}
         >
-            {BLOCK_ACTION_ITEMS.map((item) => (
+            {BLOCK_ACTION_ITEMS.map((item, index) => (
                 <button
                     key={item.action}
                     type="button"
                     role="menuitem"
+                    ref={(node) => {
+                        itemRefs.current[index] = node;
+                    }}
+                    tabIndex={index === activeIndex ? 0 : -1}
                     data-testid={`tiptap-block-menu-${item.action}`}
                     className={`${styles.blockActionMenuItem} ${item.destructive ? styles.blockActionMenuItemDanger : ''}`}
-                    onClick={() => onSelect(item.action)}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(item.action);
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onSelect(item.action);
+                    }}
+                    onFocus={() => {
+                        if (activeIndex !== index) {
+                            setActiveIndex(index);
+                        }
+                    }}
                 >
                     {item.label}
                 </button>
@@ -315,6 +378,7 @@ export default function TiptapEditor({
                         nodeType: node.type.name as BlockNodeType,
                         node,
                         depth,
+                        topLevelIndex: null,
                         parentListPos: $pos.before(depth - 1),
                         parentListNode: parentList,
                         itemIndex: $pos.index(depth - 1),
@@ -329,6 +393,7 @@ export default function TiptapEditor({
                     nodeType: node.type.name as BlockNodeType,
                     node,
                     depth,
+                    topLevelIndex: $pos.index(0),
                     parentListPos: null,
                     parentListNode: null,
                     itemIndex: null,
@@ -353,6 +418,7 @@ export default function TiptapEditor({
         const rect = getBlockTargetRect(view, target.pos);
         return {
             pos,
+            blockPos: target.pos,
             nodeType: target.nodeType,
             rect,
         };
@@ -364,6 +430,10 @@ export default function TiptapEditor({
             children.push(child);
         });
         return children;
+    }, []);
+
+    const getTopLevelOffset = useCallback((children: ProseMirrorNode[], endIndex: number) => {
+        return children.slice(0, endIndex).reduce((total, child) => total + child.nodeSize, 0);
     }, []);
 
     const splitListAroundItem = useCallback((
@@ -420,16 +490,27 @@ export default function TiptapEditor({
                 ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
                 : 0;
             selectionPos = target.parentListPos + beforeListSize + 1;
+        } else if (target.topLevelIndex != null) {
+            const children = getNodeChildren(state.doc);
+            const nextChildren = [
+                ...children.slice(0, target.topLevelIndex),
+                paragraph,
+                ...children.slice(target.topLevelIndex),
+            ];
+            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
+            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex) + 1;
         } else {
             tr = tr.insert(target.pos, paragraph);
             selectionPos = target.pos + 1;
         }
 
-        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        const nextTr = setSelectionForAction(tr, selectionPos, 1);
+        dispatch(nextTr);
+        onChange?.(nextTr.doc.toJSON() as JSONContent);
         editor.view.focus();
         closeBlockMenu();
         return true;
-    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
+    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
 
     const insertParagraphAfterBlock = useCallback((targetPos: number): boolean => {
         if (!editor) return false;
@@ -452,16 +533,27 @@ export default function TiptapEditor({
                 ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
                 : 0;
             selectionPos = target.parentListPos + beforeListSize + 1;
+        } else if (target.topLevelIndex != null) {
+            const children = getNodeChildren(state.doc);
+            const nextChildren = [
+                ...children.slice(0, target.topLevelIndex + 1),
+                paragraph,
+                ...children.slice(target.topLevelIndex + 1),
+            ];
+            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
+            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex + 1) + 1;
         } else {
             tr = tr.insert(target.pos + target.node.nodeSize, paragraph);
             selectionPos = target.pos + target.node.nodeSize + 1;
         }
 
-        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        const nextTr = setSelectionForAction(tr, selectionPos, 1);
+        dispatch(nextTr);
+        onChange?.(nextTr.doc.toJSON() as JSONContent);
         editor.view.focus();
         closeBlockMenu();
         return true;
-    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
+    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
 
     const duplicateBlock = useCallback((targetPos: number): boolean => {
         if (!editor) return false;
@@ -481,16 +573,27 @@ export default function TiptapEditor({
                 target.parentListNode.copy(Fragment.fromArray(nextChildren)),
             );
             selectionPos = target.pos + target.node.nodeSize + 1;
+        } else if (target.topLevelIndex != null) {
+            const children = getNodeChildren(state.doc);
+            const nextChildren = [
+                ...children.slice(0, target.topLevelIndex + 1),
+                clonedNode,
+                ...children.slice(target.topLevelIndex + 1),
+            ];
+            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
+            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex + 1) + 1;
         } else {
             tr = tr.insert(target.pos + target.node.nodeSize, clonedNode);
             selectionPos = target.pos + target.node.nodeSize + 1;
         }
 
-        dispatch(setSelectionForAction(tr, selectionPos, 1));
+        const nextTr = setSelectionForAction(tr, selectionPos, 1);
+        dispatch(nextTr);
+        onChange?.(nextTr.doc.toJSON() as JSONContent);
         editor.view.focus();
         closeBlockMenu();
         return true;
-    }, [closeBlockMenu, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
+    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction]);
 
     const deleteBlock = useCallback((targetPos: number): boolean => {
         if (!editor) return false;
@@ -512,6 +615,10 @@ export default function TiptapEditor({
                     target.parentListNode.copy(Fragment.fromArray(nextChildren)),
                 );
             }
+        } else if (target.topLevelIndex != null) {
+            const children = getNodeChildren(state.doc);
+            const nextChildren = [...children.slice(0, target.topLevelIndex), ...children.slice(target.topLevelIndex + 1)];
+            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
         } else {
             tr = tr.delete(target.pos, target.pos + target.node.nodeSize);
         }
@@ -519,15 +626,19 @@ export default function TiptapEditor({
         if (tr.doc.childCount === 0) {
             const defaultDoc = createDefaultDoc(state);
             tr = state.tr.replaceWith(0, state.doc.content.size, defaultDoc.content);
-            dispatch(setSelectionForAction(tr, 1, 1));
+            const nextTr = setSelectionForAction(tr, 1, 1);
+            dispatch(nextTr);
+            onChange?.(nextTr.doc.toJSON() as JSONContent);
         } else {
-            dispatch(setSelectionForAction(tr, target.pos, 1));
+            const nextTr = setSelectionForAction(tr, target.pos, 1);
+            dispatch(nextTr);
+            onChange?.(nextTr.doc.toJSON() as JSONContent);
         }
 
         editor.view.focus();
         closeBlockMenu();
         return true;
-    }, [closeBlockMenu, createDefaultDoc, getNodeChildren, resolveBlockTargetAtPos, setSelectionForAction]);
+    }, [closeBlockMenu, createDefaultDoc, getNodeChildren, onChange, resolveBlockTargetAtPos, setSelectionForAction]);
 
     const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
         if (isUpdatingRef.current) return;
@@ -1047,13 +1158,12 @@ export default function TiptapEditor({
         }
     }, [editor, editable]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!editor || suppressBlockUi) {
             setRenderableBlocks([]);
             return;
         }
 
-        let frameId = 0;
         const measureBlocks = () => {
             const nextTargets: RenderableBlockActionTarget[] = [];
             editor.state.doc.descendants((node, pos) => {
@@ -1071,7 +1181,7 @@ export default function TiptapEditor({
                     return node.type.name === 'taskItem' || node.type.name === 'listItem' ? false : true;
                 }
 
-                const isDuplicate = nextTargets.some((candidate) => candidate.pos === target.pos && candidate.nodeType === target.nodeType);
+                const isDuplicate = nextTargets.some((candidate) => candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType);
                 if (!isDuplicate) {
                     nextTargets.push(target);
                 }
@@ -1081,11 +1191,7 @@ export default function TiptapEditor({
             setRenderableBlocks(nextTargets);
         };
 
-        frameId = window.requestAnimationFrame(measureBlocks);
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-        };
+        measureBlocks();
     }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
@@ -1119,6 +1225,24 @@ export default function TiptapEditor({
 
     const handleBlockAction = (action: BlockActionType) => {
         if (!menuTarget) return;
+        const resolvedTarget = resolveBlockTargetAtPos(editor.state, menuTarget.pos);
+        if (typeof window !== 'undefined') {
+            (window as typeof window & {
+                __TAESK_LAST_BLOCK_ACTION__?: {
+                    action: BlockActionType;
+                    menuTargetPos: number;
+                    menuTargetNodeType: BlockNodeType;
+                    resolvedTargetPos: number | null;
+                    resolvedNodeType: BlockNodeType | null;
+                };
+            }).__TAESK_LAST_BLOCK_ACTION__ = {
+                action,
+                menuTargetPos: menuTarget.pos,
+                menuTargetNodeType: menuTarget.nodeType,
+                resolvedTargetPos: resolvedTarget?.pos ?? null,
+                resolvedNodeType: resolvedTarget?.nodeType ?? null,
+            };
+        }
         switch (action) {
             case 'insert-above':
                 insertParagraphBeforeBlock(menuTarget.pos);
@@ -1133,6 +1257,7 @@ export default function TiptapEditor({
                 deleteBlock(menuTarget.pos);
                 break;
         }
+        closeBlockMenu();
     };
 
     return (
@@ -1150,13 +1275,15 @@ export default function TiptapEditor({
                 if (!target.rect || !rootRect) return null;
                 return (
                     <button
-                        key={`${target.pos}-${target.nodeType}`}
+                        key={`${target.blockPos}-${target.nodeType}`}
                         type="button"
                         tabIndex={-1}
                         aria-label="ブロックメニューを開く"
                         data-testid="tiptap-block-handle"
                         data-block-index={index}
                         data-block-node-type={target.nodeType}
+                        data-block-pos={target.pos}
+                        data-block-start-pos={target.blockPos}
                         className={styles.blockActionHandle}
                         style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 12 }}
                         onMouseDown={(event) => {
