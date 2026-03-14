@@ -262,17 +262,29 @@ async function pasteHtmlWithPlainText(
   }, args);
 }
 
-async function openBlockActionMenu(page: Page, modal: Locator, handle: Locator): Promise<void> {
+type BlockMenuAction = 'insert-above' | 'insert-below' | 'duplicate' | 'delete' | 'toggle-details' | 'unset-details';
+
+async function openBlockActionMenu(
+  page: Page,
+  modal: Locator,
+  handle: Locator,
+  initialFocusAction: BlockMenuAction = 'insert-above',
+): Promise<void> {
   await expect(handle).toBeVisible();
   await handle.click();
   const menu = modal.getByTestId('tiptap-block-menu');
   await expect(menu).toBeVisible();
-  await expect(modal.getByTestId('tiptap-block-menu-insert-above')).toBeFocused();
+  const initialItem = modal.getByTestId(`tiptap-block-menu-${initialFocusAction}`);
+  if (initialFocusAction === 'insert-above') {
+    await expect(initialItem).toBeFocused();
+  } else {
+    await expect(initialItem).toBeVisible();
+  }
   await page.waitForTimeout(50);
 }
 
-async function triggerBlockAction(page: Page, modal: Locator, handle: Locator, action: 'insert-above' | 'insert-below' | 'duplicate' | 'delete'): Promise<void> {
-  await openBlockActionMenu(page, modal, handle);
+async function triggerBlockAction(page: Page, modal: Locator, handle: Locator, action: BlockMenuAction): Promise<void> {
+  await openBlockActionMenu(page, modal, handle, action === 'toggle-details' || action === 'unset-details' ? action : 'insert-above');
   await modal.getByTestId(`tiptap-block-menu-${action}`).click();
   await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
 }
@@ -2186,10 +2198,12 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      await modal.getByTestId('card-modal-insert-details').click();
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await triggerBlockAction(page, modal, paragraphHandle, 'toggle-details');
       await page.keyboard.type('詳細');
       await page.keyboard.press('Enter');
       await page.keyboard.type('内側メモ');
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]')).toHaveCount(1);
 
       const detailsToggle = modal.locator('.ProseMirror div[data-type="details"] > button').first();
       await detailsToggle.click();
@@ -2285,11 +2299,13 @@ test.describe('@feature:timeline Timeline view', () => {
         selection?.addRange(range);
       });
 
-      await modal.getByTestId('card-modal-insert-details').click();
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await triggerBlockAction(page, modal, paragraphHandle, 'toggle-details');
 
       const editorRoot = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       await expect(editorRoot.locator('summary').first()).toHaveText('');
       await expect(editorRoot.locator('div[data-type="detailsContent"] p').first()).toHaveText('トグルにする？');
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]')).toHaveCount(1);
 
       await page.waitForTimeout(2500);
 
@@ -2312,6 +2328,73 @@ test.describe('@feature:timeline Timeline view', () => {
       const wrappedParagraph = detailsContentNode?.content?.find((node) => node.type === 'paragraph');
       expect(detailsSummaryNode?.content?.length ?? 0).toBe(0);
       expect(wrappedParagraph?.content?.[0]?.text).toBe('トグルにする？');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('persists details conversion without additional typing', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Details autosave test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: '変換だけで保存される?' }] }],
+      },
+      excerpt: '変換だけで保存される?',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1898,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:10:00',
+      due_end: '16:10:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5045,
+      slug: 'details-autosave-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await triggerBlockAction(page, modal, paragraphHandle, 'toggle-details');
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]')).toHaveCount(1);
+
+      await expect
+        .poll(async () => {
+          const savedCard = await fetchSavedCard(cardId);
+          const content = savedCard?.content as { content?: Array<{ type?: string; content?: unknown[] }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return topLevelNodes.map((node) => node?.type ?? null);
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toEqual(expect.arrayContaining(['details']));
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -2367,10 +2450,11 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      await modal.getByTestId('card-modal-insert-details').click();
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await triggerBlockAction(page, modal, paragraphHandle, 'toggle-details');
       await page.keyboard.type('詳細セクション');
-      await expect(modal.getByTestId('card-modal-unset-details')).toBeVisible();
-      await modal.getByTestId('card-modal-unset-details').click();
+      const detailsHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]').first();
+      await triggerBlockAction(page, modal, detailsHandle, 'unset-details');
 
       await expect(modal.locator('.ProseMirror div[data-type="details"]')).toHaveCount(0);
       await expect(modal.locator('.ProseMirror').first()).toContainText('詳細セクション');

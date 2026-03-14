@@ -162,15 +162,6 @@ export function CardModal({
         return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
     }, [content]);
 
-    const hasDetailsNode = useMemo(() => {
-        const walk = (node: JSONContent | null | undefined): boolean => {
-            if (!node || typeof node !== "object") return false;
-            if (node.type === "details") return true;
-            return Array.isArray(node.content) ? node.content.some((child) => walk(child as JSONContent)) : false;
-        };
-        return walk(normalizeContent(content));
-    }, [content]);
-
     // onClose ref を最新に保つ
     useEffect(() => {
         onCloseRef.current = onClose;
@@ -472,16 +463,6 @@ export function CardModal({
         const nextPos = Math.min(Math.max(targetPosition, 0), maxLength);
         input.setSelectionRange(nextPos, nextPos);
     }, []);
-
-    const handleInsertDetails = useCallback(() => {
-        if (isHistoryPreviewing) return;
-        bodyBridgeRef.current?.insertDetails();
-    }, [isHistoryPreviewing]);
-
-    const handleUnsetDetails = useCallback(() => {
-        if (isHistoryPreviewing) return;
-        bodyBridgeRef.current?.unsetDetails();
-    }, [isHistoryPreviewing]);
 
     const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
         if (isHistoryPreviewing) return;
@@ -899,28 +880,6 @@ export function CardModal({
                                             <div className="flex h-full items-center justify-center text-sm text-slate-500">履歴を読み込み中...</div>
                                         ) : (
                                             <div className="flex h-full flex-col">
-                                                <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-2 dark:border-gray-700">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleInsertDetails}
-                                                        disabled={isHistoryPreviewing}
-                                                        data-testid="card-modal-insert-details"
-                                                        className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/60"
-                                                    >
-                                                        トグル
-                                                    </button>
-                                                    {hasDetailsNode ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleUnsetDetails}
-                                                            disabled={isHistoryPreviewing}
-                                                            data-testid="card-modal-unset-details"
-                                                            className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/60"
-                                                        >
-                                                            トグル解除
-                                                        </button>
-                                                    ) : null}
-                                                </div>
                                                 <TiptapEditor
                                                     key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                     initialContent={isHistoryPreviewing ? previewHistoryContent : content}

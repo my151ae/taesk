@@ -1,7 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
-import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
+import { EditorState, NodeSelection, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -30,16 +30,9 @@ export type FocusTitleRequest = {
 
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
-    insertDetails: () => void;
-    unsetDetails: () => void;
 };
 
-type DetailsContext = {
-    insideDetails: boolean;
-    hasDetails: boolean;
-};
-
-type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem';
+type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem' | 'details';
 
 type RenderableBlockActionTarget = {
     pos: number;
@@ -59,7 +52,7 @@ type ResolvedBlockTarget = {
     itemIndex: number | null;
 };
 
-type BlockActionType = 'insert-above' | 'insert-below' | 'duplicate' | 'delete';
+type BlockActionType = 'insert-above' | 'insert-below' | 'duplicate' | 'delete' | 'toggle-details' | 'unset-details';
 
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
@@ -73,7 +66,6 @@ type TiptapEditorProps = {
     onRegisterPrependTaskHandler?: ((handler: (() => void) | null) => void);
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
-    onDetailsContextChange?: (context: DetailsContext) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
@@ -127,21 +119,34 @@ function extractImageFilesFromClipboardHtml(html: string): File[] {
     return files;
 }
 
-const BLOCK_ACTION_ITEMS: Array<{ action: BlockActionType; label: string; destructive?: boolean }> = [
-    { action: 'insert-above', label: '上に段落を追加' },
-    { action: 'insert-below', label: '下に段落を追加' },
-    { action: 'duplicate', label: '複製' },
-    { action: 'delete', label: '削除', destructive: true },
-];
+type BlockActionItem = { action: BlockActionType; label: string; destructive?: boolean };
+
+function getBlockActionItems(targetType: BlockNodeType): BlockActionItem[] {
+    if (targetType === 'details') {
+        return [
+            { action: 'unset-details', label: 'トグル解除' },
+        ];
+    }
+
+    return [
+        { action: 'insert-above', label: '上に段落を追加' },
+        { action: 'insert-below', label: '下に段落を追加' },
+        { action: 'toggle-details', label: 'トグルに変換' },
+        { action: 'duplicate', label: '複製' },
+        { action: 'delete', label: '削除', destructive: true },
+    ];
+}
 
 function BlockActionMenu({
     top,
     left,
+    items,
     onClose,
     onSelect,
 }: {
     top: number;
     left: number;
+    items: BlockActionItem[];
     onClose: () => void;
     onSelect: (action: BlockActionType) => void;
 }) {
@@ -156,7 +161,7 @@ function BlockActionMenu({
         requestAnimationFrame(() => {
             itemRefs.current[0]?.focus();
         });
-    }, []);
+    }, [items]);
 
     return (
         <div
@@ -169,7 +174,7 @@ function BlockActionMenu({
                 event.stopPropagation();
             }}
             onKeyDown={(event) => {
-                if (!BLOCK_ACTION_ITEMS.length) return;
+                if (!items.length) return;
                 if (event.key === 'Escape') {
                     event.preventDefault();
                     event.stopPropagation();
@@ -180,7 +185,7 @@ function BlockActionMenu({
                     event.preventDefault();
                     event.stopPropagation();
                     const direction = event.key === 'ArrowDown' ? 1 : -1;
-                    const nextIndex = (activeIndex + direction + BLOCK_ACTION_ITEMS.length) % BLOCK_ACTION_ITEMS.length;
+                    const nextIndex = (activeIndex + direction + items.length) % items.length;
                     setActiveIndex(nextIndex);
                     itemRefs.current[nextIndex]?.focus();
                     return;
@@ -195,7 +200,7 @@ function BlockActionMenu({
                 if (event.key === 'End') {
                     event.preventDefault();
                     event.stopPropagation();
-                    const lastIndex = BLOCK_ACTION_ITEMS.length - 1;
+                    const lastIndex = items.length - 1;
                     setActiveIndex(lastIndex);
                     itemRefs.current[lastIndex]?.focus();
                     return;
@@ -203,14 +208,14 @@ function BlockActionMenu({
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     event.stopPropagation();
-                    const activeItem = BLOCK_ACTION_ITEMS[activeIndex];
+                    const activeItem = items[activeIndex];
                     if (activeItem) {
                         onSelect(activeItem.action);
                     }
                 }
             }}
         >
-            {BLOCK_ACTION_ITEMS.map((item, index) => (
+            {items.map((item, index) => (
                 <button
                     key={item.action}
                     type="button"
@@ -218,6 +223,7 @@ function BlockActionMenu({
                     ref={(node) => {
                         itemRefs.current[index] = node;
                     }}
+                    autoFocus={index === 0}
                     tabIndex={index === activeIndex ? 0 : -1}
                     data-testid={`tiptap-block-menu-${item.action}`}
                     className={`${styles.blockActionMenuItem} ${item.destructive ? styles.blockActionMenuItemDanger : ''}`}
@@ -256,7 +262,6 @@ export default function TiptapEditor({
     onRegisterPrependTaskHandler,
     onRegisterBodyBridge,
     onRequestFocusTitle,
-    onDetailsContextChange,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -271,6 +276,7 @@ export default function TiptapEditor({
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
+    const menuItems = menuTarget ? getBlockActionItems(menuTarget.nodeType) : [];
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
@@ -362,8 +368,39 @@ export default function TiptapEditor({
 
         for (let depth = $pos.depth; depth > 0; depth -= 1) {
             const node = $pos.node(depth);
-            if (node.type.name === 'details') {
+            if (node.type.name === 'detailsContent') {
                 return null;
+            }
+
+            if (node.type.name === 'detailsSummary' && depth >= 2) {
+                const detailsNode = $pos.node(depth - 1);
+                const detailsParent = $pos.node(depth - 2);
+                if (detailsNode.type.name === 'details' && detailsParent.type.name === 'doc') {
+                    return {
+                        pos: $pos.before(depth - 1),
+                        nodeType: 'details',
+                        node: detailsNode,
+                        depth: depth - 1,
+                        topLevelIndex: $pos.index(depth - 2),
+                        parentListPos: null,
+                        parentListNode: null,
+                        itemIndex: null,
+                    };
+                }
+                return null;
+            }
+
+            if (node.type.name === 'details' && depth >= 1 && $pos.node(depth - 1).type.name === 'doc') {
+                return {
+                    pos: $pos.before(depth),
+                    nodeType: 'details',
+                    node,
+                    depth,
+                    topLevelIndex: $pos.index(depth - 1),
+                    parentListPos: null,
+                    parentListNode: null,
+                    itemIndex: null,
+                };
             }
 
             if ((node.type.name === 'taskItem' || node.type.name === 'listItem') && depth >= 2) {
@@ -408,6 +445,12 @@ export default function TiptapEditor({
         const nodeDom = view.nodeDOM(pos);
         if (!(nodeDom instanceof HTMLElement)) {
             return null;
+        }
+        if (nodeDom.dataset.type === 'details') {
+            const summary = nodeDom.querySelector(':scope > summary');
+            if (summary instanceof HTMLElement) {
+                return summary.getBoundingClientRect();
+            }
         }
         return nodeDom.getBoundingClientRect();
     }, []);
@@ -648,31 +691,11 @@ export default function TiptapEditor({
         onChange?.(nextEditor.getJSON());
     }, [onChange]);
 
-    const notifyDetailsContext = useCallback((nextEditor: Editor | null) => {
-        if (!onDetailsContextChange) return;
-        const insideDetails = (() => {
-            if (!nextEditor) return false;
-            const { $from } = nextEditor.state.selection;
-            for (let depth = $from.depth; depth >= 0; depth -= 1) {
-                if ($from.node(depth).type.name === 'details') {
-                    return true;
-                }
-            }
-            return false;
-        })();
-        let hasDetails = false;
-        nextEditor?.state.doc.descendants((node) => {
-            if (node.type.name === 'details') {
-                hasDetails = true;
-                return false;
-            }
-            return true;
-        });
-        onDetailsContextChange({
-            insideDetails,
-            hasDetails,
-        });
-    }, [onDetailsContextChange]);
+    const emitForcedDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
+        if (isUpdatingRef.current) return;
+        lastEmittedDocRef.current = nextDoc;
+        onChange?.(nextDoc.toJSON() as JSONContent);
+    }, [onChange]);
 
     const insertDetailsAtSelection = useCallback((nextEditor: Editor) => {
         const inserted = nextEditor
@@ -682,19 +705,16 @@ export default function TiptapEditor({
             .run();
 
         if (inserted) {
-            emitDocChange(nextEditor, nextEditor.state.doc);
-            notifyDetailsContext(nextEditor);
+            emitForcedDocChange(nextEditor, nextEditor.state.doc);
         }
-    }, [emitDocChange, notifyDetailsContext]);
+    }, [emitForcedDocChange]);
 
     const unsetActiveDetails = useCallback((nextEditor: Editor) => {
         const removed = nextEditor.chain().focus().unsetDetails().run();
         if (removed) {
-            emitDocChange(nextEditor, nextEditor.state.doc);
-            notifyDetailsContext(nextEditor);
+            emitForcedDocChange(nextEditor, nextEditor.state.doc);
         }
-    }, [emitDocChange, notifyDetailsContext]);
-
+    }, [emitForcedDocChange]);
 
     const setCursorInLeadingTextblockWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
         const leadingSelection = getLeadingTextSelection(state);
@@ -894,23 +914,19 @@ export default function TiptapEditor({
         },
         onUpdate: ({ editor }) => {
             emitDocChange(editor, editor.state.doc);
-            notifyDetailsContext(editor);
             invalidateLayout();
         },
         onTransaction: ({ editor, transaction }) => {
             if (!transaction.docChanged) return;
             emitDocChange(editor, editor.state.doc);
-            notifyDetailsContext(editor);
             invalidateLayout();
         },
         onSelectionUpdate: ({ editor }) => {
-            notifyDetailsContext(editor);
             invalidateLayout();
         },
         autofocus: 'start',
         onCreate: ({ editor }) => {
             lastAppliedDocRef.current = editor.state.doc;
-            notifyDetailsContext(editor);
             invalidateLayout();
         },
     });
@@ -960,15 +976,33 @@ export default function TiptapEditor({
         setSelectionAtDocStart(state, dispatch);
     }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
 
-    const insertDetails = useCallback(() => {
-        if (!editor) return;
-        insertDetailsAtSelection(editor);
-    }, [editor, insertDetailsAtSelection]);
+    const toggleBlockAsDetails = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target || target.nodeType === 'details') return false;
 
-    const unsetDetailsNode = useCallback(() => {
-        if (!editor) return;
+        const selection = NodeSelection.create(state.doc, target.pos);
+        dispatch(state.tr.setSelection(selection));
+        insertDetailsAtSelection(editor);
+        editor.view.focus();
+        closeBlockMenu();
+        return true;
+    }, [closeBlockMenu, editor, insertDetailsAtSelection, resolveBlockTargetAtPos]);
+
+    const unsetDetailsAtTarget = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state, dispatch } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target || target.nodeType !== 'details') return false;
+
+        const selection = TextSelection.create(state.doc, Math.min(target.pos + 2, state.doc.content.size));
+        dispatch(state.tr.setSelection(selection));
         unsetActiveDetails(editor);
-    }, [editor, unsetActiveDetails]);
+        editor.view.focus();
+        closeBlockMenu();
+        return true;
+    }, [closeBlockMenu, editor, resolveBlockTargetAtPos, unsetActiveDetails]);
 
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
 
@@ -1011,8 +1045,6 @@ export default function TiptapEditor({
 
         onRegisterBodyBridge({
             focusBody: (offset?: number | null) => focusBody(offset),
-            insertDetails,
-            unsetDetails: unsetDetailsNode,
         });
 
         return () => {
@@ -1022,10 +1054,8 @@ export default function TiptapEditor({
         editor,
         findScrollableAncestor,
         focusBody,
-        insertDetails,
         onRegisterBodyBridge,
         setCursorInLeadingTextblockWithOffset,
-        unsetDetailsNode,
     ]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
@@ -1110,10 +1140,6 @@ export default function TiptapEditor({
     }, [initialContent, editor, boardId, cardId, onEditorError]);
 
     useEffect(() => {
-        notifyDetailsContext(editor);
-    }, [editor, notifyDetailsContext]);
-
-    useEffect(() => {
         if (suppressBlockUi) {
             closeBlockMenu();
         }
@@ -1168,6 +1194,7 @@ export default function TiptapEditor({
             const nextTargets: RenderableBlockActionTarget[] = [];
             editor.state.doc.descendants((node, pos) => {
                 if (
+                    node.type.name !== 'details' &&
                     node.type.name !== 'paragraph' &&
                     node.type.name !== 'heading' &&
                     node.type.name !== 'taskItem' &&
@@ -1178,7 +1205,7 @@ export default function TiptapEditor({
 
                 const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
                 if (!target?.rect) {
-                    return node.type.name === 'taskItem' || node.type.name === 'listItem' ? false : true;
+                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
                 }
 
                 const isDuplicate = nextTargets.some((candidate) => candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType);
@@ -1186,7 +1213,7 @@ export default function TiptapEditor({
                     nextTargets.push(target);
                 }
 
-                return node.type.name === 'taskItem' || node.type.name === 'listItem' ? false : true;
+                return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
             });
             setRenderableBlocks(nextTargets);
         };
@@ -1256,6 +1283,12 @@ export default function TiptapEditor({
             case 'delete':
                 deleteBlock(menuTarget.pos);
                 break;
+            case 'toggle-details':
+                toggleBlockAsDetails(menuTarget.pos);
+                break;
+            case 'unset-details':
+                unsetDetailsAtTarget(menuTarget.pos);
+                break;
         }
         closeBlockMenu();
     };
@@ -1306,6 +1339,7 @@ export default function TiptapEditor({
                 <BlockActionMenu
                     top={menuTop}
                     left={menuLeft}
+                    items={menuItems}
                     onClose={closeBlockMenu}
                     onSelect={handleBlockAction}
                 />
