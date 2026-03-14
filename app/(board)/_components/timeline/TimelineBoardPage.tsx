@@ -268,6 +268,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const {
     handlePrevDay,
     handleNextDay,
+    handlePrevDayRange,
+    handleNextDayRange,
     handleTodayClick,
     handleDayRangeChange,
   } = useTimelineNavigation({
@@ -675,6 +677,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     status,
     handlePrevDay,
     handleNextDay,
+    handlePrevDayRange,
+    handleNextDayRange,
     eventsByDay,
     abBuckets: filteredData?.abBuckets ?? {},
     overdue: filteredData?.overdue ?? [],
@@ -785,6 +789,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onOpenShareDialog={() => handleOpenBoardSettings(currentBoard.id)}
           onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
           onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
+          onPrevDayRange={viewMode === 'timeline' ? handlePrevDayRange : undefined}
+          onNextDayRange={viewMode === 'timeline' ? handleNextDayRange : undefined}
           listStartDate={listAnchorDate ?? null}
         />
 

@@ -55,14 +55,39 @@ export function useTimelineNavigation({
         return pixelsToMinutes(currentScrollTop, timelineStartHour, hourHeight);
     }, [timelineScrollRef, timelineStartHour, hourHeight]);
 
-    const handlePrevDay = useCallback(async () => {
-        if (status === 'loading') return;
-        const desiredIndex = activeDayIndex - navStep;
+    const navigateByDays = useCallback(async (delta: number) => {
+        if (status === 'loading' || delta === 0) return;
 
-        if (desiredIndex >= 0) {
-            const newIndex = desiredIndex;
+        const desiredIndex = activeDayIndex + delta;
+
+        if (delta < 0) {
+            if (desiredIndex >= 0) {
+                setActiveDayIndex(desiredIndex);
+                const targetDay = data?.days?.[desiredIndex];
+                if (targetDay) {
+                    updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+                }
+                return;
+            }
+
+            const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
+            const payload = await fetchTimeline(baseStart + delta);
+            const nextDaysLength = payload?.days?.length ?? 0;
+            const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
             setActiveDayIndex(newIndex);
-            const targetDay = data?.days?.[newIndex];
+            const targetDay = payload?.days?.[newIndex];
+            if (targetDay) {
+                updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
+            }
+            return;
+        }
+
+        if (!data?.days?.length) return;
+
+        const lastStartIndex = Math.max(0, data.days.length - dayRange);
+        if (desiredIndex <= lastStartIndex) {
+            setActiveDayIndex(desiredIndex);
+            const targetDay = data?.days?.[desiredIndex];
             if (targetDay) {
                 updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
             }
@@ -70,7 +95,7 @@ export function useTimelineNavigation({
         }
 
         const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-        const payload = await fetchTimeline(baseStart - navStep);
+        const payload = await fetchTimeline(baseStart + delta);
         const nextDaysLength = payload?.days?.length ?? 0;
         const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
         setActiveDayIndex(newIndex);
@@ -78,33 +103,23 @@ export function useTimelineNavigation({
         if (targetDay) {
             updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
         }
-    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrlForTimeline, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
+    }, [activeDayIndex, clampActiveDayIndex, data, dayRange, dayWindowStartRef, fetchTimeline, getCurrentTime, setActiveDayIndex, status, updateUrlForTimeline]);
+
+    const handlePrevDay = useCallback(async () => {
+        await navigateByDays(-1);
+    }, [navigateByDays]);
 
     const handleNextDay = useCallback(async () => {
-        if (status === 'loading' || !data?.days?.length) return;
-        const lastStartIndex = Math.max(0, data.days.length - dayRange);
-        const desiredIndex = activeDayIndex + navStep;
+        await navigateByDays(1);
+    }, [navigateByDays]);
 
-        if (desiredIndex <= lastStartIndex) {
-            const newIndex = desiredIndex;
-            setActiveDayIndex(newIndex);
-            const targetDay = data?.days?.[newIndex];
-            if (targetDay) {
-                updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
-            }
-            return;
-        }
+    const handlePrevDayRange = useCallback(async () => {
+        await navigateByDays(-navStep);
+    }, [navigateByDays, navStep]);
 
-        const baseStart = data?.startOffset ?? dayWindowStartRef.current ?? 0;
-        const payload = await fetchTimeline(baseStart + navStep);
-        const nextDaysLength = payload?.days?.length ?? 0;
-        const newIndex = clampActiveDayIndex(nextDaysLength, activeDayIndex);
-        setActiveDayIndex(newIndex);
-        const targetDay = payload?.days?.[newIndex];
-        if (targetDay) {
-            updateUrlForTimeline({ date: targetDay.isoDate, range: dayRange, time: getCurrentTime() });
-        }
-    }, [activeDayIndex, navStep, clampActiveDayIndex, data, fetchTimeline, status, dayRange, updateUrlForTimeline, getCurrentTime, dayWindowStartRef, setActiveDayIndex]);
+    const handleNextDayRange = useCallback(async () => {
+        await navigateByDays(navStep);
+    }, [navigateByDays, navStep]);
 
     const handleTodayClick = useCallback(async () => {
         const payload = await fetchTimeline(0);
@@ -131,6 +146,8 @@ export function useTimelineNavigation({
     return {
         handlePrevDay,
         handleNextDay,
+        handlePrevDayRange,
+        handleNextDayRange,
         handleTodayClick,
         handleDayRangeChange,
     };

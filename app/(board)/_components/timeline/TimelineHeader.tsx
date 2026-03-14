@@ -68,6 +68,8 @@ type TimelineHeaderProps = {
     onShortcutsClick: () => void;
     onPrevDay?: () => void;
     onNextDay?: () => void;
+    onPrevDayRange?: () => void;
+    onNextDayRange?: () => void;
     listStartDate?: string | null;
     onOpenShareDialog?: () => void;
     onOpenTeamSettings: (teamId: string | null | undefined) => void;
@@ -114,6 +116,8 @@ export default function TimelineHeader({
     onShortcutsClick,
     onPrevDay,
     onNextDay,
+    onPrevDayRange,
+    onNextDayRange,
     listStartDate,
     onOpenShareDialog,
     onOpenTeamSettings,
@@ -618,6 +622,45 @@ export default function TimelineHeader({
                     >
                         Today
                     </button>
+                )}
+
+                {viewMode === 'timeline' && onPrevDay && onNextDay && (
+                    <div className="flex items-center gap-1 rounded-full bg-white px-1.5 py-1 shadow-sm ring-1 ring-slate-200 shrink-0">
+                        <button
+                            type="button"
+                            onClick={onPrevDayRange}
+                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                            disabled={!onPrevDayRange}
+                            aria-label="前へ 表示日数-1日"
+                        >
+                            {'<<'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onPrevDay}
+                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                            aria-label="前へ 1日"
+                        >
+                            {'<1'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onNextDay}
+                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                            aria-label="次へ 1日"
+                        >
+                            {'1>'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onNextDayRange}
+                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                            disabled={!onNextDayRange}
+                            aria-label="次へ 表示日数-1日"
+                        >
+                            {'>>'}
+                        </button>
+                    </div>
                 )}
 
                 {/* Day Range Selector */}

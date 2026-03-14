@@ -49,6 +49,8 @@ type TimelineBoardHeaderProps = {
   onShortcutsClick: () => void;
   onPrevDay?: () => void;
   onNextDay?: () => void;
+  onPrevDayRange?: () => void;
+  onNextDayRange?: () => void;
   listStartDate?: string | null;
   onOpenShareDialog?: () => void;
 };
@@ -96,6 +98,8 @@ export default function TimelineBoardHeader({
   onShortcutsClick,
   onPrevDay,
   onNextDay,
+  onPrevDayRange,
+  onNextDayRange,
   listStartDate,
   onOpenShareDialog,
 }: TimelineBoardHeaderProps) {
@@ -143,6 +147,8 @@ export default function TimelineBoardHeader({
         onShortcutsClick={onShortcutsClick}
         onPrevDay={onPrevDay}
         onNextDay={onNextDay}
+        onPrevDayRange={onPrevDayRange}
+        onNextDayRange={onNextDayRange}
         listStartDate={listStartDate}
         onOpenShareDialog={onOpenShareDialog}
       />

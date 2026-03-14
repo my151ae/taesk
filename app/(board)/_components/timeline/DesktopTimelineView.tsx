@@ -54,6 +54,8 @@ type DesktopTimelineViewProps = {
   status: string;
   handlePrevDay: () => void;
   handleNextDay: () => void;
+  handlePrevDayRange: () => void;
+  handleNextDayRange: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
@@ -101,6 +103,8 @@ export function DesktopTimelineView({
   status,
   handlePrevDay,
   handleNextDay,
+  handlePrevDayRange,
+  handleNextDayRange,
   eventsByDay,
   abBuckets,
   overdue,
@@ -418,24 +422,36 @@ export function DesktopTimelineView({
                 )}
               >
                 {index === 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePrevDay();
-                    }}
-                    disabled={status === "loading"}
-                    className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                    aria-label="Previous day"
-                    type="button"
-                    style={{ pointerEvents: "auto" }}
-                  >
-                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handlePrevDayRange();
+                      }}
+                      disabled={status === "loading"}
+                      className="rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                      aria-label="Previous days by visible range minus one"
+                      type="button"
+                    >
+                      {'<<'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handlePrevDay();
+                      }}
+                      disabled={status === "loading"}
+                      className="rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                      aria-label="Previous day"
+                      type="button"
+                    >
+                      {'<1'}
+                    </button>
+                  </div>
                 )}
-                {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-7" />}
+                {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-[3.75rem]" />}
 
                 <div className="flex-1">
                   <p className="text-slate-800">{day.label}</p>
@@ -443,24 +459,36 @@ export function DesktopTimelineView({
                 </div>
 
                 {index === (visibleDays.length - 1) && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleNextDay();
-                    }}
-                    disabled={status === "loading"}
-                    className="p-1.5 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition-colors bg-white border border-slate-300 relative z-10"
-                    aria-label="Next day"
-                    type="button"
-                    style={{ pointerEvents: "auto" }}
-                  >
-                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleNextDay();
+                      }}
+                      disabled={status === "loading"}
+                      className="rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                      aria-label="Next day"
+                      type="button"
+                    >
+                      {'1>'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleNextDayRange();
+                      }}
+                      disabled={status === "loading"}
+                      className="rounded border border-slate-300 bg-white px-1.5 py-1 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                      aria-label="Next days by visible range minus one"
+                      type="button"
+                    >
+                      {'>>'}
+                    </button>
+                  </div>
                 )}
-                {index === 0 && <div className="w-7" />}
+                {index === 0 && <div className="w-[3.75rem]" />}
               </div>
             ))}
           </div>

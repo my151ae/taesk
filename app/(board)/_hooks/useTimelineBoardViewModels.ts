@@ -38,6 +38,8 @@ type UseTimelineBoardViewModelsArgs = {
   status: string;
   handlePrevDay: () => void;
   handleNextDay: () => void;
+  handlePrevDayRange: () => void;
+  handleNextDayRange: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
@@ -96,6 +98,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         status: args.status,
         handlePrevDay: args.handlePrevDay,
         handleNextDay: args.handleNextDay,
+        handlePrevDayRange: args.handlePrevDayRange,
+        handleNextDayRange: args.handleNextDayRange,
         eventsByDay: args.eventsByDay,
         abBuckets: args.abBuckets,
         overdue: args.overdue,
@@ -126,6 +130,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         activeDayIndex: args.activeDayIndex,
         onPrevDay: args.handlePrevDay,
         onNextDay: args.handleNextDay,
+        onPrevDayRange: args.handlePrevDayRange,
+        onNextDayRange: args.handleNextDayRange,
         onMount: args.handleTimelineViewMount,
         onScroll: args.debouncedHandleScroll,
         registerAbScrollContainer: args.registerAbScrollContainer,
