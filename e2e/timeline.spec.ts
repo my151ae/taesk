@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { readFile } from 'fs/promises';
 
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
+import { serializeTiptapContentToMarkdown } from '@/lib/tiptap';
+import type { JSONContent } from '@tiptap/react';
 
 const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? 'e2e-test@taesk.app';
 const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
@@ -262,6 +264,29 @@ async function pasteHtmlWithPlainText(
   }, args);
 }
 
+async function dispatchCopyEvent(page: Page): Promise<{ plainText: string; htmlText: string; defaultPrevented: boolean }> {
+  return page.evaluate(() => {
+    const target = document.querySelector('.ProseMirror[data-autofocus="true"]');
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Missing ProseMirror root for copy');
+    }
+
+    const data = new DataTransfer();
+    const event = new ClipboardEvent('copy', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: data,
+    });
+    target.dispatchEvent(event);
+
+    return {
+      plainText: data.getData('text/plain'),
+      htmlText: data.getData('text/html'),
+      defaultPrevented: event.defaultPrevented,
+    };
+  });
+}
+
 type BlockMenuAction = 'insert-above' | 'insert-below' | 'duplicate' | 'delete' | 'toggle-details' | 'unset-details';
 
 async function openBlockActionMenu(
@@ -369,6 +394,145 @@ function collectStoragePathsFromContent(content: unknown): string[] {
 let dueColumnsAvailable = true;
 let boardContext: TimelineBoardContext | null = null;
 let testUserId: string | null = null;
+
+test.describe('Markdown serializer helpers', () => {
+  test('serializes mixed content to markdown', async () => {
+    const content: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Heading' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Bold', marks: [{ type: 'bold' }] },
+            { type: 'text', text: ' and ' },
+            { type: 'text', text: 'link', marks: [{ type: 'link', attrs: { href: 'https://example.com' } }] },
+          ],
+        },
+        {
+          type: 'orderedList',
+          attrs: { start: 3 },
+          content: [
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Third' }] }],
+            },
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Fourth' }] }],
+            },
+          ],
+        },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Done' }] },
+                {
+                  type: 'bulletList',
+                  content: [
+                    {
+                      type: 'listItem',
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'details',
+          content: [
+            {
+              type: 'detailsSummary',
+              content: [{ type: 'text', text: 'Summary' }],
+            },
+            {
+              type: 'detailsContent',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Hidden body' }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'mention', attrs: { id: 'u1', name: 'alice' } }],
+        },
+        {
+          type: 'image',
+          attrs: { alt: 'img', src: 'https://example.com/image.png' },
+        },
+      ],
+    };
+
+    expect(serializeTiptapContentToMarkdown(content)).toBe(
+      [
+        '## Heading',
+        '',
+        '**Bold** and [link](https://example.com)',
+        '',
+        '3. Third',
+        '4. Fourth',
+        '',
+        '- [x] Done',
+        '  - Nested',
+        '',
+        'Summary',
+        '',
+        'Hidden body',
+        '',
+        '@alice',
+        '',
+        '![img](https://example.com/image.png)',
+      ].join('\n')
+    );
+  });
+
+  test('suppresses block prefixes for partial textblock selections', async () => {
+    const content: JSONContent = {
+      type: 'heading',
+      attrs: { level: 3 },
+      content: [{ type: 'text', text: 'Partial heading' }],
+    };
+
+    expect(serializeTiptapContentToMarkdown(content, { suppressBlockFormatting: true })).toBe('Partial heading');
+  });
+
+  test('omits empty details summary wrapper', async () => {
+    const content: JSONContent = {
+      type: 'details',
+      content: [
+        {
+          type: 'detailsSummary',
+          content: [],
+        },
+        {
+          type: 'detailsContent',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Body only' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(serializeTiptapContentToMarkdown(content)).toBe('Body only');
+  });
+});
 
 test.describe('@feature:timeline Timeline view', () => {
   test.beforeAll(async () => {
@@ -1140,6 +1304,274 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Mobile overdue drag card' }).first()).toBeVisible();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', overdueCardId);
+    }
+  });
+
+  test('copies selected body content as markdown while preserving html payload', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const content = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Copy Heading' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Body ' },
+            { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+          ],
+        },
+        {
+          type: 'orderedList',
+          attrs: { start: 2 },
+          content: [
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Second item' }] }],
+            },
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Third item' }] }],
+            },
+          ],
+        },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Checklist done' }] },
+                {
+                  type: 'bulletList',
+                  content: [
+                    {
+                      type: 'listItem',
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested child' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'details',
+          content: [
+            {
+              type: 'detailsSummary',
+              content: [{ type: 'text', text: 'Detail summary' }],
+            },
+            {
+              type: 'detailsContent',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Hidden copy body' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Markdown copy baseline',
+      checklist: { version: 1, lines: [] },
+      content,
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1510,
+      tags: [],
+      due_date: isoDay,
+      due_start: '09:30:00',
+      due_end: '10:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5011,
+      slug: 'markdown-copy-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+
+      await bodyEditor.click();
+      const selectAllModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+      await page.keyboard.press(`${selectAllModifier}+A`);
+
+      const payload = await dispatchCopyEvent(page);
+      expect(payload.defaultPrevented).toBeTruthy();
+      expect(payload.htmlText.length).toBeGreaterThan(0);
+      expect(payload.plainText).toBe(
+        [
+          '## Copy Heading',
+          '',
+          'Body **bold**',
+          '',
+          '2. Second item',
+          '3. Third item',
+          '',
+          '- [x] Checklist done',
+          '  - Nested child',
+          '',
+          'Detail summary',
+          '',
+          'Hidden copy body',
+        ].join('\n')
+      );
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('captures markdown copy on user shortcut and skips title input copies', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Shortcut copy title',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Shortcut heading' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Shortcut body text' }],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1515,
+      tags: [],
+      due_date: isoDay,
+      due_start: '10:30:00',
+      due_end: '11:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5012,
+      slug: 'markdown-copy-shortcut',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const copyModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+      await page.evaluate(() => {
+        (window as Window & { __taeskCopyPayload?: { plainText: string; htmlText: string; targetTag: string | null } | null }).__taeskCopyPayload = null;
+        const handler = (event: ClipboardEvent) => {
+          const clipboardData = event.clipboardData;
+          (window as Window & { __taeskCopyPayload?: { plainText: string; htmlText: string; targetTag: string | null } | null }).__taeskCopyPayload = {
+            plainText: clipboardData?.getData('text/plain') ?? '',
+            htmlText: clipboardData?.getData('text/html') ?? '',
+            targetTag: event.target instanceof HTMLElement ? event.target.tagName : null,
+          };
+        };
+        document.addEventListener('copy', handler, { capture: true, once: true });
+      });
+
+      await bodyEditor.click();
+      await page.keyboard.press(`${copyModifier}+A`);
+      await page.keyboard.press(`${copyModifier}+C`);
+
+      const bodyPayload = await page.evaluate(() => {
+        return (window as Window & { __taeskCopyPayload?: { plainText: string; htmlText: string; targetTag: string | null } | null }).__taeskCopyPayload;
+      });
+
+      expect(bodyPayload?.plainText).toBe('## Shortcut heading\n\nShortcut body text');
+      expect(bodyPayload?.htmlText?.length ?? 0).toBeGreaterThan(0);
+
+      await titleInput.click();
+      await page.evaluate(() => {
+        const input = document.querySelector('[data-sticky-title] input[type="text"]');
+        if (!(input instanceof HTMLInputElement)) {
+          throw new Error('Missing title input');
+        }
+        input.setSelectionRange(0, input.value.length);
+      });
+
+      const titlePayload = await page.evaluate(() => {
+        const input = document.querySelector('[data-sticky-title] input[type="text"]');
+        if (!(input instanceof HTMLInputElement)) {
+          throw new Error('Missing title input');
+        }
+        const data = new DataTransfer();
+        const event = new ClipboardEvent('copy', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        });
+        input.dispatchEvent(event);
+        return {
+          plainText: data.getData('text/plain'),
+          htmlText: data.getData('text/html'),
+          defaultPrevented: event.defaultPrevented,
+        };
+      });
+
+      expect(titlePayload.plainText).toBe('');
+      expect(titlePayload.htmlText).toBe('');
+      expect(titlePayload.defaultPrevented).toBeFalsy();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
   });
 

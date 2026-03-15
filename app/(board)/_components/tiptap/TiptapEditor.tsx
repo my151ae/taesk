@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
 import { EditorState, NodeSelection, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
-import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { DOMSerializer, Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -12,7 +12,7 @@ import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
-import { buildDefaultBodyContent } from '@/lib/tiptap';
+import { buildDefaultBodyContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -1058,6 +1058,46 @@ export default function TiptapEditor({
         setCursorInLeadingTextblockWithOffset,
     ]);
 
+    const handleCopyCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
+        if (!editor || !event.clipboardData || !editor.isEditable) return;
+        if (editor.state.selection.empty) return;
+
+        const root = rootRef.current;
+        if (!root) return;
+
+        const target = event.target;
+        if (target instanceof HTMLElement && target instanceof HTMLInputElement) {
+            return;
+        }
+
+        const selection = window.getSelection();
+        const anchorNode = selection?.anchorNode ?? null;
+        const focusNode = selection?.focusNode ?? null;
+        const isInsideEditor = [anchorNode, focusNode].some((node) => node instanceof Node && editor.view.dom.contains(node));
+        const isInsideContainer =
+            (target instanceof Node && root.contains(target)) ||
+            (anchorNode instanceof Node && root.contains(anchorNode));
+
+        if (!isInsideEditor || !isInsideContainer) return;
+
+        const slice = editor.state.selection.content();
+        const markdown = serializeTiptapSliceToMarkdown(slice);
+        if (!markdown.trim()) return;
+
+        const serializer =
+            editor.view.someProp('clipboardSerializer', (value) => value) ??
+            DOMSerializer.fromSchema(editor.schema);
+        const wrapper = document.createElement('div');
+        wrapper.appendChild(serializer.serializeFragment(slice.content, { document }));
+
+        event.clipboardData.setData('text/plain', markdown);
+        const html = wrapper.innerHTML;
+        if (html) {
+            event.clipboardData.setData('text/html', html);
+        }
+        event.preventDefault();
+    }, [editor]);
+
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
         const htmlImageFiles =
@@ -1302,6 +1342,7 @@ export default function TiptapEditor({
                     editor.chain().focus().run();
                 }
             }}
+            onCopyCapture={handleCopyCapture}
             onPasteCapture={handleImagePasteCapture}
         >
             {renderableBlocks.map((target, index) => {
