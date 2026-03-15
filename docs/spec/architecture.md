@@ -218,6 +218,7 @@ sequenceDiagram
   - `due_bucket_position` (numeric, 降順で並べ替え)
 - Team は Board の上位コンテナとして存在し、Board access は Team 配下で成立する。
 - 実際の Board 単位アクセス制御は `board_members` を正本として行い、全 API ルートが RLS で保護される。
+- ただし `board_members` は Team member に限定され、Board access 作成前に Team membership が必要になる。
 - Realtime は `cards`, `comments`, `notifications` を購読。TimelineBoardPage では `cards` と `comments` のみ使用。
 
 Canonical type definitions: `lib/api-types/timeline.ts`（TimelineResponse/TimelineEvent/TODAY/TOMORROW の契約を統一）

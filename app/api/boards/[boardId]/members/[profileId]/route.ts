@@ -1,22 +1,34 @@
-import { createServerSupabaseClient } from '@/lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
-import { MemberRole } from '@/lib/supabase';
+
+import { createServerSupabaseClient, type MemberRole } from '@/lib/supabase';
 import {
   getBoardMembership,
   requireAuthenticatedUser,
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
+import { errorResponse, ApiErrorCode } from '@/lib/server/api-error';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
+
+function lastOwnerConflictResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: {
+        code: 'LAST_BOARD_OWNER_TRANSFER_REQUIRED',
+        message,
+      },
+    },
+    { status: 409 }
+  );
+}
 
 function asConflictIfLastOwner(message?: string | null) {
   if (!message) return null;
   if (message.includes('last board owner')) {
-    return NextResponse.json({ error: 'Cannot modify the last owner' }, { status: 409 });
+    return lastOwnerConflictResponse('Transfer board ownership before removing or demoting the last owner.');
   }
   return null;
 }
 
-// PATCH /api/boards/[boardId]/members/[profileId] - Update member role
 const patchHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
@@ -28,67 +40,70 @@ const patchHandler = async (
 
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
-  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-  if (errorResponse || !user) {
-    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { user, errorResponse: authError } = await requireAuthenticatedUser(supabase);
+  if (authError || !user) {
+    return authError ?? errorResponse(ApiErrorCode.UNAUTHENTICATED, 'Login required', 401);
   }
 
-    const actorMembership = await getBoardMembership(supabase, boardId, user.id);
+  const actorMembership = await getBoardMembership(supabase, boardId, user.id);
+  if (!actorMembership || actorMembership.role !== 'owner') {
+    return errorResponse(ApiErrorCode.FORBIDDEN, 'Only owner can update member roles', 403);
+  }
 
-    if (!actorMembership || actorMembership.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owner can update member roles' }, { status: 403 });
-    }
+  const body = await request.json();
+  const { role } = body as { role?: MemberRole };
+  if (!role) {
+    return errorResponse(ApiErrorCode.INVALID_BODY, 'role is required', 400);
+  }
 
-    const body = await request.json();
-    const { role } = body as { role: MemberRole };
+  const { data: targetMembership, error: targetError } = await supabase
+    .from('board_members')
+    .select('role')
+    .eq('board_id', boardId)
+    .eq('profile_id', profileId)
+    .maybeSingle();
 
-    if (!role) {
-      return NextResponse.json({ error: 'role is required' }, { status: 400 });
-    }
+  if (targetError) {
+    return errorResponse(ApiErrorCode.DB_ERROR, targetError.message, 500);
+  }
+  if (!targetMembership) {
+    return errorResponse(ApiErrorCode.NOT_FOUND, 'Member not found', 404);
+  }
 
-    const { data: targetMembership } = await supabase
+  if (targetMembership.role === 'owner' && role !== 'owner') {
+    const { count, error: ownerCountError } = await supabase
       .from('board_members')
-      .select('role')
+      .select('profile_id', { count: 'exact', head: true })
       .eq('board_id', boardId)
-      .eq('profile_id', profileId)
-      .maybeSingle();
+      .eq('role', 'owner');
 
-    if (!targetMembership) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    if (ownerCountError) {
+      return errorResponse(ApiErrorCode.DB_ERROR, ownerCountError.message, 500);
     }
 
-    if (targetMembership.role === 'owner' && role !== 'owner') {
-      const { count } = await supabase
-        .from('board_members')
-        .select('profile_id', { count: 'exact', head: true })
-        .eq('board_id', boardId)
-        .eq('role', 'owner');
-
-      if ((count ?? 0) <= 1) {
-        return NextResponse.json({ error: 'Cannot demote the last owner' }, { status: 409 });
-      }
+    if ((count ?? 0) <= 1) {
+      return lastOwnerConflictResponse('Transfer board ownership before demoting the last owner.');
     }
+  }
 
-    // Update member role
-    const { data: updatedMember, error } = await supabase
-      .from('board_members')
-      .update({ role })
-      .eq('board_id', boardId)
-      .eq('profile_id', profileId)
-      .select()
-      .single();
+  const { data: updatedMember, error } = await supabase
+    .from('board_members')
+    .update({ role })
+    .eq('board_id', boardId)
+    .eq('profile_id', profileId)
+    .select()
+    .single();
 
-    if (error) {
-      const conflict = asConflictIfLastOwner(error.message);
-      if (conflict) return conflict;
-      console.error('Error updating member role:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  if (error) {
+    const conflict = asConflictIfLastOwner(error.message);
+    if (conflict) return conflict;
+    console.error('Error updating member role:', error);
+    return errorResponse(ApiErrorCode.DB_ERROR, error.message, 500);
+  }
 
-  return NextResponse.json({ member: updatedMember });
+  return NextResponse.json({ member: updatedMember }, { status: 200 });
 };
 
-// DELETE /api/boards/[boardId]/members/[profileId] - Remove member
 const deleteHandler = async (
   request: NextRequest,
   { params }: { params: Promise<{ boardId: string; profileId: string }> }
@@ -100,53 +115,58 @@ const deleteHandler = async (
 
   const supabase = await createServerSupabaseClient();
   const { boardId, profileId } = await params;
-  const { user, errorResponse } = await requireAuthenticatedUser(supabase);
-  if (errorResponse || !user) {
-    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { user, errorResponse: authError } = await requireAuthenticatedUser(supabase);
+  if (authError || !user) {
+    return authError ?? errorResponse(ApiErrorCode.UNAUTHENTICATED, 'Login required', 401);
   }
 
-    const actorMembership = await getBoardMembership(supabase, boardId, user.id);
+  const actorMembership = await getBoardMembership(supabase, boardId, user.id);
+  if (!actorMembership || actorMembership.role !== 'owner') {
+    return errorResponse(ApiErrorCode.FORBIDDEN, 'Only owner can remove members', 403);
+  }
 
-    const { data: targetMembership } = await supabase
+  const { data: targetMembership, error: targetError } = await supabase
+    .from('board_members')
+    .select('role')
+    .eq('board_id', boardId)
+    .eq('profile_id', profileId)
+    .maybeSingle();
+
+  if (targetError) {
+    return errorResponse(ApiErrorCode.DB_ERROR, targetError.message, 500);
+  }
+  if (!targetMembership) {
+    return errorResponse(ApiErrorCode.NOT_FOUND, 'Member not found', 404);
+  }
+
+  if (targetMembership.role === 'owner') {
+    const { count, error: ownerCountError } = await supabase
       .from('board_members')
-      .select('role')
+      .select('profile_id', { count: 'exact', head: true })
       .eq('board_id', boardId)
-      .eq('profile_id', profileId)
-      .maybeSingle();
+      .eq('role', 'owner');
 
-    if (!targetMembership) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    if (ownerCountError) {
+      return errorResponse(ApiErrorCode.DB_ERROR, ownerCountError.message, 500);
     }
 
-    if (!actorMembership || actorMembership.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owner can remove members' }, { status: 403 });
+    if ((count ?? 0) <= 1) {
+      return lastOwnerConflictResponse('Transfer board ownership before removing the last owner.');
     }
+  }
 
-    if (targetMembership.role === 'owner') {
-      const { count } = await supabase
-        .from('board_members')
-        .select('profile_id', { count: 'exact', head: true })
-        .eq('board_id', boardId)
-        .eq('role', 'owner');
+  const { error } = await supabase
+    .from('board_members')
+    .delete()
+    .eq('board_id', boardId)
+    .eq('profile_id', profileId);
 
-      if ((count ?? 0) <= 1) {
-        return NextResponse.json({ error: 'Cannot remove the last owner' }, { status: 409 });
-      }
-    }
-
-    // Delete member
-    const { error } = await supabase
-      .from('board_members')
-      .delete()
-      .eq('board_id', boardId)
-      .eq('profile_id', profileId);
-
-    if (error) {
-      const conflict = asConflictIfLastOwner(error.message);
-      if (conflict) return conflict;
-      console.error('Error removing member:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  if (error) {
+    const conflict = asConflictIfLastOwner(error.message);
+    if (conflict) return conflict;
+    console.error('Error removing member:', error);
+    return errorResponse(ApiErrorCode.DB_ERROR, error.message, 500);
+  }
 
   return NextResponse.json({ success: true }, { status: 200 });
 };

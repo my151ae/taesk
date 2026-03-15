@@ -92,10 +92,11 @@ interface ActiveDragState {
 
 ## 3. 共通コンポーネント
 
-### ShareDialog / Notifications / ProfileSettings
+### Board Access / Notifications / ProfileSettings
 
 - すべて `app/(board)/_components/` 直下の実装を再利用。Timeline 専用の props は不要で、`TimelineBoardPage` から必要な状態 (`initialBoard`, `availableBoards`, `user`) を渡す。
-- ShareDialog は `boardMembers` API へアクセスし、role 変更やメンバー削除を行う。
+- Board Access は `boardMembers` API へアクセスし、Team メンバーに対する role 変更や access 削除を行う。
+- メール招待は `Team invite + pending board access` として扱い、Board Settings からでも内部的には Team-first で処理する。
 - NotificationSettings は `NotificationSoundPlayer` と連携し、音声アンロック/テスト音再生に加えて quiet hours や Web Push 購読を制御する。
 
 ### CommentsPanel / Mention

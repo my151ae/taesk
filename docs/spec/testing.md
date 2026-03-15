@@ -59,6 +59,7 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 - `test:timeline` は Timeline ビュー専用 spec を単体で実行。
 - その他の `test:*` スクリプトはバッチ実行時と同じ `--project=core` を使用。
 - 重い spec はタグで再分割して回す。現状は `test:comments:modal` / `test:comments:crud` / `test:comments:mentions` と `test:permissions:ui` / `test:permissions:api` を優先する。
+- Team-first 権限モデル移行後は、permissions 系で `TEAM_MEMBERSHIP_REQUIRED`、`LAST_BOARD_OWNER_TRANSFER_REQUIRED`、pending board access の消化を重点確認する。
 
 ---
 
@@ -107,6 +108,13 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 - `@feature:*` … 機能単位の回帰テスト。
 - `@failure:*` … 異常系。API バリデーションや quiet hours など。
 - `@phase3`, `@wip` … CI 除外。コミット前に必ず削除。
+
+### Team-first 追加観点
+
+- Team 未所属ユーザーへ `board_members` を直接付与できないこと
+- Team invite 受諾時に pending board access が idempotent に消化されること
+- Team member 削除時に Board selector / Timeline から access が即座に消えること
+- 最後の Board owner を Team から外そうとした場合、owner 移譲が必要というエラーが返ること
 
 ---
 

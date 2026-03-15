@@ -18,7 +18,65 @@ function asConflictIfLastOwner(message?: string | null) {
       { status: 409 }
     );
   }
+  if (message.includes('LAST_BOARD_OWNER_TRANSFER_REQUIRED')) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'LAST_BOARD_OWNER_TRANSFER_REQUIRED',
+          message: 'Transfer board ownership before removing this team member.',
+        },
+      },
+      { status: 409 }
+    );
+  }
   return null;
+}
+
+async function findBlockingBoardOwner(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  teamId: string,
+  profileId: string
+) {
+  const { data, error } = await supabase
+    .from('boards')
+    .select(`
+      id,
+      name,
+      board_members!inner (
+        profile_id,
+        role
+      )
+    `)
+    .eq('team_id', teamId)
+    .eq('board_members.profile_id', profileId)
+    .eq('board_members.role', 'owner');
+
+  if (error) {
+    return { error, board: null };
+  }
+
+  const boards = (data ?? []) as Array<{
+    id: string;
+    name: string | null;
+  }>;
+
+  for (const board of boards) {
+    const { count, error: ownerCountError } = await supabase
+      .from('board_members')
+      .select('profile_id', { count: 'exact', head: true })
+      .eq('board_id', board.id)
+      .eq('role', 'owner');
+
+    if (ownerCountError) {
+      return { error: ownerCountError, board: null };
+    }
+
+    if ((count ?? 0) <= 1) {
+      return { error: null, board };
+    }
+  }
+
+  return { error: null, board: null };
 }
 
 const patchHandler = async (
@@ -177,6 +235,31 @@ const deleteHandler = async (
     return NextResponse.json(
       { error: { code: 'FORBIDDEN', message: 'Only owner can remove owner' } },
       { status: 403 }
+    );
+  }
+
+  const { error: blockingLookupError, board: blockingBoard } = await findBlockingBoardOwner(
+    supabase,
+    teamId,
+    profileId
+  );
+
+  if (blockingLookupError) {
+    return NextResponse.json(
+      { error: { code: 'DB_ERROR', message: blockingLookupError.message } },
+      { status: 500 }
+    );
+  }
+
+  if (blockingBoard) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'LAST_BOARD_OWNER_TRANSFER_REQUIRED',
+          message: `Transfer board ownership before removing this team member from ${blockingBoard.name ?? 'the board'}.`,
+        },
+      },
+      { status: 409 }
     );
   }
 

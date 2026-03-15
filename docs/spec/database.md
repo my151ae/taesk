@@ -8,8 +8,10 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コ�
 | --- | --- | --- |
 | `teams` | Team 本体。メンバーと Board を束ねる上位コンテナ | `/board` bootstrap, Team Settings |
 | `team_members` | Team メンバーと Team role | Team Settings, Board 作成可否判定 |
+| `team_invites` | Team 招待 | Team Settings, Board access 招待の正本 |
 | `boards` | ボード本体。short URL / slug 管理 | `/board` の初期ボードやボードピッカーに利用 |
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
+| `pending_board_access_invites` | Team 招待受諾後に付与する Board access の予約 | Board Settings の外部招待ラッパー |
 | `lists` | 旧 Kanban のリスト（A/B では未使用） | カードの `list_id` 互換のため残存 |
 | `cards` | Timeline/A/B のカード | `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked`, `checklist`, `content`, `excerpt` など |
 | `comments` | カードコメント | CardModal / CommentsPanel |
@@ -18,7 +20,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コ�
 | `google_calendar_accounts` | Google OAuth 連携 | カレンダー同期の認可情報 |
 | `calendar_sync` | カードと Google 予定の紐付け | 二重同期の防止、双方向更新 |
 | `profiles` | Supabase Auth ユーザーの拡張 | タイムライン開始時刻（`timeline_start_hour`）など |
-| `board_invites` | メール招待 | ShareDialog (ロールアウト中) |
+| `board_invites` | 旧メール招待 | 既存 token 互換 accept 用に残存 |
 
 ## ER 図（簡易）
 
@@ -83,7 +85,7 @@ CREATE TABLE public.board_members (
 - Board access は Team 配下で成立するが、最終的な認可判定の正本は `board_members` である。
 - Timeline API (`GET /api/boards/:id/timeline`) は `board_members` に存在しない場合 403 を返す。
 - ShareDialog で role 編集・削除を行い、RLS ポリシーが連動。
-- Board 招待受諾時、Team 未所属ユーザーは Team に `guest` として自動追加される。
+- `board_members` は同じ Team の `team_members` に限定され、Team 未所属ユーザーへ直接付与できない。
 
 ## lists
 

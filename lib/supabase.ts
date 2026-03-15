@@ -245,6 +245,22 @@ export interface BoardInvite {
   created_at: string;
 }
 
+export interface PendingBoardAccessInvite {
+  id: string;
+  team_id: string;
+  board_id: string;
+  team_invite_id: string | null;
+  email: string;
+  normalized_email: string;
+  board_role: Exclude<MemberRole, 'owner'>;
+  status: 'pending' | 'accepted' | 'revoked';
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  expires_at?: string | null;
+}
+
 export interface Team {
   id: string;
   name: string;

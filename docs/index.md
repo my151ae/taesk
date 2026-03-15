@@ -174,6 +174,7 @@ interface TimelineOverdueItem {
 - A/B は `due_bucket_position` で降順ソート
 - `assignee_ids` を含めて返却し、ドラッグや楽観更新でもローカル状態から消えないように保持する（再フェッチ待ちの間もメンバー表示を維持）
 - API は Team 配下の認証済みボードメンバーのみアクセス可能で、最終的な判定は `board_members` テーブルに存在しない場合 403 を返す
+- `board_members` は Team member の subset として扱い、Team 未所属ユーザーへ Board access を直接付与しない
 
 Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サーバー/ドキュメントで共通参照）
 

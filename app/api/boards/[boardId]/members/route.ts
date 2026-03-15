@@ -6,6 +6,7 @@ import {
   requireAuthenticatedUser,
   validateMutationRequestOrigin,
 } from '@/lib/server/api-security';
+import { errorResponse as apiErrorResponse, ApiErrorCode } from '@/lib/server/api-error';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 type BoardMemberRow = {
@@ -24,6 +25,23 @@ async function getActorMembership(
   return getBoardMembership(supabase, boardId, userId);
 }
 
+async function getBoardTeamId(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  boardId: string
+) {
+  const { data, error } = await supabase
+    .from('boards')
+    .select('team_id')
+    .eq('id', boardId)
+    .maybeSingle();
+
+  if (error) {
+    return { teamId: null, error };
+  }
+
+  return { teamId: data?.team_id ?? null, error: null };
+}
+
 // GET /api/boards/[boardId]/members - List members with optional search
 const getHandler = async (
   request: NextRequest,
@@ -36,13 +54,13 @@ const getHandler = async (
   // Get current user
   const { user, errorResponse } = await requireAuthenticatedUser(supabase);
   if (errorResponse || !user) {
-    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse ?? apiErrorResponse(ApiErrorCode.UNAUTHENTICATED, 'Login required', 401);
   }
 
-    const actorMembership = await getActorMembership(supabase, boardId, user.id);
-    if (!actorMembership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+  const actorMembership = await getActorMembership(supabase, boardId, user.id);
+  if (!actorMembership) {
+    return apiErrorResponse(ApiErrorCode.FORBIDDEN, 'Not a board member', 403);
+  }
 
     // Build query
     let membersQuery = supabase
@@ -65,10 +83,10 @@ const getHandler = async (
 
     const { data: members, error } = await membersQuery;
 
-    if (error) {
-      console.error('Error fetching board members:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  if (error) {
+    console.error('Error fetching board members:', error);
+    return apiErrorResponse(ApiErrorCode.DB_ERROR, error.message, 500);
+  }
 
     // Filter by search query if provided
     let results: BoardMemberRow[] = (members as BoardMemberRow[] | null) ?? [];
@@ -104,7 +122,7 @@ const getHandler = async (
       })
       .filter((member): member is { board_id: string; profile_id: string; role: MemberRole; created_at: string; profile: ProfileSummary } => Boolean(member.profile));
 
-  return NextResponse.json({ members: transformedMembers });
+  return NextResponse.json({ members: transformedMembers }, { status: 200 });
 };
 
 // POST /api/boards/[boardId]/members - Add member
@@ -121,62 +139,75 @@ const postHandler = async (
   const { boardId } = await params;
   const { user, errorResponse } = await requireAuthenticatedUser(supabase);
   if (errorResponse || !user) {
-    return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse ?? apiErrorResponse(ApiErrorCode.UNAUTHENTICATED, 'Login required', 401);
   }
 
-    const actorMembership = await getActorMembership(supabase, boardId, user.id);
-    if (!actorMembership || actorMembership.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owner can add members' }, { status: 403 });
+  const actorMembership = await getActorMembership(supabase, boardId, user.id);
+  if (!actorMembership || actorMembership.role !== 'owner') {
+    return apiErrorResponse(ApiErrorCode.FORBIDDEN, 'Only board owners can grant board access', 403);
+  }
+
+  const body = await request.json();
+  const { profile_id, role = 'editor' } = body as { profile_id: string; role?: MemberRole };
+
+  if (!profile_id) {
+    return apiErrorResponse(ApiErrorCode.INVALID_BODY, 'profile_id is required', 400);
+  }
+
+  if (role === 'owner' && actorMembership.role !== 'owner') {
+    return apiErrorResponse(ApiErrorCode.FORBIDDEN, 'Only owner can assign owner role', 403);
+  }
+
+  const { teamId, error: boardLookupError } = await getBoardTeamId(supabase, boardId);
+  if (boardLookupError) {
+    return apiErrorResponse(ApiErrorCode.DB_ERROR, boardLookupError.message, 500);
+  }
+  if (!teamId) {
+    return apiErrorResponse(ApiErrorCode.CONFLICT, 'Board must belong to a team before board access can be granted', 409);
+  }
+
+  const { data: teamMembership, error: membershipLookupError } = await supabase
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('profile_id', profile_id)
+    .maybeSingle();
+
+  if (membershipLookupError) {
+    return apiErrorResponse(ApiErrorCode.DB_ERROR, membershipLookupError.message, 500);
+  }
+  if (!teamMembership) {
+    return apiErrorResponse(
+      ApiErrorCode.TEAM_MEMBERSHIP_REQUIRED,
+      'User must join the team before board access can be granted.',
+      409
+    );
+  }
+
+  const { data: newMember, error } = await supabase
+    .from('board_members')
+    .insert({
+      board_id: boardId,
+      profile_id,
+      role,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return apiErrorResponse(ApiErrorCode.CONFLICT, 'Member already exists', 409);
     }
-
-    const body = await request.json();
-    const { profile_id, role = 'editor' } = body as { profile_id: string; role?: MemberRole };
-
-    if (!profile_id) {
-      return NextResponse.json({ error: 'profile_id is required' }, { status: 400 });
+    if (error.message.includes('TEAM_MEMBERSHIP_REQUIRED')) {
+      return apiErrorResponse(
+        ApiErrorCode.TEAM_MEMBERSHIP_REQUIRED,
+        'User must join the team before board access can be granted.',
+        409
+      );
     }
-
-    if (role === 'owner' && actorMembership.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owner can assign owner role' }, { status: 403 });
-    }
-
-    // Insert new member
-    const { data: newMember, error } = await supabase
-      .from('board_members')
-      .insert({
-        board_id: boardId,
-        profile_id,
-        role,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json({ error: 'Member already exists' }, { status: 409 });
-      }
-      console.error('Error adding board member:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Team sync fallback (DB trigger is source of truth; keep API fallback for compatibility).
-    const { data: board } = await supabase
-      .from('boards')
-      .select('team_id')
-      .eq('id', boardId)
-      .maybeSingle();
-    if (board?.team_id) {
-      await supabase
-        .from('team_members')
-        .upsert(
-          {
-            team_id: board.team_id,
-            profile_id,
-            role: 'guest',
-          },
-          { onConflict: 'team_id,profile_id', ignoreDuplicates: true }
-        );
-    }
+    console.error('Error adding board member:', error);
+    return apiErrorResponse(ApiErrorCode.DB_ERROR, error.message, 500);
+  }
 
   return NextResponse.json({ member: newMember }, { status: 201 });
 };

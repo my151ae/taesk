@@ -35,7 +35,8 @@ Taesk のユーザー向け上位概念は **Team** です。Board は Team の�
 - Board access は Team 所属の上に成り立ちます。
 - Team に所属しているだけでは、すべての Board へ自動アクセスできません。
 - 実際の Board access は `board_members` を正本として制御します。
-- Board に招待されたユーザーが Team 未所属だった場合、受諾時に Team へ `guest` として自動追加されます。
+- ただし `board_members` は同じ Team の `team_members` の subset として管理されます。
+- Team 未所属ユーザーには Board access を直接作れません。先に Team 招待を受諾する必要があります。
 
 ### Personal の扱い
 - `team_type`, `personal_for_profile_id`, `is_personal` などの内部フラグは残存可です。

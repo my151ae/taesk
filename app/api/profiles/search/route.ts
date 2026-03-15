@@ -8,7 +8,7 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 /**
  * GET /api/profiles/search?board_id={boardId}&query={query}
  *
- * Search user profiles for board sharing.
+ * Search team member profiles for board access management.
  */
 const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
@@ -65,7 +65,52 @@ const getHandler = async (request: NextRequest) => {
       }, { status: 400 });
     }
 
-    // Email mode: exact match only (no partial email search)
+    const { data: board, error: boardError } = await supabase
+      .from('boards')
+      .select('team_id')
+      .eq('id', boardId)
+      .maybeSingle();
+
+    if (boardError) {
+      console.error('Error loading board team:', boardError);
+      return NextResponse.json({
+        error: { code: 'DB_ERROR', message: 'Failed to load board team' },
+      }, { status: 500 });
+    }
+
+    if (!board?.team_id) {
+      return NextResponse.json({
+        error: { code: 'CONFLICT', message: 'Board must belong to a team before searching members' },
+      }, { status: 409 });
+    }
+
+    const { data: teamMembers, error: teamMembersError } = await supabase
+      .from('team_members')
+      .select(`
+        profile_id,
+        profiles:profile_id (
+          id,
+          username,
+          display_name,
+          full_name,
+          avatar_url,
+          email
+        )
+      `)
+      .eq('team_id', board.team_id);
+
+    if (teamMembersError) {
+      console.error('Error loading team members for search:', teamMembersError);
+      return NextResponse.json({
+        error: { code: 'DB_ERROR', message: 'Failed to load team members' },
+      }, { status: 500 });
+    }
+
+    const teamProfiles = (teamMembers ?? [])
+      .map((row) => Array.isArray(row.profiles) ? row.profiles[0] : row.profiles)
+      .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile));
+
+    // Email mode: exact match only among team members
     if (emailParam && !queryParam) {
       const email = emailParam.trim().toLowerCase();
       if (!email) {
@@ -74,26 +119,15 @@ const getHandler = async (request: NextRequest) => {
         }, { status: 400 });
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, full_name, avatar_url')
-        .eq('email', email)
-        .maybeSingle();
+      const exactProfile = teamProfiles.find((profile) => profile.email?.toLowerCase() === email) ?? null;
 
-      if (error) {
-        console.error('Error searching profile:', error);
+      if (!exactProfile) {
         return NextResponse.json({
-          error: { code: 'DB_ERROR', message: 'Failed to search profile' },
-        }, { status: 500 });
-      }
-
-      if (!profile) {
-        return NextResponse.json({
-          error: { code: 'NOT_FOUND', message: 'User not found' },
+          error: { code: 'NOT_FOUND', message: 'Team member not found' },
         }, { status: 404 });
       }
 
-      return NextResponse.json({ profile, profiles: [profile] }, { status: 200 });
+      return NextResponse.json({ profile: exactProfile, profiles: [exactProfile] }, { status: 200 });
     }
 
     const query = (queryParam || emailParam || '').trim();
@@ -106,32 +140,21 @@ const getHandler = async (request: NextRequest) => {
     }
 
     const normalizedUsername = normalizeUsername(query);
-    const escapedLikeValue = query
-      .replace(/[%_\\]/g, (match) => `\\${match}`)
-      .replace(/,/g, '\\,')
-      .replace(/\./g, '\\.');
+    const normalizedQuery = query.toLowerCase();
 
-    const { data: matches, error } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, full_name, avatar_url')
-      .or(
-        [
-          `username.eq.${normalizedUsername}`,
-          `username.ilike.${normalizedUsername}%`,
-          `display_name.ilike.%${escapedLikeValue}%`,
-          `full_name.ilike.%${escapedLikeValue}%`,
-        ].join(',')
-      )
-      .limit(20);
-
-    if (error) {
-      console.error('Error searching profile:', error);
-      return NextResponse.json({
-        error: { code: 'DB_ERROR', message: 'Failed to search profile' },
-      }, { status: 500 });
-    }
-
-    const results = (matches ?? []).sort((a, b) => {
+    const results = teamProfiles
+      .filter((profile) => {
+        const username = profile.username?.toLowerCase() ?? '';
+        const displayName = profile.display_name?.toLowerCase() ?? '';
+        const fullName = profile.full_name?.toLowerCase() ?? '';
+        return (
+          username === normalizedUsername ||
+          username.startsWith(normalizedUsername) ||
+          displayName.includes(normalizedQuery) ||
+          fullName.includes(normalizedQuery)
+        );
+      })
+      .sort((a, b) => {
       const aUsername = a.username ?? '';
       const bUsername = b.username ?? '';
 

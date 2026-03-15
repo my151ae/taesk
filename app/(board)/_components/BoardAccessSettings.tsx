@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { featureFlags } from '@/lib/featureFlags';
-import { type BoardInvite, type MemberRole, type ProfileSummary } from '@/lib/supabase';
+import { type MemberRole, type PendingBoardAccessInvite, type ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 
 type BoardMemberWithProfile = {
@@ -14,10 +14,17 @@ type BoardMemberWithProfile = {
   profile: ProfileSummary;
 };
 
-type BoardInviteItem = Pick<
-  BoardInvite,
-  'id' | 'email' | 'email_normalized' | 'role' | 'expires_at' | 'accepted_at' | 'revoked_at' | 'created_at'
->;
+type BoardInviteItem = {
+  id: string;
+  board_id: string;
+  email: string;
+  email_normalized: string;
+  role: PendingBoardAccessInvite['board_role'];
+  expires_at: string | null;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
 
 type Props = {
   boardId: string;
@@ -51,6 +58,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
   const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteManagementUnavailable, setInviteManagementUnavailable] = useState(false);
 
   const pendingInvites = useMemo(
     () => invites.filter((invite) => !invite.accepted_at && !invite.revoked_at),
@@ -112,6 +120,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       const response = await fetch(`/api/boards/${boardId}/invites`, { cache: 'no-store' });
       if (response.status === 403) {
         setInvites([]);
+        setInviteManagementUnavailable(true);
         return;
       }
       if (!response.ok) {
@@ -119,6 +128,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       }
       const { invites: fetchedInvites } = await response.json();
       setInvites(fetchedInvites ?? []);
+      setInviteManagementUnavailable(false);
     } catch (error) {
       setNotice({
         type: 'error',
@@ -176,12 +186,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
 
       setInviteIdentifier('');
       setMemberRole('editor');
-      setNotice({ type: 'success', message: 'ボードメンバーを追加しました。' });
+      setNotice({ type: 'success', message: 'Team メンバーに Board access を付与しました。' });
       await Promise.all([loadMembers(), notifyUpdated()]);
     } catch (error) {
       setNotice({
         type: 'error',
-        message: error instanceof Error ? error.message : 'メンバー追加に失敗しました',
+        message: error instanceof Error ? error.message : 'Board access の付与に失敗しました',
       });
     } finally {
       setInvitingMember(false);
@@ -203,19 +213,19 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       setMembers((current) => current.map((member) => (
         member.profile_id === profileId ? { ...member, role } : member
       )));
-      setNotice({ type: 'success', message: 'ボードメンバー権限を更新しました。' });
+      setNotice({ type: 'success', message: 'Board access 権限を更新しました。' });
       await notifyUpdated();
     } catch (error) {
       setNotice({
         type: 'error',
-        message: error instanceof Error ? error.message : '権限変更に失敗しました',
+        message: error instanceof Error ? error.message : 'Board access 権限の更新に失敗しました',
       });
     }
   };
 
   const handleRemoveMember = async (profileId: string) => {
     if (!canManage) return;
-    if (!confirm('このメンバーをボードから外しますか？')) return;
+    if (!confirm('この Team メンバーの Board access を外しますか？')) return;
 
     setNotice(null);
     try {
@@ -226,12 +236,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         throw new Error(await readErrorMessage(response, 'メンバー削除に失敗しました'));
       }
       setMembers((current) => current.filter((member) => member.profile_id !== profileId));
-      setNotice({ type: 'success', message: 'ボードメンバーを削除しました。' });
+      setNotice({ type: 'success', message: 'Board access を削除しました。' });
       await notifyUpdated();
     } catch (error) {
       setNotice({
         type: 'error',
-        message: error instanceof Error ? error.message : 'メンバー削除に失敗しました',
+        message: error instanceof Error ? error.message : 'Board access の削除に失敗しました',
       });
     }
   };
@@ -267,12 +277,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       setInviteEmail('');
       setInviteRole('editor');
       setInviteToken(typeof body?.invite_token === 'string' ? body.invite_token : null);
-      setNotice({ type: 'success', message: '招待を作成しました。' });
+      setNotice({ type: 'success', message: 'Team 招待を作成し、参加後の Board access を予約しました。' });
       await loadInvites();
     } catch (error) {
       setNotice({
         type: 'error',
-        message: error instanceof Error ? error.message : '招待の作成に失敗しました',
+        message: error instanceof Error ? error.message : 'Team 招待の作成に失敗しました',
       });
     } finally {
       setCreatingInvite(false);
@@ -291,12 +301,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, '招待の取り消しに失敗しました'));
       }
-      setNotice({ type: 'success', message: '招待を取り消しました。' });
+      setNotice({ type: 'success', message: 'Team 招待と予約済み Board access を取り消しました。' });
       await loadInvites();
     } catch (error) {
       setNotice({
         type: 'error',
-        message: error instanceof Error ? error.message : '招待の取り消しに失敗しました',
+        message: error instanceof Error ? error.message : 'Team 招待の取り消しに失敗しました',
       });
     } finally {
       setRevokingInviteId(null);
@@ -313,8 +323,8 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         <h3 className="text-sm font-semibold text-slate-900">Board Access</h3>
         <p className="text-xs text-slate-500">
           {canManage
-            ? 'このボードのメンバー管理とメール招待を行います。'
-            : 'このボードのアクセス状況です。管理はボード owner のみ可能です。'}
+            ? 'この Board にアクセスできる Team メンバーを管理します。'
+            : 'この Board のアクセス状況です。管理は board owner のみ可能です。'}
         </p>
       </div>
 
@@ -331,7 +341,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Members</h4>
-            <p className="text-xs text-slate-500">現在このボードにアクセスできるユーザーです。</p>
+            <p className="text-xs text-slate-500">現在この Board にアクセスできる Team メンバーです。</p>
           </div>
 
           {canManage && (
@@ -340,7 +350,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                 type="text"
                 value={inviteIdentifier}
                 onChange={(event) => setInviteIdentifier(event.target.value)}
-                placeholder="メールアドレス または @username"
+                placeholder="Team 内のメールアドレス または @username"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 disabled={invitingMember}
               />
@@ -360,9 +370,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                   disabled={invitingMember || !inviteIdentifier.trim()}
                   className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {invitingMember ? 'Adding...' : 'Add Member'}
+                  {invitingMember ? 'Adding...' : 'Grant Access'}
                 </button>
               </div>
+              <p className="text-xs text-slate-500">
+                Team に所属しているユーザーだけを Board access 対象にできます。
+              </p>
             </form>
           )}
 
@@ -430,10 +443,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Invites</h4>
-            <p className="text-xs text-slate-500">メール招待の発行と pending invite の管理です。</p>
+            <p className="text-xs text-slate-500">
+              Team に招待し、参加後にこの Board access を付与する予約を管理します。
+            </p>
           </div>
 
-          {canManage && (
+          {canManage && !inviteManagementUnavailable && (
             <form onSubmit={handleCreateInvite} className="space-y-2 rounded-lg bg-slate-50 p-3">
               <input
                 type="email"
@@ -459,15 +474,24 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                   disabled={creatingInvite || !inviteEmail.trim()}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {creatingInvite ? 'Sending...' : 'Create Invite'}
+                  {creatingInvite ? 'Sending...' : 'Invite To Team'}
                 </button>
               </div>
+              <p className="text-xs text-slate-500">
+                Team 参加後に、この Board へ {ROLE_LABELS[inviteRole]} 権限を付与します。
+              </p>
             </form>
+          )}
+
+          {inviteManagementUnavailable && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Team 招待の発行は Team owner / admin のみ可能です。
+            </div>
           )}
 
           {inviteToken && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest invite token</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest team invite token</div>
               <div className="mt-1 break-all font-mono text-xs text-slate-700">{inviteToken}</div>
             </div>
           )}
@@ -486,7 +510,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-slate-900">{invite.email}</div>
                     <div className="text-xs text-slate-500">
-                      {ROLE_LABELS[invite.role]} • expires {new Date(invite.expires_at).toLocaleString()}
+                      {ROLE_LABELS[invite.role]} • expires {invite.expires_at ? new Date(invite.expires_at).toLocaleString() : 'pending'}
                     </div>
                   </div>
                   {canManage && (
