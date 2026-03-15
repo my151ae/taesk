@@ -310,6 +310,7 @@ taesk/
 - [docs/spec/tiptap-block-action-testing.md](./spec/tiptap-block-action-testing.md)
 - [docs/spec/testing.md](./spec/testing.md)
 - [Supabase Docs](https://supabase.com/docs)
+- [MVP Priorities](./spec/mvp-priorities.md)
 - [Next.js Docs](https://nextjs.org/docs)
 
 ## 📝 License
