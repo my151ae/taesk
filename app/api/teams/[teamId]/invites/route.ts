@@ -155,9 +155,13 @@ const postHandler = async (
     return NextResponse.json({ error: { code: 'DB_ERROR', message: error.message } }, { status: 500 });
   }
 
+  const invitePath = `/invite/team?teamId=${encodeURIComponent(teamId)}&token=${encodeURIComponent(token)}`;
+
   return NextResponse.json({
     invite: data,
     invite_token: token,
+    invite_url: invitePath,
+    invite_path: invitePath,
   }, { status: 201 });
 };
 

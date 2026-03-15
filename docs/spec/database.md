@@ -9,7 +9,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コ�
 | `teams` | Team 本体。メンバーと Board を束ねる上位コンテナ | `/board` bootstrap, Team Settings |
 | `team_members` | Team メンバーと Team role | Team Settings, Board 作成可否判定 |
 | `team_invites` | Team 招待 | Team Settings, Board access 招待の正本 |
-| `boards` | ボード本体。short URL / slug 管理 | `/board` の初期ボードやボードピッカーに利用 |
+| `boards` | ボード本体。Team 配下の作業単位 | `/board` の初期ボードやボードピッカーに利用 |
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
 | `pending_board_access_invites` | Team 招待受諾後に付与する Board access の予約 | Board Settings の外部招待ラッパー |
 | `lists` | 旧 Kanban のリスト（A/B では未使用） | カードの `list_id` 互換のため残存 |
@@ -20,7 +20,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コ�
 | `google_calendar_accounts` | Google OAuth 連携 | カレンダー同期の認可情報 |
 | `calendar_sync` | カードと Google 予定の紐付け | 二重同期の防止、双方向更新 |
 | `profiles` | Supabase Auth ユーザーの拡張 | タイムライン開始時刻（`timeline_start_hour`）など |
-| `board_invites` | 旧メール招待 | 既存 token 互換 accept 用に残存 |
+| `board_invites` | 旧メール招待 | 互換読み取りのためにのみ残存。正規フローでは未使用 |
 
 ## ER 図（簡易）
 
@@ -29,9 +29,10 @@ teams 1 ── n boards 1 ── n cards ──┬─ n comments
   │            │                   │
   │            │                   └─ n card.assignee_ids → profiles
   │            ├─ n board_members ── profiles (role: owner/editor/commenter/viewer)
-  │            ├─ n activity_logs
-  │            └─ n board_invites
+  │            ├─ n pending_board_access_invites
+  │            └─ n activity_logs
   └─ n team_members ── profiles (role: owner/admin/member/guest)
+   └─ n team_invites
 
 profiles 1 ── n comments (author_id)
         ├─ n notifications (recipient_id)
@@ -46,6 +47,7 @@ push_subscriptions 1 ── n notification_delivery_logs
 ```sql
 CREATE TABLE public.boards (
   id UUID PRIMARY KEY,
+  team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   user_id UUID NULL,
@@ -62,6 +64,7 @@ CREATE TABLE public.boards (
 );
 ```
 
+- `team_id` は `NOT NULL`。すべての Board は必ず Team 配下に存在する。
 - `short_id` + `slug` は `/b/:short_id/:slug` や `/@modal/(...)c` などで使用。
 - `/board` は Team/Board bootstrap 入口であり、最後に使った Board、またはアクセス可能な Board へ遷移する。未所属時は default Team + default Board を生成する。
 - `is_test_board` が true の場合、E2E 専用ボードとして扱い、初期データを制限。
@@ -86,6 +89,7 @@ CREATE TABLE public.board_members (
 - Timeline API (`GET /api/boards/:id/timeline`) は `board_members` に存在しない場合 403 を返す。
 - ShareDialog で role 編集・削除を行い、RLS ポリシーが連動。
 - `board_members` は同じ Team の `team_members` に限定され、Team 未所属ユーザーへ直接付与できない。
+- Team member を削除すると、同一 Team 配下の `board_members` は cleanup trigger により削除される。
 
 ## lists
 
@@ -256,3 +260,9 @@ export interface Card {
 ```
 
 これらの型を通じて API と UI が統一され、TimelineBoardPage 内の DnD・CardModal・Playwright テストが同じフィールド定義を参照できるようになっています。
+## team_invites / pending_board_access_invites
+
+- Team 招待の正規フローは `team_invites`。
+- Team invite 作成 API は `invite_url` を返し、受け手は `/invite/team?teamId=<teamId>&token=<token>` から参加する。
+- Board Settings から未所属メールアドレスを招待した場合も、内部では `team_invites + pending_board_access_invites` を作成する。
+- Team invite 受諾時に `pending_board_access_invites` が idempotent に消化され、必要な `board_members` が付与される。

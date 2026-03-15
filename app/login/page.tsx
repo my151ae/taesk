@@ -13,12 +13,14 @@ function LoginForm() {
   const [showEmailLogin, setShowEmailLogin] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const nextPathParam = searchParams.get('next')
+  const nextPath = nextPathParam && nextPathParam.startsWith('/') ? nextPathParam : '/'
 
   useEffect(() => {
     if (user && !loading) {
-      router.push('/')
+      router.push(nextPath)
     }
-  }, [user, loading, router])
+  }, [user, loading, nextPath, router])
 
   useEffect(() => {
     const errorParam = searchParams.get('error')
@@ -31,7 +33,7 @@ function LoginForm() {
     try {
       setError(null)
       setIsLoggingIn(true)
-      await signInWithGoogle()
+      await signInWithGoogle(nextPath)
     } catch (error) {
       console.error('Login error:', error)
       setError(error instanceof Error ? error.message : 'ログインに失敗しました')

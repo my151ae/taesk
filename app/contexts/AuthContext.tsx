@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 type AuthContextType = {
   user: User | null
   loading: boolean
-  signInWithGoogle: () => Promise<void>
+  signInWithGoogle: (nextPath?: string | null) => Promise<void>
   signInWithPassword: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -57,16 +57,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (nextPath?: string | null) => {
     if (BYPASS_AUTH) {
       console.warn('Sign in bypassed in test mode')
       return
     }
 
+    const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+    if (nextPath && nextPath.startsWith('/')) {
+      callbackUrl.searchParams.set('next', nextPath)
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
         queryParams: {
           // Force Google to show account selection screen
           prompt: 'select_account',

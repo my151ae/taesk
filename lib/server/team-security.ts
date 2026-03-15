@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { TeamRole } from '@/lib/supabase';
 
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 
 export type ServerSupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -31,7 +32,9 @@ export async function canCreateBoardInTeam(
   teamId: string,
   userId: string
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const { data: team, error: teamError } = await supabase
+  const admin = createServiceRoleSupabaseClient();
+
+  const { data: team, error: teamError } = await admin
     .from('teams')
     .select('id, allow_member_create_board')
     .eq('id', teamId)
@@ -57,7 +60,23 @@ export async function canCreateBoardInTeam(
     };
   }
 
-  const membership = await getTeamMembership(supabase, teamId, userId);
+  const { data: membership, error: membershipError } = await admin
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  if (membershipError) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: 'DB_ERROR', message: membershipError.message } },
+        { status: 500 }
+      ),
+    };
+  }
+
   if (!membership) {
     return {
       ok: false,

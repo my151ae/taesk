@@ -11,7 +11,8 @@ export type SanitizedProviderError = {
 function mask(value: string, prefix = 3, suffix = 2): string {
   if (!value) return '';
   if (value.length <= prefix + suffix) return '*'.repeat(Math.max(value.length, 4));
-  return `${value.slice(0, prefix)}***${value.slice(-suffix)}`;
+  const suffixValue = suffix > 0 ? value.slice(-suffix) : '';
+  return `${value.slice(0, prefix)}***${suffixValue}`;
 }
 
 export function maskToken(token?: string | null): string | null {

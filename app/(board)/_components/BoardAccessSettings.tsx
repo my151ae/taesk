@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { featureFlags } from '@/lib/featureFlags';
-import { type MemberRole, type PendingBoardAccessInvite, type ProfileSummary } from '@/lib/supabase';
+import { type MemberRole, type ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 
 type BoardMemberWithProfile = {
@@ -12,18 +12,6 @@ type BoardMemberWithProfile = {
   role: MemberRole;
   created_at: string;
   profile: ProfileSummary;
-};
-
-type BoardInviteItem = {
-  id: string;
-  board_id: string;
-  email: string;
-  email_normalized: string;
-  role: PendingBoardAccessInvite['board_role'];
-  expires_at: string | null;
-  accepted_at: string | null;
-  revoked_at: string | null;
-  created_at: string;
 };
 
 type Props = {
@@ -46,31 +34,18 @@ const ROLE_LABELS: Record<MemberRole, string> = {
 
 export default function BoardAccessSettings({ boardId, canManage, onUpdated }: Props) {
   const [members, setMembers] = useState<BoardMemberWithProfile[]>([]);
-  const [invites, setInvites] = useState<BoardInviteItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingInvites, setLoadingInvites] = useState(true);
   const [inviteIdentifier, setInviteIdentifier] = useState('');
   const [memberRole, setMemberRole] = useState<MemberRole>('editor');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<Exclude<MemberRole, 'owner'>>('editor');
   const [invitingMember, setInvitingMember] = useState(false);
-  const [creatingInvite, setCreatingInvite] = useState(false);
-  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [inviteManagementUnavailable, setInviteManagementUnavailable] = useState(false);
-
-  const pendingInvites = useMemo(
-    () => invites.filter((invite) => !invite.accepted_at && !invite.revoked_at),
-    [invites]
-  );
 
   useEffect(() => {
     if (!featureFlags.boardPermissions) {
       return;
     }
 
-    void Promise.all([loadMembers(), loadInvites()]);
+    void loadMembers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId, canManage]);
 
@@ -111,31 +86,6 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadInvites = async () => {
-    setLoadingInvites(true);
-    try {
-      const response = await fetch(`/api/boards/${boardId}/invites`, { cache: 'no-store' });
-      if (response.status === 403) {
-        setInvites([]);
-        setInviteManagementUnavailable(true);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, 'Failed to load board invites'));
-      }
-      const { invites: fetchedInvites } = await response.json();
-      setInvites(fetchedInvites ?? []);
-      setInviteManagementUnavailable(false);
-    } catch (error) {
-      setNotice({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load board invites',
-      });
-    } finally {
-      setLoadingInvites(false);
     }
   };
 
@@ -246,73 +196,6 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
     }
   };
 
-  const handleCreateInvite = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!canManage || !inviteEmail.trim()) return;
-
-    setCreatingInvite(true);
-    setNotice(null);
-    setInviteToken(null);
-    try {
-      const response = await fetch(`/api/boards/${boardId}/invites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: inviteEmail.trim(),
-          role: inviteRole,
-        }),
-      });
-
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          typeof body?.error === 'object' && body?.error?.message
-            ? body.error.message
-            : typeof body?.error === 'string'
-              ? body.error
-              : '招待の作成に失敗しました'
-        );
-      }
-
-      setInviteEmail('');
-      setInviteRole('editor');
-      setInviteToken(typeof body?.invite_token === 'string' ? body.invite_token : null);
-      setNotice({ type: 'success', message: 'Team 招待を作成し、参加後の Board access を予約しました。' });
-      await loadInvites();
-    } catch (error) {
-      setNotice({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Team 招待の作成に失敗しました',
-      });
-    } finally {
-      setCreatingInvite(false);
-    }
-  };
-
-  const handleRevokeInvite = async (inviteId: string) => {
-    if (!canManage) return;
-
-    setRevokingInviteId(inviteId);
-    setNotice(null);
-    try {
-      const response = await fetch(`/api/boards/${boardId}/invites/${inviteId}/revoke`, {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, '招待の取り消しに失敗しました'));
-      }
-      setNotice({ type: 'success', message: 'Team 招待と予約済み Board access を取り消しました。' });
-      await loadInvites();
-    } catch (error) {
-      setNotice({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Team 招待の取り消しに失敗しました',
-      });
-    } finally {
-      setRevokingInviteId(null);
-    }
-  };
-
   if (!featureFlags.boardPermissions) {
     return null;
   }
@@ -337,7 +220,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
         <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Members</h4>
@@ -439,100 +322,10 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
             </div>
           )}
         </section>
+      </div>
 
-        <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">Invites</h4>
-            <p className="text-xs text-slate-500">
-              Team に招待し、参加後にこの Board access を付与する予約を管理します。
-            </p>
-          </div>
-
-          {canManage && !inviteManagementUnavailable && (
-            <form onSubmit={handleCreateInvite} className="space-y-2 rounded-lg bg-slate-50 p-3">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
-                placeholder="invite@example.com"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                disabled={creatingInvite}
-              />
-              <div className="flex gap-2">
-                <select
-                  value={inviteRole}
-                  onChange={(event) => setInviteRole(event.target.value as Exclude<MemberRole, 'owner'>)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                  disabled={creatingInvite}
-                >
-                  <option value="editor">Editor</option>
-                  <option value="commenter">Commenter</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={creatingInvite || !inviteEmail.trim()}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {creatingInvite ? 'Sending...' : 'Invite To Team'}
-                </button>
-              </div>
-              <p className="text-xs text-slate-500">
-                Team 参加後に、この Board へ {ROLE_LABELS[inviteRole]} 権限を付与します。
-              </p>
-            </form>
-          )}
-
-          {inviteManagementUnavailable && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Team 招待の発行は Team owner / admin のみ可能です。
-            </div>
-          )}
-
-          {inviteToken && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest team invite token</div>
-              <div className="mt-1 break-all font-mono text-xs text-slate-700">{inviteToken}</div>
-            </div>
-          )}
-
-          {loadingInvites ? (
-            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-              Loading invites...
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {pendingInvites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-900">{invite.email}</div>
-                    <div className="text-xs text-slate-500">
-                      {ROLE_LABELS[invite.role]} • expires {invite.expires_at ? new Date(invite.expires_at).toLocaleString() : 'pending'}
-                    </div>
-                  </div>
-                  {canManage && (
-                    <button
-                      type="button"
-                      onClick={() => handleRevokeInvite(invite.id)}
-                      disabled={revokingInviteId === invite.id}
-                      className="rounded-lg px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                    >
-                      {revokingInviteId === invite.id ? 'Revoking...' : 'Revoke'}
-                    </button>
-                  )}
-                </div>
-              ))}
-              {pendingInvites.length === 0 && (
-                <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                  No pending invites
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+        外部メールアドレスの招待は Team Settings から行ってください。Board Settings では Team メンバーへの Board access 付与だけを扱います。
       </div>
     </div>
   );

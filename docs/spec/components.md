@@ -99,6 +99,12 @@ interface ActiveDragState {
 - メール招待は `Team invite + pending board access` として扱い、Board Settings からでも内部的には Team-first で処理する。
 - NotificationSettings は `NotificationSoundPlayer` と連携し、音声アンロック/テスト音再生に加えて quiet hours や Web Push 購読を制御する。
 
+### TeamManagementDialog / Team Invite Accept
+
+- `TeamManagementDialog` は Team invite 作成後に token ではなく `invite_url` を主表示し、Copy link で共有できる。
+- 招待受諾 UI は `app/invite/team/page.tsx` にあり、未ログイン時は `/login?next=...` へ誘導する。
+- ログイン後は `POST /api/teams/[teamId]/invites/accept` を呼び、成功時は `/board` へ戻す。pending board access があれば同時に消化される。
+
 ### CommentsPanel / Mention
 
 - Timeline でも Kanban と同一のコメント UI を提供。`Mention` コンポーネントは @入力時に `GET /api/profiles/search` を叩き、`@[Full Name](uuid)` 形式で挿入。

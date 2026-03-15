@@ -112,6 +112,7 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 ### Team-first 追加観点
 
 - Team 未所属ユーザーへ `board_members` を直接付与できないこと
+- Team invite 作成 API が `invite_url` を返し、`/invite/team` から受諾できること
 - Team invite 受諾時に pending board access が idempotent に消化されること
 - Team member 削除時に Board selector / Timeline から access が即座に消えること
 - 最後の Board owner を Team から外そうとした場合、owner 移譲が必要というエラーが返ること

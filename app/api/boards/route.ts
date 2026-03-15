@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { canCreateBoardInTeam } from '@/lib/server/team-security';
+import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 
 const CreateBoardSchema = z.object({
   team_id: z.string().uuid(),
@@ -125,13 +126,15 @@ const postHandler = async (request: NextRequest) => {
       return createPermission.response;
     }
 
+    const admin = createServiceRoleSupabaseClient();
+
     // Generate short_id, id_short, and slug
     const short_id = await createUniqueBoardShortId();
     const id_short = await getNextBoardIdShort();
     const slug = slugifyBoardName(parsed.data.name);
 
     // Create board
-    const { data: board, error: boardError } = await supabase
+    const { data: board, error: boardError } = await admin
       .from('boards')
       .insert({
         ...parsed.data,
@@ -152,7 +155,7 @@ const postHandler = async (request: NextRequest) => {
     }
 
     // Add creator as owner
-    const { error: memberError } = await supabase
+    const { error: memberError } = await admin
       .from('board_members')
       .insert({
         board_id: board.id,
@@ -163,7 +166,7 @@ const postHandler = async (request: NextRequest) => {
     if (memberError) {
       console.error('Error adding board owner:', memberError);
       // Rollback board creation (best effort)
-      await supabase.from('boards').delete().eq('id', board.id);
+      await admin.from('boards').delete().eq('id', board.id);
       return NextResponse.json(
         { error: { code: 'DB_ERROR', message: 'Failed to add board owner' } },
         { status: 500 }

@@ -254,7 +254,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'status', 401, 'code', 'UNAUTHENTICATED', 'message', 'Login required');
   END IF;
 
-  v_hash := encode(digest(coalesce(p_token, ''), 'sha256'), 'hex');
+  v_hash := encode(extensions.digest(coalesce(p_token, ''), 'sha256'), 'hex');
 
   SELECT * INTO v_invite
   FROM public.team_invites ti
@@ -336,7 +336,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'status', 401, 'code', 'UNAUTHENTICATED', 'message', 'Login required');
   END IF;
 
-  v_hash := encode(digest(coalesce(p_token, ''), 'sha256'), 'hex');
+  v_hash := encode(extensions.digest(coalesce(p_token, ''), 'sha256'), 'hex');
 
   SELECT * INTO v_invite
   FROM public.board_invites bi

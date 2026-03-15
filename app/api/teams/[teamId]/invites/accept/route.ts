@@ -17,6 +17,7 @@ type RpcInviteResult = {
   message?: string;
   team_id?: string;
   role?: string;
+  consumed_board_accesses?: number;
 };
 
 const postHandler = async (
@@ -95,7 +96,12 @@ const postHandler = async (
   }
 
   return NextResponse.json(
-    { success: true, team_id: result.team_id, role: result.role },
+    {
+      success: true,
+      team_id: result.team_id,
+      role: result.role,
+      consumed_board_accesses: result.consumed_board_accesses ?? 0,
+    },
     { status: 200 }
   );
 };

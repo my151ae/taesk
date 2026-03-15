@@ -23,6 +23,23 @@ type Props = {
   initialTeamId?: string | null;
 };
 
+type LatestInviteInfo = {
+  token: string | null;
+  url: string | null;
+};
+
+function buildInviteUrl(inviteUrl?: string | null, invitePath?: string | null): string | null {
+  if (invitePath && typeof window !== "undefined") {
+    return new URL(invitePath, window.location.origin).toString();
+  }
+
+  if (inviteUrl && inviteUrl.startsWith("/") && typeof window !== "undefined") {
+    return new URL(inviteUrl, window.location.origin).toString();
+  }
+
+  return inviteUrl ?? null;
+}
+
 const ADMIN_ROLES: TeamRole[] = ["owner", "admin"];
 
 function displayName(member: TeamMemberItem): string {
@@ -55,7 +72,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "guest">("member");
-  const [latestInviteToken, setLatestInviteToken] = useState<string | null>(null);
+  const [latestInvite, setLatestInvite] = useState<LatestInviteInfo | null>(null);
 
   const actorRole = selectedTeam?.role ?? null;
   const isTeamAdmin = canManageTeam(actorRole);
@@ -258,33 +275,80 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
     }
   }, [fetchSelectedTeam, resetNotice, selectedTeamId]);
 
+  const createOrRefreshInvite = useCallback(async (
+    email: string,
+    role: "admin" | "member" | "guest",
+    successMessage: string
+  ) => {
+    if (!selectedTeamId) return;
+
+    const res = await fetch(`/api/teams/${selectedTeamId}/invites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        role,
+      }),
+    });
+    const body = (await res.json()) as {
+      invite_token?: string;
+      invite_url?: string;
+      invite_path?: string;
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(body.error?.message || "Failed to create invite");
+    }
+
+    setLatestInvite({
+      token: body.invite_token || null,
+      url: buildInviteUrl(body.invite_url, body.invite_path),
+    });
+    setMessage(successMessage);
+    await fetchSelectedTeam(selectedTeamId);
+  }, [fetchSelectedTeam, selectedTeamId]);
+
   const handleCreateInvite = useCallback(async () => {
     if (!selectedTeamId || !inviteEmail.trim()) return;
     setSaving(true);
     resetNotice();
     try {
-      const res = await fetch(`/api/teams/${selectedTeamId}/invites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: inviteEmail.trim(),
-          role: inviteRole,
-        }),
-      });
-      const body = (await res.json()) as { invite_token?: string; error?: { message?: string } };
-      if (!res.ok) {
-        throw new Error(body.error?.message || "Failed to create invite");
-      }
+      await createOrRefreshInvite(inviteEmail.trim(), inviteRole, "Invite created");
       setInviteEmail("");
-      setLatestInviteToken(body.invite_token || null);
-      setMessage("Invite created");
-      await fetchSelectedTeam(selectedTeamId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create invite");
     } finally {
       setSaving(false);
     }
-  }, [fetchSelectedTeam, inviteEmail, inviteRole, resetNotice, selectedTeamId]);
+  }, [createOrRefreshInvite, inviteEmail, inviteRole, resetNotice, selectedTeamId]);
+
+  const handleReissueInvite = useCallback(async (invite: TeamInviteItem) => {
+    setSaving(true);
+    resetNotice();
+    try {
+      await createOrRefreshInvite(
+        invite.email,
+        invite.role,
+        "Invite link reissued"
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reissue invite");
+    } finally {
+      setSaving(false);
+    }
+  }, [createOrRefreshInvite, resetNotice]);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!latestInvite?.url) return;
+
+    try {
+      await navigator.clipboard.writeText(latestInvite.url);
+      setMessage("Invite link copied");
+      setError(null);
+    } catch {
+      setError("Failed to copy invite link");
+    }
+  }, [latestInvite?.url]);
 
   const handleRevokeInvite = useCallback(async (inviteId: string) => {
     if (!selectedTeamId) return;
@@ -458,12 +522,31 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 </button>
               </div>
 
-              {latestInviteToken && (
-                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                  <p className="font-medium">Latest invite token</p>
-                  <p className="break-all">{latestInviteToken}</p>
+              {latestInvite?.url && (
+                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="font-medium">Invite link</p>
+                  <p className="mt-1 break-all">{latestInvite.url}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyInviteLink()}
+                      className="rounded-md border border-amber-300 bg-white px-2 py-1 font-medium text-amber-900"
+                    >
+                      Copy link
+                    </button>
+                    {latestInvite.token && (
+                      <details className="text-amber-900">
+                        <summary className="cursor-pointer font-medium">Token</summary>
+                        <p className="mt-1 break-all">{latestInvite.token}</p>
+                      </details>
+                    )}
+                  </div>
                 </div>
               )}
+
+              <p className="mb-3 text-xs text-slate-500">
+                セキュリティ上、発行済みリンクは一覧から再表示できません。再度共有する場合は pending invite の「Reissue link」を使って新しいリンクを発行してください。
+              </p>
 
               <div className="space-y-2">
                 {pendingInvites.map((invite) => (
@@ -472,13 +555,22 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                       <p className="truncate text-sm text-slate-800">{invite.email}</p>
                       <p className="text-xs text-slate-500">role={invite.role} / expires={new Date(invite.expires_at).toLocaleString()}</p>
                     </div>
-                    <button
-                      onClick={() => void handleRevokeInvite(invite.id)}
-                      disabled={!isTeamAdmin || saving}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
-                    >
-                      Revoke
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => void handleReissueInvite(invite)}
+                        disabled={!isTeamAdmin || saving}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                      >
+                        Reissue link
+                      </button>
+                      <button
+                        onClick={() => void handleRevokeInvite(invite.id)}
+                        disabled={!isTeamAdmin || saving}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                      >
+                        Revoke
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {pendingInvites.length === 0 && <p className="text-sm text-slate-500">No pending invites.</p>}
