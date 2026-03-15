@@ -14,6 +14,13 @@ type BoardMemberWithProfile = {
   profile: ProfileSummary;
 };
 
+type AvailableTeamMember = {
+  profile_id: string;
+  role: string;
+  created_at: string;
+  profile: ProfileSummary;
+};
+
 type Props = {
   boardId: string;
   canManage: boolean;
@@ -34,8 +41,9 @@ const ROLE_LABELS: Record<MemberRole, string> = {
 
 export default function BoardAccessSettings({ boardId, canManage, onUpdated }: Props) {
   const [members, setMembers] = useState<BoardMemberWithProfile[]>([]);
+  const [availableMembers, setAvailableMembers] = useState<AvailableTeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteIdentifier, setInviteIdentifier] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [memberRole, setMemberRole] = useState<MemberRole>('editor');
   const [invitingMember, setInvitingMember] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -77,8 +85,9 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, 'Failed to load board members'));
       }
-      const { members: fetchedMembers } = await response.json();
+      const { members: fetchedMembers, available_members: fetchedAvailableMembers } = await response.json();
       setMembers(fetchedMembers ?? []);
+      setAvailableMembers(fetchedAvailableMembers ?? []);
     } catch (error) {
       setNotice({
         type: 'error',
@@ -91,33 +100,12 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
 
   const handleMemberAdd = async (event: React.FormEvent) => {
     event.preventDefault();
-    const rawInput = inviteIdentifier.trim();
-    if (!rawInput || !canManage) return;
-
-    const isEmail = rawInput.includes('@') && !rawInput.startsWith('@');
-    const params = new URLSearchParams();
-    if (isEmail) {
-      params.set('email', rawInput.toLowerCase());
-    } else {
-      params.set('query', rawInput.startsWith('@') ? rawInput.slice(1) : rawInput);
-    }
-    params.set('board_id', boardId);
+    if (!selectedProfileId || !canManage) return;
 
     setInvitingMember(true);
     setNotice(null);
     try {
-      const searchRes = await fetch(`/api/profiles/search?${params.toString()}`);
-      if (!searchRes.ok) {
-        throw new Error(await readErrorMessage(searchRes, 'ユーザー検索に失敗しました'));
-      }
-
-      const payload = await searchRes.json().catch(() => null);
-      const profile = payload?.profile ?? payload?.profiles?.[0];
-      if (!profile) {
-        throw new Error('一致するユーザーが見つかりませんでした。');
-      }
-
-      if (members.some((member) => member.profile_id === profile.id)) {
+      if (members.some((member) => member.profile_id === selectedProfileId)) {
         throw new Error('そのユーザーは既にこのボードのメンバーです。');
       }
 
@@ -125,7 +113,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile_id: profile.id,
+          profile_id: selectedProfileId,
           role: memberRole,
         }),
       });
@@ -134,7 +122,7 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
         throw new Error(await readErrorMessage(response, 'メンバー追加に失敗しました'));
       }
 
-      setInviteIdentifier('');
+      setSelectedProfileId('');
       setMemberRole('editor');
       setNotice({ type: 'success', message: 'Team メンバーに Board access を付与しました。' });
       await Promise.all([loadMembers(), notifyUpdated()]);
@@ -229,14 +217,25 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
 
           {canManage && (
             <form onSubmit={handleMemberAdd} className="space-y-2 rounded-lg bg-slate-50 p-3">
-              <input
-                type="text"
-                value={inviteIdentifier}
-                onChange={(event) => setInviteIdentifier(event.target.value)}
-                placeholder="Team 内のメールアドレス または @username"
+              <select
+                value={selectedProfileId}
+                onChange={(event) => setSelectedProfileId(event.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 disabled={invitingMember}
-              />
+              >
+                <option value="">Board に追加する Team メンバーを選択</option>
+                {availableMembers.map((member) => {
+                  const identity = resolveProfileIdentity(member.profile, member.profile.email ?? null);
+                  const detail = identity.secondary && identity.secondary !== identity.label
+                    ? ` (${identity.secondary})`
+                    : '';
+                  return (
+                    <option key={member.profile_id} value={member.profile_id}>
+                      {identity.label}{detail}
+                    </option>
+                  );
+                })}
+              </select>
               <div className="flex gap-2">
                 <select
                   value={memberRole}
@@ -250,14 +249,14 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                 </select>
                 <button
                   type="submit"
-                  disabled={invitingMember || !inviteIdentifier.trim()}
+                  disabled={invitingMember || !selectedProfileId}
                   className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {invitingMember ? 'Adding...' : 'Grant Access'}
                 </button>
               </div>
               <p className="text-xs text-slate-500">
-                Team に所属しているユーザーだけを Board access 対象にできます。
+                まだこの Board に追加されていない Team メンバーだけを選べます。
               </p>
             </form>
           )}

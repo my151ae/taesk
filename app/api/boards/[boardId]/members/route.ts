@@ -17,6 +17,14 @@ type BoardMemberRow = {
   profiles: ProfileSummary | ProfileSummary[] | null;
 };
 
+type TeamMemberRow = {
+  team_id: string;
+  profile_id: string;
+  role: string;
+  created_at: string;
+  profiles: ProfileSummary | ProfileSummary[] | null;
+};
+
 async function getActorMembership(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   boardId: string,
@@ -122,7 +130,72 @@ const getHandler = async (
       })
       .filter((member): member is { board_id: string; profile_id: string; role: MemberRole; created_at: string; profile: ProfileSummary } => Boolean(member.profile));
 
-  return NextResponse.json({ members: transformedMembers }, { status: 200 });
+  let availableMembers: Array<{
+    profile_id: string;
+    role: string;
+    created_at: string;
+    profile: ProfileSummary;
+  }> = [];
+
+  const { teamId, error: teamLookupError } = await getBoardTeamId(supabase, boardId);
+  if (teamLookupError) {
+    return apiErrorResponse(ApiErrorCode.DB_ERROR, teamLookupError.message, 500);
+  }
+
+  if (teamId) {
+    const { data: actorTeamMembership, error: actorTeamMembershipError } = await supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('profile_id', user.id)
+      .maybeSingle();
+
+    if (actorTeamMembershipError) {
+      return apiErrorResponse(ApiErrorCode.DB_ERROR, actorTeamMembershipError.message, 500);
+    }
+
+    if (actorTeamMembership && actorTeamMembership.role !== 'guest') {
+      const { data: teamMembers, error: teamMembersError } = await supabase
+        .from('team_members')
+        .select(`
+          team_id,
+          profile_id,
+          role,
+          created_at,
+          profiles:profile_id (
+            id,
+            username,
+            display_name,
+            full_name,
+            avatar_url,
+            email
+          )
+        `)
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: true });
+
+      if (teamMembersError) {
+        return apiErrorResponse(ApiErrorCode.DB_ERROR, teamMembersError.message, 500);
+      }
+
+      const memberIds = new Set(transformedMembers.map((member) => member.profile_id));
+      availableMembers = ((teamMembers as TeamMemberRow[] | null) ?? [])
+        .map((member) => {
+          const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+          return {
+            profile_id: member.profile_id,
+            role: member.role,
+            created_at: member.created_at,
+            profile: profile ?? null,
+          };
+        })
+        .filter((member): member is { profile_id: string; role: string; created_at: string; profile: ProfileSummary } => {
+          return Boolean(member.profile) && !memberIds.has(member.profile_id);
+        });
+    }
+  }
+
+  return NextResponse.json({ members: transformedMembers, available_members: availableMembers }, { status: 200 });
 };
 
 // POST /api/boards/[boardId]/members - Add member
