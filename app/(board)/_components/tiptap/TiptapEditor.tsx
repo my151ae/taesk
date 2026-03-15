@@ -1118,11 +1118,16 @@ export default function TiptapEditor({
         });
     }, [editor, onEditorError, uploadAndInsertImages]);
 
-    // Handle external updates to initialContent
-    // Note: Deep comparison might be expensive, so we trust React key="" or explicit reset
-    // But CardModal updates content based on prop change (switching cards).
+    // 外部からの本文差し替えだけを取り込み、ローカル編集中の prop 反映では再初期化しない。
+    // 画像付き本文は signed URL の再取得で doc が毎回変わり得るため、ここで setContent すると
+    // 入力中の selection が飛びやすい。
     useEffect(() => {
         if (!editor) return;
+
+        const lastAppliedDoc = lastAppliedDocRef.current;
+        if (lastAppliedDoc && !editor.state.doc.eq(lastAppliedDoc)) {
+            return;
+        }
 
         const requestId = ++signedUrlRequestIdRef.current;
         let cancelled = false;
