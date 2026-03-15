@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { readFile } from 'fs/promises';
 
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
-import { serializeTiptapContentToMarkdown } from '@/lib/tiptap';
+import { parseMarkdownToTiptapContent, serializeTiptapContentToMarkdown } from '@/lib/tiptap';
 import type { JSONContent } from '@tiptap/react';
 
 const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? 'e2e-test@taesk.app';
@@ -450,6 +450,7 @@ test.describe('Markdown serializer helpers', () => {
         },
         {
           type: 'details',
+          attrs: { open: true },
           content: [
             {
               type: 'detailsSummary',
@@ -489,9 +490,11 @@ test.describe('Markdown serializer helpers', () => {
         '- [x] Done',
         '  - Nested',
         '',
+        ':::details',
         'Summary',
         '',
         'Hidden body',
+        ':::',
         '',
         '@alice',
         '',
@@ -531,6 +534,88 @@ test.describe('Markdown serializer helpers', () => {
     };
 
     expect(serializeTiptapContentToMarkdown(content)).toBe('Body only');
+  });
+
+  test('parses markdown v2 structures into tiptap content', async () => {
+    const parsed = parseMarkdownToTiptapContent(
+      [
+        '## Heading',
+        '',
+        '- [x] Done',
+        '- [ ] Todo',
+        '',
+        ':::details',
+        'Summary',
+        '',
+        'Body line 1',
+        '',
+        'Body line 2',
+        ':::',
+      ].join('\n')
+    );
+
+    expect(parsed).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Heading' }],
+        },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Done' }] }],
+            },
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Todo' }] }],
+            },
+          ],
+        },
+        {
+          type: 'details',
+          attrs: { open: true },
+          content: [
+            {
+              type: 'detailsSummary',
+              content: [{ type: 'text', text: 'Summary' }],
+            },
+            {
+              type: 'detailsContent',
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Body line 1' }] },
+                { type: 'paragraph', content: [{ type: 'text', text: 'Body line 2' }] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test('falls back for ambiguous details compat text', async () => {
+    expect(parseMarkdownToTiptapContent('Summary\n\n- [x] Body')).toEqual({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Summary' }] },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body' }] }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(parseMarkdownToTiptapContent(':::details\n\nBody\n:::')).toBeNull();
   });
 });
 
@@ -1443,9 +1528,11 @@ test.describe('@feature:timeline Timeline view', () => {
           '- [x] Checklist done',
           '  - Nested child',
           '',
+          ':::details',
           'Detail summary',
           '',
           'Hidden copy body',
+          ':::',
         ].join('\n')
       );
     } finally {
@@ -1572,6 +1659,226 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(titlePayload.defaultPrevented).toBeFalsy();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('pastes markdown and restores heading checklist and details blocks', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Markdown paste target',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1516,
+      tags: [],
+      due_date: isoDay,
+      due_start: '11:30:00',
+      due_end: '12:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5013,
+      slug: 'markdown-paste-target',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+
+      await bodyEditor.click();
+      await pastePlainText(page, [
+        '## Pasted Heading',
+        '',
+        '- [x] Done',
+        '- [ ] Todo',
+        '',
+        ':::details',
+        'Pasted Summary',
+        '',
+        'Details body line 1',
+        '',
+        'Details body line 2',
+        ':::',
+      ].join('\n'));
+
+      await expect(bodyEditor.locator('h2').first()).toHaveText('Pasted Heading');
+      await expect(bodyEditor.locator('ul[data-type="taskList"] li').first()).toContainText('Done');
+      await expect(bodyEditor.locator('summary').first()).toHaveText('Pasted Summary');
+      await expect(bodyEditor.locator('div[data-type="detailsContent"] p').first()).toHaveText('Details body line 1');
+
+      await expect.poll(async () => {
+        const { data } = await supabaseAdmin
+          .from('cards')
+          .select('content')
+          .eq('id', cardId)
+          .eq('board_id', boardContext.boardId)
+          .maybeSingle();
+        return Array.isArray((data?.content as { content?: Array<{ type?: string }> } | null)?.content)
+          ? (data?.content as { content: Array<{ type?: string }> }).content.map((node) => node.type)
+          : [];
+      }, { timeout: 20_000 }).toEqual(expect.arrayContaining(['heading', 'taskList', 'details']));
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('round-trips taesk markdown copy into restored details blocks', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const isoDay = isoDateJst();
+    const sourceCardId = crypto.randomUUID();
+    const targetCardId = crypto.randomUUID();
+    const sourceShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const targetShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    const sourceInsert = await supabaseAdmin.from('cards').insert({
+      id: sourceCardId,
+      title: 'Markdown source',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Roundtrip Heading' }],
+          },
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Roundtrip Task' }] }],
+              },
+            ],
+          },
+          {
+            type: 'details',
+            attrs: { open: true },
+            content: [
+              {
+                type: 'detailsSummary',
+                content: [{ type: 'text', text: 'Roundtrip Summary' }],
+              },
+              {
+                type: 'detailsContent',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Roundtrip Body' }] }],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1517,
+      tags: [],
+      due_date: isoDay,
+      due_start: '12:30:00',
+      due_end: '13:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: sourceShortId,
+      id_short: 5014,
+      slug: 'markdown-roundtrip-source',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+    expect(sourceInsert.error).toBeNull();
+
+    const targetInsert = await supabaseAdmin.from('cards').insert({
+      id: targetCardId,
+      title: 'Markdown target',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1518,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:30:00',
+      due_end: '14:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: targetShortId,
+      id_short: 5015,
+      slug: 'markdown-roundtrip-target',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+    expect(targetInsert.error).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${sourceShortId}`);
+      const sourceModal = page.getByRole('dialog');
+      await expect(sourceModal).toBeVisible();
+      const sourceEditor = sourceModal.locator('.ProseMirror[data-autofocus="true"]').first();
+
+      await sourceEditor.click();
+      const selectAllModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+      await page.keyboard.press(`${selectAllModifier}+A`);
+      const payload = await dispatchCopyEvent(page);
+      expect(payload.plainText).toContain(':::details');
+
+      await page.goto(`${boardContext.canonicalPath}?card=${targetShortId}`);
+      const targetModal = page.getByRole('dialog');
+      await expect(targetModal).toBeVisible();
+      const targetEditor = targetModal.locator('.ProseMirror[data-autofocus="true"]').first();
+
+      await targetEditor.click();
+      await pastePlainText(page, payload.plainText);
+
+      await expect(targetEditor.locator('h2').first()).toHaveText('Roundtrip Heading');
+      await expect(targetEditor.locator('ul[data-type="taskList"] li').first()).toContainText('Roundtrip Task');
+      await expect(targetEditor.locator('summary').first()).toHaveText('Roundtrip Summary');
+      await expect(targetEditor.locator('div[data-type="detailsContent"] p').first()).toHaveText('Roundtrip Body');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [sourceCardId, targetCardId]);
     }
   });
 

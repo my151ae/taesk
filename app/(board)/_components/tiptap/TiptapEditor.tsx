@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
 import { EditorState, NodeSelection, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
-import { DOMSerializer, Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { DOMSerializer, Fragment, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -12,7 +12,7 @@ import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
-import { buildDefaultBodyContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
+import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -347,6 +347,26 @@ export default function TiptapEditor({
             return false;
         }
     }, [getLeadingTextSelection]);
+
+    const isSelectionInLeadingTaskItemState = useCallback((state: EditorState): boolean => {
+        if (!state.selection.empty) return false;
+        const { $from, $to } = state.selection;
+        if (!$from.parent.isTextblock || !$to.parent.isTextblock) return false;
+
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+            const node = $from.node(depth);
+            if (node.type.name !== 'taskItem') continue;
+            if (depth < 2) return false;
+            const parentList = $from.node(depth - 1);
+            const docNode = $from.node(depth - 2);
+            if (parentList.type.name !== 'taskList' || docNode.type.name !== 'doc') {
+                return false;
+            }
+            return $from.index(depth - 2) === 0 && $from.index(depth - 1) === 0;
+        }
+
+        return false;
+    }, []);
 
     const setSelectionAtDocStart = useCallback((state: EditorState, dispatch: (tr: Transaction) => void): void => {
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
@@ -1098,6 +1118,53 @@ export default function TiptapEditor({
         event.preventDefault();
     }, [editor]);
 
+    const applyParsedMarkdownPaste = useCallback((content: JSONContent): boolean => {
+        if (!editor) return false;
+
+        const { state, dispatch } = editor.view;
+        const contentNodes = content.type === 'doc' ? content.content ?? [] : [content];
+        if (contentNodes.length === 0) return false;
+
+        let fragment: Fragment;
+        try {
+            fragment = Fragment.fromArray(contentNodes.map((node) => editor.schema.nodeFromJSON(node)));
+        } catch {
+            return false;
+        }
+
+        const insertFrom = state.selection.from;
+        const insertedSize = fragment.size;
+        const tr = state.tr.replaceSelection(new Slice(fragment, 0, 0));
+        const selectionPos = Math.min(insertFrom + insertedSize, tr.doc.content.size);
+        const nextSelection = Selection.near(tr.doc.resolve(selectionPos), -1);
+        const nextTr = tr.setSelection(nextSelection).scrollIntoView();
+        dispatch(nextTr);
+        onChange?.(nextTr.doc.toJSON() as JSONContent);
+        editor.view.focus();
+        return true;
+    }, [editor, onChange]);
+
+    const handleMarkdownPasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
+        if (!editor || !editor.isEditable || !event.clipboardData) return false;
+
+        const text = event.clipboardData.getData('text/plain');
+        if (!text.trim()) return false;
+
+        if (text.trimStart().startsWith(':::details') && isSelectionInLeadingTaskItemState(editor.state)) {
+            return false;
+        }
+
+        const parsedContent = parseMarkdownToTiptapContent(text);
+        if (!parsedContent) return false;
+
+        const applied = applyParsedMarkdownPaste(parsedContent);
+        if (!applied) return false;
+
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+    }, [applyParsedMarkdownPaste, editor, isSelectionInLeadingTaskItemState]);
+
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
         const htmlImageFiles =
@@ -1117,6 +1184,21 @@ export default function TiptapEditor({
             onEditorError?.('画像の貼り付けに失敗しました。');
         });
     }, [editor, onEditorError, uploadAndInsertImages]);
+
+    const handlePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
+        const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
+        const htmlImageFiles =
+            directImageFiles.length === 0
+                ? extractImageFilesFromClipboardHtml(event.clipboardData?.getData('text/html') ?? '')
+                : [];
+
+        if (directImageFiles.length > 0 || htmlImageFiles.length > 0) {
+            handleImagePasteCapture(event);
+            return;
+        }
+
+        handleMarkdownPasteCapture(event);
+    }, [handleImagePasteCapture, handleMarkdownPasteCapture]);
 
     // 外部からの本文差し替えだけを取り込み、ローカル編集中の prop 反映では再初期化しない。
     // 画像付き本文は signed URL の再取得で doc が毎回変わり得るため、ここで setContent すると
@@ -1348,7 +1430,7 @@ export default function TiptapEditor({
                 }
             }}
             onCopyCapture={handleCopyCapture}
-            onPasteCapture={handleImagePasteCapture}
+            onPasteCapture={handlePasteCapture}
         >
             {renderableBlocks.map((target, index) => {
                 if (!target.rect || !rootRect) return null;

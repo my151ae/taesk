@@ -43,7 +43,25 @@ type MarkdownSerializeContext = {
   suppressBlockFormatting: boolean;
 };
 
+type MarkdownParseResult =
+  | {
+      kind: "parsed";
+      content: JSONContent;
+      format: "markdown-v2" | "markdown-v1-compat" | "generic-markdown";
+    }
+  | {
+      kind: "fallback";
+      reason:
+        | "looks-like-plain-text"
+        | "ambiguous-details"
+        | "unsupported-structure"
+        | "html-preferred"
+        | "title-row-preferred";
+    };
+
 const LIST_INDENT = "  ";
+const DETAILS_FENCE_OPEN = ":::details";
+const DETAILS_FENCE_CLOSE = ":::";
 
 const isListNodeType = (type?: string) =>
   type === "bulletList" || type === "orderedList" || type === "taskList";
@@ -55,6 +73,12 @@ const normalizeMarkdown = (value: string): string =>
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trimEnd();
+
+const normalizeMarkdownInput = (value: string): string =>
+  value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
 
 const escapeMarkdownText = (value: string): string =>
   value
@@ -274,7 +298,9 @@ const serializeMarkdownNode = (node: JSONContent, context: MarkdownSerializeCont
       const contentNode = (node.content ?? []).find((child) => child.type === "detailsContent");
       const summary = summaryNode ? serializeMarkdownNode(summaryNode, context).trim() : "";
       const body = contentNode ? serializeMarkdownNode(contentNode, context).trim() : "";
-      if (summary && body) return `${summary}\n\n${body}`;
+      if (summary && body) {
+        return `${DETAILS_FENCE_OPEN}\n${summary}\n\n${body}\n${DETAILS_FENCE_CLOSE}`;
+      }
       return summary || body;
     }
     case "doc":
@@ -331,6 +357,324 @@ export const serializeTiptapSliceToMarkdown = (slice: Slice): string => {
     },
     { suppressBlockFormatting: singleTextBlockPartialSelection }
   );
+};
+
+const headingPattern = /^(#{1,3})\s+(.+)$/;
+const taskPattern = /^- \[([ xX])\]\s+(.*)$/;
+const bulletPattern = /^- (?!\[[ xX]\]\s)(.+)$/;
+const orderedPattern = /^(\d+)\.\s+(.*)$/;
+const imagePattern = /^!\[(.*)\]\((.+)\)$/;
+
+const hasTopLevelIndent = (line: string): boolean => /^\s+/.test(line);
+
+const createInlineContent = (text: string): JSONContent[] | undefined => {
+  if (!text) return undefined;
+  const parts = text.split("\n");
+  const content: JSONContent[] = [];
+  parts.forEach((part, index) => {
+    if (index > 0) {
+      content.push({ type: "hardBreak" });
+    }
+    if (part.length > 0) {
+      content.push({ type: "text", text: part });
+    }
+  });
+  return content.length > 0 ? content : undefined;
+};
+
+const createParagraphBlock = (lines: string[]): JSONContent => ({
+  type: "paragraph",
+  content: createInlineContent(lines.join("\n")),
+});
+
+const createParagraphBlocksFromText = (text: string): JSONContent[] => {
+  const groups = normalizeMarkdownInput(text)
+    .split(/\n{2,}/)
+    .map((group) => group.split("\n").map((line) => line.trimEnd()))
+    .filter((group) => group.some((line) => line.trim().length > 0));
+  return groups.map((group) => createParagraphBlock(group));
+};
+
+const isRecognizedTopLevelMarkdownLine = (line: string, allowDetails: boolean): boolean => {
+  if (!line.trim()) return false;
+  if (allowDetails && line === DETAILS_FENCE_OPEN) return true;
+  if (hasTopLevelIndent(line)) return false;
+  return (
+    headingPattern.test(line) ||
+    taskPattern.test(line) ||
+    bulletPattern.test(line) ||
+    orderedPattern.test(line) ||
+    imagePattern.test(line)
+  );
+};
+
+const looksLikeSupportedMarkdown = (markdown: string): boolean => {
+  return normalizeMarkdownInput(markdown)
+    .split("\n")
+    .some((line) => isRecognizedTopLevelMarkdownLine(line, true));
+};
+
+const parseDetailsBlocksFromMarkdown = (markdown: string, sourceFormat: "markdown-v1-compat" | "markdown-v2"): JSONContent | null => {
+  const normalized = normalizeMarkdownInput(markdown);
+  if (!normalized) return null;
+
+  if (sourceFormat === "markdown-v2") {
+    const lines = normalized.split("\n");
+    if (lines[0] !== DETAILS_FENCE_OPEN || lines[lines.length - 1] !== DETAILS_FENCE_CLOSE) {
+      return null;
+    }
+    const innerLines = lines.slice(1, -1);
+    if (innerLines.some((line) => line === DETAILS_FENCE_OPEN)) {
+      return null;
+    }
+    const summary = innerLines[0]?.trim() ?? "";
+    if (!summary || innerLines[1] !== "") {
+      return null;
+    }
+    const bodyText = innerLines.slice(2).join("\n").trim();
+    if (!bodyText) return null;
+    return {
+      type: "details",
+      attrs: { open: true },
+      content: [
+        {
+          type: "detailsSummary",
+          content: createInlineContent(summary),
+        },
+        {
+          type: "detailsContent",
+          content: createParagraphBlocksFromText(bodyText),
+        },
+      ],
+    };
+  }
+
+  const lines = normalized.split("\n");
+  const separatorIndex = lines.findIndex((line) => line.trim() === "");
+  if (separatorIndex <= 0 || separatorIndex >= lines.length - 1) {
+    return null;
+  }
+  const summaryLines = lines.slice(0, separatorIndex);
+  const bodyLines = lines.slice(separatorIndex + 1);
+  if (summaryLines.length !== 1) return null;
+
+  const summary = summaryLines[0].trim();
+  const body = bodyLines.join("\n").trim();
+  if (!summary || summary.length > 60 || !body) return null;
+  if (
+    isRecognizedTopLevelMarkdownLine(summary, true) ||
+    looksLikeSupportedMarkdown(body)
+  ) {
+    return null;
+  }
+
+  return {
+    type: "details",
+    attrs: { open: true },
+    content: [
+      {
+        type: "detailsSummary",
+        content: createInlineContent(summary),
+      },
+      {
+        type: "detailsContent",
+        content: createParagraphBlocksFromText(body),
+      },
+    ],
+  };
+};
+
+const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
+  const normalized = normalizeMarkdownInput(markdown);
+  if (!normalized) {
+    return { kind: "fallback", reason: "looks-like-plain-text" };
+  }
+
+  const detailsV2 = parseDetailsBlocksFromMarkdown(normalized, "markdown-v2");
+  if (detailsV2) {
+    return {
+      kind: "parsed",
+      format: "markdown-v2",
+      content: { type: "doc", content: [detailsV2] },
+    };
+  }
+
+  if (!looksLikeSupportedMarkdown(normalized)) {
+    const detailsV1 = parseDetailsBlocksFromMarkdown(normalized, "markdown-v1-compat");
+    if (detailsV1) {
+      return {
+        kind: "parsed",
+        format: "markdown-v1-compat",
+        content: { type: "doc", content: [detailsV1] },
+      };
+    }
+    return { kind: "fallback", reason: "looks-like-plain-text" };
+  }
+
+  const lines = normalized.split("\n");
+  const blocks: JSONContent[] = [];
+  let index = 0;
+
+  const consumeParagraph = () => {
+    const paragraphLines: string[] = [];
+    while (index < lines.length) {
+      const line = lines[index];
+      if (!line.trim()) break;
+      if (isRecognizedTopLevelMarkdownLine(line, true)) break;
+      if (hasTopLevelIndent(line)) {
+        return false;
+      }
+      paragraphLines.push(line);
+      index += 1;
+    }
+    if (paragraphLines.length > 0) {
+      blocks.push(createParagraphBlock(paragraphLines));
+    }
+    return paragraphLines.length > 0;
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    if (line === DETAILS_FENCE_OPEN) {
+      let endIndex = index + 1;
+      while (endIndex < lines.length && lines[endIndex] !== DETAILS_FENCE_CLOSE) {
+        endIndex += 1;
+      }
+      if (endIndex >= lines.length) {
+        return { kind: "fallback", reason: "ambiguous-details" };
+      }
+      const detailsNode = parseDetailsBlocksFromMarkdown(lines.slice(index, endIndex + 1).join("\n"), "markdown-v2");
+      if (!detailsNode) {
+        return { kind: "fallback", reason: "ambiguous-details" };
+      }
+      blocks.push(detailsNode);
+      index = endIndex + 1;
+      continue;
+    }
+
+    if (hasTopLevelIndent(line)) {
+      return { kind: "fallback", reason: "unsupported-structure" };
+    }
+
+    const headingMatch = line.match(headingPattern);
+    if (headingMatch) {
+      blocks.push({
+        type: "heading",
+        attrs: { level: headingMatch[1].length },
+        content: createInlineContent(headingMatch[2].trim()),
+      });
+      index += 1;
+      continue;
+    }
+
+    if (taskPattern.test(line)) {
+      const taskItems: JSONContent[] = [];
+      while (index < lines.length) {
+        const currentLine = lines[index];
+        const match = currentLine.match(taskPattern);
+        if (!match || hasTopLevelIndent(currentLine)) break;
+        taskItems.push({
+          type: "taskItem",
+          attrs: { checked: match[1].toLowerCase() === "x" },
+          content: [
+            {
+              type: "paragraph",
+              content: createInlineContent(match[2].trim()),
+            },
+          ],
+        });
+        index += 1;
+      }
+      blocks.push({ type: "taskList", content: taskItems });
+      continue;
+    }
+
+    if (bulletPattern.test(line)) {
+      const items: JSONContent[] = [];
+      while (index < lines.length) {
+        const currentLine = lines[index];
+        const match = currentLine.match(bulletPattern);
+        if (!match || hasTopLevelIndent(currentLine)) break;
+        items.push({
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: createInlineContent(match[1].trim()),
+            },
+          ],
+        });
+        index += 1;
+      }
+      blocks.push({ type: "bulletList", content: items });
+      continue;
+    }
+
+    if (orderedPattern.test(line)) {
+      const items: JSONContent[] = [];
+      let start = 1;
+      while (index < lines.length) {
+        const currentLine = lines[index];
+        const match = currentLine.match(orderedPattern);
+        if (!match || hasTopLevelIndent(currentLine)) break;
+        if (items.length === 0) {
+          start = Number(match[1]);
+        }
+        items.push({
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: createInlineContent(match[2].trim()),
+            },
+          ],
+        });
+        index += 1;
+      }
+      blocks.push({ type: "orderedList", attrs: { start }, content: items });
+      continue;
+    }
+
+    const imageMatch = line.match(imagePattern);
+    if (imageMatch) {
+      blocks.push({
+        type: "image",
+        attrs: {
+          alt: imageMatch[1],
+          src: imageMatch[2],
+        },
+      });
+      index += 1;
+      continue;
+    }
+
+    if (!consumeParagraph()) {
+      return { kind: "fallback", reason: "unsupported-structure" };
+    }
+  }
+
+  if (blocks.length === 0) {
+    return { kind: "fallback", reason: "looks-like-plain-text" };
+  }
+
+  return {
+    kind: "parsed",
+    format: "generic-markdown",
+    content: {
+      type: "doc",
+      content: blocks,
+    },
+  };
+};
+
+export const parseMarkdownToTiptapContent = (markdown: string): JSONContent | null => {
+  const result = parseMarkdownToResult(markdown);
+  return result.kind === "parsed" ? result.content : null;
 };
 
 /**
