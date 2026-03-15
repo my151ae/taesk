@@ -787,10 +787,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           viewMode={viewMode} setViewMode={handleViewModeChange}
           onShortcutsClick={() => setShowShortcutsModal(true)}
           onOpenShareDialog={() => handleOpenBoardSettings(currentBoard.id)}
-          onPrevDay={viewMode === 'list' ? handleListPrevDay : handlePrevDay}
-          onNextDay={viewMode === 'list' ? handleListNextDay : handleNextDay}
-          onPrevDayRange={viewMode === 'timeline' ? handlePrevDayRange : undefined}
-          onNextDayRange={viewMode === 'timeline' ? handleNextDayRange : undefined}
           listStartDate={listAnchorDate ?? null}
         />
 

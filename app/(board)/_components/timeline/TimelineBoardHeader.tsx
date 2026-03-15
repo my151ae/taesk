@@ -47,10 +47,6 @@ type TimelineBoardHeaderProps = {
   viewMode: 'timeline' | 'list';
   setViewMode: (mode: 'timeline' | 'list') => void;
   onShortcutsClick: () => void;
-  onPrevDay?: () => void;
-  onNextDay?: () => void;
-  onPrevDayRange?: () => void;
-  onNextDayRange?: () => void;
   listStartDate?: string | null;
   onOpenShareDialog?: () => void;
 };
@@ -96,10 +92,6 @@ export default function TimelineBoardHeader({
   viewMode,
   setViewMode,
   onShortcutsClick,
-  onPrevDay,
-  onNextDay,
-  onPrevDayRange,
-  onNextDayRange,
   listStartDate,
   onOpenShareDialog,
 }: TimelineBoardHeaderProps) {
@@ -145,10 +137,6 @@ export default function TimelineBoardHeader({
         viewMode={viewMode}
         setViewMode={setViewMode}
         onShortcutsClick={onShortcutsClick}
-        onPrevDay={onPrevDay}
-        onNextDay={onNextDay}
-        onPrevDayRange={onPrevDayRange}
-        onNextDayRange={onNextDayRange}
         listStartDate={listStartDate}
         onOpenShareDialog={onOpenShareDialog}
       />

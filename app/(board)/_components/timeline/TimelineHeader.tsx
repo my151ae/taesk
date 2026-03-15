@@ -66,10 +66,6 @@ type TimelineHeaderProps = {
     viewMode: 'timeline' | 'list';
     setViewMode: (mode: 'timeline' | 'list') => void;
     onShortcutsClick: () => void;
-    onPrevDay?: () => void;
-    onNextDay?: () => void;
-    onPrevDayRange?: () => void;
-    onNextDayRange?: () => void;
     listStartDate?: string | null;
     onOpenShareDialog?: () => void;
     onOpenTeamSettings: (teamId: string | null | undefined) => void;
@@ -114,10 +110,6 @@ export default function TimelineHeader({
     viewMode,
     setViewMode,
     onShortcutsClick,
-    onPrevDay,
-    onNextDay,
-    onPrevDayRange,
-    onNextDayRange,
     listStartDate,
     onOpenShareDialog,
     onOpenTeamSettings,
@@ -246,6 +238,11 @@ export default function TimelineHeader({
         }));
         return sections;
     }, [board.id, board.team_id, boardsByTeamId, modalTeams]);
+
+    const currentTeam = useMemo(
+        () => modalTeams.find((team) => team.id === board.team_id) ?? null,
+        [board.team_id, modalTeams]
+    );
 
     const getRealtimeStatusColor = () => {
         switch (realtimeStatus) {
@@ -405,8 +402,17 @@ export default function TimelineHeader({
                     </div>
 
                     {/* Board Name */}
-                    <div className="flex items-center gap-2 min-w-0 shrink">
-                        <h1 className="text-base font-medium text-slate-900 truncate md:text-xl md:font-semibold shrink min-w-0">{board.name}</h1>
+                    <div className="flex min-w-0 shrink items-center gap-2">
+                        <div className="min-w-0 shrink">
+                            {currentTeam ? (
+                                <p className="truncate text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 md:text-xs">
+                                    {currentTeam.name}
+                                </p>
+                            ) : null}
+                            <h1 className="truncate text-base font-medium text-slate-900 md:text-xl md:font-semibold">
+                                {board.name}
+                            </h1>
+                        </div>
                         <div className="hidden md:flex group relative items-center justify-center" title={`Realtime: ${getRealtimeStatusText()}`}>
                             <div className={clsx("w-2 h-2 rounded-full", getRealtimeStatusColor())} />
                         </div>
@@ -622,45 +628,6 @@ export default function TimelineHeader({
                     >
                         Today
                     </button>
-                )}
-
-                {viewMode === 'timeline' && onPrevDay && onNextDay && (
-                    <div className="flex items-center gap-1 rounded-full bg-white px-1.5 py-1 shadow-sm ring-1 ring-slate-200 shrink-0">
-                        <button
-                            type="button"
-                            onClick={onPrevDayRange}
-                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30"
-                            disabled={!onPrevDayRange}
-                            aria-label="前へ 表示日数-1日"
-                        >
-                            {'<<'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onPrevDay}
-                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                            aria-label="前へ 1日"
-                        >
-                            {'<1'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onNextDay}
-                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                            aria-label="次へ 1日"
-                        >
-                            {'1>'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onNextDayRange}
-                            className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30"
-                            disabled={!onNextDayRange}
-                            aria-label="次へ 表示日数-1日"
-                        >
-                            {'>>'}
-                        </button>
-                    </div>
                 )}
 
                 {/* Day Range Selector */}
