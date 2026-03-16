@@ -243,13 +243,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   // 5. Filtering
   const {
     searchQuery, setSearchQuery,
-    selectedTags, setSelectedTags,
-    sortBy, setSortBy,
-    showFilters, setShowFilters,
     filteredData,
     searchResults,
-    hasActiveFilters,
-    availableTags,
   } = useTimelineFiltering(data);
 
   // 6. Navigation
@@ -777,21 +772,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onOpenBoardSettings={handleOpenBoardSettings}
           onOpenTeamSettings={handleOpenTeamSettings}
           profile={profile} user={user} signOut={signOut}
-          showFilters={showFilters} setShowFilters={setShowFilters} hasActiveFilters={hasActiveFilters}
-          searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-          selectedTags={selectedTags} setSelectedTags={setSelectedTags}
-          availableTags={availableTags} dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
+          dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
           onTodayClick={viewMode === 'list' ? handleListToday : handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
-          onUpdateBoard={handleUpdateBoard}
           googleStatusText={googleStatusText}
           googleCalendarStatus={googleCalendarStatus} googleCalendarError={googleCalendarError}
           calendarPreset={calendarPreset} setCalendarPreset={setCalendarPreset}
           refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
-          isGoogleLoading={googleCalendarStatus === 'loading'} isCalendarRangeReady={!!visibleDays.length}
+          isGoogleLoading={googleCalendarStatus === 'loading'}
           viewMode={viewMode} setViewMode={handleViewModeChange}
           onShortcutsClick={() => setShowShortcutsModal(true)}
-          onOpenShareDialog={() => handleOpenBoardSettings(currentBoard.id)}
-          listStartDate={listAnchorDate ?? null}
         />
 
         {viewMode === 'timeline' ? (

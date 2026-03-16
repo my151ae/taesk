@@ -110,7 +110,7 @@ export default function TimelineBoardDialogs({
           onClick={() => setShowBoardSettings(false)}
         >
           <div
-            className="my-6 flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl bg-white p-6 shadow-2xl"
+            className="my-6 flex h-[90vh] w-full max-w-5xl flex-col bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -122,7 +122,7 @@ export default function TimelineBoardDialogs({
                 ✕
               </button>
             </div>
-            <div className="overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 pr-1 xl:overflow-hidden">
               <BoardSettings
                 board={targetBoard}
                 onAccessUpdated={onMemberAdded}
@@ -200,7 +200,7 @@ export default function TimelineBoardDialogs({
           onClick={() => setShowTeamSettings(false)}
         >
           <div
-            className="my-6 flex max-h-[90vh] w-full max-w-6xl flex-col rounded-xl bg-white p-6 shadow-2xl"
+            className="my-6 flex h-[90vh] w-full max-w-5xl flex-col bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -212,7 +212,7 @@ export default function TimelineBoardDialogs({
                 ✕
               </button>
             </div>
-            <div className="overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 pr-1 xl:overflow-hidden">
               <TeamManagementDialog initialTeamId={teamSettingsTeamId ?? initialBoard.team_id ?? null} />
             </div>
           </div>

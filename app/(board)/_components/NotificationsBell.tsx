@@ -10,7 +10,11 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type TabType = 'all' | 'unread';
 
-export default function NotificationsBell() {
+type NotificationsBellProps = {
+  onOpenNotificationSettings?: () => void;
+};
+
+export default function NotificationsBell({ onOpenNotificationSettings }: NotificationsBellProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [showDrawer, setShowDrawer] = useState(false);
@@ -156,6 +160,11 @@ export default function NotificationsBell() {
     await markAllAsRead();
   };
 
+  const handleOpenNotificationSettings = () => {
+    setShowDrawer(false);
+    onOpenNotificationSettings?.();
+  };
+
   return (
     <div ref={drawerRef} className="relative">
       {/* Bell Icon Button */}
@@ -202,6 +211,17 @@ export default function NotificationsBell() {
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="font-semibold text-lg">Notifications</h3>
               <div className="flex items-center gap-2">
+                {onOpenNotificationSettings && (
+                  <button
+                    type="button"
+                    onClick={handleOpenNotificationSettings}
+                    className="text-xs text-gray-600 dark:text-gray-300 hover:underline"
+                    aria-label="Notification settings"
+                    data-testid="notification-settings-button"
+                  >
+                    Settings
+                  </button>
+                )}
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}

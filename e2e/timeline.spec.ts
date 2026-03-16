@@ -1332,11 +1332,10 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(boardContext.canonicalPath);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
-      await expect(page.getByText('Menu').first()).toBeVisible();
-
       const overdueToggle = page.getByTestId('desktop-sidebar-overdue-panel-toggle');
       const overduePanel = page.getByTestId('desktop-sidebar-overdue-panel');
       const overdueCount = page.getByTestId('desktop-sidebar-overdue-panel-count');
+      const searchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
 
       await expect(overdueToggle).toBeVisible();
       await expect(overdueCount).toHaveText('1');
@@ -1352,15 +1351,23 @@ test.describe('@feature:timeline Timeline view', () => {
       const searchCount = page.getByTestId('desktop-sidebar-search-panel-count');
       const searchInput = page.getByTestId('desktop-sidebar-search-input');
 
+      await expect(searchPanel).toBeHidden();
+      await expect(searchCount).toHaveText('0');
+
+      await searchToggle.click();
       await expect(searchPanel).toBeVisible();
       await expect(searchInput).toBeVisible();
-      await expect(searchCount).toHaveText('0');
+      await expect(overduePanel).toBeHidden();
 
       await searchInput.fill('Sidebar Search');
 
       await expect(searchCount).toHaveText('2');
       await expect(page.locator(`[data-testid="search-card-overdue-${overdueCardId}"]:visible`).first()).toBeVisible();
       await expect(page.locator(`[data-testid="search-card-bucket-${bucketCardId}"]:visible`).first()).toBeVisible();
+
+      await overdueToggle.click();
+      await expect(overduePanel).toBeVisible();
+      await expect(searchPanel).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
     }

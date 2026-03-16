@@ -209,14 +209,21 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
       )}
 
       <div className="space-y-6">
-        <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">Members</h4>
-            <p className="text-xs text-slate-500">現在この Board にアクセスできる Team メンバーです。</p>
+        <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900">Members</h4>
+              <p className="text-xs text-slate-500">現在この Board にアクセスできる Team メンバーです。</p>
+            </div>
+            {!loading && (
+              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                {members.length} members
+              </span>
+            )}
           </div>
 
           {canManage && (
-            <form onSubmit={handleMemberAdd} className="space-y-2 rounded-lg bg-slate-50 p-3">
+            <form onSubmit={handleMemberAdd} className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
               <select
                 value={selectedProfileId}
                 onChange={(event) => setSelectedProfileId(event.target.value)}
@@ -266,7 +273,8 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
               Loading members...
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2">
               {members.map((member) => {
                 const identity = resolveProfileIdentity(member.profile, member.profile?.email ?? null);
                 const secondary = identity.secondary && identity.secondary !== identity.label
@@ -276,10 +284,10 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                 return (
                   <div
                     key={member.profile_id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-3"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
                         {getProfileInitial(member.profile, member.profile?.email ?? null)}
                       </div>
                       <div className="min-w-0">
@@ -318,12 +326,13 @@ export default function BoardAccessSettings({ boardId, canManage, onUpdated }: P
                   No members yet
                 </div>
               )}
+              </div>
             </div>
           )}
         </section>
       </div>
 
-      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+      <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
         外部メールアドレスの招待は Team Settings から行ってください。Board Settings では Team メンバーへの Board access 付与だけを扱います。
       </div>
     </div>

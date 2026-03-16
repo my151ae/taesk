@@ -33,20 +33,10 @@ type TimelineHeaderProps = {
     profile: UserProfile | null;
     user: User | null;
     signOut: () => Promise<void>;
-    // Filter props
-    showFilters: boolean;
-    setShowFilters: (show: boolean | ((prev: boolean) => boolean)) => void;
-    hasActiveFilters: boolean;
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
-    selectedTags: string[];
-    setSelectedTags: (tags: string[] | ((prev: string[]) => string[])) => void;
-    availableTags: string[];
     onOpenBoardSettings: (boardId: string | null | undefined) => void;
     dayRange: number;
     onDayRangeChange: (days: number) => void;
     onTodayClick: () => void;
-    onUpdateBoard: (updates: Partial<Board>) => Promise<void>;
     // Google Calendar props
     googleStatusText: string;
     googleCalendarStatus: string;
@@ -56,13 +46,10 @@ type TimelineHeaderProps = {
     refreshGoogleCalendar: () => void;
     handleGoogleConnect: () => void;
     isGoogleLoading: boolean;
-    isCalendarRangeReady: boolean;
     realtimeStatus: 'connected' | 'connecting' | 'disconnected';
     viewMode: 'timeline' | 'list';
     setViewMode: (mode: 'timeline' | 'list') => void;
     onShortcutsClick: () => void;
-    listStartDate?: string | null;
-    onOpenShareDialog?: () => void;
     onOpenTeamSettings: (teamId: string | null | undefined) => void;
 };
 
@@ -79,19 +66,10 @@ export default function TimelineHeader({
     profile,
     user,
     signOut,
-    showFilters,
-    setShowFilters,
-    hasActiveFilters,
-    searchQuery,
-    setSearchQuery,
-    selectedTags,
-    setSelectedTags,
-    availableTags,
     onOpenBoardSettings,
     dayRange,
     onDayRangeChange,
     onTodayClick,
-    onUpdateBoard,
     googleStatusText,
     googleCalendarStatus,
     googleCalendarError,
@@ -100,13 +78,10 @@ export default function TimelineHeader({
     refreshGoogleCalendar,
     handleGoogleConnect,
     isGoogleLoading,
-    isCalendarRangeReady,
     realtimeStatus,
     viewMode,
     setViewMode,
     onShortcutsClick,
-    listStartDate,
-    onOpenShareDialog,
     onOpenTeamSettings,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
@@ -117,7 +92,6 @@ export default function TimelineHeader({
     const [showMobileActions, setShowMobileActions] = useState(false);
     const [showDayRangeDropdown, setShowDayRangeDropdown] = useState(false);
     const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
-    const filtersDropdownRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
@@ -173,7 +147,6 @@ export default function TimelineHeader({
 
     // Click outside handlers for dropdowns
     useClickOutside(dayRangeDropdownRef, () => setShowDayRangeDropdown(false));
-    useClickOutside(filtersDropdownRef, () => setShowFilters(false));
     useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
     useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
     useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
@@ -474,19 +447,6 @@ export default function TimelineHeader({
                     {showMobileActions && (
                         <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-slate-100 bg-white p-2 shadow-lg ring-1 ring-black/5">
                             <div className="space-y-1">
-                                <button
-                                    onClick={() => {
-                                        setShowFilters((prev) => !prev);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className={clsx(
-                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
-                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
-                                    )}
-                                >
-                                    <span>Filters</span>
-                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
-                                </button>
                                 {viewMode === 'timeline' && (
                                     <div className="rounded-lg px-3 py-2 text-sm text-slate-700">
                                         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Range</p>
@@ -514,15 +474,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     Profile Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowNotificationSettings(true);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    Notifications
                                 </button>
                                 <Link
                                     href="/playground"
@@ -629,88 +580,8 @@ export default function TimelineHeader({
                 </div>
                 )}
 
-                {/* Filters Button */}
-                <div ref={filtersDropdownRef} className="relative shrink-0">
-                    <button
-                        onClick={() => setShowFilters((prev) => !prev)}
-                        className={clsx(
-                            "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm ring-1 ring-slate-200 transition-colors",
-                            hasActiveFilters ? "bg-sky-50 text-sky-700 ring-sky-200" : "bg-white text-slate-700 hover:bg-slate-50"
-                        )}
-                        title="Filters"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                        </svg>
-                        <span>Filters</span>
-                        {hasActiveFilters && (
-                            <span className="flex h-2 w-2 rounded-full bg-sky-500" />
-                        )}
-                    </button>
-
-                    {showFilters && (
-                        <div className="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-xl border border-slate-100 bg-white p-3 shadow-lg ring-1 ring-black/5 focus:outline-none">
-                            <div className="space-y-3">
-                                <div className="flex gap-2">
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(event) => setSearchQuery(event.target.value)}
-                                            placeholder="Search..."
-                                            className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {availableTags.length === 0 && (
-                                            <span className="text-xs text-slate-400">No tags available</span>
-                                        )}
-                                        {availableTags.map((tag) => {
-                                            const active = selectedTags.includes(tag);
-                                            return (
-                                                <button
-                                                    key={tag}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedTags((prev) =>
-                                                            prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]
-                                                        );
-                                                    }}
-                                                    className={clsx(
-                                                        'rounded-full px-2 py-0.5 text-[10px] font-medium transition border',
-                                                        active ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                    )}
-                                                >
-                                                    #{tag}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {hasActiveFilters && (
-                                    <div className="border-t border-slate-100 pt-2 flex justify-end">
-                                        <button
-                                            onClick={() => {
-                                                setSearchQuery('');
-                                                setSelectedTags([]);
-                                            }}
-                                            className="text-xs font-medium text-slate-500 hover:text-slate-700"
-                                        >
-                                            Clear all
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 {/* Notifications Bell */}
-                <NotificationsBell />
+                <NotificationsBell onOpenNotificationSettings={() => setShowNotificationSettings(true)} />
 
                 {/* Profile Menu */}
                 <div ref={profileMenuRef} className="relative shrink-0">
@@ -740,24 +611,6 @@ export default function TimelineHeader({
                             <div className="p-1">
                                 <button
                                     onClick={() => {
-                                        setShowFilters((prev) => !prev);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className={clsx(
-                                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-slate-50",
-                                        hasActiveFilters ? "text-sky-700" : "text-slate-700"
-                                    )}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                                        </svg>
-                                        Filters
-                                    </span>
-                                    {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
-                                </button>
-                                <button
-                                    onClick={() => {
                                         setShowProfileSettings(true);
                                         setShowProfileMenu(false);
                                     }}
@@ -767,18 +620,6 @@ export default function TimelineHeader({
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0ZM4.5 20.118a7.5 7.5 0 0115 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.5-1.632Z" />
                                     </svg>
                                     Profile Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowNotificationSettings(true);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.31 6.022 23.848 23.848 0 005.454 1.31m5.713 0a24.255 24.255 0 01-5.713 0m5.713 0a3 3 0 11-5.713 0" />
-                                    </svg>
-                                    Notifications
                                 </button>
                                 <Link
                                     href="/playground"

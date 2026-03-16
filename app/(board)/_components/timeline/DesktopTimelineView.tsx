@@ -409,16 +409,13 @@ export function DesktopTimelineView({
       >
         <div ref={timelineHeaderRef} className="z-30">
           <div
-            className="grid border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-500 pr-[14px]"
+            className="grid border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
             style={{
               gridTemplateColumns: desktopGridTemplateColumns,
             }}
           >
-            <div className="flex items-center justify-center px-4 py-3 text-center text-slate-800">
-              <div>
-                <p>Menu</p>
-                <p className="text-[10px] text-slate-400 normal-case tracking-normal">Overdue / Search</p>
-              </div>
+            <div className="flex items-center justify-center bg-white px-4 py-3 text-center text-slate-700">
+              <p>SideMenu</p>
             </div>
             {visibleDays.map((day, index) => (
               <div
@@ -575,7 +572,7 @@ export function DesktopTimelineView({
                 gridTemplateColumns: desktopGridTemplateColumns,
               }}
             >
-              <aside className="border-r border-slate-100 bg-amber-50/40">
+              <aside className="border-r border-slate-200 bg-white">
                 <div
                   className="sticky top-0 min-h-0"
                   style={abViewportHeight > 0 ? { height: `${abViewportHeight}px` } : undefined}

@@ -21,18 +21,9 @@ type TimelineBoardHeaderProps = {
   profile: UserProfile | null;
   user: User | null;
   signOut: () => Promise<void>;
-  showFilters: boolean;
-  setShowFilters: (show: boolean | ((prev: boolean) => boolean)) => void;
-  hasActiveFilters: boolean;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  selectedTags: string[];
-  setSelectedTags: (tags: string[] | ((prev: string[]) => string[])) => void;
-  availableTags: string[];
   dayRange: number;
   onDayRangeChange: (days: number) => void;
   onTodayClick: () => void;
-  onUpdateBoard: (updates: Partial<Board>) => Promise<void>;
   googleStatusText: string;
   googleCalendarStatus: string;
   googleCalendarError: string | null;
@@ -41,14 +32,11 @@ type TimelineBoardHeaderProps = {
   refreshGoogleCalendar: () => void;
   handleGoogleConnect: () => void;
   isGoogleLoading: boolean;
-  isCalendarRangeReady: boolean;
   realtimeStatus: "connected" | "connecting" | "disconnected";
   googleToast: string | null;
   viewMode: 'timeline' | 'list';
   setViewMode: (mode: 'timeline' | 'list') => void;
   onShortcutsClick: () => void;
-  listStartDate?: string | null;
-  onOpenShareDialog?: () => void;
 };
 
 export default function TimelineBoardHeader({
@@ -66,18 +54,9 @@ export default function TimelineBoardHeader({
   profile,
   user,
   signOut,
-  showFilters,
-  setShowFilters,
-  hasActiveFilters,
-  searchQuery,
-  setSearchQuery,
-  selectedTags,
-  setSelectedTags,
-  availableTags,
   dayRange,
   onDayRangeChange,
   onTodayClick,
-  onUpdateBoard,
   googleStatusText,
   googleCalendarStatus,
   googleCalendarError,
@@ -86,14 +65,11 @@ export default function TimelineBoardHeader({
   refreshGoogleCalendar,
   handleGoogleConnect,
   isGoogleLoading,
-  isCalendarRangeReady,
   realtimeStatus,
   googleToast,
   viewMode,
   setViewMode,
   onShortcutsClick,
-  listStartDate,
-  onOpenShareDialog,
 }: TimelineBoardHeaderProps) {
   return (
     <>
@@ -112,18 +88,9 @@ export default function TimelineBoardHeader({
         profile={profile}
         user={user}
         signOut={signOut}
-        showFilters={showFilters}
-        setShowFilters={setShowFilters}
-        hasActiveFilters={hasActiveFilters}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedTags={selectedTags}
-        setSelectedTags={setSelectedTags}
-        availableTags={availableTags}
         dayRange={dayRange}
         onDayRangeChange={onDayRangeChange}
         onTodayClick={onTodayClick}
-        onUpdateBoard={onUpdateBoard}
         googleStatusText={googleStatusText}
         googleCalendarStatus={googleCalendarStatus}
         googleCalendarError={googleCalendarError}
@@ -132,13 +99,10 @@ export default function TimelineBoardHeader({
         refreshGoogleCalendar={refreshGoogleCalendar}
         handleGoogleConnect={handleGoogleConnect}
         isGoogleLoading={isGoogleLoading}
-        isCalendarRangeReady={isCalendarRangeReady}
         realtimeStatus={realtimeStatus}
         viewMode={viewMode}
         setViewMode={setViewMode}
         onShortcutsClick={onShortcutsClick}
-        listStartDate={listStartDate}
-        onOpenShareDialog={onOpenShareDialog}
       />
       {googleToast && (
         <div className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white shadow-md">

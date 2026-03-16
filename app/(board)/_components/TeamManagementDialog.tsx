@@ -389,16 +389,21 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
   }, [fetchSelectedTeam, resetNotice, selectedTeamId]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-[260px,1fr]">
-      <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <h3 className="text-sm font-semibold text-slate-800">Teams</h3>
+    <div className="grid gap-4 xl:h-full xl:min-h-0 xl:grid-cols-[280px,minmax(0,1fr)]">
+      <section className="space-y-4 border border-slate-200 bg-white p-4 xl:min-h-0">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-900">Teams</h3>
+          <p className="text-xs text-slate-500">所属している Team を選択して設定を編集します。</p>
+        </div>
         <div className="max-h-60 space-y-1 overflow-y-auto">
           {orderedTeams.map((team) => (
             <button
               key={team.id}
               onClick={() => setSelectedTeamId(team.id)}
-              className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                team.id === selectedTeamId ? "bg-sky-100 text-sky-900" : "bg-white text-slate-700 hover:bg-slate-100"
+              className={`w-full rounded-lg border px-3 py-2.5 text-left text-sm transition ${
+                team.id === selectedTeamId
+                  ? "border-sky-200 bg-sky-50 text-sky-900"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -417,19 +422,19 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
           {teams.length === 0 && <p className="text-xs text-slate-500">No teams</p>}
         </div>
 
-        <div className="space-y-2 border-t border-slate-200 pt-3">
+        <div className="space-y-2 border-t border-slate-200 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Create Team</p>
           <input
             value={newTeamName}
             onChange={(e) => setNewTeamName(e.target.value)}
             placeholder="Team name"
-            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
           <input
             value={newTeamSlug}
             onChange={(e) => setNewTeamSlug(e.target.value)}
             placeholder="Slug (optional)"
-            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
           <label className="flex items-center gap-2 text-xs text-slate-700">
             <input
@@ -442,76 +447,100 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
           <button
             onClick={handleCreateTeam}
             disabled={saving || !newTeamName.trim()}
-            className="w-full rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             Create Team
           </button>
         </div>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-slate-800">Team Settings</h3>
+      <section className="space-y-4 border border-slate-200 bg-white p-4 xl:min-h-0 xl:overflow-y-auto">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-900">Team Settings</h3>
+          <p className="text-xs text-slate-500">メンバー、招待、Team オプションをこの画面で管理します。</p>
+        </div>
         {loading && <p className="text-sm text-slate-500">Loading...</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-emerald-700">{message}</p>}
+        {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        {message && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>}
 
         {selectedTeam ? (
-          <>
-            <div className="border-t border-slate-200 pt-4">
-              <h4 className="mb-2 text-sm font-semibold text-slate-800">Members</h4>
+          <div className="space-y-4 xl:grid xl:min-h-0 xl:grid-rows-[minmax(360px,1fr)_auto_auto]">
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 xl:flex xl:min-h-0 xl:flex-col">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">Members</h4>
+                  <p className="text-xs text-slate-500">この Team に所属するメンバーです。</p>
+                </div>
+                {!membersForbidden && (
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    {members.length} members
+                  </span>
+                )}
+              </div>
               {membersForbidden ? (
-                <p className="text-sm text-slate-500">Guest role cannot view team members.</p>
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500">
+                  Guest role cannot view team members.
+                </div>
               ) : (
-                <div className="space-y-2">
-                  {members.map((member) => (
-                    <div key={member.profile_id} className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
-                        {getInitials(displayName(member))}
+                <div className="max-h-[420px] overflow-y-auto pr-1 xl:min-h-0 xl:flex-1 xl:max-h-none">
+                  <div className="space-y-2">
+                    {members.map((member) => (
+                      <div key={member.profile_id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
+                          {getInitials(displayName(member))}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-800">{displayName(member)}</p>
+                          <p className="truncate text-xs text-slate-500">{member.profile.email || member.profile_id}</p>
+                        </div>
+                        <select
+                          value={member.role}
+                          onChange={(e) => void handleChangeMemberRole(member.profile_id, e.target.value as TeamRole)}
+                          disabled={!isTeamAdmin || saving}
+                          className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                        >
+                          <option value="owner">owner</option>
+                          <option value="admin">admin</option>
+                          <option value="member">member</option>
+                          <option value="guest">guest</option>
+                        </select>
+                        <button
+                          onClick={() => void handleRemoveMember(member.profile_id)}
+                          disabled={!isTeamAdmin || saving}
+                          className="rounded-lg px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800">{displayName(member)}</p>
-                        <p className="truncate text-xs text-slate-500">{member.profile.email || member.profile_id}</p>
+                    ))}
+                    {members.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                        No members.
                       </div>
-                      <select
-                        value={member.role}
-                        onChange={(e) => void handleChangeMemberRole(member.profile_id, e.target.value as TeamRole)}
-                        disabled={!isTeamAdmin || saving}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-                      >
-                        <option value="owner">owner</option>
-                        <option value="admin">admin</option>
-                        <option value="member">member</option>
-                        <option value="guest">guest</option>
-                      </select>
-                      <button
-                        onClick={() => void handleRemoveMember(member.profile_id)}
-                        disabled={!isTeamAdmin || saving}
-                        className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {members.length === 0 && <p className="text-sm text-slate-500">No members.</p>}
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="border-t border-slate-200 pt-4">
-              <h4 className="mb-2 text-sm font-semibold text-slate-800">Invites</h4>
-              <div className="mb-3 grid gap-2 md:grid-cols-[1fr,120px,auto]">
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">Invites</h4>
+                <p className="text-xs text-slate-500">外部メールアドレスの招待と発行済みリンクを管理します。</p>
+              </div>
+              <div className="grid gap-2 md:grid-cols-[1fr,120px,auto]">
                 <input
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="member@example.com"
                   disabled={!isTeamAdmin || saving}
-                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as "admin" | "member" | "guest")}
                   disabled={!isTeamAdmin || saving}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                 >
                   <option value="admin">admin</option>
                   <option value="member">member</option>
@@ -520,14 +549,14 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 <button
                   onClick={handleCreateInvite}
                   disabled={!isTeamAdmin || saving || !inviteEmail.trim()}
-                  className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
                   Invite
                 </button>
               </div>
 
               {latestInvite?.url && (
-                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                   <p className="font-medium">Invite link</p>
                   <p className="mt-1 break-all">{latestInvite.url}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -548,13 +577,13 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 </div>
               )}
 
-              <p className="mb-3 text-xs text-slate-500">
+              <p className="text-xs text-slate-500">
                 セキュリティ上、発行済みリンクは一覧から再表示できません。再度共有する場合は pending invite の「Reissue link」を使って新しいリンクを発行してください。
               </p>
 
               <div className="space-y-2">
                 {pendingInvites.map((invite) => (
-                  <div key={invite.id} className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5">
+                  <div key={invite.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-slate-800">{invite.email}</p>
                       <p className="text-xs text-slate-500">role={invite.role} / expires={new Date(invite.expires_at).toLocaleString()}</p>
@@ -563,14 +592,14 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                       <button
                         onClick={() => void handleReissueInvite(invite)}
                         disabled={!isTeamAdmin || saving}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700 disabled:opacity-50"
                       >
                         Reissue link
                       </button>
                       <button
                         onClick={() => void handleRevokeInvite(invite.id)}
                         disabled={!isTeamAdmin || saving}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 disabled:opacity-50"
+                        className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700 disabled:opacity-50"
                       >
                         Revoke
                       </button>
@@ -579,17 +608,20 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 ))}
                 {pendingInvites.length === 0 && <p className="text-sm text-slate-500">No pending invites.</p>}
               </div>
-            </div>
+            </section>
 
-            <div className="border-t border-slate-200 pt-4">
-              <h4 className="mb-3 text-sm font-semibold text-slate-800">Team Options</h4>
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">Team Options</h4>
+                <p className="text-xs text-slate-500">Team 名称と board 作成権限を設定します。</p>
+              </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                     disabled={!isTeamAdmin || saving}
                   />
                 </div>
@@ -598,12 +630,12 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                   <input
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
                     disabled={!isTeamAdmin || saving}
                   />
                 </div>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+              <label className="mt-1 flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={allowMemberCreateBoard}
@@ -616,13 +648,13 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 <button
                   onClick={handleSaveTeamSettings}
                   disabled={!isTeamAdmin || saving}
-                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
                   Save Team Settings
                 </button>
               </div>
-            </div>
-          </>
+            </section>
+          </div>
         ) : (
           !loading && <p className="text-sm text-slate-500">Select a team.</p>
         )}

@@ -24,16 +24,19 @@ type DesktopSidebarMenuProps = {
   contextMenuCardId: string | null;
 };
 
+type SidebarSectionKey = "overdue" | "search";
+type SidebarSectionTone = "amber" | "slate";
+
 function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <span
       className={clsx(
-        "inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 transition-transform duration-150 ease-out",
+        "inline-flex h-[18px] w-[18px] items-center justify-center border border-slate-200 bg-white text-slate-600 transition-transform duration-150 ease-out",
         expanded ? "rotate-180" : ""
       )}
       aria-hidden="true"
     >
-      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
       </svg>
     </span>
@@ -45,46 +48,53 @@ function SidebarSection({
   tone,
   label,
   count,
+  fillAvailableSpace,
   expanded,
   onToggle,
   children,
 }: {
   id: string;
-  tone: "amber" | "slate";
+  tone: SidebarSectionTone;
   label: string;
   count: number;
+  fillAvailableSpace?: boolean;
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
-  const toneClassName =
+  const buttonClassName =
     tone === "amber"
-      ? "border-amber-200 bg-amber-50/80 text-amber-900 hover:bg-amber-100/70"
-      : "border-slate-200 bg-white/90 text-slate-800 hover:bg-slate-50";
+      ? "text-sky-700 hover:bg-sky-50/70"
+      : "text-slate-700 hover:bg-white/60";
   const countClassName =
     tone === "amber"
-      ? "bg-white/90 text-amber-800"
+      ? "bg-sky-100 text-sky-700"
       : "bg-slate-100 text-slate-700";
 
   return (
-    <section className="overflow-hidden rounded-xl">
+    <section
+      className={clsx(
+        "overflow-hidden border-b border-slate-200/80",
+        expanded && fillAvailableSpace ? "flex min-h-0 flex-1 flex-col" : ""
+      )}
+    >
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls={id}
         onClick={onToggle}
         className={clsx(
-          "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left shadow-sm transition-colors",
-          toneClassName
+          "flex w-full items-center justify-between px-2 py-2 text-left transition-colors",
+          buttonClassName
         )}
         data-testid={`${id}-toggle`}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+          <span className="text-[11px] font-semibold tracking-[0.01em]">
             {label}
           </span>
           <span
-            className={clsx("rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm", countClassName)}
+            className={clsx("rounded-sm px-1.5 py-0.5 text-[9px] font-semibold", countClassName)}
             data-testid={`${id}-count`}
           >
             {count}
@@ -97,13 +107,13 @@ function SidebarSection({
         id={id}
         data-testid={id}
         aria-hidden={!expanded}
-        className="overflow-hidden transition-[max-height,opacity] duration-150 ease-out"
-        style={{
-          maxHeight: expanded ? "2000px" : "0px",
-          opacity: expanded ? 1 : 0,
-        }}
+        hidden={!expanded}
+        className={clsx(
+          "min-h-0 pt-1",
+          expanded && fillAvailableSpace ? "flex min-h-0 flex-1 flex-col" : ""
+        )}
       >
-        <div className="pt-2">{children}</div>
+        {children}
       </div>
     </section>
   );
@@ -146,7 +156,7 @@ function SidebarCardRow({
 }) {
   const card = (
     <div
-      className="min-w-0"
+      className="relative min-w-0 pt-4 has-[:focus]:z-10"
       data-testid={testId}
       onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
     >
@@ -166,7 +176,7 @@ function SidebarCardRow({
         onOpen={() => openCardModal(item.short_id, openSource)}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
         paddingClass="py-1"
-        className={clsx("min-h-0 border-slate-200", className)}
+        className={clsx("min-h-0", className)}
         onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
         focusGroup="bucket"
       />
@@ -204,61 +214,70 @@ export function DesktopSidebarMenu({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
 }: DesktopSidebarMenuProps) {
-  const [overdueExpanded, setOverdueExpanded] = useState(true);
-  const [searchExpanded, setSearchExpanded] = useState(true);
+  const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>("overdue");
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
-      <div className="px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">Menu</p>
-        <p className="mt-1 text-[10px] text-slate-500">Overdue と Search をここで開閉できます</p>
-      </div>
+  const handleToggleSection = (key: SidebarSectionKey) => {
+    setExpandedSectionKey((prev) => (prev === key ? null : key));
+  };
 
-      <SidebarSection
-        id="desktop-sidebar-overdue-panel"
-        tone="amber"
-        label="Overdue"
-        count={overdueItems.length}
-        expanded={overdueExpanded}
-        onToggle={() => setOverdueExpanded((prev) => !prev)}
-      >
-        <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-2">
+  const sectionDefinitions: Array<{
+    key: SidebarSectionKey;
+    tone: SidebarSectionTone;
+    id: string;
+    label: string;
+    count: number;
+    renderContent: () => React.ReactNode;
+  }> = [
+    {
+      key: "overdue",
+      tone: "amber",
+      id: "desktop-sidebar-overdue-panel",
+      label: "Overdue",
+      count: overdueItems.length,
+      renderContent: () => (
+        <div className="flex min-h-0 flex-1 flex-col">
           {overdueItems.length === 0 ? (
-            <p className="rounded-md border border-dashed border-amber-200 bg-white/70 px-3 py-2 text-[10px] text-amber-700/80">
+            <div className="px-2 py-3">
+              <p className="border border-dashed border-slate-200 bg-white/80 px-3 py-2 text-[10px] text-slate-500">
               未完了の期限超過カードはありません
-            </p>
+              </p>
+            </div>
           ) : (
-            overdueItems.map((item) => (
-              <SidebarCardRow
-                key={item.card_id}
-                item={item}
-                badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
-                timeText={buildOverdueTimeText(item)}
-                openSource="overdue"
-                testId={`overdue-card-${item.card_id}`}
-                className="bg-amber-50/80"
-                draggable
-                onToggleCheck={onToggleCheck}
-                openCardModal={openCardModal}
-                onCardContextMenu={onCardContextMenu}
-                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                isContextMenuOpen={contextMenuCardId === item.card_id}
-              />
-            ))
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+              <div className="min-h-full space-y-1 p-[1px] pl-1 pr-0 pb-3">
+              {overdueItems.map((item) => (
+                <SidebarCardRow
+                  key={item.card_id}
+                  item={item}
+                  badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
+                  timeText={buildOverdueTimeText(item)}
+                  openSource="overdue"
+                  testId={`overdue-card-${item.card_id}`}
+                  className="bg-white"
+                  draggable
+                  onToggleCheck={onToggleCheck}
+                  openCardModal={openCardModal}
+                  onCardContextMenu={onCardContextMenu}
+                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                  isContextMenuOpen={contextMenuCardId === item.card_id}
+                />
+              ))}
+              </div>
+            </div>
           )}
         </div>
-      </SidebarSection>
-
-      <SidebarSection
-        id="desktop-sidebar-search-panel"
-        tone="slate"
-        label="Search"
-        count={searchQuery.trim() ? searchResults.length : 0}
-        expanded={searchExpanded}
-        onToggle={() => setSearchExpanded((prev) => !prev)}
-      >
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+      ),
+    },
+    {
+      key: "search",
+      tone: "slate",
+      id: "desktop-sidebar-search-panel",
+      label: "Search",
+      count: searchQuery.trim() ? searchResults.length : 0,
+      renderContent: () => (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="px-1 py-1">
+            <div className="border border-slate-200 bg-white px-3 py-1.5">
             <input
               type="text"
               value={searchQuery}
@@ -267,36 +286,73 @@ export function DesktopSidebarMenu({
               className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
               data-testid="desktop-sidebar-search-input"
             />
+            </div>
           </div>
 
           {!searchQuery.trim() ? (
-            <p className="rounded-md border border-dashed border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">
-              キーワードを入れると該当カードをここに一覧表示します
-            </p>
+            <div className="px-2 py-3">
+              <p className="border border-dashed border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">
+                キーワードを入れると該当カードをここに一覧表示します
+              </p>
+            </div>
           ) : searchResults.length === 0 ? (
-            <p className="rounded-md border border-dashed border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">
-              一致するカードはありません
-            </p>
+            <div className="px-2 py-3">
+              <p className="border border-dashed border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">
+                一致するカードはありません
+              </p>
+            </div>
           ) : (
-            searchResults.map((result) => (
-              <SidebarCardRow
-                key={`${result.kind}:${result.item.card_id}`}
-                item={result.item}
-                badgeLabel={result.badgeLabel}
-                timeText={result.timeText}
-                openSource="search"
-                testId={`search-card-${result.kind}-${result.item.card_id}`}
-                className="bg-white/90"
-                onToggleCheck={onToggleCheck}
-                openCardModal={openCardModal}
-                onCardContextMenu={onCardContextMenu}
-                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                isContextMenuOpen={contextMenuCardId === result.item.card_id}
-              />
-            ))
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+              <div className="min-h-full space-y-1 p-[1px] pl-1 pr-0 pb-3">
+              {searchResults.map((result) => (
+                <SidebarCardRow
+                  key={`${result.kind}:${result.item.card_id}`}
+                  item={result.item}
+                  badgeLabel={result.badgeLabel}
+                  timeText={result.timeText}
+                  openSource="search"
+                  testId={`search-card-${result.kind}-${result.item.card_id}`}
+                  className="bg-white"
+                  onToggleCheck={onToggleCheck}
+                  openCardModal={openCardModal}
+                  onCardContextMenu={onCardContextMenu}
+                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                  isContextMenuOpen={contextMenuCardId === result.item.card_id}
+                />
+              ))}
+              </div>
+            </div>
           )}
         </div>
-      </SidebarSection>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden pl-2 pr-0 py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden bg-white">
+        {sectionDefinitions.map((section, index) => (
+          <div
+            key={section.key}
+            className={clsx(
+              "flex min-h-0 flex-col",
+              index > 0 ? "pt-3" : ""
+            )}
+          >
+            <SidebarSection
+              id={section.id}
+              tone={section.tone}
+              label={section.label}
+              count={section.count}
+              expanded={expandedSectionKey === section.key}
+              fillAvailableSpace
+              onToggle={() => handleToggleSection(section.key)}
+            >
+              {section.renderContent()}
+            </SidebarSection>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
