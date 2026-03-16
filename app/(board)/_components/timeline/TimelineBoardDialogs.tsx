@@ -106,10 +106,13 @@ export default function TimelineBoardDialogs({
 
       {showBoardSettings && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
           onClick={() => setShowBoardSettings(false)}
         >
-          <div className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="my-6 flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Board Settings</h2>
               <button
@@ -119,18 +122,54 @@ export default function TimelineBoardDialogs({
                 ✕
               </button>
             </div>
-            <BoardSettings
-              board={targetBoard}
-              onAccessUpdated={onMemberAdded}
-              onUpdate={async (updates) => {
-                try {
+            <div className="overflow-y-auto pr-1">
+              <BoardSettings
+                board={targetBoard}
+                onAccessUpdated={onMemberAdded}
+                onUpdate={async (updates) => {
+                  try {
+                    const response = await fetch(`/api/boards/${targetBoard.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(updates),
+                    });
+                    if (!response.ok) {
+                      let message = "Failed to update board";
+                      try {
+                        const body = await response.json() as { error?: { message?: string } };
+                        if (body?.error?.message) {
+                          message = body.error.message;
+                        }
+                      } catch {
+                        // ignore JSON parse errors and fallback to generic message
+                      }
+                      throw new Error(message);
+                    }
+                    const { board: updatedBoard } = await response.json();
+
+                    Object.assign(initialBoard, updatedBoard);
+
+                    setAvailableBoards((prev) =>
+                      prev.map((board) => (board.id === updatedBoard.id ? updatedBoard : board)),
+                    );
+
+                    setShowBoardSettings(false);
+                    if (targetBoard.id === initialBoard.id) {
+                      setActiveDayIndex(0);
+                      await fetchTimeline();
+                    }
+                  } catch (error) {
+                    console.error("Failed to update board", error);
+                    alert(error instanceof Error ? error.message : "Failed to update board");
+                  }
+                }}
+                onDelete={async () => {
                   const response = await fetch(`/api/boards/${targetBoard.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(updates),
+                    method: "DELETE",
                   });
+
                   if (!response.ok) {
-                    let message = "Failed to update board";
+                    let message = "Failed to delete board";
                     try {
                       const body = await response.json() as { error?: { message?: string } };
                       if (body?.error?.message) {
@@ -141,25 +180,16 @@ export default function TimelineBoardDialogs({
                     }
                     throw new Error(message);
                   }
-                  const { board: updatedBoard } = await response.json();
 
-                  Object.assign(initialBoard, updatedBoard);
-
-                  setAvailableBoards((prev) =>
-                    prev.map((board) => (board.id === updatedBoard.id ? updatedBoard : board)),
-                  );
-
+                  setAvailableBoards((prev) => prev.filter((board) => board.id !== targetBoard.id));
                   setShowBoardSettings(false);
+
                   if (targetBoard.id === initialBoard.id) {
-                    setActiveDayIndex(0);
-                    await fetchTimeline();
+                    window.location.href = "/board";
                   }
-                } catch (error) {
-                  console.error("Failed to update board", error);
-                  alert(error instanceof Error ? error.message : "Failed to update board");
-                }
-              }}
-            />
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

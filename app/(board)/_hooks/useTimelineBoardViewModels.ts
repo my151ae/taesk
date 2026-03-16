@@ -9,6 +9,7 @@ import type {
 } from "react";
 
 import type { ExternalCalendarEntry, TimelineBucketItem, TimelineDay, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { ActiveDragState, ActiveResizeState, BucketIndicator, PointerPreviewState } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
@@ -43,6 +44,9 @@ type UseTimelineBoardViewModelsArgs = {
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
+  searchQuery: string;
+  setSearchQuery: (value: string) => void;
+  searchResults: TimelineSearchResultItem[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   timelineViewportHeight: number;
@@ -103,6 +107,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         eventsByDay: args.eventsByDay,
         abBuckets: args.abBuckets,
         overdue: args.overdue,
+        searchQuery: args.searchQuery,
+        onSearchQueryChange: args.setSearchQuery,
+        searchResults: args.searchResults,
         indicatorTop: args.indicatorTop,
         indicatorDayIso: args.liveNowIsoDate,
         timelineViewportHeight: args.timelineViewportHeight,

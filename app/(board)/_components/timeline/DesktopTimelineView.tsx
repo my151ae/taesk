@@ -4,7 +4,8 @@ import clsx from "clsx";
 import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
-import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
+import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -59,6 +60,9 @@ type DesktopTimelineViewProps = {
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  searchResults: TimelineSearchResultItem[];
   indicatorTop: number | null;
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
@@ -108,6 +112,9 @@ export function DesktopTimelineView({
   eventsByDay,
   abBuckets,
   overdue,
+  searchQuery,
+  onSearchQueryChange,
+  searchResults,
   indicatorTop,
   indicatorDayIso,
   timelineViewportHeight,
@@ -409,8 +416,8 @@ export function DesktopTimelineView({
           >
             <div className="flex items-center justify-center px-4 py-3 text-center text-slate-800">
               <div>
-                <p>Overdue</p>
-                <p className="text-[10px] text-slate-400 normal-case tracking-normal">{overdue.length} cards</p>
+                <p>Menu</p>
+                <p className="text-[10px] text-slate-400 normal-case tracking-normal">Overdue / Search</p>
               </div>
             </div>
             {visibleDays.map((day, index) => (
@@ -573,16 +580,16 @@ export function DesktopTimelineView({
                   className="sticky top-0 min-h-0"
                   style={abViewportHeight > 0 ? { height: `${abViewportHeight}px` } : undefined}
                 >
-                  <OverduePanel
-                    items={overdue}
-                    variant="desktop"
+                  <DesktopSidebarMenu
+                    overdueItems={overdue}
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={onSearchQueryChange}
+                    searchResults={searchResults}
                     openCardModal={openCardModal}
                     onToggleCheck={onToggleCheck}
                     onCardContextMenu={onCardContextMenu}
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}
-                    className="h-full border-0"
-                    contentClassName="space-y-1.5"
                   />
                 </div>
               </aside>

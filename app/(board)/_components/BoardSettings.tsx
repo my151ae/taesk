@@ -2,26 +2,33 @@ import { useState } from 'react';
 import { Board } from '@/lib/supabase';
 import clsx from 'clsx';
 import BoardAccessSettings from '@/app/(board)/_components/BoardAccessSettings';
+import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 
 type BoardSettingsProps = {
     board: Board;
     onUpdate: (updates: Partial<Board>) => Promise<void>;
     onAccessUpdated?: () => Promise<void> | void;
+    onDelete?: () => Promise<void>;
 };
 
-export default function BoardSettings({ board, onUpdate, onAccessUpdated }: BoardSettingsProps) {
+export default function BoardSettings({ board, onUpdate, onAccessUpdated, onDelete }: BoardSettingsProps) {
     const [boardName, setBoardName] = useState(board.name ?? '');
     const [dayRange, setDayRange] = useState(board.day_range ?? 2);
     const [isSaving, setIsSaving] = useState(false);
+    const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
     const canEditName = board.membership_role === 'owner';
     const canEditDisplaySettings = !board.membership_role || board.membership_role === 'owner' || board.membership_role === 'editor';
     const canManageAccess = board.membership_role === 'owner';
+    const canDeleteBoard = board.membership_role === 'owner' && board.id !== MAIN_BOARD_ID;
+    const isProtectedBoard = board.id === MAIN_BOARD_ID;
 
     const trimmedName = boardName.trim();
     const hasNameChanged = canEditName && trimmedName !== (board.name ?? '').trim();
     const hasDayRangeChanged = canEditDisplaySettings && dayRange !== (board.day_range ?? 2);
     const hasChanges = hasNameChanged || hasDayRangeChanged;
     const canSave = hasChanges && trimmedName.length > 0;
+    const canConfirmDelete = deleteConfirmationName.trim() === (board.name ?? '').trim();
 
     const handleSave = async () => {
         if (!canSave) return;
@@ -45,8 +52,27 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
         }
     };
 
+    const handleDelete = async () => {
+        if (!canDeleteBoard || !canConfirmDelete || !onDelete) return;
+        setIsDeleting(true);
+        try {
+            await onDelete();
+        } catch (error) {
+            console.error('Failed to delete board', error);
+            alert(error instanceof Error ? error.message : 'Failed to delete board');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
+            <BoardAccessSettings
+                boardId={board.id}
+                canManage={canManageAccess}
+                onUpdated={onAccessUpdated}
+            />
+
             <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
                 <div>
                     <h3 className="text-sm font-medium text-slate-900">Board Name</h3>
@@ -90,11 +116,45 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated }: Boar
                 </div>
             </div>
 
-            <BoardAccessSettings
-                boardId={board.id}
-                canManage={canManageAccess}
-                onUpdated={onAccessUpdated}
-            />
+            <details className="rounded-xl border border-red-200 bg-red-50/70 p-4">
+                <summary className="cursor-pointer list-none text-sm font-semibold text-red-900">
+                    Danger Zone
+                </summary>
+                <div className="mt-4 space-y-3">
+                    <div>
+                        <h3 className="text-sm font-medium text-red-900">Delete Board</h3>
+                        <p className="mt-1 text-xs text-red-700">
+                            {isProtectedBoard
+                                ? 'This protected board cannot be deleted.'
+                                : canDeleteBoard
+                                    ? `Type "${board.name}" to enable deletion. This action cannot be undone.`
+                                    : 'Only board owners can delete this board.'}
+                        </p>
+                    </div>
+                    <input
+                        type="text"
+                        value={deleteConfirmationName}
+                        onChange={(event) => setDeleteConfirmationName(event.target.value)}
+                        className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+                        placeholder={board.name ?? 'Board name'}
+                        disabled={!canDeleteBoard || isDeleting}
+                    />
+                    <div className="flex justify-end">
+                        <button
+                            onClick={handleDelete}
+                            disabled={!canDeleteBoard || !canConfirmDelete || isDeleting}
+                            className={clsx(
+                                'rounded-lg px-4 py-2 text-sm font-semibold text-white transition',
+                                !canDeleteBoard || !canConfirmDelete || isDeleting
+                                    ? 'cursor-not-allowed bg-red-200'
+                                    : 'bg-red-600 hover:bg-red-700'
+                            )}
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete Board'}
+                        </button>
+                    </div>
+                </div>
+            </details>
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
                 <button

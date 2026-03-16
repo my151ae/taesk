@@ -14,6 +14,7 @@ type TeamMemberItem = {
     display_name: string | null;
     full_name: string | null;
     username: string | null;
+    avatar_url: string | null;
   };
 };
 
@@ -44,6 +45,15 @@ const ADMIN_ROLES: TeamRole[] = ["owner", "admin"];
 
 function displayName(member: TeamMemberItem): string {
   return member.profile.display_name || member.profile.full_name || member.profile.username || member.profile.email || member.profile.id;
+}
+
+function getInitials(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "?";
 }
 
 function canManageTeam(role: TeamRole | null): boolean {
@@ -173,6 +183,15 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
     () => invites.filter((invite) => !invite.accepted_at && !invite.revoked_at),
     [invites]
   );
+
+  const orderedTeams = useMemo(() => {
+    const priorityTeamId = initialTeamId ?? "";
+    return [...teams].sort((a, b) => {
+      if (a.id === priorityTeamId && b.id !== priorityTeamId) return -1;
+      if (b.id === priorityTeamId && a.id !== priorityTeamId) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [initialTeamId, teams]);
 
   const handleCreateTeam = useCallback(async () => {
     if (!newTeamName.trim()) return;
@@ -374,7 +393,7 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
       <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
         <h3 className="text-sm font-semibold text-slate-800">Teams</h3>
         <div className="max-h-60 space-y-1 overflow-y-auto">
-          {teams.map((team) => (
+          {orderedTeams.map((team) => (
             <button
               key={team.id}
               onClick={() => setSelectedTeamId(team.id)}
@@ -382,8 +401,17 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                 team.id === selectedTeamId ? "bg-sky-100 text-sky-900" : "bg-white text-slate-700 hover:bg-slate-100"
               }`}
             >
-              <div className="font-medium">{team.name}</div>
-              <div className="text-xs text-slate-500">{team.role}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{team.name}</div>
+                  <div className="text-xs text-slate-500">{team.role}</div>
+                </div>
+                {team.id === initialTeamId ? (
+                  <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                    Current
+                  </span>
+                ) : null}
+              </div>
             </button>
           ))}
           {teams.length === 0 && <p className="text-xs text-slate-500">No teams</p>}
@@ -429,33 +457,6 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
 
         {selectedTeam ? (
           <>
-            <div className="grid gap-2 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" disabled={!isTeamAdmin || saving} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Slug</label>
-                <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" disabled={!isTeamAdmin || saving} />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={allowMemberCreateBoard}
-                onChange={(e) => setAllowMemberCreateBoard(e.target.checked)}
-                disabled={!isTeamAdmin || saving}
-              />
-              members can create boards
-            </label>
-            <button
-              onClick={handleSaveTeamSettings}
-              disabled={!isTeamAdmin || saving}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-            >
-              Save Team Settings
-            </button>
-
             <div className="border-t border-slate-200 pt-4">
               <h4 className="mb-2 text-sm font-semibold text-slate-800">Members</h4>
               {membersForbidden ? (
@@ -463,7 +464,10 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
               ) : (
                 <div className="space-y-2">
                   {members.map((member) => (
-                    <div key={member.profile_id} className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5">
+                    <div key={member.profile_id} className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
+                        {getInitials(displayName(member))}
+                      </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-slate-800">{displayName(member)}</p>
                         <p className="truncate text-xs text-slate-500">{member.profile.email || member.profile_id}</p>
@@ -574,6 +578,48 @@ export default function TeamManagementDialog({ initialTeamId }: Props) {
                   </div>
                 ))}
                 {pendingInvites.length === 0 && <p className="text-sm text-slate-500">No pending invites.</p>}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-slate-800">Team Options</h4>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    disabled={!isTeamAdmin || saving}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Slug</label>
+                  <input
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                    disabled={!isTeamAdmin || saving}
+                  />
+                </div>
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={allowMemberCreateBoard}
+                  onChange={(e) => setAllowMemberCreateBoard(e.target.checked)}
+                  disabled={!isTeamAdmin || saving}
+                />
+                members can create boards
+              </label>
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={handleSaveTeamSettings}
+                  disabled={!isTeamAdmin || saving}
+                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Save Team Settings
+                </button>
               </div>
             </div>
           </>

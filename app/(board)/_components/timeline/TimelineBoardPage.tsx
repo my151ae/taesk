@@ -247,6 +247,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     sortBy, setSortBy,
     showFilters, setShowFilters,
     filteredData,
+    searchResults,
     hasActiveFilters,
     availableTags,
   } = useTimelineFiltering(data);
@@ -682,6 +683,9 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     eventsByDay,
     abBuckets: filteredData?.abBuckets ?? {},
     overdue: filteredData?.overdue ?? [],
+    searchQuery,
+    setSearchQuery,
+    searchResults,
     indicatorTop,
     liveNowIsoDate,
     timelineViewportHeight,

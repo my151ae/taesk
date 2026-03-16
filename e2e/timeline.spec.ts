@@ -1257,6 +1257,115 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('shows desktop menu accordions and lists search matches in the sidebar', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const todayIso = isoDateJst();
+    const yesterdayIso = shiftIsoDateJst(-1);
+    const tomorrowIso = shiftIsoDateJst(1);
+    const overdueCardId = crypto.randomUUID();
+    const bucketCardId = crypto.randomUUID();
+    const overdueShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const bucketShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: overdueCardId,
+        title: 'Sidebar Search Overdue',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'desktop menu overdue search target',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1800,
+        tags: [],
+        due_date: yesterdayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: overdueShortId,
+        id_short: Math.floor(Math.random() * 100000) + 910,
+        slug: 'sidebar-search-overdue',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: bucketCardId,
+        title: 'Sidebar Search Bucket',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'desktop menu bucket search target',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1900,
+        tags: [],
+        due_date: tomorrowIso || todayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: bucketShortId,
+        id_short: Math.floor(Math.random() * 100000) + 920,
+        slug: 'sidebar-search-bucket',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      await expect(page.getByText('Menu').first()).toBeVisible();
+
+      const overdueToggle = page.getByTestId('desktop-sidebar-overdue-panel-toggle');
+      const overduePanel = page.getByTestId('desktop-sidebar-overdue-panel');
+      const overdueCount = page.getByTestId('desktop-sidebar-overdue-panel-count');
+
+      await expect(overdueToggle).toBeVisible();
+      await expect(overdueCount).toHaveText('1');
+      await expect(overduePanel).toBeVisible();
+      await expect(page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first()).toBeVisible();
+
+      await overdueToggle.click();
+      await expect(overduePanel).toBeHidden();
+      await overdueToggle.click();
+      await expect(overduePanel).toBeVisible();
+
+      const searchPanel = page.getByTestId('desktop-sidebar-search-panel');
+      const searchCount = page.getByTestId('desktop-sidebar-search-panel-count');
+      const searchInput = page.getByTestId('desktop-sidebar-search-input');
+
+      await expect(searchPanel).toBeVisible();
+      await expect(searchInput).toBeVisible();
+      await expect(searchCount).toHaveText('0');
+
+      await searchInput.fill('Sidebar Search');
+
+      await expect(searchCount).toHaveText('2');
+      await expect(page.locator(`[data-testid="search-card-overdue-${overdueCardId}"]:visible`).first()).toBeVisible();
+      await expect(page.locator(`[data-testid="search-card-bucket-${bucketCardId}"]:visible`).first()).toBeVisible();
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
+    }
+  });
+
   test('collapses overdue into a mobile sheet and keeps overdue drag working', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

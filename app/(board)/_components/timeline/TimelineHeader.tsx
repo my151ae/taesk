@@ -8,7 +8,6 @@ import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
 import type { ProfileSummary } from '@/lib/supabase';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
-import { MAIN_BOARD_ID } from '@/lib/board-defaults';
 
 function canCreateBoardInTeam(team: TeamView): boolean {
     return team.role === 'owner'
@@ -19,10 +18,6 @@ function canCreateBoardInTeam(team: TeamView): boolean {
 function canEditBoard(board: Board): boolean {
     if (!board.membership_role) return true;
     return board.membership_role === 'owner' || board.membership_role === 'editor';
-}
-
-function isProtectedBoard(board: Board): boolean {
-    return board.id === MAIN_BOARD_ID;
 }
 
 type TimelineHeaderProps = {
@@ -163,34 +158,17 @@ export default function TimelineHeader({
         setNewBoardName('');
     };
 
-    const handleDeleteBoard = async (boardId: string, boardName: string) => {
-        if (boardId === MAIN_BOARD_ID) {
-            alert('E2E core board cannot be deleted');
+    const handleBoardSelection = (nextBoard: Board) => {
+        if (nextBoard.id === board.id) {
+            handleBoardNavigate(nextBoard);
             return;
         }
-        if (!confirm(`Are you sure you want to delete "${boardName}"? This cannot be undone.`)) return;
 
-        try {
-            const response = await fetch(`/api/boards/${boardId}`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error?.message || 'Failed to delete board');
-            }
-
-            // If deleted current board, redirect to home (which will redirect to another board or show error)
-            if (boardId === board.id) {
-                window.location.href = '/board';
-            } else {
-                // Refresh page to update list
-                window.location.reload();
-            }
-        } catch (error) {
-            console.error('Failed to delete board:', error);
-            alert(error instanceof Error ? error.message : 'Failed to delete board');
+        if (!confirm(`"${nextBoard.name || 'Untitled board'}" を開きますか？`)) {
+            return;
         }
+
+        handleBoardNavigate(nextBoard);
     };
 
     // Click outside handlers for dropdowns
@@ -300,12 +278,14 @@ export default function TimelineHeader({
                                             </div>
                                             <div className="space-y-1">
                                                 {boards.map((b) => (
-                                                    <div key={b.id} className="group flex items-center gap-1 pr-1">
+                                                    <div key={b.id} className="flex items-center gap-1 pr-1">
                                                         <button
-                                                            onClick={() => handleBoardNavigate(b)}
+                                                            onClick={() => handleBoardSelection(b)}
                                                             className={clsx(
-                                                                'flex-1 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white',
-                                                                b.id === board.id && 'bg-white text-slate-900 ring-1 ring-slate-200'
+                                                                'flex-1 rounded-lg border px-2.5 py-2 text-left text-sm transition',
+                                                                b.id === board.id
+                                                                    ? 'border-slate-300 bg-white text-slate-900 shadow-sm'
+                                                                    : 'border-slate-200 bg-white/90 text-slate-700 hover:border-slate-300 hover:bg-white'
                                                             )}
                                                         >
                                                             <div className="font-medium text-slate-800">{b.name || 'Untitled board'}</div>
@@ -320,32 +300,19 @@ export default function TimelineHeader({
                                                                 onOpenBoardSettings(b.id);
                                                             }}
                                                             className={clsx(
-                                                                "hidden h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-medium group-hover:flex",
+                                                                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-[11px] font-medium shadow-sm",
                                                                 canEditBoard(b)
                                                                     ? "text-slate-600 hover:bg-slate-50"
                                                                     : "cursor-not-allowed text-slate-300"
                                                             )}
                                                             title="Board settings"
+                                                            aria-label="Board settings"
                                                             disabled={!canEditBoard(b)}
                                                         >
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (isProtectedBoard(b)) return;
-                                                                handleDeleteBoard(b.id, b.name);
-                                                            }}
-                                                            className={clsx(
-                                                                "hidden h-8 w-8 items-center justify-center rounded-lg group-hover:flex",
-                                                                isProtectedBoard(b)
-                                                                    ? "cursor-not-allowed text-slate-300"
-                                                                    : "text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                                            )}
-                                                            title={isProtectedBoard(b) ? "Protected E2E board" : "Delete board"}
-                                                            disabled={isProtectedBoard(b)}
-                                                        >
-                                                            🗑️
+                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94l.213 1.279c.066.395.324.73.684.893.265.12.52.268.764.443.33.236.757.296 1.136.16l1.227-.438a1.125 1.125 0 011.363.512l1.296 2.245c.275.477.173 1.084-.245 1.446l-1.013.88a1.125 1.125 0 00-.363 1.059c.03.286.03.575 0 .86a1.125 1.125 0 00.363 1.06l1.013.879c.418.363.52.97.245 1.446l-1.296 2.245a1.125 1.125 0 01-1.363.512l-1.227-.438a1.125 1.125 0 00-1.136.16 5.97 5.97 0 01-.764.443 1.125 1.125 0 00-.684.893l-.213 1.28c-.09.541-.56.939-1.11.939h-2.592c-.55 0-1.02-.398-1.11-.94l-.213-1.279a1.125 1.125 0 00-.684-.893 5.97 5.97 0 01-.764-.443 1.125 1.125 0 00-1.136-.16l-1.227.438a1.125 1.125 0 01-1.363-.512L2.98 17.728a1.125 1.125 0 01.245-1.446l1.013-.88a1.125 1.125 0 00.363-1.059 8.257 8.257 0 010-.86 1.125 1.125 0 00-.363-1.06l-1.013-.879a1.125 1.125 0 01-.245-1.446l1.296-2.245a1.125 1.125 0 011.363-.512l1.227.438c.379.136.806.076 1.136-.16.244-.175.499-.323.764-.443.36-.163.618-.498.684-.893l.213-1.28Z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0Z" />
+                                                            </svg>
                                                         </button>
                                                     </div>
                                                 ))}
@@ -547,24 +514,6 @@ export default function TimelineHeader({
                                     className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
                                     Profile Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenBoardSettings(board.id);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    Board Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenTeamSettings(board.team_id);
-                                        setShowMobileActions(false);
-                                    }}
-                                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    Team Settings
                                 </button>
                                 <button
                                     onClick={() => {
@@ -799,7 +748,12 @@ export default function TimelineHeader({
                                         hasActiveFilters ? "text-sky-700" : "text-slate-700"
                                     )}
                                 >
-                                    <span className="flex items-center gap-2"><span>🔎</span> Filters</span>
+                                    <span className="flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                        </svg>
+                                        Filters
+                                    </span>
                                     {hasActiveFilters && <span className="h-2 w-2 rounded-full bg-sky-500" />}
                                 </button>
                                 <button
@@ -809,25 +763,10 @@ export default function TimelineHeader({
                                     }}
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
-                                    <span>👤</span> Profile Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenBoardSettings(board.id);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>👥</span> Board Settings
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenTeamSettings(board.team_id);
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <span>🏢</span> Team Settings
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0ZM4.5 20.118a7.5 7.5 0 0115 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.5-1.632Z" />
+                                    </svg>
+                                    Profile Settings
                                 </button>
                                 <button
                                     onClick={() => {
@@ -836,14 +775,21 @@ export default function TimelineHeader({
                                     }}
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
-                                    <span>🔔</span> Notifications
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.31 6.022 23.848 23.848 0 005.454 1.31m5.713 0a24.255 24.255 0 01-5.713 0m5.713 0a3 3 0 11-5.713 0" />
+                                    </svg>
+                                    Notifications
                                 </button>
                                 <Link
                                     href="/playground"
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                     onClick={() => setShowProfileMenu(false)}
                                 >
-                                    <span>🧪</span> Playground
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 2.25v2.386c0 .51.203 1 .565 1.361l5.538 5.538a2.25 2.25 0 010 3.182l-4.636 4.636a2.25 2.25 0 01-3.182 0l-5.538-5.538a1.927 1.927 0 00-1.36-.565H3.75m10.5-10.5L12 5.25m2.25-3H9.75m4.5 0h.008v.008h-.008V2.25Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9.75h.008v.008H8.25V9.75Z" />
+                                    </svg>
+                                    Playground
                                 </Link>
                                 <button
                                     onClick={() => {
@@ -852,7 +798,11 @@ export default function TimelineHeader({
                                     }}
                                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                 >
-                                    <span>⌨️</span> Shortcuts
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5h10.5A2.25 2.25 0 0119.5 9.75v4.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 14.25v-4.5A2.25 2.25 0 016.75 7.5Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 10.5h.75m2.25 0h.75m2.25 0h.75m-6 2.25h6" />
+                                    </svg>
+                                    Shortcuts
                                 </button>
                             </div>
 
@@ -866,9 +816,13 @@ export default function TimelineHeader({
                                             console.error('Failed to sign out', error);
                                         }
                                     }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                                 >
-                                    <span>🚪</span> Sign out
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-3.5 w-3.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H9.75m0 0 2.625-2.625M9.75 12l2.625 2.625" />
+                                    </svg>
+                                    Sign out
                                 </button>
                             </div>
                         </div>
