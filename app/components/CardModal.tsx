@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from "react";
+import type { ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
@@ -9,6 +10,7 @@ import {
     deriveExcerptFromContent,
     getTiptapPlainText,
     normalizeContent,
+    parseMarkdownToTiptapContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
@@ -25,6 +27,58 @@ const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
     { value: 'b', label: 'B (if possible)' },
 ];
 const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
+
+const normalizePastedTitleWhitespace = (value: string): string =>
+    value
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const normalizeTitleInputValue = (value: string): string =>
+    value
+        .replace(/\r\n/g, " ")
+        .replace(/\r/g, " ")
+        .replace(/\n/g, " ");
+
+const stripMarkdownLinePrefix = (line: string): string =>
+    line
+        .replace(/^\s*>\s?/, "")
+        .replace(/^\s*#{1,6}\s+/, "")
+        .replace(/^\s*(?:[-+*]|\d+[.)])\s+\[(?: |x|X)\]\s+/, "")
+        .replace(/^\s*(?:[-+*]|\d+[.)])\s+/, "")
+        .replace(/^\s*\[(?: |x|X)\]\s+/, "")
+        .trim();
+
+const stripInlineMarkdown = (value: string): string =>
+    value
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/__([^_]+)__/g, "$1")
+        .replace(/~~([^~]+)~~/g, "$1");
+
+const sanitizeTitlePaste = (value: string): string => {
+    const normalized = value.replace(/\u00A0/g, " ").trim();
+    if (!normalized) return "";
+
+    const parsedMarkdown = parseMarkdownToTiptapContent(normalized);
+    const plainText = parsedMarkdown ? getTiptapPlainText(parsedMarkdown) : normalized;
+
+    return normalizePastedTitleWhitespace(
+        stripInlineMarkdown(
+            plainText
+                .split(/\r\n|\r|\n/)
+                .map(stripMarkdownLinePrefix)
+                .join("\n")
+        )
+    );
+};
 
 interface CardModalProps {
     card: Card;
@@ -123,7 +177,7 @@ export function CardModal({
     const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
-    const titleInputRef = useRef<HTMLInputElement | null>(null);
+    const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
     const prependTaskHandlerRef = useRef<(() => void) | null>(null);
     const {
@@ -464,7 +518,51 @@ export function CardModal({
         input.setSelectionRange(nextPos, nextPos);
     }, []);
 
-    const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const resizeTitleInput = useCallback(() => {
+        const input = titleInputRef.current;
+        if (!input) return;
+        input.style.height = "auto";
+        input.style.height = `${input.scrollHeight}px`;
+    }, []);
+
+    useLayoutEffect(() => {
+        resizeTitleInput();
+    }, [resizeTitleInput, title, isLoading]);
+
+    useLayoutEffect(() => {
+        const input = titleInputRef.current;
+        if (!input || typeof ResizeObserver === "undefined") return;
+
+        let frameId = 0;
+        const scheduleResize = () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+            frameId = requestAnimationFrame(() => {
+                frameId = 0;
+                resizeTitleInput();
+            });
+        };
+
+        scheduleResize();
+
+        const observer = new ResizeObserver(() => {
+            scheduleResize();
+        });
+        observer.observe(input);
+        if (input.parentElement) {
+            observer.observe(input.parentElement);
+        }
+
+        return () => {
+            observer.disconnect();
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
+    }, [resizeTitleInput, showSidebar, stickyTitleChecklistProgress]);
+
+    const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (isHistoryPreviewing) return;
         if ((event.nativeEvent as KeyboardEvent).isComposing) return;
 
@@ -505,6 +603,38 @@ export function CardModal({
             return;
         }
     }, [isHistoryPreviewing, title]);
+
+    const handleTitlePaste = useCallback((event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+        if (isHistoryPreviewing) return;
+
+        const rawText = event.clipboardData.getData("text/plain");
+        if (!rawText.trim()) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const input = event.currentTarget;
+        const selectionStart = input.selectionStart ?? input.value.length;
+        const selectionEnd = input.selectionEnd ?? selectionStart;
+        const sanitized = sanitizeTitlePaste(rawText);
+        const nextTitle =
+            input.value.slice(0, selectionStart) +
+            sanitized +
+            input.value.slice(selectionEnd);
+        const nextCaret = selectionStart + sanitized.length;
+
+        setTitle(nextTitle);
+        triggerAutoSave();
+
+        requestAnimationFrame(() => {
+            const element = titleInputRef.current;
+            if (!element) return;
+            resizeTitleInput();
+            element.focus();
+            element.setSelectionRange(nextCaret, nextCaret);
+        });
+    }, [isHistoryPreviewing, resizeTitleInput, setTitle, triggerAutoSave]);
 
 
     const handleAddMember = (profileId: string) => {
@@ -821,20 +951,22 @@ export function CardModal({
                                             {stickyTitleChecklistProgress}
                                         </span>
                                     ) : null}
-                                    <input
+                                    <textarea
                                         ref={titleInputRef}
-                                        type="text"
                                         value={title}
+                                        rows={1}
+                                        wrap="soft"
                                         disabled={isHistoryPreviewing}
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
-                                            const val = e.target.value;
+                                            const val = normalizeTitleInputValue(e.target.value);
                                             setTitle(val);
                                             triggerAutoSave();
                                         }}
+                                        onPaste={handleTitlePaste}
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
-                                        className="flex-1 bg-transparent border-none p-0 text-xl font-bold text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
+                                        className="min-h-[1lh] min-w-0 basis-0 flex-1 resize-none overflow-hidden bg-transparent border-none p-0 text-xl font-bold leading-tight text-slate-900 break-words dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
                                     />
                                 </div>
                             </div>

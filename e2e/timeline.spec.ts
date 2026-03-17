@@ -1733,7 +1733,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
-      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
       const copyModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
       await page.evaluate(() => {
@@ -1762,16 +1762,16 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await titleInput.click();
       await page.evaluate(() => {
-        const input = document.querySelector('[data-sticky-title] input[type="text"]');
-        if (!(input instanceof HTMLInputElement)) {
+        const input = document.querySelector('[data-sticky-title] textarea');
+        if (!(input instanceof HTMLTextAreaElement)) {
           throw new Error('Missing title input');
         }
         input.setSelectionRange(0, input.value.length);
       });
 
       const titlePayload = await page.evaluate(() => {
-        const input = document.querySelector('[data-sticky-title] input[type="text"]');
-        if (!(input instanceof HTMLInputElement)) {
+        const input = document.querySelector('[data-sticky-title] textarea');
+        if (!(input instanceof HTMLTextAreaElement)) {
           throw new Error('Missing title input');
         }
         const data = new DataTransfer();
@@ -1791,6 +1791,168 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(titlePayload.plainText).toBe('');
       expect(titlePayload.htmlText).toBe('');
       expect(titlePayload.defaultPrevented).toBeFalsy();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('sanitizes markdown symbols when pasting into title row', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Paste baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body stays unchanged' }] }],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1516,
+      tags: [],
+      due_date: isoDay,
+      due_start: '10:40:00',
+      due_end: '11:40:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5013,
+      slug: 'title-paste-sanitize',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+
+      await titleInput.focus();
+      await page.evaluate(() => {
+        const input = document.querySelector('[data-sticky-title] textarea');
+        if (!(input instanceof HTMLTextAreaElement)) {
+          throw new Error('Missing title input');
+        }
+        input.setSelectionRange(0, input.value.length);
+
+        const data = new DataTransfer();
+        data.setData('text/plain', '## Pasted title\n- [ ] follow up');
+        const pasteEvent = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        });
+        input.dispatchEvent(pasteEvent);
+      });
+
+      await expect(titleInput).toHaveValue('Pasted title follow up');
+      await expect(bodyEditor).toContainText('Body stays unchanged');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('keeps long title wrapped after reopening modal', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const longTitle = 'Long title '.repeat(20).trim();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: longTitle,
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] }],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1517,
+      tags: [],
+      due_date: isoDay,
+      due_start: '10:50:00',
+      due_end: '11:50:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5014,
+      slug: 'title-wrap-reopen',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    const readMetrics = async () => {
+      return page.evaluate(() => {
+        const input = document.querySelector('[data-sticky-title] textarea');
+        if (!(input instanceof HTMLTextAreaElement)) {
+          throw new Error('Missing title textarea');
+        }
+        const styles = window.getComputedStyle(input);
+        const lineHeight = Number.parseFloat(styles.lineHeight);
+        return {
+          clientHeight: input.clientHeight,
+          scrollHeight: input.scrollHeight,
+          clientWidth: input.clientWidth,
+          scrollWidth: input.scrollWidth,
+          lineHeight,
+        };
+      });
+    };
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      let modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const firstMetrics = await readMetrics();
+      expect(firstMetrics.clientHeight).toBeGreaterThan(firstMetrics.lineHeight * 1.5);
+      expect(firstMetrics.scrollWidth).toBeLessThanOrEqual(firstMetrics.clientWidth + 2);
+
+      await page.goto(boardContext.canonicalPath);
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const reopenedMetrics = await readMetrics();
+      expect(reopenedMetrics.clientHeight).toBeGreaterThan(reopenedMetrics.lineHeight * 1.5);
+      expect(reopenedMetrics.scrollWidth).toBeLessThanOrEqual(reopenedMetrics.clientWidth + 2);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -2091,7 +2253,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.keyboard.press(`${selectAllModifier}+A`);
       await pastePlainText(page, 'A\nB\nC');
 
-      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue(initialTitle);
+      await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
 
       const nodeSummary = await bodyEditor.evaluate((root) => {
         const textContent = root.textContent ?? '';
@@ -2198,7 +2360,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const uploadResponse = await uploadResponsePromise;
       expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
-      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue(initialTitle);
+      await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
       await expect(bodyEditor.locator('img')).toHaveCount(1);
 
       await expect.poll(async () => {
@@ -2475,7 +2637,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const uploadResponse = await uploadResponsePromise;
       expect(uploadResponse.ok(), `image upload API failed: ${uploadResponse.status()}`).toBeTruthy();
-      await expect(modal.locator('[data-sticky-title] input[type="text"]')).toHaveValue(initialTitle);
+      await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
       await expect(bodyEditor.locator('img')).toHaveCount(1);
 
       await expect.poll(async () => {
@@ -2926,13 +3088,13 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
 
       await expect(titleInput).toHaveValue('Arrow navigation baseline');
       await expect(firstChecklistLine).toBeVisible();
 
-      await titleInput.evaluate((input: HTMLInputElement) => {
+      await titleInput.evaluate((input: HTMLTextAreaElement) => {
         input.focus();
         input.setSelectionRange(5, 5);
       });
@@ -3014,7 +3176,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
       await expect(titleInput).toHaveValue('Enter from title test');
 
       // 1. Enter を押下
@@ -3111,13 +3273,13 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const titleInput = modal.locator('[data-sticky-title] input[type="text"]').first();
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
 
       await expect(titleInput).toHaveValue('Arrow LR baseline');
       await expect(firstChecklistLine).toHaveText('body line');
 
-      await titleInput.evaluate((input: HTMLInputElement) => {
+      await titleInput.evaluate((input: HTMLTextAreaElement) => {
         const pos = input.value.length;
         input.focus();
         input.setSelectionRange(pos, pos);
@@ -3144,6 +3306,12 @@ test.describe('@feature:timeline Timeline view', () => {
         selection?.addRange(range);
       });
       await page.keyboard.press('ArrowLeft');
+      await expect.poll(async () => {
+        return page.evaluate(() => {
+          const active = document.activeElement;
+          return active instanceof HTMLTextAreaElement && active.closest('[data-sticky-title]') !== null;
+        });
+      }).toBeTruthy();
       await page.keyboard.type('Y');
       await expect(titleInput).toHaveValue('Arrow LR baselineY');
     } finally {
