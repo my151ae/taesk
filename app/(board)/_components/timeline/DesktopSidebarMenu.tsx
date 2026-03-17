@@ -24,7 +24,7 @@ type DesktopSidebarMenuProps = {
   contextMenuCardId: string | null;
 };
 
-type SidebarSectionKey = "overdue" | "search";
+type SidebarSectionKey = string;
 type SidebarSectionTone = "amber" | "slate";
 
 function Chevron({ expanded }: { expanded: boolean }) {
@@ -329,14 +329,15 @@ export function DesktopSidebarMenu({
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden pl-2 pr-0 py-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden bg-white">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50/70 pl-2 pr-0 py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden bg-slate-50/70">
         {sectionDefinitions.map((section, index) => (
           <div
             key={section.key}
             className={clsx(
-              "flex min-h-0 flex-col",
-              index > 0 ? "pt-3" : ""
+              "flex flex-col",
+              index > 0 ? "border-t border-slate-200/80 pt-3" : "",
+              expandedSectionKey === section.key ? "min-h-0 flex-1" : "shrink-0"
             )}
           >
             <SidebarSection

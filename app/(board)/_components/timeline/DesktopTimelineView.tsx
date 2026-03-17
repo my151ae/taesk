@@ -414,7 +414,7 @@ export function DesktopTimelineView({
               gridTemplateColumns: desktopGridTemplateColumns,
             }}
           >
-            <div className="flex items-center justify-center bg-white px-4 py-3 text-center text-slate-700">
+            <div className="flex items-center justify-center bg-slate-50/70 px-4 py-3 text-center text-slate-700">
               <p>SideMenu</p>
             </div>
             {visibleDays.map((day, index) => (
@@ -572,7 +572,7 @@ export function DesktopTimelineView({
                 gridTemplateColumns: desktopGridTemplateColumns,
               }}
             >
-              <aside className="border-r border-slate-200 bg-white">
+              <aside className="border-r border-slate-200 bg-slate-50/70">
                 <div
                   className="sticky top-0 min-h-0"
                   style={abViewportHeight > 0 ? { height: `${abViewportHeight}px` } : undefined}
