@@ -410,7 +410,7 @@ export function DesktopTimelineView({
       >
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <aside
-            className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
+            className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
             style={{ width: desktopSidebarWidth }}
           >
             <DesktopSidebarMenu

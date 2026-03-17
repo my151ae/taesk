@@ -326,7 +326,7 @@ export function DesktopSidebarMenu({
   ];
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.94))]">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.94))]">
       <div className="flex w-[2.5rem] shrink-0 flex-col items-center gap-2 border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.8))] px-0.5 py-2.5">
         <div className="h-0.5" aria-hidden="true" />
         {sectionDefinitions.map((section) => (
