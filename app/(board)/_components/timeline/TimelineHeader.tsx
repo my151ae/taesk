@@ -96,6 +96,7 @@ export default function TimelineHeader({
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
+    const todayButtonClassName = "rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm ring-1 ring-sky-600 hover:bg-sky-700 shrink-0";
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -422,7 +423,7 @@ export default function TimelineHeader({
                 <div className="ml-auto flex items-center gap-2 md:hidden">
                     <button
                         onClick={onTodayClick}
-                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        className={todayButtonClassName}
                     >
                         Today
                     </button>
@@ -524,7 +525,7 @@ export default function TimelineHeader({
                 {viewMode === 'timeline' && (
                     <button
                         onClick={onTodayClick}
-                        className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 shrink-0"
+                        className={todayButtonClassName}
                     >
                         Today
                     </button>

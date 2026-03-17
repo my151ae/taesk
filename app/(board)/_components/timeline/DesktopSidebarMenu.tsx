@@ -239,8 +239,8 @@ export function DesktopSidebarMenu({
               </p>
             </div>
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
                 {overdueItems.map((item) => (
                   <SidebarCardRow
                     key={item.card_id}
@@ -299,8 +299,8 @@ export function DesktopSidebarMenu({
               </p>
             </div>
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
                 {searchResults.map((result) => (
                   <SidebarCardRow
                     key={`${result.kind}:${result.item.card_id}`}
@@ -355,21 +355,11 @@ export function DesktopSidebarMenu({
               className={clsx("min-h-0 flex-1 flex-col", expanded ? "flex" : "hidden")}
               aria-hidden={!expanded}
             >
-              <div className="relative flex items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
+              <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
                 <span className="pointer-events-none absolute right-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                   Panel
                 </span>
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    className={clsx(
-                      "inline-flex h-7 w-7 items-center justify-center rounded-lg border",
-                      isDanger
-                        ? "border-rose-200 bg-rose-50 text-rose-700"
-                        : "border-slate-200 bg-white text-slate-700"
-                    )}
-                  >
-                    {section.icon}
-                  </span>
+                <div className="flex min-w-0 items-center gap-2 leading-tight">
                   <h2 className="truncate text-sm font-semibold leading-tight text-slate-800">{section.label}</h2>
                   <span
                     className={clsx(

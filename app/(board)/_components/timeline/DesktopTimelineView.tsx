@@ -149,7 +149,7 @@ export function DesktopTimelineView({
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
-  const desktopSidebarWidth = "clamp(288px, 22vw, 336px)";
+  const desktopSidebarWidth = "clamp(252px, 19vw, 292px)";
   const desktopGridTemplateColumns = `repeat(${visibleDays.length}, minmax(0, 1fr))`;
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
@@ -434,84 +434,97 @@ export function DesktopTimelineView({
                   gridTemplateColumns: desktopGridTemplateColumns,
                 }}
               >
-                {visibleDays.map((day, index) => (
-                  <div
-                    key={day.key}
-                    className={clsx(
-                      "px-3 py-1.5 text-center flex items-center justify-between relative",
-                      index > 0 ? "border-l border-slate-100" : ""
-                    )}
-                  >
-                    {index === 0 && (
-                      <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handlePrevDayRange();
-                          }}
-                          disabled={status === "loading"}
-                          className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                          aria-label="Previous days by visible range minus one"
-                          type="button"
-                        >
-                          {'<<'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handlePrevDay();
-                          }}
-                          disabled={status === "loading"}
-                          className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                          aria-label="Previous day"
-                          type="button"
-                        >
-                          {'<1'}
-                        </button>
-                      </div>
-                    )}
-                    {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-[3.4rem]" />}
+                {visibleDays.map((day, index) => {
+                  const isToday = day.label.startsWith("Today ");
+                  const headerLabel = isToday ? day.label.replace(/^Today\s+/, "") : day.label;
 
-                    <div className="flex-1 leading-tight">
-                      <p className="text-slate-800">{day.label}</p>
-                      <p className="text-[10px] text-slate-400">{day.isoDate}</p>
+                  return (
+                    <div
+                      key={day.key}
+                      className={clsx(
+                        "min-h-10 px-3 py-1.5 text-center flex items-center justify-between relative",
+                        index > 0 ? "border-l border-slate-100" : ""
+                      )}
+                    >
+                      {index === 0 && (
+                        <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handlePrevDayRange();
+                            }}
+                            disabled={status === "loading"}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                            aria-label="Previous days by visible range minus one"
+                            type="button"
+                          >
+                            {'<<'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handlePrevDay();
+                            }}
+                            disabled={status === "loading"}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                            aria-label="Previous day"
+                            type="button"
+                          >
+                            {'<1'}
+                          </button>
+                        </div>
+                      )}
+                      {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-[3.4rem]" />}
+
+                      <div className="flex flex-1 items-center justify-center leading-tight">
+                        <span
+                          className={clsx(
+                            "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5",
+                            isToday
+                              ? "bg-sky-600 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                              : "text-slate-800"
+                          )}
+                        >
+                          {headerLabel}
+                        </span>
+                      </div>
+
+                      {index === (visibleDays.length - 1) && (
+                        <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleNextDay();
+                            }}
+                            disabled={status === "loading"}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                            aria-label="Next day"
+                            type="button"
+                          >
+                            {'1>'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleNextDayRange();
+                            }}
+                            disabled={status === "loading"}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
+                            aria-label="Next days by visible range minus one"
+                            type="button"
+                          >
+                            {'>>'}
+                          </button>
+                        </div>
+                      )}
+                      {index === 0 && <div className="w-[3.4rem]" />}
                     </div>
-
-                    {index === (visibleDays.length - 1) && (
-                      <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleNextDay();
-                          }}
-                          disabled={status === "loading"}
-                          className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                          aria-label="Next day"
-                          type="button"
-                        >
-                          {'1>'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleNextDayRange();
-                          }}
-                          disabled={status === "loading"}
-                          className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                          aria-label="Next days by visible range minus one"
-                          type="button"
-                        >
-                          {'>>'}
-                        </button>
-                      </div>
-                    )}
-                    {index === 0 && <div className="w-[3.4rem]" />}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {hasAllDayEvents && (
