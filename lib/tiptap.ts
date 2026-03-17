@@ -47,7 +47,7 @@ type MarkdownParseResult =
   | {
       kind: "parsed";
       content: JSONContent;
-      format: "markdown-v2" | "markdown-v1-compat" | "generic-markdown";
+      format: "markdown-v2" | "generic-markdown";
     }
   | {
       kind: "fallback";
@@ -414,59 +414,24 @@ const looksLikeSupportedMarkdown = (markdown: string): boolean => {
     .some((line) => isRecognizedTopLevelMarkdownLine(line, true));
 };
 
-const parseDetailsBlocksFromMarkdown = (markdown: string, sourceFormat: "markdown-v1-compat" | "markdown-v2"): JSONContent | null => {
+const parseDetailsBlocksFromMarkdown = (markdown: string): JSONContent | null => {
   const normalized = normalizeMarkdownInput(markdown);
   if (!normalized) return null;
 
-  if (sourceFormat === "markdown-v2") {
-    const lines = normalized.split("\n");
-    if (lines[0] !== DETAILS_FENCE_OPEN || lines[lines.length - 1] !== DETAILS_FENCE_CLOSE) {
-      return null;
-    }
-    const innerLines = lines.slice(1, -1);
-    if (innerLines.some((line) => line === DETAILS_FENCE_OPEN)) {
-      return null;
-    }
-    const summary = innerLines[0]?.trim() ?? "";
-    if (!summary || innerLines[1] !== "") {
-      return null;
-    }
-    const bodyText = innerLines.slice(2).join("\n").trim();
-    if (!bodyText) return null;
-    return {
-      type: "details",
-      attrs: { open: true },
-      content: [
-        {
-          type: "detailsSummary",
-          content: createInlineContent(summary),
-        },
-        {
-          type: "detailsContent",
-          content: createParagraphBlocksFromText(bodyText),
-        },
-      ],
-    };
-  }
-
   const lines = normalized.split("\n");
-  const separatorIndex = lines.findIndex((line) => line.trim() === "");
-  if (separatorIndex <= 0 || separatorIndex >= lines.length - 1) {
+  if (lines[0] !== DETAILS_FENCE_OPEN || lines[lines.length - 1] !== DETAILS_FENCE_CLOSE) {
     return null;
   }
-  const summaryLines = lines.slice(0, separatorIndex);
-  const bodyLines = lines.slice(separatorIndex + 1);
-  if (summaryLines.length !== 1) return null;
-
-  const summary = summaryLines[0].trim();
-  const body = bodyLines.join("\n").trim();
-  if (!summary || summary.length > 60 || !body) return null;
-  if (
-    isRecognizedTopLevelMarkdownLine(summary, true) ||
-    looksLikeSupportedMarkdown(body)
-  ) {
+  const innerLines = lines.slice(1, -1);
+  if (innerLines.some((line) => line === DETAILS_FENCE_OPEN)) {
     return null;
   }
+  const summary = innerLines[0]?.trim() ?? "";
+  if (!summary || innerLines[1] !== "") {
+    return null;
+  }
+  const bodyText = innerLines.slice(2).join("\n").trim();
+  if (!bodyText) return null;
 
   return {
     type: "details",
@@ -478,7 +443,7 @@ const parseDetailsBlocksFromMarkdown = (markdown: string, sourceFormat: "markdow
       },
       {
         type: "detailsContent",
-        content: createParagraphBlocksFromText(body),
+        content: createParagraphBlocksFromText(bodyText),
       },
     ],
   };
@@ -490,7 +455,7 @@ const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
     return { kind: "fallback", reason: "looks-like-plain-text" };
   }
 
-  const detailsV2 = parseDetailsBlocksFromMarkdown(normalized, "markdown-v2");
+  const detailsV2 = parseDetailsBlocksFromMarkdown(normalized);
   if (detailsV2) {
     return {
       kind: "parsed",
@@ -500,14 +465,6 @@ const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
   }
 
   if (!looksLikeSupportedMarkdown(normalized)) {
-    const detailsV1 = parseDetailsBlocksFromMarkdown(normalized, "markdown-v1-compat");
-    if (detailsV1) {
-      return {
-        kind: "parsed",
-        format: "markdown-v1-compat",
-        content: { type: "doc", content: [detailsV1] },
-      };
-    }
     return { kind: "fallback", reason: "looks-like-plain-text" };
   }
 
@@ -548,7 +505,7 @@ const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
       if (endIndex >= lines.length) {
         return { kind: "fallback", reason: "ambiguous-details" };
       }
-      const detailsNode = parseDetailsBlocksFromMarkdown(lines.slice(index, endIndex + 1).join("\n"), "markdown-v2");
+      const detailsNode = parseDetailsBlocksFromMarkdown(lines.slice(index, endIndex + 1).join("\n"));
       if (!detailsNode) {
         return { kind: "fallback", reason: "ambiguous-details" };
       }

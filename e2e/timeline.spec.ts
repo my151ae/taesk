@@ -617,6 +617,22 @@ test.describe('Markdown serializer helpers', () => {
     });
     expect(parseMarkdownToTiptapContent(':::details\n\nBody\n:::')).toBeNull();
   });
+
+  test('keeps blank-line plain text out of markdown parsing', async () => {
+    expect(
+      parseMarkdownToTiptapContent(
+        [
+          'Article',
+          '',
+          'See new posts',
+          'Conversation',
+          '内向哲学',
+          '@naikoutetsugaku',
+          '本を読む人と読まない人では、圧倒的な思考格差が生まれる',
+        ].join('\n')
+      )
+    ).toBeNull();
+  });
 });
 
 test.describe('@feature:timeline Timeline view', () => {
