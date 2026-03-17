@@ -76,14 +76,12 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
 
     const filteredData = useMemo(() => {
         if (!data) return null;
-        const filterItem = (item: FilterableTimelineItem) => (
-            matchesSelectedTags(item, selectedTags) && matchesSearchQuery(item, searchQuery)
-        );
+        const filterItem = (item: FilterableTimelineItem) => matchesSelectedTags(item, selectedTags);
 
-        const filteredEvents = data.events.filter(event => filterItem(event));
+        const filteredEvents = data.events.filter((event) => filterItem(event));
 
         const filteredBuckets = Object.entries(data.abBuckets).reduce((acc, [key, items]) => {
-            acc[key] = items.filter(item => filterItem(item));
+            acc[key] = items.filter((item) => filterItem(item));
             return acc;
         }, {} as Record<string, TimelineBucketItem[]>);
 
@@ -95,7 +93,7 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
             abBuckets: filteredBuckets,
             overdue: filteredOverdue,
         };
-    }, [data, searchQuery, selectedTags]);
+    }, [data, selectedTags]);
 
     const searchResults = useMemo(() => {
         if (!data || !searchQuery.trim()) return [] as TimelineSearchResultItem[];

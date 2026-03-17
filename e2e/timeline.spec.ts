@@ -1362,11 +1362,13 @@ test.describe('@feature:timeline Timeline view', () => {
       await searchInput.fill('Sidebar Search');
 
       await expect(searchCount).toHaveText('2');
+      await expect(overdueCount).toHaveText('1');
       await expect(page.locator(`[data-testid="search-card-overdue-${overdueCardId}"]:visible`).first()).toBeVisible();
       await expect(page.locator(`[data-testid="search-card-bucket-${bucketCardId}"]:visible`).first()).toBeVisible();
 
       await overdueToggle.click();
       await expect(overduePanel).toBeVisible();
+      await expect(overdueCount).toHaveText('1');
       await expect(searchPanel).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
