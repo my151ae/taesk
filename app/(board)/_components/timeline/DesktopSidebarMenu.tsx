@@ -352,7 +352,7 @@ export function DesktopSidebarMenu({
           return (
             <section
               key={section.key}
-              className={clsx("min-h-0 flex-1 flex-col", expanded ? "flex" : "hidden")}
+              className={clsx("min-h-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
               aria-hidden={!expanded}
             >
               <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
@@ -377,7 +377,7 @@ export function DesktopSidebarMenu({
                 data-testid={section.id}
                 aria-hidden={!expanded}
                 hidden={!expanded}
-                className="min-h-0 flex-1"
+                className="flex min-h-0 flex-1 flex-col overflow-hidden"
               >
                 {section.renderContent()}
               </div>
