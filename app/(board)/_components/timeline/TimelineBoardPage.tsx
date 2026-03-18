@@ -242,7 +242,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     filteredData,
     searchResults,
   } = useTimelineFiltering(data);
-  const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("oldest");
+  const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
   const sortedFilteredData = useMemo(() => {
     if (!filteredData) return null;
     return {

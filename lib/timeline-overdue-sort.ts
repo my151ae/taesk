@@ -7,7 +7,7 @@ const getOverdueTimeValue = (item: TimelineOverdueItem) => item.due_start ?? ite
 export function compareTimelineOverdueItems(
   a: TimelineOverdueItem,
   b: TimelineOverdueItem,
-  order: OverdueSortOrder = "oldest"
+  order: OverdueSortOrder = "newest"
 ) {
   const direction = order === "oldest" ? 1 : -1;
 
@@ -26,7 +26,7 @@ export function compareTimelineOverdueItems(
 
 export function sortTimelineOverdueItems(
   items: readonly TimelineOverdueItem[],
-  order: OverdueSortOrder = "oldest"
+  order: OverdueSortOrder = "newest"
 ) {
   return [...items].sort((a, b) => compareTimelineOverdueItems(a, b, order));
 }

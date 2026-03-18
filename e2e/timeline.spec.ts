@@ -1221,15 +1221,15 @@ test.describe('@feature:timeline Timeline view', () => {
       const sortToggle = page.getByTestId('desktop-sidebar-overdue-sort-toggle');
 
       await expect(overdueCards).toHaveCount(2);
-      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
-      await expect(overdueCards.nth(0)).toContainText('Desktop overdue oldest');
-      await expect(overdueCards.nth(1)).toContainText('Desktop overdue newest');
-
-      await sortToggle.click();
-
       await expect(sortToggle).toHaveAttribute('data-order', 'newest');
       await expect(overdueCards.nth(0)).toContainText('Desktop overdue newest');
       await expect(overdueCards.nth(1)).toContainText('Desktop overdue oldest');
+
+      await sortToggle.click();
+
+      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
+      await expect(overdueCards.nth(0)).toContainText('Desktop overdue oldest');
+      await expect(overdueCards.nth(1)).toContainText('Desktop overdue newest');
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [olderOverdueCardId, newerOverdueCardId]);
     }
@@ -1450,15 +1450,15 @@ test.describe('@feature:timeline Timeline view', () => {
       await overdueToggle.click();
 
       await expect(overdueCards).toHaveCount(2);
-      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
-      await expect(overdueCards.nth(0)).toContainText('Mobile overdue oldest');
-      await expect(overdueCards.nth(1)).toContainText('Mobile overdue newest');
-
-      await sortToggle.click();
-
       await expect(sortToggle).toHaveAttribute('data-order', 'newest');
       await expect(overdueCards.nth(0)).toContainText('Mobile overdue newest');
       await expect(overdueCards.nth(1)).toContainText('Mobile overdue oldest');
+
+      await sortToggle.click();
+
+      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
+      await expect(overdueCards.nth(0)).toContainText('Mobile overdue oldest');
+      await expect(overdueCards.nth(1)).toContainText('Mobile overdue newest');
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [olderOverdueCardId, newerOverdueCardId]);
     }
