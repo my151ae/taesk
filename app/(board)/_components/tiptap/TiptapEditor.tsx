@@ -11,7 +11,6 @@ import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-detai
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
-import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
@@ -20,6 +19,17 @@ import {
     collectImageStoragePaths,
     isSupportedCardImageMimeType,
 } from '@/lib/tiptap-images';
+import {
+    BlockActionMenu,
+    getBlockActionItems,
+    type BlockActionType,
+    type BlockNodeType,
+} from '@/app/(board)/_components/tiptap/tiptap-block-menu';
+import {
+    extractImageFilesFromClipboard,
+    extractImageFilesFromClipboardHtml,
+    parseErrorMessage,
+} from '@/app/(board)/_components/tiptap/tiptap-image-paste';
 
 export type FocusTitleRequest = {
     mode: 'end';
@@ -31,8 +41,6 @@ export type FocusTitleRequest = {
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
 };
-
-type BlockNodeType = 'paragraph' | 'heading' | 'listItem' | 'taskItem' | 'details';
 
 type RenderableBlockActionTarget = {
     pos: number;
@@ -52,8 +60,6 @@ type ResolvedBlockTarget = {
     itemIndex: number | null;
 };
 
-type BlockActionType = 'insert-above' | 'insert-below' | 'duplicate' | 'delete' | 'toggle-details' | 'unset-details';
-
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -69,186 +75,6 @@ type TiptapEditorProps = {
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
-
-async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
-    try {
-        const body = await response.json() as { error?: { message?: unknown } };
-        if (typeof body?.error?.message === 'string' && body.error.message.trim()) {
-            return body.error.message;
-        }
-    } catch {
-        // ignore parse error
-    }
-    return fallback;
-}
-
-function extractImageFilesFromClipboard(clipboardData: DataTransfer | null): File[] {
-    return Array.from(clipboardData?.items ?? [])
-        .filter((item) => item.kind === 'file')
-        .map((item) => item.getAsFile())
-        .filter((file): file is File => !!file && file.type.startsWith('image/'));
-}
-
-function extractImageFilesFromClipboardHtml(html: string): File[] {
-    if (!html || typeof html !== 'string') return [];
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const imageSources = Array.from(doc.querySelectorAll('img'))
-        .map((element) => element.getAttribute('src') ?? '')
-        .filter((value) => value.startsWith('data:image/'));
-
-    const files: File[] = [];
-    imageSources.forEach((source, index) => {
-        const match = source.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=]+)$/i);
-        if (!match) return;
-        const mimeType = match[1].toLowerCase();
-        if (!isSupportedCardImageMimeType(mimeType)) return;
-
-        const extension = cardImageExtensionFromMimeType(mimeType) ?? 'img';
-        try {
-            const binary = atob(match[2]);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            files.push(new File([bytes], `pasted-html-${Date.now()}-${index}.${extension}`, { type: mimeType }));
-        } catch {
-            // ignore malformed data url
-        }
-    });
-
-    return files;
-}
-
-type BlockActionItem = { action: BlockActionType; label: string; destructive?: boolean };
-
-function getBlockActionItems(targetType: BlockNodeType): BlockActionItem[] {
-    if (targetType === 'details') {
-        return [
-            { action: 'unset-details', label: 'トグル解除' },
-        ];
-    }
-
-    return [
-        { action: 'insert-above', label: '上に段落を追加' },
-        { action: 'insert-below', label: '下に段落を追加' },
-        { action: 'toggle-details', label: 'トグルに変換' },
-        { action: 'duplicate', label: '複製' },
-        { action: 'delete', label: '削除', destructive: true },
-    ];
-}
-
-function BlockActionMenu({
-    top,
-    left,
-    items,
-    onClose,
-    onSelect,
-}: {
-    top: number;
-    left: number;
-    items: BlockActionItem[];
-    onClose: () => void;
-    onSelect: (action: BlockActionType) => void;
-}) {
-    const menuRef = useRef<HTMLDivElement | null>(null);
-    const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-    const [activeIndex, setActiveIndex] = useState(0);
-
-    useClickOutside(menuRef, () => onClose());
-
-    useEffect(() => {
-        setActiveIndex(0);
-        requestAnimationFrame(() => {
-            itemRefs.current[0]?.focus();
-        });
-    }, [items]);
-
-    return (
-        <div
-            ref={menuRef}
-            className={styles.blockActionMenu}
-            style={{ top, left }}
-            role="menu"
-            data-testid="tiptap-block-menu"
-            onMouseDown={(event) => {
-                event.stopPropagation();
-            }}
-            onKeyDown={(event) => {
-                if (!items.length) return;
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onClose();
-                    return;
-                }
-                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const direction = event.key === 'ArrowDown' ? 1 : -1;
-                    const nextIndex = (activeIndex + direction + items.length) % items.length;
-                    setActiveIndex(nextIndex);
-                    itemRefs.current[nextIndex]?.focus();
-                    return;
-                }
-                if (event.key === 'Home') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setActiveIndex(0);
-                    itemRefs.current[0]?.focus();
-                    return;
-                }
-                if (event.key === 'End') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const lastIndex = items.length - 1;
-                    setActiveIndex(lastIndex);
-                    itemRefs.current[lastIndex]?.focus();
-                    return;
-                }
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const activeItem = items[activeIndex];
-                    if (activeItem) {
-                        onSelect(activeItem.action);
-                    }
-                }
-            }}
-        >
-            {items.map((item, index) => (
-                <button
-                    key={item.action}
-                    type="button"
-                    role="menuitem"
-                    ref={(node) => {
-                        itemRefs.current[index] = node;
-                    }}
-                    autoFocus={index === 0}
-                    tabIndex={index === activeIndex ? 0 : -1}
-                    data-testid={`tiptap-block-menu-${item.action}`}
-                    className={`${styles.blockActionMenuItem} ${item.destructive ? styles.blockActionMenuItemDanger : ''}`}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onSelect(item.action);
-                    }}
-                    onKeyDown={(event) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSelect(item.action);
-                    }}
-                    onFocus={() => {
-                        if (activeIndex !== index) {
-                            setActiveIndex(index);
-                        }
-                    }}
-                >
-                    {item.label}
-                </button>
-            ))}
-        </div>
-    );
-}
 
 export default function TiptapEditor({
     initialContent,

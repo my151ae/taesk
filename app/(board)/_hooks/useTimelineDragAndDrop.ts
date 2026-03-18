@@ -51,6 +51,8 @@ export type ActiveDragState = {
     duration: number;
 };
 
+export type DragSourceKind = 'event' | 'bucket' | 'overdue';
+
 export type PointerPreviewState = {
     visible: boolean;
     startMinutes: number;
@@ -79,6 +81,18 @@ export type ActiveResizeState = {
     startY: number;
     edge: 'top' | 'bottom';
 };
+
+export type DragSession = ActiveDragState & {
+    sourceKind: DragSourceKind;
+    pointerPreview: PointerPreviewState;
+    bucketIndicator: BucketIndicator | null;
+    isOverABList: boolean;
+};
+
+export type InteractionState =
+    | { mode: 'idle' }
+    | { mode: 'dragging'; dragSession: DragSession }
+    | { mode: 'resizing'; resize: ActiveResizeState };
 
 export const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
     const pointer = args.pointerCoordinates;
@@ -157,15 +171,25 @@ export function useTimelineDragAndDrop({
     timelineStartHour = 0,
     hourHeight = 40,
 }: UseTimelineDragAndDropProps) {
-    const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
-    const activeDragRef = useRef<ActiveDragState | null>(null);
-    const [pointerPreview, setPointerPreview] = useState<PointerPreviewState>(HIDDEN_POINTER_PREVIEW);
-    const [activeResize, setActiveResize] = useState<ActiveResizeState | null>(null);
-    const [bucketIndicator, setBucketIndicator] = useState<BucketIndicator | null>(null);
+    const [interactionState, setInteractionState] = useState<InteractionState>({ mode: 'idle' });
+    const activeDragRef = useRef<DragSession | null>(null);
     const dragAutoScrollRef = useRef(createDragAutoScrollState());
     const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
     const pointerTrackingHandlerRef = useRef<((e: globalThis.PointerEvent) => void) | null>(null);
     const dragStartPointerRef = useRef<{ x: number; y: number } | null>(null);
+
+    const dragSession = interactionState.mode === 'dragging' ? interactionState.dragSession : null;
+    const activeResize = interactionState.mode === 'resizing' ? interactionState.resize : null;
+    const activeDrag: ActiveDragState | null = dragSession
+        ? {
+            cardId: dragSession.cardId,
+            startMinutes: dragSession.startMinutes,
+            duration: dragSession.duration,
+        }
+        : null;
+    const pointerPreview = dragSession?.pointerPreview ?? HIDDEN_POINTER_PREVIEW;
+    const bucketIndicator = dragSession?.bucketIndicator ?? null;
+    const isOverABList = dragSession?.isOverABList ?? false;
 
     const sensors = useSensors(
         useSensor(MouseSensor, {
@@ -205,32 +229,51 @@ export function useTimelineDragAndDrop({
             pointerTrackingHandlerRef.current = handler;
             window.addEventListener('pointermove', handler, { passive: true });
         }
-        const kind = event.active.data.current?.kind as 'event' | 'bucket' | 'overdue';
+        const kind = event.active.data.current?.kind as DragSourceKind;
+        let nextSession: DragSession | null = null;
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
             const startMinutes = getMinutesFromTime(eventData?.due_start ?? null) ?? 0;
             const duration = Math.max(eventData.durationMinutes ?? eventData.duration ?? 60, 0);
-            const dragState: ActiveDragState = { cardId, startMinutes, duration };
-            setActiveDrag(dragState);
-            activeDragRef.current = dragState;
+            nextSession = {
+                cardId,
+                startMinutes,
+                duration,
+                sourceKind: kind,
+                pointerPreview: HIDDEN_POINTER_PREVIEW,
+                bucketIndicator: null,
+                isOverABList: false,
+            };
         } else if (kind === 'bucket') {
             const bucketItem = event.active.data.current?.item as TimelineBucketItem;
             const duration = Math.max(bucketItem?.duration ?? 60, 0);
-            const dragState: ActiveDragState = { cardId, startMinutes: 9 * 60, duration };
-            setActiveDrag(dragState);
-            activeDragRef.current = dragState;
+            nextSession = {
+                cardId,
+                startMinutes: 9 * 60,
+                duration,
+                sourceKind: kind,
+                pointerPreview: HIDDEN_POINTER_PREVIEW,
+                bucketIndicator: null,
+                isOverABList: false,
+            };
         } else {
             const overdueItem = event.active.data.current?.item as TimelineOverdueItem;
             const startMinutes = getMinutesFromTime(overdueItem?.due_start ?? null) ?? 9 * 60;
             const duration = Math.max(overdueItem?.duration ?? 60, 0);
-            const dragState: ActiveDragState = { cardId, startMinutes, duration };
-            setActiveDrag(dragState);
-            activeDragRef.current = dragState;
+            nextSession = {
+                cardId,
+                startMinutes,
+                duration,
+                sourceKind: kind,
+                pointerPreview: HIDDEN_POINTER_PREVIEW,
+                bucketIndicator: null,
+                isOverABList: false,
+            };
         }
-        setPointerPreview(HIDDEN_POINTER_PREVIEW);
+        if (!nextSession) return;
+        setInteractionState({ mode: 'dragging', dragSession: nextSession });
+        activeDragRef.current = nextSession;
     };
-
-    const [isOverABList, setIsOverABList] = useState(false);
 
     const resolveTimelineTargetAtPointer = useCallback(
         (pointerX: number | null, pointerY: number | null) => {
@@ -311,8 +354,8 @@ export function useTimelineDragAndDrop({
         const currentDrag = activeDragRef.current;
         if (!currentDrag) {
             stopDragAutoScroll();
-            if (pointerPreview.visible) {
-                setPointerPreview(HIDDEN_POINTER_PREVIEW);
+            if (dragSession?.pointerPreview.visible) {
+                setInteractionState({ mode: 'idle' });
             }
             return;
         }
@@ -327,36 +370,44 @@ export function useTimelineDragAndDrop({
         // Check if over A/B list
         const isAB = overType === 'ab-bucket' || overType === 'bucket-item' || overType === 'bucket-item-top' || overType === 'bucket-item-bottom';
         const isOverAbArea = !visualTimelineTarget && (Boolean(hoveredAbEl) || isAB);
-        if (isOverAbArea !== isOverABList) {
-            setIsOverABList(isOverAbArea);
-        }
+        const nextBucketIndicator =
+            !visualTimelineTarget && overType === 'ab-bucket'
+                ? (() => {
+                    const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
+                    const items = bucketKey && data?.abBuckets ? data.abBuckets[bucketKey] ?? [] : [];
+                    if (bucketKey && items.length) {
+                        const nextPointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
+                        const bucketRect = event.over?.rect;
+                        let targetIndex = 0;
+                        if (bucketRect && nextPointerY != null) {
+                            const relativeY = nextPointerY - bucketRect.top;
+                            const clampedY = Math.max(0, Math.min(bucketRect.height, relativeY));
+                            const ratio = bucketRect.height > 0 ? clampedY / bucketRect.height : 0;
+                            targetIndex = Math.min(items.length - 1, Math.max(0, Math.round(ratio * (items.length - 1))));
+                        }
+                        return { bucketKey, cardId: items[targetIndex]?.card_id ?? null } satisfies BucketIndicator;
+                    }
+                    return null;
+                })()
+                : null;
         updateDragAutoScroll(event);
 
-        if (!visualTimelineTarget && overType === 'ab-bucket') {
-            const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
-            const items = bucketKey && data?.abBuckets ? data.abBuckets[bucketKey] ?? [] : [];
-            if (bucketKey && items.length) {
-                    const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
-                const bucketRect = event.over?.rect;
-                let targetIndex = 0;
-                if (bucketRect && pointerY != null) {
-                    const relativeY = pointerY - bucketRect.top;
-                    const clampedY = Math.max(0, Math.min(bucketRect.height, relativeY));
-                    const ratio = bucketRect.height > 0 ? clampedY / bucketRect.height : 0;
-                    targetIndex = Math.min(items.length - 1, Math.max(0, Math.round(ratio * (items.length - 1))));
-                }
-                setBucketIndicator({ bucketKey, cardId: items[targetIndex]?.card_id ?? null });
-            } else {
-                setBucketIndicator(null);
-            }
-        } else if (bucketIndicator) {
-            setBucketIndicator(null);
-        }
-
         if (!visualTimelineTarget && overType !== 'timeline-column') {
-            if (pointerPreview.visible) {
-                setPointerPreview(HIDDEN_POINTER_PREVIEW);
-            }
+            setInteractionState({
+                mode: 'dragging',
+                dragSession: {
+                    ...currentDrag,
+                    isOverABList: isOverAbArea,
+                    bucketIndicator: nextBucketIndicator,
+                    pointerPreview: HIDDEN_POINTER_PREVIEW,
+                },
+            });
+            activeDragRef.current = {
+                ...currentDrag,
+                isOverABList: isOverAbArea,
+                bucketIndicator: nextBucketIndicator,
+                pointerPreview: HIDDEN_POINTER_PREVIEW,
+            };
             return;
         }
         const day = visualTimelineTarget?.day ?? (event.over?.data.current?.day as TimelineDay | undefined);
@@ -375,12 +426,19 @@ export function useTimelineDragAndDrop({
         const desiredEnd = nextStart + currentDrag.duration;
         const endMinutes = Math.min(desiredEnd, 24 * 60 - 1);
         const durationMinutes = Math.max(endMinutes - nextStart, 0);
-        setPointerPreview({
-            visible: true,
-            startMinutes: nextStart,
-            durationMinutes,
-            dayIso: day?.isoDate ?? null,
-        });
+        const nextSession: DragSession = {
+            ...currentDrag,
+            isOverABList: isOverAbArea,
+            bucketIndicator: nextBucketIndicator,
+            pointerPreview: {
+                visible: true,
+                startMinutes: nextStart,
+                durationMinutes,
+                dayIso: day?.isoDate ?? null,
+            },
+        };
+        setInteractionState({ mode: 'dragging', dragSession: nextSession });
+        activeDragRef.current = nextSession;
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -390,11 +448,9 @@ export function useTimelineDragAndDrop({
         const visualTimelineTarget = resolveTimelineTargetAtPointer(pointerX, pointerY);
         stopDragAutoScroll();
         stopPointerTracking();
-        setActiveDrag(null);
+        const completedDrag = activeDragRef.current;
+        setInteractionState({ mode: 'idle' });
         activeDragRef.current = null;
-        setPointerPreview(HIDDEN_POINTER_PREVIEW);
-        setIsOverABList(false);
-        setBucketIndicator(null);
 
         if (!over && !visualTimelineTarget) return;
         const cardId = active.data.current?.cardId as string | undefined;
@@ -431,7 +487,7 @@ export function useTimelineDragAndDrop({
             const payload = buildBucketDropPayload({
                 bucketKey,
                 dayIso,
-                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
+                duration: completedDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
                 bucketPosition,
             });
             persistPlacement(cardId, payload, {
@@ -445,7 +501,7 @@ export function useTimelineDragAndDrop({
             return;
         }
 
-        if (overType === 'timeline-column' && activeDrag) {
+        if (overType === 'timeline-column' && completedDrag) {
             const day = visualTimelineTarget?.day ?? (over?.data.current?.day as TimelineDay | undefined);
             if (!day) return;
             const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
@@ -458,7 +514,7 @@ export function useTimelineDragAndDrop({
                         : undefined,
                 hourHeight,
             });
-            const fallbackPointer = activeDrag.startMinutes + (delta.y / hourHeight) * 60;
+            const fallbackPointer = completedDrag.startMinutes + (delta.y / hourHeight) * 60;
             let nextStart = pointerMinutes ?? fallbackPointer;
             nextStart = Math.round(nextStart / 5) * 5;
             nextStart = Math.max(0, Math.min(23 * 60 + 55, nextStart));
@@ -471,7 +527,7 @@ export function useTimelineDragAndDrop({
             const payload = buildTimelineDropPayload({
                 dayIso: day.isoDate,
                 nextStart,
-                duration: activeDrag.duration,
+                duration: completedDrag.duration,
                 sourceDueBucket,
                 sourceEvent,
                 sourceBucketItem,
@@ -482,7 +538,7 @@ export function useTimelineDragAndDrop({
                 sourceEvent,
                 sourceBucketItem,
                 sourceOverdueItem,
-                defaultDuration: activeDrag.duration,
+                defaultDuration: completedDrag.duration,
                 localDueDate: day.isoDate,
             });
             return;
@@ -499,12 +555,12 @@ export function useTimelineDragAndDrop({
                 bucketItems,
                 bucketKey,
                 activeCardId: cardId,
-                targetCardId: fallbackTargetCardId,
+                targetCardId: completedDrag?.bucketIndicator?.bucketKey === bucketKey ? completedDrag.bucketIndicator.cardId : fallbackTargetCardId,
             });
             const payload = buildBucketDropPayload({
                 bucketKey,
                 dayIso,
-                duration: activeDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
+                duration: completedDrag?.duration ?? sourceEvent?.durationMinutes ?? sourceEvent?.duration ?? sourceOverdueItem?.duration ?? sourceBucketItem?.duration ?? 60,
                 bucketPosition,
             });
             persistPlacement(cardId, payload, {
@@ -514,7 +570,7 @@ export function useTimelineDragAndDrop({
                 sourceBucketItem,
                 sourceOverdueItem,
                 localDueDate: dayIso,
-                defaultDuration: activeDrag?.duration,
+                defaultDuration: completedDrag?.duration,
             });
         }
     };
@@ -522,11 +578,8 @@ export function useTimelineDragAndDrop({
     const handleDragCancel = () => {
         stopDragAutoScroll();
         stopPointerTracking();
-        setActiveDrag(null);
+        setInteractionState({ mode: 'idle' });
         activeDragRef.current = null;
-        setPointerPreview(HIDDEN_POINTER_PREVIEW);
-        setIsOverABList(false);
-        setBucketIndicator(null);
     };
 
     const handleEventKeyDown = (
@@ -564,14 +617,17 @@ export function useTimelineDragAndDrop({
         e.stopPropagation();
         const target = e.currentTarget as HTMLElement;
         target.setPointerCapture(e.pointerId);
-        setActiveResize({
-            cardId,
-            startMinutes,
-            duration,
-            originalStartMinutes: startMinutes,
-            originalDuration: duration,
-            startY: e.clientY,
-            edge,
+        setInteractionState({
+            mode: 'resizing',
+            resize: {
+                cardId,
+                startMinutes,
+                duration,
+                originalStartMinutes: startMinutes,
+                originalDuration: duration,
+                startY: e.clientY,
+                edge,
+            },
         });
     }, []);
 
@@ -590,7 +646,10 @@ export function useTimelineDragAndDrop({
             const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
 
             if (cappedDuration !== activeResize.duration) {
-                setActiveResize(prev => prev ? { ...prev, duration: cappedDuration } : null);
+                setInteractionState({
+                    mode: 'resizing',
+                    resize: { ...activeResize, duration: cappedDuration },
+                });
             }
         } else { // activeResize.edge === 'top'
             let newStart = activeResize.originalStartMinutes + deltaMinutes;
@@ -609,7 +668,10 @@ export function useTimelineDragAndDrop({
             }
 
             if (newStart !== activeResize.startMinutes || newDuration !== activeResize.duration) {
-                setActiveResize(prev => prev ? { ...prev, startMinutes: newStart, duration: newDuration } : null);
+                setInteractionState({
+                    mode: 'resizing',
+                    resize: { ...activeResize, startMinutes: newStart, duration: newDuration },
+                });
             }
         }
     }, [activeResize, hourHeight]);
@@ -654,7 +716,7 @@ export function useTimelineDragAndDrop({
             }
         }
 
-        setActiveResize(null);
+        setInteractionState({ mode: 'idle' });
     }, [activeResize, applyPatch, dataMode, setData]);
 
     return {

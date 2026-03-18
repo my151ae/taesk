@@ -5,12 +5,10 @@ import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-k
 import {
   getDisplayHours,
   getTimelineHeight,
-  calculateStackedEventLayout,
   minuteToPixels,
   timeLabel,
   detailedTimeLabel,
   minutesToTime,
-  normalizeTimelineItems,
   TimelineBucketItem,
   TimelineDay,
   TimelineEvent,
@@ -23,11 +21,6 @@ import {
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
-import {
-  buildOverlayCardData,
-  findOverlayBucketEntry,
-  findOverlayOverdueEntry,
-} from "@/app/(board)/_utils/timeline-overlay";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   TimelineCard,
@@ -43,6 +36,13 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP
 } from "@/app/(board)/_stores/timeline-zoom-store";
+import {
+  buildActiveBuckets,
+  formatAllDayMeta,
+  buildStackedTimelineColumnLayout,
+  buildTimelineInteractionLock,
+  buildTimelineOverlayState,
+} from "@/app/(board)/_components/timeline/timeline-render-model";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
@@ -86,12 +86,17 @@ function MobileTimelineColumn({
   setActiveStackItem: React.Dispatch<React.SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
-  const combinedItems = normalizeTimelineItems(events, calendarEvents);
-  const stackedLayout = calculateStackedEventLayout(combinedItems, { 
+  const { combinedItems, stackedLayout } = buildStackedTimelineColumnLayout({
+    events,
+    calendarEvents,
     device: "mobile",
-    hourHeight
+    hourHeight,
   });
-  const interactionLocked = Boolean(activeDragCardId || contextMenuCardId || pointerPreview.visible);
+  const interactionLocked = buildTimelineInteractionLock({
+    activeDragCardId,
+    contextMenuCardId,
+    pointerPreviewVisible: pointerPreview.visible,
+  });
 
   return (
     <div className="relative">
@@ -591,60 +596,26 @@ export default function MobileTimelineView({
     return calendarAllDayByDay[activeDay.isoDate] ?? [];
   }, [activeDay, calendarAllDayByDay]);
 
-  const shiftIsoDate = (iso?: string | null, deltaDays = 0) => {
-    if (!iso) return null;
-    const [year, month, day] = iso.split("-").map((part) => Number(part));
-    if (!year || !month || !day) return iso;
-    const shifted = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + deltaDays));
-    return shifted.toISOString().split("T")[0];
-  };
-
-  const formatShortDate = (iso?: string | null) => {
-    if (!iso) return null;
-    const [, month, day] = iso.split("-");
-    if (!month || !day) return null;
-    return `${Number(month)}/${Number(day)}`;
-  };
-
-  const formatAllDayMeta = (entry: ExternalCalendarEntry) => {
-    const startIso = entry.startDate ?? entry.dayIso ?? activeDay?.isoDate ?? null;
-    const endIso = entry.endDate ? shiftIsoDate(entry.endDate, -1) : startIso;
-    const startLabel = formatShortDate(startIso);
-    const endLabel = formatShortDate(endIso);
-    const range = startLabel && endLabel && startLabel !== endLabel ? `${startLabel}–${endLabel}` : startLabel ?? endLabel;
-    const tzLabel = entry.displayTz && entry.displayTz !== "Asia/Tokyo" ? entry.displayTz : null;
-    return [range, tzLabel].filter(Boolean).join(" · ");
-  };
-
   const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
 
   const activeDayIso = activeDay?.isoDate ?? null;
   const indicatorVisible = indicatorTop != null && !!activeDayIso && indicatorDayIso === activeDayIso;
   const indicatorPosition = indicatorTop ?? 0;
-  const activeBuckets = useMemo(() => {
-    if (!activeDay) return {} as Record<string, TimelineBucketItem[]>;
-    const entries = Object.entries(abBuckets || {}).filter(([key]) => key.startsWith(activeDay.key));
-    return Object.fromEntries(entries);
-  }, [abBuckets, activeDay]);
+  const activeBuckets = useMemo(
+    () => buildActiveBuckets({ activeDay, abBuckets }),
+    [abBuckets, activeDay]
+  );
   const activeDragCardId = activeDrag?.cardId ?? null;
-  const overlayBucketEntry = useMemo(
-    () => findOverlayBucketEntry(activeBuckets, activeDragCardId),
-    [activeBuckets, activeDragCardId]
-  );
-  const overlayOverdueEntry = useMemo(
-    () => findOverlayOverdueEntry(overdue, activeDragCardId),
-    [overdue, activeDragCardId]
-  );
-  const overlayTimelineEvent = eventsForDay.find((event) => event.card_id === activeDragCardId);
-  const overlayCardData = useMemo(
+  const { overlayBucketEntry, overlayOverdueEntry, overlayCardData } = useMemo(
     () =>
-      buildOverlayCardData({
-        timelineEvent: overlayTimelineEvent,
-        bucketEntry: overlayBucketEntry,
-        overdueEntry: overlayOverdueEntry,
+      buildTimelineOverlayState({
+        abBuckets: activeBuckets,
+        overdue,
+        events: eventsForDay,
+        activeDragCardId,
         defaultTimelineDuration: 0,
       }),
-    [overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent]
+    [activeBuckets, overdue, eventsForDay, activeDragCardId]
   );
   const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
 
@@ -799,7 +770,7 @@ export default function MobileTimelineView({
               </div>
               <div className="flex flex-wrap gap-2">
                 {calendarAllDayForDay.map((item) => {
-                  const meta = formatAllDayMeta(item);
+                  const meta = formatAllDayMeta({ entry: item, fallbackIsoDate: activeDay?.isoDate ?? null });
                   return (
                     <button
                       key={item.id}

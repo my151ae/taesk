@@ -20,6 +20,9 @@ import { useCardModalHistory } from "@/app/components/card-modal/hooks/useCardMo
 import { useCardModalGoogleSync } from "@/app/components/card-modal/hooks/useCardModalGoogleSync";
 import { useCardModalDraft } from "@/app/components/card-modal/hooks/useCardModalDraft";
 import { useCardModalResize } from "@/app/components/card-modal/hooks/useCardModalResize";
+import { useCardModalAutoSave } from "@/app/components/card-modal/hooks/useCardModalAutoSave";
+import { useCardModalLifecycle } from "@/app/components/card-modal/hooks/useCardModalLifecycle";
+import { useCardModalMemberPicker } from "@/app/components/card-modal/hooks/useCardModalMemberPicker";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -161,21 +164,6 @@ export function CardModal({
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
 
-    const dialogRef = useRef<HTMLDivElement>(null);
-    const cardIdRef = useRef(card.id);
-    const hasAppliedInitialLoadRef = useRef(false);
-    const previousLoadingRef = useRef<boolean | null>(null);
-    const onCloseRef = useRef(onClose);
-    const requestCloseRef = useRef<() => void>(() => { });
-    const hasPendingChangesRef = useRef(false);
-    const hasAutoSavedEditsRef = useRef(false);
-    const memberButtonRef = useRef<HTMLButtonElement | null>(null);
-    const memberDropdownRef = useRef<HTMLDivElement | null>(null);
-
-    // Debounce and max-wait for auto-save
-    const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const autoSaveMaxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const pendingAutoSaveContentRef = useRef<JSONContent | null>(null);
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -216,150 +204,6 @@ export function CardModal({
         return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
     }, [content]);
 
-    // onClose ref を最新に保つ
-    useEffect(() => {
-        onCloseRef.current = onClose;
-    }, [onClose]);
-
-
-    // 初期表示時のみ、デスクトップならサイドバーを開く
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const media = window.matchMedia("(min-width: 640px)");
-        if (media.matches) {
-            setShowSidebar(true);
-        }
-    }, []);
-
-    // card prop が変わったときの処理
-    useEffect(() => {
-        // カードIDが変わった場合は、エディタも含め全てリセット
-        if (card.id !== cardIdRef.current) {
-            cardIdRef.current = card.id;
-            hasAppliedInitialLoadRef.current = false;
-            previousLoadingRef.current = null;
-            resetDraft(card);
-            hasPendingChangesRef.current = false;
-            hasAutoSavedEditsRef.current = false;
-            resetHistoryState();
-        }
-        // NOTE: 同期ループ防止のため、同じカード間での外部データ -> contentステートへの同期はここでは行わない。
-        // TiptapEditor は非制御のため、マウント時のデータ（card.content）のみを信じる。
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- カード切替時のみ初期化する設計
-    }, [card.id, resetDraft, resetHistoryState]); // id 変化のみを監視
-
-    // 同じカードIDで本文データが後から到着した場合は、未編集の時だけ同期する
-    useEffect(() => {
-        if (card.id !== cardIdRef.current) return;
-        const loadingNow = Boolean(isLoading);
-        const wasLoading = previousLoadingRef.current;
-        previousLoadingRef.current = loadingNow;
-        if (hasPendingChangesRef.current) return;
-        if (loadingNow) return;
-        if (hasAppliedInitialLoadRef.current) return;
-        if (wasLoading !== true) return;
-
-        const incomingContent = normalizeContent(card.content);
-        setContent(incomingContent);
-        setTitle(card.title || "");
-        setChecked(card.checked || false);
-        setEditorError(null);
-        hasAppliedInitialLoadRef.current = true;
-    }, [card.content, card.id, card.title, card.checked, isLoading]);
-
-    // 保存後のリセット対応は 各ハンドラーと card prop の同期にて行う
-    // (重い JSON.stringify 比較は行わない)
-
-    // Escape key to close + focus trap
-    useEffect(() => {
-        // モーダルを開く直前のフォーカス要素を保持
-        const previousActiveElement = document.activeElement as HTMLElement | null;
-
-        const focusableSelector =
-            'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-        const focusFirstElement = () => {
-            const dialog = dialogRef.current;
-            if (!dialog) return;
-            const autoFocusTarget = dialog.querySelector<HTMLElement>('[data-autofocus]');
-            if (autoFocusTarget) {
-                autoFocusTarget.focus();
-                return;
-            }
-            const focusable = dialog.querySelectorAll<HTMLElement>(focusableSelector);
-            (focusable[0] ?? dialog).focus();
-        };
-
-        const trapFocus = (event: KeyboardEvent) => {
-            const dialog = dialogRef.current;
-            if (!dialog) return;
-
-            if (event.key === "Escape") {
-                event.preventDefault();
-                requestCloseRef.current();
-                return;
-            }
-
-            if (event.key !== "Tab") {
-                return;
-            }
-
-            const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-                (element) => !element.hasAttribute("disabled"),
-            );
-
-            if (focusable.length === 0) {
-                event.preventDefault();
-                dialog.focus();
-                return;
-            }
-
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            const current = document.activeElement as HTMLElement | null;
-            const isShift = event.shiftKey;
-
-            if (!current) {
-                event.preventDefault();
-                first.focus();
-                return;
-            }
-
-            if (!isShift && current === last) {
-                event.preventDefault();
-                first.focus();
-                return;
-            }
-
-            if (isShift && current === first) {
-                event.preventDefault();
-                last.focus();
-                return;
-            }
-        };
-
-        document.addEventListener("keydown", trapFocus);
-        focusFirstElement();
-
-        return () => {
-            document.removeEventListener("keydown", trapFocus);
-            if (autoSaveTimeoutRef.current) {
-                clearTimeout(autoSaveTimeoutRef.current);
-            }
-            if (autoSaveMaxTimeoutRef.current) {
-                clearTimeout(autoSaveMaxTimeoutRef.current);
-            }
-            // モーダルが閉じる際にフォーカスを戻す
-            // 要素がまだ存在している場合のみフォーカス
-            if (previousActiveElement && document.body.contains(previousActiveElement)) {
-                previousActiveElement.focus();
-            }
-        };
-    }, []); // 空配列でマウント時のみ実行
-
-    // Close member dropdown when clicking outside
-    useClickOutside(memberDropdownRef, () => setShowMemberDropdown(false));
-
     const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; forceHistorySnapshot?: boolean; }) => {
         const normalizedDueDate = dueDate || null;
         const hasTime = dueStart && dueEnd; // Both must be present
@@ -376,8 +220,6 @@ export function CardModal({
         const nextTitle = title.trim();
         const nextChecked = checked;
         const nextExcerpt = deriveExcerptFromContent(normalizedContent);
-
-        hasPendingChangesRef.current = false;
 
         if (!isAutoSave) {
             setEditorError(null);
@@ -434,65 +276,60 @@ export function CardModal({
             onMoveToBoard,
     ]);
 
-    const triggerAutoSave = useCallback((contentOverride?: JSONContent) => {
-        if (isHistoryPreviewing) return;
-        hasPendingChangesRef.current = true;
-        hasAutoSavedEditsRef.current = true;
-        if (contentOverride) {
-            pendingAutoSaveContentRef.current = contentOverride;
-        }
-        if (autoSaveTimeoutRef.current) {
-            clearTimeout(autoSaveTimeoutRef.current);
-        }
-        autoSaveTimeoutRef.current = setTimeout(() => {
-            if (autoSaveMaxTimeoutRef.current) {
-                clearTimeout(autoSaveMaxTimeoutRef.current);
-                autoSaveMaxTimeoutRef.current = null;
-            }
-            const latestContent = pendingAutoSaveContentRef.current ?? undefined;
-            pendingAutoSaveContentRef.current = null;
-            handleSave(true, { contentOverride: latestContent });
-        }, 2000);
-        if (!autoSaveMaxTimeoutRef.current) {
-            autoSaveMaxTimeoutRef.current = setTimeout(() => {
-                if (autoSaveTimeoutRef.current) {
-                    clearTimeout(autoSaveTimeoutRef.current);
-                }
-                autoSaveMaxTimeoutRef.current = null;
-                const latestContent = pendingAutoSaveContentRef.current ?? undefined;
-                pendingAutoSaveContentRef.current = null;
-                handleSave(true, { contentOverride: latestContent });
-            }, 15000);
-        }
-    }, [handleSave, isHistoryPreviewing]);
+    const {
+        hasPendingChangesRef,
+        hasAutoSavedEditsRef,
+        triggerAutoSave,
+        clearAutoSaveTimers,
+        resetAutoSaveState,
+        flushPendingAutoSave,
+    } = useCardModalAutoSave({
+        isHistoryPreviewing,
+        onAutoSave: (contentOverride, options) =>
+            handleSave(true, {
+                contentOverride,
+                forceHistorySnapshot: options?.forceHistorySnapshot,
+            }),
+    });
 
     const requestClose = useCallback(() => {
         if (isHistoryPreviewing) {
             cancelHistoryPreview();
             return;
         }
-        if (hasPendingChangesRef.current || hasAutoSavedEditsRef.current) {
-            if (autoSaveTimeoutRef.current) {
-                clearTimeout(autoSaveTimeoutRef.current);
-            }
-            if (autoSaveMaxTimeoutRef.current) {
-                clearTimeout(autoSaveMaxTimeoutRef.current);
-                autoSaveMaxTimeoutRef.current = null;
-            }
-            // 閉じる操作は待たずに反映し、保存は即時 autosave として送信する
-            const latestContent = pendingAutoSaveContentRef.current ?? undefined;
-            pendingAutoSaveContentRef.current = null;
-            hasAutoSavedEditsRef.current = false;
-            handleSave(true, { contentOverride: latestContent, forceHistorySnapshot: true });
+        if (flushPendingAutoSave({ forceHistorySnapshot: true })) {
             onCloseRef.current();
             return;
         }
         onCloseRef.current();
-    }, [handleSave, isHistoryPreviewing, cancelHistoryPreview]);
+    }, [flushPendingAutoSave, isHistoryPreviewing, cancelHistoryPreview]);
 
-    useEffect(() => {
-        requestCloseRef.current = requestClose;
-    }, [requestClose]);
+    const { dialogRef, onCloseRef } = useCardModalLifecycle({
+        card,
+        isLoading,
+        onClose,
+        onRequestClose: requestClose,
+        resetDraft,
+        resetHistoryState,
+        setShowSidebar,
+        setContent,
+        setTitle,
+        setChecked,
+        setEditorError,
+        hasPendingChangesRef,
+        hasAutoSavedEditsRef,
+        clearAutoSaveTimers,
+    });
+
+    const {
+        memberButtonRef,
+        memberDropdownRef,
+        closeMemberDropdown,
+        toggleMemberDropdown,
+    } = useCardModalMemberPicker({
+        setShowMemberDropdown,
+        setMemberSearch,
+    });
 
     const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
         bodyBridgeRef.current = bridge;
@@ -644,8 +481,7 @@ export function CardModal({
             setAssigneeTouched(true);
             triggerAutoSave();
         }
-        setShowMemberDropdown(false);
-        setMemberSearch('');
+        closeMemberDropdown();
     };
 
     const handleRemoveMember = (profileId: string) => {
@@ -862,8 +698,8 @@ export function CardModal({
                     showMemberDropdown={showMemberDropdown}
                     memberButtonRef={memberButtonRef}
                     memberDropdownRef={memberDropdownRef}
-                    onMemberSearchChange={setMemberSearch}
-                    onToggleMemberDropdown={() => setShowMemberDropdown((prev) => !prev)}
+                            onMemberSearchChange={setMemberSearch}
+                    onToggleMemberDropdown={toggleMemberDropdown}
                     onAddMember={handleAddMember}
                     onRemoveMember={handleRemoveMember}
                     onDueDateChange={handleDueDateInputChange}

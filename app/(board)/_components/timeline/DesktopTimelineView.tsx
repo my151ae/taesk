@@ -25,6 +25,10 @@ import {
   MAX_HOUR_HEIGHT,
   ZOOM_STEP,
 } from "@/app/(board)/_stores/timeline-zoom-store";
+import {
+  buildAllDayLayout,
+  formatAllDayRange,
+} from "@/app/(board)/_components/timeline/timeline-render-model";
 
 const ALL_DAY_ROW_HEIGHT = 36;
 
@@ -292,120 +296,13 @@ export function DesktopTimelineView({
 
   const activeDragCardId = activeDrag?.cardId ?? null;
 
-  const allDayLayout = useMemo(() => {
-    if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number; entry: ExternalCalendarEntry; startDate?: string | null; endDate?: string | null; displayTz?: string | null; calendarId?: string | null }[], rows: 0 };
-
-    type SegmentSeed = {
-      id: string;
-      title: string;
-      start: number;
-      end: number;
-      entry: ExternalCalendarEntry;
-      startDate?: string | null;
-      endDate?: string | null;
-      displayTz?: string | null;
-      calendarId?: string | null;
-    };
-    type Segment = SegmentSeed & { row: number };
-    const segments: SegmentSeed[] = [];
-    const ongoing = new Map<string, SegmentSeed>();
-
-    visibleDays.forEach((day, idx) => {
-      const items = calendarAllDayByDay[day.isoDate] ?? [];
-      const present = new Set<string>();
-
-      items.forEach((item) => {
-        const key = item.eventId ?? item.id;
-        present.add(key);
-        const existing = ongoing.get(key);
-        if (existing) {
-          if (idx === existing.end + 1) {
-            existing.end = idx;
-          } else {
-            segments.push(existing);
-            ongoing.set(key, {
-              id: key,
-              title: item.title || "Google予定",
-              start: idx,
-              end: idx,
-              entry: item,
-              startDate: item.startDate ?? item.dayIso ?? null,
-              endDate: item.endDate ?? null,
-              displayTz: item.displayTz ?? null,
-              calendarId: item.calendarId ?? null,
-            });
-          }
-        } else {
-          ongoing.set(key, {
-            id: key,
-            title: item.title || "Google予定",
-            start: idx,
-            end: idx,
-            entry: item,
-            startDate: item.startDate ?? item.dayIso ?? null,
-            endDate: item.endDate ?? null,
-            displayTz: item.displayTz ?? null,
-            calendarId: item.calendarId ?? null,
-          });
-        }
-      });
-
-      // close segments that ended before this day
-      const toClose: string[] = [];
-      ongoing.forEach((seg, key) => {
-        if (!present.has(key)) {
-          segments.push(seg);
-          toClose.push(key);
-        }
-      });
-      toClose.forEach((key) => ongoing.delete(key));
-    });
-
-    ongoing.forEach((seg) => segments.push(seg));
-
-    // pack rows so spans don't overlap on the same row
-    segments.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-    const rowEnds: number[] = [];
-    const placed: Segment[] = segments.map((seg) => {
-      let row = rowEnds.findIndex((end) => seg.start > end);
-      if (row === -1) {
-        row = rowEnds.length;
-        rowEnds.push(seg.end);
-      } else {
-        rowEnds[row] = seg.end;
-      }
-      return { ...seg, row };
-    });
-
-    return { segments: placed, rows: rowEnds.length };
-  }, [calendarAllDayByDay, hasAllDayEvents, visibleDays]);
-
-  const shiftIsoDate = (iso?: string | null, deltaDays = 0) => {
-    if (!iso) return null;
-    const [year, month, day] = iso.split("-").map((part) => Number(part));
-    if (!year || !month || !day) return iso;
-    const shifted = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + deltaDays));
-    return shifted.toISOString().split("T")[0];
-  };
-
-  const formatShortDate = (iso?: string | null) => {
-    if (!iso) return null;
-    const [, month, day] = iso.split("-");
-    if (!month || !day) return null;
-    return `${Number(month)}/${Number(day)}`;
-  };
-
-  const formatAllDayRange = (segment: { startDate?: string | null; endDate?: string | null; start: number; end: number }) => {
-    const visibleStartIso = visibleDays[segment.start]?.isoDate ?? null;
-    const visibleEndIso = visibleDays[segment.end]?.isoDate ?? null;
-    const startIso = segment.startDate ?? visibleStartIso;
-    const endExclusive = segment.endDate ?? null;
-    const endIso = endExclusive ? shiftIsoDate(endExclusive, -1) : visibleEndIso ?? startIso;
-    const startLabel = formatShortDate(startIso);
-    const endLabel = formatShortDate(endIso);
-    if (startLabel && endLabel && startLabel !== endLabel) return `${startLabel}–${endLabel}`;
-    return startLabel ?? endLabel;
-  };
+  const allDayLayout = useMemo(
+    () =>
+      hasAllDayEvents
+        ? buildAllDayLayout({ visibleDays, calendarAllDayByDay })
+        : { segments: [], rows: 0 },
+    [calendarAllDayByDay, hasAllDayEvents, visibleDays]
+  );
 
   const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
 
@@ -471,7 +368,7 @@ export function DesktopTimelineView({
                       const dayWidth = 100 / visibleDays.length;
                       const left = dayWidth * item.start;
                       const width = dayWidth * span;
-                      const rangeLabel = formatAllDayRange(item);
+                      const rangeLabel = formatAllDayRange({ segment: item, visibleDays });
                       const tzLabel = item.displayTz && item.displayTz !== "Asia/Tokyo" ? item.displayTz : null;
                       const meta = [rangeLabel, tzLabel].filter(Boolean).join(" · ");
                       return (

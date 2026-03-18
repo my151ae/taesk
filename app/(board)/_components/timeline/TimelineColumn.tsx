@@ -10,8 +10,6 @@ import {
     minuteToPixels,
     minutesToTime,
     getMinutesFromTime,
-    calculateStackedEventLayout,
-    normalizeTimelineItems,
     type StackedTimelineItemKind,
     timeLabel,
     ExternalCalendarEntry,
@@ -20,6 +18,10 @@ import {
 import { TimelineEventItem } from './TimelineEventItem';
 import { TimelineCard } from './TimelineCard';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
+import {
+    buildStackedTimelineColumnLayout,
+    buildTimelineInteractionLock,
+} from '@/app/(board)/_components/timeline/timeline-render-model';
 
 type PointerPreviewState = {
     visible: boolean;
@@ -108,12 +110,18 @@ export const TimelineColumn = memo(function TimelineColumn({
     const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
     const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
-    const combinedItems = normalizeTimelineItems(events, calendarEvents);
-    const stackedLayout = calculateStackedEventLayout(combinedItems, { 
+    const { combinedItems, stackedLayout } = buildStackedTimelineColumnLayout({
+        events,
+        calendarEvents,
         device: 'desktop',
-        hourHeight: currentHourHeight
+        hourHeight: currentHourHeight,
     });
-    const interactionLocked = Boolean(activeDragCardId || activeResize || contextMenuCardId || selectedSlot);
+    const interactionLocked = buildTimelineInteractionLock({
+        activeDragCardId,
+        activeResize,
+        contextMenuCardId,
+        selectedSlotVisible: Boolean(selectedSlot),
+    });
 
     const handleSingleClick = (e: MouseEvent, dayIso: string) => {
         e.stopPropagation();

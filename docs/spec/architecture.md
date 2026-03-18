@@ -76,13 +76,17 @@ app/layout.tsx
 `TimelineBoardPage` は巨大なクライアントコンポーネントだが、責務ごとに以下のフックへ委譲している:
 
 - `useTimelineUrlState` … URL 由来の表示範囲/日付の同期
-- `useTimelineData` … Timeline API 取得・Realtime 反映・オンライン状態（内部で `useRealtimeBoard` / `useSyncQueue`）
+- `useTimelineBoardController` … timeline/list 切替、list window preset、anchor date/offset の制御
+- `useTimelineData` … Timeline API 取得・Realtime 反映・オンライン状態の保持
+- `useTimelineBoardViewModels` … desktop/mobile の panel・toolbar・body props 組み立て
 - `useTimelineViewport` … ヘッダー高さ/表示領域/現在時刻の算出
 - `useTimelineFiltering` … 検索・タグ・優先度のフィルタ（内部で `useBoardFilters`）
 - `useTimelineNavigation` … 日付移動/範囲変更の制御
 - `useTimelineCalendar` … 外部カレンダーの取得と表示
 - `useTimelineDragAndDrop` … DnD/リサイズ/プレビュー状態
 - `useTimelineCardActions` … CardModal 保存や新規作成の処理
+
+画面描画は `TimelineBoardPage` が直接抱えず、`TimelineBoardScreen` に grouped props を渡す構成へ寄せている。desktop/mobile の最終 JSX は view 側に残しつつ、画面 wiring と render 前計算の境界を分ける方針を採っている。
 
 ## Data Flow
 
@@ -96,13 +100,13 @@ app/layout.tsx
    `useRealtimeBoard` が `supabase.channel` を作成し、`postgres_changes` で `cards` / `comments` の INSERT/UPDATE/DELETE を購読。`handleCardChange` がイベント配列と `abBuckets` を即時更新する。
 
 4. **User interaction**  
-   - Timeline での DnD → `handleDragStart` / `handleDragMove` / `handleDragEnd`  
-     `handleDragEnd` は `activeDrag` 情報をもとに `due_bucket` / `due_start` / `due_end` を再計算し、既存の `assignee_ids` などを保持したままローカル状態を書き換える。確定後は `applyPatch` で `PATCH /api/boards/:id/cards/:id` を実行し、失敗時はロールバック。
+   - Timeline での DnD / resize → `handleDragStart` / `handleDragMove` / `handleDragEnd` / `handleResize*`  
+     `useTimelineDragAndDrop` は内部で drag session と resize をまとめて扱い、`pointerPreview`、bucket indicator、A/B hover 状態を導出する。確定時は `useTimelineCardActions` の `applyPatch` を通じて `PATCH /api/boards/:id/cards/:id` を実行し、失敗時はロールバックする。
    - CardModal での編集 → `PATCH /api/cards/:id` を呼び、成功レスポンスをローカル状態へ反映（タイトル/タグ/期日/`assignee_ids` 等）。リアルタイム通知とも整合するため再フェッチは原則不要。
-   - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、`comment-queue` に保持した上で API へ送信。エラー時はローカルキューへ残存。
+   - CommentsPanel → `useCommentsStore` がコメントをローカルで挿入し、API へ送信する。エラー時は store 側の retry 情報を保持する。
 
-5. **Offline / retry**  
-   `useSyncQueue` は localStorage (`taesk-sync-queue`) を監視し、オンライン状態や未同期数を提供。Timeline は直接 `PATCH` を行うため、失敗時はロールバックとエラー表示で対応する。
+5. **Rollback / retry**  
+   Timeline の mutation は `applyPatch` を通して楽観更新し、失敗時はロールバックとエラー表示で収束させる。D&D 完了後に一律再フェッチする前提ではなく、ローカル状態と API 応答の整合を優先する。
 
 6. **Metrics**  
    `createClientTrace('timeline')` が `traceRef` に格納され、ページロードや DnD 操作ごとに `traceRef.current?.addEvent('drag_end', payload)` のように記録。アンマウント時に `traceRef.current?.flush()` が呼ばれ、`test-results/batches/*` に含まれる `dumpClientMetrics` で取得可能。
@@ -115,9 +119,15 @@ app/layout.tsx
   - `comments` テーブル → `callbacks.upsertComment` / `callbacks.removeComment`
 - `realtimeStatus` を返しており、接続中/切断/エラーを UI に表示可能。
 
-### useSyncQueue
-- `taesk-sync-queue` を localStorage に保持。アクション単位で `enqueue` し、成功/失敗を `stats` に反映。
-- Timeline DnD、CardModal 保存、コメント投稿など全てのミューテーションがここを通過するため、board state を直接書き換える場面でも API 反映との整合が保たれる。
+### useTimelineBoardViewModels
+- `TimelineBoardPage` が保持する state と handler から、desktop/mobile の panel・toolbar・body props をまとめる。
+- `TimelineBoardScreen` に渡す grouped props の土台であり、page 本体に JSX ごとの細かい wiring を残さない。
+- render 前計算は shared helper へ逃がしつつ、view 固有 interaction は各 view に残す。
+
+### useTimelineDragAndDrop
+- helper 分割済みの pointer/autoscroll/drop/persist を束ねる orchestrator。
+- 公開 state は `activeDrag`, `pointerPreview`, `activeResize`, `bucketIndicator`, `isOverABList` だが、内部では drag session / interaction state へ寄せる前提で整理を進めている。
+- Timeline と A/B の drop、event resize、drag overlay 用の導出値を 1 箇所で管理する。
 
 ### useTimelineFiltering
 - `searchQuery`, `selectedTags`, `sortBy`, `showFilters` を管理し、`events` と `abBuckets` を同時にフィルタする。
@@ -129,14 +139,14 @@ app/layout.tsx
 
 ## Drag & Drop Lifecycle
 
-1. `DndContext` + `PointerSensor` (distance 6px) を初期化。
-2. `handleDragStart` が `activeDragRef` に対象カードや開始位置 (`originColumn`, `originBucket`, `originMinutes`) を保存し、`setPointerPreview` でカスタムプレビューを表示。
-3. `handleDragMove` が `pointerWithin` / `rectIntersection` を併用してドロップ候補を判定し、Timeline や A/B のハイライト状態を更新。
+1. `TimelineBoardScreen` / `MobileTimelineView` が `DndContext` を初期化し、Timeline 用 collision detection を適用する。
+2. `handleDragStart` が drag session を開始し、対象カードや開始位置 (`originColumn`, `originBucket`, `originMinutes`) を保存する。
+3. `handleDragMove` が pointer helper と drop helper を使って候補を判定し、`pointerPreview`、bucket indicator、A/B hover を更新する。
 4. `handleDragEnd` が drop target を解析:
    - Timeline へのドロップ → `due_start`/`due_end` を座標から再計算
    - A/B へのドロップ → `due_bucket` をターゲットから取得し、`due_bucket_position` を算出
    - 不正なドロップ or キャンセル → `previousData` を戻し、`activeDrag` を解除
-5. 成功した変更は `syncQueue` に enqueue され、API 反映後に `fetchTimeline()` を再実行して整合性を取る。
+5. 成功した変更は `applyPatch` で API へ反映し、成功レスポンスか realtime 差分で収束させる。失敗時はロールバックする。
 
 ## Modal & Routing
 
@@ -159,13 +169,11 @@ app/layout.tsx
 sequenceDiagram
   participant UI as CardModal
   participant State as Timeline state
-  participant Sync as useSyncQueue
   participant API as PATCH /api/boards/:id/cards/:id
   participant RT as Supabase Realtime
 
   UI->>State: Optimistic merge (title/tags/due_*/assignee_ids)
-  UI->>Sync: enqueue({payload})
-  Sync->>API: PATCH cards
+  UI->>API: PATCH cards
   API-->>RT: postgres_changes (card row)
   RT-->>State: handleCardChange merges (assignee_ids preserved)
   State-->>UI: Modal re-renders with updated card
@@ -178,14 +186,12 @@ sequenceDiagram
   participant UI as TimelineView
   participant DnD as useTimelineDragAndDrop
   participant State as Timeline state
-  participant Sync as useSyncQueue
   participant API as PATCH /api/boards/:id/cards/:id
   participant RT as Supabase Realtime
 
   UI->>DnD: handleDragEnd(cardId, target)
   DnD->>State: persistPlacement (bucket/start/end, keep assignee_ids)
-  DnD->>Sync: enqueue({payload})
-  Sync->>API: PATCH cards
+  DnD->>API: PATCH cards
   API-->>RT: postgres_changes
   RT-->>State: handleCardChange (assignee_ids retained)
 ```
@@ -207,8 +213,7 @@ sequenceDiagram
 
 - Timeline fetch 失敗時は `setStatus('error')` と `setErrorMessage()` を通じてリトライ UI を表示。
 - Realtime 切断時は `realtimeStatus.state === 'error'` をヘッダーで警告。ユーザーには `Reconnect` ボタンを提供。
-- オフライン検知 (`navigator.onLine`) は `useSyncQueue` で監視され、送信失敗したアクションはローカルキューに残して指数バックオフで再試行。
-- CardModal 保存や DnD 更新が API エラーになった場合、`toast.error` を表示しつつ `fetchTimeline()` でサーバー状態を優先。
+- CardModal 保存や DnD 更新が API エラーになった場合、エラー表示とロールバックで収束させる。Timeline の mutation 成功後に一律再フェッチする設計ではない。
 
 ## Supabase Schema Highlights
 

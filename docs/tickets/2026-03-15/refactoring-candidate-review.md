@@ -1,5 +1,10 @@
 # リファクタリング候補の洗い出し
 
+> [!WARNING]
+> このメモは 2026-03-15 時点のコード読解ベースの候補レビューです。一次情報ではありません。
+> 現在の着手判断と責務境界は現コードと [`docs/spec/architecture.md`](../../spec/architecture.md)、[`docs/tickets/2026-03-18/timeline-refactor-ownership-map.md`](../2026-03-18/timeline-refactor-ownership-map.md) を優先してください。
+> 本メモは superseded 扱いの履歴資料として残しています。
+
 ## Summary
 現状の taesk は Timeline 中心で機能拡張が進んでおり、機能自体は hook 分割や helper 分割である程度整理されている。一方で、画面コンテナ層、D&D 制御、CardModal、Tiptap、Google Calendar 連携、E2E の一部がまだ大きく、責務境界が曖昧な箇所が残っている。
 

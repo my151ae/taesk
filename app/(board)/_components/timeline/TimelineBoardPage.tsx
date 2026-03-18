@@ -2,19 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
-import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
-import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
-import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
-import { DesktopTimelineToolbar, DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
-import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
-import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
-import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
+import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
 import {
   type TimelineEvent,
   minuteToPixels,
@@ -23,10 +16,7 @@ import {
   DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
-import { DesktopListToolbar, DesktopListView } from "@/app/(board)/_components/timeline/DesktopListView";
-import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
-import { DesktopSidebarMenu, type SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
-import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
+import { type SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
@@ -45,12 +35,7 @@ import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextM
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimelineBoardInitialization";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
-import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import {
-  buildOverlayCardData,
-  findOverlayBucketEntry,
-  findOverlayOverdueEntry,
-} from "@/app/(board)/_utils/timeline-overlay";
+import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/timeline-render-model";
 import {
   LIST_WINDOW_PRESETS,
   listWindowRange,
@@ -670,27 +655,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   });
 
   const activeDragCardId = activeDrag?.cardId ?? null;
-  const overlayBucketEntry = useMemo(
-    () => findOverlayBucketEntry(sortedFilteredData?.abBuckets ?? {}, activeDragCardId),
-    [sortedFilteredData?.abBuckets, activeDragCardId]
-  );
-  const overlayOverdueEntry = useMemo(
-    () => findOverlayOverdueEntry(sortedFilteredData?.overdue ?? [], activeDragCardId),
-    [sortedFilteredData?.overdue, activeDragCardId]
-  );
-  const overlayTimelineEvent = useMemo(
-    () => sortedFilteredData?.events.find((event) => event.card_id === activeDragCardId) ?? null,
-    [sortedFilteredData?.events, activeDragCardId]
-  );
-  const overlayCardData = useMemo(
+  const { overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent, overlayCardData } = useMemo(
     () =>
-      buildOverlayCardData({
-        timelineEvent: overlayTimelineEvent,
-        bucketEntry: overlayBucketEntry,
-        overdueEntry: overlayOverdueEntry,
+      buildTimelineOverlayState({
+        abBuckets: sortedFilteredData?.abBuckets ?? {},
+        overdue: sortedFilteredData?.overdue ?? [],
+        events: sortedFilteredData?.events ?? [],
+        activeDragCardId,
         defaultTimelineDuration: 60,
       }),
-    [overlayTimelineEvent, overlayBucketEntry, overlayOverdueEntry]
+    [sortedFilteredData?.abBuckets, sortedFilteredData?.overdue, sortedFilteredData?.events, activeDragCardId]
   );
 
   const viewModels = useTimelineBoardViewModels({
@@ -789,245 +763,146 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     });
   }, [viewMode, data?.days, activeDayIndex, updateUrlForTimeline, timelineRange, updateUrlForList, listWindow.before, listWindow.after, listAnchorDate]);
 
-  if (!parseResult.ok) {
-    return (
-      <div className="min-h-screen bg-[#f4f5f7] p-6">
-        <div className="mx-auto max-w-xl rounded-xl border border-rose-200 bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">Invalid/legacy URL</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            このURLは現在の契約に一致しません。reason: <span className="font-mono text-rose-600">{parseResult.code}</span>
-          </p>
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={handleResetInvalidUrl}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              URLをリセット
-            </button>
-            <button
-              onClick={handleMoveToCanonicalUrl}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800"
-            >
-              正規URLへ移動
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const headerProps = {
+    board: currentBoard,
+    modalBoards: availableBoards,
+    modalTeams: availableTeams,
+    handleBoardNavigate,
+    showBoardMenu,
+    setShowBoardMenu,
+    boardMenuRef,
+    setShowNotificationSettings,
+    setShowProfileSettings,
+    onOpenBoardSettings: handleOpenBoardSettings,
+    onOpenTeamSettings: handleOpenTeamSettings,
+    profile,
+    user,
+    signOut,
+    dayRange: intendedDayRange,
+    onDayRangeChange: handleDayRangeUpdate,
+    onTodayClick: viewMode === "list" ? handleListToday : handleTodayClick,
+    realtimeStatus,
+    googleToast,
+    googleStatusText,
+    googleCalendarStatus,
+    googleCalendarError,
+    calendarPreset,
+    setCalendarPreset,
+    refreshGoogleCalendar,
+    handleGoogleConnect,
+    isGoogleLoading: googleCalendarStatus === "loading",
+    viewMode,
+    onShortcutsClick: () => setShowShortcutsModal(true),
+  };
+
+  const leftPanelProps = {
+    state: viewModels.desktop.leftPanel.state,
+    actions: viewModels.desktop.leftPanel.actions,
+    sections: viewModels.desktop.leftPanel.sections,
+    allowOverdueDrag: viewModels.desktop.leftPanel.allowOverdueDrag,
+    openCardModal,
+    onToggleCheck: handleToggleCardChecked,
+    onCardContextMenu: handleCardContextMenu,
+    onCardContextMenuByKeyboard: handleCardContextMenuByKeyboard,
+    contextMenuCardId: contextMenu.cardId,
+  };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]">
-      <div className="flex w-full flex-col gap-4 px-3 pt-4 md:px-4 md:pt-6 xl:px-6 2xl:px-8">
-        <TimelineBoardHeader
-          board={currentBoard} modalBoards={availableBoards} modalTeams={availableTeams} handleBoardNavigate={handleBoardNavigate}
-          showBoardMenu={showBoardMenu} setShowBoardMenu={setShowBoardMenu} boardMenuRef={boardMenuRef}
-          setShowNotificationSettings={setShowNotificationSettings}
-          setShowProfileSettings={setShowProfileSettings}
-          onOpenBoardSettings={handleOpenBoardSettings}
-          onOpenTeamSettings={handleOpenTeamSettings}
-          profile={profile} user={user} signOut={signOut}
-          dayRange={intendedDayRange} onDayRangeChange={handleDayRangeUpdate}
-          onTodayClick={viewMode === 'list' ? handleListToday : handleTodayClick} realtimeStatus={realtimeStatus} googleToast={googleToast}
-          googleStatusText={googleStatusText}
-          googleCalendarStatus={googleCalendarStatus} googleCalendarError={googleCalendarError}
-          calendarPreset={calendarPreset} setCalendarPreset={setCalendarPreset}
-          refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
-          isGoogleLoading={googleCalendarStatus === 'loading'}
-          viewMode={viewMode}
-          onShortcutsClick={() => setShowShortcutsModal(true)}
-        />
-
-        <div className="hidden md:block">
-          {desktopActiveView === "timeline" ? (
-            <DndContext
-              sensors={sensors}
-              onDragStart={handleDragStart}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
-              onDragCancel={handleDragCancel}
-              collisionDetection={bucketsFirstCollisionDetection}
-              measuring={{
-                droppable: { strategy: MeasuringStrategy.Always },
-              }}
-              autoScroll={{
-                enabled: false,
-                threshold: { x: 0, y: 0.2 },
-                acceleration: 1,
-              }}
-            >
-              <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-                <aside
-                  className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-                  style={{ width: "clamp(252px, 19vw, 292px)" }}
-                >
-                  <DesktopSidebarMenu
-                    state={viewModels.desktop.leftPanel.state}
-                    actions={viewModels.desktop.leftPanel.actions}
-                    sections={viewModels.desktop.leftPanel.sections}
-                    overdueSortOrder={overdueSortOrder}
-                    onOverdueSortOrderChange={setOverdueSortOrder}
-                    allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
-                    openCardModal={openCardModal}
-                    onToggleCheck={handleToggleCardChecked}
-                    onCardContextMenu={handleCardContextMenu}
-                    onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
-                    contextMenuCardId={contextMenu.cardId}
-                  />
-                </aside>
-
-                <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="border-b border-slate-100 bg-white px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      {desktopTabItems.map((item) => {
-                        const isActive = item.key === desktopActiveView;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => viewModels.desktop.mainPanel.tabs.onChange(item.key)}
-                            className={
-                              isActive
-                                ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                                : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            }
-                            aria-current={isActive ? "page" : undefined}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <DesktopTimelineToolbar {...viewModels.desktop.mainPanel.views.timeline.toolbar} />
-                  <DesktopTimelineView {...viewModels.desktop.mainPanel.views.timeline.body} />
-                </section>
-              </div>
-
-              <DragOverlay dropAnimation={null} zIndex={50}>
-                <TimelineDragOverlayCard
-                  variant="desktop"
-                  overlayCardData={overlayCardData}
-                  overlayTimelineEvent={overlayTimelineEvent}
-                  overlayBucketCard={overlayBucketEntry?.item ?? null}
-                  overlayOverdueCard={overlayOverdueEntry?.item ?? null}
-                />
-              </DragOverlay>
-            </DndContext>
-          ) : (
-            <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-              <aside
-                className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-                style={{ width: "clamp(252px, 19vw, 292px)" }}
-              >
-                <DesktopSidebarMenu
-                  state={viewModels.desktop.leftPanel.state}
-                  actions={viewModels.desktop.leftPanel.actions}
-                  sections={viewModels.desktop.leftPanel.sections}
-                  overdueSortOrder={overdueSortOrder}
-                  onOverdueSortOrderChange={setOverdueSortOrder}
-                  allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
-                  openCardModal={openCardModal}
-                  onToggleCheck={handleToggleCardChecked}
-                  onCardContextMenu={handleCardContextMenu}
-                  onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
-                  contextMenuCardId={contextMenu.cardId}
-                />
-              </aside>
-
-              <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="border-b border-slate-100 bg-white px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    {desktopTabItems.map((item) => {
-                      const isActive = item.key === desktopActiveView;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => viewModels.desktop.mainPanel.tabs.onChange(item.key)}
-                          className={
-                            isActive
-                              ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                              : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          }
-                          aria-current={isActive ? "page" : undefined}
-                        >
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <DesktopListToolbar {...viewModels.desktop.mainPanel.views.list.toolbar} />
-                <DesktopListView {...viewModels.desktop.mainPanel.views.list.body} />
-              </section>
-            </div>
-          )}
-        </div>
-
-        {viewMode === "timeline" ? (
-          <div className="flex-1 overflow-hidden md:hidden">
-            <MobileTimelineView
-              {...viewModels.mobile.timeline}
-              overdueSortOrder={overdueSortOrder}
-              onOverdueSortOrderChange={setOverdueSortOrder}
-            />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-hidden md:hidden">
-            <MobileListView {...viewModels.mobile.list} />
-          </div>
-        )}
-
-        <TimelineBoardDialogs
-          showShareDialog={showShareDialog} setShowShareDialog={setShowShareDialog}
-          showNotificationSettings={showNotificationSettings} setShowNotificationSettings={setShowNotificationSettings}
-          showProfileSettings={showProfileSettings} setShowProfileSettings={setShowProfileSettings}
-          showBoardSettings={showBoardSettings} setShowBoardSettings={setShowBoardSettings}
-          boardSettingsBoardId={boardSettingsBoardId}
-          showTeamSettings={showTeamSettings} setShowTeamSettings={setShowTeamSettings}
-          teamSettingsTeamId={teamSettingsTeamId}
-          initialBoard={currentBoard}
-          availableBoards={availableBoards}
-          fetchProfile={fetchProfile}
-          setAvailableBoards={setAvailableBoards}
-          setActiveDayIndex={setActiveDayIndex} fetchTimeline={fetchTimeline}
-          onMemberAdded={refreshBoardMembers}
-        />
-
-        <ShortcutsModal
-          isOpen={showShortcutsModal}
-          onClose={() => setShowShortcutsModal(false)}
-        />
-
-        {modalCard && (cardModalStatus === 'ready' || cardModalStatus === 'loading') && (
-          <CardModal
-            card={modalCard} boards={availableBoards} profiles={modalProfiles}
-            onSave={handleCardModalSave} onDelete={handleCardModalDelete}
-            onMoveToBoard={() => { }} onClose={closeCardModal}
-            isLoading={cardModalStatus === 'loading'}
-            historySaveWarning={historySaveWarning}
-            onRetryHistorySave={retryHistorySave}
-            onCloseWithoutHistory={closeModalWithoutHistory}
-          />
-        )}
-        {cardModalError && (
-          <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
-            {cardModalError}
-          </div>
-        )}
-
-        {contextMenu.open && contextMenu.cardId && (
-          <CardContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
-            onClose={closeContextMenu}
-            items={contextMenuItems}
-          />
-        )}
-      </div>
-    </div>
+    <TimelineBoardScreen
+      parseResult={parseResult}
+      onResetInvalidUrl={handleResetInvalidUrl}
+      onMoveToCanonicalUrl={handleMoveToCanonicalUrl}
+      headerProps={headerProps}
+      desktop={{
+        activeView: desktopActiveView,
+        tabItems: desktopTabItems,
+        onTabChange: viewModels.desktop.mainPanel.tabs.onChange,
+        leftPanelProps,
+        overdueSortOrder,
+        onOverdueSortOrderChange: setOverdueSortOrder,
+        timelineToolbarProps: viewModels.desktop.mainPanel.views.timeline.toolbar,
+        timelineViewProps: viewModels.desktop.mainPanel.views.timeline.body,
+        listToolbarProps: viewModels.desktop.mainPanel.views.list.toolbar,
+        listViewProps: viewModels.desktop.mainPanel.views.list.body,
+        dndProps: {
+          sensors,
+          handleDragStart,
+          handleDragMove,
+          handleDragEnd,
+          handleDragCancel,
+        },
+        overlayProps: {
+          overlayCardData,
+          overlayTimelineEvent,
+          overlayBucketCard: overlayBucketEntry?.item ?? null,
+          overlayOverdueCard: overlayOverdueEntry?.item ?? null,
+        },
+      }}
+      mobile={{
+        viewMode,
+        timelineProps: viewModels.mobile.timeline,
+        listProps: viewModels.mobile.list,
+        overdueSortOrder,
+        onOverdueSortOrderChange: setOverdueSortOrder,
+      }}
+      dialogsProps={{
+        showShareDialog,
+        setShowShareDialog,
+        showNotificationSettings,
+        setShowNotificationSettings,
+        showProfileSettings,
+        setShowProfileSettings,
+        showBoardSettings,
+        setShowBoardSettings,
+        boardSettingsBoardId,
+        showTeamSettings,
+        setShowTeamSettings,
+        teamSettingsTeamId,
+        initialBoard: currentBoard,
+        availableBoards,
+        fetchProfile,
+        setAvailableBoards,
+        setActiveDayIndex,
+        fetchTimeline,
+        onMemberAdded: refreshBoardMembers,
+      }}
+      shortcutsProps={{
+        isOpen: showShortcutsModal,
+        onClose: () => setShowShortcutsModal(false),
+      }}
+      modalProps={
+        modalCard && (cardModalStatus === "ready" || cardModalStatus === "loading")
+          ? {
+              card: modalCard,
+              boards: availableBoards,
+              profiles: modalProfiles,
+              onSave: handleCardModalSave,
+              onDelete: handleCardModalDelete,
+              onMoveToBoard: () => {},
+              onClose: closeCardModal,
+              isLoading: cardModalStatus === "loading",
+              historySaveWarning,
+              onRetryHistorySave: retryHistorySave,
+              onCloseWithoutHistory: closeModalWithoutHistory,
+            }
+          : null
+      }
+      cardModalError={cardModalError}
+      contextMenu={
+        contextMenu.open && contextMenu.cardId
+          ? {
+              open: true,
+              cardId: contextMenu.cardId,
+              x: contextMenu.x,
+              y: contextMenu.y,
+              items: contextMenuItems,
+              onClose: () => closeContextMenu("dismiss"),
+            }
+          : {
+              open: false,
+              cardId: contextMenu.cardId,
+            }
+      }
+    />
   );
 }
