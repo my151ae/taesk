@@ -10,6 +10,7 @@ import {
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
+import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
 export type SidebarSectionKey = "overdue" | "search";
 type SidebarSectionTone = "danger" | "neutral";
@@ -46,6 +47,8 @@ type DesktopSidebarMenuProps = {
   state: DesktopSidebarMenuState;
   actions: DesktopSidebarMenuActions;
   sections: readonly DesktopSidebarSection[];
+  overdueSortOrder: OverdueSortOrder;
+  onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   allowOverdueDrag: boolean;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
@@ -53,6 +56,37 @@ type DesktopSidebarMenuProps = {
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
 };
+
+function OverdueSortToggle({
+  order,
+  onChange,
+  testId,
+}: {
+  order: OverdueSortOrder;
+  onChange: (order: OverdueSortOrder) => void;
+  testId: string;
+}) {
+  const nextOrder = order === "oldest" ? "newest" : "oldest";
+  const currentLabel = order === "oldest" ? "古い順" : "新しい順";
+  const nextLabel = nextOrder === "oldest" ? "古い順" : "新しい順";
+
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      data-order={order}
+      onClick={() => onChange(nextOrder)}
+      aria-label={`Overdue の並び順を${nextLabel}に切り替え`}
+      title={`現在: ${currentLabel}`}
+      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+    >
+      <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d={order === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"} />
+      </svg>
+      <span>{currentLabel}</span>
+    </button>
+  );
+}
 
 function OverdueIcon() {
   return (
@@ -228,6 +262,8 @@ export function DesktopSidebarMenu({
   state,
   actions,
   sections,
+  overdueSortOrder,
+  onOverdueSortOrderChange,
   allowOverdueDrag,
   openCardModal,
   onToggleCheck,
@@ -378,7 +414,7 @@ export function DesktopSidebarMenu({
               aria-hidden={!expanded}
             >
               <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
-                <span className="pointer-events-none absolute right-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                <span className="pointer-events-none absolute left-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                   Panel
                 </span>
                 <div className="flex min-w-0 items-center gap-2 leading-tight">
@@ -392,6 +428,13 @@ export function DesktopSidebarMenu({
                     {section.count}
                   </span>
                 </div>
+                {section.key === "overdue" ? (
+                  <OverdueSortToggle
+                    order={overdueSortOrder}
+                    onChange={onOverdueSortOrderChange}
+                    testId="desktop-sidebar-overdue-sort-toggle"
+                  />
+                ) : null}
               </div>
 
               <div

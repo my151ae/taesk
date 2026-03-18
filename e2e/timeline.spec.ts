@@ -1391,6 +1391,96 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('toggles overdue sort order in the desktop sidebar', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const olderOverdueCardId = crypto.randomUUID();
+    const newerOverdueCardId = crypto.randomUUID();
+    const olderShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const newerShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: olderOverdueCardId,
+        title: 'Desktop overdue oldest',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'desktop overdue oldest card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1810,
+        tags: [],
+        due_date: shiftIsoDateJst(-3),
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: olderShortId,
+        id_short: Math.floor(Math.random() * 100000) + 930,
+        slug: 'desktop-overdue-oldest',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: newerOverdueCardId,
+        title: 'Desktop overdue newest',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'desktop overdue newest card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1820,
+        tags: [],
+        due_date: shiftIsoDateJst(-1),
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: newerShortId,
+        id_short: Math.floor(Math.random() * 100000) + 940,
+        slug: 'desktop-overdue-newest',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const overdueCards = page.locator('[data-testid^="overdue-card-"]:visible');
+      const sortToggle = page.getByTestId('desktop-sidebar-overdue-sort-toggle');
+
+      await expect(overdueCards).toHaveCount(2);
+      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
+      await expect(overdueCards.nth(0)).toContainText('Desktop overdue oldest');
+      await expect(overdueCards.nth(1)).toContainText('Desktop overdue newest');
+
+      await sortToggle.click();
+
+      await expect(sortToggle).toHaveAttribute('data-order', 'newest');
+      await expect(overdueCards.nth(0)).toContainText('Desktop overdue newest');
+      await expect(overdueCards.nth(1)).toContainText('Desktop overdue oldest');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [olderOverdueCardId, newerOverdueCardId]);
+    }
+  });
+
   test('collapses overdue into a mobile sheet and keeps overdue drag working', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
@@ -1523,6 +1613,99 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: 'Mobile overdue drag card' }).first()).toBeVisible();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', overdueCardId);
+    }
+  });
+
+  test('toggles overdue sort order in the mobile overdue sheet', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const olderOverdueCardId = crypto.randomUUID();
+    const newerOverdueCardId = crypto.randomUUID();
+    const olderShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const newerShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: olderOverdueCardId,
+        title: 'Mobile overdue oldest',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'mobile overdue oldest card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1830,
+        tags: [],
+        due_date: shiftIsoDateJst(-4),
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: olderShortId,
+        id_short: Math.floor(Math.random() * 100000) + 950,
+        slug: 'mobile-overdue-oldest',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: newerOverdueCardId,
+        title: 'Mobile overdue newest',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'mobile overdue newest card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 1840,
+        tags: [],
+        due_date: shiftIsoDateJst(-1),
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: newerShortId,
+        id_short: Math.floor(Math.random() * 100000) + 960,
+        slug: 'mobile-overdue-newest',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const overdueToggle = page.getByTestId('mobile-overdue-toggle');
+      const sortToggle = page.getByTestId('mobile-overdue-sort-toggle');
+      const overdueCards = page.locator('[data-testid^="overdue-card-"]:visible');
+
+      await overdueToggle.click();
+
+      await expect(overdueCards).toHaveCount(2);
+      await expect(sortToggle).toHaveAttribute('data-order', 'oldest');
+      await expect(overdueCards.nth(0)).toContainText('Mobile overdue oldest');
+      await expect(overdueCards.nth(1)).toContainText('Mobile overdue newest');
+
+      await sortToggle.click();
+
+      await expect(sortToggle).toHaveAttribute('data-order', 'newest');
+      await expect(overdueCards.nth(0)).toContainText('Mobile overdue newest');
+      await expect(overdueCards.nth(1)).toContainText('Mobile overdue oldest');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [olderOverdueCardId, newerOverdueCardId]);
     }
   });
 

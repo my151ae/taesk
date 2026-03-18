@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay, TimelineOverdueItem } from '@/lib/api-types/timeline';
 import { DEFAULT_TIMELINE_DAY_RANGE, formatDayLabel } from '@/app/(board)/_utils/timeline-helpers';
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
+import { sortTimelineOverdueItems } from '@/lib/timeline-overdue-sort';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -255,20 +256,13 @@ const getHandler = async (
     return a.due_date.localeCompare(b.due_date);
   });
 
-  overdue.sort((a, b) => {
-    const dateCompare = (a.due_date ?? '').localeCompare(b.due_date ?? '');
-    if (dateCompare !== 0) return dateCompare;
-    const aPos = a.due_bucket_position ?? 0;
-    const bPos = b.due_bucket_position ?? 0;
-    if (aPos !== bPos) return bPos - aPos;
-    return (a.title ?? '').localeCompare(b.title ?? '');
-  });
+  const sortedOverdue = sortTimelineOverdueItems(overdue);
 
   const responseBody: TimelineResponse = {
     days,
     events,
     abBuckets,
-    overdue,
+    overdue: sortedOverdue,
     serverNow: new Date().toISOString(),
     startOffset,
     range,

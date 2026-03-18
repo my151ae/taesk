@@ -9,6 +9,7 @@ import {
   getMinutesFromTime,
   toLocalDay,
 } from '@/app/(board)/_utils/timeline-helpers';
+import { sortTimelineOverdueItems } from '@/lib/timeline-overdue-sort';
 import type { DueBucket } from '@/lib/supabase';
 
 export type PlacementMeta = {
@@ -135,14 +136,8 @@ export function createPersistPlacement({
           short_id: baseOverdueItem?.short_id ?? baseEvent?.short_id ?? baseBucketItem?.short_id ?? null,
           slug: baseOverdueItem?.slug ?? baseEvent?.slug ?? baseBucketItem?.slug ?? null,
         });
-        nextOverdue.sort((a, b) => {
-          const dateCompare = (a.due_date ?? '').localeCompare(b.due_date ?? '');
-          if (dateCompare !== 0) return dateCompare;
-          const aPos = a.due_bucket_position ?? 0;
-          const bPos = b.due_bucket_position ?? 0;
-          if (aPos !== bPos) return bPos - aPos;
-          return (a.title ?? '').localeCompare(b.title ?? '');
-        });
+        const sortedOverdue = sortTimelineOverdueItems(nextOverdue);
+        nextOverdue.splice(0, nextOverdue.length, ...sortedOverdue);
       };
 
       if (meta.target === 'timeline') {

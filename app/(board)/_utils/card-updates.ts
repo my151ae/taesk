@@ -1,5 +1,6 @@
 
 import type { TimelineResponse, TimelineEvent, TimelineBucketItem, TimelineDay, TimelineOverdueItem } from "./timeline-helpers";
+import { sortTimelineOverdueItems } from "@/lib/timeline-overdue-sort";
 import type { Card, DueBucket } from "@/lib/supabase";
 import { normalizeChecklist, EMPTY_CHECKLIST } from "@/lib/checklist";
 import { getIsoDateJst, getMinutesFromTime, toLocalDay } from "./timeline-helpers";
@@ -185,14 +186,8 @@ export function applyCardUpdate(
         };
 
         nextOverdue.push(overdueItem);
-        nextOverdue.sort((a, b) => {
-            const dateCompare = (a.due_date ?? "").localeCompare(b.due_date ?? "");
-            if (dateCompare !== 0) return dateCompare;
-            const aPos = a.due_bucket_position ?? 0;
-            const bPos = b.due_bucket_position ?? 0;
-            if (aPos !== bPos) return bPos - aPos;
-            return (a.title ?? "").localeCompare(b.title ?? "");
-        });
+        const sortedOverdue = sortTimelineOverdueItems(nextOverdue);
+        return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: sortedOverdue };
     }
 
     return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };

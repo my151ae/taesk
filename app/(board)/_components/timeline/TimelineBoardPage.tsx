@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
+import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
 import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -256,6 +257,14 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     filteredData,
     searchResults,
   } = useTimelineFiltering(data);
+  const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("oldest");
+  const sortedFilteredData = useMemo(() => {
+    if (!filteredData) return null;
+    return {
+      ...filteredData,
+      overdue: sortTimelineOverdueItems(filteredData.overdue, overdueSortOrder),
+    };
+  }, [filteredData, overdueSortOrder]);
 
   // 6. Navigation
   const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
@@ -366,7 +375,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleDragStart, handleDragMove, handleDragEnd, handleDragCancel,
     handleEventKeyDown, handleResizeStart, handleResizeMove, handleResizeEnd,
   } = useTimelineDragAndDrop({
-    data: filteredData, setData, applyPatch, timelineScrollRef,
+    data: sortedFilteredData, setData, applyPatch, timelineScrollRef,
     abScrollContainersRef, bucketDayMap, dataMode,
     timelineStartHour,
     hourHeight, // [NEW]
@@ -636,12 +645,12 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
-    filteredData?.events?.forEach((event) => {
+    sortedFilteredData?.events?.forEach((event) => {
       if (!result[event.due_date]) result[event.due_date] = [];
       result[event.due_date].push(event);
     });
     return result;
-  }, [filteredData?.events]);
+  }, [sortedFilteredData?.events]);
 
   const registerAbScrollContainer = useCallback(
     (iso: string, el: HTMLDivElement | null, bucket?: "a" | "b") => {
@@ -662,16 +671,16 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
   const activeDragCardId = activeDrag?.cardId ?? null;
   const overlayBucketEntry = useMemo(
-    () => findOverlayBucketEntry(filteredData?.abBuckets ?? {}, activeDragCardId),
-    [filteredData?.abBuckets, activeDragCardId]
+    () => findOverlayBucketEntry(sortedFilteredData?.abBuckets ?? {}, activeDragCardId),
+    [sortedFilteredData?.abBuckets, activeDragCardId]
   );
   const overlayOverdueEntry = useMemo(
-    () => findOverlayOverdueEntry(filteredData?.overdue ?? [], activeDragCardId),
-    [filteredData?.overdue, activeDragCardId]
+    () => findOverlayOverdueEntry(sortedFilteredData?.overdue ?? [], activeDragCardId),
+    [sortedFilteredData?.overdue, activeDragCardId]
   );
   const overlayTimelineEvent = useMemo(
-    () => filteredData?.events.find((event) => event.card_id === activeDragCardId) ?? null,
-    [filteredData?.events, activeDragCardId]
+    () => sortedFilteredData?.events.find((event) => event.card_id === activeDragCardId) ?? null,
+    [sortedFilteredData?.events, activeDragCardId]
   );
   const overlayCardData = useMemo(
     () =>
@@ -716,8 +725,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleDayRangeChange: handleDayRangeUpdate,
     handleTodayClick,
     eventsByDay,
-    abBuckets: filteredData?.abBuckets ?? {},
-    overdue: filteredData?.overdue ?? [],
+    abBuckets: sortedFilteredData?.abBuckets ?? {},
+    overdue: sortedFilteredData?.overdue ?? [],
     searchQuery,
     setSearchQuery,
     searchResults,
@@ -856,6 +865,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                     state={viewModels.desktop.leftPanel.state}
                     actions={viewModels.desktop.leftPanel.actions}
                     sections={viewModels.desktop.leftPanel.sections}
+                    overdueSortOrder={overdueSortOrder}
+                    onOverdueSortOrderChange={setOverdueSortOrder}
                     allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
                     openCardModal={openCardModal}
                     onToggleCheck={handleToggleCardChecked}
@@ -914,6 +925,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
                   state={viewModels.desktop.leftPanel.state}
                   actions={viewModels.desktop.leftPanel.actions}
                   sections={viewModels.desktop.leftPanel.sections}
+                  overdueSortOrder={overdueSortOrder}
+                  onOverdueSortOrderChange={setOverdueSortOrder}
                   allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
                   openCardModal={openCardModal}
                   onToggleCheck={handleToggleCardChecked}
@@ -956,7 +969,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
 
         {viewMode === "timeline" ? (
           <div className="flex-1 overflow-hidden md:hidden">
-            <MobileTimelineView {...viewModels.mobile.timeline} />
+            <MobileTimelineView
+              {...viewModels.mobile.timeline}
+              overdueSortOrder={overdueSortOrder}
+              onOverdueSortOrderChange={setOverdueSortOrder}
+            />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden md:hidden">

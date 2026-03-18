@@ -22,6 +22,7 @@ import {
   type StackedTimelineItemKind,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
+import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import {
   buildOverlayCardData,
   findOverlayBucketEntry,
@@ -289,6 +290,8 @@ function MobileOverdueSection({
   items,
   expanded,
   onToggle,
+  overdueSortOrder,
+  onOverdueSortOrderChange,
   openCardModal,
   onToggleCheck,
   onCardContextMenu,
@@ -298,42 +301,65 @@ function MobileOverdueSection({
   items: TimelineOverdueItem[];
   expanded: boolean;
   onToggle: () => void;
+  overdueSortOrder: OverdueSortOrder;
+  onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
 }) {
+  const nextOrder = overdueSortOrder === "oldest" ? "newest" : "oldest";
+  const currentLabel = overdueSortOrder === "oldest" ? "古い順" : "新しい順";
+  const nextLabel = nextOrder === "oldest" ? "古い順" : "新しい順";
+
   return (
     <div className="border-b border-amber-100 bg-amber-50/40 px-3 py-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls="mobile-overdue-sheet"
-        data-testid="mobile-overdue-toggle"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-amber-100/70"
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
-            Overdue
-          </span>
-          <span
-            className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm"
-            data-testid="mobile-overdue-count"
-          >
-            {items.length}
-          </span>
-        </div>
-        <span
-          className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-amber-200 bg-white/90 text-amber-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
-          aria-hidden="true"
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls="mobile-overdue-sheet"
+          data-testid="mobile-overdue-toggle"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center justify-between rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-amber-100/70"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+              Overdue
+            </span>
+            <span
+              className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm"
+              data-testid="mobile-overdue-count"
+            >
+              {items.length}
+            </span>
+          </div>
+          <span
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-amber-200 bg-white/90 text-amber-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="mobile-overdue-sort-toggle"
+          data-order={overdueSortOrder}
+          onClick={() => onOverdueSortOrderChange(nextOrder)}
+          aria-label={`Overdue の並び順を${nextLabel}に切り替え`}
+          title={`現在: ${currentLabel}`}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-white/90 px-2.5 py-2 text-[10px] font-semibold text-amber-800 shadow-sm transition-colors hover:bg-white"
+        >
+          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d={overdueSortOrder === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"} />
           </svg>
-        </span>
-      </button>
+          <span>{currentLabel}</span>
+        </button>
+      </div>
 
       <div
         id="mobile-overdue-sheet"
@@ -494,6 +520,8 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  overdueSortOrder: OverdueSortOrder;
+  onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
 };
 
 export default function MobileTimelineView({
@@ -531,6 +559,8 @@ export default function MobileTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  overdueSortOrder,
+  onOverdueSortOrderChange,
 }: MobileTimelineViewProps) {
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -801,6 +831,8 @@ export default function MobileTimelineView({
             items={overdue}
             expanded={isOverdueExpanded}
             onToggle={() => setIsOverdueExpanded((current) => !current)}
+            overdueSortOrder={overdueSortOrder}
+            onOverdueSortOrderChange={onOverdueSortOrderChange}
             openCardModal={openCardModal}
             onToggleCheck={onToggleCheck}
             onCardContextMenu={onCardContextMenu}
