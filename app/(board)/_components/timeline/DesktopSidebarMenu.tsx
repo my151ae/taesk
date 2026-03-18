@@ -1,7 +1,6 @@
 "use client";
 
 import clsx from "clsx";
-import { useState } from "react";
 
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
@@ -12,20 +11,48 @@ import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/ti
 import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
-type DesktopSidebarMenuProps = {
-  overdueItems: readonly TimelineOverdueItem[];
+export type SidebarSectionKey = "overdue" | "search";
+type SidebarSectionTone = "danger" | "neutral";
+
+export type DesktopSidebarMenuState = {
+  expandedSectionKey: SidebarSectionKey | null;
   searchQuery: string;
+};
+
+export type DesktopSidebarMenuActions = {
+  onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
   onSearchQueryChange: (value: string) => void;
-  searchResults: readonly TimelineSearchResultItem[];
+};
+
+export type DesktopSidebarSection =
+  | {
+      key: "overdue";
+      tone: "danger";
+      id: string;
+      label: string;
+      count: number;
+      items: readonly TimelineOverdueItem[];
+    }
+  | {
+      key: "search";
+      tone: "neutral";
+      id: string;
+      label: string;
+      count: number;
+      results: readonly TimelineSearchResultItem[];
+    };
+
+type DesktopSidebarMenuProps = {
+  state: DesktopSidebarMenuState;
+  actions: DesktopSidebarMenuActions;
+  sections: readonly DesktopSidebarSection[];
+  allowOverdueDrag: boolean;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
 };
-
-type SidebarSectionKey = "overdue" | "search";
-type SidebarSectionTone = "danger" | "neutral";
 
 function OverdueIcon() {
   return (
@@ -198,41 +225,43 @@ function buildOverdueTimeText(item: TimelineOverdueItem) {
 }
 
 export function DesktopSidebarMenu({
-  overdueItems,
-  searchQuery,
-  onSearchQueryChange,
-  searchResults,
+  state,
+  actions,
+  sections,
+  allowOverdueDrag,
   openCardModal,
   onToggleCheck,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
 }: DesktopSidebarMenuProps) {
-  const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>("overdue");
-
   const handleToggleSection = (key: SidebarSectionKey) => {
-    setExpandedSectionKey((prev) => (prev === key ? null : key));
+    actions.onExpandedSectionChange(state.expandedSectionKey === key ? null : key);
   };
 
-  const sectionDefinitions: Array<{
-    key: SidebarSectionKey;
-    tone: SidebarSectionTone;
-    id: string;
-    label: string;
-    count: number;
-    icon: React.ReactNode;
-    renderContent: () => React.ReactNode;
-  }> = [
-    {
-      key: "overdue",
-      tone: "danger",
-      id: "desktop-sidebar-overdue-panel",
-      label: "Overdue",
-      count: overdueItems.length,
-      icon: <OverdueIcon />,
-      renderContent: () => (
+  const getSectionIcon = (key: SidebarSectionKey) => {
+    switch (key) {
+      case "overdue":
+        return <OverdueIcon />;
+      case "search":
+        return <SearchIcon />;
+      default:
+        return null;
+    }
+  };
+
+  const renderSectionContent = (section: DesktopSidebarSection) => {
+    if (section.key === "overdue") {
+      return (
         <div className="flex min-h-0 flex-1 flex-col">
-          {overdueItems.length === 0 ? (
+          {!allowOverdueDrag ? (
+            <div className="px-3 pt-3">
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                List表示中はドラッグ移動を停止しています
+              </p>
+            </div>
+          ) : null}
+          {section.items.length === 0 ? (
             <div className="px-3 py-4">
               <p className="rounded-2xl border border-dashed border-rose-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
                 未完了の期限超過カードはありません
@@ -241,7 +270,7 @@ export function DesktopSidebarMenu({
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
               <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-                {overdueItems.map((item) => (
+                {section.items.map((item) => (
                   <SidebarCardRow
                     key={item.card_id}
                     item={item}
@@ -249,8 +278,8 @@ export function DesktopSidebarMenu({
                     timeText={buildOverdueTimeText(item)}
                     openSource="overdue"
                     testId={`overdue-card-${item.card_id}`}
-                    className="bg-white"
-                    draggable
+                    className={allowOverdueDrag ? "bg-white" : "bg-slate-50"}
+                    draggable={allowOverdueDrag}
                     onToggleCheck={onToggleCheck}
                     openCardModal={openCardModal}
                     onCardContextMenu={onCardContextMenu}
@@ -262,91 +291,84 @@ export function DesktopSidebarMenu({
             </div>
           )}
         </div>
-      ),
-    },
-    {
-      key: "search",
-      tone: "neutral",
-      id: "desktop-sidebar-search-panel",
-      label: "Search",
-      count: searchQuery.trim() ? searchResults.length : 0,
-      icon: <SearchIcon />,
-      renderContent: () => (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="px-2 py-2">
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(event) => onSearchQueryChange(event.target.value)}
-                placeholder="Search cards..."
-                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-                data-testid="desktop-sidebar-search-input"
-              />
+      );
+    }
+
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="px-2 py-2">
+          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <input
+              type="text"
+              value={state.searchQuery}
+              onChange={(event) => actions.onSearchQueryChange(event.target.value)}
+              placeholder="Search cards..."
+              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              data-testid="desktop-sidebar-search-input"
+            />
+          </div>
+        </div>
+
+        {!state.searchQuery.trim() ? (
+          <div className="px-3 py-4">
+            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+              キーワードを入れると該当カードをここに一覧表示します
+            </p>
+          </div>
+        ) : section.results.length === 0 ? (
+          <div className="px-3 py-4">
+            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+              一致するカードはありません
+            </p>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+            <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
+              {section.results.map((result) => (
+                <SidebarCardRow
+                  key={`${result.kind}:${result.item.card_id}`}
+                  item={result.item}
+                  badgeLabel={result.badgeLabel}
+                  timeText={result.timeText}
+                  openSource="search"
+                  testId={`search-card-${result.kind}-${result.item.card_id}`}
+                  className="bg-white"
+                  onToggleCheck={onToggleCheck}
+                  openCardModal={openCardModal}
+                  onCardContextMenu={onCardContextMenu}
+                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                  isContextMenuOpen={contextMenuCardId === result.item.card_id}
+                />
+              ))}
             </div>
           </div>
-
-          {!searchQuery.trim() ? (
-            <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                キーワードを入れると該当カードをここに一覧表示します
-              </p>
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                一致するカードはありません
-              </p>
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
-              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-                {searchResults.map((result) => (
-                  <SidebarCardRow
-                    key={`${result.kind}:${result.item.card_id}`}
-                    item={result.item}
-                    badgeLabel={result.badgeLabel}
-                    timeText={result.timeText}
-                    openSource="search"
-                    testId={`search-card-${result.kind}-${result.item.card_id}`}
-                    className="bg-white"
-                    onToggleCheck={onToggleCheck}
-                    openCardModal={openCardModal}
-                    onCardContextMenu={onCardContextMenu}
-                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                    isContextMenuOpen={contextMenuCardId === result.item.card_id}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ),
-    },
-  ];
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.94))]">
       <div className="flex w-[2.5rem] shrink-0 flex-col items-center gap-2 border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.8))] px-0.5 py-2.5">
         <div className="h-0.5" aria-hidden="true" />
-        {sectionDefinitions.map((section) => (
+        {sections.map((section) => (
           <SidebarRailButton
             key={section.key}
             id={section.id}
             label={section.label}
             count={section.count}
             tone={section.tone}
-            expanded={expandedSectionKey === section.key}
+            expanded={state.expandedSectionKey === section.key}
             onToggle={() => handleToggleSection(section.key)}
           >
-            {section.icon}
+            {getSectionIcon(section.key)}
           </SidebarRailButton>
         ))}
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {sectionDefinitions.map((section) => {
-          const expanded = expandedSectionKey === section.key;
+        {sections.map((section) => {
+          const expanded = state.expandedSectionKey === section.key;
           const isDanger = section.tone === "danger";
 
           return (
@@ -379,13 +401,13 @@ export function DesktopSidebarMenu({
                 hidden={!expanded}
                 className="flex min-h-0 flex-1 flex-col overflow-hidden"
               >
-                {section.renderContent()}
+                {renderSectionContent(section)}
               </div>
             </section>
           );
         })}
 
-        {!expandedSectionKey ? (
+        {!state.expandedSectionKey ? (
           <div className="flex flex-1 items-center justify-center px-6 text-center">
             <div className="max-w-[18rem] rounded-3xl border border-dashed border-slate-300/90 bg-white/75 px-5 py-6 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Sidebar</p>

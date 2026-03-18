@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 
@@ -9,7 +10,7 @@ import { CardModal } from "@/app/components/CardModal";
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
-import { DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
+import { DesktopTimelineToolbar, DesktopTimelineView } from "@/app/(board)/_components/timeline/DesktopTimelineView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
 import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
@@ -21,8 +22,10 @@ import {
   DEFAULT_TIMELINE_DAY_RANGE,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
-import { DesktopListView } from "@/app/(board)/_components/timeline/DesktopListView";
+import { DesktopListToolbar, DesktopListView } from "@/app/(board)/_components/timeline/DesktopListView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
+import { DesktopSidebarMenu, type SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
@@ -41,6 +44,12 @@ import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextM
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimelineBoardInitialization";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
+import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import {
+  buildOverlayCardData,
+  findOverlayBucketEntry,
+  findOverlayOverdueEntry,
+} from "@/app/(board)/_utils/timeline-overlay";
 import {
   LIST_WINDOW_PRESETS,
   listWindowRange,
@@ -178,6 +187,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const pendingTimelineAnchorDateRef = useRef<string | null>(null);
   const pendingListWindowAutoSyncRef = useRef(false);
   const pendingListWindowAutoSyncAttemptsRef = useRef(0);
+  const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>("overdue");
 
   const {
     profile,
@@ -650,9 +660,37 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleCardModalDelete,
   });
 
-  const { timelineViewModel, listViewModel } = useTimelineBoardViewModels({
+  const activeDragCardId = activeDrag?.cardId ?? null;
+  const overlayBucketEntry = useMemo(
+    () => findOverlayBucketEntry(filteredData?.abBuckets ?? {}, activeDragCardId),
+    [filteredData?.abBuckets, activeDragCardId]
+  );
+  const overlayOverdueEntry = useMemo(
+    () => findOverlayOverdueEntry(filteredData?.overdue ?? [], activeDragCardId),
+    [filteredData?.overdue, activeDragCardId]
+  );
+  const overlayTimelineEvent = useMemo(
+    () => filteredData?.events.find((event) => event.card_id === activeDragCardId) ?? null,
+    [filteredData?.events, activeDragCardId]
+  );
+  const overlayCardData = useMemo(
+    () =>
+      buildOverlayCardData({
+        timelineEvent: overlayTimelineEvent,
+        bucketEntry: overlayBucketEntry,
+        overdueEntry: overlayOverdueEntry,
+        defaultTimelineDuration: 60,
+      }),
+    [overlayTimelineEvent, overlayBucketEntry, overlayOverdueEntry]
+  );
+
+  const viewModels = useTimelineBoardViewModels({
+    viewMode,
+    expandedSectionKey,
+    onExpandedSectionChange: setExpandedSectionKey,
     days: data?.days ?? [],
     activeDayIndex,
+    intendedDayRange,
     effectiveDayRange,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,
@@ -675,6 +713,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleNextDay,
     handlePrevDayRange,
     handleNextDayRange,
+    handleDayRangeChange: handleDayRangeUpdate,
+    handleTodayClick,
     eventsByDay,
     abBuckets: filteredData?.abBuckets ?? {},
     overdue: filteredData?.overdue ?? [],
@@ -712,6 +752,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleListToday,
     handleViewModeChange,
   });
+
+  const desktopActiveView = viewModels.desktop.mainPanel.tabs.activeKey;
+  const desktopTabItems = viewModels.desktop.mainPanel.tabs.items.filter((item) =>
+    viewModels.desktop.mainPanel.tabs.availableKeys.includes(item.key)
+  );
 
   const handleResetInvalidUrl = useCallback(() => {
     router.replace(basePath, { scroll: false });
@@ -784,25 +829,139 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           onShortcutsClick={() => setShowShortcutsModal(true)}
         />
 
-        {viewMode === 'timeline' ? (
-          <>
-            <div className="hidden md:block">
-              <DesktopTimelineView {...timelineViewModel.desktop} />
-            </div>
+        <div className="hidden md:block">
+          {desktopActiveView === "timeline" ? (
+            <DndContext
+              sensors={sensors}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              collisionDetection={bucketsFirstCollisionDetection}
+              measuring={{
+                droppable: { strategy: MeasuringStrategy.Always },
+              }}
+              autoScroll={{
+                enabled: false,
+                threshold: { x: 0, y: 0.2 },
+                acceleration: 1,
+              }}
+            >
+              <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                <aside
+                  className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
+                  style={{ width: "clamp(252px, 19vw, 292px)" }}
+                >
+                  <DesktopSidebarMenu
+                    state={viewModels.desktop.leftPanel.state}
+                    actions={viewModels.desktop.leftPanel.actions}
+                    sections={viewModels.desktop.leftPanel.sections}
+                    allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
+                    openCardModal={openCardModal}
+                    onToggleCheck={handleToggleCardChecked}
+                    onCardContextMenu={handleCardContextMenu}
+                    onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
+                    contextMenuCardId={contextMenu.cardId}
+                  />
+                </aside>
 
-            <div className="flex-1 overflow-hidden md:hidden">
-              <MobileTimelineView {...timelineViewModel.mobile} />
+                <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="border-b border-slate-100 bg-white px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      {desktopTabItems.map((item) => {
+                        const isActive = item.key === desktopActiveView;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => viewModels.desktop.mainPanel.tabs.onChange(item.key)}
+                            className={
+                              isActive
+                                ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                                : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            }
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <DesktopTimelineToolbar {...viewModels.desktop.mainPanel.views.timeline.toolbar} />
+                  <DesktopTimelineView {...viewModels.desktop.mainPanel.views.timeline.body} />
+                </section>
+              </div>
+
+              <DragOverlay dropAnimation={null} zIndex={50}>
+                <TimelineDragOverlayCard
+                  variant="desktop"
+                  overlayCardData={overlayCardData}
+                  overlayTimelineEvent={overlayTimelineEvent}
+                  overlayBucketCard={overlayBucketEntry?.item ?? null}
+                  overlayOverdueCard={overlayOverdueEntry?.item ?? null}
+                />
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+              <aside
+                className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
+                style={{ width: "clamp(252px, 19vw, 292px)" }}
+              >
+                <DesktopSidebarMenu
+                  state={viewModels.desktop.leftPanel.state}
+                  actions={viewModels.desktop.leftPanel.actions}
+                  sections={viewModels.desktop.leftPanel.sections}
+                  allowOverdueDrag={viewModels.desktop.leftPanel.allowOverdueDrag}
+                  openCardModal={openCardModal}
+                  onToggleCheck={handleToggleCardChecked}
+                  onCardContextMenu={handleCardContextMenu}
+                  onCardContextMenuByKeyboard={handleCardContextMenuByKeyboard}
+                  contextMenuCardId={contextMenu.cardId}
+                />
+              </aside>
+
+              <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="border-b border-slate-100 bg-white px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {desktopTabItems.map((item) => {
+                      const isActive = item.key === desktopActiveView;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => viewModels.desktop.mainPanel.tabs.onChange(item.key)}
+                          className={
+                            isActive
+                              ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                              : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          }
+                          aria-current={isActive ? "page" : undefined}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <DesktopListToolbar {...viewModels.desktop.mainPanel.views.list.toolbar} />
+                <DesktopListView {...viewModels.desktop.mainPanel.views.list.body} />
+              </section>
             </div>
-          </>
+          )}
+        </div>
+
+        {viewMode === "timeline" ? (
+          <div className="flex-1 overflow-hidden md:hidden">
+            <MobileTimelineView {...viewModels.mobile.timeline} />
+          </div>
         ) : (
-          <>
-            <div className="hidden md:block">
-              <DesktopListView {...listViewModel.desktop} />
-            </div>
-            <div className="flex-1 overflow-hidden md:hidden">
-              <MobileListView {...listViewModel.mobile} />
-            </div>
-          </>
+          <div className="flex-1 overflow-hidden md:hidden">
+            <MobileListView {...viewModels.mobile.list} />
+          </div>
         )}
 
         <TimelineBoardDialogs

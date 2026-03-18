@@ -1,35 +1,24 @@
 "use client";
 
 import clsx from "clsx";
-import { DndContext, MeasuringStrategy, DragOverlay } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
-import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
-import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type {
   ActiveDragState,
   ActiveResizeState,
   PointerPreviewState,
   useTimelineDragAndDrop,
 } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
-import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import {
   type TimelineBucketItem,
   type TimelineDay,
   type TimelineEvent,
-  type TimelineOverdueItem,
   type ExternalCalendarEntry,
   type StackedTimelineItemKind,
   minuteToPixels,
   pixelsToMinutes,
   getTimelineHeight,
 } from "@/app/(board)/_utils/timeline-helpers";
-import {
-  buildOverlayCardData,
-  findOverlayBucketEntry,
-  findOverlayOverdueEntry,
-} from "@/app/(board)/_utils/timeline-overlay";
-import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import {
   useTimelineZoomStore,
   MIN_HOUR_HEIGHT,
@@ -45,7 +34,7 @@ const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
-type DesktopTimelineViewProps = {
+export type DesktopTimelineViewProps = {
   timelineHeaderRef: React.RefObject<HTMLDivElement>;
   timelineScrollRef: React.RefObject<HTMLDivElement>;
   registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
@@ -53,16 +42,8 @@ type DesktopTimelineViewProps = {
   activeDayIndex: number;
   dayRange: number;
   status: string;
-  handlePrevDay: () => void;
-  handleNextDay: () => void;
-  handlePrevDayRange: () => void;
-  handleNextDayRange: () => void;
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
-  overdue: TimelineOverdueItem[];
-  searchQuery: string;
-  onSearchQueryChange: (value: string) => void;
-  searchResults: TimelineSearchResultItem[];
   indicatorTop: number | null;
   indicatorDayIso: string | null;
   timelineViewportHeight: number;
@@ -83,7 +64,6 @@ type DesktopTimelineViewProps = {
   handleDragMove: DragAndDropBindings["handleDragMove"];
   handleDragEnd: DragAndDropBindings["handleDragEnd"];
   handleDragCancel: DragAndDropBindings["handleDragCancel"];
-  isOverABList: boolean;
   floatingLayerTop: number;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
@@ -94,8 +74,87 @@ type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  onSwitchToList?: () => void;
 };
+
+export type DesktopTimelineToolbarProps = {
+  status: string;
+  dayRange: number;
+  onDayRangeChange: (days: number) => void;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+  onPrevDayRange: () => void;
+  onNextDayRange: () => void;
+  onToday: () => void;
+};
+
+export function DesktopTimelineToolbar({
+  status,
+  dayRange,
+  onDayRangeChange,
+  onPrevDay,
+  onNextDay,
+  onPrevDayRange,
+  onNextDayRange,
+  onToday,
+}: DesktopTimelineToolbarProps) {
+  const buttonClassName =
+    "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
+
+  return (
+    <div className="border-b border-slate-100 bg-white px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} className={buttonClassName}>
+          {"<<"}
+        </button>
+        <button type="button" onClick={onPrevDay} disabled={status === "loading"} className={buttonClassName}>
+          {"<1"}
+        </button>
+        <button type="button" onClick={onToday} disabled={status === "loading"} className={buttonClassName}>
+          Today
+        </button>
+        <button type="button" onClick={onNextDay} disabled={status === "loading"} className={buttonClassName}>
+          {"1>"}
+        </button>
+        <button type="button" onClick={onNextDayRange} disabled={status === "loading"} className={buttonClassName}>
+          {">>"}
+        </button>
+        <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+          <button
+            type="button"
+            onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
+            disabled={status === "loading" || dayRange <= 1}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label="表示日数を減らす"
+          >
+            -
+          </button>
+          <select
+            value={dayRange}
+            onChange={(event) => onDayRangeChange(Number(event.target.value))}
+            disabled={status === "loading"}
+            className="rounded-full border-0 bg-transparent px-1 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-0"
+            aria-label="表示日数"
+          >
+            {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+              <option key={days} value={days}>
+                {days} day{days > 1 ? "s" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
+            disabled={status === "loading" || dayRange >= 7}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label="表示日数を増やす"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function DesktopTimelineView({
   onMount,
@@ -106,16 +165,8 @@ export function DesktopTimelineView({
   activeDayIndex,
   dayRange,
   status,
-  handlePrevDay,
-  handleNextDay,
-  handlePrevDayRange,
-  handleNextDayRange,
   eventsByDay,
   abBuckets,
-  overdue,
-  searchQuery,
-  onSearchQueryChange,
-  searchResults,
   indicatorTop,
   indicatorDayIso,
   timelineViewportHeight,
@@ -136,7 +187,6 @@ export function DesktopTimelineView({
   handleDragMove,
   handleDragEnd,
   handleDragCancel,
-  isOverABList,
   floatingLayerTop,
   calendarEventsByDay,
   calendarAllDayByDay,
@@ -146,12 +196,10 @@ export function DesktopTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  onSwitchToList,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
   const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
-  const desktopSidebarWidth = "clamp(252px, 19vw, 292px)";
   const desktopGridTemplateColumns = `repeat(${visibleDays.length}, minmax(0, 1fr))`;
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
@@ -242,32 +290,7 @@ export function DesktopTimelineView({
     return () => observer.disconnect();
   }, [timelineScrollRef]);
 
-  // Build overlay card data for DragOverlay
   const activeDragCardId = activeDrag?.cardId ?? null;
-  const overlayBucketEntry = useMemo(
-    () => findOverlayBucketEntry(abBuckets, activeDragCardId),
-    [abBuckets, activeDragCardId]
-  );
-  const overlayBucketCard = overlayBucketEntry?.item ?? null;
-  const overlayOverdueEntry = useMemo(
-    () => findOverlayOverdueEntry(overdue, activeDragCardId),
-    [overdue, activeDragCardId]
-  );
-  const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
-
-  const allEvents = useMemo(() => Object.values(eventsByDay).flat(), [eventsByDay]);
-  const overlayTimelineEvent = allEvents.find((event) => event.card_id === activeDragCardId);
-
-  const overlayCardData = useMemo(
-    () =>
-      buildOverlayCardData({
-        timelineEvent: overlayTimelineEvent,
-        bucketEntry: overlayBucketEntry,
-        overdueEntry: overlayOverdueEntry,
-        defaultTimelineDuration: 60,
-      }),
-    [overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent]
-  );
 
   const allDayLayout = useMemo(() => {
     if (!hasAllDayEvents || !visibleDays.length) return { segments: [] as { id: string; title: string; start: number; end: number; row: number; entry: ExternalCalendarEntry; startDate?: string | null; endDate?: string | null; displayTz?: string | null; calendarId?: string | null }[], rows: 0 };
@@ -391,61 +414,9 @@ export function DesktopTimelineView({
   }, [onMount]);
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-      collisionDetection={bucketsFirstCollisionDetection}
-      measuring={{
-        droppable: { strategy: MeasuringStrategy.Always },
-      }}
-      autoScroll={{
-        enabled: false,
-        threshold: { x: 0, y: 0.2 },
-        acceleration: 1,
-      }}
-    >
-      <div
-        className="relative flex min-h-0 flex-col max-h-[80vh] overflow-x-hidden overflow-y-hidden bg-white shadow-sm ring-1 ring-black/5"
-      >
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <aside
-            className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-            style={{ width: desktopSidebarWidth }}
-          >
-            <DesktopSidebarMenu
-              overdueItems={overdue}
-              searchQuery={searchQuery}
-              onSearchQueryChange={onSearchQueryChange}
-              searchResults={searchResults}
-              openCardModal={openCardModal}
-              onToggleCheck={onToggleCheck}
-              onCardContextMenu={onCardContextMenu}
-              onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-              contextMenuCardId={contextMenuCardId}
-            />
-          </aside>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div ref={timelineHeaderRef} className="z-30">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-white px-3 py-2">
-                <button
-                  type="button"
-                  className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                  aria-current="page"
-                >
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSwitchToList?.()}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  List
-                </button>
-              </div>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div ref={timelineHeaderRef} className="z-30">
               <div
                 className="grid border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
                 style={{
@@ -464,39 +435,7 @@ export function DesktopTimelineView({
                         index > 0 ? "border-l border-slate-100" : ""
                       )}
                     >
-                      {index === 0 && (
-                        <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handlePrevDayRange();
-                            }}
-                            disabled={status === "loading"}
-                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                            aria-label="Previous days by visible range minus one"
-                            type="button"
-                          >
-                            {'<<'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handlePrevDay();
-                            }}
-                            disabled={status === "loading"}
-                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                            aria-label="Previous day"
-                            type="button"
-                          >
-                            {'<1'}
-                          </button>
-                        </div>
-                      )}
-                      {index !== 0 && index !== (visibleDays.length - 1) && <div className="w-[3.4rem]" />}
-
-                      <div className="flex flex-1 items-center justify-center leading-tight">
+                      <div className="flex w-full items-center justify-center leading-tight">
                         <span
                           className={clsx(
                             "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5",
@@ -508,38 +447,6 @@ export function DesktopTimelineView({
                           {headerLabel}
                         </span>
                       </div>
-
-                      {index === (visibleDays.length - 1) && (
-                        <div className="flex items-center gap-1 relative z-10" style={{ pointerEvents: "auto" }}>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleNextDay();
-                            }}
-                            disabled={status === "loading"}
-                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                            aria-label="Next day"
-                            type="button"
-                          >
-                            {'1>'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleNextDayRange();
-                            }}
-                            disabled={status === "loading"}
-                            className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-20"
-                            aria-label="Next days by visible range minus one"
-                            type="button"
-                          >
-                            {'>>'}
-                          </button>
-                        </div>
-                      )}
-                      {index === 0 && <div className="w-[3.4rem]" />}
                     </div>
                   );
                 })}
@@ -594,83 +501,71 @@ export function DesktopTimelineView({
                   </div>
                 </div>
               )}
-            </div>
+          </div>
 
-            <div
-              ref={timelineScrollRef}
-              onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-              className="relative flex-1 min-h-0 overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
-            >
-              <div className="relative" style={{ minHeight: timelineViewportHeight }}>
-                {(status === "loading" || !days.length) && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
-                  </div>
-                )}
-
-                <div
-                  className="grid timeline-container"
-                  data-testid="timeline-grid"
-                  style={{
-                    gridTemplateColumns: desktopGridTemplateColumns,
-                  }}
-                >
-                  {visibleDays.map((day, index) => (
-                    <DaySection
-                      key={day.isoDate}
-                      day={day}
-                      index={index}
-                      events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
-                      indicatorTop={indicatorTop}
-                      indicatorDayIso={indicatorDayIso}
-                      timelineViewportHeight={timelineViewportHeight}
-                      activeDragCardId={activeDrag?.cardId ?? null}
-                      pointerPreview={pointerPreview}
-                      activeResize={activeResize}
-                      selectedSlot={selectedSlot}
-                      handleEventKeyDown={handleEventKeyDown}
-                      handleColumnClick={handleColumnClick}
-                      handleResizeStart={handleResizeStart}
-                      handleResizeMove={handleResizeMove}
-                      handleResizeEnd={handleResizeEnd}
-                      setSelectedSlot={setSelectedSlot}
-                      calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
-                      onExternalEventClick={onExternalEventClick}
-                      timelineStartHour={timelineStartHour}
-                      bucketsA={abBuckets[`${day.key}_a`] ?? EMPTY_BUCKET}
-                      bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
-                      bucketIndicator={bucketIndicator}
-                      onCreateBucketCard={onCreateBucketCard}
-                      viewportHeight={abViewportHeight}
-                      registerAbScrollContainer={registerAbScrollContainer}
-                      floatingLayerTop={floatingLayerTop}
-                      status={status}
-                      openCardModal={openCardModal}
-                      onToggleCheck={onToggleCheck}
-                      onCardContextMenu={onCardContextMenu}
-                      onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                      contextMenuCardId={contextMenuCardId}
-                      hourHeight={hourHeight}
-                      activeStackItem={activeStackItem}
-                      setActiveStackItem={setActiveStackItem}
-                    />
-                  ))}
+          <div
+            ref={timelineScrollRef}
+            onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
+            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+          >
+            <div className="relative" style={{ minHeight: timelineViewportHeight }}>
+              {(status === "loading" || !days.length) && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
                 </div>
+              )}
+
+              <div
+                className="grid timeline-container"
+                data-testid="timeline-grid"
+                style={{
+                  gridTemplateColumns: desktopGridTemplateColumns,
+                }}
+              >
+                {visibleDays.map((day, index) => (
+                  <DaySection
+                    key={day.isoDate}
+                    day={day}
+                    index={index}
+                    events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
+                    indicatorTop={indicatorTop}
+                    indicatorDayIso={indicatorDayIso}
+                    timelineViewportHeight={timelineViewportHeight}
+                    activeDragCardId={activeDrag?.cardId ?? null}
+                    pointerPreview={pointerPreview}
+                    activeResize={activeResize}
+                    selectedSlot={selectedSlot}
+                    handleEventKeyDown={handleEventKeyDown}
+                    handleColumnClick={handleColumnClick}
+                    handleResizeStart={handleResizeStart}
+                    handleResizeMove={handleResizeMove}
+                    handleResizeEnd={handleResizeEnd}
+                    setSelectedSlot={setSelectedSlot}
+                    calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
+                    onExternalEventClick={onExternalEventClick}
+                    timelineStartHour={timelineStartHour}
+                    bucketsA={abBuckets[`${day.key}_a`] ?? EMPTY_BUCKET}
+                    bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
+                    bucketIndicator={bucketIndicator}
+                    onCreateBucketCard={onCreateBucketCard}
+                    viewportHeight={abViewportHeight}
+                    registerAbScrollContainer={registerAbScrollContainer}
+                    floatingLayerTop={floatingLayerTop}
+                    status={status}
+                    openCardModal={openCardModal}
+                    onToggleCheck={onToggleCheck}
+                    onCardContextMenu={onCardContextMenu}
+                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                    contextMenuCardId={contextMenuCardId}
+                    hourHeight={hourHeight}
+                    activeStackItem={activeStackItem}
+                    setActiveStackItem={setActiveStackItem}
+                  />
+                ))}
               </div>
             </div>
           </div>
-        </div>
       </div>
-
-      <DragOverlay dropAnimation={null} zIndex={50}>
-        <TimelineDragOverlayCard
-          variant="desktop"
-          overlayCardData={overlayCardData}
-          overlayTimelineEvent={overlayTimelineEvent}
-          overlayBucketCard={overlayBucketCard}
-          overlayOverdueCard={overlayOverdueCard}
-        />
-      </DragOverlay>
-    </DndContext>
+    </div>
   );
 }

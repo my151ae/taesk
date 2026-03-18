@@ -494,7 +494,6 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
-  onSwitchToList?: () => void;
 };
 
 export default function MobileTimelineView({
@@ -532,7 +531,6 @@ export default function MobileTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
-  onSwitchToList,
 }: MobileTimelineViewProps) {
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -697,31 +695,18 @@ export default function MobileTimelineView({
 
         <div className="flex h-full flex-col">
           <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSwitchToList?.();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200"
-                aria-label="List表示へ切り替え"
-              >
-                List
-              </button>
-              <button
-                type="button"
-                aria-label="前へ 1日"
-                disabled={status === "loading"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onPrevDay();
-                }}
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {'<1'}
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="前へ 1日"
+              disabled={status === "loading"}
+              onClick={(e) => {
+                e.preventDefault();
+                onPrevDay();
+              }}
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {"<1"}
+            </button>
             <div className="flex items-center gap-2 text-slate-800">
               {/* Zoom Controls (Left of date) */}
               <div className="flex items-center gap-1">

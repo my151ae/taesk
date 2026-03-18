@@ -34,7 +34,6 @@ type MobileListViewProps = {
     onListWindowPresetChange?: (preset: ListWindowPresetKey) => void;
     listReverse?: boolean;
     onListBaseDateChange?: (isoDate: string) => void;
-    onSwitchToTimeline?: () => void;
 };
 
 export default function MobileListView({
@@ -57,7 +56,6 @@ export default function MobileListView({
     onListWindowPresetChange,
     listReverse = false,
     onListBaseDateChange,
-    onSwitchToTimeline,
 }: MobileListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
     const [showGoogle, setShowGoogle] = useState(false);
@@ -119,13 +117,6 @@ export default function MobileListView({
         <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
                 <div className="flex flex-nowrap items-center gap-1">
-                    <button
-                        onClick={() => onSwitchToTimeline?.()}
-                        className="h-7 shrink-0 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700"
-                        aria-label="Timeline表示へ切り替え"
-                    >
-                        Timeline
-                    </button>
                     <button
                         onClick={() => onPrevWeek?.()}
                         className="h-7 w-7 shrink-0 rounded-full border border-slate-200 text-[11px] font-medium text-slate-600"

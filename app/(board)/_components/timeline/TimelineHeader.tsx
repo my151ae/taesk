@@ -88,8 +88,6 @@ export default function TimelineHeader({
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showMobileActions, setShowMobileActions] = useState(false);
-    const [showDayRangeDropdown, setShowDayRangeDropdown] = useState(false);
-    const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
@@ -145,7 +143,6 @@ export default function TimelineHeader({
     };
 
     // Click outside handlers for dropdowns
-    useClickOutside(dayRangeDropdownRef, () => setShowDayRangeDropdown(false));
     useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
     useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
     useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
@@ -418,64 +415,6 @@ export default function TimelineHeader({
                     </div>
 
                     <div className="hidden md:flex items-center gap-2 shrink-0">
-                        {viewMode === 'timeline' && (
-                            <button
-                                onClick={onTodayClick}
-                                className={todayButtonClassName}
-                            >
-                                Today
-                            </button>
-                        )}
-
-                        {viewMode === 'timeline' && (
-                            <div ref={dayRangeDropdownRef} className="relative flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs shadow-sm ring-1 ring-slate-200 shrink-0">
-                                <button
-                                    onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
-                                    disabled={dayRange <= 1}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                                >
-                                    -
-                                </button>
-                                <button
-                                    onClick={() => setShowDayRangeDropdown((prev) => !prev)}
-                                    className="min-w-[3rem] cursor-pointer items-center justify-center gap-1 text-center font-medium text-slate-600 hover:text-slate-900 flex"
-                                >
-                                    <span>{`${dayRange} day${dayRange > 1 ? 's' : ''}`}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-slate-400">
-                                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                                {showDayRangeDropdown && (
-                                    <div className="absolute left-1/2 top-full z-50 mt-1 w-32 -translate-x-1/2 origin-top rounded-lg border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
-                                        {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-                                            <button
-                                                key={days}
-                                                onClick={() => {
-                                                    onDayRangeChange(days);
-                                                    setShowDayRangeDropdown(false);
-                                                }}
-                                                className={clsx(
-                                                    "flex w-full items-center justify-center px-3 py-1.5 text-xs font-medium transition",
-                                                    dayRange === days
-                                                        ? "bg-sky-50 text-sky-700"
-                                                        : "text-slate-700 hover:bg-slate-50"
-                                                )}
-                                            >
-                                                {days} {days === 1 ? 'day' : 'days'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                <button
-                                    onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
-                                    disabled={dayRange >= 7}
-                                    className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        )}
-
                         <NotificationsBell onOpenNotificationSettings={() => setShowNotificationSettings(true)} />
                     </div>
                 </div>
