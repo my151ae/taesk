@@ -35,6 +35,7 @@ type DesktopListViewProps = {
     onListWindowPresetChange?: (preset: ListWindowPresetKey) => void;
     listReverse?: boolean;
     onListBaseDateChange?: (isoDate: string) => void;
+    onSwitchToTimeline?: () => void;
 };
 
 export function DesktopListView({
@@ -58,6 +59,7 @@ export function DesktopListView({
     onListWindowPresetChange,
     listReverse = false,
     onListBaseDateChange,
+    onSwitchToTimeline,
 }: DesktopListViewProps) {
     const [showUnchecked, setShowUnchecked] = useState(true);
     const [showGoogle, setShowGoogle] = useState(false);
@@ -106,6 +108,21 @@ export function DesktopListView({
     return (
         <div className="flex flex-col gap-6 px-4 pb-20">
             <div className="sticky top-0 z-20 -mx-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+                <div className="mb-2 flex items-center gap-2">
+                    <button
+                        onClick={() => onSwitchToTimeline?.()}
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        aria-label="Timeline表示へ切り替え"
+                    >
+                        Timeline
+                    </button>
+                    <button
+                        className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                        aria-current="page"
+                    >
+                        List
+                    </button>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <button
                         onClick={() => onPrevWeek?.()}

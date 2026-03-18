@@ -94,6 +94,7 @@ type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  onSwitchToList?: () => void;
 };
 
 export function DesktopTimelineView({
@@ -145,6 +146,7 @@ export function DesktopTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  onSwitchToList,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
   const dayCount = Math.min(dayRange, days.length - activeDayIndex);
@@ -428,6 +430,22 @@ export function DesktopTimelineView({
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div ref={timelineHeaderRef} className="z-30">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-white px-3 py-2">
+                <button
+                  type="button"
+                  className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                  aria-current="page"
+                >
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSwitchToList?.()}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  List
+                </button>
+              </div>
               <div
                 className="grid border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
                 style={{

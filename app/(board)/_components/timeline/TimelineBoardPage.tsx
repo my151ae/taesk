@@ -710,6 +710,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     handleListPrevWeek,
     handleListNextWeek,
     handleListToday,
+    handleViewModeChange,
   });
 
   const handleResetInvalidUrl = useCallback(() => {
@@ -779,7 +780,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
           calendarPreset={calendarPreset} setCalendarPreset={setCalendarPreset}
           refreshGoogleCalendar={refreshGoogleCalendar} handleGoogleConnect={handleGoogleConnect}
           isGoogleLoading={googleCalendarStatus === 'loading'}
-          viewMode={viewMode} setViewMode={handleViewModeChange}
+          viewMode={viewMode}
           onShortcutsClick={() => setShowShortcutsModal(true)}
         />
 

@@ -35,7 +35,6 @@ type TimelineBoardHeaderProps = {
   realtimeStatus: "connected" | "connecting" | "disconnected";
   googleToast: string | null;
   viewMode: 'timeline' | 'list';
-  setViewMode: (mode: 'timeline' | 'list') => void;
   onShortcutsClick: () => void;
 };
 
@@ -68,7 +67,6 @@ export default function TimelineBoardHeader({
   realtimeStatus,
   googleToast,
   viewMode,
-  setViewMode,
   onShortcutsClick,
 }: TimelineBoardHeaderProps) {
   return (
@@ -101,7 +99,6 @@ export default function TimelineBoardHeader({
         isGoogleLoading={isGoogleLoading}
         realtimeStatus={realtimeStatus}
         viewMode={viewMode}
-        setViewMode={setViewMode}
         onShortcutsClick={onShortcutsClick}
       />
       {googleToast && (

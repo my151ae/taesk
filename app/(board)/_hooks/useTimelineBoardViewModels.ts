@@ -76,6 +76,7 @@ type UseTimelineBoardViewModelsArgs = {
   handleListPrevWeek: () => void;
   handleListNextWeek: () => void;
   handleListToday: () => void;
+  handleViewModeChange: (mode: "timeline" | "list") => void;
 };
 
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
@@ -130,6 +131,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onCardContextMenu: args.handleCardContextMenu,
         onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
         contextMenuCardId: args.contextMenuCardId,
+        onSwitchToList: () => args.handleViewModeChange("list"),
       },
       mobile: {
         timelineScrollRef: args.timelineScrollRefMobile,
@@ -166,6 +168,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onCardContextMenu: args.handleCardContextMenu,
         onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
         contextMenuCardId: args.contextMenuCardId,
+        onSwitchToList: () => args.handleViewModeChange("list"),
       },
     }),
     [args]
@@ -194,6 +197,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onListWindowPresetChange: args.handleListWindowPresetChange,
         listReverse: args.listReverse,
         onListBaseDateChange: args.handleListBaseDateChange,
+        onSwitchToTimeline: () => args.handleViewModeChange("timeline"),
       },
       mobile: {
         days: args.days,
@@ -215,6 +219,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         onListWindowPresetChange: args.handleListWindowPresetChange,
         listReverse: args.listReverse,
         onListBaseDateChange: args.handleListBaseDateChange,
+        onSwitchToTimeline: () => args.handleViewModeChange("timeline"),
       },
     }),
     [args]
