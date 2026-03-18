@@ -42,10 +42,11 @@ export default function BoardSettings({ board, onUpdate, onAccessUpdated, onDele
     const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [activeSection, setActiveSection] = useState<BoardSettingsSection>('members');
-    const canEditName = board.membership_role === 'owner';
+    const isOwnerLike = !board.membership_role || board.membership_role === 'owner';
+    const canEditName = isOwnerLike;
     const canEditDisplaySettings = !board.membership_role || board.membership_role === 'owner' || board.membership_role === 'editor';
-    const canManageAccess = board.membership_role === 'owner';
-    const canDeleteBoard = board.membership_role === 'owner' && board.id !== MAIN_BOARD_ID;
+    const canManageAccess = isOwnerLike;
+    const canDeleteBoard = isOwnerLike && board.id !== MAIN_BOARD_ID;
     const isProtectedBoard = board.id === MAIN_BOARD_ID;
 
     const trimmedName = boardName.trim();

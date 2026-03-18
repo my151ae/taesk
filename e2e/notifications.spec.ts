@@ -7,6 +7,9 @@ type QuietHours = { start: string; end: string; timezone: string };
 async function openNotificationSettings(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /notifications/i }).click();
   await page.getByTestId('notification-settings-button').click();
+  await expect(page.getByRole('heading', { name: 'Notification Settings' })).toBeVisible({
+    timeout: 10000,
+  });
   await expect(page.getByTestId('enable-push-button')).toBeVisible({ timeout: 10000 });
 }
 

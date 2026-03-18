@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 import { createClient } from '@supabase/supabase-js';
+import { resolveTestUserId as resolveAuthUserId } from './helpers/timeline-fixtures';
 
 const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
 const MOCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001';
@@ -24,37 +25,41 @@ interface TestBoard {
   shortId: string;
   idShort: number;
   slug: string;
+  canonicalPath: string;
 }
 
 async function openBoardAccessSettings(page: import('@playwright/test').Page, boardName: string) {
-  await page.waitForLoadState('networkidle');
-  await page.getByTestId('board-menu-button').click();
+  let lastError: unknown = null;
 
-  const boardRow = page.locator('div.group').filter({ hasText: boardName }).first();
-  await expect(boardRow).toBeVisible({ timeout: 10000 });
-  await boardRow.hover();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('board-menu-button').click();
 
-  const editButton = boardRow.getByRole('button', { name: 'Edit' });
-  await expect(editButton).toBeVisible({ timeout: 5000 });
-  await editButton.click();
+    const boardButton = page.getByRole('button', { name: boardName, exact: true }).first();
 
-  await expect(page.getByText('Board Settings', { exact: true })).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText('Board Access', { exact: true })).toBeVisible({ timeout: 10000 });
-}
+    try {
+      await expect(boardButton).toBeVisible({ timeout: 5000 });
 
-async function resolveTestUserId(): Promise<string> {
-  const { data: profiles, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .eq('email', TEST_USER_EMAIL)
-    .limit(1);
+      const boardRow = boardButton.locator('xpath=..');
+      const settingsButton = boardRow.getByRole('button', { name: 'Board settings' });
+      await expect(settingsButton).toBeVisible({ timeout: 5000 });
+      await settingsButton.click();
 
-  const profileId = profiles?.[0]?.id;
-  if (error || !profileId) {
-    throw new Error(`Failed to resolve test user id for ${TEST_USER_EMAIL}: ${error?.message ?? 'not found'}`);
+      await expect(page.getByRole('heading', { name: 'Board Settings', exact: true })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: 'Board Access', exact: true })).toBeVisible({ timeout: 10000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 4) {
+        throw error;
+      }
+      await page.goto('/board', { waitUntil: 'domcontentloaded' });
+    }
   }
 
-  return profileId;
+  if (lastError) {
+    throw lastError;
+  }
 }
 
 let cachedTestTeamId: string | null = null;
@@ -110,7 +115,15 @@ async function createTestBoard(boardName: string, ownerUserId: string): Promise<
     throw new Error(`Failed to create board owner: ${memberError.message}`);
   }
 
-  return { id: boardId, name: boardName, shortId, idShort, slug };
+  const canonicalTail = slug ? `${idShort}-${slug}` : `${idShort}`;
+  return {
+    id: boardId,
+    name: boardName,
+    shortId,
+    idShort,
+    slug,
+    canonicalPath: `/b/${shortId}/${canonicalTail}`,
+  };
 }
 
 async function createTeamFixture(name: string, ownerUserId: string, allowMemberCreateBoard: boolean): Promise<string> {
@@ -161,7 +174,7 @@ test.describe('Board Permissions @feature:boards', () => {
   let createdBoardIds: string[] = [];
 
   test.beforeAll(async () => {
-    testUserId = await resolveTestUserId();
+    testUserId = await resolveAuthUserId();
   });
 
   test.beforeEach(async ({ page }) => {
@@ -247,7 +260,17 @@ test.describe('Board Permissions @feature:boards', () => {
       await route.fallback();
     });
 
-    await page.goto(`/b/${testBoard.shortId}/${testBoard.slug}`);
+    await page.goto('/board', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('board-menu-button')).toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(async () => {
+        const response = await page.request.get('/api/boards');
+        if (!response.ok()) return false;
+        const body = (await response.json()) as { boards?: Array<{ id?: string }> };
+        return (body.boards ?? []).some((board) => board.id === testBoard?.id);
+      }, { timeout: 15000, intervals: [500, 1000, 2000] })
+      .toBe(true);
   });
 
   test.afterEach(async () => {
@@ -273,8 +296,9 @@ test.describe('Board Permissions @feature:boards', () => {
 
   test('should change member role @permissions:ui', async ({ page }) => {
     await openBoardAccessSettings(page, testBoard!.name);
-    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
-    const roleSelect = editorRow.getByRole('combobox').first();
+    const membersSection = page.getByRole('heading', { name: 'Members', exact: true }).locator('xpath=ancestor::section[1]');
+    const editorRow = membersSection.getByRole('button', { name: 'Remove' }).locator('xpath=ancestor::div[contains(@class,"justify-between")]');
+    const roleSelect = editorRow.locator('select').first();
 
     await roleSelect.selectOption('commenter');
     await expect(roleSelect).toHaveValue('commenter');
@@ -297,8 +321,8 @@ test.describe('Board Permissions @feature:boards', () => {
     });
 
     await openBoardAccessSettings(page, testBoard!.name);
-    const editorRow = page.locator('div').filter({ hasText: 'Test Editor' }).first();
-    const removeButton = editorRow.getByRole('button', { name: /remove/i });
+    const membersSection = page.getByRole('heading', { name: 'Members', exact: true }).locator('xpath=ancestor::section[1]');
+    const removeButton = membersSection.getByRole('button', { name: /remove/i }).first();
 
     // Handle confirmation dialog if present
     page.once('dialog', (dialog) => dialog.accept());

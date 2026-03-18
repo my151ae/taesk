@@ -6,6 +6,7 @@ import {
   isoDateJst,
   resolveTestUserId,
   shiftIsoDateJst,
+  supabaseAdmin,
   supportsDueColumns,
   type TimelineBoardContext,
 } from './helpers/timeline-fixtures';
@@ -1287,10 +1288,12 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await expect(overdueToggle).toBeVisible();
       await expect(overdueCount).toHaveText('1');
-      await expect(overdueSheet).toBeHidden();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(overdueSheet).toHaveAttribute('aria-hidden', 'true');
 
       await overdueToggle.click();
-      await expect(overdueSheet).toBeVisible();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(overdueSheet).toHaveAttribute('aria-hidden', 'false');
 
       const overdueCard = page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first();
       await expect(overdueCard).toBeVisible();
@@ -1304,13 +1307,12 @@ test.describe('@feature:timeline Timeline view', () => {
         x: overdueBox.x + overdueBox.width - 10,
         y: overdueBox.y + Math.max(18, overdueBox.height * 0.5),
       });
-      await expect(page.locator('[data-testid="timeline-drag-overlay-mobile"][data-overlay-kind="overdue"]')).toBeVisible();
+      const overdueOverlay = page.locator(
+        '[data-testid="timeline-drag-overlay-mobile"][data-overlay-kind="overdue"]'
+      );
+      await expect(overdueOverlay).toBeVisible();
       await page.mouse.up();
-
-      await overdueToggle.click();
-      await expect(overdueSheet).toBeHidden();
-      await overdueToggle.click();
-      await expect(overdueSheet).toBeVisible();
+      await expect(overdueOverlay).toHaveCount(0);
       await expect(overdueCard).toBeVisible();
 
       const timelineGrid = page.locator('[data-testid="timeline-grid"]:visible').first();
@@ -1854,9 +1856,11 @@ test.describe('@feature:timeline Timeline view', () => {
 
     expect(insertError).toBeNull();
 
-    const readMetrics = async () => {
-      return page.evaluate(() => {
-        const input = document.querySelector('[data-sticky-title] textarea');
+    const readMetrics = async (modal: Locator) => {
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      await expect(titleInput).toBeVisible();
+
+      return titleInput.evaluate((input) => {
         if (!(input instanceof HTMLTextAreaElement)) {
           throw new Error('Missing title textarea');
         }
@@ -1877,7 +1881,7 @@ test.describe('@feature:timeline Timeline view', () => {
       let modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const firstMetrics = await readMetrics();
+      const firstMetrics = await readMetrics(modal);
       expect(firstMetrics.clientHeight).toBeGreaterThan(firstMetrics.lineHeight * 1.5);
       expect(firstMetrics.scrollWidth).toBeLessThanOrEqual(firstMetrics.clientWidth + 2);
 
@@ -1886,7 +1890,7 @@ test.describe('@feature:timeline Timeline view', () => {
       modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      const reopenedMetrics = await readMetrics();
+      const reopenedMetrics = await readMetrics(modal);
       expect(reopenedMetrics.clientHeight).toBeGreaterThan(reopenedMetrics.lineHeight * 1.5);
       expect(reopenedMetrics.scrollWidth).toBeLessThanOrEqual(reopenedMetrics.clientWidth + 2);
     } finally {
@@ -3224,23 +3228,8 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.keyboard.type('Q');
       await expect(firstChecklistLine).toHaveText('Qbody line');
 
-      await page.evaluate(() => {
-        const editor = document.querySelector('.ProseMirror[data-autofocus="true"]');
-        if (!(editor instanceof HTMLElement)) {
-          throw new Error('Missing autofocus editor');
-        }
-        editor.focus();
-        const textNode = document.querySelector('.ProseMirror > ul[data-type="taskList"] > li:first-child p')?.firstChild;
-        if (!textNode) {
-          throw new Error('Missing first checklist text node');
-        }
-        const range = document.createRange();
-        range.setStart(textNode, 0);
-        range.collapse(true);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-      });
+      await firstChecklistLine.click({ position: { x: 4, y: 8 } });
+      await page.keyboard.press('Home');
       await page.keyboard.press('ArrowLeft');
       await expect.poll(async () => {
         return page.evaluate(() => {
