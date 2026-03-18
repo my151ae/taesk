@@ -92,7 +92,7 @@ export default function TimelineHeader({
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
-    const todayButtonClassName = "rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm ring-1 ring-sky-600 hover:bg-sky-700 shrink-0";
+    const todayButtonClassName = "rounded-full bg-sky-600 px-2.5 py-1 text-xs font-medium text-white shadow-sm ring-1 ring-sky-600 hover:bg-sky-700 shrink-0";
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -211,13 +211,13 @@ export default function TimelineHeader({
 
     return (
         <>
-            <header className="flex items-center gap-2 border-b border-slate-200 px-2 py-2 md:gap-3 md:px-4">
-                <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+            <header className="flex items-center gap-1.5 px-1.5 py-1 md:gap-2 md:px-3">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 md:gap-2">
                     {/* Board Switch */}
                     <div ref={boardMenuRef} className="relative shrink-0">
                         <button
                             onClick={() => setShowBoardMenu((prev) => !prev)}
-                            className="flex items-center justify-center rounded-full bg-white p-2 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                            className="flex items-center justify-center rounded-full bg-white p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                             aria-haspopup="true"
                             aria-expanded={showBoardMenu}
                             data-testid="board-menu-button"
@@ -338,16 +338,16 @@ export default function TimelineHeader({
                     </div>
 
                     {/* Board Name */}
-                    <div className="flex min-w-0 shrink items-center gap-2">
-                        <div className="min-w-0 shrink">
-                            {currentTeam ? (
-                                <p className="truncate text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 md:text-xs">
-                                    {currentTeam.name}
-                                </p>
-                            ) : null}
-                            <h1 className="truncate text-base font-medium text-slate-900 md:text-xl md:font-semibold">
+                    <div className="flex min-w-0 shrink items-center gap-1.5">
+                        <div className="flex min-w-0 shrink items-baseline gap-1.5">
+                            <h1 className="truncate text-sm font-medium text-slate-900 md:text-lg md:font-semibold">
                                 {board.name}
                             </h1>
+                            {currentTeam ? (
+                                <span className="truncate text-[11px] font-medium text-slate-500 md:text-xs">
+                                    {currentTeam.name}
+                                </span>
+                            ) : null}
                         </div>
                         <div className="hidden md:flex group relative items-center justify-center" title={`Realtime: ${getRealtimeStatusText()}`}>
                             <div className={clsx("w-2 h-2 rounded-full", getRealtimeStatusColor())} />
@@ -355,13 +355,13 @@ export default function TimelineHeader({
                     </div>
 
                     {/* Google Calendar Icon + Status Text */}
-                    <div className="hidden md:flex items-center gap-1.5 shrink-0">
+                    <div className="hidden shrink-0 items-center gap-1 md:flex">
                         <div className="relative group">
                             <button
                                 onClick={handleGoogleConnect}
                                 disabled={isGoogleLoading}
                                 className={clsx(
-                                    "p-1.5 rounded-full transition-colors flex items-center justify-center",
+                                    "flex items-center justify-center rounded-full p-1 transition-colors",
                                     googleCalendarStatus === 'success' ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-100 hover:text-emerald-600"
                                 )}
                                 title={googleStatusText}
@@ -414,12 +414,12 @@ export default function TimelineHeader({
                         <span className="text-xs text-slate-500 whitespace-nowrap">{googleStatusText}</span>
                     </div>
 
-                    <div className="hidden md:flex items-center gap-2 shrink-0">
+                    <div className="hidden shrink-0 items-center gap-1.5 md:flex">
                         <NotificationsBell onOpenNotificationSettings={() => setShowNotificationSettings(true)} />
                     </div>
                 </div>
 
-                <div className="ml-auto flex items-center gap-2 md:hidden">
+                <div className="ml-auto flex items-center gap-1.5 md:hidden">
                     <button
                         onClick={onTodayClick}
                         className={todayButtonClassName}
@@ -432,7 +432,7 @@ export default function TimelineHeader({
                         onClick={() => setShowMobileActions((prev) => !prev)}
                         aria-expanded={showMobileActions}
                         aria-label="ヘッダーメニュー"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-slate-200"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -509,7 +509,7 @@ export default function TimelineHeader({
                 <div ref={profileMenuRef} className="relative shrink-0">
                     <button
                         onClick={() => setShowProfileMenu((prev) => !prev)}
-                        className="flex items-center gap-1 rounded-full bg-white px-2 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        className="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                         data-testid="profile-menu-button"
                     >
                         <div className="h-6 w-6 rounded-full bg-sky-100 text-xs flex items-center justify-center text-sky-600 font-bold">

@@ -141,11 +141,11 @@ export default function TimelineBoardScreen({
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f5f7]">
-      <div className="flex w-full flex-col gap-4 px-3 pt-4 md:px-4 md:pt-6 xl:px-6 2xl:px-8">
+    <div className="h-screen overflow-x-hidden bg-[#f4f5f7]">
+      <div className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4">
         <TimelineBoardHeader {...headerProps} />
 
-        <div className="hidden md:block">
+        <div className="hidden min-h-0 flex-1 md:flex md:flex-col">
           {desktop.activeView === "timeline" ? (
             <DndContext
               sensors={desktop.dndProps.sensors}
@@ -161,7 +161,7 @@ export default function TimelineBoardScreen({
                 acceleration: 1,
               }}
             >
-              <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+              <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
                 <aside
                   className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
                   style={{ width: "clamp(252px, 19vw, 292px)" }}
@@ -213,7 +213,7 @@ export default function TimelineBoardScreen({
               </DragOverlay>
             </DndContext>
           ) : (
-            <div className="flex min-h-0 max-h-[80vh] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+            <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
               <aside
                 className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
                 style={{ width: "clamp(252px, 19vw, 292px)" }}
