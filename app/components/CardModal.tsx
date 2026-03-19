@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from "react";
-import type { ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
+import { useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
@@ -10,7 +9,6 @@ import {
     deriveExcerptFromContent,
     getTiptapPlainText,
     normalizeContent,
-    parseMarkdownToTiptapContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
@@ -30,58 +28,6 @@ const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
     { value: 'b', label: 'B (if possible)' },
 ];
 const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
-
-const normalizePastedTitleWhitespace = (value: string): string =>
-    value
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-const normalizeTitleInputValue = (value: string): string =>
-    value
-        .replace(/\r\n/g, " ")
-        .replace(/\r/g, " ")
-        .replace(/\n/g, " ");
-
-const stripMarkdownLinePrefix = (line: string): string =>
-    line
-        .replace(/^\s*>\s?/, "")
-        .replace(/^\s*#{1,6}\s+/, "")
-        .replace(/^\s*(?:[-+*]|\d+[.)])\s+\[(?: |x|X)\]\s+/, "")
-        .replace(/^\s*(?:[-+*]|\d+[.)])\s+/, "")
-        .replace(/^\s*\[(?: |x|X)\]\s+/, "")
-        .trim();
-
-const stripInlineMarkdown = (value: string): string =>
-    value
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-        .replace(/`([^`]+)`/g, "$1")
-        .replace(/\*\*([^*]+)\*\*/g, "$1")
-        .replace(/__([^_]+)__/g, "$1")
-        .replace(/~~([^~]+)~~/g, "$1");
-
-const sanitizeTitlePaste = (value: string): string => {
-    const normalized = value.replace(/\u00A0/g, " ").trim();
-    if (!normalized) return "";
-
-    const parsedMarkdown = parseMarkdownToTiptapContent(normalized);
-    const plainText = parsedMarkdown ? getTiptapPlainText(parsedMarkdown) : normalized;
-
-    return normalizePastedTitleWhitespace(
-        stripInlineMarkdown(
-            plainText
-                .split(/\r\n|\r|\n/)
-                .map(stripMarkdownLinePrefix)
-                .join("\n")
-        )
-    );
-};
 
 interface CardModalProps {
     card: Card;
@@ -281,8 +227,7 @@ export function CardModal({
         hasAutoSavedEditsRef,
         triggerAutoSave,
         clearAutoSaveTimers,
-        resetAutoSaveState,
-        flushPendingAutoSave,
+        requestClose,
     } = useCardModalAutoSave({
         isHistoryPreviewing,
         onAutoSave: (contentOverride, options) =>
@@ -290,24 +235,13 @@ export function CardModal({
                 contentOverride,
                 forceHistorySnapshot: options?.forceHistorySnapshot,
             }),
+        onRequestClose: onClose,
+        onCancelHistoryPreview: cancelHistoryPreview,
     });
 
-    const requestClose = useCallback(() => {
-        if (isHistoryPreviewing) {
-            cancelHistoryPreview();
-            return;
-        }
-        if (flushPendingAutoSave({ forceHistorySnapshot: true })) {
-            onCloseRef.current();
-            return;
-        }
-        onCloseRef.current();
-    }, [flushPendingAutoSave, isHistoryPreviewing, cancelHistoryPreview]);
-
-    const { dialogRef, onCloseRef } = useCardModalLifecycle({
+    const { dialogRef } = useCardModalLifecycle({
         card,
         isLoading,
-        onClose,
         onRequestClose: requestClose,
         resetDraft,
         resetHistoryState,
@@ -440,39 +374,6 @@ export function CardModal({
             return;
         }
     }, [isHistoryPreviewing, title]);
-
-    const handleTitlePaste = useCallback((event: ReactClipboardEvent<HTMLTextAreaElement>) => {
-        if (isHistoryPreviewing) return;
-
-        const rawText = event.clipboardData.getData("text/plain");
-        if (!rawText.trim()) {
-            return;
-        }
-
-        event.preventDefault();
-
-        const input = event.currentTarget;
-        const selectionStart = input.selectionStart ?? input.value.length;
-        const selectionEnd = input.selectionEnd ?? selectionStart;
-        const sanitized = sanitizeTitlePaste(rawText);
-        const nextTitle =
-            input.value.slice(0, selectionStart) +
-            sanitized +
-            input.value.slice(selectionEnd);
-        const nextCaret = selectionStart + sanitized.length;
-
-        setTitle(nextTitle);
-        triggerAutoSave();
-
-        requestAnimationFrame(() => {
-            const element = titleInputRef.current;
-            if (!element) return;
-            resizeTitleInput();
-            element.focus();
-            element.setSelectionRange(nextCaret, nextCaret);
-        });
-    }, [isHistoryPreviewing, resizeTitleInput, setTitle, triggerAutoSave]);
-
 
     const handleAddMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
@@ -795,11 +696,9 @@ export function CardModal({
                                         disabled={isHistoryPreviewing}
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
-                                            const val = normalizeTitleInputValue(e.target.value);
-                                            setTitle(val);
+                                            setTitle(e.target.value);
                                             triggerAutoSave();
                                         }}
-                                        onPaste={handleTitlePaste}
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
                                         className="min-h-[1lh] min-w-0 basis-0 flex-1 resize-none overflow-hidden bg-transparent border-none p-0 text-xl font-bold leading-tight text-slate-900 break-words dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"

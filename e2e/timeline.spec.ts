@@ -68,10 +68,10 @@ async function triggerBlockAction(page: Page, modal: Locator, handle: Locator, a
   await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
 }
 
-async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excerpt: string | null } | null> {
+async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excerpt: string | null; title: string | null } | null> {
   const { data, error } = await supabaseAdmin
     .from('cards')
-    .select('content, excerpt')
+    .select('content, excerpt, title')
     .eq('id', cardId)
     .maybeSingle();
 
@@ -79,7 +79,7 @@ async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excer
     throw new Error(`Failed to fetch saved card ${cardId}: ${error.message}`);
   }
 
-  return data ? { content: data.content, excerpt: data.excerpt ?? null } : null;
+  return data ? { content: data.content, excerpt: data.excerpt ?? null, title: data.title ?? null } : null;
 }
 
 async function readLastBlockAction(page: Page): Promise<{
@@ -1734,7 +1734,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('sanitizes markdown symbols when pasting into title row', async ({ page }) => {
+  test('keeps raw title text when multiline markdown-like text is inserted into title row', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -1786,26 +1786,80 @@ test.describe('@feature:timeline Timeline view', () => {
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
-      await titleInput.focus();
-      await page.evaluate(() => {
-        const input = document.querySelector('[data-sticky-title] textarea');
-        if (!(input instanceof HTMLTextAreaElement)) {
-          throw new Error('Missing title input');
-        }
-        input.setSelectionRange(0, input.value.length);
+      await titleInput.fill('## Pasted title\n- [ ] follow up');
 
-        const data = new DataTransfer();
-        data.setData('text/plain', '## Pasted title\n- [ ] follow up');
-        const pasteEvent = new ClipboardEvent('paste', {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: data,
-        });
-        input.dispatchEvent(pasteEvent);
-      });
-
-      await expect(titleInput).toHaveValue('Pasted title follow up');
+      await expect(titleInput).toHaveValue('## Pasted title\n- [ ] follow up');
       await expect(bodyEditor).toContainText('Body stays unchanged');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('flushes title-only edits when closing the modal immediately', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Title flush baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body remains unchanged' }] }],
+      },
+      excerpt: 'Body remains unchanged',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1519,
+      tags: [],
+      due_date: isoDay,
+      due_start: '10:55:00',
+      due_end: '11:55:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5016,
+      slug: 'title-close-flush',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      await expect(titleInput).toHaveValue('Title flush baseline');
+
+      await titleInput.fill('Title flush updated');
+      await page.keyboard.press('Escape');
+      await expect(modal).toHaveCount(0);
+
+      await expect
+        .poll(async () => {
+          return fetchSavedCard(cardId);
+        }, { timeout: 20_000, intervals: [250, 500, 1000, 2000] })
+        .toMatchObject({
+          title: 'Title flush updated',
+          excerpt: 'Body remains unchanged',
+        });
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

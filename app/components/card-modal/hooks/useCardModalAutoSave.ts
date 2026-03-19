@@ -6,11 +6,15 @@ import type { JSONContent } from "@tiptap/react";
 type UseCardModalAutoSaveArgs = {
   isHistoryPreviewing: boolean;
   onAutoSave: (contentOverride?: JSONContent, options?: { forceHistorySnapshot?: boolean }) => void;
+  onRequestClose: () => void;
+  onCancelHistoryPreview: () => void;
 };
 
 export function useCardModalAutoSave({
   isHistoryPreviewing,
   onAutoSave,
+  onRequestClose,
+  onCancelHistoryPreview,
 }: UseCardModalAutoSaveArgs) {
   const hasPendingChangesRef = useRef(false);
   const hasAutoSavedEditsRef = useRef(false);
@@ -81,6 +85,15 @@ export function useCardModalAutoSave({
     return hadPending;
   }, [clearAutoSaveTimers, onAutoSave]);
 
+  const requestClose = useCallback(() => {
+    if (isHistoryPreviewing) {
+      onCancelHistoryPreview();
+      return;
+    }
+    flushPendingAutoSave({ forceHistorySnapshot: true });
+    onRequestClose();
+  }, [flushPendingAutoSave, isHistoryPreviewing, onCancelHistoryPreview, onRequestClose]);
+
   return {
     hasPendingChangesRef,
     hasAutoSavedEditsRef,
@@ -91,5 +104,6 @@ export function useCardModalAutoSave({
     clearAutoSaveTimers,
     resetAutoSaveState,
     flushPendingAutoSave,
+    requestClose,
   };
 }

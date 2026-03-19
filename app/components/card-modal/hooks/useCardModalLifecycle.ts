@@ -8,7 +8,6 @@ import { normalizeContent } from "@/lib/tiptap";
 type UseCardModalLifecycleArgs = {
   card: Card;
   isLoading?: boolean;
-  onClose: () => void;
   onRequestClose: () => void;
   resetDraft: (card: Card) => void;
   resetHistoryState: () => void;
@@ -25,7 +24,6 @@ type UseCardModalLifecycleArgs = {
 export function useCardModalLifecycle({
   card,
   isLoading,
-  onClose,
   onRequestClose,
   resetDraft,
   resetHistoryState,
@@ -42,12 +40,7 @@ export function useCardModalLifecycle({
   const cardIdRef = useRef(card.id);
   const hasAppliedInitialLoadRef = useRef(false);
   const previousLoadingRef = useRef<boolean | null>(null);
-  const onCloseRef = useRef(onClose);
   const requestCloseRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
 
   useEffect(() => {
     requestCloseRef.current = onRequestClose;
@@ -166,6 +159,5 @@ export function useCardModalLifecycle({
 
   return {
     dialogRef,
-    onCloseRef,
   };
 }

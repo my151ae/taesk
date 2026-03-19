@@ -1,7 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
-import { EditorState, NodeSelection, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
+import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import { DOMSerializer, Fragment, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -11,7 +11,7 @@ import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-detai
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
-import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
+import { parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -30,6 +30,15 @@ import {
     extractImageFilesFromClipboardHtml,
     parseErrorMessage,
 } from '@/app/(board)/_components/tiptap/tiptap-image-paste';
+import {
+    buildDeleteBlockTransaction,
+    buildDuplicateBlockTransaction,
+    buildInsertParagraphAfterBlockTransaction,
+    buildInsertParagraphBeforeBlockTransaction,
+    createToggleDetailsSelection,
+    createUnsetDetailsSelection,
+    type ResolvedBlockTarget,
+} from '@/app/(board)/_components/tiptap/tiptap-block-actions';
 
 export type FocusTitleRequest = {
     mode: 'end';
@@ -47,17 +56,6 @@ type RenderableBlockActionTarget = {
     blockPos: number;
     nodeType: BlockNodeType;
     rect: DOMRect | null;
-};
-
-type ResolvedBlockTarget = {
-    pos: number;
-    nodeType: BlockNodeType;
-    node: ProseMirrorNode;
-    depth: number;
-    topLevelIndex: number | null;
-    parentListPos: number | null;
-    parentListNode: ProseMirrorNode | null;
-    itemIndex: number | null;
 };
 
 type TiptapEditorProps = {
@@ -199,15 +197,6 @@ export default function TiptapEditor({
         dispatch(tr);
     }, []);
 
-    const clampSelectionPos = useCallback((doc: ProseMirrorNode, pos: number) => {
-        return Math.max(0, Math.min(pos, doc.content.size));
-    }, []);
-
-    const findSelectionNear = useCallback((doc: ProseMirrorNode, searchPos: number, direction: 1 | -1) => {
-        const resolved = doc.resolve(clampSelectionPos(doc, searchPos));
-        return Selection.findFrom(resolved, direction, true) ?? Selection.atStart(doc);
-    }, [clampSelectionPos]);
-
     const resolveBlockTargetAtPos = useCallback((state: EditorState, pos: number): ResolvedBlockTarget | null => {
         const clampedPos = Math.max(0, Math.min(pos, state.doc.content.size));
         const $pos = state.doc.resolve(clampedPos);
@@ -312,222 +301,6 @@ export default function TiptapEditor({
             rect,
         };
     }, [getBlockTargetRect, resolveBlockTargetAtPos]);
-
-    const getNodeChildren = useCallback((node: ProseMirrorNode) => {
-        const children: ProseMirrorNode[] = [];
-        node.forEach((child) => {
-            children.push(child);
-        });
-        return children;
-    }, []);
-
-    const getTopLevelOffset = useCallback((children: ProseMirrorNode[], endIndex: number) => {
-        return children.slice(0, endIndex).reduce((total, child) => total + child.nodeSize, 0);
-    }, []);
-
-    const splitListAroundItem = useCallback((
-        listNode: ProseMirrorNode,
-        itemIndex: number,
-        insertedParagraph: ProseMirrorNode,
-        mode: 'before' | 'after',
-    ): ProseMirrorNode[] => {
-        const children = getNodeChildren(listNode);
-        const beforeEnd = mode === 'before' ? itemIndex : itemIndex + 1;
-        const afterStart = mode === 'before' ? itemIndex : itemIndex + 1;
-        const beforeItems = children.slice(0, beforeEnd);
-        const afterItems = children.slice(afterStart);
-        const nextNodes: ProseMirrorNode[] = [];
-
-        if (beforeItems.length > 0) {
-            nextNodes.push(listNode.copy(Fragment.fromArray(beforeItems)));
-        }
-        nextNodes.push(insertedParagraph);
-        if (afterItems.length > 0) {
-            nextNodes.push(listNode.copy(Fragment.fromArray(afterItems)));
-        }
-
-        return nextNodes;
-    }, [getNodeChildren]);
-
-    const setSelectionForAction = useCallback((tr: Transaction, searchPos: number, direction: 1 | -1 = 1) => {
-        const selection = findSelectionNear(tr.doc, searchPos, direction);
-        return tr.setSelection(selection).scrollIntoView();
-    }, [findSelectionNear]);
-
-    const createDefaultDoc = useCallback((state: EditorState) => {
-        return state.schema.nodeFromJSON(buildDefaultBodyContent());
-    }, []);
-
-    const insertParagraphBeforeBlock = useCallback((targetPos: number): boolean => {
-        if (!editor) return false;
-        const { state, dispatch } = editor.view;
-        const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target) return false;
-        const paragraph = state.schema.nodes.paragraph.create();
-        let tr = state.tr;
-        let selectionPos = target.pos + 1;
-
-        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
-            const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, 'before');
-            tr = tr.replaceWith(
-                target.parentListPos,
-                target.parentListPos + target.parentListNode.nodeSize,
-                Fragment.fromArray(replacement),
-            );
-            const beforeItemsCount = target.itemIndex;
-            const beforeListSize = beforeItemsCount > 0
-                ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
-                : 0;
-            selectionPos = target.parentListPos + beforeListSize + 1;
-        } else if (target.topLevelIndex != null) {
-            const children = getNodeChildren(state.doc);
-            const nextChildren = [
-                ...children.slice(0, target.topLevelIndex),
-                paragraph,
-                ...children.slice(target.topLevelIndex),
-            ];
-            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
-            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex) + 1;
-        } else {
-            tr = tr.insert(target.pos, paragraph);
-            selectionPos = target.pos + 1;
-        }
-
-        const nextTr = setSelectionForAction(tr, selectionPos, 1);
-        dispatch(nextTr);
-        onChange?.(nextTr.doc.toJSON() as JSONContent);
-        editor.view.focus();
-        closeBlockMenu();
-        return true;
-    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
-
-    const insertParagraphAfterBlock = useCallback((targetPos: number): boolean => {
-        if (!editor) return false;
-        const { state, dispatch } = editor.view;
-        const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target) return false;
-        const paragraph = state.schema.nodes.paragraph.create();
-        let tr = state.tr;
-        let selectionPos = target.pos + target.node.nodeSize + 1;
-
-        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
-            const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, 'after');
-            tr = tr.replaceWith(
-                target.parentListPos,
-                target.parentListPos + target.parentListNode.nodeSize,
-                Fragment.fromArray(replacement),
-            );
-            const beforeItemsCount = target.itemIndex + 1;
-            const beforeListSize = beforeItemsCount > 0
-                ? target.parentListNode.copy(Fragment.fromArray(getNodeChildren(target.parentListNode).slice(0, beforeItemsCount))).nodeSize
-                : 0;
-            selectionPos = target.parentListPos + beforeListSize + 1;
-        } else if (target.topLevelIndex != null) {
-            const children = getNodeChildren(state.doc);
-            const nextChildren = [
-                ...children.slice(0, target.topLevelIndex + 1),
-                paragraph,
-                ...children.slice(target.topLevelIndex + 1),
-            ];
-            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
-            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex + 1) + 1;
-        } else {
-            tr = tr.insert(target.pos + target.node.nodeSize, paragraph);
-            selectionPos = target.pos + target.node.nodeSize + 1;
-        }
-
-        const nextTr = setSelectionForAction(tr, selectionPos, 1);
-        dispatch(nextTr);
-        onChange?.(nextTr.doc.toJSON() as JSONContent);
-        editor.view.focus();
-        closeBlockMenu();
-        return true;
-    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction, splitListAroundItem]);
-
-    const duplicateBlock = useCallback((targetPos: number): boolean => {
-        if (!editor) return false;
-        const { state, dispatch } = editor.view;
-        const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target) return false;
-        const clonedNode = target.node.type.create(target.node.attrs, target.node.content, target.node.marks);
-        let tr = state.tr;
-        let selectionPos = target.pos + target.node.nodeSize + 1;
-
-        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
-            const children = getNodeChildren(target.parentListNode);
-            const nextChildren = [...children.slice(0, target.itemIndex + 1), clonedNode, ...children.slice(target.itemIndex + 1)];
-            tr = tr.replaceWith(
-                target.parentListPos,
-                target.parentListPos + target.parentListNode.nodeSize,
-                target.parentListNode.copy(Fragment.fromArray(nextChildren)),
-            );
-            selectionPos = target.pos + target.node.nodeSize + 1;
-        } else if (target.topLevelIndex != null) {
-            const children = getNodeChildren(state.doc);
-            const nextChildren = [
-                ...children.slice(0, target.topLevelIndex + 1),
-                clonedNode,
-                ...children.slice(target.topLevelIndex + 1),
-            ];
-            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
-            selectionPos = getTopLevelOffset(nextChildren, target.topLevelIndex + 1) + 1;
-        } else {
-            tr = tr.insert(target.pos + target.node.nodeSize, clonedNode);
-            selectionPos = target.pos + target.node.nodeSize + 1;
-        }
-
-        const nextTr = setSelectionForAction(tr, selectionPos, 1);
-        dispatch(nextTr);
-        onChange?.(nextTr.doc.toJSON() as JSONContent);
-        editor.view.focus();
-        closeBlockMenu();
-        return true;
-    }, [closeBlockMenu, getNodeChildren, getTopLevelOffset, onChange, resolveBlockTargetAtPos, setSelectionForAction]);
-
-    const deleteBlock = useCallback((targetPos: number): boolean => {
-        if (!editor) return false;
-        const { state, dispatch } = editor.view;
-        const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target) return false;
-
-        let tr = state.tr;
-
-        if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
-            const children = getNodeChildren(target.parentListNode);
-            const nextChildren = [...children.slice(0, target.itemIndex), ...children.slice(target.itemIndex + 1)];
-            if (nextChildren.length === 0) {
-                tr = tr.delete(target.parentListPos, target.parentListPos + target.parentListNode.nodeSize);
-            } else {
-                tr = tr.replaceWith(
-                    target.parentListPos,
-                    target.parentListPos + target.parentListNode.nodeSize,
-                    target.parentListNode.copy(Fragment.fromArray(nextChildren)),
-                );
-            }
-        } else if (target.topLevelIndex != null) {
-            const children = getNodeChildren(state.doc);
-            const nextChildren = [...children.slice(0, target.topLevelIndex), ...children.slice(target.topLevelIndex + 1)];
-            tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
-        } else {
-            tr = tr.delete(target.pos, target.pos + target.node.nodeSize);
-        }
-
-        if (tr.doc.childCount === 0) {
-            const defaultDoc = createDefaultDoc(state);
-            tr = state.tr.replaceWith(0, state.doc.content.size, defaultDoc.content);
-            const nextTr = setSelectionForAction(tr, 1, 1);
-            dispatch(nextTr);
-            onChange?.(nextTr.doc.toJSON() as JSONContent);
-        } else {
-            const nextTr = setSelectionForAction(tr, target.pos, 1);
-            dispatch(nextTr);
-            onChange?.(nextTr.doc.toJSON() as JSONContent);
-        }
-
-        editor.view.focus();
-        closeBlockMenu();
-        return true;
-    }, [closeBlockMenu, createDefaultDoc, getNodeChildren, onChange, resolveBlockTargetAtPos, setSelectionForAction]);
 
     const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
         if (isUpdatingRef.current) return;
@@ -777,6 +550,52 @@ export default function TiptapEditor({
         },
     });
 
+    const applyBlockActionTransaction = useCallback((nextEditor: Editor | null, transaction: Transaction | null): boolean => {
+        if (!nextEditor || !transaction) return false;
+        const { dispatch } = nextEditor.view;
+        dispatch(transaction);
+        onChange?.(transaction.doc.toJSON() as JSONContent);
+        nextEditor.view.focus();
+        closeBlockMenu();
+        return true;
+    }, [closeBlockMenu, onChange]);
+
+    const insertParagraphBeforeBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const transaction = buildInsertParagraphBeforeBlockTransaction(state, target);
+        return applyBlockActionTransaction(editor, transaction);
+    }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
+
+    const insertParagraphAfterBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const transaction = buildInsertParagraphAfterBlockTransaction(state, target);
+        return applyBlockActionTransaction(editor, transaction);
+    }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
+
+    const duplicateBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const transaction = buildDuplicateBlockTransaction(state, target);
+        return applyBlockActionTransaction(editor, transaction);
+    }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
+
+    const deleteBlock = useCallback((targetPos: number): boolean => {
+        if (!editor) return false;
+        const { state } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const transaction = buildDeleteBlockTransaction(state, target);
+        return applyBlockActionTransaction(editor, transaction);
+    }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
+
     const prependTask = useCallback(() => {
         if (!editor) return;
         const { state, dispatch } = editor.view;
@@ -826,9 +645,9 @@ export default function TiptapEditor({
         if (!editor) return false;
         const { state, dispatch } = editor.view;
         const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target || target.nodeType === 'details') return false;
-
-        const selection = NodeSelection.create(state.doc, target.pos);
+        if (!target) return false;
+        const selection = createToggleDetailsSelection(state, target);
+        if (!selection) return false;
         dispatch(state.tr.setSelection(selection));
         insertDetailsAtSelection(editor);
         editor.view.focus();
@@ -840,9 +659,9 @@ export default function TiptapEditor({
         if (!editor) return false;
         const { state, dispatch } = editor.view;
         const target = resolveBlockTargetAtPos(state, targetPos);
-        if (!target || target.nodeType !== 'details') return false;
-
-        const selection = TextSelection.create(state.doc, Math.min(target.pos + 2, state.doc.content.size));
+        if (!target) return false;
+        const selection = createUnsetDetailsSelection(state, target);
+        if (!selection) return false;
         dispatch(state.tr.setSelection(selection));
         unsetActiveDetails(editor);
         editor.view.focus();
