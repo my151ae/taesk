@@ -41,31 +41,51 @@ async function dispatchCopyEvent(page: Page): Promise<{ plainText: string; htmlT
   });
 }
 
-type BlockMenuAction = 'insert-above' | 'insert-below' | 'duplicate' | 'delete' | 'toggle-details' | 'unset-details';
+type BlockMenuAction =
+  | 'move-up'
+  | 'move-down'
+  | 'insert-above'
+  | 'insert-below'
+  | 'duplicate'
+  | 'delete'
+  | 'toggle-details'
+  | 'unset-details';
 
 async function openBlockActionMenu(
   page: Page,
   modal: Locator,
   handle: Locator,
-  initialFocusAction: BlockMenuAction = 'insert-above',
+  initialFocusAction?: BlockMenuAction,
 ): Promise<void> {
   await expect(handle).toBeVisible();
   await handle.click();
   const menu = modal.getByTestId('tiptap-block-menu');
   await expect(menu).toBeVisible();
-  const initialItem = modal.getByTestId(`tiptap-block-menu-${initialFocusAction}`);
-  if (initialFocusAction === 'insert-above') {
+  if (initialFocusAction) {
+    const initialItem = modal.getByTestId(`tiptap-block-menu-${initialFocusAction}`);
     await expect(initialItem).toBeFocused();
-  } else {
-    await expect(initialItem).toBeVisible();
   }
   await page.waitForTimeout(50);
 }
 
-async function triggerBlockAction(page: Page, modal: Locator, handle: Locator, action: BlockMenuAction): Promise<void> {
-  await openBlockActionMenu(page, modal, handle, action === 'toggle-details' || action === 'unset-details' ? action : 'insert-above');
+async function triggerBlockAction(
+  page: Page,
+  modal: Locator,
+  handle: Locator,
+  action: BlockMenuAction,
+  initialFocusAction?: BlockMenuAction,
+): Promise<void> {
+  await openBlockActionMenu(page, modal, handle, initialFocusAction);
   await modal.getByTestId(`tiptap-block-menu-${action}`).click();
   await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+}
+
+async function clearLastBlockAction(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    delete (window as typeof window & {
+      __TAESK_LAST_BLOCK_ACTION__?: unknown;
+    }).__TAESK_LAST_BLOCK_ACTION__;
+  });
 }
 
 async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excerpt: string | null; title: string | null } | null> {
@@ -3926,6 +3946,444 @@ test.describe('@feature:timeline Timeline view', () => {
       const content = savedCard?.content as { content?: Array<{ type?: string; attrs?: { level?: number } }> } | null;
       const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
       expect(topLevelNodes.filter((node) => node?.type === 'heading')).toHaveLength(2);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('keeps disabled move action visible and non-executable', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action disabled move',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'First paragraph' }] },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Section heading' }] },
+        ],
+      },
+      excerpt: 'First paragraph\nSection heading',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1892,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:30:00',
+      due_end: '15:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5039,
+      slug: 'block-action-disabled-move',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      await clearLastBlockAction(page);
+
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await openBlockActionMenu(page, modal, paragraphHandle, 'move-down');
+      const moveUpItem = modal.getByTestId('tiptap-block-menu-move-up');
+
+      await expect(moveUpItem).toHaveAttribute('aria-disabled', 'true');
+      await page.keyboard.press('ArrowUp');
+      await expect(moveUpItem).toBeFocused();
+      await page.keyboard.press('Enter');
+
+      await expect(modal.getByTestId('tiptap-block-menu')).toBeVisible();
+      expect(await readLastBlockAction(page)).toBeNull();
+
+      const savedCard = await fetchSavedCard(cardId);
+      const content = savedCard?.content as { content?: Array<{ type?: string }> } | null;
+      const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+      expect(topLevelNodes.map((node) => node?.type ?? null)).toEqual(['paragraph', 'heading']);
+
+      await page.keyboard.press('Escape');
+      await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves top-level paragraph down when move-down is executed from block menu', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action move paragraph',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'First paragraph' }] },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Section heading' }] },
+          {
+            type: 'details',
+            attrs: { open: true },
+            content: [
+              { type: 'detailsSummary', content: [{ type: 'text', text: 'Details summary' }] },
+              {
+                type: 'detailsContent',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Details body' }] }],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: 'First paragraph\nSection heading\nDetails summary',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1891,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:20:00',
+      due_end: '15:20:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5038,
+      slug: 'block-action-move-paragraph',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
+      await openBlockActionMenu(page, modal, paragraphHandle, 'move-down');
+      await expect(modal.getByTestId('tiptap-block-menu-move-up')).toHaveAttribute('aria-disabled', 'true');
+      await triggerBlockAction(page, modal, paragraphHandle, 'move-down', 'move-down');
+
+      const moveDebug = await readLastBlockAction(page);
+      expect(moveDebug).toMatchObject({
+        action: 'move-down',
+        menuTargetNodeType: 'paragraph',
+        resolvedNodeType: 'paragraph',
+      });
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as { content?: Array<{ type?: string }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            firstThreeTypes: topLevelNodes.slice(0, 3).map((node) => node?.type ?? null),
+            trailingParagraphCount: topLevelNodes.filter((node) => node?.type === 'paragraph').length,
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          firstThreeTypes: ['heading', 'paragraph', 'details'],
+          trailingParagraphCount: expect.any(Number),
+        });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves details up when move-up is executed from block menu', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action move details',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Leading paragraph' }] },
+          {
+            type: 'details',
+            attrs: { open: true },
+            content: [
+              { type: 'detailsSummary', content: [{ type: 'text', text: 'Details summary' }] },
+              {
+                type: 'detailsContent',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Details body' }] }],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: 'Leading paragraph\nDetails summary',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1890,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:10:00',
+      due_end: '15:10:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5037,
+      slug: 'block-action-move-details',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const detailsHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]').first();
+      await openBlockActionMenu(page, modal, detailsHandle, 'move-up');
+      await triggerBlockAction(page, modal, detailsHandle, 'move-up', 'move-up');
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as { content?: Array<{ type?: string }> } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            firstTwoTypes: topLevelNodes.slice(0, 2).map((node) => node?.type ?? null),
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          firstTwoTypes: ['details', 'paragraph'],
+        });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves bullet list item down within the same list', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action move list item',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First item' }] }],
+              },
+              {
+                type: 'listItem',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Second item' }] },
+                  {
+                    type: 'bulletList',
+                    content: [
+                      {
+                        type: 'listItem',
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested item' }] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: 'First item\nSecond item',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1889,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:00:00',
+      due_end: '15:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5036,
+      slug: 'block-action-move-list-item',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const listItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="listItem"]');
+      await expect(listItemHandles).toHaveCount(2);
+      await openBlockActionMenu(page, modal, listItemHandles.first(), 'move-down');
+      await triggerBlockAction(page, modal, listItemHandles.first(), 'move-down', 'move-down');
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as {
+            content?: Array<{
+              type?: string;
+              content?: Array<{ content?: Array<{ content?: Array<{ text?: string }> }> }>;
+            }>;
+          } | null;
+          const listNode = Array.isArray(content?.content) ? content.content[0] : null;
+          const itemTexts = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => item?.content?.[0]?.content?.[0]?.text ?? null)
+            : [];
+          return { itemTexts };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          itemTexts: ['Second item', 'First item'],
+        });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves heading with Mod-Shift-ArrowUp shortcut', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+Shift+ArrowUp' : 'Control+Shift+ArrowUp';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action shortcut move',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'First paragraph' }] },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Shortcut heading' }] },
+        ],
+      },
+      excerpt: 'First paragraph\nShortcut heading',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1888,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:50:00',
+      due_end: '14:50:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5035,
+      slug: 'block-action-shortcut-move',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await modal.locator('.ProseMirror h2').click();
+      await page.keyboard.press(moveUpShortcut);
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as {
+            content?: Array<{ type?: string; content?: Array<{ text?: string }> }>;
+          } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          return {
+            firstTwoTypes: topLevelNodes.slice(0, 2).map((node) => node?.type ?? null),
+            firstText: topLevelNodes[0]?.content?.[0]?.text ?? null,
+          };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          firstTwoTypes: ['heading', 'paragraph'],
+          firstText: 'Shortcut heading',
+        });
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

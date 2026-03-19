@@ -51,12 +51,17 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
 - 通常 block には従来どおり block handle を表示する
 - `details` では summary 行にのみ handle を表示する
 - `detailsContent` 内の段落・見出し・task は独立した handle 対象にしない
+- move の対象は同一コンテナ内に限る
+  - top-level `paragraph` / `heading` / `details`
+  - `doc` 直下 `taskList` / `bulletList` / `orderedList` 内の item
 - menu 項目は target type ごとに切り替える
+- menu open 直後の初期 focus は「最初の enabled item」
+- disabled item は menu 上に表示し、roving focus では到達可能だが実行はできない
 
 | block type | 表示する menu |
 | --- | --- |
-| `paragraph` / `heading` / `taskItem` | `insert-above`, `insert-below`, `toggle-details`, `duplicate`, `delete` |
-| `details` | `unset-details` |
+| `paragraph` / `heading` / `taskItem` / `listItem` | `move-up`, `move-down`, `insert-above`, `insert-below`, `toggle-details`, `duplicate`, `delete` |
+| `details` | `move-up`, `move-down`, `unset-details` |
 
 ## 5. 保存仕様
 
@@ -83,6 +88,7 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
   - 通常行から `toggle-details` で `details` が保存される
   - 空 summary + 既存 block の `detailsContent` 包装が維持される
   - summary 行の handle から `unset-details` が動く
+  - top-level `details` が `move-up` / `move-down` で同一コンテナ内を移動できる
   - `details` 解除後に summary/content が消えずに通常 block へ戻る
 
 ## 8. 今後の拡張ポイント

@@ -11,6 +11,8 @@ import {
 import { buildDefaultBodyContent } from "@/lib/tiptap";
 import type { BlockNodeType } from "@/app/(board)/_components/tiptap/tiptap-block-menu";
 
+export type MoveBlockDirection = "up" | "down";
+
 export type ResolvedBlockTarget = {
   pos: number;
   nodeType: BlockNodeType;
@@ -82,6 +84,26 @@ function setSelectionForAction(
 
 function createDefaultDoc(state: EditorState): ProseMirrorNode {
   return state.schema.nodeFromJSON(buildDefaultBodyContent());
+}
+
+export function canMoveBlock(
+  state: EditorState,
+  target: ResolvedBlockTarget,
+  direction: MoveBlockDirection,
+): boolean {
+  const delta = direction === "up" ? -1 : 1;
+
+  if (target.parentListNode && target.itemIndex != null) {
+    const nextIndex = target.itemIndex + delta;
+    return nextIndex >= 0 && nextIndex < target.parentListNode.childCount;
+  }
+
+  if (target.topLevelIndex != null) {
+    const nextIndex = target.topLevelIndex + delta;
+    return nextIndex >= 0 && nextIndex < state.doc.childCount;
+  }
+
+  return false;
 }
 
 export function buildInsertParagraphBeforeBlockTransaction(
@@ -196,6 +218,48 @@ export function buildDuplicateBlockTransaction(
   }
 
   return setSelectionForAction(tr, selectionPos, 1);
+}
+
+export function buildMoveBlockTransaction(
+  state: EditorState,
+  target: ResolvedBlockTarget,
+  direction: MoveBlockDirection,
+): Transaction | null {
+  if (!canMoveBlock(state, target, direction)) {
+    return null;
+  }
+
+  const delta = direction === "up" ? -1 : 1;
+
+  if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+    const children = getNodeChildren(target.parentListNode);
+    const nextIndex = target.itemIndex + delta;
+    const nextChildren = [...children];
+    const [movedChild] = nextChildren.splice(target.itemIndex, 1);
+    nextChildren.splice(nextIndex, 0, movedChild);
+
+    const tr = state.tr.replaceWith(
+      target.parentListPos,
+      target.parentListPos + target.parentListNode.nodeSize,
+      target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+    );
+    const selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, nextIndex) + 2;
+    return setSelectionForAction(tr, selectionPos, 1);
+  }
+
+  if (target.topLevelIndex != null) {
+    const children = getNodeChildren(state.doc);
+    const nextIndex = target.topLevelIndex + delta;
+    const nextChildren = [...children];
+    const [movedChild] = nextChildren.splice(target.topLevelIndex, 1);
+    nextChildren.splice(nextIndex, 0, movedChild);
+
+    const tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextChildren));
+    const selectionPos = getTopLevelOffset(nextChildren, nextIndex) + 1;
+    return setSelectionForAction(tr, selectionPos, 1);
+  }
+
+  return null;
 }
 
 export function buildDeleteBlockTransaction(

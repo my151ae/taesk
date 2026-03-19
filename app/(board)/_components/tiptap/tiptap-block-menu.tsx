@@ -6,6 +6,8 @@ import styles from "./TiptapEditor.module.css";
 
 export type BlockNodeType = "paragraph" | "heading" | "listItem" | "taskItem" | "details";
 export type BlockActionType =
+  | "move-up"
+  | "move-down"
   | "insert-above"
   | "insert-below"
   | "duplicate"
@@ -17,14 +19,34 @@ export type BlockActionItem = {
   action: BlockActionType;
   label: string;
   destructive?: boolean;
+  disabled?: boolean;
 };
 
-export function getBlockActionItems(targetType: BlockNodeType): BlockActionItem[] {
+type BlockActionAvailability = {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+};
+
+function getInitialActiveIndex(items: BlockActionItem[]): number {
+  const firstEnabledIndex = items.findIndex((item) => !item.disabled);
+  return firstEnabledIndex >= 0 ? firstEnabledIndex : 0;
+}
+
+export function getBlockActionItems(
+  targetType: BlockNodeType,
+  { canMoveUp, canMoveDown }: BlockActionAvailability,
+): BlockActionItem[] {
   if (targetType === "details") {
-    return [{ action: "unset-details", label: "トグル解除" }];
+    return [
+      { action: "move-up", label: "上へ移動", disabled: !canMoveUp },
+      { action: "move-down", label: "下へ移動", disabled: !canMoveDown },
+      { action: "unset-details", label: "トグル解除" },
+    ];
   }
 
   return [
+    { action: "move-up", label: "上へ移動", disabled: !canMoveUp },
+    { action: "move-down", label: "下へ移動", disabled: !canMoveDown },
     { action: "insert-above", label: "上に段落を追加" },
     { action: "insert-below", label: "下に段落を追加" },
     { action: "toggle-details", label: "トグルに変換" },
@@ -48,14 +70,16 @@ export function BlockActionMenu({
 }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(() => getInitialActiveIndex(items));
+  const initialActiveIndex = getInitialActiveIndex(items);
 
   useClickOutside(menuRef, () => onClose());
 
   useEffect(() => {
-    setActiveIndex(0);
+    const nextActiveIndex = getInitialActiveIndex(items);
+    setActiveIndex(nextActiveIndex);
     requestAnimationFrame(() => {
-      itemRefs.current[0]?.focus();
+      itemRefs.current[nextActiveIndex]?.focus();
     });
   }, [items]);
 
@@ -105,7 +129,7 @@ export function BlockActionMenu({
           event.preventDefault();
           event.stopPropagation();
           const activeItem = items[activeIndex];
-          if (activeItem) {
+          if (activeItem && !activeItem.disabled) {
             onSelect(activeItem.action);
           }
         }
@@ -119,13 +143,19 @@ export function BlockActionMenu({
           ref={(node) => {
             itemRefs.current[index] = node;
           }}
-          autoFocus={index === 0}
+          autoFocus={index === initialActiveIndex}
           tabIndex={index === activeIndex ? 0 : -1}
           data-testid={`tiptap-block-menu-${item.action}`}
+          aria-disabled={item.disabled ? "true" : undefined}
           className={`${styles.blockActionMenuItem} ${
             item.destructive ? styles.blockActionMenuItemDanger : ""
-          }`}
+          } ${item.disabled ? styles.blockActionMenuItemDisabled : ""}`}
           onClick={(event) => {
+            if (item.disabled) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
             event.stopPropagation();
             onSelect(item.action);
           }}
@@ -133,6 +163,7 @@ export function BlockActionMenu({
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
             event.stopPropagation();
+            if (item.disabled) return;
             onSelect(item.action);
           }}
           onFocus={() => {

@@ -83,6 +83,15 @@
     color: #b91c1c;
 }
 
+.blockActionMenuItemDisabled {
+    color: #94a3b8;
+    cursor: default;
+}
+
+.blockActionMenuItemDisabled:hover {
+    background: transparent;
+}
+
 .editor :global(ul[data-type="taskList"] li) {
     margin: 0 !important;
     padding: 0 !important;
@@ -335,4 +344,12 @@
 
 :global(.dark) .blockActionMenuItemDanger {
     color: #fca5a5;
+}
+
+:global(.dark) .blockActionMenuItemDisabled {
+    color: #64748b;
+}
+
+:global(.dark) .blockActionMenuItemDisabled:hover {
+    background: transparent;
 }

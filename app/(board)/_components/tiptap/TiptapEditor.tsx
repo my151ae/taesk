@@ -31,12 +31,15 @@ import {
     parseErrorMessage,
 } from '@/app/(board)/_components/tiptap/tiptap-image-paste';
 import {
+    buildMoveBlockTransaction,
     buildDeleteBlockTransaction,
     buildDuplicateBlockTransaction,
     buildInsertParagraphAfterBlockTransaction,
     buildInsertParagraphBeforeBlockTransaction,
+    canMoveBlock,
     createToggleDetailsSelection,
     createUnsetDetailsSelection,
+    type MoveBlockDirection,
     type ResolvedBlockTarget,
 } from '@/app/(board)/_components/tiptap/tiptap-block-actions';
 
@@ -100,7 +103,6 @@ export default function TiptapEditor({
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
-    const menuItems = menuTarget ? getBlockActionItems(menuTarget.nodeType) : [];
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
@@ -275,6 +277,15 @@ export default function TiptapEditor({
 
         return null;
     }, []);
+
+    const applyBlockActionTransactionToView = useCallback((view: Editor['view'], transaction: Transaction | null): boolean => {
+        if (!transaction) return false;
+        view.dispatch(transaction);
+        onChange?.(transaction.doc.toJSON() as JSONContent);
+        view.focus();
+        closeBlockMenu();
+        return true;
+    }, [closeBlockMenu, onChange]);
 
     const getBlockTargetRect = useCallback((view: Editor['view'], pos: number): DOMRect | null => {
         const nodeDom = view.nodeDOM(pos);
@@ -488,6 +499,24 @@ export default function TiptapEditor({
                 if (!event.isTrusted || event.isComposing) return false;
 
                 const { state } = view;
+                const isMoveShortcut =
+                    (event.metaKey || event.ctrlKey) &&
+                    event.shiftKey &&
+                    (event.key === 'ArrowUp' || event.key === 'ArrowDown');
+
+                if (isMoveShortcut) {
+                    const target = resolveBlockTargetAtPos(state, state.selection.from);
+                    if (!target) return false;
+
+                    const direction: MoveBlockDirection = event.key === 'ArrowUp' ? 'up' : 'down';
+                    const transaction = buildMoveBlockTransaction(state, target, direction);
+                    if (!transaction) return false;
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return applyBlockActionTransactionToView(view, transaction);
+                }
+
                 if (!state.selection.empty) return false;
 
                 if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(view, state)) {
@@ -551,14 +580,9 @@ export default function TiptapEditor({
     });
 
     const applyBlockActionTransaction = useCallback((nextEditor: Editor | null, transaction: Transaction | null): boolean => {
-        if (!nextEditor || !transaction) return false;
-        const { dispatch } = nextEditor.view;
-        dispatch(transaction);
-        onChange?.(transaction.doc.toJSON() as JSONContent);
-        nextEditor.view.focus();
-        closeBlockMenu();
-        return true;
-    }, [closeBlockMenu, onChange]);
+        if (!nextEditor) return false;
+        return applyBlockActionTransactionToView(nextEditor.view, transaction);
+    }, [applyBlockActionTransactionToView]);
 
     const insertParagraphBeforeBlock = useCallback((targetPos: number): boolean => {
         if (!editor) return false;
@@ -584,6 +608,15 @@ export default function TiptapEditor({
         const target = resolveBlockTargetAtPos(state, targetPos);
         if (!target) return false;
         const transaction = buildDuplicateBlockTransaction(state, target);
+        return applyBlockActionTransaction(editor, transaction);
+    }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
+
+    const moveBlock = useCallback((targetPos: number, direction: MoveBlockDirection): boolean => {
+        if (!editor) return false;
+        const { state } = editor.view;
+        const target = resolveBlockTargetAtPos(state, targetPos);
+        if (!target) return false;
+        const transaction = buildMoveBlockTransaction(state, target, direction);
         return applyBlockActionTransaction(editor, transaction);
     }, [applyBlockActionTransaction, editor, resolveBlockTargetAtPos]);
 
@@ -1013,6 +1046,13 @@ export default function TiptapEditor({
     }
 
     const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
+    const resolvedMenuTarget = menuTarget ? resolveBlockTargetAtPos(editor.state, menuTarget.pos) : null;
+    const menuItems = menuTarget
+        ? getBlockActionItems(menuTarget.nodeType, {
+            canMoveUp: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'up') : false,
+            canMoveDown: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'down') : false,
+        })
+        : [];
 
     const menuAnchor = (() => {
         if (!editor || !menuTarget) return null;
@@ -1024,7 +1064,6 @@ export default function TiptapEditor({
 
     const handleBlockAction = (action: BlockActionType) => {
         if (!menuTarget) return;
-        const resolvedTarget = resolveBlockTargetAtPos(editor.state, menuTarget.pos);
         if (typeof window !== 'undefined') {
             (window as typeof window & {
                 __TAESK_LAST_BLOCK_ACTION__?: {
@@ -1038,11 +1077,17 @@ export default function TiptapEditor({
                 action,
                 menuTargetPos: menuTarget.pos,
                 menuTargetNodeType: menuTarget.nodeType,
-                resolvedTargetPos: resolvedTarget?.pos ?? null,
-                resolvedNodeType: resolvedTarget?.nodeType ?? null,
+                resolvedTargetPos: resolvedMenuTarget?.pos ?? null,
+                resolvedNodeType: resolvedMenuTarget?.nodeType ?? null,
             };
         }
         switch (action) {
+            case 'move-up':
+                moveBlock(menuTarget.pos, 'up');
+                break;
+            case 'move-down':
+                moveBlock(menuTarget.pos, 'down');
+                break;
             case 'insert-above':
                 insertParagraphBeforeBlock(menuTarget.pos);
                 break;
