@@ -13,7 +13,6 @@ import {
   TimelineDay,
   TimelineEvent,
   TimelineOverdueItem,
-  buildAbMeta,
   getMinutesFromTime,
   ExternalCalendarEntry,
   formatDuration,
@@ -37,11 +36,10 @@ import {
   ZOOM_STEP
 } from "@/app/(board)/_stores/timeline-zoom-store";
 import {
-  buildActiveBuckets,
+  buildMobileTimelineViewState,
   formatAllDayMeta,
   buildStackedTimelineColumnLayout,
   buildTimelineInteractionLock,
-  buildTimelineOverlayState,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -579,45 +577,46 @@ export default function MobileTimelineView({
 
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
 
-  const activeDay = useMemo(() => days[activeDayIndex] ?? days[0] ?? null, [activeDayIndex, days]);
-
-  const eventsForDay = useMemo(() => {
-    if (!activeDay) return [] as TimelineEvent[];
-    return eventsByDay[activeDay.isoDate] ?? [];
-  }, [activeDay, eventsByDay]);
-
-  const calendarTimedEventsForDay = useMemo(() => {
-    if (!activeDay) return [] as ExternalCalendarEntry[];
-    return calendarEventsByDay[activeDay.isoDate] ?? [];
-  }, [activeDay, calendarEventsByDay]);
-
-  const calendarAllDayForDay = useMemo(() => {
-    if (!activeDay) return [] as ExternalCalendarEntry[];
-    return calendarAllDayByDay[activeDay.isoDate] ?? [];
-  }, [activeDay, calendarAllDayByDay]);
-
-  const abMeta = useMemo(() => (activeDay ? buildAbMeta(activeDay) : null), [activeDay]);
-
-  const activeDayIso = activeDay?.isoDate ?? null;
-  const indicatorVisible = indicatorTop != null && !!activeDayIso && indicatorDayIso === activeDayIso;
-  const indicatorPosition = indicatorTop ?? 0;
-  const activeBuckets = useMemo(
-    () => buildActiveBuckets({ activeDay, abBuckets }),
-    [abBuckets, activeDay]
-  );
   const activeDragCardId = activeDrag?.cardId ?? null;
-  const { overlayBucketEntry, overlayOverdueEntry, overlayCardData } = useMemo(
+  const {
+    activeDay,
+    eventsForDay,
+    calendarTimedEventsForDay,
+    calendarAllDayForDay,
+    abMeta,
+    activeBuckets,
+    indicatorVisible,
+    indicatorPosition,
+    overlayBucketEntry,
+    overlayOverdueCard,
+    overlayCardData,
+  } = useMemo(
     () =>
-      buildTimelineOverlayState({
-        abBuckets: activeBuckets,
+      buildMobileTimelineViewState({
+        days,
+        activeDayIndex,
+        eventsByDay,
+        calendarEventsByDay,
+        calendarAllDayByDay,
+        abBuckets,
         overdue,
-        events: eventsForDay,
+        indicatorTop,
+        indicatorDayIso,
         activeDragCardId,
-        defaultTimelineDuration: 0,
       }),
-    [activeBuckets, overdue, eventsForDay, activeDragCardId]
+    [
+      abBuckets,
+      activeDayIndex,
+      activeDragCardId,
+      calendarAllDayByDay,
+      calendarEventsByDay,
+      days,
+      eventsByDay,
+      indicatorDayIso,
+      indicatorTop,
+      overdue,
+    ]
   );
-  const overlayOverdueCard = overlayOverdueEntry?.item ?? null;
 
   useEffect(() => {
     setActiveStackItem(null);

@@ -1,4 +1,5 @@
 import {
+  buildAbMeta,
   calculateStackedEventLayout,
   compareStackedTimelineLayoutItems,
   getStackedTimelineItemKey,
@@ -27,6 +28,9 @@ type AllDaySegmentSeed = {
 
 export type TimelineAllDaySegment = AllDaySegmentSeed & { row: number };
 
+const EMPTY_SEGMENTS: TimelineAllDaySegment[] = [];
+const EMPTY_ACTIVE_BUCKETS: Record<string, TimelineBucketItem[]> = {};
+
 export const buildStackedTimelineColumnLayout = ({
   events,
   calendarEvents,
@@ -44,6 +48,25 @@ export const buildStackedTimelineColumnLayout = ({
   return {
     combinedItems,
     stackedLayout,
+  };
+};
+
+export const buildVisibleDays = ({
+  days,
+  activeDayIndex,
+  dayRange,
+}: {
+  days: TimelineDay[];
+  activeDayIndex: number;
+  dayRange: number;
+}) => {
+  const dayCount = Math.min(dayRange, Math.max(0, days.length - activeDayIndex));
+  const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
+
+  return {
+    dayCount,
+    visibleDays,
+    gridTemplateColumns: `repeat(${visibleDays.length}, minmax(0, 1fr))`,
   };
 };
 
@@ -109,6 +132,31 @@ export const buildActiveBuckets = ({
   return Object.fromEntries(
     Object.entries(abBuckets || {}).filter(([key]) => key.startsWith(activeDay.key))
   );
+};
+
+export const buildDesktopAllDayState = ({
+  visibleDays,
+  calendarAllDayByDay,
+  rowHeight,
+  rowGap = 6,
+  minHeight = 48,
+}: {
+  visibleDays: TimelineDay[];
+  calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
+  rowHeight: number;
+  rowGap?: number;
+  minHeight?: number;
+}) => {
+  const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
+  const allDayLayout = hasAllDayEvents
+    ? buildAllDayLayout({ visibleDays, calendarAllDayByDay })
+    : { segments: EMPTY_SEGMENTS, rows: 0 };
+
+  return {
+    hasAllDayEvents,
+    allDayLayout,
+    allDayMinHeight: Math.max(minHeight, allDayLayout.rows * (rowHeight + rowGap) + 10),
+  };
 };
 
 export const buildAllDayLayout = ({
@@ -193,6 +241,76 @@ export const buildAllDayLayout = ({
   return {
     segments: placed,
     rows: rowEnds.length,
+  };
+};
+
+export const buildMobileTimelineViewState = ({
+  days,
+  activeDayIndex,
+  eventsByDay,
+  calendarEventsByDay,
+  calendarAllDayByDay,
+  abBuckets,
+  overdue,
+  indicatorTop,
+  indicatorDayIso,
+  activeDragCardId,
+}: {
+  days: TimelineDay[];
+  activeDayIndex: number;
+  eventsByDay: Record<string, TimelineEvent[]>;
+  calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
+  calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
+  abBuckets: Record<string, TimelineBucketItem[]>;
+  overdue: TimelineOverdueItem[];
+  indicatorTop: number | null;
+  indicatorDayIso: string | null;
+  activeDragCardId: string | null;
+}) => {
+  const activeDay = days[activeDayIndex] ?? days[0] ?? null;
+
+  if (!activeDay) {
+    return {
+      activeDay: null,
+      eventsForDay: [] as TimelineEvent[],
+      calendarTimedEventsForDay: [] as ExternalCalendarEntry[],
+      calendarAllDayForDay: [] as ExternalCalendarEntry[],
+      abMeta: null,
+      activeBuckets: EMPTY_ACTIVE_BUCKETS,
+      indicatorVisible: false,
+      indicatorPosition: indicatorTop ?? 0,
+      overlayBucketEntry: null,
+      overlayOverdueEntry: null,
+      overlayOverdueCard: null,
+      overlayCardData: null,
+    };
+  }
+
+  const eventsForDay = eventsByDay[activeDay.isoDate] ?? [];
+  const calendarTimedEventsForDay = calendarEventsByDay[activeDay.isoDate] ?? [];
+  const calendarAllDayForDay = calendarAllDayByDay[activeDay.isoDate] ?? [];
+  const activeBuckets = buildActiveBuckets({ activeDay, abBuckets });
+  const { overlayBucketEntry, overlayOverdueEntry, overlayCardData } = buildTimelineOverlayState({
+    abBuckets: activeBuckets,
+    overdue,
+    events: eventsForDay,
+    activeDragCardId,
+    defaultTimelineDuration: 0,
+  });
+
+  return {
+    activeDay,
+    eventsForDay,
+    calendarTimedEventsForDay,
+    calendarAllDayForDay,
+    abMeta: buildAbMeta(activeDay),
+    activeBuckets,
+    indicatorVisible: indicatorTop != null && indicatorDayIso === activeDay.isoDate,
+    indicatorPosition: indicatorTop ?? 0,
+    overlayBucketEntry,
+    overlayOverdueEntry,
+    overlayOverdueCard: overlayOverdueEntry?.item ?? null,
+    overlayCardData,
   };
 };
 

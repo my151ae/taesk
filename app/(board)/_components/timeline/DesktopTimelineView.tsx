@@ -26,7 +26,8 @@ import {
   ZOOM_STEP,
 } from "@/app/(board)/_stores/timeline-zoom-store";
 import {
-  buildAllDayLayout,
+  buildDesktopAllDayState,
+  buildVisibleDays,
   formatAllDayRange,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 
@@ -202,10 +203,15 @@ export function DesktopTimelineView({
   contextMenuCardId,
 }: DesktopTimelineViewProps) {
   // Calculate how many days to show based on dayRange setting
-  const dayCount = Math.min(dayRange, days.length - activeDayIndex);
-  const visibleDays = days.slice(activeDayIndex, activeDayIndex + dayCount);
-  const desktopGridTemplateColumns = `repeat(${visibleDays.length}, minmax(0, 1fr))`;
-  const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
+  const { visibleDays, gridTemplateColumns: desktopGridTemplateColumns } = useMemo(
+    () =>
+      buildVisibleDays({
+        days,
+        activeDayIndex,
+        dayRange,
+      }),
+    [activeDayIndex, dayRange, days]
+  );
   const [abViewportHeight, setAbViewportHeight] = useState(0);
 
   // Zoom State
@@ -296,15 +302,15 @@ export function DesktopTimelineView({
 
   const activeDragCardId = activeDrag?.cardId ?? null;
 
-  const allDayLayout = useMemo(
+  const { hasAllDayEvents, allDayLayout, allDayMinHeight } = useMemo(
     () =>
-      hasAllDayEvents
-        ? buildAllDayLayout({ visibleDays, calendarAllDayByDay })
-        : { segments: [], rows: 0 },
-    [calendarAllDayByDay, hasAllDayEvents, visibleDays]
+      buildDesktopAllDayState({
+        visibleDays,
+        calendarAllDayByDay,
+        rowHeight: ALL_DAY_ROW_HEIGHT,
+      }),
+    [calendarAllDayByDay, visibleDays]
   );
-
-  const allDayMinHeight = Math.max(48, allDayLayout.rows * (ALL_DAY_ROW_HEIGHT + 6) + 10);
 
   useEffect(() => {
     onMount?.();

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { calculateStackedEventLayout, NormalizedTimelineLayoutItem } from '../app/(board)/_utils/timeline-helpers';
+import { buildDesktopAllDayState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
 
 test.describe('calculateStackedEventLayout - Time Overlap Logic', () => {
     test('水平方向の重なりで 2 番目以降のアイテムの isTimeOverlapped が true になること', async () => {
@@ -161,5 +162,43 @@ test.describe('calculateStackedEventLayout - Time Overlap Logic', () => {
         const layout = calculateStackedEventLayout(items, { hourHeight: 40, timeLabelHeightPx: 16 });
         // target は long (12:00終了) に近接しているため true
         expect(layout['card:target'].isTimeOverlapped).toBe(true);
+    });
+});
+
+test.describe('timeline-render-model helpers', () => {
+    test('buildVisibleDays slices the active window and returns the desktop grid template', async () => {
+        const days = [
+            { key: '2026-03-19', label: 'Today 03/19 (Thu)', isoDate: '2026-03-19' },
+            { key: '2026-03-20', label: '03/20 (Fri)', isoDate: '2026-03-20' },
+            { key: '2026-03-21', label: '03/21 (Sat)', isoDate: '2026-03-21' },
+        ];
+
+        const result = buildVisibleDays({
+            days,
+            activeDayIndex: 1,
+            dayRange: 2,
+        });
+
+        expect(result.visibleDays.map((day) => day.isoDate)).toEqual(['2026-03-20', '2026-03-21']);
+        expect(result.dayCount).toBe(2);
+        expect(result.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+    });
+
+    test('buildDesktopAllDayState returns empty layout when no all-day events are visible', async () => {
+        const visibleDays = [
+            { key: '2026-03-19', label: 'Today 03/19 (Thu)', isoDate: '2026-03-19' },
+            { key: '2026-03-20', label: '03/20 (Fri)', isoDate: '2026-03-20' },
+        ];
+
+        const result = buildDesktopAllDayState({
+            visibleDays,
+            calendarAllDayByDay: {},
+            rowHeight: 36,
+        });
+
+        expect(result.hasAllDayEvents).toBe(false);
+        expect(result.allDayLayout.rows).toBe(0);
+        expect(result.allDayLayout.segments).toEqual([]);
+        expect(result.allDayMinHeight).toBe(48);
     });
 });

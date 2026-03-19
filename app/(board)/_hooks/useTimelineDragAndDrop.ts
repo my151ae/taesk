@@ -172,6 +172,7 @@ export function useTimelineDragAndDrop({
     hourHeight = 40,
 }: UseTimelineDragAndDropProps) {
     const [interactionState, setInteractionState] = useState<InteractionState>({ mode: 'idle' });
+    const interactionStateRef = useRef<InteractionState>({ mode: 'idle' });
     const activeDragRef = useRef<DragSession | null>(null);
     const dragAutoScrollRef = useRef(createDragAutoScrollState());
     const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
@@ -209,6 +210,36 @@ export function useTimelineDragAndDrop({
             }),
         [applyPatch, dataMode, setData]
     );
+
+    const commitInteractionState = useCallback((nextState: InteractionState) => {
+        interactionStateRef.current = nextState;
+        activeDragRef.current = nextState.mode === 'dragging' ? nextState.dragSession : null;
+        setInteractionState(nextState);
+    }, []);
+
+    const setDraggingSession = useCallback((dragSession: DragSession) => {
+        commitInteractionState({ mode: 'dragging', dragSession });
+    }, [commitInteractionState]);
+
+    const updateDraggingSession = useCallback((updater: (current: DragSession) => DragSession) => {
+        const currentState = interactionStateRef.current;
+        if (currentState.mode !== 'dragging') return;
+        setDraggingSession(updater(currentState.dragSession));
+    }, [setDraggingSession]);
+
+    const setResizeInteraction = useCallback((resize: ActiveResizeState) => {
+        commitInteractionState({ mode: 'resizing', resize });
+    }, [commitInteractionState]);
+
+    const updateResizeInteraction = useCallback((updater: (current: ActiveResizeState) => ActiveResizeState) => {
+        const currentState = interactionStateRef.current;
+        if (currentState.mode !== 'resizing') return;
+        setResizeInteraction(updater(currentState.resize));
+    }, [setResizeInteraction]);
+
+    const resetInteractionState = useCallback(() => {
+        commitInteractionState({ mode: 'idle' });
+    }, [commitInteractionState]);
 
     const handleDragStart = (event: DragStartEvent) => {
         const cardId = event.active.data.current?.cardId as string | undefined;
@@ -271,8 +302,7 @@ export function useTimelineDragAndDrop({
             };
         }
         if (!nextSession) return;
-        setInteractionState({ mode: 'dragging', dragSession: nextSession });
-        activeDragRef.current = nextSession;
+        setDraggingSession(nextSession);
     };
 
     const resolveTimelineTargetAtPointer = useCallback(
@@ -351,11 +381,12 @@ export function useTimelineDragAndDrop({
     );
 
     const handleDragMove = (event: DragMoveEvent) => {
-        const currentDrag = activeDragRef.current;
+        const currentState = interactionStateRef.current;
+        const currentDrag = currentState.mode === 'dragging' ? currentState.dragSession : null;
         if (!currentDrag) {
             stopDragAutoScroll();
             if (dragSession?.pointerPreview.visible) {
-                setInteractionState({ mode: 'idle' });
+                resetInteractionState();
             }
             return;
         }
@@ -393,21 +424,12 @@ export function useTimelineDragAndDrop({
         updateDragAutoScroll(event);
 
         if (!visualTimelineTarget && overType !== 'timeline-column') {
-            setInteractionState({
-                mode: 'dragging',
-                dragSession: {
-                    ...currentDrag,
-                    isOverABList: isOverAbArea,
-                    bucketIndicator: nextBucketIndicator,
-                    pointerPreview: HIDDEN_POINTER_PREVIEW,
-                },
-            });
-            activeDragRef.current = {
+            updateDraggingSession(() => ({
                 ...currentDrag,
                 isOverABList: isOverAbArea,
                 bucketIndicator: nextBucketIndicator,
                 pointerPreview: HIDDEN_POINTER_PREVIEW,
-            };
+            }));
             return;
         }
         const day = visualTimelineTarget?.day ?? (event.over?.data.current?.day as TimelineDay | undefined);
@@ -437,8 +459,7 @@ export function useTimelineDragAndDrop({
                 dayIso: day?.isoDate ?? null,
             },
         };
-        setInteractionState({ mode: 'dragging', dragSession: nextSession });
-        activeDragRef.current = nextSession;
+        setDraggingSession(nextSession);
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -448,9 +469,9 @@ export function useTimelineDragAndDrop({
         const visualTimelineTarget = resolveTimelineTargetAtPointer(pointerX, pointerY);
         stopDragAutoScroll();
         stopPointerTracking();
-        const completedDrag = activeDragRef.current;
-        setInteractionState({ mode: 'idle' });
-        activeDragRef.current = null;
+        const completedDrag =
+            interactionStateRef.current.mode === 'dragging' ? interactionStateRef.current.dragSession : null;
+        resetInteractionState();
 
         if (!over && !visualTimelineTarget) return;
         const cardId = active.data.current?.cardId as string | undefined;
@@ -578,8 +599,7 @@ export function useTimelineDragAndDrop({
     const handleDragCancel = () => {
         stopDragAutoScroll();
         stopPointerTracking();
-        setInteractionState({ mode: 'idle' });
-        activeDragRef.current = null;
+        resetInteractionState();
     };
 
     const handleEventKeyDown = (
@@ -617,64 +637,61 @@ export function useTimelineDragAndDrop({
         e.stopPropagation();
         const target = e.currentTarget as HTMLElement;
         target.setPointerCapture(e.pointerId);
-        setInteractionState({
-            mode: 'resizing',
-            resize: {
-                cardId,
-                startMinutes,
-                duration,
-                originalStartMinutes: startMinutes,
-                originalDuration: duration,
-                startY: e.clientY,
-                edge,
-            },
+        setResizeInteraction({
+            cardId,
+            startMinutes,
+            duration,
+            originalStartMinutes: startMinutes,
+            originalDuration: duration,
+            startY: e.clientY,
+            edge,
         });
-    }, []);
+    }, [setResizeInteraction]);
 
     const handleResizeMove = useCallback((e: ReactPointerEvent) => {
-        if (!activeResize) return;
+        const currentState = interactionStateRef.current;
+        if (currentState.mode !== 'resizing') return;
+        const currentResize = currentState.resize;
         e.preventDefault();
         e.stopPropagation();
 
-        const deltaY = e.clientY - activeResize.startY;
+        const deltaY = e.clientY - currentResize.startY;
         const deltaMinutes = Math.round((deltaY / hourHeight) * 60 / 5) * 5;
 
-        if (activeResize.edge === 'bottom') {
-            const newDuration = Math.max(0, activeResize.originalDuration + deltaMinutes);
-            const endMinutes = activeResize.startMinutes + newDuration;
+        if (currentResize.edge === 'bottom') {
+            const newDuration = Math.max(0, currentResize.originalDuration + deltaMinutes);
+            const endMinutes = currentResize.startMinutes + newDuration;
             const maxEnd = 24 * 60;
-            const cappedDuration = Math.min(newDuration, maxEnd - activeResize.startMinutes);
+            const cappedDuration = Math.min(newDuration, maxEnd - currentResize.startMinutes);
 
-            if (cappedDuration !== activeResize.duration) {
-                setInteractionState({
-                    mode: 'resizing',
-                    resize: { ...activeResize, duration: cappedDuration },
-                });
+            if (cappedDuration !== currentResize.duration) {
+                updateResizeInteraction((resize) => ({ ...resize, duration: cappedDuration }));
             }
         } else { // activeResize.edge === 'top'
-            let newStart = activeResize.originalStartMinutes + deltaMinutes;
-            let newDuration = activeResize.originalDuration - deltaMinutes;
+            let newStart = currentResize.originalStartMinutes + deltaMinutes;
+            let newDuration = currentResize.originalDuration - deltaMinutes;
 
             // Ensure minimum duration
             if (newDuration < 0) {
                 newDuration = 0;
-                newStart = activeResize.originalStartMinutes + activeResize.originalDuration;
+                newStart = currentResize.originalStartMinutes + currentResize.originalDuration;
             }
 
             // Ensure start time is not negative
             if (newStart < 0) {
                 newStart = 0;
-                newDuration = activeResize.originalStartMinutes + activeResize.originalDuration;
+                newDuration = currentResize.originalStartMinutes + currentResize.originalDuration;
             }
 
-            if (newStart !== activeResize.startMinutes || newDuration !== activeResize.duration) {
-                setInteractionState({
-                    mode: 'resizing',
-                    resize: { ...activeResize, startMinutes: newStart, duration: newDuration },
-                });
+            if (newStart !== currentResize.startMinutes || newDuration !== currentResize.duration) {
+                updateResizeInteraction((resize) => ({
+                    ...resize,
+                    startMinutes: newStart,
+                    duration: newDuration,
+                }));
             }
         }
-    }, [activeResize, hourHeight]);
+    }, [hourHeight, updateResizeInteraction]);
 
     const handleResizeEnd = useCallback((e: ReactPointerEvent) => {
         if (!activeResize) return;
@@ -716,8 +733,8 @@ export function useTimelineDragAndDrop({
             }
         }
 
-        setInteractionState({ mode: 'idle' });
-    }, [activeResize, applyPatch, dataMode, setData]);
+        resetInteractionState();
+    }, [activeResize, applyPatch, dataMode, resetInteractionState, setData]);
 
     return {
         sensors,
