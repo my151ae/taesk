@@ -1,7 +1,7 @@
 "use client";
 
-export type ShortcutScope = "board" | "modal" | "context-menu" | "shortcuts-modal";
-export type ShortcutRegion = "sidebar" | "main-panel" | "modal-title" | "modal-body";
+export type ShortcutScope = "board" | "modal" | "context-menu";
+export type ShortcutRegion = "sidebar" | "main-panel" | "modal-title" | "modal-body" | "shortcuts-modal";
 export type ShortcutSection = "overdue" | "search";
 export type ShortcutView = "timeline" | "list";
 export type ShortcutPart = "card" | "checkbox" | "title" | "editor";
@@ -60,7 +60,6 @@ const SCOPE_ORDER: Record<ShortcutScope, number> = {
   board: 1,
   modal: 2,
   "context-menu": 3,
-  "shortcuts-modal": 4,
 };
 
 const REGION_ORDER: Record<ShortcutRegion, number> = {
@@ -68,6 +67,7 @@ const REGION_ORDER: Record<ShortcutRegion, number> = {
   "main-panel": 2,
   "modal-title": 3,
   "modal-body": 4,
+  "shortcuts-modal": 5,
 };
 
 const SECTION_ORDER: Record<ShortcutSection, number> = {
@@ -91,7 +91,6 @@ const SCOPE_LABELS: Record<ShortcutScope, string> = {
   board: "Board",
   modal: "Modal",
   "context-menu": "Context menu",
-  "shortcuts-modal": "Shortcuts modal",
 };
 
 const REGION_LABELS: Record<ShortcutRegion, string> = {
@@ -99,6 +98,7 @@ const REGION_LABELS: Record<ShortcutRegion, string> = {
   "main-panel": "Main panel",
   "modal-title": "Card title",
   "modal-body": "Card body",
+  "shortcuts-modal": "Shortcuts modal",
 };
 
 const SECTION_LABELS: Record<ShortcutSection, string> = {
@@ -290,6 +290,30 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     visibleWhen: ACTIVE_ONLY,
   },
   {
+    id: "modal-title-redo",
+    scope: "modal",
+    regions: ["modal-title"],
+    parts: ["title"],
+    legacyContexts: ["cardmodal-title"],
+    keys: ["⌘", "⇧", "Z"],
+    label: "やり直す",
+    priorityBand: 2,
+    displayOrder: 40,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "modal-title-close",
+    scope: "modal",
+    regions: ["modal-title"],
+    parts: ["title"],
+    legacyContexts: ["cardmodal-title"],
+    keys: ["Esc"],
+    label: "閉じる",
+    priorityBand: 2,
+    displayOrder: 50,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
     id: "modal-body-focus-title-column",
     scope: "modal",
     regions: ["modal-body"],
@@ -323,6 +347,40 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     label: "元に戻す",
     priorityBand: 2,
     displayOrder: 30,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "modal-body-redo",
+    scope: "modal",
+    regions: ["modal-body"],
+    parts: ["editor"],
+    legacyContexts: ["cardmodal-editor"],
+    keys: ["⌘", "⇧", "Z"],
+    label: "やり直す",
+    priorityBand: 2,
+    displayOrder: 40,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "modal-body-close",
+    scope: "modal",
+    regions: ["modal-body"],
+    parts: ["editor"],
+    legacyContexts: ["cardmodal-editor"],
+    keys: ["Esc"],
+    label: "閉じる",
+    priorityBand: 2,
+    displayOrder: 50,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "shortcuts-modal-close",
+    scope: "modal",
+    regions: ["shortcuts-modal"],
+    keys: ["Esc"],
+    label: "閉じる",
+    priorityBand: 1,
+    displayOrder: 10,
     visibleWhen: ACTIVE_ONLY,
   },
 ];
@@ -452,6 +510,7 @@ export function getShortcutContextLabel(input: ShortcutContextDescriptor | Short
   const descriptor = normalizeShortcutDescriptor(input);
   if (descriptor.region === "modal-title") return "カードタイトル";
   if (descriptor.region === "modal-body") return "カード本文";
+  if (descriptor.region === "shortcuts-modal") return "ショートカット一覧";
   if (descriptor.region === "sidebar" && descriptor.section === "overdue") return "期限超過";
   if (descriptor.region === "sidebar" && descriptor.section === "search") return "検索";
   if (descriptor.region === "main-panel" && descriptor.view === "timeline") return "タイムライン";
@@ -546,13 +605,17 @@ function minAxisOrder<T extends string>(values: T[] | undefined, orderMap: Recor
 }
 
 function readScope(value: string | null): ShortcutScope | null {
-  return value === "board" || value === "modal" || value === "context-menu" || value === "shortcuts-modal"
+  return value === "board" || value === "modal" || value === "context-menu"
     ? value
     : null;
 }
 
 function readRegion(value: string | null): ShortcutRegion | null {
-  return value === "sidebar" || value === "main-panel" || value === "modal-title" || value === "modal-body"
+  return value === "sidebar" ||
+    value === "main-panel" ||
+    value === "modal-title" ||
+    value === "modal-body" ||
+    value === "shortcuts-modal"
     ? value
     : null;
 }

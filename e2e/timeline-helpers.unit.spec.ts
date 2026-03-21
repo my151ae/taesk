@@ -293,6 +293,8 @@ test.describe('shortcut bar registry helpers', () => {
             'modal-title-focus-body-column',
             'modal-title-focus-body-start',
             'modal-title-undo',
+            'modal-title-redo',
+            'modal-title-close',
         ]);
     });
 
@@ -310,6 +312,21 @@ test.describe('shortcut bar registry helpers', () => {
             'modal-body-focus-title-column',
             'modal-body-focus-title-end',
             'modal-body-undo',
+            'modal-body-redo',
+            'modal-body-close',
+        ]);
+    });
+
+    test('shortcuts modal payload resolves under modal scope', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'modal',
+            region: 'shortcuts-modal',
+            state: 'active',
+        });
+
+        expect(payload?.contextLabel).toBe('ショートカット一覧');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'shortcuts-modal-close',
         ]);
     });
 

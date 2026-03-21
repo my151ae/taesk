@@ -303,10 +303,14 @@ taesk/
 7. **CardModal Boundary Is Focus-Only**  
    CardModal のタイトル入力欄と本文先頭ブロックの境界は、`ArrowDown` / `ArrowRight` / `ArrowUp` / `ArrowLeft` によるフォーカス移動だけを持つ。`Enter` 分割や `Delete` / `Backspace` 結合、タイトルから本文への画像 paste 転送は持たない。
 
+8. **Shortcut Taxonomy Is Layer-First**  
+   shortcut の分類は `scope / region / section / view / part / state` を正本とし、`scope` は `board | modal | context-menu` のレイヤー専用に固定する。`ShortcutsModal` は独立 scope ではなく `scope=modal, region=shortcuts-modal` として扱う。
+
 ## 🔗 Quick Links
 
 - [docs/spec/architecture.md](./spec/architecture.md)
 - [docs/spec/keyboard-navigation.md](./spec/keyboard-navigation.md)
+- [docs/spec/shortcut-taxonomy.md](./spec/shortcut-taxonomy.md)
 - [docs/spec/tiptap-details-toggle.md](./spec/tiptap-details-toggle.md)
 - [docs/spec/tiptap-block-action-testing.md](./spec/tiptap-block-action-testing.md)
 - [docs/spec/testing.md](./spec/testing.md)
