@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import TimelineBoardScreen, {
   type TimelineBoardScreenProps,
 } from "@/app/(board)/_components/timeline/TimelineBoardScreen";
+import type { ShortcutBarConfig } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { Board, ProfileSummary, TeamView } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
@@ -482,10 +483,13 @@ export function useTimelineBoardScreen({
       fetchTimeline: fetchTimelineForDialogs,
       onMemberAdded: refreshBoardMembers,
     },
-    shortcutsProps: {
+  shortcutsProps: {
       isOpen: showShortcutsModal,
       onClose: () => setShowShortcutsModal(false),
     },
+    shortcutBarProps: {
+      maxVisibleItems: 5,
+    } satisfies ShortcutBarConfig,
     modalProps:
       modalCard && (cardModalStatus === "ready" || cardModalStatus === "loading")
         ? {
@@ -500,6 +504,9 @@ export function useTimelineBoardScreen({
             historySaveWarning,
             onRetryHistorySave: retryHistorySave,
             onCloseWithoutHistory: closeModalWithoutHistory,
+            shortcutBar: {
+              maxVisibleItems: 5,
+            },
           }
         : null,
     cardModalError,

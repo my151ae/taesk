@@ -1,7 +1,7 @@
 "use client";
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
-import type { ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -18,7 +18,15 @@ import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
+import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
 import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
+import {
+  createEmptyShortcutBarPayload,
+  getShortcutRegionFromTarget,
+  resolveShortcutBarPayload,
+  type ShortcutBarConfig,
+  type ShortcutRegion,
+} from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
@@ -82,6 +90,7 @@ export type TimelineBoardScreenProps = {
   };
   dialogsProps: DialogsProps;
   shortcutsProps: ShortcutsModalProps;
+  shortcutBarProps: ShortcutBarConfig;
   modalProps: CardModalProps | null;
   cardModalError: string | null;
   contextMenu:
@@ -108,10 +117,47 @@ export default function TimelineBoardScreen({
   mobile,
   dialogsProps,
   shortcutsProps,
+  shortcutBarProps,
   modalProps,
   cardModalError,
   contextMenu,
 }: TimelineBoardScreenProps) {
+  const desktopScopeRef = useRef<HTMLDivElement | null>(null);
+  const [desktopShortcutRegion, setDesktopShortcutRegion] = useState<ShortcutRegion | null>(null);
+
+  const setBoardRegionFromTarget = useCallback((target: EventTarget | null) => {
+    const nextRegion = getShortcutRegionFromTarget(target);
+    setDesktopShortcutRegion(nextRegion === "timeline-card" ? nextRegion : null);
+  }, []);
+
+  const syncBoardRegionFromActiveElement = useCallback(() => {
+    if (modalProps) {
+      setDesktopShortcutRegion(null);
+      return;
+    }
+    const scope = desktopScopeRef.current;
+    const activeElement = document.activeElement;
+    if (!(scope && activeElement instanceof Element) || !scope.contains(activeElement)) {
+      setDesktopShortcutRegion(null);
+      return;
+    }
+    setBoardRegionFromTarget(activeElement);
+  }, [modalProps, setBoardRegionFromTarget]);
+
+  useEffect(() => {
+    syncBoardRegionFromActiveElement();
+  }, [modalProps, syncBoardRegionFromActiveElement]);
+
+  const boardShortcutPayload = useMemo(() => {
+    if (modalProps) return createEmptyShortcutBarPayload("board");
+    if (!desktopShortcutRegion) return createEmptyShortcutBarPayload("board");
+    return resolveShortcutBarPayload({
+      scope: "board",
+      region: desktopShortcutRegion,
+      state: "active",
+    }) ?? createEmptyShortcutBarPayload("board");
+  }, [desktopShortcutRegion, modalProps]);
+
   if (!parseResult.ok) {
     return (
       <div className="min-h-screen bg-[#f4f5f7] p-6">
@@ -145,22 +191,98 @@ export default function TimelineBoardScreen({
       <div className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4">
         <TimelineBoardHeader {...headerProps} />
 
-        <div className="hidden min-h-0 flex-1 md:flex md:flex-col">
+        <div
+          ref={desktopScopeRef}
+          className="hidden min-h-0 flex-1 md:flex md:flex-col"
+          onFocusCapture={(event) => {
+            if (modalProps) return;
+            setBoardRegionFromTarget(event.target);
+          }}
+          onBlurCapture={() => {
+            if (typeof window === "undefined") return;
+            window.requestAnimationFrame(() => {
+              syncBoardRegionFromActiveElement();
+            });
+          }}
+        >
           {desktop.activeView === "timeline" ? (
-            <DndContext
-              sensors={desktop.dndProps.sensors}
-              onDragStart={desktop.dndProps.handleDragStart}
-              onDragMove={desktop.dndProps.handleDragMove}
-              onDragEnd={desktop.dndProps.handleDragEnd}
-              onDragCancel={desktop.dndProps.handleDragCancel}
-              collisionDetection={bucketsFirstCollisionDetection}
-              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-              autoScroll={{
-                enabled: false,
-                threshold: { x: 0, y: 0.2 },
-                acceleration: 1,
-              }}
-            >
+            <>
+              <DndContext
+                sensors={desktop.dndProps.sensors}
+                onDragStart={desktop.dndProps.handleDragStart}
+                onDragMove={desktop.dndProps.handleDragMove}
+                onDragEnd={desktop.dndProps.handleDragEnd}
+                onDragCancel={desktop.dndProps.handleDragCancel}
+                collisionDetection={bucketsFirstCollisionDetection}
+                measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+                autoScroll={{
+                  enabled: false,
+                  threshold: { x: 0, y: 0.2 },
+                  acceleration: 1,
+                }}
+              >
+                <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                  <aside
+                    className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
+                    style={{ width: "clamp(252px, 19vw, 292px)" }}
+                  >
+                    <DesktopSidebarMenu
+                      {...desktop.leftPanelProps}
+                      overdueSortOrder={desktop.overdueSortOrder}
+                      onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
+                    />
+                  </aside>
+
+                  <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <div className="border-b border-slate-100 bg-white px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {desktop.tabItems.map((item) => {
+                          const isActive = item.key === desktop.activeView;
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => desktop.onTabChange(item.key)}
+                              className={
+                                isActive
+                                  ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
+                                  : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              }
+                              aria-current={isActive ? "page" : undefined}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <DesktopTimelineToolbar {...desktop.timelineToolbarProps} />
+                    <DesktopTimelineView {...desktop.timelineViewProps} />
+                  </section>
+                </div>
+
+                <DragOverlay dropAnimation={null} zIndex={50}>
+                  <TimelineDragOverlayCard
+                    variant="desktop"
+                    overlayCardData={desktop.overlayProps.overlayCardData}
+                    overlayTimelineEvent={desktop.overlayProps.overlayTimelineEvent}
+                    overlayBucketCard={desktop.overlayProps.overlayBucketCard}
+                    overlayOverdueCard={desktop.overlayProps.overlayOverdueCard}
+                  />
+                </DragOverlay>
+              </DndContext>
+              {!modalProps ? (
+                <StatusShortcutBar
+                  payload={boardShortcutPayload}
+                  maxVisibleItems={shortcutBarProps.maxVisibleItems}
+                  className="mt-2 shrink-0"
+                  dataTestId="board-shortcut-bar"
+                />
+              ) : null}
+            </>
+          ) : (
+            <>
               <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
                 <aside
                   className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
@@ -197,62 +319,19 @@ export default function TimelineBoardScreen({
                     </div>
                   </div>
 
-                  <DesktopTimelineToolbar {...desktop.timelineToolbarProps} />
-                  <DesktopTimelineView {...desktop.timelineViewProps} />
+                  <DesktopListToolbar {...desktop.listToolbarProps} />
+                  <DesktopListView {...desktop.listViewProps} />
                 </section>
               </div>
-
-              <DragOverlay dropAnimation={null} zIndex={50}>
-                <TimelineDragOverlayCard
-                  variant="desktop"
-                  overlayCardData={desktop.overlayProps.overlayCardData}
-                  overlayTimelineEvent={desktop.overlayProps.overlayTimelineEvent}
-                  overlayBucketCard={desktop.overlayProps.overlayBucketCard}
-                  overlayOverdueCard={desktop.overlayProps.overlayOverdueCard}
+              {!modalProps ? (
+                <StatusShortcutBar
+                  payload={boardShortcutPayload}
+                  maxVisibleItems={shortcutBarProps.maxVisibleItems}
+                  className="mt-2 shrink-0"
+                  dataTestId="board-shortcut-bar"
                 />
-              </DragOverlay>
-            </DndContext>
-          ) : (
-            <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-              <aside
-                className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-                style={{ width: "clamp(252px, 19vw, 292px)" }}
-              >
-                <DesktopSidebarMenu
-                  {...desktop.leftPanelProps}
-                  overdueSortOrder={desktop.overdueSortOrder}
-                  onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
-                />
-              </aside>
-
-              <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="border-b border-slate-100 bg-white px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    {desktop.tabItems.map((item) => {
-                      const isActive = item.key === desktop.activeView;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => desktop.onTabChange(item.key)}
-                          className={
-                            isActive
-                              ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                              : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          }
-                          aria-current={isActive ? "page" : undefined}
-                        >
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <DesktopListToolbar {...desktop.listToolbarProps} />
-                <DesktopListView {...desktop.listViewProps} />
-              </section>
-            </div>
+              ) : null}
+            </>
           )}
         </div>
 

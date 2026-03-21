@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
+import { useEffect, useRef, useCallback, useMemo, useLayoutEffect, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
@@ -21,6 +21,15 @@ import { useCardModalResize } from "@/app/components/card-modal/hooks/useCardMod
 import { useCardModalAutoSave } from "@/app/components/card-modal/hooks/useCardModalAutoSave";
 import { useCardModalLifecycle } from "@/app/components/card-modal/hooks/useCardModalLifecycle";
 import { useCardModalMemberPicker } from "@/app/components/card-modal/hooks/useCardModalMemberPicker";
+import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
+import {
+    createEmptyShortcutBarPayload,
+    getShortcutRegionFromTarget,
+    resolveShortcutBarPayload,
+    SHORTCUT_REGION_ATTRIBUTE,
+    type ShortcutBarConfig,
+    type ShortcutRegion,
+} from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
 const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
@@ -41,6 +50,7 @@ interface CardModalProps {
     historySaveWarning?: string | null;
     onRetryHistorySave?: () => void;
     onCloseWithoutHistory?: () => void;
+    shortcutBar?: ShortcutBarConfig;
 }
 
 export function CardModal({
@@ -55,6 +65,7 @@ export function CardModal({
     historySaveWarning,
     onRetryHistorySave,
     onCloseWithoutHistory,
+    shortcutBar,
 }: CardModalProps) {
     const {
         content,
@@ -109,6 +120,7 @@ export function CardModal({
     } = useCardModalDraft({ card, profiles });
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
+    const [activeShortcutRegion, setActiveShortcutRegion] = useState<ShortcutRegion | null>(null);
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -254,6 +266,44 @@ export function CardModal({
         hasAutoSavedEditsRef,
         clearAutoSaveTimers,
     });
+
+    const syncActiveShortcutRegion = useCallback(() => {
+        const isReadonly = Boolean(isLoading || isHistoryPreviewing);
+        if (isReadonly) {
+            setActiveShortcutRegion(null);
+            return;
+        }
+
+        const root = dialogRef.current;
+        const activeElement = document.activeElement;
+        if (!(root && activeElement instanceof Element) || !root.contains(activeElement)) {
+            setActiveShortcutRegion(null);
+            return;
+        }
+
+        const nextRegion = getShortcutRegionFromTarget(activeElement);
+        if (nextRegion === "cardmodal-title" || nextRegion === "cardmodal-editor") {
+            setActiveShortcutRegion(nextRegion);
+            return;
+        }
+
+        setActiveShortcutRegion(null);
+    }, [dialogRef, isHistoryPreviewing, isLoading]);
+
+    useEffect(() => {
+        syncActiveShortcutRegion();
+    }, [syncActiveShortcutRegion]);
+
+    const modalShortcutPayload = useMemo(() => {
+        if (isLoading || isHistoryPreviewing || !activeShortcutRegion) {
+            return createEmptyShortcutBarPayload("modal");
+        }
+        return resolveShortcutBarPayload({
+            scope: "modal",
+            region: activeShortcutRegion,
+            state: "active",
+        }) ?? createEmptyShortcutBarPayload("modal");
+    }, [activeShortcutRegion, isHistoryPreviewing, isLoading]);
 
     const {
         memberButtonRef,
@@ -583,6 +633,24 @@ export function CardModal({
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 onClick={(e) => e.stopPropagation()}
+                onFocusCapture={(event) => {
+                    if (isLoading || isHistoryPreviewing) {
+                        setActiveShortcutRegion(null);
+                        return;
+                    }
+                    const nextRegion = getShortcutRegionFromTarget(event.target);
+                    if (nextRegion === "cardmodal-title" || nextRegion === "cardmodal-editor") {
+                        setActiveShortcutRegion(nextRegion);
+                        return;
+                    }
+                    setActiveShortcutRegion(null);
+                }}
+                onBlurCapture={() => {
+                    if (typeof window === "undefined") return;
+                    window.requestAnimationFrame(() => {
+                        syncActiveShortcutRegion();
+                    });
+                }}
             >
                 <CardModalHeader
                     dueDate={dueDate}
@@ -702,6 +770,7 @@ export function CardModal({
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
                                         className="min-h-[1lh] min-w-0 basis-0 flex-1 resize-none overflow-hidden bg-transparent border-none p-0 text-xl font-bold leading-tight text-slate-900 break-words dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
+                                        data-shortcut-region="cardmodal-title"
                                     />
                                 </div>
                             </div>
@@ -746,7 +815,7 @@ export function CardModal({
                                         {previewLoading ? (
                                             <div className="flex h-full items-center justify-center text-sm text-slate-500">履歴を読み込み中...</div>
                                         ) : (
-                                            <div className="flex h-full flex-col">
+                                            <div className="flex h-full flex-col" {...{ [SHORTCUT_REGION_ATTRIBUTE]: "cardmodal-editor" }}>
                                                 <TiptapEditor
                                                     key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                     initialContent={isHistoryPreviewing ? previewHistoryContent : content}
@@ -808,6 +877,14 @@ export function CardModal({
                         />
                         </>
                     )}
+                </div>
+                <div className="shrink-0 border-t border-slate-200 bg-slate-50/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900/80">
+                    <StatusShortcutBar
+                        payload={modalShortcutPayload}
+                        maxVisibleItems={shortcutBar?.maxVisibleItems}
+                        className="rounded-none border-0 bg-transparent px-0 py-0 shadow-none ring-0"
+                        dataTestId="modal-shortcut-bar"
+                    />
                 </div>
             </div>
         </div>

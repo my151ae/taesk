@@ -62,6 +62,7 @@ type TimelineCardProps = {
     titleClassName?: string;
     /** 左側のチェックボックス列を非表示にするか */
     hideLeftColumn?: boolean;
+    shortcutRegion?: "timeline-card" | "cardmodal-title" | "cardmodal-editor";
 };
 
 export function TimelineCard({
@@ -97,6 +98,7 @@ export function TimelineCard({
     cardId,
     titleClassName,
     hideLeftColumn = false,
+    shortcutRegion,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -180,6 +182,7 @@ export function TimelineCard({
             style={style}
             data-testid={dataTestId}
             data-card-id={cardId}
+            data-shortcut-region={shortcutRegion}
             tabIndex={tabIndex ?? 0}
             role={role}
             data-focus-group={focusGroup}

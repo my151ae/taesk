@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { calculateStackedEventLayout, NormalizedTimelineLayoutItem } from '../app/(board)/_utils/timeline-helpers';
 import { buildDesktopAllDayState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
+import {
+    resolveShortcutBarPayload,
+    sliceShortcutItems,
+} from '../app/(board)/_components/timeline/shortcut-bar-registry';
 
 test.describe('calculateStackedEventLayout - Time Overlap Logic', () => {
     test('水平方向の重なりで 2 番目以降のアイテムの isTimeOverlapped が true になること', async () => {
@@ -200,5 +204,42 @@ test.describe('timeline-render-model helpers', () => {
         expect(result.allDayLayout.rows).toBe(0);
         expect(result.allDayLayout.segments).toEqual([]);
         expect(result.allDayMinHeight).toBe(48);
+    });
+});
+
+test.describe('shortcut bar registry helpers', () => {
+    test('board timeline-card payload resolves in priority/display order', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'timeline-card',
+            state: 'active',
+        });
+
+        expect(payload).not.toBeNull();
+        expect(payload?.contextLabel).toBe('タイムラインカード');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'timeline-open-details',
+            'timeline-toggle-complete',
+            'timeline-create-next',
+            'timeline-open-menu',
+        ]);
+    });
+
+    test('readonly payload resolves to null', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'modal',
+            region: 'cardmodal-editor',
+            state: 'readonly',
+        });
+
+        expect(payload).toBeNull();
+    });
+
+    test('sliceShortcutItems returns visible items and overflow count', async () => {
+        const input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+        const result = sliceShortcutItems(input, 5);
+
+        expect(result.visibleItems).toEqual(['a', 'b', 'c', 'd', 'e']);
+        expect(result.overflowCount).toBe(2);
     });
 });
