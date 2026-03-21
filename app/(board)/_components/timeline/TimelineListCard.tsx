@@ -66,6 +66,12 @@ export function TimelineListCard({
           "min-h-0",
           variant === "mobile" ? "shadow-sm" : ""
         )}
+        shortcutContext={{
+          scope: "board",
+          region: "main-panel",
+          view: "list",
+          part: "card",
+        }}
         focusGroup="bucket"
       />
     </div>

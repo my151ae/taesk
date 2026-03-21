@@ -23,12 +23,12 @@ import { useCardModalLifecycle } from "@/app/components/card-modal/hooks/useCard
 import { useCardModalMemberPicker } from "@/app/components/card-modal/hooks/useCardModalMemberPicker";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
 import {
+    buildShortcutDataAttributes,
     createEmptyShortcutBarPayload,
-    getShortcutRegionFromTarget,
+    getShortcutContextFromTarget,
     resolveShortcutBarPayload,
-    SHORTCUT_REGION_ATTRIBUTE,
     type ShortcutBarConfig,
-    type ShortcutRegion,
+    type ShortcutContextDescriptor,
 } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 
 const DEFAULT_BUCKET: DueBucket = 'b';
@@ -120,12 +120,11 @@ export function CardModal({
     } = useCardModalDraft({ card, profiles });
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
-    const [activeShortcutRegion, setActiveShortcutRegion] = useState<ShortcutRegion | null>(null);
+    const [activeShortcutDescriptor, setActiveShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const prependTaskHandlerRef = useRef<(() => void) | null>(null);
     const {
         historyItems,
         historyLoading,
@@ -267,43 +266,37 @@ export function CardModal({
         clearAutoSaveTimers,
     });
 
-    const syncActiveShortcutRegion = useCallback(() => {
+    const syncActiveShortcutDescriptor = useCallback(() => {
         const isReadonly = Boolean(isLoading || isHistoryPreviewing);
         if (isReadonly) {
-            setActiveShortcutRegion(null);
+            setActiveShortcutDescriptor(null);
             return;
         }
 
         const root = dialogRef.current;
         const activeElement = document.activeElement;
         if (!(root && activeElement instanceof Element) || !root.contains(activeElement)) {
-            setActiveShortcutRegion(null);
+            setActiveShortcutDescriptor(null);
             return;
         }
 
-        const nextRegion = getShortcutRegionFromTarget(activeElement);
-        if (nextRegion === "cardmodal-title" || nextRegion === "cardmodal-editor") {
-            setActiveShortcutRegion(nextRegion);
-            return;
-        }
-
-        setActiveShortcutRegion(null);
+        const nextDescriptor = getShortcutContextFromTarget(activeElement);
+        setActiveShortcutDescriptor(nextDescriptor?.scope === "modal" ? nextDescriptor : null);
     }, [dialogRef, isHistoryPreviewing, isLoading]);
 
     useEffect(() => {
-        syncActiveShortcutRegion();
-    }, [syncActiveShortcutRegion]);
+        syncActiveShortcutDescriptor();
+    }, [syncActiveShortcutDescriptor]);
 
     const modalShortcutPayload = useMemo(() => {
-        if (isLoading || isHistoryPreviewing || !activeShortcutRegion) {
+        if (isLoading || isHistoryPreviewing || !activeShortcutDescriptor) {
             return createEmptyShortcutBarPayload("modal");
         }
         return resolveShortcutBarPayload({
-            scope: "modal",
-            region: activeShortcutRegion,
+            ...activeShortcutDescriptor,
             state: "active",
         }) ?? createEmptyShortcutBarPayload("modal");
-    }, [activeShortcutRegion, isHistoryPreviewing, isLoading]);
+    }, [activeShortcutDescriptor, isHistoryPreviewing, isLoading]);
 
     const {
         memberButtonRef,
@@ -317,10 +310,6 @@ export function CardModal({
 
     const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
         bodyBridgeRef.current = bridge;
-    }, []);
-
-    const handleRegisterPrependTaskHandler = useCallback((handler: (() => void) | null) => {
-        prependTaskHandlerRef.current = handler;
     }, []);
 
     const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
@@ -401,11 +390,8 @@ export function CardModal({
         const isCaretAtEnd = caret === title.length;
 
         if (event.key === "Enter") {
-            if (prependTaskHandlerRef.current) {
-                event.preventDefault();
-                event.stopPropagation();
-                prependTaskHandlerRef.current();
-            }
+            event.preventDefault();
+            event.stopPropagation();
             return;
         }
 
@@ -617,6 +603,27 @@ export function CardModal({
         });
     }, [previewHistoryContent, selectedHistoryId, handleSave]);
 
+    const titleShortcutAttributes = useMemo(
+        () =>
+            buildShortcutDataAttributes({
+                scope: "modal",
+                region: "modal-title",
+                part: "title",
+                legacyContext: "cardmodal-title",
+            }),
+        []
+    );
+    const bodyShortcutAttributes = useMemo(
+        () =>
+            buildShortcutDataAttributes({
+                scope: "modal",
+                region: "modal-body",
+                part: "editor",
+                legacyContext: "cardmodal-editor",
+            }),
+        []
+    );
+
     return (
         <div className="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:items-center sm:p-4" role="presentation">
             <div
@@ -635,20 +642,16 @@ export function CardModal({
                 onClick={(e) => e.stopPropagation()}
                 onFocusCapture={(event) => {
                     if (isLoading || isHistoryPreviewing) {
-                        setActiveShortcutRegion(null);
+                        setActiveShortcutDescriptor(null);
                         return;
                     }
-                    const nextRegion = getShortcutRegionFromTarget(event.target);
-                    if (nextRegion === "cardmodal-title" || nextRegion === "cardmodal-editor") {
-                        setActiveShortcutRegion(nextRegion);
-                        return;
-                    }
-                    setActiveShortcutRegion(null);
+                    const nextDescriptor = getShortcutContextFromTarget(event.target);
+                    setActiveShortcutDescriptor(nextDescriptor?.scope === "modal" ? nextDescriptor : null);
                 }}
                 onBlurCapture={() => {
                     if (typeof window === "undefined") return;
                     window.requestAnimationFrame(() => {
-                        syncActiveShortcutRegion();
+                        syncActiveShortcutDescriptor();
                     });
                 }}
             >
@@ -770,7 +773,7 @@ export function CardModal({
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
                                         className="min-h-[1lh] min-w-0 basis-0 flex-1 resize-none overflow-hidden bg-transparent border-none p-0 text-xl font-bold leading-tight text-slate-900 break-words dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"
-                                        data-shortcut-region="cardmodal-title"
+                                        {...titleShortcutAttributes}
                                     />
                                 </div>
                             </div>
@@ -815,7 +818,7 @@ export function CardModal({
                                         {previewLoading ? (
                                             <div className="flex h-full items-center justify-center text-sm text-slate-500">履歴を読み込み中...</div>
                                         ) : (
-                                            <div className="flex h-full flex-col" {...{ [SHORTCUT_REGION_ATTRIBUTE]: "cardmodal-editor" }}>
+                                            <div className="flex h-full flex-col" {...bodyShortcutAttributes}>
                                                 <TiptapEditor
                                                     key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                     initialContent={isHistoryPreviewing ? previewHistoryContent : content}
@@ -824,7 +827,6 @@ export function CardModal({
                                                     cardId={card.id}
                                                     onEditorError={setEditorError}
                                                     onRegisterBodyBridge={handleRegisterBodyBridge}
-                                                    onRegisterPrependTaskHandler={handleRegisterPrependTaskHandler}
                                                     onRequestFocusTitle={handleRequestFocusTitle}
                                                     onChange={(val) => {
                                                         if (isHistoryPreviewing) return;

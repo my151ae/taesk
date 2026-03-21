@@ -118,7 +118,13 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"
-                    shortcutRegion="timeline-card"
+                    shortcutContext={{
+                        scope: 'board',
+                        region: 'main-panel',
+                        view: 'timeline',
+                        part: 'card',
+                        legacyContext: 'timeline-card',
+                    }}
                     onKeyDown={(native) => handleEventKeyDown(event, native)}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                     onFocus={() => {

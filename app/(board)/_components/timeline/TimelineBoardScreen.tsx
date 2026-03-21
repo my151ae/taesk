@@ -22,10 +22,10 @@ import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShor
 import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
 import {
   createEmptyShortcutBarPayload,
-  getShortcutRegionFromTarget,
+  getShortcutContextFromTarget,
   resolveShortcutBarPayload,
   type ShortcutBarConfig,
-  type ShortcutRegion,
+  type ShortcutContextDescriptor,
 } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
@@ -123,40 +123,39 @@ export default function TimelineBoardScreen({
   contextMenu,
 }: TimelineBoardScreenProps) {
   const desktopScopeRef = useRef<HTMLDivElement | null>(null);
-  const [desktopShortcutRegion, setDesktopShortcutRegion] = useState<ShortcutRegion | null>(null);
+  const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
 
-  const setBoardRegionFromTarget = useCallback((target: EventTarget | null) => {
-    const nextRegion = getShortcutRegionFromTarget(target);
-    setDesktopShortcutRegion(nextRegion === "timeline-card" ? nextRegion : null);
+  const setBoardShortcutContextFromTarget = useCallback((target: EventTarget | null) => {
+    const nextDescriptor = getShortcutContextFromTarget(target);
+    setDesktopShortcutDescriptor(nextDescriptor?.scope === "board" ? nextDescriptor : null);
   }, []);
 
-  const syncBoardRegionFromActiveElement = useCallback(() => {
+  const syncBoardShortcutContextFromActiveElement = useCallback(() => {
     if (modalProps) {
-      setDesktopShortcutRegion(null);
+      setDesktopShortcutDescriptor(null);
       return;
     }
     const scope = desktopScopeRef.current;
     const activeElement = document.activeElement;
     if (!(scope && activeElement instanceof Element) || !scope.contains(activeElement)) {
-      setDesktopShortcutRegion(null);
+      setDesktopShortcutDescriptor(null);
       return;
     }
-    setBoardRegionFromTarget(activeElement);
-  }, [modalProps, setBoardRegionFromTarget]);
+    setBoardShortcutContextFromTarget(activeElement);
+  }, [modalProps, setBoardShortcutContextFromTarget]);
 
   useEffect(() => {
-    syncBoardRegionFromActiveElement();
-  }, [modalProps, syncBoardRegionFromActiveElement]);
+    syncBoardShortcutContextFromActiveElement();
+  }, [modalProps, syncBoardShortcutContextFromActiveElement]);
 
   const boardShortcutPayload = useMemo(() => {
     if (modalProps) return createEmptyShortcutBarPayload("board");
-    if (!desktopShortcutRegion) return createEmptyShortcutBarPayload("board");
+    if (!desktopShortcutDescriptor) return createEmptyShortcutBarPayload("board");
     return resolveShortcutBarPayload({
-      scope: "board",
-      region: desktopShortcutRegion,
+      ...desktopShortcutDescriptor,
       state: "active",
     }) ?? createEmptyShortcutBarPayload("board");
-  }, [desktopShortcutRegion, modalProps]);
+  }, [desktopShortcutDescriptor, modalProps]);
 
   if (!parseResult.ok) {
     return (
@@ -196,12 +195,12 @@ export default function TimelineBoardScreen({
           className="hidden min-h-0 flex-1 md:flex md:flex-col"
           onFocusCapture={(event) => {
             if (modalProps) return;
-            setBoardRegionFromTarget(event.target);
+            setBoardShortcutContextFromTarget(event.target);
           }}
           onBlurCapture={() => {
             if (typeof window === "undefined") return;
             window.requestAnimationFrame(() => {
-              syncBoardRegionFromActiveElement();
+              syncBoardShortcutContextFromActiveElement();
             });
           }}
         >

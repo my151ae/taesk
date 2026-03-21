@@ -3,9 +3,12 @@
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef } from "react";
 import {
-    getShortcutContextLabel,
+    formatShortcutParts,
+    formatShortcutRegions,
+    formatShortcutScope,
+    formatShortcutSections,
+    formatShortcutViews,
     getSortedShortcutDefinitions,
-    type ShortcutDefinition,
 } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 
 type KeyIconProps = {
@@ -49,14 +52,6 @@ type ShortcutsModalProps = {
     isOpen: boolean;
     onClose: () => void;
 };
-
-function formatScope(scope: ShortcutDefinition["scope"]) {
-    return scope === "board" ? "Board" : "Modal";
-}
-
-function formatRegions(regions: ShortcutDefinition["regions"]) {
-    return regions.map((region) => getShortcutContextLabel(region)).join(" / ");
-}
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
     const modalRef = useRef<HTMLDivElement>(null);
@@ -129,9 +124,12 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
                 <div className="overflow-y-auto p-6 md:p-8">
                     <div className="overflow-hidden rounded-2xl border border-slate-200">
-                        <div className="grid grid-cols-[110px_180px_minmax(220px,1fr)_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        <div className="grid grid-cols-[96px_112px_96px_96px_96px_minmax(220px,1fr)_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
                             <span>Scope</span>
-                            <span>Context</span>
+                            <span>Region</span>
+                            <span>Section</span>
+                            <span>View</span>
+                            <span>Part</span>
                             <span>Shortcut</span>
                             <span className="text-right">Priority</span>
                         </div>
@@ -139,15 +137,24 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                             {rows.map((row) => (
                                 <div
                                     key={row.id}
-                                    className="grid grid-cols-[110px_180px_minmax(220px,1fr)_90px] gap-4 px-5 py-3"
+                                    className="grid grid-cols-[96px_112px_96px_96px_96px_minmax(220px,1fr)_90px] gap-4 px-5 py-3"
                                 >
                                     <div className="flex items-center">
                                         <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                                            {formatScope(row.scope)}
+                                            {formatShortcutScope(row.scope)}
                                         </span>
                                     </div>
                                     <div className="flex items-center text-sm font-medium text-slate-700">
-                                        {formatRegions(row.regions)}
+                                        {formatShortcutRegions(row.regions)}
+                                    </div>
+                                    <div className="flex items-center text-sm font-medium text-slate-700">
+                                        {formatShortcutSections(row.sections)}
+                                    </div>
+                                    <div className="flex items-center text-sm font-medium text-slate-700">
+                                        {formatShortcutViews(row.views)}
+                                    </div>
+                                    <div className="flex items-center text-sm font-medium text-slate-700">
+                                        {formatShortcutParts(row.parts)}
                                     </div>
                                     <div className="flex min-w-0 flex-col gap-1">
                                         <ShortcutRow

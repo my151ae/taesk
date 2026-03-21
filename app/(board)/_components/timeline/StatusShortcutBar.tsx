@@ -41,6 +41,9 @@ export function StatusShortcutBar({
       data-testid={dataTestId}
       data-shortcut-bar-scope={resolvedPayload.scope}
       data-shortcut-bar-region={resolvedPayload.region ?? ""}
+      data-shortcut-bar-section={resolvedPayload.section ?? ""}
+      data-shortcut-bar-view={resolvedPayload.view ?? ""}
+      data-shortcut-bar-part={resolvedPayload.part ?? ""}
     >
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex items-center gap-3 overflow-x-auto">

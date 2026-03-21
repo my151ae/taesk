@@ -7,6 +7,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
+import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
@@ -179,6 +180,7 @@ function SidebarCardRow({
   badgeLabel,
   timeText,
   openSource,
+  shortcutSection,
   testId,
   className,
   draggable = false,
@@ -200,6 +202,7 @@ function SidebarCardRow({
   badgeLabel: string;
   timeText: string | null;
   openSource: string;
+  shortcutSection: ShortcutSection;
   testId: string;
   className?: string;
   draggable?: boolean;
@@ -232,6 +235,12 @@ function SidebarCardRow({
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
         paddingClass="py-1"
         className={clsx("min-h-0", className)}
+        shortcutContext={{
+          scope: "board",
+          region: "sidebar",
+          section: shortcutSection,
+          part: "card",
+        }}
         onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
         focusGroup="bucket"
       />
@@ -313,6 +322,7 @@ export function DesktopSidebarMenu({
                     badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
                     timeText={buildOverdueTimeText(item)}
                     openSource="overdue"
+                    shortcutSection="overdue"
                     testId={`overdue-card-${item.card_id}`}
                     className={allowOverdueDrag ? "bg-white" : "bg-slate-50"}
                     draggable={allowOverdueDrag}
@@ -334,14 +344,17 @@ export function DesktopSidebarMenu({
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="px-2 py-2">
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-            <input
-              type="text"
-              value={state.searchQuery}
-              onChange={(event) => actions.onSearchQueryChange(event.target.value)}
-              placeholder="Search cards..."
-              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-              data-testid="desktop-sidebar-search-input"
-            />
+              <input
+                type="text"
+                value={state.searchQuery}
+                onChange={(event) => actions.onSearchQueryChange(event.target.value)}
+                placeholder="Search cards..."
+                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                data-testid="desktop-sidebar-search-input"
+                data-shortcut-scope="board"
+                data-shortcut-region="sidebar"
+                data-shortcut-section="search"
+              />
           </div>
         </div>
 
@@ -367,6 +380,7 @@ export function DesktopSidebarMenu({
                   badgeLabel={result.badgeLabel}
                   timeText={result.timeText}
                   openSource="search"
+                  shortcutSection="search"
                   testId={`search-card-${result.kind}-${result.item.card_id}`}
                   className="bg-white"
                   onToggleCheck={onToggleCheck}

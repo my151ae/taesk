@@ -208,27 +208,135 @@ test.describe('timeline-render-model helpers', () => {
 });
 
 test.describe('shortcut bar registry helpers', () => {
-    test('board timeline-card payload resolves in priority/display order', async () => {
+    test('board sidebar overdue card payload resolves', async () => {
         const payload = resolveShortcutBarPayload({
             scope: 'board',
-            region: 'timeline-card',
+            region: 'sidebar',
+            section: 'overdue',
+            part: 'card',
             state: 'active',
         });
 
         expect(payload).not.toBeNull();
-        expect(payload?.contextLabel).toBe('タイムラインカード');
+        expect(payload?.contextLabel).toBe('期限超過');
         expect(payload?.items.map((item) => item.id)).toEqual([
-            'timeline-open-details',
-            'timeline-toggle-complete',
-            'timeline-create-next',
-            'timeline-open-menu',
+            'board-sidebar-card-open-details',
+            'board-sidebar-card-toggle-complete',
+            'board-sidebar-card-open-menu',
         ]);
+    });
+
+    test('board sidebar search card payload resolves', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'sidebar',
+            section: 'search',
+            part: 'card',
+            state: 'active',
+        });
+
+        expect(payload?.contextLabel).toBe('検索');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'board-sidebar-card-open-details',
+            'board-sidebar-card-toggle-complete',
+            'board-sidebar-card-open-menu',
+        ]);
+    });
+
+    test('board main timeline card payload resolves in priority/display order', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'main-panel',
+            view: 'timeline',
+            part: 'card',
+            legacyContext: 'timeline-card',
+            state: 'active',
+        });
+
+        expect(payload).not.toBeNull();
+        expect(payload?.contextLabel).toBe('タイムライン');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'board-main-timeline-open-details',
+            'board-main-timeline-toggle-complete',
+            'board-main-timeline-create-next',
+            'board-main-timeline-open-menu',
+        ]);
+    });
+
+    test('board main list card payload resolves', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'main-panel',
+            view: 'list',
+            part: 'card',
+            state: 'active',
+        });
+
+        expect(payload?.contextLabel).toBe('リスト');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'board-main-list-open-details',
+            'board-main-list-toggle-complete',
+        ]);
+    });
+
+    test('modal title payload resolves', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'modal',
+            region: 'modal-title',
+            part: 'title',
+            legacyContext: 'cardmodal-title',
+            state: 'active',
+        });
+
+        expect(payload?.contextLabel).toBe('カードタイトル');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'modal-title-focus-body-column',
+            'modal-title-focus-body-start',
+            'modal-title-undo',
+        ]);
+    });
+
+    test('modal body payload resolves', async () => {
+        const payload = resolveShortcutBarPayload({
+            scope: 'modal',
+            region: 'modal-body',
+            part: 'editor',
+            legacyContext: 'cardmodal-editor',
+            state: 'active',
+        });
+
+        expect(payload?.contextLabel).toBe('カード本文');
+        expect(payload?.items.map((item) => item.id)).toEqual([
+            'modal-body-focus-title-column',
+            'modal-body-focus-title-end',
+            'modal-body-undo',
+        ]);
+    });
+
+    test('ambiguous bucket-like descriptors resolve to null until section or view is provided', async () => {
+        const sidebarPayload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'sidebar',
+            part: 'card',
+            state: 'active',
+        });
+        const mainPanelPayload = resolveShortcutBarPayload({
+            scope: 'board',
+            region: 'main-panel',
+            part: 'card',
+            state: 'active',
+        });
+
+        expect(sidebarPayload).toBeNull();
+        expect(mainPanelPayload).toBeNull();
     });
 
     test('readonly payload resolves to null', async () => {
         const payload = resolveShortcutBarPayload({
             scope: 'modal',
-            region: 'cardmodal-editor',
+            region: 'modal-body',
+            part: 'editor',
+            legacyContext: 'cardmodal-editor',
             state: 'readonly',
         });
 

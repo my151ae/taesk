@@ -3140,7 +3140,7 @@ test.describe('@feature:timeline Timeline view', () => {
   });
 
 
-  test('prepends empty task item on Enter from title', async ({ page }) => {
+  test('does not change title-body boundary on Enter from title', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -3154,7 +3154,6 @@ test.describe('@feature:timeline Timeline view', () => {
     const isoDay = isoDateJst();
     const timestamp = new Date().toISOString();
 
-    // 先頭が taskList でない初期状態
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,
       title: 'Enter from title test',
@@ -3193,29 +3192,13 @@ test.describe('@feature:timeline Timeline view', () => {
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
       await expect(titleInput).toHaveValue('Enter from title test');
 
-      // 1. Enter を押下
       await titleInput.focus();
       await page.keyboard.press('Enter');
 
-      // 2. 本文先頭に空の taskItem が挿入され、フォーカスが移動していることを確認
-      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
-      await expect(firstChecklistLine).toBeVisible();
-      
-      // 書き込めるか確認（フォーカスが移動していることの証明）
-      await page.keyboard.type('New item 1');
-      await expect(firstChecklistLine).toHaveText('New item 1');
-      await expect(titleInput).toHaveValue('Enter from title test'); // タイトルは不変
-
-      // 3. 再びタイトルから Enter
-      await titleInput.focus();
-      await page.keyboard.press('Enter');
-      
-      // 二重 taskList にならず、既存リストの先頭に追加されることを確認
-      const secondChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:nth-child(2) p').first();
-      await expect(secondChecklistLine).toHaveText('New item 1');
-      const newFirstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
-      await page.keyboard.type('New item 2');
-      await expect(newFirstChecklistLine).toHaveText('New item 2');
+      await expect(titleInput).toBeFocused();
+      await expect(titleInput).toHaveValue('Enter from title test');
+      await expect(modal.locator('.ProseMirror > ul[data-type="taskList"]')).toHaveCount(0);
+      await expect(modal.locator('div.tiptap.ProseMirror.prose.prose-slate').first()).toContainText('existing body text');
 
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
@@ -3382,14 +3365,14 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(boardContext.canonicalPath);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
-      const eventCard = page.locator(`[data-card-id="${cardId}"][data-shortcut-region="timeline-card"]`).first();
+      const eventCard = page.locator(`[data-card-id="${cardId}"][data-shortcut-context="timeline-card"]`).first();
       await expect(eventCard).toBeVisible();
 
       await eventCard.focus();
 
       const boardBar = page.getByTestId('board-shortcut-bar');
       await expect(boardBar).toBeVisible();
-      await expect(boardBar).toContainText('タイムラインカード');
+      await expect(boardBar).toContainText('タイムライン');
       await expect(boardBar).toContainText('詳細');
       await expect(boardBar).toContainText('完了');
 
@@ -3402,11 +3385,11 @@ test.describe('@feature:timeline Timeline view', () => {
       const modalBar = page.getByTestId('modal-shortcut-bar');
       await expect(modalBar).toBeVisible();
 
-      const titleInput = modal.locator('[data-shortcut-region="cardmodal-title"]').first();
+      const titleInput = modal.locator('[data-shortcut-context="cardmodal-title"]').first();
       await titleInput.focus();
       await expect(modalBar).toContainText('カードタイトル');
       await expect(modalBar).toContainText('本文へ');
-      await expect(modalBar).toContainText('空チェック追加');
+      await expect(modalBar).toContainText('元に戻す');
 
       await page.keyboard.press('ArrowDown');
       await expect(modalBar).toContainText('カード本文');

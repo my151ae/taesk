@@ -11,6 +11,10 @@ import type { JSONContent } from '@tiptap/react';
 import type { Checklist } from '@/lib/checklist';
 import { countCheckedLines, countNonEmptyLines } from '@/lib/checklist';
 import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
+import {
+    buildShortcutDataAttributes,
+    type ShortcutContextDescriptor,
+} from '@/app/(board)/_components/timeline/shortcut-bar-registry';
 
 export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-3';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
@@ -62,7 +66,7 @@ type TimelineCardProps = {
     titleClassName?: string;
     /** 左側のチェックボックス列を非表示にするか */
     hideLeftColumn?: boolean;
-    shortcutRegion?: "timeline-card" | "cardmodal-title" | "cardmodal-editor";
+    shortcutContext?: ShortcutContextDescriptor | null;
 };
 
 export function TimelineCard({
@@ -98,7 +102,7 @@ export function TimelineCard({
     cardId,
     titleClassName,
     hideLeftColumn = false,
-    shortcutRegion,
+    shortcutContext,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -166,6 +170,7 @@ export function TimelineCard({
             </span>
         );
     }, [rightMeta]);
+    const shortcutAttributes = shortcutContext ? buildShortcutDataAttributes(shortcutContext) : undefined;
 
     return (
         <div
@@ -182,7 +187,7 @@ export function TimelineCard({
             style={style}
             data-testid={dataTestId}
             data-card-id={cardId}
-            data-shortcut-region={shortcutRegion}
+            {...shortcutAttributes}
             tabIndex={tabIndex ?? 0}
             role={role}
             data-focus-group={focusGroup}
