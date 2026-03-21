@@ -30,13 +30,13 @@ export const SHORTCUT_REGION_ATTRIBUTE = "data-shortcut-region";
 
 const ACTIVE_ONLY = ({ state }: { state: ShortcutState }) => state === "active";
 
-const CONTEXT_LABELS: Record<ShortcutRegion, string> = {
+export const CONTEXT_LABELS: Record<ShortcutRegion, string> = {
   "timeline-card": "タイムラインカード",
   "cardmodal-title": "カードタイトル",
   "cardmodal-editor": "カード本文",
 };
 
-const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
+export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   {
     id: "timeline-open-details",
     scope: "board",
@@ -176,6 +176,30 @@ export function resolveShortcutBarPayload(input: {
     contextLabel: CONTEXT_LABELS[input.region],
     items,
   };
+}
+
+export function getShortcutContextLabel(region: ShortcutRegion): string {
+  return CONTEXT_LABELS[region];
+}
+
+export function getSortedShortcutDefinitions(): ShortcutDefinition[] {
+  return [...SHORTCUT_REGISTRY].sort((left, right) => {
+    if (left.scope !== right.scope) {
+      return left.scope.localeCompare(right.scope);
+    }
+    const leftRegion = left.regions.join(",");
+    const rightRegion = right.regions.join(",");
+    if (leftRegion !== rightRegion) {
+      return leftRegion.localeCompare(rightRegion);
+    }
+    if (left.priorityBand !== right.priorityBand) {
+      return left.priorityBand - right.priorityBand;
+    }
+    if (left.displayOrder !== right.displayOrder) {
+      return left.displayOrder - right.displayOrder;
+    }
+    return SHORTCUT_REGISTRY.indexOf(left) - SHORTCUT_REGISTRY.indexOf(right);
+  });
 }
 
 export function createEmptyShortcutBarPayload(scope: ShortcutScope): ShortcutBarPayload {

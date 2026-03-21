@@ -505,6 +505,17 @@ export default function TimelineHeader({
                 </div>
 
                 <div className="hidden items-center gap-2 md:flex">
+                <button
+                    type="button"
+                    onClick={onShortcutsClick}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5h10.5A2.25 2.25 0 0119.5 9.75v4.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 14.25v-4.5A2.25 2.25 0 016.75 7.5Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 10.5h.75m2.25 0h.75m2.25 0h.75m-6 2.25h6" />
+                    </svg>
+                    Shortcuts
+                </button>
                 {/* Profile Menu */}
                 <div ref={profileMenuRef} className="relative shrink-0">
                     <button
@@ -554,19 +565,6 @@ export default function TimelineHeader({
                                     </svg>
                                     Playground
                                 </Link>
-                                <button
-                                    onClick={() => {
-                                        onShortcutsClick();
-                                        setShowProfileMenu(false);
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5h10.5A2.25 2.25 0 0119.5 9.75v4.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 14.25v-4.5A2.25 2.25 0 016.75 7.5Z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 10.5h.75m2.25 0h.75m2.25 0h.75m-6 2.25h6" />
-                                    </svg>
-                                    Shortcuts
-                                </button>
                             </div>
 
                             <div className="border-t border-slate-100 p-1">

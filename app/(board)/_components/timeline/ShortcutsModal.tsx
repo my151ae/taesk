@@ -1,7 +1,12 @@
 "use client";
 
 import { clsx } from "clsx";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import {
+    getShortcutContextLabel,
+    getSortedShortcutDefinitions,
+    type ShortcutDefinition,
+} from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 
 type KeyIconProps = {
     children: React.ReactNode;
@@ -40,29 +45,22 @@ function ShortcutRow({ label, keys }: ShortcutRowProps) {
     );
 }
 
-type SectionProps = {
-    title: string;
-    children: React.ReactNode;
-};
-
-function Section({ title, children }: SectionProps) {
-    return (
-        <div className="flex flex-col gap-2">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2 mb-1">{title}</h2>
-            <div className="flex flex-col">
-                {children}
-            </div>
-        </div>
-    );
-}
-
 type ShortcutsModalProps = {
     isOpen: boolean;
     onClose: () => void;
 };
 
+function formatScope(scope: ShortcutDefinition["scope"]) {
+    return scope === "board" ? "Board" : "Modal";
+}
+
+function formatRegions(regions: ShortcutDefinition["regions"]) {
+    return regions.map((region) => getShortcutContextLabel(region)).join(" / ");
+}
+
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
     const modalRef = useRef<HTMLDivElement>(null);
+    const rows = useMemo(() => getSortedShortcutDefinitions(), []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,7 +95,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                 <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0">
                     <div className="flex flex-col">
                         <h1 className="text-xl font-bold text-slate-900 tracking-tight">Keyboard Shortcuts</h1>
-                        <p className="text-sm text-slate-500 font-medium">Power through your workflow</p>
+                        <p className="text-sm text-slate-500 font-medium">現在の registry に登録されている一覧</p>
                     </div>
 
                     <div className="hidden md:flex items-center gap-6">
@@ -129,37 +127,41 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                     </button>
                 </div>
 
-                {/* Scrollable Grid */}
-                <div className="p-8 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-10">
-                    <Section title="General Navigation">
-                        <ShortcutRow label="Move focus" keys={[<KeyIcon key="arrows" className="px-2">←↑↓→</KeyIcon>]} />
-                        <ShortcutRow label="Next item" keys={["Tab"]} />
-                        <ShortcutRow label="Previous item" keys={[<KeyIcon key="shift">⇧</KeyIcon>, "Tab"]} />
-                    </Section>
-
-                    <Section title="Card Actions">
-                        <ShortcutRow label="Open card details" keys={["Enter"]} />
-                        <ShortcutRow label="Toggle complete" keys={["Space"]} />
-                        <ShortcutRow label="Create next card" keys={[<KeyIcon key="shift">⇧</KeyIcon>, "Enter"]} />
-                    </Section>
-
-                    <Section title="Scheduling">
-                        <ShortcutRow label="Move 5m earlier" keys={[<KeyIcon key="opt">⌥</KeyIcon>, <KeyIcon key="up">↑</KeyIcon>]} />
-                        <ShortcutRow label="Move 5m later" keys={[<KeyIcon key="opt">⌥</KeyIcon>, <KeyIcon key="down">↓</KeyIcon>]} />
-                        <ShortcutRow label="Jump to Today" keys={["T"]} />
-                    </Section>
-
-                    <Section title="Views">
-                        <ShortcutRow label="Switch List/Timeline" keys={["L"]} />
-                        <ShortcutRow label="Prev day" keys={["["]} />
-                        <ShortcutRow label="Next day" keys={["]"]} />
-                    </Section>
-
-                    <Section title="Coming Soon...">
-                        <div className="h-full min-h-[100px] rounded-2xl border-2 border-dashed border-slate-100 flex items-center justify-center p-4">
-                            <span className="text-xs text-slate-300 font-bold uppercase tracking-widest text-center">More shortcuts soon</span>
+                <div className="overflow-y-auto p-6 md:p-8">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200">
+                        <div className="grid grid-cols-[110px_180px_minmax(220px,1fr)_90px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                            <span>Scope</span>
+                            <span>Context</span>
+                            <span>Shortcut</span>
+                            <span className="text-right">Priority</span>
                         </div>
-                    </Section>
+                        <div className="divide-y divide-slate-100">
+                            {rows.map((row) => (
+                                <div
+                                    key={row.id}
+                                    className="grid grid-cols-[110px_180px_minmax(220px,1fr)_90px] gap-4 px-5 py-3"
+                                >
+                                    <div className="flex items-center">
+                                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                                            {formatScope(row.scope)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center text-sm font-medium text-slate-700">
+                                        {formatRegions(row.regions)}
+                                    </div>
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                        <ShortcutRow
+                                            label={row.label}
+                                            keys={row.keys.map((key) => <KeyIcon key={`${row.id}-${key}`}>{key}</KeyIcon>)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-end text-sm font-semibold text-slate-500">
+                                        {row.priorityBand}.{row.displayOrder}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
