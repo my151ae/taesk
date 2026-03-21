@@ -553,8 +553,7 @@ export default function TiptapEditor({
             },
             handleKeyDown: (view, event) => {
                 if (event.key === 'Tab') {
-                    const handled = runListIndentCommand(editor, event.shiftKey ? 'outdent' : 'indent');
-                    if (!handled) return false;
+                    runListIndentCommand(editor, event.shiftKey ? 'outdent' : 'indent');
                     event.preventDefault();
                     event.stopPropagation();
                     return true;
