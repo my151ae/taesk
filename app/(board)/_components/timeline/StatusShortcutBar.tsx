@@ -15,9 +15,16 @@ type StatusShortcutBarProps = {
   dataTestId?: string;
 };
 
-function KeyChip({ label }: { label: string }) {
+function KeyChip({ label, disabled = false }: { label: string; disabled?: boolean }) {
   return (
-    <span className="inline-flex min-w-[24px] items-center justify-center rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px] font-bold leading-none text-slate-700 shadow-sm">
+    <span
+      className={clsx(
+        "inline-flex min-w-[24px] items-center justify-center rounded-md border px-1.5 py-1 text-[11px] font-bold leading-none shadow-sm",
+        disabled
+          ? "border-slate-200 bg-slate-50 text-slate-300 shadow-none"
+          : "border-slate-300 bg-white text-slate-700"
+      )}
+    >
       {label}
     </span>
   );
@@ -53,11 +60,13 @@ export function StatusShortcutBar({
                 {item.keys.map((key, index) => (
                   <div key={`${item.id}-${key}-${index}`} className="flex items-center gap-1">
                     {index > 0 ? <span className="text-[10px] text-slate-400">+</span> : null}
-                    <KeyChip label={key} />
+                    <KeyChip label={key} disabled={!item.enabled} />
                   </div>
                 ))}
               </div>
-              <span className="text-xs font-medium text-slate-700">{item.label}</span>
+              <span className={clsx("text-xs font-medium", item.enabled ? "text-slate-700" : "text-slate-300")}>
+                {item.label}
+              </span>
             </div>
           ))}
           {overflowCount > 0 ? (

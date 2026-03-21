@@ -137,4 +137,8 @@ CardModal の title/body 境界は focus-only とする。
 - registry は shortcut 表示定義の SSOT
 - `ShortcutsModal` は registry をそのまま表で表示する
 - status bar は同じ registry を current context でフィルタして使う
+- shortcut は「非表示」と「表示するが disabled」を分けて扱う
+  - 文脈が違う shortcut は出さない
+  - 文脈は合うが実行不能な shortcut は disabled 表示で残す
+- Tiptap 本文では runtime capability を使って `undo` / `redo` / `Tab` / `Shift+Tab` の enabled 状態を判定する
 - 旧 `timeline-card` / `cardmodal-title` / `cardmodal-editor` は移行用 alias として残してよいが、新規追加は descriptor ベースで行う

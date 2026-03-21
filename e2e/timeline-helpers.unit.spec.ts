@@ -298,12 +298,18 @@ test.describe('shortcut bar registry helpers', () => {
         ]);
     });
 
-    test('modal body payload resolves', async () => {
+    test('modal body payload resolves with capability-aware shortcuts', async () => {
         const payload = resolveShortcutBarPayload({
             scope: 'modal',
             region: 'modal-body',
             part: 'editor',
             legacyContext: 'cardmodal-editor',
+            capabilities: {
+                canUndo: true,
+                canRedo: true,
+                canIndent: true,
+                canOutdent: false,
+            },
             state: 'active',
         });
 
@@ -313,7 +319,18 @@ test.describe('shortcut bar registry helpers', () => {
             'modal-body-focus-title-end',
             'modal-body-undo',
             'modal-body-redo',
+            'modal-body-indent',
+            'modal-body-outdent',
             'modal-body-close',
+        ]);
+        expect(payload?.items.map((item) => item.enabled)).toEqual([
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            true,
         ]);
     });
 

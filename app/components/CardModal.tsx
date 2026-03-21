@@ -3,7 +3,11 @@
 import { useEffect, useRef, useCallback, useMemo, useLayoutEffect, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
-import TiptapEditor, { BodyEditorBridge, FocusTitleRequest } from "@/app/(board)/_components/tiptap/TiptapEditor";
+import TiptapEditor, {
+    BodyEditorBridge,
+    BodyEditorShortcutState,
+    FocusTitleRequest,
+} from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
@@ -121,6 +125,12 @@ export function CardModal({
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
     const [activeShortcutDescriptor, setActiveShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
+    const [bodyShortcutState, setBodyShortcutState] = useState<BodyEditorShortcutState>({
+        canUndo: false,
+        canRedo: false,
+        canIndent: false,
+        canOutdent: false,
+    });
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -294,9 +304,10 @@ export function CardModal({
         }
         return resolveShortcutBarPayload({
             ...activeShortcutDescriptor,
+            capabilities: activeShortcutDescriptor.part === "editor" ? bodyShortcutState : null,
             state: "active",
         }) ?? createEmptyShortcutBarPayload("modal");
-    }, [activeShortcutDescriptor, isHistoryPreviewing, isLoading]);
+    }, [activeShortcutDescriptor, bodyShortcutState, isHistoryPreviewing, isLoading]);
 
     const {
         memberButtonRef,
@@ -828,6 +839,7 @@ export function CardModal({
                                                     onEditorError={setEditorError}
                                                     onRegisterBodyBridge={handleRegisterBodyBridge}
                                                     onRequestFocusTitle={handleRequestFocusTitle}
+                                                    onShortcutStateChange={setBodyShortcutState}
                                                     onChange={(val) => {
                                                         if (isHistoryPreviewing) return;
                                                         setContent(val);

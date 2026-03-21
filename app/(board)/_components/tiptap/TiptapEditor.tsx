@@ -54,6 +54,13 @@ export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
 };
 
+export type BodyEditorShortcutState = {
+    canUndo: boolean;
+    canRedo: boolean;
+    canIndent: boolean;
+    canOutdent: boolean;
+};
+
 type RenderableBlockActionTarget = {
     pos: number;
     blockPos: number;
@@ -73,6 +80,7 @@ type TiptapEditorProps = {
     onRegisterPrependTaskHandler?: ((handler: (() => void) | null) => void);
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
+    onShortcutStateChange?: (state: BodyEditorShortcutState) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
@@ -89,6 +97,7 @@ export default function TiptapEditor({
     onRegisterPrependTaskHandler,
     onRegisterBodyBridge,
     onRequestFocusTitle,
+    onShortcutStateChange,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -198,6 +207,54 @@ export default function TiptapEditor({
         const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
         dispatch(tr);
     }, []);
+
+    const runListIndentCommand = useCallback((currentEditor: Editor | null, direction: 'indent' | 'outdent'): boolean => {
+        if (!currentEditor) return false;
+        const itemTypes = ['taskItem', 'listItem'] as const;
+
+        for (const itemType of itemTypes) {
+            const command =
+                direction === 'indent'
+                    ? currentEditor.chain().focus().sinkListItem(itemType).run()
+                    : currentEditor.chain().focus().liftListItem(itemType).run();
+            if (command) {
+                return true;
+            }
+        }
+
+        return false;
+    }, []);
+
+    const canRunListIndentCommand = useCallback((currentEditor: Editor | null, direction: 'indent' | 'outdent'): boolean => {
+        if (!currentEditor) return false;
+        const itemTypes = ['taskItem', 'listItem'] as const;
+
+        return itemTypes.some((itemType) =>
+            direction === 'indent'
+                ? currentEditor.can().chain().focus().sinkListItem(itemType).run()
+                : currentEditor.can().chain().focus().liftListItem(itemType).run()
+        );
+    }, []);
+
+    const emitShortcutState = useCallback((currentEditor: Editor | null) => {
+        if (!onShortcutStateChange) return;
+        if (!currentEditor || !editable) {
+            onShortcutStateChange({
+                canUndo: false,
+                canRedo: false,
+                canIndent: false,
+                canOutdent: false,
+            });
+            return;
+        }
+
+        onShortcutStateChange({
+            canUndo: currentEditor.can().chain().focus().undo().run(),
+            canRedo: currentEditor.can().chain().focus().redo().run(),
+            canIndent: canRunListIndentCommand(currentEditor, 'indent'),
+            canOutdent: canRunListIndentCommand(currentEditor, 'outdent'),
+        });
+    }, [canRunListIndentCommand, editable, onShortcutStateChange]);
 
     const resolveBlockTargetAtPos = useCallback((state: EditorState, pos: number): ResolvedBlockTarget | null => {
         const clampedPos = Math.max(0, Math.min(pos, state.doc.content.size));
@@ -495,6 +552,14 @@ export default function TiptapEditor({
                 ...(dataAutofocus ? { 'data-autofocus': 'true' } : {}),
             },
             handleKeyDown: (view, event) => {
+                if (event.key === 'Tab') {
+                    const handled = runListIndentCommand(editor, event.shiftKey ? 'outdent' : 'indent');
+                    if (!handled) return false;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return true;
+                }
+
                 if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft') return false;
                 if (!event.isTrusted || event.isComposing) return false;
 
@@ -562,19 +627,23 @@ export default function TiptapEditor({
         },
         onUpdate: ({ editor }) => {
             emitDocChange(editor, editor.state.doc);
+            emitShortcutState(editor);
             invalidateLayout();
         },
         onTransaction: ({ editor, transaction }) => {
             if (!transaction.docChanged) return;
             emitDocChange(editor, editor.state.doc);
+            emitShortcutState(editor);
             invalidateLayout();
         },
         onSelectionUpdate: ({ editor }) => {
+            emitShortcutState(editor);
             invalidateLayout();
         },
         autofocus: 'start',
         onCreate: ({ editor }) => {
             lastAppliedDocRef.current = editor.state.doc;
+            emitShortcutState(editor);
             invalidateLayout();
         },
     });
@@ -703,6 +772,10 @@ export default function TiptapEditor({
     }, [closeBlockMenu, editor, resolveBlockTargetAtPos, unsetActiveDetails]);
 
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
+
+    useEffect(() => {
+        emitShortcutState(editor);
+    }, [editor, emitShortcutState]);
 
     useEffect(() => {
         if (!onRegisterFocusBodyHandler) return;

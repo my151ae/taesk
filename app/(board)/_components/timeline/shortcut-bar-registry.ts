@@ -7,6 +7,12 @@ export type ShortcutView = "timeline" | "list";
 export type ShortcutPart = "card" | "checkbox" | "title" | "editor";
 export type ShortcutState = "active" | "editing" | "readonly" | "dragging" | "menu-open";
 export type LegacyShortcutContext = "timeline-card" | "cardmodal-title" | "cardmodal-editor";
+export type ShortcutCapabilities = {
+  canUndo?: boolean | null;
+  canRedo?: boolean | null;
+  canIndent?: boolean | null;
+  canOutdent?: boolean | null;
+};
 
 export type ShortcutContextDescriptor = {
   scope?: ShortcutScope;
@@ -16,6 +22,7 @@ export type ShortcutContextDescriptor = {
   part?: ShortcutPart | null;
   state?: ShortcutState;
   legacyContext?: LegacyShortcutContext | null;
+  capabilities?: ShortcutCapabilities | null;
 };
 
 export type ShortcutDefinition = {
@@ -31,6 +38,11 @@ export type ShortcutDefinition = {
   priorityBand: number;
   displayOrder: number;
   visibleWhen?: (input: { state: ShortcutState; descriptor: ShortcutContextDescriptor }) => boolean;
+  enabledWhen?: (input: { state: ShortcutState; descriptor: ShortcutContextDescriptor }) => boolean;
+};
+
+export type ShortcutBarItem = ShortcutDefinition & {
+  enabled: boolean;
 };
 
 export type ShortcutBarPayload = {
@@ -40,7 +52,7 @@ export type ShortcutBarPayload = {
   view: ShortcutView | null;
   part: ShortcutPart | null;
   contextLabel: string | null;
-  items: ShortcutDefinition[];
+  items: ShortcutBarItem[];
 };
 
 export type ShortcutBarConfig = {
@@ -55,6 +67,10 @@ export const SHORTCUT_PART_ATTRIBUTE = "data-shortcut-part";
 export const SHORTCUT_LEGACY_CONTEXT_ATTRIBUTE = "data-shortcut-context";
 
 const ACTIVE_ONLY = ({ state }: { state: ShortcutState }) => state === "active";
+const CAN_UNDO = ({ descriptor }: { descriptor: ShortcutContextDescriptor }) => Boolean(descriptor.capabilities?.canUndo);
+const CAN_REDO = ({ descriptor }: { descriptor: ShortcutContextDescriptor }) => Boolean(descriptor.capabilities?.canRedo);
+const CAN_INDENT = ({ descriptor }: { descriptor: ShortcutContextDescriptor }) => Boolean(descriptor.capabilities?.canIndent);
+const CAN_OUTDENT = ({ descriptor }: { descriptor: ShortcutContextDescriptor }) => Boolean(descriptor.capabilities?.canOutdent);
 
 const SCOPE_ORDER: Record<ShortcutScope, number> = {
   board: 1,
@@ -348,6 +364,7 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     priorityBand: 2,
     displayOrder: 30,
     visibleWhen: ACTIVE_ONLY,
+    enabledWhen: CAN_UNDO,
   },
   {
     id: "modal-body-redo",
@@ -360,6 +377,33 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     priorityBand: 2,
     displayOrder: 40,
     visibleWhen: ACTIVE_ONLY,
+    enabledWhen: CAN_REDO,
+  },
+  {
+    id: "modal-body-indent",
+    scope: "modal",
+    regions: ["modal-body"],
+    parts: ["editor"],
+    legacyContexts: ["cardmodal-editor"],
+    keys: ["Tab"],
+    label: "インデント",
+    priorityBand: 2,
+    displayOrder: 50,
+    visibleWhen: ACTIVE_ONLY,
+    enabledWhen: CAN_INDENT,
+  },
+  {
+    id: "modal-body-outdent",
+    scope: "modal",
+    regions: ["modal-body"],
+    parts: ["editor"],
+    legacyContexts: ["cardmodal-editor"],
+    keys: ["⇧", "Tab"],
+    label: "アウトデント",
+    priorityBand: 2,
+    displayOrder: 60,
+    visibleWhen: ACTIVE_ONLY,
+    enabledWhen: CAN_OUTDENT,
   },
   {
     id: "modal-body-close",
@@ -370,7 +414,7 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     keys: ["Esc"],
     label: "閉じる",
     priorityBand: 2,
-    displayOrder: 50,
+    displayOrder: 70,
     visibleWhen: ACTIVE_ONLY,
   },
   {
@@ -389,7 +433,13 @@ export function resolveShortcutBarPayload(input: ShortcutContextDescriptor): Sho
   const descriptor = normalizeShortcutDescriptor(input);
   if (!descriptor.scope || !descriptor.region) return null;
 
-  const items = SHORTCUT_REGISTRY.filter((shortcut) => matchesShortcutDefinition(shortcut, descriptor)).sort(compareShortcutDefinitions);
+  const items = SHORTCUT_REGISTRY
+    .filter((shortcut) => matchesShortcutDefinition(shortcut, descriptor))
+    .sort(compareShortcutDefinitions)
+    .map((shortcut) => ({
+      ...shortcut,
+      enabled: shortcut.enabledWhen ? shortcut.enabledWhen({ state: descriptor.state ?? "active", descriptor }) : true,
+    }));
   if (items.length === 0) return null;
 
   return {
@@ -413,6 +463,7 @@ export function normalizeShortcutDescriptor(input: ShortcutContextDescriptor | n
       part: null,
       state: "active",
       legacyContext: null,
+      capabilities: null,
     };
   }
 
@@ -425,6 +476,7 @@ export function normalizeShortcutDescriptor(input: ShortcutContextDescriptor | n
     part: input.part ?? aliasDescriptor?.part ?? null,
     state: input.state ?? "active",
     legacyContext: input.legacyContext ?? aliasDescriptor?.legacyContext ?? null,
+    capabilities: input.capabilities ?? null,
   };
 }
 
