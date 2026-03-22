@@ -94,6 +94,12 @@ export const TimelineBucketCard = ({
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
                     paddingClass="py-1"
                     className="min-h-0"
+                    shortcutContext={{
+                        scope: 'board',
+                        region: 'main-panel',
+                        view: 'timeline',
+                        part: 'card',
+                    }}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     focusGroup="bucket"
                     onCreateNext={() => onCreateBucketCard?.(bucketKey, item.card_id)}

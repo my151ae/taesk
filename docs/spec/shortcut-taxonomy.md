@@ -90,6 +90,8 @@ MVP では主に `active` と `readonly` を使う。
 - `view=timeline`
 - `part=card`
 
+時間付き Timeline event と A/B bucket card は、shortcut 上は同じ `view=timeline, part=card` を共有する。両者で shortcut セットを分ける必要が出た場合だけ、別軸の追加を検討する。
+
 ### Main panel の list card
 
 - `scope=board`
