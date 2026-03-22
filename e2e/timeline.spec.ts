@@ -1156,22 +1156,59 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.getByRole('button', { name: 'Timeline' }).click();
 
       const activeACard = page.getByTestId(`ab-card-${activeACardId}`).first();
-      const activeBCard = page.getByTestId(`ab-card-${activeBCardId}`).first();
-
       await expect(activeACard).toBeVisible({ timeout: 20_000 });
-      await expect(activeBCard).toBeVisible({ timeout: 20_000 });
-      const dayBucket = page.locator('[data-ab-day]').first();
-      const completedToggle = dayBucket.locator('[data-testid^="completed-toggle-"]').first();
-      const completedCount = dayBucket.locator('[data-testid^="completed-count-"]').first();
+      const toggleA = page.getByTestId(`bucket-toggle-a-${todayIso}`).first();
+      const toggleB = page.getByTestId(`bucket-toggle-b-${todayIso}`).first();
+      const completedToggle = page.getByTestId(`bucket-toggle-completed-${todayIso}`).first();
+      const countA = page.getByTestId(`bucket-count-a-${todayIso}`).first();
+      const countB = page.getByTestId(`bucket-count-b-${todayIso}`).first();
+      const completedCount = page.getByTestId(`bucket-count-completed-${todayIso}`).first();
+      const previewB = page.getByTestId(`bucket-preview-b-${todayIso}`).first();
+      const previewCompleted = page.getByTestId(`bucket-preview-completed-${todayIso}`).first();
+      const sectionB = page.getByTestId(`bucket-section-b-${todayIso}`).first();
+      const sectionCompleted = page.getByTestId(`bucket-section-completed-${todayIso}`).first();
+
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(countA).toHaveText('1');
+      await expect(countB).toHaveText('1');
       await expect(completedCount).toHaveText('1');
+      await expect(previewB).toContainText('Completed flow active B');
+      await expect(previewCompleted).toContainText('Completed flow done B');
+      await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
+      await expect(sectionCompleted.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
+
+      const previewBCard = previewB.locator(`[data-card-id="${activeBCardId}"]`);
+      await previewBCard.click();
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 500 });
+      await previewBCard.click();
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
+
+      await toggleB.click();
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible();
+      await expect(page.getByTestId(`bucket-preview-a-${todayIso}`).first()).toContainText('Completed flow active A');
+      await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(1);
+
+      await toggleB.click();
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
 
       await completedToggle.click();
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
-
       const completedBCard = page.getByTestId(`completed-card-${completedBCardId}`).first();
       await expect(completedBCard).toBeVisible();
       await expect(page.getByTestId(`completed-badge-${completedBCardId}`)).toHaveText('B');
+      await expect(page.getByTestId(`bucket-preview-a-${todayIso}`).first()).toContainText('Completed flow active A');
+      await expect(page.getByTestId(`bucket-preview-b-${todayIso}`).first()).toContainText('Completed flow active B');
 
       const completedBFocusable = page.locator(`[data-testid="completed-card-${completedBCardId}"] [data-card-id="${completedBCardId}"]`);
       await completedBFocusable.focus();
@@ -1181,11 +1218,18 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByRole('menu', { name: 'カード操作メニュー' })).toBeHidden();
 
       await completedToggle.click();
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
 
       await activeACard.locator('[role="checkbox"]').click();
       await expect(activeACard).toBeHidden({ timeout: 20_000 });
+      await expect(countA).toHaveText('0');
       await expect(completedCount).toHaveText('2');
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggleB).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeVisible();
+      await expect(page.getByTestId(`completed-badge-${activeACardId}`)).toHaveText('A');
 
       await completedToggle.click();
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
@@ -1200,10 +1244,102 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.keyboard.press('Space');
 
       await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeHidden({ timeout: 20_000 });
-      await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible({ timeout: 20_000 });
       await expect(completedCount).toHaveText('1');
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
+
+      await completedToggle.click();
+      await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [activeACardId, activeBCardId, completedBCardId]);
+    }
+  });
+
+  test('promotes the first non-empty bucket section when A is empty', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const bOnlyIso = shiftIsoDateJst(1);
+    const bOnlyCardId = crypto.randomUUID();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: bOnlyCardId,
+      title: 'Accordion default B only',
+      checklist: { version: 1, lines: [] },
+      excerpt: 'b only card for accordion default state',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 2600,
+      tags: ['accordion-default'],
+      due_date: bOnlyIso,
+      due_start: null,
+      due_end: null,
+      due_bucket: 'b',
+      due_bucket_position: 2600,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      id_short: Math.floor(Math.random() * 100000) + 1250,
+      slug: 'accordion-default-b-only',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const initialSearchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await initialSearchToggle.getAttribute('aria-expanded')) === 'true') {
+        await initialSearchToggle.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const bOnlyToggleA = page.getByTestId(`bucket-toggle-a-${bOnlyIso}`).first();
+      const bOnlyToggleB = page.getByTestId(`bucket-toggle-b-${bOnlyIso}`).first();
+      const bOnlyToggleCompleted = page.getByTestId(`bucket-toggle-completed-${bOnlyIso}`).first();
+      await expect(bOnlyToggleA).toHaveAttribute('aria-expanded', 'false');
+      await expect(bOnlyToggleB).toHaveAttribute('aria-expanded', 'true');
+      await expect(bOnlyToggleCompleted).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId(`bucket-count-a-${bOnlyIso}`)).toHaveText('0');
+      await expect(page.getByTestId(`bucket-count-b-${bOnlyIso}`)).toHaveText('1');
+      await expect(page.getByTestId(`ab-card-${bOnlyCardId}`).first()).toBeVisible({ timeout: 20_000 });
+
+      const { error: updateError } = await supabaseAdmin
+        .from('cards')
+        .update({ checked: true, updated_at: new Date().toISOString() })
+        .eq('id', bOnlyCardId);
+      expect(updateError).toBeNull();
+
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const searchToggleAfterReload = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await searchToggleAfterReload.getAttribute('aria-expanded')) === 'true') {
+        await searchToggleAfterReload.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const completedOnlyToggleA = page.getByTestId(`bucket-toggle-a-${bOnlyIso}`).first();
+      const completedOnlyToggleB = page.getByTestId(`bucket-toggle-b-${bOnlyIso}`).first();
+      const completedOnlyToggleCompleted = page.getByTestId(`bucket-toggle-completed-${bOnlyIso}`).first();
+      await expect(completedOnlyToggleA).toHaveAttribute('aria-expanded', 'false');
+      await expect(completedOnlyToggleB).toHaveAttribute('aria-expanded', 'false');
+      await expect(completedOnlyToggleCompleted).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`bucket-count-completed-${bOnlyIso}`)).toHaveText('1');
+      await expect(page.getByTestId(`completed-card-${bOnlyCardId}`)).toBeVisible({ timeout: 20_000 });
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [bOnlyCardId]);
     }
   });
 
