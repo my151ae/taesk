@@ -156,6 +156,10 @@ export default function TimelineBoardScreen({
       state: "active",
     }) ?? createEmptyShortcutBarPayload("board");
   }, [desktopShortcutDescriptor, modalProps]);
+  const activeTabClassName =
+    "rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
+  const inactiveTabClassName =
+    "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50";
 
   if (!parseResult.ok) {
     return (
@@ -242,11 +246,7 @@ export default function TimelineBoardScreen({
                               key={item.key}
                               type="button"
                               onClick={() => desktop.onTabChange(item.key)}
-                              className={
-                                isActive
-                                  ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                                  : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                              }
+                              className={isActive ? activeTabClassName : inactiveTabClassName}
                               aria-current={isActive ? "page" : undefined}
                             >
                               {item.label}
@@ -304,11 +304,7 @@ export default function TimelineBoardScreen({
                             key={item.key}
                             type="button"
                             onClick={() => desktop.onTabChange(item.key)}
-                            className={
-                              isActive
-                                ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-sm"
-                                : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            }
+                            className={isActive ? activeTabClassName : inactiveTabClassName}
                             aria-current={isActive ? "page" : undefined}
                           >
                             {item.label}

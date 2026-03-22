@@ -72,7 +72,7 @@ function OverdueCardRow({
           onOpen={() => openCardModal(item.short_id, "overdue")}
           openButtonTestId={`cardOpenButton-overdue-${item.card_id}`}
           paddingClass="py-1"
-          className="min-h-0 border-slate-200 bg-amber-50/80"
+          className="min-h-0 border-rose-200 bg-rose-50/80"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"
         />
@@ -101,18 +101,18 @@ export function OverduePanel({
   return (
     <section
       className={clsx(
-        "flex min-h-0 min-w-0 flex-col border border-amber-200 bg-amber-50/60",
+        "flex min-h-0 min-w-0 flex-col border border-rose-200 bg-rose-50/60",
         variant === "desktop" ? "h-full" : "",
         className
       )}
     >
       {!hideHeader ? (
-        <div className="flex items-center justify-between border-b border-amber-200 px-3 py-2">
+        <div className="flex items-center justify-between border-b border-rose-200 px-3 py-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Overdue</p>
-            <p className="text-[10px] text-amber-700/80">Past due and incomplete</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-800">Overdue</p>
+            <p className="text-[10px] text-rose-700/80">Past due and incomplete</p>
           </div>
-          <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm">
+          <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-rose-800 shadow-sm ring-1 ring-rose-200">
             {countLabel}
           </span>
         </div>
@@ -120,14 +120,14 @@ export function OverduePanel({
 
       <div
         className={clsx(
-          "min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-2 pt-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-amber-200",
+          "min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-2 pt-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-rose-200",
           contentClassName
         )}
       >
         {items.length === 0 ? (
           <p
             className={clsx(
-              "rounded-md border border-dashed border-amber-200 bg-white/70 text-amber-700/80",
+              "rounded-md border border-dashed border-rose-200 bg-white/70 text-rose-700/80",
               compactEmptyState ? "px-3 py-2 text-[10px]" : "px-3 py-4 text-[11px]"
             )}
           >

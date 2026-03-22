@@ -104,6 +104,8 @@ export function DesktopTimelineToolbar({
 }: DesktopTimelineToolbarProps) {
   const buttonClassName =
     "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
+  const todayButtonClassName =
+    "rounded-full border border-sky-300 bg-sky-200 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
     <div className="border-b border-slate-100 bg-white px-3 py-2">
@@ -114,7 +116,7 @@ export function DesktopTimelineToolbar({
         <button type="button" onClick={onPrevDay} disabled={status === "loading"} className={buttonClassName}>
           {"<1"}
         </button>
-        <button type="button" onClick={onToday} disabled={status === "loading"} className={buttonClassName}>
+        <button type="button" onClick={onToday} disabled={status === "loading"} className={todayButtonClassName}>
           Today
         </button>
         <button type="button" onClick={onNextDay} disabled={status === "loading"} className={buttonClassName}>
@@ -343,7 +345,7 @@ export function DesktopTimelineView({
                           className={clsx(
                             "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5",
                             isToday
-                              ? "bg-sky-600 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                              ? "bg-sky-200 text-sky-800 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.7)]"
                               : "text-slate-800"
                           )}
                         >

@@ -92,7 +92,7 @@ export default function TimelineHeader({
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
-    const todayButtonClassName = "rounded-full bg-sky-600 px-2.5 py-1 text-xs font-medium text-white shadow-sm ring-1 ring-sky-600 hover:bg-sky-700 shrink-0";
+    const todayButtonClassName = "shrink-0 rounded-full bg-sky-200 px-2.5 py-1 text-xs font-medium text-sky-800 shadow-sm ring-1 ring-sky-300 hover:bg-sky-300";
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();

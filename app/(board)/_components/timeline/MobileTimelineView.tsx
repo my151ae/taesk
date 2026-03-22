@@ -317,7 +317,7 @@ function MobileOverdueSection({
   const nextLabel = nextOrder === "oldest" ? "古い順" : "新しい順";
 
   return (
-    <div className="border-b border-amber-100 bg-amber-50/40 px-3 py-2">
+    <div className="border-b border-rose-100 bg-rose-50/40 px-3 py-2">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -325,21 +325,21 @@ function MobileOverdueSection({
           aria-controls="mobile-overdue-sheet"
           data-testid="mobile-overdue-toggle"
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center justify-between rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-amber-100/70"
+          className="flex min-w-0 flex-1 items-center justify-between rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-rose-100/70"
         >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-900">
               Overdue
             </span>
             <span
-              className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm"
+              className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-rose-800 shadow-sm ring-1 ring-rose-200"
               data-testid="mobile-overdue-count"
             >
               {items.length}
             </span>
           </div>
           <span
-            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-amber-200 bg-white/90 text-amber-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-rose-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
             aria-hidden="true"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -355,7 +355,7 @@ function MobileOverdueSection({
           onClick={() => onOverdueSortOrderChange(nextOrder)}
           aria-label={`Overdue の並び順を${nextLabel}に切り替え`}
           title={`現在: ${currentLabel}`}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-white/90 px-2.5 py-2 text-[10px] font-semibold text-amber-800 shadow-sm transition-colors hover:bg-white"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-white/90 px-2.5 py-2 text-[10px] font-semibold text-rose-800 shadow-sm transition-colors hover:bg-white"
         >
           <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d={overdueSortOrder === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"} />

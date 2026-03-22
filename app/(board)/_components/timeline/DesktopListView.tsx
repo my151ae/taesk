@@ -54,6 +54,9 @@ export function DesktopListToolbar({
   showGoogle,
   onShowGoogleChange,
 }: DesktopListToolbarProps) {
+  const todayButtonClassName =
+    "h-8 rounded-full border border-sky-300 bg-sky-200 px-2 text-xs font-medium text-sky-800 hover:bg-sky-300";
+
   return (
     <div className="border-b border-slate-100 bg-white px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -73,7 +76,7 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onToday?.()}
-          className="h-8 rounded-full border border-slate-200 px-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className={todayButtonClassName}
           aria-label="Today"
         >
           Today
@@ -235,6 +238,7 @@ export function DesktopListView({
               ...bucketA.map((i) => ({ ...i, bkey: "a" as const })),
               ...bucketB.map((i) => ({ ...i, bkey: "b" as const })),
             ].filter((item) => (item.checked ? showChecked : showUnchecked));
+            const isToday = day.label.startsWith("Today");
 
             return (
               <div key={day.isoDate} className="flex gap-6 group">
@@ -242,8 +246,8 @@ export function DesktopListView({
                   <div className="sticky top-6">
                     <div
                       className={clsx(
-                        "text-2xl font-bold transition-colors",
-                        day.label === "Today" ? "text-sky-600" : "text-slate-900"
+                        "inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-3 py-1 text-2xl font-bold transition-colors",
+                        isToday ? "bg-sky-200 text-sky-800 ring-1 ring-sky-300" : "text-slate-900"
                       )}
                     >
                       {day.isoDate.split("-")[2]}

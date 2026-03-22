@@ -128,10 +128,10 @@ function SidebarRailButton({
   const isDanger = tone === "danger";
   const badgeClassName = isDanger
     ? count > 0
-      ? "bg-rose-600 text-white"
-      : "bg-rose-100 text-rose-600"
+      ? "bg-rose-200 text-rose-800"
+      : "bg-rose-100 text-rose-700"
     : count > 0
-      ? "bg-slate-700 text-white"
+      ? "bg-slate-200 text-slate-800"
       : "bg-slate-200 text-slate-500";
 
   return (
@@ -147,8 +147,8 @@ function SidebarRailButton({
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
         expanded
           ? isDanger
-            ? "border-rose-200 bg-white text-rose-700 shadow-[0_10px_24px_-18px_rgba(225,29,72,0.9)] focus-visible:outline-rose-500"
-            : "border-sky-200 bg-white text-sky-700 shadow-[0_10px_24px_-18px_rgba(14,165,233,0.9)] focus-visible:outline-sky-500"
+            ? "border-rose-200 bg-white text-rose-700 shadow-[0_10px_24px_-18px_rgba(251,113,133,0.7)] focus-visible:outline-rose-400"
+            : "border-slate-300 bg-white text-slate-700 shadow-[0_10px_24px_-18px_rgba(100,116,139,0.45)] focus-visible:outline-slate-400"
           : "border-transparent bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-800 focus-visible:outline-slate-400"
       )}
     >
@@ -156,7 +156,7 @@ function SidebarRailButton({
         aria-hidden="true"
         className={clsx(
           "absolute left-[-5px] top-1/2 h-4 w-1 -translate-y-1/2 rounded-full transition-opacity duration-150",
-          expanded ? (isDanger ? "bg-rose-500 opacity-100" : "bg-sky-500 opacity-100") : "opacity-0"
+          expanded ? (isDanger ? "bg-rose-300 opacity-100" : "bg-slate-300 opacity-100") : "opacity-0"
         )}
       />
       <span className="relative inline-flex items-center justify-center">
@@ -308,7 +308,7 @@ export function DesktopSidebarMenu({
           ) : null}
           {section.items.length === 0 ? (
             <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-rose-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+              <p className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/70 px-3 py-3 text-[11px] text-rose-700/80">
                 未完了の期限超過カードはありません
               </p>
             </div>
@@ -436,7 +436,7 @@ export function DesktopSidebarMenu({
                   <span
                     className={clsx(
                       "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
-                      isDanger ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"
+                      isDanger ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
                     )}
                   >
                     {section.count}
