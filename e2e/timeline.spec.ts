@@ -1047,6 +1047,166 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('renders completed bucket cards separately and preserves keyboard interactions', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const todayIso = isoDateJst();
+    const activeACardId = crypto.randomUUID();
+    const activeBCardId = crypto.randomUUID();
+    const completedBCardId = crypto.randomUUID();
+    const activeAShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const activeBShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const completedBShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: activeACardId,
+        title: 'Completed flow active A',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'active a card for completed flow',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2100,
+        tags: ['completed-flow'],
+        due_date: todayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        due_bucket_position: 2500,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: activeAShortId,
+        id_short: Math.floor(Math.random() * 100000) + 1200,
+        slug: 'completed-flow-active-a',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: activeBCardId,
+        title: 'Completed flow active B',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'active b card for completed flow',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2200,
+        tags: ['completed-flow'],
+        due_date: todayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        due_bucket_position: 3000,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: activeBShortId,
+        id_short: Math.floor(Math.random() * 100000) + 1201,
+        slug: 'completed-flow-active-b',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: completedBCardId,
+        title: 'Completed flow done B',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'completed b card for completed flow',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2300,
+        tags: ['completed-flow'],
+        due_date: todayIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        due_bucket_position: 1000,
+        checked: true,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: completedBShortId,
+        id_short: Math.floor(Math.random() * 100000) + 1202,
+        slug: 'completed-flow-done-b',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const initialSearchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await initialSearchToggle.getAttribute('aria-expanded')) === 'true') {
+        await initialSearchToggle.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const activeACard = page.getByTestId(`ab-card-${activeACardId}`).first();
+      const activeBCard = page.getByTestId(`ab-card-${activeBCardId}`).first();
+
+      await expect(activeACard).toBeVisible({ timeout: 20_000 });
+      await expect(activeBCard).toBeVisible({ timeout: 20_000 });
+      const dayBucket = page.locator('[data-ab-day]').first();
+      const completedToggle = dayBucket.locator('[data-testid^="completed-toggle-"]').first();
+      const completedCount = dayBucket.locator('[data-testid^="completed-count-"]').first();
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(completedCount).toHaveText('1');
+
+      await completedToggle.click();
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
+
+      const completedBCard = page.getByTestId(`completed-card-${completedBCardId}`).first();
+      await expect(completedBCard).toBeVisible();
+      await expect(page.getByTestId(`completed-badge-${completedBCardId}`)).toHaveText('B');
+
+      const completedBFocusable = page.locator(`[data-testid="completed-card-${completedBCardId}"] [data-card-id="${completedBCardId}"]`);
+      await completedBFocusable.focus();
+      await page.keyboard.press('Delete');
+      await expect(page.getByRole('menu', { name: 'カード操作メニュー' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('menu', { name: 'カード操作メニュー' })).toBeHidden();
+
+      await completedToggle.click();
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
+
+      await activeACard.locator('[role="checkbox"]').click();
+      await expect(activeACard).toBeHidden({ timeout: 20_000 });
+      await expect(completedCount).toHaveText('2');
+
+      await completedToggle.click();
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeVisible();
+
+      const completedBadges = page.locator(`[data-testid^="completed-badge-"]`);
+      await expect(completedBadges.first()).toHaveText('A');
+      await expect(page.getByTestId(`completed-badge-${activeACardId}`)).toHaveText('A');
+
+      const completedAFocusable = page.locator(`[data-testid="completed-card-${activeACardId}"] [data-card-id="${activeACardId}"]`);
+      await completedAFocusable.focus();
+      await page.keyboard.press('Space');
+
+      await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeHidden({ timeout: 20_000 });
+      await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible({ timeout: 20_000 });
+      await expect(completedCount).toHaveText('1');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [activeACardId, activeBCardId, completedBCardId]);
+    }
+  });
+
   test('shows desktop menu accordions and lists search matches in the sidebar', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
