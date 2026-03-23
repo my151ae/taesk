@@ -51,7 +51,7 @@ export const TimelineBucketCard = ({
             // コンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen}
         >
-            <div className="relative min-w-0 pt-4 has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
+            <div className="relative min-w-0 pt-4 select-none has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}
@@ -93,7 +93,7 @@ export const TimelineBucketCard = ({
                     }}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
                     paddingClass="py-1"
-                    className="min-h-0"
+                    className="min-h-0 cursor-grab active:cursor-grabbing"
                     shortcutContext={{
                         scope: 'board',
                         region: 'main-panel',
