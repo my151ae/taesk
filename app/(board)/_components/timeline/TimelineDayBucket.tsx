@@ -81,6 +81,15 @@ function pickFirstNonEmptySection(counts: Record<ActiveBucketSection, number>): 
     return null;
 }
 
+function findNextNonEmptySection(current: ActiveBucketSection, counts: Record<ActiveBucketSection, number>): ActiveBucketSection {
+    const currentIndex = SECTION_ORDER.indexOf(current);
+    for (let step = 1; step <= SECTION_ORDER.length; step += 1) {
+        const nextSection = SECTION_ORDER[(currentIndex + step) % SECTION_ORDER.length];
+        if (counts[nextSection] > 0) return nextSection;
+    }
+    return current;
+}
+
 function resolveSectionRowHeight(section: ActiveBucketSection, expandedSection: ActiveBucketSection | null, counts: Record<ActiveBucketSection, number>) {
     if (expandedSection === section && counts[section] > 0) {
         return 'minmax(0, 1fr)';
@@ -118,7 +127,7 @@ function StaticBucketRow({
         >
             {badgeLabel ? (
                 <span
-                    className="pointer-events-none absolute right-[6px] top-[3px] z-20 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-slate-500 shadow-sm"
+                    className="pointer-events-none absolute right-[8px] top-[8px] z-20 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-500 shadow-sm"
                     data-testid={badgeTestId}
                 >
                     {badgeLabel}
@@ -217,12 +226,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
     const handleSectionToggle = useCallback((section: ActiveBucketSection) => {
         setActiveSection((current) => {
-            if (section === 'a') {
-                return current === 'a' ? current : resolveFallbackSection('a');
-            }
-
             if (current === section) {
-                return resolveFallbackSection('a');
+                return findNextNonEmptySection(current, sectionCounts);
             }
 
             if (sectionCounts[section] === 0) {
@@ -231,7 +236,12 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
             return section;
         });
-    }, [resolveFallbackSection, sectionCounts]);
+    }, [sectionCounts]);
+
+    const handleAddAndExpand = useCallback((section: 'a' | 'b', bucketKey: string) => {
+        setActiveSection(section);
+        onCreateBucketCard?.(bucketKey);
+    }, [onCreateBucketCard]);
 
     const rowTemplate = useMemo(
         () =>
@@ -257,29 +267,34 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         addButton?: ReactNode;
     }) => {
         const isExpanded = expandedSection === section && count > 0;
+        const lineClass = section === 'a' ? 'border-b' : 'border-y';
 
         return (
-            <div className="flex items-center justify-between gap-2 px-3">
-                <button
-                    type="button"
-                    aria-expanded={isExpanded}
-                    aria-controls={bodyId}
-                    onClick={() => handleSectionToggle(section)}
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-0.5 py-0.5 text-left text-slate-600 transition-colors duration-150 hover:text-slate-800"
-                    data-testid={`bucket-toggle-${section}-${day.isoDate}`}
-                >
-                    <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-[10px] font-semibold text-slate-600">{label}</span>
+            <div className={clsx('px-0', lineClass, 'border-slate-200/90 bg-slate-100/70')}>
+                <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_1.75rem] items-center">
+                    <div className="flex h-7 w-7 items-center justify-center border-r border-slate-200/70">
+                        {addButton ?? <span aria-hidden="true" className="block h-7 w-7" />}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 px-1.5 py-0.5">
+                        <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
                         <CountBadge count={count} testId={countTestId} />
-                    </span>
-                    <span
-                        aria-hidden="true"
-                        className={clsx('text-xs transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
+                    </div>
+                    <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        aria-controls={bodyId}
+                        onClick={() => handleSectionToggle(section)}
+                        className="flex h-7 w-7 items-center justify-center border-l border-slate-200/70 text-slate-600 transition-colors duration-150 hover:bg-white/70 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
+                        data-testid={`bucket-toggle-${section}-${day.isoDate}`}
                     >
-                        ▾
-                    </span>
-                </button>
-                {addButton}
+                        <span
+                            aria-hidden="true"
+                            className={clsx('text-xs transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
+                        >
+                            ▾
+                        </span>
+                    </button>
+                </div>
             </div>
         );
     };
@@ -335,9 +350,9 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 disabled={status === 'loading' || !onCreateBucketCard}
                 onClick={(e) => {
                     e.stopPropagation();
-                    onCreateBucketCard?.(bucketKey);
+                    handleAddAndExpand(section, bucketKey);
                 }}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-7 w-7 items-center justify-center border border-transparent text-slate-500 transition-colors duration-150 hover:bg-white/70 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid={`ab-add-${bucketKey}`}
             >
                 <span className="text-base leading-none">＋</span>
@@ -352,7 +367,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {(isOver) => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 py-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
@@ -365,7 +380,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     id={bodyId}
                                     ref={(el) => registerScrollContainer?.(day.isoDate, el, bucket)}
                                     data-ab-scroll-container="true"
-                                    className="mt-2 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
+                                    className="mt-1 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
                                 >
                                     {items.length === 0 && isOver ? <div className="mb-2 h-0.5 bg-sky-500" /> : null}
                                     {items.map((item) => (
@@ -413,7 +428,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {() => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 py-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
@@ -435,13 +450,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 data-testid={`bucket-section-${section}-${day.isoDate}`}
                 className="min-h-0 overflow-hidden"
             >
-                <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 py-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                     {renderSectionHeader({
                         label,
                         section,
                         count,
                         bodyId,
                         countTestId: `bucket-count-${section}-${day.isoDate}`,
+                        addButton,
                     })}
                     {renderCompactPreview({
                         section,
@@ -463,7 +479,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 data-testid={`bucket-section-completed-${day.isoDate}`}
                 className="min-h-0 overflow-hidden"
             >
-                <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 py-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                     {renderSectionHeader({
                         label: 'Completed',
                         section,
@@ -474,7 +490,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     {isExpanded ? (
                         <div
                             id={bodyId}
-                            className="mt-2 flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
+                            className="mt-1 flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
                         >
                             {completedItems.map(({ item, sourceBucket }) => (
                                 <StaticBucketRow
@@ -511,7 +527,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             style={{ height: viewportHeight ? `${viewportHeight}px` : `calc(100vh - ${floatingLayerTop}px)` }}
         >
             <div
-                className="grid h-full min-h-0 content-start gap-0.5 transition-[grid-template-rows] duration-200 ease-out"
+                className="grid h-full min-h-0 content-start gap-0 transition-[grid-template-rows] duration-200 ease-out"
                 style={{ gridTemplateRows: rowTemplate }}
             >
                 {renderBucketSection({
