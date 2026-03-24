@@ -1176,7 +1176,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(completedCount).toHaveText('1');
       await expect(previewB).toContainText('Completed flow active B');
       await expect(previewCompleted).toContainText('Completed flow done B');
-      await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
+      await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(1);
       await expect(sectionCompleted.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
 
       const previewBCard = previewB.locator(`[data-card-id="${activeBCardId}"]`);
@@ -1340,6 +1340,159 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId(`completed-card-${bOnlyCardId}`)).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [bOnlyCardId]);
+    }
+  });
+
+  test('keeps closed A/B buckets droppable and shows a hover line', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const sourceIso = isoDateJst();
+    const targetIso = shiftIsoDateJst(1);
+    const sourceCardId = crypto.randomUUID();
+    const targetACardId = crypto.randomUUID();
+    const targetBCardId = crypto.randomUUID();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: sourceCardId,
+        title: 'Closed drop source A',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'source card for closed bucket drop',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2700,
+        tags: ['accordion-drop'],
+        due_date: sourceIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        due_bucket_position: 2700,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1400,
+        slug: 'closed-drop-source-a',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: targetACardId,
+        title: 'Closed drop target A',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'target day active A card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2710,
+        tags: ['accordion-drop'],
+        due_date: targetIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'a',
+        due_bucket_position: 2710,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1401,
+        slug: 'closed-drop-target-a',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: targetBCardId,
+        title: 'Closed drop target B',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'target day closed B card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2720,
+        tags: ['accordion-drop'],
+        due_date: targetIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        due_bucket_position: 2720,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1402,
+        slug: 'closed-drop-target-b',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const initialSearchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await initialSearchToggle.getAttribute('aria-expanded')) === 'true') {
+        await initialSearchToggle.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const sourceCard = page.getByTestId(`ab-card-${sourceCardId}`).first();
+      const targetToggleA = page.getByTestId(`bucket-toggle-a-${targetIso}`).first();
+      const targetToggleB = page.getByTestId(`bucket-toggle-b-${targetIso}`).first();
+      const targetSectionB = page.getByTestId(`bucket-section-b-${targetIso}`).first();
+      const targetPreviewB = page.getByTestId(`bucket-preview-b-${targetIso}`).first();
+      const targetCountB = page.getByTestId(`bucket-count-b-${targetIso}`).first();
+
+      await expect(sourceCard).toBeVisible({ timeout: 20_000 });
+      await expect(targetToggleA).toHaveAttribute('aria-expanded', 'true');
+      await expect(targetToggleB).toHaveAttribute('aria-expanded', 'false');
+      await expect(targetSectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(1);
+      await expect(targetPreviewB).toContainText('Closed drop target B');
+
+      const previewBox = await targetPreviewB.boundingBox();
+      if (!previewBox) {
+        throw new Error('Missing closed B preview bounds');
+      }
+
+      const patchResponsePromise = page.waitForResponse((res) => {
+        return (
+          res.request().method() === 'PATCH' &&
+          res.url().includes(`/api/boards/${boardContext.boardId}/cards/${sourceCardId}`)
+        );
+      }, { timeout: 20_000 });
+
+      await dragLocatorToPoint(page, sourceCard, {
+        x: previewBox.x + previewBox.width * 0.5,
+        y: previewBox.y + Math.min(24, previewBox.height * 0.5),
+      });
+      await expect(targetSectionB.locator('.bg-sky-500')).toBeVisible();
+
+      const [patchResponse] = await Promise.all([
+        patchResponsePromise,
+        page.mouse.up(),
+      ]);
+      expect(patchResponse.ok(), `closed bucket PATCH failed: ${patchResponse.status()}`).toBeTruthy();
+
+      await expect(targetCountB).toHaveText('2', { timeout: 20_000 });
+
+      await targetToggleB.click();
+      await expect(targetToggleB).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId(`ab-card-${sourceCardId}`).first()).toBeVisible({ timeout: 20_000 });
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [sourceCardId, targetACardId, targetBCardId]);
     }
   });
 

@@ -335,9 +335,9 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
         return (
             <div className={clsx('px-0', lineClass, 'border-slate-200/90 bg-slate-100/70')}>
-                <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_1.75rem] items-center">
-                    <div className="flex h-7 w-7 items-center justify-center border-r border-slate-200/70">
-                        {addButton ?? <span aria-hidden="true" className="block h-7 w-7" />}
+                <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1.75rem] items-center">
+                    <div className="flex h-6 w-6 items-center justify-center border-r border-slate-200/70">
+                        {addButton ?? <span aria-hidden="true" className="block h-6 w-6" />}
                     </div>
                     <div className="flex min-w-0 items-center gap-2 px-1.5 py-0.5">
                         <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
@@ -441,10 +441,38 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     e.stopPropagation();
                     handleAddAndExpand(section, bucketKey);
                 }}
-                className="inline-flex h-7 w-7 items-center justify-center border border-transparent text-slate-500 transition-colors duration-150 hover:bg-white/70 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-6 w-6 items-center justify-center border border-transparent text-slate-500 transition-colors duration-150 hover:bg-white/70 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
                 data-testid={`ab-add-${bucketKey}`}
             >
-                <span className="text-base leading-none">＋</span>
+                <span className="text-sm leading-none">＋</span>
+            </button>
+        );
+        const renderBucketFooterSlot = ({
+            isOver,
+            onClick,
+        }: {
+            isOver: boolean;
+            onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+        }) => (
+            <button
+                type="button"
+                disabled={status === 'loading' || !onCreateBucketCard}
+                onClick={onClick}
+                className={clsx(
+                    'relative mt-1 flex h-5 w-full items-center justify-center overflow-hidden rounded-sm border border-dashed text-slate-500 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                    isOver
+                        ? 'border-sky-400 bg-sky-50 text-sky-700'
+                        : 'border-slate-300/90 bg-white/60 hover:border-sky-300 hover:bg-white hover:text-sky-700'
+                )}
+                data-testid={`ab-add-bottom-${bucketKey}`}
+            >
+                {isOver ? (
+                    <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-sky-500"
+                    />
+                ) : null}
+                <span className="relative z-10 inline-flex h-5 w-5 items-center justify-center text-[13px] leading-none">＋</span>
             </button>
         );
 
@@ -488,19 +516,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                             onCreateBucketCard={onCreateBucketCard}
                                         />
                                     ))}
-                                    <button
-                                        type="button"
-                                        disabled={status === 'loading' || !onCreateBucketCard}
-                                        onClick={(e) => {
+                                    {renderBucketFooterSlot({
+                                        isOver,
+                                        onClick: (e) => {
                                             e.stopPropagation();
                                             onCreateBucketCard?.(bucketKey, lastCardId);
-                                        }}
-                                        className="flex w-full items-center gap-2 rounded-none border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                        data-testid={`ab-add-bottom-${bucketKey}`}
-                                    >
-                                        <span className="text-base leading-none">＋</span>
-                                        <span>追加</span>
-                                    </button>
+                                        },
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -527,18 +549,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     addButton,
                                 })}
                                 <div id={bodyId} className="mt-1 px-3">
-                                    <div
-                                        className={clsx(
-                                            'relative h-6 overflow-hidden rounded-sm border border-dashed transition-colors duration-150',
-                                            isOver
-                                                ? 'border-sky-400 bg-sky-50'
-                                                : 'border-slate-200/80 bg-white/50'
-                                        )}
-                                    >
-                                        {isOver ? (
-                                            <div className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-sky-500" />
-                                        ) : null}
-                                    </div>
+                                    {renderBucketFooterSlot({
+                                        isOver,
+                                        onClick: (e) => {
+                                            e.stopPropagation();
+                                            handleAddAndExpand(section, bucketKey);
+                                        },
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -548,13 +565,18 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         }
 
         return (
-            <section
-                data-testid={`bucket-section-${section}-${day.isoDate}`}
-                className="min-h-0 overflow-hidden"
-            >
-                <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
-                    {() => (
-                        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                <section
+                    data-testid={`bucket-section-${section}-${day.isoDate}`}
+                    className="min-h-0 overflow-hidden"
+                >
+                    <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
+                    {(isOver) => (
+                        <div
+                            className={clsx(
+                                'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out',
+                                isOver ? 'bg-sky-50/60' : ''
+                            )}
+                        >
                             {renderSectionHeader({
                                 label,
                                 section,
@@ -563,11 +585,22 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                 countTestId: `bucket-count-${section}-${day.isoDate}`,
                                 addButton,
                             })}
-                            {renderCompactPreview({
-                                section,
-                                previews: items.slice(0, layout.previewCounts[section]).map((item) => ({ item })),
-                                bucketKey,
-                            })}
+                            <div className="flex min-h-0 flex-1 flex-col">
+                                {renderCompactPreview({
+                                    section,
+                                    previews: items.slice(0, layout.previewCounts[section]).map((item) => ({ item })),
+                                    bucketKey,
+                                })}
+                                <div className="px-[1px]">
+                                    {renderBucketFooterSlot({
+                                        isOver,
+                                        onClick: (e) => {
+                                            e.stopPropagation();
+                                            handleAddAndExpand(section, bucketKey);
+                                        },
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </DroppableBucket>
