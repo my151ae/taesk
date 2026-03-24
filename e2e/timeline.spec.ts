@@ -1175,7 +1175,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(countB).toHaveText('1');
       await expect(completedCount).toHaveText('1');
       await expect(previewB).toContainText('Completed flow active B');
-      await expect(previewCompleted).toContainText('Completed flow done B');
+      await expect(previewCompleted).toBeHidden();
       await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(1);
       await expect(sectionCompleted.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
 
@@ -1228,12 +1228,13 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(toggleA).toHaveAttribute('aria-expanded', 'false');
       await expect(toggleB).toHaveAttribute('aria-expanded', 'true');
       await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeVisible();
-      await expect(page.getByTestId(`completed-badge-${activeACardId}`)).toHaveText('A');
+      await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId(`completed-card-${activeACardId}`)).toHaveCount(0);
 
       await completedToggle.click();
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeVisible();
+      await expect(page.getByTestId(`completed-badge-${activeACardId}`)).toHaveText('A');
 
       const completedBadges = page.locator(`[data-testid^="completed-badge-"]`);
       await expect(completedBadges.first()).toHaveText('A');
@@ -1333,10 +1334,16 @@ test.describe('@feature:timeline Timeline view', () => {
       const completedOnlyToggleA = page.getByTestId(`bucket-toggle-a-${bOnlyIso}`).first();
       const completedOnlyToggleB = page.getByTestId(`bucket-toggle-b-${bOnlyIso}`).first();
       const completedOnlyToggleCompleted = page.getByTestId(`bucket-toggle-completed-${bOnlyIso}`).first();
+      const completedOnlyPreview = page.getByTestId(`bucket-preview-completed-${bOnlyIso}`).first();
       await expect(completedOnlyToggleA).toHaveAttribute('aria-expanded', 'false');
       await expect(completedOnlyToggleB).toHaveAttribute('aria-expanded', 'false');
-      await expect(completedOnlyToggleCompleted).toHaveAttribute('aria-expanded', 'true');
+      await expect(completedOnlyToggleCompleted).toHaveAttribute('aria-expanded', 'false');
       await expect(page.getByTestId(`bucket-count-completed-${bOnlyIso}`)).toHaveText('1');
+      await expect(completedOnlyPreview).toBeHidden();
+      await expect(page.getByTestId(`completed-card-${bOnlyCardId}`)).toHaveCount(0);
+
+      await completedOnlyToggleCompleted.click();
+      await expect(completedOnlyToggleCompleted).toHaveAttribute('aria-expanded', 'true');
       await expect(page.getByTestId(`completed-card-${bOnlyCardId}`)).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [bOnlyCardId]);

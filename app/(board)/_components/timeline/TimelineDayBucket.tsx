@@ -39,9 +39,11 @@ type CompletedBucketEntry = {
 };
 
 const SECTION_ORDER: readonly ActiveBucketSection[] = ['a', 'b', 'completed'];
-const COMPACT_EMPTY_HEIGHT_PX = 60;
+const PRIMARY_SECTION_ORDER: readonly Exclude<ActiveBucketSection, 'completed'>[] = ['a', 'b'];
 const HEADER_HEIGHT_PX = 32;
 const PREVIEW_CARD_HEIGHT_PX = 78;
+const COMPACT_BUCKET_FOOTER_HEIGHT_PX = 20;
+const COMPACT_EMPTY_HEIGHT_PX = HEADER_HEIGHT_PX + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
 const EXPANDED_CARD_HEIGHT_PX = 78;
 const EXPANDED_AB_FOOTER_HEIGHT_PX = 48;
 const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
@@ -82,25 +84,29 @@ function resolveCompletedBadgeLabel(item: TimelineBucketItem, fallbackBucket: Co
     return fallbackBucket.toUpperCase();
 }
 
-function pickFirstNonEmptySection(counts: Record<ActiveBucketSection, number>): ActiveBucketSection | null {
-    for (const section of SECTION_ORDER) {
+function pickFirstNonEmptyPrimarySection(counts: Record<ActiveBucketSection, number>): Exclude<ActiveBucketSection, 'completed'> | null {
+    for (const section of PRIMARY_SECTION_ORDER) {
         if (counts[section] > 0) return section;
     }
     return null;
 }
 
-function findNextNonEmptySection(current: ActiveBucketSection, counts: Record<ActiveBucketSection, number>): ActiveBucketSection {
-    const currentIndex = SECTION_ORDER.indexOf(current);
-    for (let step = 1; step <= SECTION_ORDER.length; step += 1) {
-        const nextSection = SECTION_ORDER[(currentIndex + step) % SECTION_ORDER.length];
+function findNextNonEmptyPrimarySection(
+    current: Exclude<ActiveBucketSection, 'completed'>,
+    counts: Record<ActiveBucketSection, number>
+): Exclude<ActiveBucketSection, 'completed'> {
+    const currentIndex = PRIMARY_SECTION_ORDER.indexOf(current);
+    for (let step = 1; step <= PRIMARY_SECTION_ORDER.length; step += 1) {
+        const nextSection = PRIMARY_SECTION_ORDER[(currentIndex + step) % PRIMARY_SECTION_ORDER.length];
         if (counts[nextSection] > 0) return nextSection;
     }
     return current;
 }
 
-function resolveCompactSectionRowHeight(itemCount: number, previewCount: number) {
+function resolveCompactSectionRowHeight(section: ActiveBucketSection, itemCount: number, previewCount: number) {
+    if (section === 'completed') return HEADER_HEIGHT_PX;
     if (itemCount === 0) return COMPACT_EMPTY_HEIGHT_PX;
-    return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX);
+    return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX) + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
 }
 
 function StaticBucketRow({
@@ -208,33 +214,42 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         }),
         [activeA.length, activeB.length, completedItems.length]
     );
-    const resolveFallbackSection = useCallback(
-        (preferred: ActiveBucketSection) => {
+    const resolvePrimaryFallbackSection = useCallback(
+        (preferred: Exclude<ActiveBucketSection, 'completed'>) => {
             if (sectionCounts[preferred] > 0) return preferred;
-            return pickFirstNonEmptySection(sectionCounts) ?? 'a';
+            return pickFirstNonEmptyPrimarySection(sectionCounts) ?? 'a';
         },
         [sectionCounts]
     );
-    const [activeSection, setActiveSection] = useState<ActiveBucketSection>(() => resolveFallbackSection('a'));
+    const [activeSection, setActiveSection] = useState<ActiveBucketSection>(() => resolvePrimaryFallbackSection('a'));
     const previousCountsRef = useRef(sectionCounts);
-    const expandedSection = sectionCounts[activeSection] > 0 ? activeSection : pickFirstNonEmptySection(sectionCounts);
+    const expandedSection = useMemo<ActiveBucketSection | null>(() => {
+        if (activeSection === 'completed') {
+            return sectionCounts.completed > 0 ? 'completed' : resolvePrimaryFallbackSection('a');
+        }
+        if (sectionCounts[activeSection] > 0) return activeSection;
+        return pickFirstNonEmptyPrimarySection(sectionCounts);
+    }, [activeSection, resolvePrimaryFallbackSection, sectionCounts]);
 
     useEffect(() => {
         const previousCounts = previousCountsRef.current;
         previousCountsRef.current = sectionCounts;
 
         if (previousCounts[activeSection] > 0 && sectionCounts[activeSection] === 0) {
-            const nextSection = resolveFallbackSection('a');
+            const nextSection = resolvePrimaryFallbackSection('a');
             if (nextSection !== activeSection) {
                 setActiveSection(nextSection);
             }
         }
-    }, [activeSection, resolveFallbackSection, sectionCounts]);
+    }, [activeSection, resolvePrimaryFallbackSection, sectionCounts]);
 
     const handleSectionToggle = useCallback((section: ActiveBucketSection) => {
         setActiveSection((current) => {
             if (current === section) {
-                return findNextNonEmptySection(current, sectionCounts);
+                if (section === 'completed') {
+                    return resolvePrimaryFallbackSection('a');
+                }
+                return findNextNonEmptyPrimarySection(section, sectionCounts);
             }
 
             if (sectionCounts[section] === 0) {
@@ -243,7 +258,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
             return section;
         });
-    }, [sectionCounts]);
+    }, [resolvePrimaryFallbackSection, sectionCounts]);
 
     const handleAddAndExpand = useCallback((section: 'a' | 'b', bucketKey: string) => {
         setActiveSection(section);
@@ -257,18 +272,22 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 b: 0,
                 completed: 0,
             };
+            const completedCompactHeight = resolveCompactSectionRowHeight('completed', sectionCounts.completed, 0);
 
             if (!expandedSection || sectionCounts[expandedSection] === 0) {
                 return {
                     previewCounts,
-                    rowTemplate: SECTION_ORDER
-                        .map((section) => `${resolveCompactSectionRowHeight(sectionCounts[section], 0)}px`)
-                        .join(' '),
+                    rowTemplate: [
+                        `${resolveCompactSectionRowHeight('a', sectionCounts.a, 0)}px`,
+                        `${resolveCompactSectionRowHeight('b', sectionCounts.b, 0)}px`,
+                        'minmax(0,1fr)',
+                        `${completedCompactHeight}px`,
+                    ].join(' '),
                 };
             }
 
             SECTION_ORDER.forEach((section) => {
-                if (section !== expandedSection && sectionCounts[section] > 0) {
+                if (section !== expandedSection && section !== 'completed' && sectionCounts[section] > 0) {
                     previewCounts[section] = 1;
                 }
             });
@@ -276,10 +295,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             const containerHeight = viewportHeight ?? FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX;
             const compactHeights = SECTION_ORDER
                 .filter((section) => section !== expandedSection)
-                .reduce((sum, section) => sum + resolveCompactSectionRowHeight(sectionCounts[section], previewCounts[section]), 0);
-            const maxExpandedHeight = Math.max(resolveCompactSectionRowHeight(sectionCounts[expandedSection], 1), containerHeight - compactHeights);
+                .reduce((sum, section) => sum + resolveCompactSectionRowHeight(section, sectionCounts[section], previewCounts[section]), 0);
+            const maxExpandedHeight = Math.max(
+                resolveCompactSectionRowHeight(expandedSection, sectionCounts[expandedSection], 1),
+                containerHeight - compactHeights
+            );
             const ratioCappedHeight = Math.max(
-                resolveCompactSectionRowHeight(sectionCounts[expandedSection], 1),
+                resolveCompactSectionRowHeight(expandedSection, sectionCounts[expandedSection], 1),
                 Math.min(MAX_EXPANDED_SECTION_HEIGHT_PX, Math.floor(containerHeight * MAX_EXPANDED_SECTION_RATIO))
             );
             const desiredExpandedHeight =
@@ -303,13 +325,20 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
             return {
                 previewCounts,
-                rowTemplate: SECTION_ORDER
-                    .map((section) =>
-                        section === expandedSection
-                            ? `${expandedHeight}px`
-                            : `${resolveCompactSectionRowHeight(sectionCounts[section], previewCounts[section])}px`
-                    )
-                    .join(' '),
+                rowTemplate:
+                    expandedSection === 'completed'
+                        ? [
+                            `${resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
+                            `${resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
+                            '0px',
+                            `${expandedHeight}px`,
+                        ].join(' ')
+                        : [
+                            `${expandedSection === 'a' ? expandedHeight : resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
+                            `${expandedSection === 'b' ? expandedHeight : resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
+                            'minmax(0,1fr)',
+                            `${completedCompactHeight}px`,
+                        ].join(' '),
             };
         },
         [expandedSection, sectionCounts, viewportHeight]
@@ -459,7 +488,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 disabled={status === 'loading' || !onCreateBucketCard}
                 onClick={onClick}
                 className={clsx(
-                    'relative mt-1 flex h-5 w-full items-center justify-center overflow-hidden rounded-sm border border-dashed text-slate-500 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                    'relative mt-0.5 mb-1 flex h-4 w-full items-center justify-center overflow-hidden rounded-sm border border-dashed text-slate-500 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
                     isOver
                         ? 'border-sky-400 bg-sky-50 text-sky-700'
                         : 'border-slate-300/90 bg-white/60 hover:border-sky-300 hover:bg-white hover:text-sky-700'
@@ -472,7 +501,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                         className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-sky-500"
                     />
                 ) : null}
-                <span className="relative z-10 inline-flex h-5 w-5 items-center justify-center text-[13px] leading-none">＋</span>
+                <span className="relative z-10 inline-flex h-4 w-4 items-center justify-center text-xs leading-none">＋</span>
             </button>
         );
 
@@ -484,7 +513,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {(isOver) => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
@@ -539,7 +568,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {(isOver) => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
@@ -548,7 +577,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     countTestId: `bucket-count-${section}-${day.isoDate}`,
                                     addButton,
                                 })}
-                                <div id={bodyId} className="mt-1 px-3">
+                                <div id={bodyId} className="px-3">
                                     {renderBucketFooterSlot({
                                         isOver,
                                         onClick: (e) => {
@@ -573,7 +602,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     {(isOver) => (
                         <div
                             className={clsx(
-                                'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out',
+                                'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out',
                                 isOver ? 'bg-sky-50/60' : ''
                             )}
                         >
@@ -619,7 +648,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 data-testid={`bucket-section-completed-${day.isoDate}`}
                 className="min-h-0 overflow-hidden"
             >
-                <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 pb-2 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                             {renderSectionHeader({
                                 label: 'Completed',
                                 section,
@@ -646,15 +675,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                 />
                             ))}
                         </div>
-                    ) : count > 0 ? (
-                        renderCompactPreview({
-                            section: 'completed',
-                            previews: completedItems
-                                .slice(0, layout.previewCounts.completed)
-                                .map((entry) => entry),
-                        })
                     ) : (
-                        <div id={bodyId} hidden />
+                        <div id={bodyId} data-testid={`bucket-preview-completed-${day.isoDate}`} hidden />
                     )}
                 </div>
             </section>
@@ -683,6 +705,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     items: activeB,
                     bucket: 'b',
                 })}
+                <div aria-hidden="true" className="min-h-0" />
                 {renderCompletedSection()}
             </div>
         </div>
