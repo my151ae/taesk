@@ -44,6 +44,7 @@ const HEADER_HEIGHT_PX = 32;
 const PREVIEW_CARD_HEIGHT_PX = 78;
 const COMPACT_BUCKET_FOOTER_HEIGHT_PX = 20;
 const COMPACT_EMPTY_HEIGHT_PX = HEADER_HEIGHT_PX + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
+const COMPLETED_SUMMARY_ROW_HEIGHT_PX = HEADER_HEIGHT_PX;
 const EXPANDED_CARD_HEIGHT_PX = 78;
 const EXPANDED_AB_FOOTER_HEIGHT_PX = 48;
 const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
@@ -66,13 +67,13 @@ const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver:
     );
 };
 
-function CountBadge({ count, testId }: { count: number; testId?: string }) {
+function CountBadge({ value, testId }: { value: ReactNode; testId?: string }) {
     return (
         <span
             className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold leading-tight text-slate-700"
             data-testid={testId}
         >
-            {count}
+            {value}
         </span>
     );
 }
@@ -103,8 +104,7 @@ function findNextNonEmptyPrimarySection(
     return current;
 }
 
-function resolveCompactSectionRowHeight(section: ActiveBucketSection, itemCount: number, previewCount: number) {
-    if (section === 'completed') return HEADER_HEIGHT_PX;
+function resolveCompactSectionRowHeight(itemCount: number, previewCount: number) {
     if (itemCount === 0) return COMPACT_EMPTY_HEIGHT_PX;
     return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX) + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
 }
@@ -206,6 +206,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         ],
         [completedA, completedB]
     );
+    const completedCount = completedA.length + completedB.length;
+    const totalCount = bucketsA.length + bucketsB.length;
     const sectionCounts = useMemo<Record<ActiveBucketSection, number>>(
         () => ({
             a: activeA.length,
@@ -272,14 +274,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 b: 0,
                 completed: 0,
             };
-            const completedCompactHeight = resolveCompactSectionRowHeight('completed', sectionCounts.completed, 0);
+            const completedCompactHeight = COMPLETED_SUMMARY_ROW_HEIGHT_PX;
 
             if (!expandedSection || sectionCounts[expandedSection] === 0) {
                 return {
                     previewCounts,
                     rowTemplate: [
-                        `${resolveCompactSectionRowHeight('a', sectionCounts.a, 0)}px`,
-                        `${resolveCompactSectionRowHeight('b', sectionCounts.b, 0)}px`,
+                        `${resolveCompactSectionRowHeight(sectionCounts.a, 0)}px`,
+                        `${resolveCompactSectionRowHeight(sectionCounts.b, 0)}px`,
                         'minmax(0,1fr)',
                         `${completedCompactHeight}px`,
                     ].join(' '),
@@ -295,13 +297,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             const containerHeight = viewportHeight ?? FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX;
             const compactHeights = SECTION_ORDER
                 .filter((section) => section !== expandedSection)
-                .reduce((sum, section) => sum + resolveCompactSectionRowHeight(section, sectionCounts[section], previewCounts[section]), 0);
+                .reduce((sum, section) => sum + resolveCompactSectionRowHeight(sectionCounts[section], previewCounts[section]), 0);
             const maxExpandedHeight = Math.max(
-                resolveCompactSectionRowHeight(expandedSection, sectionCounts[expandedSection], 1),
+                resolveCompactSectionRowHeight(sectionCounts[expandedSection], 1),
                 containerHeight - compactHeights
             );
             const ratioCappedHeight = Math.max(
-                resolveCompactSectionRowHeight(expandedSection, sectionCounts[expandedSection], 1),
+                resolveCompactSectionRowHeight(sectionCounts[expandedSection], 1),
                 Math.min(MAX_EXPANDED_SECTION_HEIGHT_PX, Math.floor(containerHeight * MAX_EXPANDED_SECTION_RATIO))
             );
             const desiredExpandedHeight =
@@ -328,14 +330,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 rowTemplate:
                     expandedSection === 'completed'
                         ? [
-                            `${resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
-                            `${resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
+                            `${resolveCompactSectionRowHeight(sectionCounts.a, previewCounts.a)}px`,
+                            `${resolveCompactSectionRowHeight(sectionCounts.b, previewCounts.b)}px`,
                             '0px',
                             `${expandedHeight}px`,
                         ].join(' ')
                         : [
-                            `${expandedSection === 'a' ? expandedHeight : resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
-                            `${expandedSection === 'b' ? expandedHeight : resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
+                            `${expandedSection === 'a' ? expandedHeight : resolveCompactSectionRowHeight(sectionCounts.a, previewCounts.a)}px`,
+                            `${expandedSection === 'b' ? expandedHeight : resolveCompactSectionRowHeight(sectionCounts.b, previewCounts.b)}px`,
                             'minmax(0,1fr)',
                             `${completedCompactHeight}px`,
                         ].join(' '),
@@ -348,6 +350,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         label,
         section,
         count,
+        countValue,
         bodyId,
         countTestId,
         addButton,
@@ -355,6 +358,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         label: string;
         section: ActiveBucketSection;
         count: number;
+        countValue?: ReactNode;
         bodyId: string;
         countTestId: string;
         addButton?: ReactNode;
@@ -370,7 +374,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     </div>
                     <div className="flex min-w-0 items-center gap-2 px-1.5 py-0.5">
                         <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
-                        <CountBadge count={count} testId={countTestId} />
+                        <CountBadge value={countValue ?? count} testId={countTestId} />
                     </div>
                     <button
                         type="button"
@@ -454,7 +458,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         section: 'a' | 'b';
         label: string;
         items: readonly TimelineBucketItem[];
-        bucket: CompletedBucketSource;
+        bucket: ActiveBucketSection;
     }) => {
         const bucketKey = `${day.key}_${bucket}`;
         const isExpanded = expandedSection === section && items.length > 0;
@@ -649,13 +653,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 className="min-h-0 overflow-hidden"
             >
                 <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
-                            {renderSectionHeader({
-                                label: 'Completed',
-                                section,
-                                count,
-                                bodyId,
-                                countTestId: `bucket-count-completed-${day.isoDate}`,
-                            })}
+                    {renderSectionHeader({
+                        label: 'Completed',
+                        section,
+                        count,
+                        countValue: `${completedCount}/${totalCount}`,
+                        bodyId,
+                        countTestId: `bucket-count-completed-${day.isoDate}`,
+                    })}
                     {isExpanded ? (
                         <div
                             id={bodyId}
