@@ -137,6 +137,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                         isActive && "ring-2 ring-sky-400 shadow-md"
                     )}
                     backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
+                    checkedVisualTone="timeline-dim"
                     onCreateNext={onCreateNext}
                 />
                 <div

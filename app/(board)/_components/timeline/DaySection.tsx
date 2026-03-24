@@ -143,6 +143,7 @@ export const DaySection = memo(function DaySection({
                 >
                     <TimelineDayBucket
                         day={day}
+                        events={events}
                         bucketsA={bucketsA}
                         bucketsB={bucketsB}
                         floatingLayerTop={floatingLayerTop}

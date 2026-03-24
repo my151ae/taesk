@@ -67,6 +67,7 @@ type TimelineCardProps = {
     /** 左側のチェックボックス列を非表示にするか */
     hideLeftColumn?: boolean;
     shortcutContext?: ShortcutContextDescriptor | null;
+    checkedVisualTone?: 'default' | 'timeline-dim';
 };
 
 export function TimelineCard({
@@ -103,6 +104,7 @@ export function TimelineCard({
     titleClassName,
     hideLeftColumn = false,
     shortcutContext,
+    checkedVisualTone = 'default',
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -130,6 +132,7 @@ export function TimelineCard({
     const checklistCheckedCount = countCheckedLines(checklist) || contentChecklistProgress.checked;
     const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
     const hasBodySection = Boolean(note || checklistProgressLabel);
+    const isTimelineDimChecked = checked && checkedVisualTone === 'timeline-dim';
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
@@ -176,8 +179,9 @@ export function TimelineCard({
         <div
             ref={containerRef}
             className={clsx(
-                'relative flex flex-row items-stretch border border-slate-200 text-left shadow-sm w-full max-w-full outline-none transition-shadow',
+                'relative flex flex-row items-stretch border text-left shadow-sm w-full max-w-full outline-none transition-shadow',
                 backgroundClass, // 背景色を適用
+                isTimelineDimChecked ? 'border-emerald-200/90 shadow-none' : 'border-slate-200',
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
                 'focus:ring-2 focus:ring-sky-500', // フォーカス時のリング
@@ -187,6 +191,7 @@ export function TimelineCard({
             style={style}
             data-testid={dataTestId}
             data-card-id={cardId}
+            data-checked-visual={isTimelineDimChecked ? 'timeline-dim' : undefined}
             {...shortcutAttributes}
             tabIndex={tabIndex ?? 0}
             role={role}
@@ -249,7 +254,9 @@ export function TimelineCard({
                             aria-hidden="true"
                             style={{
                                 left: CARD_LEFT_COLUMN_WIDTH,
-                                backgroundImage: "repeating-linear-gradient(to bottom, rgb(203 213 225) 0 8px, transparent 8px 12px)",
+                                backgroundImage: isTimelineDimChecked
+                                    ? "repeating-linear-gradient(to bottom, rgb(226 232 240) 0 8px, transparent 8px 12px)"
+                                    : "repeating-linear-gradient(to bottom, rgb(203 213 225) 0 8px, transparent 8px 12px)",
                             }}
                         />
                         <div
@@ -279,10 +286,13 @@ export function TimelineCard({
                                         }}
                                         aria-label={checked ? '未完了に戻す' : '完了にする'}
                                         onPointerDown={(e) => e.stopPropagation()}
+                                        data-checkbox-tone={isTimelineDimChecked ? 'success' : 'default'}
                                         className={clsx(
                                             "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
                                             checked
-                                                ? "border-slate-400 bg-slate-400"
+                                                ? isTimelineDimChecked
+                                                    ? 'border-emerald-500 bg-emerald-500'
+                                                    : "border-slate-400 bg-slate-400"
                                                 : "border-slate-300 bg-white hover:border-sky-400"
                                         )}
                                     >
@@ -296,7 +306,10 @@ export function TimelineCard({
                             )}
 
                             <div
-                                className="flex min-w-0 items-center"
+                                className={clsx(
+                                    'flex min-w-0 items-center',
+                                    isTimelineDimChecked ? 'opacity-35' : ''
+                                )}
                                 style={{
                                     minHeight: CARD_TOP_ROW_MIN_HEIGHT,
                                     paddingLeft: CARD_RIGHT_CELL_X_PADDING,
@@ -305,7 +318,10 @@ export function TimelineCard({
                                     paddingBottom: CARD_TOP_CELL_Y_PADDING,
                                 }}
                             >
-                                <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold text-slate-800">
+                                <div className={clsx(
+                                    'flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold',
+                                    isTimelineDimChecked ? 'text-slate-400' : 'text-slate-800'
+                                )}>
                                     <span
                                         className={clsx(
                                             "truncate leading-tight",
@@ -327,7 +343,10 @@ export function TimelineCard({
 
                         {hasBodySection ? (
                             <div
-                                className="grid min-h-0 min-w-0 flex-1 border-t border-slate-200"
+                                className={clsx(
+                                    'grid min-h-0 min-w-0 flex-1 border-t',
+                                    isTimelineDimChecked ? 'border-slate-100 opacity-35' : 'border-slate-200'
+                                )}
                                 style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
                             >
                                 {!hideLeftColumn && (
@@ -341,11 +360,14 @@ export function TimelineCard({
                                     >
                                         {checklistProgressLabel ? (
                                             <div
-                                                className="flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none text-slate-500 tabular-nums"
+                                                className={clsx(
+                                                    'flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none tabular-nums',
+                                                    isTimelineDimChecked ? 'text-slate-400' : 'text-slate-500'
+                                                )}
                                                 aria-label={`チェックリスト ${checklistProgressLabel}`}
                                             >
                                                 <span>{checklistCheckedCount}</span>
-                                                <span className="my-1 h-px w-3 bg-slate-300" aria-hidden="true" />
+                                                <span className={clsx('my-1 h-px w-3', isTimelineDimChecked ? 'bg-slate-200' : 'bg-slate-300')} aria-hidden="true" />
                                                 <span>{checklistTotalCount}</span>
                                             </div>
                                         ) : null}
@@ -354,7 +376,8 @@ export function TimelineCard({
 
                                 <div
                                     className={clsx(
-                                        "flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pt-1 text-[10px] leading-tight text-slate-600"
+                                        'flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pt-1 text-[10px] leading-tight',
+                                        isTimelineDimChecked ? 'text-slate-400' : 'text-slate-600'
                                     )}
                                     style={{
                                         ...(note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : {}),
@@ -412,13 +435,19 @@ export function TimelineCard({
                 </div>
 
                 {timePlacement === 'top' && timeText ? (
-                    <div className="absolute top-0 left-[6px] pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-20 pointer-events-none whitespace-nowrap max-w-[calc(100%-12px)] overflow-hidden text-ellipsis">
+                    <div className={clsx(
+                        'absolute top-0 left-[6px] z-20 max-w-[calc(100%-12px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold pointer-events-none',
+                        isTimelineDimChecked ? 'text-slate-400 opacity-40' : 'text-slate-600'
+                    )}>
                         {timeText}
                     </div>
                 ) : null}
 
                 {timePlacement === 'out-top' && timeText ? (
-                    <div className="absolute -top-4 left-[6px] max-w-[calc(100%-32px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold text-slate-600 z-10 pointer-events-none">
+                    <div className={clsx(
+                        'absolute -top-4 left-[6px] z-10 max-w-[calc(100%-32px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold pointer-events-none',
+                        isTimelineDimChecked ? 'text-slate-400 opacity-40' : 'text-slate-600'
+                    )}>
                         {timeText}
                     </div>
                 ) : null}
@@ -426,10 +455,11 @@ export function TimelineCard({
 
             {rightMeta ? (
                 <div className={clsx(
-                    "flex shrink-0 items-center justify-center",
+                    'flex shrink-0 items-center justify-center',
+                    isTimelineDimChecked ? 'opacity-35' : '',
                     (timePlacement === 'top' && timeText) ? "pt-4 pb-1" : "py-1"
                 )}>
-                    <div className="h-full w-px bg-slate-200" />
+                    <div className={clsx('h-full w-px', isTimelineDimChecked ? 'bg-slate-100' : 'bg-slate-200')} />
                     <div className="flex items-center justify-center px-1">
                         {renderRightMeta()}
                     </div>

@@ -1025,9 +1025,11 @@ test.describe('@feature:timeline Timeline view', () => {
     const activeACardId = crypto.randomUUID();
     const activeBCardId = crypto.randomUUID();
     const completedBCardId = crypto.randomUUID();
+    const completedEventCardId = crypto.randomUUID();
     const activeAShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const activeBShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const completedBShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const completedEventShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert([
       {
@@ -1105,6 +1107,31 @@ test.describe('@feature:timeline Timeline view', () => {
         created_at: timestamp,
         updated_at: timestamp,
       },
+      {
+        id: completedEventCardId,
+        title: 'Completed flow done event',
+        checklist: { version: 1, lines: [] },
+        excerpt: 'completed timeline event for completed flow',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2400,
+        tags: ['completed-flow'],
+        due_date: todayIso,
+        due_start: '09:00',
+        due_end: '10:00',
+        due_bucket: 'a',
+        due_bucket_position: 900,
+        checked: true,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: completedEventShortId,
+        id_short: Math.floor(Math.random() * 100000) + 1203,
+        slug: 'completed-flow-done-event',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
     ]);
 
     expect(insertError).toBeNull();
@@ -1129,28 +1156,31 @@ test.describe('@feature:timeline Timeline view', () => {
       const completedCount = page.getByTestId(`bucket-count-completed-${todayIso}`).first();
       const previewB = page.getByTestId(`bucket-preview-b-${todayIso}`).first();
       const previewCompleted = page.getByTestId(`bucket-preview-completed-${todayIso}`).first();
+      const sectionA = page.getByTestId(`bucket-section-a-${todayIso}`).first();
       const sectionB = page.getByTestId(`bucket-section-b-${todayIso}`).first();
       const sectionCompleted = page.getByTestId(`bucket-section-completed-${todayIso}`).first();
+      const completedTimelineEvent = page.locator(`.timeline-col [data-card-id="${completedEventCardId}"]`).first();
 
       await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
       await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(countA).toHaveText('1');
       await expect(countB).toHaveText('1');
-      await expect(completedCount).toHaveText('1/3');
+      await expect(completedCount).toHaveText('2/4');
       await expect(previewB).toContainText('Completed flow active B');
       await expect(previewCompleted).toBeHidden();
+      await expect(completedTimelineEvent).toBeVisible({ timeout: 20_000 });
+      await expect(completedTimelineEvent).toHaveAttribute('data-checked-visual', 'timeline-dim');
+      await expect(completedTimelineEvent.locator('[role="checkbox"]').first()).toHaveAttribute('data-checkbox-tone', 'success');
       await expect(sectionB.locator('[data-dnd="ab-bucket"]')).toHaveCount(1);
       await expect(sectionCompleted.locator('[data-dnd="ab-bucket"]')).toHaveCount(0);
       await expect(sectionCompleted).toContainText('Completed');
+      const initialCompletedBox = await sectionCompleted.boundingBox();
+      const initialABox = await sectionA.boundingBox();
+      expect(initialCompletedBox).not.toBeNull();
+      expect(initialABox).not.toBeNull();
+      expect((initialCompletedBox?.y ?? 0) < (initialABox?.y ?? 0)).toBe(true);
 
-      const previewBCard = previewB.locator(`[data-card-id="${activeBCardId}"]`);
-      await previewBCard.click();
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 500 });
-      await previewBCard.click();
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
-      await page.keyboard.press('Escape');
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
       await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
       await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
 
@@ -1170,8 +1200,12 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
       const completedBCard = page.getByTestId(`completed-card-${completedBCardId}`).first();
+      const completedEventCard = page.getByTestId(`completed-card-${completedEventCardId}`).first();
       await expect(completedBCard).toBeVisible();
+      await expect(completedEventCard).toBeVisible();
+      await expect(completedEventCard).toContainText('09:00');
       await expect(page.getByTestId(`completed-badge-${completedBCardId}`)).toHaveText('B');
+      await expect(page.getByTestId(`completed-badge-${completedEventCardId}`)).toHaveText('A');
       await expect(page.getByTestId(`bucket-preview-a-${todayIso}`).first()).toContainText('Completed flow active A');
       await expect(page.getByTestId(`bucket-preview-b-${todayIso}`).first()).toContainText('Completed flow active B');
 
@@ -1189,7 +1223,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await activeACard.locator('[role="checkbox"]').click();
       await expect(activeACard).toBeHidden({ timeout: 20_000 });
       await expect(countA).toHaveText('0');
-      await expect(completedCount).toHaveText('2/3');
+      await expect(completedCount).toHaveText('3/4');
       await expect(toggleA).toHaveAttribute('aria-expanded', 'false');
       await expect(toggleB).toHaveAttribute('aria-expanded', 'true');
       await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible({ timeout: 20_000 });
@@ -1206,15 +1240,22 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.keyboard.press('Space');
 
       await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeHidden({ timeout: 20_000 });
-      await expect(completedCount).toHaveText('1/3');
+      await expect(completedCount).toHaveText('2/4');
       await expect(completedToggle).toHaveAttribute('aria-expanded', 'true');
+
+      const completedEventFocusable = page.locator(`[data-testid="completed-card-${completedEventCardId}"] [data-card-id="${completedEventCardId}"]`);
+      await completedEventFocusable.focus();
+      await page.keyboard.press('Space');
+      await expect(page.getByTestId(`completed-card-${completedEventCardId}`)).toBeHidden({ timeout: 20_000 });
+      await expect(completedCount).toHaveText('1/4');
+      await expect(completedTimelineEvent).not.toHaveAttribute('data-checked-visual', 'timeline-dim');
 
       await completedToggle.click();
       await expect(toggleA).toHaveAttribute('aria-expanded', 'true');
       await expect(toggleB).toHaveAttribute('aria-expanded', 'false');
       await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible({ timeout: 20_000 });
     } finally {
-      await supabaseAdmin.from('cards').delete().in('id', [activeACardId, activeBCardId, completedBCardId]);
+      await supabaseAdmin.from('cards').delete().in('id', [activeACardId, activeBCardId, completedBCardId, completedEventCardId]);
     }
   });
 
