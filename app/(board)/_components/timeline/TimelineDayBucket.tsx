@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { TimelineBucketCard } from './TimelineBucketCard';
 import { DraggableCard } from './TimelineDraggableCard';
@@ -42,11 +42,12 @@ const SECTION_ORDER: readonly ActiveBucketSection[] = ['a', 'b', 'completed'];
 const PRIMARY_SECTION_ORDER: readonly Exclude<ActiveBucketSection, 'completed'>[] = ['a', 'b'];
 const HEADER_HEIGHT_PX = 32;
 const PREVIEW_CARD_HEIGHT_PX = 78;
-const COMPACT_BUCKET_FOOTER_HEIGHT_PX = 20;
-const COMPACT_EMPTY_HEIGHT_PX = HEADER_HEIGHT_PX + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
+const COMPACT_BUCKET_SECTION_PADDING_PX = 8;
+const EMPTY_SECTION_BODY_HEIGHT_PX = 18;
+const COMPACT_EMPTY_HEIGHT_PX = HEADER_HEIGHT_PX + EMPTY_SECTION_BODY_HEIGHT_PX;
 const COMPLETED_SUMMARY_ROW_HEIGHT_PX = HEADER_HEIGHT_PX;
 const EXPANDED_CARD_HEIGHT_PX = 78;
-const EXPANDED_AB_FOOTER_HEIGHT_PX = 48;
+const EXPANDED_SECTION_PADDING_PX = 8;
 const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
 const MAX_PREVIEW_ITEMS = 2;
 const MAX_EXPANDED_SECTION_RATIO = 0.52;
@@ -106,7 +107,7 @@ function findNextNonEmptyPrimarySection(
 
 function resolveCompactSectionRowHeight(itemCount: number, previewCount: number) {
     if (itemCount === 0) return COMPACT_EMPTY_HEIGHT_PX;
-    return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX) + COMPACT_BUCKET_FOOTER_HEIGHT_PX;
+    return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX) + COMPACT_BUCKET_SECTION_PADDING_PX;
 }
 
 function StaticBucketRow({
@@ -262,11 +263,6 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         });
     }, [resolvePrimaryFallbackSection, sectionCounts]);
 
-    const handleAddAndExpand = useCallback((section: 'a' | 'b', bucketKey: string) => {
-        setActiveSection(section);
-        onCreateBucketCard?.(bucketKey);
-    }, [onCreateBucketCard]);
-
     const layout = useMemo(
         () => {
             const previewCounts: Record<ActiveBucketSection, number> = {
@@ -309,7 +305,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             const desiredExpandedHeight =
                 HEADER_HEIGHT_PX +
                 (sectionCounts[expandedSection] * EXPANDED_CARD_HEIGHT_PX) +
-                (expandedSection === 'completed' ? 0 : EXPANDED_AB_FOOTER_HEIGHT_PX);
+                EXPANDED_SECTION_PADDING_PX;
             const expandedHeight = Math.min(maxExpandedHeight, ratioCappedHeight, desiredExpandedHeight);
 
             let remainingHeight = containerHeight - compactHeights - expandedHeight;
@@ -353,7 +349,6 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         countValue,
         bodyId,
         countTestId,
-        addButton,
     }: {
         label: string;
         section: ActiveBucketSection;
@@ -361,57 +356,141 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         countValue?: ReactNode;
         bodyId: string;
         countTestId: string;
-        addButton?: ReactNode;
     }) => {
         const isExpanded = expandedSection === section && count > 0;
         const lineClass = section === 'a' ? 'border-b' : 'border-y';
+        const isToggleable = count > 0;
+        const toggleLabel = !isToggleable ? 'Empty' : isExpanded ? 'Close' : 'Open';
 
         return (
-            <div className={clsx('px-0', lineClass, 'border-slate-200/90 bg-slate-100/70')}>
-                <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1.75rem] items-center">
-                    <div className="flex h-6 w-6 items-center justify-center border-r border-slate-200/70">
-                        {addButton ?? <span aria-hidden="true" className="block h-6 w-6" />}
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2 px-1.5 py-0.5">
-                        <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
-                        <CountBadge value={countValue ?? count} testId={countTestId} />
-                    </div>
-                    <button
-                        type="button"
-                        aria-expanded={isExpanded}
-                        aria-controls={bodyId}
-                        onClick={() => handleSectionToggle(section)}
-                        className="flex h-7 w-7 items-center justify-center border-l border-slate-200/70 text-slate-600 transition-colors duration-150 hover:bg-white/70 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset"
-                        data-testid={`bucket-toggle-${section}-${day.isoDate}`}
-                    >
+            <button
+                type="button"
+                aria-expanded={isExpanded}
+                aria-controls={bodyId}
+                aria-label={isToggleable ? `${label} ${toggleLabel}` : `${label} Empty`}
+                disabled={!isToggleable}
+                onClick={() => handleSectionToggle(section)}
+                className={clsx(
+                    'flex min-h-8 w-full min-w-0 items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
+                    lineClass,
+                    'border-slate-200/90 bg-slate-100/70',
+                    isToggleable
+                        ? 'cursor-pointer hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset'
+                        : 'cursor-default'
+                )}
+                data-testid={`bucket-toggle-${section}-${day.isoDate}`}
+            >
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
+                    <CountBadge value={countValue ?? count} testId={countTestId} />
+                </span>
+                <span
+                    className={clsx(
+                        'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors duration-150',
+                        !isToggleable
+                            ? 'border-slate-200 bg-slate-100 text-slate-400'
+                            : isExpanded
+                                ? 'border-sky-200 bg-sky-50 text-sky-700'
+                                : 'border-slate-200 bg-white text-slate-500'
+                    )}
+                >
+                    <span>{toggleLabel}</span>
+                    {isToggleable ? (
                         <span
                             aria-hidden="true"
-                            className={clsx('text-xs transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
+                            className={clsx('text-[11px] transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
                         >
                             ▾
                         </span>
-                    </button>
-                </div>
-            </div>
+                    ) : null}
+                </span>
+            </button>
         );
     };
+
+    const renderBucketAddSlot = ({
+        isOver,
+        onClick,
+        testId,
+        sticky = false,
+        revealClassName,
+        showDropLine = false,
+    }: {
+        isOver: boolean;
+        onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+        testId: string;
+        sticky?: boolean;
+        revealClassName?: string;
+        showDropLine?: boolean;
+    }) => (
+        <div
+            className={clsx(
+                'pointer-events-none relative mx-[1px] h-0 shrink-0',
+                sticky
+                    ? 'sticky top-0 z-10'
+                    : 'z-10'
+            )}
+        >
+            {showDropLine && isOver ? (
+                <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-0.5 -translate-y-1/2 bg-sky-400"
+                />
+            ) : null}
+            <button
+                type="button"
+                disabled={status === 'loading' || !onCreateBucketCard}
+                onClick={onClick}
+                className={clsx(
+                    'pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                    'scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300',
+                    !isOver && revealClassName,
+                    isOver
+                        ? 'border-sky-400 bg-sky-50 text-sky-700'
+                        : 'border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
+                )}
+                aria-label="Add card"
+                data-testid={testId}
+            >
+                <span aria-hidden="true">＋</span>
+            </button>
+        </div>
+    );
 
     const renderCompactPreview = ({
         section,
         previews,
         badgeLabel,
         bucketKey,
+        isOver = false,
     }: {
         section: 'a' | 'b' | 'completed';
         previews: Array<CompletedBucketEntry | { item: TimelineBucketItem }>;
         badgeLabel?: string | null;
         bucketKey?: string;
+        isOver?: boolean;
     }) => (
         <div
             id={`bucket-panel-${section}-${day.isoDate}`}
             data-testid={`bucket-preview-${section}-${day.isoDate}`}
-            className="mt-1 flex-1 min-h-0 space-y-1 overflow-hidden p-[1px]"
+            className={clsx(
+                'mt-1 flex-1 min-h-0 space-y-1 pl-[1px] py-[1px]',
+                bucketKey ? 'overflow-y-auto overflow-x-hidden scrollbar-ab-thin [scrollbar-gutter:stable]' : 'overflow-hidden'
+            )}
         >
+            {bucketKey
+                ? renderBucketAddSlot({
+                    isOver,
+                    sticky: false,
+                    testId: `ab-add-top-${bucketKey}`,
+                    revealClassName:
+                        'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
+                    onClick: (e) => {
+                        e.stopPropagation();
+                        onCreateBucketCard?.(bucketKey);
+                    },
+                })
+                : null}
             {previews.map((preview, index) => {
                 const rowBadgeLabel =
                     section === 'completed' && 'sourceBucket' in preview
@@ -437,13 +516,25 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 }
 
                 return (
-                    <DraggableCard
-                        key={preview.item.card_id}
-                        id={`bucket-preview:${preview.item.card_id}`}
-                        data={{ kind: 'bucket', cardId: preview.item.card_id, bucketKey, item: preview.item }}
-                    >
-                        {row}
-                    </DraggableCard>
+                    <div key={preview.item.card_id} className="group/item relative">
+                        <DraggableCard
+                            id={`bucket-preview:${preview.item.card_id}`}
+                            data={{ kind: 'bucket', cardId: preview.item.card_id, bucketKey, item: preview.item }}
+                        >
+                            {row}
+                        </DraggableCard>
+                        {renderBucketAddSlot({
+                            isOver,
+                            sticky: false,
+                            testId: `ab-add-after-${preview.item.card_id}`,
+                            revealClassName:
+                                'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',
+                            onClick: (e) => {
+                                e.stopPropagation();
+                                onCreateBucketCard?.(bucketKey, preview.item.card_id);
+                            },
+                        })}
+                    </div>
                 );
             })}
         </div>
@@ -458,56 +549,12 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         section: 'a' | 'b';
         label: string;
         items: readonly TimelineBucketItem[];
-        bucket: ActiveBucketSection;
+        bucket: 'a' | 'b';
     }) => {
         const bucketKey = `${day.key}_${bucket}`;
         const isExpanded = expandedSection === section && items.length > 0;
         const bodyId = `bucket-panel-${section}-${day.isoDate}`;
-        const lastCardId = items.length ? items[items.length - 1]?.card_id : undefined;
         const count = items.length;
-        const addButton = (
-            <button
-                type="button"
-                aria-label={`${label} にカードを追加`}
-                disabled={status === 'loading' || !onCreateBucketCard}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddAndExpand(section, bucketKey);
-                }}
-                className="inline-flex h-6 w-6 items-center justify-center border border-transparent text-slate-500 transition-colors duration-150 hover:bg-white/70 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-                data-testid={`ab-add-${bucketKey}`}
-            >
-                <span className="text-sm leading-none">＋</span>
-            </button>
-        );
-        const renderBucketFooterSlot = ({
-            isOver,
-            onClick,
-        }: {
-            isOver: boolean;
-            onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-        }) => (
-            <button
-                type="button"
-                disabled={status === 'loading' || !onCreateBucketCard}
-                onClick={onClick}
-                className={clsx(
-                    'relative mt-0.5 mb-1 flex h-4 w-full items-center justify-center overflow-hidden rounded-sm border border-dashed text-slate-500 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                    isOver
-                        ? 'border-sky-400 bg-sky-50 text-sky-700'
-                        : 'border-slate-300/90 bg-white/60 hover:border-sky-300 hover:bg-white hover:text-sky-700'
-                )}
-                data-testid={`ab-add-bottom-${bucketKey}`}
-            >
-                {isOver ? (
-                    <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-sky-500"
-                    />
-                ) : null}
-                <span className="relative z-10 inline-flex h-4 w-4 items-center justify-center text-xs leading-none">＋</span>
-            </button>
-        );
 
         if (isExpanded) {
             return (
@@ -517,45 +564,58 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {(isOver) => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="group/section flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
                                     count,
                                     bodyId,
                                     countTestId: `bucket-count-${section}-${day.isoDate}`,
-                                    addButton,
                                 })}
                                 <div
                                     id={bodyId}
                                     ref={(el) => registerScrollContainer?.(day.isoDate, el, bucket)}
                                     data-ab-scroll-container="true"
-                                    className="mt-1 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
+                                    className="mt-1 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable] pl-[1px] py-[1px]"
                                 >
-                                    {items.length === 0 && isOver ? <div className="mb-2 h-0.5 bg-sky-500" /> : null}
-                                    {items.map((item) => (
-                                        <TimelineBucketCard
-                                            key={item.card_id}
-                                            item={item}
-                                            bucketKey={bucketKey}
-                                            openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
-                                            onToggleCheck={onToggleCheck}
-                                            showFallbackBottomLine={
-                                                bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id
-                                            }
-                                            onCardContextMenu={onCardContextMenu}
-                                            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                                            isContextMenuOpen={contextMenuCardId === item.card_id}
-                                            onCreateBucketCard={onCreateBucketCard}
-                                        />
-                                    ))}
-                                    {renderBucketFooterSlot({
+                                    {renderBucketAddSlot({
                                         isOver,
+                                        sticky: true,
+                                        testId: `ab-add-top-${bucketKey}`,
+                                        revealClassName:
+                                            'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
                                         onClick: (e) => {
                                             e.stopPropagation();
-                                            onCreateBucketCard?.(bucketKey, lastCardId);
+                                            onCreateBucketCard?.(bucketKey);
                                         },
                                     })}
+                                    {items.map((item) => (
+                                        <div key={item.card_id} className="group/item relative">
+                                            <TimelineBucketCard
+                                                item={item}
+                                                bucketKey={bucketKey}
+                                                openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                                                onToggleCheck={onToggleCheck}
+                                                showFallbackBottomLine={
+                                                    bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id
+                                                }
+                                                onCardContextMenu={onCardContextMenu}
+                                                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                                                isContextMenuOpen={contextMenuCardId === item.card_id}
+                                                onCreateBucketCard={onCreateBucketCard}
+                                            />
+                                            {renderBucketAddSlot({
+                                                isOver,
+                                                testId: `ab-add-after-${item.card_id}`,
+                                                revealClassName:
+                                                    'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',
+                                                onClick: (e) => {
+                                                    e.stopPropagation();
+                                                    onCreateBucketCard?.(bucketKey, item.card_id);
+                                                },
+                                            })}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -572,21 +632,27 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 >
                     <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                         {(isOver) => (
-                            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                            <div className="group/section flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
                                 {renderSectionHeader({
                                     label,
                                     section,
                                     count,
                                     bodyId,
                                     countTestId: `bucket-count-${section}-${day.isoDate}`,
-                                    addButton,
                                 })}
-                                <div id={bodyId} className="px-3">
-                                    {renderBucketFooterSlot({
+                                <div
+                                    id={bodyId}
+                                    className="flex min-h-0 flex-1 flex-col pl-[1px] py-0.5"
+                                >
+                                    {renderBucketAddSlot({
                                         isOver,
+                                        testId: `ab-add-top-${bucketKey}`,
+                                        showDropLine: true,
+                                        revealClassName:
+                                            'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
                                         onClick: (e) => {
                                             e.stopPropagation();
-                                            handleAddAndExpand(section, bucketKey);
+                                            onCreateBucketCard?.(bucketKey);
                                         },
                                     })}
                                 </div>
@@ -598,15 +664,15 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         }
 
         return (
-                <section
-                    data-testid={`bucket-section-${section}-${day.isoDate}`}
-                    className="min-h-0 overflow-hidden"
-                >
-                    <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
+            <section
+                data-testid={`bucket-section-${section}-${day.isoDate}`}
+                className="min-h-0 overflow-hidden"
+            >
+                <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                     {(isOver) => (
                         <div
                             className={clsx(
-                                'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out',
+                                'group/section flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out',
                                 isOver ? 'bg-sky-50/60' : ''
                             )}
                         >
@@ -616,23 +682,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                 count,
                                 bodyId,
                                 countTestId: `bucket-count-${section}-${day.isoDate}`,
-                                addButton,
                             })}
                             <div className="flex min-h-0 flex-1 flex-col">
                                 {renderCompactPreview({
                                     section,
                                     previews: items.slice(0, layout.previewCounts[section]).map((item) => ({ item })),
                                     bucketKey,
+                                    isOver,
                                 })}
-                                <div className="px-[1px]">
-                                    {renderBucketFooterSlot({
-                                        isOver,
-                                        onClick: (e) => {
-                                            e.stopPropagation();
-                                            handleAddAndExpand(section, bucketKey);
-                                        },
-                                    })}
-                                </div>
                             </div>
                         </div>
                     )}
@@ -664,7 +721,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     {isExpanded ? (
                         <div
                             id={bodyId}
-                            className="mt-1 flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 p-[1px]"
+                            className="mt-1 flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable] pl-[1px] py-[1px]"
                         >
                             {completedItems.map(({ item, sourceBucket }) => (
                                 <StaticBucketRow

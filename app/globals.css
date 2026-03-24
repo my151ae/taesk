@@ -34,4 +34,25 @@ body {
   .scrollbar-thin::-webkit-scrollbar-corner {
     background: transparent;
   }
+
+  .scrollbar-ab-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  .scrollbar-ab-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-ab-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-ab-thin::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-ab-thin::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }

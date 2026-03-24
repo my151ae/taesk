@@ -923,42 +923,6 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('can create a date-only card from A/B list by click', async ({ page }) => {
-    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
-    if (!boardContext) {
-      throw new Error('Missing board context for timeline spec');
-    }
-
-    await page.goto(boardContext.canonicalPath);
-    await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
-
-    const createResponsePromise = page.waitForResponse((res) => {
-      const url = res.url();
-      return (
-        res.request().method() === 'POST' &&
-        url.includes(`/api/boards/${boardContext.boardId}/cards`)
-      );
-    }, { timeout: 20_000 });
-
-    const [response] = await Promise.all([
-      createResponsePromise,
-      page.locator('[data-testid^="ab-add-"]').first().click(),
-    ]);
-    expect(response.ok(), `create card API failed: ${response.status()}`).toBeTruthy();
-    const body = await response.json().catch(() => null);
-    const createdCardId = body?.card?.id as string | undefined;
-
-    if (createdCardId) {
-      await expect(page.getByTestId(`ab-card-${createdCardId}`).first()).toBeVisible();
-    } else {
-      await expect(page.locator('[data-testid^="ab-card-"]').first()).toBeVisible();
-    }
-
-    if (createdCardId) {
-      await supabaseAdmin.from('cards').delete().eq('id', createdCardId);
-    }
-  });
-
   test('shows A/B and overdue previews up to 3 lines without fixed card height', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

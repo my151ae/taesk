@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   getDisplayHours,
@@ -427,7 +427,29 @@ function MobileAbBucket({
     id: `bucket-drop:${bucketKey}`,
     data: { type: "ab-bucket", bucketKey },
   });
-  const lastCardId = items.length ? items[items.length - 1]?.card_id : undefined;
+  const renderAddButton = (position: "top" | "bottom", onClick: (e: React.MouseEvent<HTMLButtonElement>) => void) => (
+    <div
+      className={`pointer-events-none relative mx-0.5 h-0 shrink-0 ${
+        position === "top"
+          ? "sticky top-0 z-10"
+          : "z-10"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className={`pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+          isOver
+            ? "border-sky-400 bg-sky-50 text-sky-700"
+            : "border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+        }`}
+        aria-label="Add card"
+        data-testid={`ab-add-${position}-${bucketKey}`}
+      >
+        <span aria-hidden="true">＋</span>
+      </button>
+    </div>
+  );
 
   return (
     <div
@@ -437,52 +459,40 @@ function MobileAbBucket({
       data-bucket-key={bucketKey}
     >
       <div className="border-b border-slate-200 px-3 py-1.5">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-semibold text-slate-700">{sectionLabel}</p>
-          <button
-            type="button"
-            aria-label="カードを追加"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateBucketCard(bucketKey);
-            }}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-sky-700"
-            data-testid={`ab-add-${bucketKey}`}
-          >
-            <span className="text-base leading-none">＋</span>
-          </button>
-        </div>
+        <p className="text-[10px] font-semibold text-slate-700">{sectionLabel}</p>
       </div>
       <div className="space-y-1 px-2 pb-2">
         {items.length === 0 ? (
-          <p className="px-1 py-3 text-[11px] text-slate-400">{isOver ? "ここにドロップ" : "カードがありません"}</p>
-        ) : (
-          items.map((item) => (
-            <MobileBucketCard
-              key={item.card_id}
-              item={item}
-              bucketKey={bucketKey}
-              openCardModal={openCardModal}
-              onToggleCheck={onToggleCheck}
-              bucketIndicator={bucketIndicator}
-              onCardContextMenu={onCardContextMenu}
-              onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-              isContextMenuOpen={contextMenuCardId === item.card_id}
-            />
-          ))
-        )}
-        <button
-          type="button"
-          onClick={(e) => {
+          renderAddButton("bottom", (e) => {
             e.stopPropagation();
-            onCreateBucketCard(bucketKey, lastCardId);
-          }}
-          className="flex w-full items-center gap-2 rounded-none border border-slate-200/70 bg-white/60 px-3 py-2 text-[11px] font-semibold text-slate-400 hover:border-sky-300 hover:bg-white hover:text-sky-700"
-          data-testid={`ab-add-bottom-${bucketKey}`}
-        >
-          <span className="text-base leading-none">＋</span>
-          <span>追加</span>
-        </button>
+            onCreateBucketCard(bucketKey);
+          })
+        ) : (
+          <>
+            {renderAddButton("top", (e) => {
+              e.stopPropagation();
+              onCreateBucketCard(bucketKey);
+            })}
+            {items.map((item) => (
+              <Fragment key={item.card_id}>
+                <MobileBucketCard
+                  item={item}
+                  bucketKey={bucketKey}
+                  openCardModal={openCardModal}
+                  onToggleCheck={onToggleCheck}
+                  bucketIndicator={bucketIndicator}
+                  onCardContextMenu={onCardContextMenu}
+                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                  isContextMenuOpen={contextMenuCardId === item.card_id}
+                />
+                {renderAddButton("bottom", (e) => {
+                  e.stopPropagation();
+                  onCreateBucketCard(bucketKey, item.card_id);
+                })}
+              </Fragment>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
@@ -850,7 +860,7 @@ export default function MobileTimelineView({
               ref={(el) => registerAbScrollContainer?.(activeDay.isoDate, el)}
               data-ab-scroll-container="true"
               data-ab-day={activeDay.isoDate}
-              className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+              className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-ab-thin [scrollbar-gutter:stable]"
             >
               <div className="space-y-3 px-3 pb-4">
                 {abMeta?.sections.map((section) => {
