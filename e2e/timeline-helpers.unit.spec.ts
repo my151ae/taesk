@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { calculateStackedEventLayout, NormalizedTimelineLayoutItem } from '../app/(board)/_utils/timeline-helpers';
 import { buildDesktopAllDayState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
 import {
+    formatShortcutKeyLabel,
     resolveShortcutBarPayload,
     sliceShortcutItems,
 } from '../app/(board)/_components/timeline/shortcut-bar-registry';
@@ -208,6 +209,11 @@ test.describe('timeline-render-model helpers', () => {
 });
 
 test.describe('shortcut bar registry helpers', () => {
+    test('formatShortcutKeyLabel preserves mac shift symbol', async () => {
+        expect(formatShortcutKeyLabel('⇧')).toBe('⇧');
+        expect(formatShortcutKeyLabel('Enter')).toBe('Enter');
+    });
+
     test('board sidebar overdue card payload resolves', async () => {
         const payload = resolveShortcutBarPayload({
             scope: 'board',

@@ -227,7 +227,7 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     parts: ["card"],
     legacyContexts: ["timeline-card"],
     keys: ["⇧", "Enter"],
-    label: "次カード",
+    label: "カード追加",
     priorityBand: 2,
     displayOrder: 30,
     visibleWhen: ACTIVE_ONLY,
@@ -494,6 +494,10 @@ export function createEmptyShortcutBarPayload(scope: ShortcutScope): ShortcutBar
     contextLabel: null,
     items: [],
   };
+}
+
+export function formatShortcutKeyLabel(key: string): string {
+  return key;
 }
 
 export function sliceShortcutItems<T>(items: T[], maxVisibleItems: number): {

@@ -118,6 +118,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"
+                    focusGroup="timeline"
                     shortcutContext={{
                         scope: 'board',
                         region: 'main-panel',

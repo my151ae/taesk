@@ -674,6 +674,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             <button
                 type="button"
                 disabled={status === 'loading' || !onCreateBucketCard}
+                tabIndex={-1}
+                data-arrow-skip="true"
                 onClick={onClick}
                 className={clsx(
                     'pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50',
@@ -701,6 +703,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         <button
             type="button"
             disabled={status === 'loading' || !onCreateBucketCard}
+            tabIndex={-1}
+            data-arrow-skip="true"
             onClick={(e) => {
                 e.stopPropagation();
                 onCreateBucketCard?.(bucketKey);
@@ -753,10 +757,12 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 type="button"
                 aria-pressed={isPriority}
                 aria-label={isPriority ? `${label}を優先中` : `${label}を優先表示`}
+                data-focus-group="bucket"
+                data-focus-part="section-button"
                 disabled={isDisabled}
                 onClick={() => handlePriorityPress(section)}
                 className={clsx(
-                    'flex min-h-8 w-full min-w-0 items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
+                    'flex min-h-8 w-full min-w-0 select-none items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
                     lineClass,
                     section === 'completed' ? 'border-slate-200/90 bg-white' : 'border-slate-200/90 bg-slate-100/70',
                     isDisabled

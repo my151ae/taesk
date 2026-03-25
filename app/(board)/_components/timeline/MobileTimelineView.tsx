@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
 import {
   getDisplayHours,
@@ -28,6 +28,7 @@ import {
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
+import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import {
   useTimelineZoomStore,
@@ -159,6 +160,8 @@ function MobileTimelineColumn({
                 key={`calendar-${calendarEvent.id}`}
                 type="button"
                 data-testid="timeline-calendar-event"
+                data-focus-group="timeline"
+                data-focus-part="card"
                 data-stack-mode={layout?.presentationMode ?? "full-width"}
                 data-column-span={layout?.columnSpan ?? 1}
                 data-cluster-columns={layout?.clusterColumns ?? 1}
@@ -265,6 +268,7 @@ function MobileTimelineColumn({
                   dataTestId="timeline-event"
                   className={`w-full h-full pt-0 ${activeStackItem?.kind === "card" && activeStackItem.id === event.card_id ? "ring-2 ring-sky-400 shadow-md" : ""}`}
                   tabIndex={0}
+                  focusGroup="timeline"
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
                   onFocus={() => {
                     if (interactionLocked) return;
@@ -437,6 +441,8 @@ function MobileAbBucket({
     >
       <button
         type="button"
+        tabIndex={-1}
+        data-arrow-skip="true"
         onClick={onClick}
         className={`pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
           isOver
@@ -575,6 +581,10 @@ export default function MobileTimelineView({
   overdueSortOrder,
   onOverdueSortOrderChange,
 }: MobileTimelineViewProps) {
+  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    handleTimelineCardArrowFocus(event);
+  }, []);
+
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const swipeLockedRef = useRef(false);
@@ -692,6 +702,7 @@ export default function MobileTimelineView({
     >
       <div
         className="relative flex h-full w-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
+        onKeyDownCapture={handleArrowKeyFocus}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
         onTouchEnd={handleSwipeEnd}
@@ -784,6 +795,8 @@ export default function MobileTimelineView({
                     <button
                       key={item.id}
                       type="button"
+                      data-focus-group="timeline"
+                      data-focus-part="card"
                       disabled={!onExternalEventClick}
                       onClick={() => onExternalEventClick?.(item)}
                       className="flex min-w-0 items-start gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"

@@ -1,8 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
+import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -204,6 +205,10 @@ export function DesktopTimelineView({
   onCardContextMenuByKeyboard,
   contextMenuCardId,
 }: DesktopTimelineViewProps) {
+  const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    handleTimelineCardArrowFocus(event);
+  }, []);
+
   // Calculate how many days to show based on dayRange setting
   const { visibleDays, gridTemplateColumns: desktopGridTemplateColumns } = useMemo(
     () =>
@@ -319,7 +324,10 @@ export function DesktopTimelineView({
   }, [onMount]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
+      onKeyDownCapture={handleArrowKeyFocus}
+    >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div ref={timelineHeaderRef} className="z-30">
               <div
@@ -383,6 +391,8 @@ export function DesktopTimelineView({
                         <button
                           key={`${item.id}-${item.start}-${item.end}`}
                           type="button"
+                          data-focus-group="timeline"
+                          data-focus-part="card"
                           disabled={!onExternalEventClick}
                           onClick={() => onExternalEventClick?.(item.entry)}
                           className="absolute flex items-start gap-2 rounded-md border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"

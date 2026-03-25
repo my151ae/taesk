@@ -15,6 +15,26 @@ type StatusShortcutBarProps = {
   dataTestId?: string;
 };
 
+function ShiftKeyGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5">
+      <path
+        d="M12 4.25 18.35 10.6H14.9v7.15H9.1V10.6H5.65L12 4.25Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function renderKeyLabel(label: string) {
+  if (label === "⇧") return <ShiftKeyGlyph />;
+  return label;
+}
+
 function KeyChip({ label, disabled = false }: { label: string; disabled?: boolean }) {
   return (
     <span
@@ -25,7 +45,7 @@ function KeyChip({ label, disabled = false }: { label: string; disabled?: boolea
           : "border-slate-300 bg-white text-slate-700"
       )}
     >
-      {label}
+      {renderKeyLabel(label)}
     </span>
   );
 }

@@ -27,6 +27,26 @@ function KeyIcon({ children, className }: KeyIconProps) {
     );
 }
 
+function ShiftKeyGlyph() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4">
+            <path
+                d="M12 4.25 18.35 10.6H14.9v7.15H9.1V10.6H5.65L12 4.25Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
+function renderKeyLabel(label: string) {
+    if (label === "⇧") return <ShiftKeyGlyph />;
+    return label;
+}
+
 type ShortcutRowProps = {
     label: string;
     keys: React.ReactNode[];
@@ -95,7 +115,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
                     <div className="hidden md:flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
-                            <KeyIcon className="w-8 h-8 text-sm">⇧</KeyIcon>
+                            <KeyIcon className="w-8 h-8 text-sm"><ShiftKeyGlyph /></KeyIcon>
                             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Shift</span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -159,7 +179,9 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
                                     <div className="flex min-w-0 flex-col gap-1">
                                         <ShortcutRow
                                             label={row.label}
-                                            keys={row.keys.map((key) => <KeyIcon key={`${row.id}-${key}`}>{key}</KeyIcon>)}
+                                            keys={row.keys.map((key) => (
+                                                <KeyIcon key={`${row.id}-${key}`}>{renderKeyLabel(key)}</KeyIcon>
+                                            ))}
                                         />
                                     </div>
                                     <div className="flex items-center justify-end text-sm font-semibold text-slate-500">

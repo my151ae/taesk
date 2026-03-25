@@ -280,6 +280,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             dataTestId="timeline-calendar-event"
                                             tabIndex={0}
                                             role="group"
+                                            focusGroup="timeline"
                                             onFocus={() => {
                                                 if (interactionLocked) return;
                                                 setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });
