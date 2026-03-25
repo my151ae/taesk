@@ -218,15 +218,20 @@
     font-size: 16px;
     line-height: 1.5;
     min-height: 200px;
+    min-width: 0;
+    max-width: 100%;
     padding-left: 2.5rem;
 }
 
 .editor :global(.ProseMirror p),
-.editor :global(.ProseMirror ul[data-type="taskList"] li) {
+.editor :global(.ProseMirror ul[data-type="taskList"] li),
+.editor :global(.ProseMirror summary) {
     margin: 0 !important;
     padding-bottom: 2px !important;
     border-bottom: 1px solid #e5e7eb;
     line-height: 1.5;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .editor :global(.ProseMirror div[data-type="details"]) {

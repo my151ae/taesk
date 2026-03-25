@@ -2746,6 +2746,93 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('keeps sidebar reachable after pasting long multiline text in the modal body', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Sidebar resilience',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1701,
+      tags: [],
+      due_date: isoDay,
+      due_start: '12:00:00',
+      due_end: '13:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 503,
+      slug: 'sidebar-resilience',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const openSidebarToggle = modal.locator('button[title="Show details"]');
+      const closeSidebarToggle = modal.locator('button[title="Hide details"]');
+
+      const longToken = 'LONGTOKEN'.repeat(80);
+      const pastedText = [
+        `1:${longToken}`,
+        `2:${longToken}`,
+        '3: 改行ありの長文でも右パネルを開けること',
+        `4:${longToken}`,
+        `5:${longToken}`,
+      ].join('\n');
+
+      await bodyEditor.click();
+      await pastePlainText(page, pastedText);
+
+      const commentsPanel = modal.getByTestId('comments-panel');
+
+      if (await closeSidebarToggle.isVisible()) {
+        await closeSidebarToggle.click();
+        await expect(openSidebarToggle).toBeVisible();
+      }
+
+      await openSidebarToggle.click();
+      await expect(closeSidebarToggle).toBeVisible();
+      await expect(commentsPanel).toBeVisible();
+
+      const modalBox = await modal.boundingBox();
+      const panelBox = await commentsPanel.boundingBox();
+
+      expect(modalBox).not.toBeNull();
+      expect(panelBox).not.toBeNull();
+      expect(panelBox!.x).toBeGreaterThanOrEqual(modalBox!.x - 1);
+      expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(modalBox!.x + modalBox!.width + 1);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('pastes image in body editor, stores storagePath, and refreshes signed URL on reopen', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

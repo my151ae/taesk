@@ -742,9 +742,9 @@ export function CardModal({
                 )}
 
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
-                <div ref={resizeRef} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
+                <div ref={resizeRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden sm:flex-row">
                     {/* Left Column - Details (Note) */}
-                    <div className={`flex flex-col flex-1 min-h-0 p-0 ${showSidebar ? "hidden sm:flex" : "flex"}`}>
+                    <div className={`flex min-h-0 min-w-0 flex-1 flex-col p-0 ${showSidebar ? "hidden sm:flex" : "flex"}`}>
                         {!isLoading && (
                             <div
                                 className="z-20"
@@ -789,7 +789,7 @@ export function CardModal({
                                 </div>
                             </div>
                         )}
-                        <div className="flex-1 overflow-y-auto min-h-0">
+                        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center p-12 space-y-4">
                                     <svg className="w-8 h-8 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -799,7 +799,7 @@ export function CardModal({
                                     <p className="text-sm text-slate-500 animate-pulse">読み込み中...</p>
                                 </div>
                             ) : (
-                                <div className="flex flex-col h-full min-h-0">
+                                <div className="flex h-full min-h-0 min-w-0 flex-col">
                                     {isHistoryPreviewing && (
                                         <div className="mx-6 mt-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                                             <p className="font-semibold">履歴プレビュー中</p>
@@ -829,7 +829,7 @@ export function CardModal({
                                         {previewLoading ? (
                                             <div className="flex h-full items-center justify-center text-sm text-slate-500">履歴を読み込み中...</div>
                                         ) : (
-                                            <div className="flex h-full flex-col" {...bodyShortcutAttributes}>
+                                            <div className="flex h-full min-w-0 flex-col" {...bodyShortcutAttributes}>
                                                 <TiptapEditor
                                                     key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                     initialContent={isHistoryPreviewing ? previewHistoryContent : content}
