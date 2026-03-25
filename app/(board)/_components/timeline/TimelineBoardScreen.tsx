@@ -208,6 +208,14 @@ export default function TimelineBoardScreen({
             });
           }}
         >
+          {!modalProps ? (
+            <StatusShortcutBar
+              payload={boardShortcutPayload}
+              maxVisibleItems={shortcutBarProps.maxVisibleItems}
+              className="mb-px shrink-0"
+              dataTestId="board-shortcut-bar"
+            />
+          ) : null}
           {desktop.activeView === "timeline" ? (
             <>
               <DndContext
@@ -271,14 +279,6 @@ export default function TimelineBoardScreen({
                   />
                 </DragOverlay>
               </DndContext>
-              {!modalProps ? (
-                <StatusShortcutBar
-                  payload={boardShortcutPayload}
-                  maxVisibleItems={shortcutBarProps.maxVisibleItems}
-                  className="mt-2 shrink-0"
-                  dataTestId="board-shortcut-bar"
-                />
-              ) : null}
             </>
           ) : (
             <>
@@ -318,14 +318,6 @@ export default function TimelineBoardScreen({
                   <DesktopListView {...desktop.listViewProps} />
                 </section>
               </div>
-              {!modalProps ? (
-                <StatusShortcutBar
-                  payload={boardShortcutPayload}
-                  maxVisibleItems={shortcutBarProps.maxVisibleItems}
-                  className="mt-2 shrink-0"
-                  dataTestId="board-shortcut-bar"
-                />
-              ) : null}
             </>
           )}
         </div>

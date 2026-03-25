@@ -1,8 +1,7 @@
 import clsx from 'clsx';
-import { memo, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { TimelineBucketCard } from './TimelineBucketCard';
-import { DraggableCard } from './TimelineDraggableCard';
 import {
     TimelineCard,
     TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
@@ -48,35 +47,224 @@ type CompletedEntry =
         sourceBucket: CompletedBucketSource;
     };
 
-const SECTION_ORDER: readonly ActiveBucketSection[] = ['completed', 'a', 'b'];
-const PRIMARY_SECTION_ORDER: readonly PrimaryBucketSection[] = ['a', 'b'];
-const HEADER_HEIGHT_PX = 32;
-const PREVIEW_CARD_HEIGHT_PX = 78;
-const COMPACT_BUCKET_SECTION_PADDING_PX = 8;
-const EMPTY_SECTION_BODY_HEIGHT_PX = 80;
-const COMPACT_EMPTY_HEIGHT_PX = HEADER_HEIGHT_PX + EMPTY_SECTION_BODY_HEIGHT_PX;
-const COMPLETED_SUMMARY_ROW_HEIGHT_PX = HEADER_HEIGHT_PX;
-const EXPANDED_CARD_HEIGHT_PX = 78;
-const EXPANDED_SECTION_PADDING_PX = 8;
-const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
-const MAX_PREVIEW_ITEMS = 2;
-const MAX_EXPANDED_SECTION_RATIO = 0.52;
-const MAX_EXPANDED_SECTION_HEIGHT_PX = 420;
+type SectionMeasurements = {
+    headerHeight: number;
+    bodyNaturalHeight: number;
+    peekMinBodyHeight: number;
+    emptyBodyMinHeight: number;
+};
 
-function bucketSectionFrameClass(_section: PrimaryBucketSection, isOver = false) {
+type SectionSizing = {
+    count: number;
+    naturalBodyHeight: number;
+    minBodyHeight: number;
+    enforceMinBodyHeight: boolean;
+};
+
+type PairAllocation = {
+    priorityBodyHeight: number;
+    secondaryBodyHeight: number;
+};
+
+type SectionLayout = {
+    bodyHeight: number;
+    totalHeight: number;
+};
+
+const SECTION_ORDER: readonly ActiveBucketSection[] = ['completed', 'a', 'b'];
+const FALLBACK_HEADER_HEIGHT_PX = 32;
+const FALLBACK_PEEK_BODY_HEIGHT_PX = 96;
+const MIN_PEEK_BODY_HEIGHT_PX = 64;
+const FALLBACK_COMPLETED_BODY_HEIGHT_PX = 96;
+const FALLBACK_EMPTY_BODY_HEIGHT_PX = 84;
+const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
+const CONTENT_CHROME_ALLOWANCE_PX = 8;
+
+const DEFAULT_MEASUREMENTS: Record<ActiveBucketSection, SectionMeasurements> = {
+    completed: {
+        headerHeight: FALLBACK_HEADER_HEIGHT_PX,
+        bodyNaturalHeight: 0,
+        peekMinBodyHeight: FALLBACK_COMPLETED_BODY_HEIGHT_PX,
+        emptyBodyMinHeight: 0,
+    },
+    a: {
+        headerHeight: FALLBACK_HEADER_HEIGHT_PX,
+        bodyNaturalHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+        peekMinBodyHeight: FALLBACK_PEEK_BODY_HEIGHT_PX,
+        emptyBodyMinHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+    },
+    b: {
+        headerHeight: FALLBACK_HEADER_HEIGHT_PX,
+        bodyNaturalHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+        peekMinBodyHeight: FALLBACK_PEEK_BODY_HEIGHT_PX,
+        emptyBodyMinHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+    },
+};
+
+function bucketSectionFrameClass(section: ActiveBucketSection, isOver = false) {
     return clsx(
-        'group/section flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-slate-100 bg-slate-50/70 shadow-inner transition-[height,max-height,opacity,background-color,border-color] duration-200 ease-out',
-        isOver ? 'bg-sky-50/60 border-sky-200' : ''
+        'group/section flex h-full min-h-0 min-w-0 flex-col overflow-hidden transition-[background-color,border-color] duration-200 ease-out',
+        section === 'completed' ? 'border border-slate-200 bg-white shadow-inner' : 'border border-slate-100 bg-slate-50/70 shadow-inner',
+        isOver ? 'border-sky-200 bg-sky-50/60' : ''
     );
 }
 
-const DroppableBucket = ({ children, bucketKey, disabled }: { children: (isOver: boolean) => ReactNode; bucketKey: string; disabled?: boolean }) => {
+function compareNullableNumber(a: number | null | undefined, b: number | null | undefined) {
+    const left = a ?? Number.MAX_SAFE_INTEGER;
+    const right = b ?? Number.MAX_SAFE_INTEGER;
+    return left - right;
+}
+
+function compareString(a: string | null | undefined, b: string | null | undefined) {
+    return (a ?? '').localeCompare(b ?? '', 'en', { sensitivity: 'base' });
+}
+
+function sortCompletedEvents(items: readonly TimelineEvent[]) {
+    return [...items].sort((left, right) => (
+        compareNullableNumber(getMinutesFromTime(left.due_start ?? null), getMinutesFromTime(right.due_start ?? null)) ||
+        compareNullableNumber(getMinutesFromTime(left.due_end ?? null), getMinutesFromTime(right.due_end ?? null)) ||
+        compareString(left.title, right.title) ||
+        compareString(left.card_id, right.card_id)
+    ));
+}
+
+function sortCompletedBuckets(items: readonly TimelineBucketItem[]) {
+    return [...items].sort((left, right) => (
+        compareNullableNumber(left.bucketPosition, right.bucketPosition) ||
+        compareString(left.title, right.title) ||
+        compareString(left.card_id, right.card_id)
+    ));
+}
+
+function resolveCompletedBucketBadgeLabel(item: TimelineBucketItem, fallbackBucket: CompletedBucketSource) {
+    if (item.due_bucket === 'a' || item.due_bucket === 'b') {
+        return item.due_bucket.toUpperCase();
+    }
+    return fallbackBucket.toUpperCase();
+}
+
+function resolveCompletedEventBadgeLabel(item: TimelineEvent) {
+    return item.due_bucket?.toUpperCase() ?? 'A';
+}
+
+function resolveCompletedCountBadgeTone(done: number, total: number): 'neutral' | 'danger' | 'warning' | 'success' {
+    if (total === 0) {
+        return 'neutral';
+    }
+    if (done === 0) {
+        return 'danger';
+    }
+    if (done === total) {
+        return 'success';
+    }
+    return 'warning';
+}
+
+function resolveMeasuredPeekHeight(contentNode: HTMLDivElement | null, section: ActiveBucketSection) {
+    if (!contentNode) {
+        return section === 'completed' ? FALLBACK_COMPLETED_BODY_HEIGHT_PX : FALLBACK_PEEK_BODY_HEIGHT_PX;
+    }
+
+    const selector = section === 'completed' ? '[data-testid^="completed-card-"]' : '[data-testid^="ab-card-"]';
+    const firstCardNode = contentNode.querySelector<HTMLElement>(selector);
+    if (!firstCardNode) {
+        return section === 'completed' ? FALLBACK_COMPLETED_BODY_HEIGHT_PX : FALLBACK_PEEK_BODY_HEIGHT_PX;
+    }
+
+    const firstCardHeight = Math.ceil(firstCardNode.getBoundingClientRect().height);
+    if (firstCardHeight <= 0) {
+        return section === 'completed' ? FALLBACK_COMPLETED_BODY_HEIGHT_PX : FALLBACK_PEEK_BODY_HEIGHT_PX;
+    }
+
+    return Math.max(MIN_PEEK_BODY_HEIGHT_PX, firstCardHeight + CONTENT_CHROME_ALLOWANCE_PX);
+}
+
+function pickFallbackPriority(counts: Record<ActiveBucketSection, number>): ActiveBucketSection {
+    if (counts.a > 0) return 'a';
+    if (counts.b > 0) return 'b';
+    if (counts.completed > 0) return 'completed';
+    return 'a';
+}
+
+function allocatePairHeights({
+    priority,
+    secondary,
+    availableBodyHeight,
+}: {
+    priority: SectionSizing;
+    secondary: SectionSizing;
+    availableBodyHeight: number;
+}): PairAllocation {
+    if (availableBodyHeight <= 0) {
+        return { priorityBodyHeight: 0, secondaryBodyHeight: 0 };
+    }
+
+    if (priority.naturalBodyHeight <= 0 && secondary.naturalBodyHeight <= 0) {
+        return { priorityBodyHeight: 0, secondaryBodyHeight: 0 };
+    }
+
+    if (secondary.naturalBodyHeight <= 0) {
+        const priorityBodyHeight = Math.min(priority.naturalBodyHeight, availableBodyHeight);
+        return {
+            priorityBodyHeight: priority.enforceMinBodyHeight && priorityBodyHeight < priority.minBodyHeight ? 0 : priorityBodyHeight,
+            secondaryBodyHeight: 0,
+        };
+    }
+
+    if (priority.naturalBodyHeight <= 0) {
+        const secondaryBodyHeight = Math.min(secondary.naturalBodyHeight, availableBodyHeight);
+        return {
+            priorityBodyHeight: 0,
+            secondaryBodyHeight: secondaryBodyHeight < secondary.minBodyHeight ? 0 : secondaryBodyHeight,
+        };
+    }
+
+    if (priority.naturalBodyHeight + secondary.naturalBodyHeight <= availableBodyHeight) {
+        return {
+            priorityBodyHeight: priority.naturalBodyHeight,
+            secondaryBodyHeight: secondary.naturalBodyHeight,
+        };
+    }
+
+    let priorityBodyHeight = Math.min(priority.naturalBodyHeight, availableBodyHeight);
+    if (priority.enforceMinBodyHeight && priorityBodyHeight > 0 && priorityBodyHeight < priority.minBodyHeight) {
+        priorityBodyHeight = 0;
+    }
+
+    const remaining = Math.max(0, availableBodyHeight - priorityBodyHeight);
+    if (remaining < secondary.minBodyHeight) {
+        return {
+            priorityBodyHeight: priorityBodyHeight > 0 ? availableBodyHeight : 0,
+            secondaryBodyHeight: 0,
+        };
+    }
+
+    const secondaryBodyHeight = Math.min(secondary.naturalBodyHeight, remaining);
+    if (secondaryBodyHeight > 0 && secondaryBodyHeight < secondary.minBodyHeight) {
+        return {
+            priorityBodyHeight: priorityBodyHeight > 0 ? availableBodyHeight : 0,
+            secondaryBodyHeight: 0,
+        };
+    }
+
+    return { priorityBodyHeight, secondaryBodyHeight };
+}
+
+const DroppableBucket = ({
+    children,
+    bucketKey,
+    disabled,
+}: {
+    children: (isOver: boolean) => ReactNode;
+    bucketKey: string;
+    disabled?: boolean;
+}) => {
     const { setNodeRef, isOver } = useDroppable({ id: `bucket-drop:${bucketKey}`, data: { type: 'ab-bucket', bucketKey } });
     const highlight = !disabled && isOver ? 'bg-slate-100/50' : '';
     return (
         <div
             ref={setNodeRef}
-            className={`flex h-full min-h-0 w-full flex-1 flex-col ${highlight}`}
+            className={`flex h-full min-h-0 w-full flex-col ${highlight}`}
             data-dnd="ab-bucket"
             data-bucket-key={bucketKey}
         >
@@ -108,82 +296,6 @@ function CountBadge({
             {value}
         </span>
     );
-}
-
-function resolveCompletedBucketBadgeLabel(item: TimelineBucketItem, fallbackBucket: CompletedBucketSource) {
-    if (item.due_bucket === 'a' || item.due_bucket === 'b') {
-        return item.due_bucket.toUpperCase();
-    }
-    return fallbackBucket.toUpperCase();
-}
-
-function resolveCompletedEventBadgeLabel(item: TimelineEvent) {
-    return item.due_bucket?.toUpperCase() ?? 'A';
-}
-
-function resolveCompletedCountBadgeTone(done: number, total: number): 'neutral' | 'danger' | 'warning' | 'success' {
-    if (total === 0) {
-        return 'neutral';
-    }
-    if (done === 0) {
-        return 'danger';
-    }
-    if (done === total) {
-        return 'success';
-    }
-    return 'warning';
-}
-
-function pickFirstNonEmptyPrimarySection(counts: Record<ActiveBucketSection, number>): PrimaryBucketSection | null {
-    for (const section of PRIMARY_SECTION_ORDER) {
-        if (counts[section] > 0) return section;
-    }
-    return null;
-}
-
-function findNextNonEmptyPrimarySection(
-    current: PrimaryBucketSection,
-    counts: Record<ActiveBucketSection, number>
-): PrimaryBucketSection {
-    const currentIndex = PRIMARY_SECTION_ORDER.indexOf(current);
-    for (let step = 1; step <= PRIMARY_SECTION_ORDER.length; step += 1) {
-        const nextSection = PRIMARY_SECTION_ORDER[(currentIndex + step) % PRIMARY_SECTION_ORDER.length];
-        if (counts[nextSection] > 0) return nextSection;
-    }
-    return current;
-}
-
-function resolveCompactSectionRowHeight(section: ActiveBucketSection, itemCount: number, previewCount: number) {
-    if (section === 'completed') return COMPLETED_SUMMARY_ROW_HEIGHT_PX;
-    if (itemCount === 0) return COMPACT_EMPTY_HEIGHT_PX;
-    return HEADER_HEIGHT_PX + (previewCount * PREVIEW_CARD_HEIGHT_PX) + COMPACT_BUCKET_SECTION_PADDING_PX;
-}
-
-function compareNullableNumber(a: number | null | undefined, b: number | null | undefined) {
-    const left = a ?? Number.MAX_SAFE_INTEGER;
-    const right = b ?? Number.MAX_SAFE_INTEGER;
-    return left - right;
-}
-
-function compareString(a: string | null | undefined, b: string | null | undefined) {
-    return (a ?? '').localeCompare(b ?? '', 'en', { sensitivity: 'base' });
-}
-
-function sortCompletedEvents(items: readonly TimelineEvent[]) {
-    return [...items].sort((left, right) => (
-        compareNullableNumber(getMinutesFromTime(left.due_start ?? null), getMinutesFromTime(right.due_start ?? null)) ||
-        compareNullableNumber(getMinutesFromTime(left.due_end ?? null), getMinutesFromTime(right.due_end ?? null)) ||
-        compareString(left.title, right.title) ||
-        compareString(left.card_id, right.card_id)
-    ));
-}
-
-function sortCompletedBuckets(items: readonly TimelineBucketItem[]) {
-    return [...items].sort((left, right) => (
-        compareNullableNumber(left.bucketPosition, right.bucketPosition) ||
-        compareString(left.title, right.title) ||
-        compareString(left.card_id, right.card_id)
-    ));
 }
 
 function StaticTimelineRow({
@@ -289,209 +401,248 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         ],
         [completedA, completedB, completedEvents]
     );
+
     const completedCount = completedEntries.length;
     const totalCount = events.length + bucketsA.length + bucketsB.length;
     const sectionCounts = useMemo<Record<ActiveBucketSection, number>>(
         () => ({
-            completed: completedEntries.length,
+            completed: completedCount,
             a: activeA.length,
             b: activeB.length,
         }),
-        [activeA.length, activeB.length, completedEntries.length]
+        [activeA.length, activeB.length, completedCount]
     );
-    const resolvePrimaryFallbackSection = useCallback(
-        (preferred: PrimaryBucketSection) => {
-            if (sectionCounts[preferred] > 0) return preferred;
-            return pickFirstNonEmptyPrimarySection(sectionCounts) ?? 'a';
-        },
-        [sectionCounts]
-    );
-    const [activeSection, setActiveSection] = useState<ActiveBucketSection>(() => resolvePrimaryFallbackSection('a'));
+
+    const [prioritySection, setPrioritySection] = useState<ActiveBucketSection>(() => pickFallbackPriority(sectionCounts));
+    const [measurements, setMeasurements] = useState<Record<ActiveBucketSection, SectionMeasurements>>(DEFAULT_MEASUREMENTS);
     const previousCountsRef = useRef(sectionCounts);
-    const expandedSection = useMemo<ActiveBucketSection | null>(() => {
-        if (activeSection === 'completed') {
-            return sectionCounts.completed > 0 ? 'completed' : resolvePrimaryFallbackSection('a');
-        }
-        if (sectionCounts[activeSection] > 0) return activeSection;
-        return pickFirstNonEmptyPrimarySection(sectionCounts);
-    }, [activeSection, resolvePrimaryFallbackSection, sectionCounts]);
+
+    const headerRefs = useRef<Record<ActiveBucketSection, HTMLButtonElement | null>>({
+        completed: null,
+        a: null,
+        b: null,
+    });
+    const contentRefs = useRef<Record<ActiveBucketSection, HTMLDivElement | null>>({
+        completed: null,
+        a: null,
+        b: null,
+    });
 
     useEffect(() => {
         const previousCounts = previousCountsRef.current;
         previousCountsRef.current = sectionCounts;
 
-        if (previousCounts[activeSection] > 0 && sectionCounts[activeSection] === 0) {
-            const nextSection = resolvePrimaryFallbackSection('a');
-            if (nextSection !== activeSection) {
-                setActiveSection(nextSection);
+        if (previousCounts[prioritySection] > 0 && sectionCounts[prioritySection] === 0) {
+            const next = pickFallbackPriority(sectionCounts);
+            if (next !== prioritySection) {
+                setPrioritySection(next);
             }
         }
-    }, [activeSection, resolvePrimaryFallbackSection, sectionCounts]);
+    }, [prioritySection, sectionCounts]);
 
-    const handleSectionToggle = useCallback((section: ActiveBucketSection) => {
-        setActiveSection((current) => {
-            if (current === section) {
-                if (section === 'completed') {
-                    return resolvePrimaryFallbackSection('a');
+    const recomputeMeasurements = useCallback(() => {
+        setMeasurements((current) => {
+            let changed = false;
+            const next = { ...current };
+
+            for (const section of SECTION_ORDER) {
+                const headerNode = headerRefs.current[section];
+                const contentNode = contentRefs.current[section];
+                const count = sectionCounts[section];
+                const measuredHeader = headerNode ? Math.ceil(headerNode.getBoundingClientRect().height) : DEFAULT_MEASUREMENTS[section].headerHeight;
+                const measuredContent = contentNode
+                    ? Math.ceil(contentNode.getBoundingClientRect().height) + (section === 'completed' ? 0 : CONTENT_CHROME_ALLOWANCE_PX)
+                    : DEFAULT_MEASUREMENTS[section].bodyNaturalHeight;
+
+                const peekMinBodyHeight = resolveMeasuredPeekHeight(contentNode, section);
+                const emptyBodyMinHeight = section === 'completed'
+                    ? 0
+                    : Math.max(FALLBACK_EMPTY_BODY_HEIGHT_PX, count === 0 ? measuredContent : FALLBACK_EMPTY_BODY_HEIGHT_PX);
+                const bodyNaturalHeight = count > 0
+                    ? Math.max(measuredContent, peekMinBodyHeight)
+                    : section === 'completed'
+                        ? 0
+                        : Math.max(measuredContent, emptyBodyMinHeight);
+
+                const previous = current[section];
+                const nextMeasurement: SectionMeasurements = {
+                    headerHeight: measuredHeader,
+                    bodyNaturalHeight,
+                    peekMinBodyHeight,
+                    emptyBodyMinHeight,
+                };
+
+                if (
+                    previous.headerHeight !== nextMeasurement.headerHeight ||
+                    previous.bodyNaturalHeight !== nextMeasurement.bodyNaturalHeight ||
+                    previous.peekMinBodyHeight !== nextMeasurement.peekMinBodyHeight ||
+                    previous.emptyBodyMinHeight !== nextMeasurement.emptyBodyMinHeight
+                ) {
+                    changed = true;
+                    next[section] = nextMeasurement;
                 }
-                return findNextNonEmptyPrimarySection(section, sectionCounts);
             }
 
-            if (sectionCounts[section] === 0) {
-                return current;
-            }
-
-            return section;
+            return changed ? next : current;
         });
-    }, [resolvePrimaryFallbackSection, sectionCounts]);
+    }, [sectionCounts]);
 
-    const layout = useMemo(() => {
-        const previewCounts: Record<ActiveBucketSection, number> = {
-            completed: 0,
-            a: 0,
-            b: 0,
+    useEffect(() => {
+        recomputeMeasurements();
+
+        if (typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(() => recomputeMeasurements());
+        for (const section of SECTION_ORDER) {
+            const headerNode = headerRefs.current[section];
+            const contentNode = contentRefs.current[section];
+            if (headerNode) observer.observe(headerNode);
+            if (contentNode) observer.observe(contentNode);
+        }
+        return () => observer.disconnect();
+    }, [recomputeMeasurements, prioritySection, activeA.length, activeB.length, completedEntries.length, viewportHeight]);
+
+    const containerHeight = viewportHeight ?? FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX;
+
+    const sectionLayout = useMemo<Record<ActiveBucketSection, SectionLayout>>(() => {
+        const headerTotalHeight = SECTION_ORDER.reduce((sum, section) => sum + measurements[section].headerHeight, 0);
+        const availableBodyHeight = Math.max(0, containerHeight - headerTotalHeight);
+
+        const aSizing: SectionSizing = {
+            count: activeA.length,
+            naturalBodyHeight: activeA.length > 0 ? measurements.a.bodyNaturalHeight : measurements.a.emptyBodyMinHeight,
+            minBodyHeight: activeA.length > 0 ? measurements.a.peekMinBodyHeight : measurements.a.emptyBodyMinHeight,
+            enforceMinBodyHeight: activeA.length === 0,
         };
-        const completedCompactHeight = resolveCompactSectionRowHeight('completed', sectionCounts.completed, 0);
-        const compactAHeight = resolveCompactSectionRowHeight('a', sectionCounts.a, 0);
-        const compactBHeight = resolveCompactSectionRowHeight('b', sectionCounts.b, 0);
+        const bSizing: SectionSizing = {
+            count: activeB.length,
+            naturalBodyHeight: activeB.length > 0 ? measurements.b.bodyNaturalHeight : measurements.b.emptyBodyMinHeight,
+            minBodyHeight: activeB.length > 0 ? measurements.b.peekMinBodyHeight : measurements.b.emptyBodyMinHeight,
+            enforceMinBodyHeight: activeB.length === 0,
+        };
+        const completedSizing: SectionSizing = {
+            count: completedCount,
+            naturalBodyHeight: completedCount > 0 ? measurements.completed.bodyNaturalHeight : 0,
+            minBodyHeight: 0,
+            enforceMinBodyHeight: false,
+        };
 
-        if (!expandedSection || sectionCounts[expandedSection] === 0) {
-            return {
-                previewCounts,
-                rowTemplate: [
-                    `${completedCompactHeight}px`,
-                    `${compactAHeight}px`,
-                    `${compactBHeight}px`,
-                    'minmax(0,1fr)',
-                ].join(' '),
-            };
-        }
+        let completedBodyHeight = 0;
+        let aBodyHeight = 0;
+        let bBodyHeight = 0;
 
-        for (const section of PRIMARY_SECTION_ORDER) {
-            if (section !== expandedSection && sectionCounts[section] > 0) {
-                previewCounts[section] = 1;
+        if (prioritySection === 'completed' && completedSizing.count > 0) {
+            completedBodyHeight = Math.min(completedSizing.naturalBodyHeight, availableBodyHeight);
+            const remainingBodyHeight = Math.max(0, availableBodyHeight - completedBodyHeight);
+            const { priorityBodyHeight, secondaryBodyHeight } = allocatePairHeights({
+                priority: aSizing,
+                secondary: bSizing,
+                availableBodyHeight: remainingBodyHeight,
+            });
+            aBodyHeight = priorityBodyHeight;
+            bBodyHeight = secondaryBodyHeight;
+        } else {
+            const pair = prioritySection === 'b'
+                ? allocatePairHeights({
+                    priority: bSizing,
+                    secondary: aSizing,
+                    availableBodyHeight,
+                })
+                : allocatePairHeights({
+                    priority: aSizing,
+                    secondary: bSizing,
+                    availableBodyHeight,
+                });
+
+            if (prioritySection === 'b') {
+                bBodyHeight = pair.priorityBodyHeight;
+                aBodyHeight = pair.secondaryBodyHeight;
+            } else {
+                aBodyHeight = pair.priorityBodyHeight;
+                bBodyHeight = pair.secondaryBodyHeight;
             }
         }
 
-        const containerHeight = viewportHeight ?? FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX;
-        const compactHeights = SECTION_ORDER
-            .filter((section) => section !== expandedSection)
-            .reduce((sum, section) => sum + resolveCompactSectionRowHeight(section, sectionCounts[section], previewCounts[section]), 0);
-        const minimumExpandedHeight = HEADER_HEIGHT_PX;
-        const maxExpandedHeight = Math.max(minimumExpandedHeight, containerHeight - compactHeights);
-        const ratioCappedHeight = Math.max(
-            minimumExpandedHeight,
-            Math.min(MAX_EXPANDED_SECTION_HEIGHT_PX, Math.floor(containerHeight * MAX_EXPANDED_SECTION_RATIO))
+        const sizingMap: Record<ActiveBucketSection, SectionSizing> = {
+            completed: completedSizing,
+            a: aSizing,
+            b: bSizing,
+        };
+        const bodyHeightMap: Record<ActiveBucketSection, number> = {
+            completed: completedBodyHeight,
+            a: aBodyHeight,
+            b: bBodyHeight,
+        };
+
+        let remainingBodyHeight = Math.max(
+            0,
+            availableBodyHeight - (bodyHeightMap.completed + bodyHeightMap.a + bodyHeightMap.b)
         );
-        const desiredExpandedHeight =
-            HEADER_HEIGHT_PX +
-            (sectionCounts[expandedSection] * EXPANDED_CARD_HEIGHT_PX) +
-            EXPANDED_SECTION_PADDING_PX;
-        const expandedHeight = Math.min(maxExpandedHeight, ratioCappedHeight, desiredExpandedHeight);
 
-        let remainingHeight = containerHeight - compactHeights - expandedHeight;
-        for (const section of PRIMARY_SECTION_ORDER) {
-            if (section === expandedSection) continue;
-            while (
-                remainingHeight >= PREVIEW_CARD_HEIGHT_PX &&
-                previewCounts[section] > 0 &&
-                previewCounts[section] < Math.min(MAX_PREVIEW_ITEMS, sectionCounts[section])
-            ) {
-                previewCounts[section] += 1;
-                remainingHeight -= PREVIEW_CARD_HEIGHT_PX;
+        const growthOrder: ActiveBucketSection[] = prioritySection === 'completed'
+            ? ['a', 'b', 'completed']
+            : prioritySection === 'b'
+                ? ['a', 'b']
+                : ['b', 'a'];
+
+        for (const section of growthOrder) {
+            if (remainingBodyHeight <= 0) break;
+            const sizing = sizingMap[section];
+            const currentBodyHeight = bodyHeightMap[section];
+            if (sizing.naturalBodyHeight <= currentBodyHeight) continue;
+
+            if (currentBodyHeight === 0 && sizing.minBodyHeight > 0) {
+                if (remainingBodyHeight < sizing.minBodyHeight) {
+                    continue;
+                }
+                const minGrant = Math.min(sizing.naturalBodyHeight, sizing.minBodyHeight);
+                bodyHeightMap[section] = minGrant;
+                remainingBodyHeight -= minGrant;
             }
-        }
 
-        if (expandedSection === 'completed') {
-            return {
-                previewCounts,
-                rowTemplate: [
-                    `${expandedHeight}px`,
-                    `${resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
-                    `${resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
-                    '0px',
-                ].join(' '),
-            };
+            if (remainingBodyHeight <= 0) break;
+
+            if (bodyHeightMap[section] < sizing.naturalBodyHeight) {
+                const extra = Math.min(remainingBodyHeight, sizing.naturalBodyHeight - bodyHeightMap[section]);
+                bodyHeightMap[section] += extra;
+                remainingBodyHeight -= extra;
+            }
         }
 
         return {
-            previewCounts,
-            rowTemplate: [
-                `${completedCompactHeight}px`,
-                `${expandedSection === 'a' ? expandedHeight : resolveCompactSectionRowHeight('a', sectionCounts.a, previewCounts.a)}px`,
-                `${expandedSection === 'b' ? expandedHeight : resolveCompactSectionRowHeight('b', sectionCounts.b, previewCounts.b)}px`,
-                'minmax(0,1fr)',
-            ].join(' '),
+            completed: {
+                bodyHeight: bodyHeightMap.completed,
+                totalHeight: measurements.completed.headerHeight + bodyHeightMap.completed,
+            },
+            a: {
+                bodyHeight: bodyHeightMap.a,
+                totalHeight: measurements.a.headerHeight + bodyHeightMap.a,
+            },
+            b: {
+                bodyHeight: bodyHeightMap.b,
+                totalHeight: measurements.b.headerHeight + bodyHeightMap.b,
+            },
         };
-    }, [expandedSection, sectionCounts, viewportHeight]);
+    }, [
+        activeA.length,
+        activeB.length,
+        completedCount,
+        containerHeight,
+        measurements,
+        prioritySection,
+    ]);
 
-    const renderSectionHeader = ({
-        label,
-        section,
-        count,
-        countValue,
-        bodyId,
-        countTestId,
-        countBadgeTone,
-    }: {
-        label: string;
-        section: ActiveBucketSection;
-        count: number;
-        countValue?: ReactNode;
-        bodyId: string;
-        countTestId: string;
-        countBadgeTone?: 'neutral' | 'danger' | 'warning' | 'success';
-    }) => {
-        const isExpanded = expandedSection === section && count > 0;
-        const lineClass = section === 'completed' ? 'border-b' : 'border-b border-dashed';
-        const isToggleable = count > 0;
-        const toggleLabel = !isToggleable ? 'Empty' : isExpanded ? 'Close' : 'Open';
+    const setHeaderRef = useCallback((section: ActiveBucketSection, node: HTMLButtonElement | null) => {
+        headerRefs.current[section] = node;
+    }, []);
 
-        return (
-            <button
-                type="button"
-                aria-expanded={isExpanded}
-                aria-controls={bodyId}
-                aria-label={isToggleable ? `${label} ${toggleLabel}` : `${label} Empty`}
-                disabled={!isToggleable}
-                onClick={() => handleSectionToggle(section)}
-                className={clsx(
-                    'flex min-h-8 w-full min-w-0 items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
-                    lineClass,
-                    section === 'completed' ? 'border-slate-200/90 bg-white' : 'border-slate-200/90 bg-slate-100/70',
-                    isToggleable
-                        ? 'cursor-pointer hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset'
-                        : 'cursor-default'
-                )}
-                data-testid={`bucket-toggle-${section}-${day.isoDate}`}
-            >
-                <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
-                    <CountBadge value={countValue ?? count} testId={countTestId} tone={countBadgeTone} />
-                </span>
-                <span
-                    className={clsx(
-                        'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors duration-150',
-                        !isToggleable
-                            ? 'border-slate-200 bg-slate-100 text-slate-400'
-                            : isExpanded
-                                ? 'border-sky-200 bg-sky-50 text-sky-700'
-                                : 'border-slate-200 bg-white text-slate-500'
-                    )}
-                >
-                    <span>{toggleLabel}</span>
-                    {isToggleable ? (
-                        <span
-                            aria-hidden="true"
-                            className={clsx('text-[11px] transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
-                        >
-                            ▾
-                        </span>
-                    ) : null}
-                </span>
-            </button>
-        );
-    };
+    const setContentRef = useCallback((section: ActiveBucketSection, node: HTMLDivElement | null) => {
+        contentRefs.current[section] = node;
+    }, []);
+
+    const handlePriorityPress = useCallback((section: ActiveBucketSection) => {
+        if (section === 'completed' && sectionCounts.completed === 0) return;
+        setPrioritySection(section);
+    }, [sectionCounts.completed]);
 
     const renderBucketAddSlot = ({
         isOver,
@@ -577,82 +728,119 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         </button>
     );
 
-    const renderCompactPreview = ({
+    const renderSectionHeader = ({
+        label,
         section,
-        previews,
+        count,
+        countValue,
+        countTestId,
+        countBadgeTone,
+    }: {
+        label: string;
+        section: ActiveBucketSection;
+        count: number;
+        countValue?: ReactNode;
+        countTestId: string;
+        countBadgeTone?: 'neutral' | 'danger' | 'warning' | 'success';
+    }) => {
+        const isPriority = prioritySection === section;
+        const isDisabled = section === 'completed' ? count === 0 : false;
+        const lineClass = section === 'completed' ? 'border-b' : 'border-b border-dashed';
+
+        return (
+            <button
+                ref={(node) => setHeaderRef(section, node)}
+                type="button"
+                aria-pressed={isPriority}
+                aria-label={isPriority ? `${label}を優先中` : `${label}を優先表示`}
+                disabled={isDisabled}
+                onClick={() => handlePriorityPress(section)}
+                className={clsx(
+                    'flex min-h-8 w-full min-w-0 items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
+                    lineClass,
+                    section === 'completed' ? 'border-slate-200/90 bg-white' : 'border-slate-200/90 bg-slate-100/70',
+                    isDisabled
+                        ? 'cursor-default opacity-70'
+                        : 'cursor-pointer hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset'
+                )}
+                data-testid={`bucket-toggle-${section}-${day.isoDate}`}
+            >
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[10px] font-semibold text-slate-700">{label}</span>
+                    <CountBadge value={countValue ?? count} testId={countTestId} tone={countBadgeTone} />
+                </span>
+                <span
+                    className={clsx(
+                        'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors duration-150',
+                        isDisabled
+                            ? 'border-slate-200 bg-slate-100 text-slate-400'
+                            : isPriority
+                                ? 'border-sky-200 bg-sky-50 text-sky-700'
+                                : 'border-slate-200 bg-white text-slate-500'
+                    )}
+                >
+                    {isPriority ? '優先中' : '優先表示'}
+                </span>
+            </button>
+        );
+    };
+
+    const renderBucketContent = ({
+        section,
+        items,
         bucketKey,
-        isOver = false,
+        isOver,
     }: {
         section: PrimaryBucketSection;
-        previews: Array<{ item: TimelineBucketItem }>;
-        bucketKey?: string;
-        isOver?: boolean;
+        items: readonly TimelineBucketItem[];
+        bucketKey: string;
+        isOver: boolean;
     }) => (
         <div
-            id={`bucket-panel-${section}-${day.isoDate}`}
-            data-testid={`bucket-preview-${section}-${day.isoDate}`}
-            className={clsx(
-                'mt-1 flex-1 min-h-0 space-y-1 pl-[1px] py-[1px]',
-                bucketKey ? 'overflow-y-auto overflow-x-hidden scrollbar-ab-thin [scrollbar-gutter:stable]' : 'overflow-hidden'
-            )}
+            ref={(node) => setContentRef(section, node)}
+            className="min-h-0 min-w-0 space-y-1 pl-[1px] py-[1px]"
         >
-            {bucketKey
-                ? renderBucketAddSlot({
-                    isOver,
-                    sticky: false,
-                    testId: `ab-add-top-${bucketKey}`,
-                    revealClassName:
-                        'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
-                    onClick: (e) => {
-                        e.stopPropagation();
-                        onCreateBucketCard?.(bucketKey);
-                    },
-                })
-                : null}
-            {previews.map((preview, index) => {
-                const row = (
-                    <StaticTimelineRow
-                        item={preview.item}
-                        openCardModal={openCardModal}
-                        onToggleCheck={onToggleCheck}
-                        onCardContextMenu={onCardContextMenu}
-                        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                        notePreviewLines={2}
-                        cardClassName={bucketKey ? 'cursor-grab active:cursor-grabbing select-none' : undefined}
-                        timeText={buildTimelineCardTimeText(preview.item, {
-                            includeDate: true,
-                            includeTime: false,
-                            includeDuration: true,
-                        })}
-                    />
-                );
+            {renderBucketAddSlot({
+                isOver,
+                sticky: false,
+                testId: `ab-add-top-${bucketKey}`,
+                revealClassName:
+                    'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
+                onClick: (e) => {
+                    e.stopPropagation();
+                    onCreateBucketCard?.(bucketKey);
+                },
+            })}
 
-                if (!bucketKey) {
-                    return <div key={preview.item.card_id ?? index}>{row}</div>;
-                }
-
-                return (
-                    <div key={preview.item.card_id} className="group/item relative">
-                        <DraggableCard
-                            id={`bucket-preview:${preview.item.card_id}`}
-                            data={{ kind: 'bucket', cardId: preview.item.card_id, bucketKey, item: preview.item }}
-                        >
-                            {row}
-                        </DraggableCard>
+            {items.length === 0 ? (
+                renderEmptyBucketDropZone({ bucketKey, isOver })
+            ) : (
+                items.map((item) => (
+                    <div key={item.card_id} className="group/item relative">
+                        <TimelineBucketCard
+                            item={item}
+                            bucketKey={bucketKey}
+                            openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
+                            onToggleCheck={onToggleCheck}
+                            showFallbackBottomLine={bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id}
+                            onCardContextMenu={onCardContextMenu}
+                            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                            isContextMenuOpen={contextMenuCardId === item.card_id}
+                            onCreateBucketCard={onCreateBucketCard}
+                        />
                         {renderBucketAddSlot({
                             isOver,
-                            sticky: false,
-                            testId: `ab-add-after-${preview.item.card_id}`,
+                            testId: `ab-add-after-${item.card_id}`,
                             revealClassName:
                                 'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',
                             onClick: (e) => {
                                 e.stopPropagation();
-                                onCreateBucketCard?.(bucketKey, preview.item.card_id);
+                                onCreateBucketCard?.(bucketKey, item.card_id);
                             },
                         })}
                     </div>
-                );
-            })}
+                ))
+            )}
         </div>
     );
 
@@ -660,136 +848,40 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         section,
         label,
         items,
-        bucket,
     }: {
         section: PrimaryBucketSection;
         label: string;
         items: readonly TimelineBucketItem[];
-        bucket: PrimaryBucketSection;
     }) => {
-        const bucketKey = `${day.key}_${bucket}`;
-        const isExpanded = expandedSection === section && items.length > 0;
-        const bodyId = `bucket-panel-${section}-${day.isoDate}`;
-        const count = items.length;
-
-        if (isExpanded) {
-            return (
-                <section
-                    data-testid={`bucket-section-${section}-${day.isoDate}`}
-                    className="min-h-0 overflow-hidden"
-                >
-                    <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
-                        {(isOver) => (
-                            <div className={bucketSectionFrameClass(section, isOver)}>
-                                {renderSectionHeader({
-                                    label,
-                                    section,
-                                    count,
-                                    bodyId,
-                                    countTestId: `bucket-count-${section}-${day.isoDate}`,
-                                })}
-                                <div
-                                    id={bodyId}
-                                    ref={(el) => registerScrollContainer?.(day.isoDate, el, bucket)}
-                                    data-ab-scroll-container="true"
-                                    className="mt-1 flex-1 min-h-0 min-w-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable] pl-[1px] py-[1px]"
-                                >
-                                    {renderBucketAddSlot({
-                                        isOver,
-                                        sticky: true,
-                                        testId: `ab-add-top-${bucketKey}`,
-                                        revealClassName:
-                                            'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
-                                        onClick: (e) => {
-                                            e.stopPropagation();
-                                            onCreateBucketCard?.(bucketKey);
-                                        },
-                                    })}
-                                    {items.map((item) => (
-                                        <div key={item.card_id} className="group/item relative">
-                                            <TimelineBucketCard
-                                                item={item}
-                                                bucketKey={bucketKey}
-                                                openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
-                                                onToggleCheck={onToggleCheck}
-                                                showFallbackBottomLine={
-                                                    bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id
-                                                }
-                                                onCardContextMenu={onCardContextMenu}
-                                                onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                                                isContextMenuOpen={contextMenuCardId === item.card_id}
-                                                onCreateBucketCard={onCreateBucketCard}
-                                            />
-                                            {renderBucketAddSlot({
-                                                isOver,
-                                                testId: `ab-add-after-${item.card_id}`,
-                                                revealClassName:
-                                                    'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',
-                                                onClick: (e) => {
-                                                    e.stopPropagation();
-                                                    onCreateBucketCard?.(bucketKey, item.card_id);
-                                                },
-                                            })}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </DroppableBucket>
-                </section>
-            );
-        }
-
-        if (count === 0) {
-            return (
-                <section
-                    data-testid={`bucket-section-${section}-${day.isoDate}`}
-                    className="min-h-0 overflow-hidden"
-                >
-                    <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
-                        {(isOver) => (
-                            <div className={bucketSectionFrameClass(section, isOver)}>
-                                {renderSectionHeader({
-                                    label,
-                                    section,
-                                    count,
-                                    bodyId,
-                                    countTestId: `bucket-count-${section}-${day.isoDate}`,
-                                })}
-                                <div
-                                    id={bodyId}
-                                    className="flex min-h-0 flex-1 flex-col pl-[1px] py-0.5"
-                                >
-                                    {renderEmptyBucketDropZone({ bucketKey, isOver })}
-                                </div>
-                            </div>
-                        )}
-                    </DroppableBucket>
-                </section>
-            );
-        }
+        const bucketKey = `${day.key}_${section}`;
+        const layout = sectionLayout[section];
 
         return (
             <section
                 data-testid={`bucket-section-${section}-${day.isoDate}`}
                 className="min-h-0 overflow-hidden"
+                style={{ height: `${layout.totalHeight}px` }}
             >
                 <DroppableBucket bucketKey={bucketKey} disabled={status === 'loading'}>
                     {(isOver) => (
-                        <div
-                            className={bucketSectionFrameClass(section, isOver)}
-                        >
+                        <div className={bucketSectionFrameClass(section, isOver)}>
                             {renderSectionHeader({
                                 label,
                                 section,
-                                count,
-                                bodyId,
+                                count: items.length,
                                 countTestId: `bucket-count-${section}-${day.isoDate}`,
                             })}
-                            <div className="flex min-h-0 flex-1 flex-col">
-                                {renderCompactPreview({
+                            <div
+                                ref={(node) => {
+                                    registerScrollContainer?.(day.isoDate, node, section);
+                                }}
+                                data-ab-scroll-container="true"
+                                className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable]"
+                                style={{ height: `${layout.bodyHeight}px` }}
+                            >
+                                {renderBucketContent({
                                     section,
-                                    previews: items.slice(0, layout.previewCounts[section]).map((item) => ({ item })),
+                                    items,
                                     bucketKey,
                                     isOver,
                                 })}
@@ -844,36 +936,34 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     };
 
     const renderCompletedSection = () => {
-        const section: ActiveBucketSection = 'completed';
-        const count = completedEntries.length;
-        const isExpanded = expandedSection === section && count > 0;
-        const bodyId = `bucket-panel-${section}-${day.isoDate}`;
+        const layout = sectionLayout.completed;
 
         return (
             <section
                 data-testid={`bucket-section-completed-${day.isoDate}`}
                 className="min-h-0 overflow-hidden"
+                style={{ height: `${layout.totalHeight}px` }}
             >
-                <div className="flex h-full min-h-0 flex-col overflow-hidden border border-slate-200 bg-white shadow-inner transition-[height,max-height,opacity,background-color] duration-200 ease-out">
+                <div className={bucketSectionFrameClass('completed')}>
                     {renderSectionHeader({
                         label: 'Completed',
-                        section,
-                        count,
+                        section: 'completed',
+                        count: completedEntries.length,
                         countValue: `${completedCount}/${totalCount}`,
-                        bodyId,
                         countTestId: `bucket-count-completed-${day.isoDate}`,
                         countBadgeTone: resolveCompletedCountBadgeTone(completedCount, totalCount),
                     })}
-                    {isExpanded ? (
+                    <div
+                        className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable]"
+                        style={{ height: `${layout.bodyHeight}px` }}
+                    >
                         <div
-                            id={bodyId}
-                            className="mt-1 flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable] pl-[1px] py-[1px]"
+                            ref={(node) => setContentRef('completed', node)}
+                            className="min-h-0 space-y-1 pl-[1px] py-[1px]"
                         >
                             {completedEntries.map((entry) => renderCompletedEntryRow(entry))}
                         </div>
-                    ) : (
-                        <div id={bodyId} data-testid={`bucket-preview-completed-${day.isoDate}`} hidden />
-                    )}
+                    </div>
                 </div>
             </section>
         );
@@ -882,27 +972,30 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     return (
         <div
             data-ab-day={day.isoDate}
-            className="pointer-events-auto w-full min-w-0 min-h-0 border-l border-slate-100 bg-white overflow-hidden md:border-slate-200"
+            className="pointer-events-auto w-full min-w-0 min-h-0 overflow-hidden border-l border-slate-100 bg-white md:border-slate-200"
             style={{ height: viewportHeight ? `${viewportHeight}px` : `calc(100vh - ${floatingLayerTop}px)` }}
         >
             <div
                 className="grid h-full min-h-0 content-start gap-0 transition-[grid-template-rows] duration-200 ease-out"
-                style={{ gridTemplateRows: layout.rowTemplate }}
+                style={{
+                    gridTemplateRows: [
+                        `${sectionLayout.completed.totalHeight}px`,
+                        `${sectionLayout.a.totalHeight}px`,
+                        `${sectionLayout.b.totalHeight}px`,
+                    ].join(' '),
+                }}
             >
                 {renderCompletedSection()}
                 {renderBucketSection({
                     section: 'a',
                     label: 'A: Critical',
                     items: activeA,
-                    bucket: 'a',
                 })}
                 {renderBucketSection({
                     section: 'b',
                     label: 'B: Stretch',
                     items: activeB,
-                    bucket: 'b',
                 })}
-                <div aria-hidden="true" className="min-h-0" />
             </div>
         </div>
     );

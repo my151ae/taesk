@@ -719,6 +719,14 @@ export function CardModal({
                     showSidebar={showSidebar}
                     onToggleSidebar={() => setShowSidebar((prev) => !prev)}
                 />
+                <div className="shrink-0 border-b border-slate-200 bg-slate-50/90 px-0 py-0 dark:border-gray-700 dark:bg-gray-900/80">
+                    <StatusShortcutBar
+                        payload={modalShortcutPayload}
+                        maxVisibleItems={shortcutBar?.maxVisibleItems}
+                        className="rounded-none border-0 bg-transparent px-0 py-0 shadow-none ring-0"
+                        dataTestId="modal-shortcut-bar"
+                    />
+                </div>
                 {historySaveWarning && (
                     <div className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                         <p>{historySaveWarning}</p>
@@ -891,14 +899,6 @@ export function CardModal({
                         />
                         </>
                     )}
-                </div>
-                <div className="shrink-0 border-t border-slate-200 bg-slate-50/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900/80">
-                    <StatusShortcutBar
-                        payload={modalShortcutPayload}
-                        maxVisibleItems={shortcutBar?.maxVisibleItems}
-                        className="rounded-none border-0 bg-transparent px-0 py-0 shadow-none ring-0"
-                        dataTestId="modal-shortcut-bar"
-                    />
                 </div>
             </div>
         </div>
