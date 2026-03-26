@@ -50,6 +50,7 @@ type TimelineHeaderProps = {
     viewMode: 'timeline' | 'list';
     onShortcutsClick: () => void;
     onOpenTeamSettings: (teamId: string | null | undefined) => void;
+    collapsed?: boolean;
 };
 
 export default function TimelineHeader({
@@ -81,6 +82,7 @@ export default function TimelineHeader({
     viewMode,
     onShortcutsClick,
     onOpenTeamSettings,
+    collapsed = false,
 }: TimelineHeaderProps) {
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
     const [createBoardTeamId, setCreateBoardTeamId] = useState<string | null>(board.team_id ?? null);
@@ -154,6 +156,14 @@ export default function TimelineHeader({
             setCreateBoardTeamId(board.team_id ?? null);
         }
     }, [board.team_id, showBoardMenu]);
+
+    useEffect(() => {
+        if (!collapsed) return;
+        setShowBoardMenu(false);
+        setShowProfileMenu(false);
+        setShowMobileActions(false);
+        setIsCreatingBoard(false);
+    }, [collapsed, setShowBoardMenu]);
 
     const boardsByTeamId = useMemo(() => {
         const groups = new Map<string, Board[]>();

@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import type { ReactNode } from "react";
 
 import {
   createEmptyShortcutBarPayload,
@@ -13,6 +14,7 @@ type StatusShortcutBarProps = {
   maxVisibleItems?: number;
   className?: string;
   dataTestId?: string;
+  trailingAction?: ReactNode;
 };
 
 function ShiftKeyGlyph() {
@@ -55,6 +57,7 @@ export function StatusShortcutBar({
   maxVisibleItems = 5,
   className,
   dataTestId,
+  trailingAction,
 }: StatusShortcutBarProps) {
   const resolvedPayload = payload ?? createEmptyShortcutBarPayload("board");
   const { visibleItems, overflowCount } = sliceShortcutItems(resolvedPayload.items, maxVisibleItems);
@@ -94,8 +97,11 @@ export function StatusShortcutBar({
           ) : null}
         </div>
       </div>
-      <div className="ml-auto shrink-0 text-right text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-slate-400">
-        {resolvedPayload.contextLabel}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="text-right text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-slate-400">
+          {resolvedPayload.contextLabel}
+        </div>
+        {trailingAction}
       </div>
     </div>
   );

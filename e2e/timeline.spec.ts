@@ -4226,6 +4226,35 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('toggles the desktop main header from the shortcut bar', async ({ page }) => {
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+
+    await page.goto(boardContext.canonicalPath);
+
+    const boardMenuButton = page.getByTestId('board-menu-button');
+    const boardMainHeader = page.getByTestId('board-main-header');
+    const headerToggle = page.getByTestId('board-header-toggle');
+
+    await expect(boardMenuButton).toBeVisible();
+    await expect(boardMainHeader).toHaveAttribute('aria-hidden', 'false');
+    await expect(headerToggle).toHaveAttribute('aria-label', 'メインヘッダーを隠す');
+
+    await headerToggle.click();
+
+    await expect(boardMainHeader).toHaveAttribute('aria-hidden', 'true');
+    await expect(headerToggle).toHaveAttribute('aria-label', 'メインヘッダーを表示');
+    const collapsedHeaderBox = await boardMainHeader.boundingBox();
+    expect(collapsedHeaderBox?.height ?? 0).toBeLessThan(4);
+
+    await headerToggle.click();
+
+    await expect(boardMainHeader).toHaveAttribute('aria-hidden', 'false');
+    await expect(boardMenuButton).toBeVisible();
+    await expect(headerToggle).toHaveAttribute('aria-label', 'メインヘッダーを隠す');
+  });
+
   test('inserts details, persists closed state, and updates excerpt text', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

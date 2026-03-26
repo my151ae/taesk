@@ -1,6 +1,7 @@
 "use client";
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
+import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
@@ -124,6 +125,7 @@ export default function TimelineBoardScreen({
 }: TimelineBoardScreenProps) {
   const desktopScopeRef = useRef<HTMLDivElement | null>(null);
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   const setBoardShortcutContextFromTarget = useCallback((target: EventTarget | null) => {
     const nextDescriptor = getShortcutContextFromTarget(target);
@@ -185,6 +187,7 @@ export default function TimelineBoardScreen({
     ),
     [desktop.leftPanelProps, desktop.onOverdueSortOrderChange, desktop.overdueSortOrder, desktopSidebarWidth]
   );
+  const headerToggleLabel = isHeaderCollapsed ? "メインヘッダーを表示" : "メインヘッダーを隠す";
 
   if (!parseResult.ok) {
     return (
@@ -217,7 +220,16 @@ export default function TimelineBoardScreen({
   return (
     <div className="h-screen overflow-x-hidden bg-[#f4f5f7]">
       <div className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4">
-        <TimelineBoardHeader {...headerProps} />
+        <div
+          className={clsx(
+            "shrink-0 overflow-hidden transition-[max-height,opacity,transform] duration-200 ease-out",
+            isHeaderCollapsed ? "pointer-events-none max-h-0 -translate-y-3 opacity-0" : "max-h-56 translate-y-0 opacity-100"
+          )}
+          aria-hidden={isHeaderCollapsed}
+          data-testid="board-main-header"
+        >
+          <TimelineBoardHeader {...headerProps} collapsed={isHeaderCollapsed} />
+        </div>
 
         <div
           ref={desktopScopeRef}
@@ -239,6 +251,29 @@ export default function TimelineBoardScreen({
               maxVisibleItems={shortcutBarProps.maxVisibleItems}
               className="mb-0 shrink-0 rounded-t-2xl rounded-b-none border-b-0 shadow-sm ring-0"
               dataTestId="board-shortcut-bar"
+              trailingAction={
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderCollapsed((prev) => !prev)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-800"
+                  aria-label={headerToggleLabel}
+                  aria-expanded={!isHeaderCollapsed}
+                  data-testid="board-header-toggle"
+                  title={headerToggleLabel}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    className={clsx("h-4 w-4 transition-transform duration-200", isHeaderCollapsed && "rotate-180")}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 14.25 3.75-3.75 3.75 3.75" />
+                  </svg>
+                </button>
+              }
             />
           ) : null}
           {desktop.activeView === "timeline" ? (
