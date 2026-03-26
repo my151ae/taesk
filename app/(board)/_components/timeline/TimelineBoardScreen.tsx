@@ -165,7 +165,7 @@ export default function TimelineBoardScreen({
 
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-b-2xl border border-slate-200 border-t-slate-200 bg-white shadow-sm">
         <aside
           data-testid="desktop-sidebar-shell"
           className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70 transition-[width] duration-200 ease-out"
@@ -237,7 +237,7 @@ export default function TimelineBoardScreen({
             <StatusShortcutBar
               payload={boardShortcutPayload}
               maxVisibleItems={shortcutBarProps.maxVisibleItems}
-              className="mb-px shrink-0"
+              className="mb-0 shrink-0 rounded-t-2xl rounded-b-none border-b-0 shadow-sm ring-0"
               dataTestId="board-shortcut-bar"
             />
           ) : null}
