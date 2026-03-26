@@ -102,6 +102,14 @@ async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excer
   return data ? { content: data.content, excerpt: data.excerpt ?? null, title: data.title ?? null } : null;
 }
 
+async function getElementWidth(locator: Locator, label: string): Promise<number> {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error(`Missing bounds for ${label}`);
+  }
+  return box.width;
+}
+
 async function readLastBlockAction(page: Page): Promise<{
   action: string;
   menuTargetPos: number;
@@ -1811,16 +1819,32 @@ test.describe('@feature:timeline Timeline view', () => {
       const overduePanel = page.getByTestId('desktop-sidebar-overdue-panel');
       const overdueCount = page.getByTestId('desktop-sidebar-overdue-panel-count');
       const searchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      const sidebarShell = page.getByTestId('desktop-sidebar-shell');
+      const mainPanel = page.getByTestId('desktop-main-panel');
 
       await expect(overdueToggle).toBeVisible();
       await expect(overdueCount).toHaveText('1');
       await expect(overduePanel).toBeVisible();
+      await expect(sidebarShell).toBeVisible();
+      await expect(mainPanel).toBeVisible();
       await expect(page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first()).toBeVisible();
 
+      const initialSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
+      const initialMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
+
       await overdueToggle.click();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(overduePanel).toBeHidden();
+      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeLessThan(initialSidebarWidth);
+      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeGreaterThan(initialMainWidth);
+      const collapsedSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
+      const collapsedMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
+
       await overdueToggle.click();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(overduePanel).toBeVisible();
+      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(collapsedSidebarWidth);
+      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeLessThan(collapsedMainWidth);
 
       const searchPanel = page.getByTestId('desktop-sidebar-search-panel');
       const searchCount = page.getByTestId('desktop-sidebar-search-panel-count');
@@ -1830,9 +1854,12 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(searchCount).toHaveText('0');
 
       await searchToggle.click();
+      await expect(searchToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(searchPanel).toBeVisible();
       await expect(searchInput).toBeVisible();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(overduePanel).toBeHidden();
+      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(collapsedSidebarWidth);
 
       await searchInput.fill('Sidebar Search');
 
@@ -1841,10 +1868,25 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.locator(`[data-testid="search-card-overdue-${overdueCardId}"]:visible`).first()).toBeVisible();
       await expect(page.locator(`[data-testid="search-card-bucket-${bucketCardId}"]:visible`).first()).toBeVisible();
 
+      await searchToggle.click();
+      await expect(searchToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(searchPanel).toBeHidden();
+      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeLessThan(initialSidebarWidth);
+      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeGreaterThan(initialMainWidth);
+
+      const listTab = page.getByRole('button', { name: 'List' });
+      await listTab.click();
+      await expect(listTab).toHaveAttribute('aria-current', 'page');
+      const listCollapsedSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
+      const listCollapsedMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
+
       await overdueToggle.click();
+      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(overduePanel).toBeVisible();
       await expect(overdueCount).toHaveText('1');
       await expect(searchPanel).toBeHidden();
+      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(listCollapsedSidebarWidth);
+      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeLessThan(listCollapsedMainWidth);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
     }

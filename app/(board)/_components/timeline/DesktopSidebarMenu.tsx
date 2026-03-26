@@ -471,64 +471,56 @@ export function DesktopSidebarMenu({
         ))}
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {sections.map((section) => {
-          const expanded = state.expandedSectionKey === section.key;
-          const isDanger = section.tone === "danger";
+      {state.expandedSectionKey ? (
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {sections.map((section) => {
+            const expanded = state.expandedSectionKey === section.key;
+            const isDanger = section.tone === "danger";
 
-          return (
-            <section
-              key={section.key}
-              className={clsx("min-h-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
-              aria-hidden={!expanded}
-            >
-              <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
-                <span className="pointer-events-none absolute left-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                  Panel
-                </span>
-                <div className="flex min-w-0 items-center gap-2 leading-tight">
-                  <h2 className="truncate text-sm font-semibold leading-tight text-slate-800">{section.label}</h2>
-                  <span
-                    className={clsx(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
-                      isDanger ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
-                    )}
-                  >
-                    {section.count}
-                  </span>
-                </div>
-                {section.key === "overdue" ? (
-                  <OverdueSortToggle
-                    order={overdueSortOrder}
-                    onChange={onOverdueSortOrderChange}
-                    testId="desktop-sidebar-overdue-sort-toggle"
-                  />
-                ) : null}
-              </div>
-
-              <div
-                id={section.id}
-                data-testid={section.id}
+            return (
+              <section
+                key={section.key}
+                className={clsx("min-h-0 min-w-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
                 aria-hidden={!expanded}
-                hidden={!expanded}
-                className="flex min-h-0 flex-1 flex-col overflow-hidden"
               >
-                {renderSectionContent(section)}
-              </div>
-            </section>
-          );
-        })}
+                <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
+                  <span className="pointer-events-none absolute left-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                    Panel
+                  </span>
+                  <div className="flex min-w-0 items-center gap-2 leading-tight">
+                    <h2 className="truncate text-sm font-semibold leading-tight text-slate-800">{section.label}</h2>
+                    <span
+                      className={clsx(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
+                        isDanger ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
+                      )}
+                    >
+                      {section.count}
+                    </span>
+                  </div>
+                  {section.key === "overdue" ? (
+                    <OverdueSortToggle
+                      order={overdueSortOrder}
+                      onChange={onOverdueSortOrderChange}
+                      testId="desktop-sidebar-overdue-sort-toggle"
+                    />
+                  ) : null}
+                </div>
 
-        {!state.expandedSectionKey ? (
-          <div className="flex flex-1 items-center justify-center px-6 text-center">
-            <div className="max-w-[18rem] rounded-3xl border border-dashed border-slate-300/90 bg-white/75 px-5 py-6 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Sidebar</p>
-              <p className="mt-2 text-sm font-medium text-slate-700">左のアイコンを押すとパネルを表示します</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Overdue は赤バッジ、Search は該当件数をそのまま確認できます。</p>
-            </div>
-          </div>
-        ) : null}
-      </div>
+                <div
+                  id={section.id}
+                  data-testid={section.id}
+                  aria-hidden={!expanded}
+                  hidden={!expanded}
+                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                >
+                  {renderSectionContent(section)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

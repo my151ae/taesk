@@ -1,7 +1,7 @@
 "use client";
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -160,6 +160,31 @@ export default function TimelineBoardScreen({
     "rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
   const inactiveTabClassName =
     "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50";
+  const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
+  const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "3.5rem";
+
+  const renderDesktopShell = useCallback(
+    (content: ReactNode) => (
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+        <aside
+          data-testid="desktop-sidebar-shell"
+          className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70 transition-[width] duration-200 ease-out"
+          style={{ width: desktopSidebarWidth }}
+        >
+          <DesktopSidebarMenu
+            {...desktop.leftPanelProps}
+            overdueSortOrder={desktop.overdueSortOrder}
+            onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
+          />
+        </aside>
+
+        <section data-testid="desktop-main-panel" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {content}
+        </section>
+      </div>
+    ),
+    [desktop.leftPanelProps, desktop.onOverdueSortOrderChange, desktop.overdueSortOrder, desktopSidebarWidth]
+  );
 
   if (!parseResult.ok) {
     return (
@@ -226,25 +251,14 @@ export default function TimelineBoardScreen({
                 onDragCancel={desktop.dndProps.handleDragCancel}
                 collisionDetection={bucketsFirstCollisionDetection}
                 measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-                autoScroll={{
+              autoScroll={{
                   enabled: false,
                   threshold: { x: 0, y: 0.2 },
                   acceleration: 1,
                 }}
               >
-                <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-                  <aside
-                    className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-                    style={{ width: "clamp(252px, 19vw, 292px)" }}
-                  >
-                    <DesktopSidebarMenu
-                      {...desktop.leftPanelProps}
-                      overdueSortOrder={desktop.overdueSortOrder}
-                      onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
-                    />
-                  </aside>
-
-                  <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {renderDesktopShell(
+                  <>
                     <div className="border-b border-slate-100 bg-white px-3 py-2">
                       <div className="flex items-center gap-2">
                         {desktop.tabItems.map((item) => {
@@ -266,8 +280,8 @@ export default function TimelineBoardScreen({
 
                     <DesktopTimelineToolbar {...desktop.timelineToolbarProps} />
                     <DesktopTimelineView {...desktop.timelineViewProps} />
-                  </section>
-                </div>
+                  </>
+                )}
 
                 <DragOverlay dropAnimation={null} zIndex={50}>
                   <TimelineDragOverlayCard
@@ -282,19 +296,8 @@ export default function TimelineBoardScreen({
             </>
           ) : (
             <>
-              <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-                <aside
-                  className="flex min-h-0 shrink-0 self-stretch flex-col overflow-hidden border-r border-slate-200 bg-slate-50/70"
-                  style={{ width: "clamp(252px, 19vw, 292px)" }}
-                >
-                  <DesktopSidebarMenu
-                    {...desktop.leftPanelProps}
-                    overdueSortOrder={desktop.overdueSortOrder}
-                    onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
-                  />
-                </aside>
-
-                <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {renderDesktopShell(
+                <>
                   <div className="border-b border-slate-100 bg-white px-3 py-2">
                     <div className="flex items-center gap-2">
                       {desktop.tabItems.map((item) => {
@@ -316,8 +319,8 @@ export default function TimelineBoardScreen({
 
                   <DesktopListToolbar {...desktop.listToolbarProps} />
                   <DesktopListView {...desktop.listViewProps} />
-                </section>
-              </div>
+                </>
+              )}
             </>
           )}
         </div>
