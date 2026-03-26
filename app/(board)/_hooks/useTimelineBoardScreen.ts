@@ -70,7 +70,7 @@ type UseTimelineBoardScreenArgs = {
   debouncedHandleScroll: (scrollTop: number) => void;
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
-  handleToggleCardChecked: (cardId: string, checked: boolean) => void;
+  handleToggleCardChecked: (cardId: string, checked: boolean) => Promise<boolean>;
   activeResize: DragAndDropBindings["activeResize"];
   handleResizeStart: DragAndDropBindings["handleResizeStart"];
   handleResizeMove: DragAndDropBindings["handleResizeMove"];
@@ -112,9 +112,22 @@ type UseTimelineBoardScreenArgs = {
   contextMenu: {
     open: boolean;
     cardId: string | null;
+    targetCardIds: string[];
     x: number;
     y: number;
   };
+  selectedCardIds: ReadonlySet<string>;
+  selectionLeadCardId: string | null;
+  onShiftSelect: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  clearSelection: () => void;
+  onActivateCard: (cardId: string, laneId: string) => void;
+  activeCardId: string | null;
+  activeLaneId: string | null;
   listAnchorDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -149,14 +162,14 @@ type UseTimelineBoardScreenArgs = {
   cardModalStatus: "idle" | "loading" | "ready" | "error";
   modalProfiles: ProfileSummary[];
   handleCardModalSave: NonNullable<TimelineBoardScreenProps["modalProps"]>["onSave"];
-  handleCardModalDelete: (cardId: string) => void;
+  handleCardModalDelete: (cardId: string) => Promise<boolean>;
   closeCardModal: () => void;
   historySaveWarning: string | null;
   retryHistorySave: () => void;
   closeModalWithoutHistory: () => void;
   cardModalError: string | null;
   data: TimelineResponse | null;
-  moveCardByDayOffset: (cardId: string, offset: number) => void;
+  moveCardByDayOffset: (cardId: string, offset: number) => Promise<boolean>;
   overdueSortOrder: OverdueSortOrder;
   onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   filteredData: TimelineResponse | null;
@@ -242,6 +255,13 @@ export function useTimelineBoardScreen({
   handleCardContextMenu,
   handleCardContextMenuByKeyboard,
   contextMenu,
+  selectedCardIds,
+  selectionLeadCardId,
+  onShiftSelect,
+  clearSelection,
+  onActivateCard,
+  activeCardId,
+  activeLaneId,
   listAnchorDate,
   listWindowPresetKey,
   handleListWindowPresetChange,
@@ -290,11 +310,13 @@ export function useTimelineBoardScreen({
 }: UseTimelineBoardScreenArgs): TimelineBoardScreenContentProps {
   const { items: contextMenuItems } = useTimelineCardContextMenuItems({
     contextMenuCardId: contextMenu.cardId,
+    contextMenuTargetCardIds: contextMenu.targetCardIds,
     data,
     openCardModal,
     handleToggleCardChecked,
     moveCardByDayOffset,
     handleCardModalDelete,
+    onBulkActionSuccess: clearSelection,
   });
 
   const activeDragCardId = activeDrag?.cardId ?? null;
@@ -366,6 +388,13 @@ export function useTimelineBoardScreen({
     handleCardContextMenu,
     handleCardContextMenuByKeyboard,
     contextMenuCardId: contextMenu.cardId,
+    selectedCardIds,
+    selectionLeadCardId,
+    onShiftSelect,
+    onClearSelection: clearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
     listBaseDate: listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange,
@@ -426,6 +455,13 @@ export function useTimelineBoardScreen({
     onCardContextMenu: handleCardContextMenu,
     onCardContextMenuByKeyboard: handleCardContextMenuByKeyboard,
     contextMenuCardId: contextMenu.cardId,
+    selectedCardIds,
+    selectionLeadCardId,
+    onShiftSelect,
+    onClearSelection: clearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
   };
 
   return {

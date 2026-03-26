@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 type ContextMenuState = {
   open: boolean;
   cardId: string | null;
+  targetCardIds: string[];
   x: number;
   y: number;
 };
@@ -17,35 +18,25 @@ export function useTimelineContextMenu({ focusCardById }: UseTimelineContextMenu
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     open: false,
     cardId: null,
+    targetCardIds: [],
     x: 0,
     y: 0,
   });
   const lastContextMenuCardIdRef = useRef<string | null>(null);
 
-  const openContextMenuAt = useCallback((cardId: string, x: number, y: number) => {
+  const openContextMenuAt = useCallback((cardId: string, targetCardIds: string[], x: number, y: number) => {
     lastContextMenuCardIdRef.current = cardId;
     setContextMenu({
       open: true,
       cardId,
+      targetCardIds,
       x,
       y,
     });
   }, []);
 
-  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openContextMenuAt(cardId, e.clientX, e.clientY);
-  }, [openContextMenuAt]);
-
-  const handleCardContextMenuByKeyboard = useCallback((cardId: string, rect: DOMRect) => {
-    const x = rect.right + 8;
-    const y = rect.top;
-    openContextMenuAt(cardId, x, y);
-  }, [openContextMenuAt]);
-
   const closeContextMenu = useCallback((reason: "action" | "dismiss") => {
-    setContextMenu((prev) => ({ ...prev, open: false, cardId: null }));
+    setContextMenu((prev) => ({ ...prev, open: false, cardId: null, targetCardIds: [] }));
     if (reason === "action") {
       requestAnimationFrame(() => {
         focusCardById(lastContextMenuCardIdRef.current);
@@ -55,8 +46,7 @@ export function useTimelineContextMenu({ focusCardById }: UseTimelineContextMenu
 
   return {
     contextMenu,
-    handleCardContextMenu,
-    handleCardContextMenuByKeyboard,
+    openContextMenuAt,
     closeContextMenu,
   };
 }

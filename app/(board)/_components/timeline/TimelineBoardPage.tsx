@@ -34,6 +34,7 @@ import { useTimelineBoardInitialization } from "@/app/(board)/_hooks/useTimeline
 import { useTimelineBoardController } from "@/app/(board)/_hooks/useTimelineBoardController";
 import { useTimelineBoardModeSync } from "@/app/(board)/_hooks/useTimelineBoardModeSync";
 import { useTimelineBoardScreen } from "@/app/(board)/_hooks/useTimelineBoardScreen";
+import { useTimelineCardSelection } from "@/app/(board)/_hooks/useTimelineCardSelection";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -75,6 +76,10 @@ const canPersistBoardPreferences = (board: Board) => {
   if (!board.membership_role) return true;
   return board.membership_role === "owner" || board.membership_role === "editor";
 };
+
+const timelineLaneId = (isoDate: string) => `timeline:${isoDate}`;
+const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
+const OVERDUE_LANE_ID = "overdue";
 
 function InvalidTimelineUrlState({
   code,
@@ -137,9 +142,20 @@ function TimelineBoardPageContent({
   }, []);
 
   const {
+    selectedCardIds,
+    selectedCardIdSet,
+    selectionLane,
+    selectionLeadCardId,
+    activeCardId,
+    activeLaneId,
+    clearSelection,
+    setActiveCard,
+    handleShiftSelect,
+  } = useTimelineCardSelection();
+
+  const {
     contextMenu,
-    handleCardContextMenu,
-    handleCardContextMenuByKeyboard,
+    openContextMenuAt,
     closeContextMenu,
   } = useTimelineContextMenu({ focusCardById });
 
@@ -255,6 +271,78 @@ function TimelineBoardPageContent({
       overdue: sortTimelineOverdueItems(filteredData.overdue, overdueSortOrder),
     };
   }, [filteredData, overdueSortOrder]);
+
+  const laneCardOrderMap = useMemo(() => {
+    if (!sortedFilteredData) return new Map<string, string[]>();
+
+    const next = new Map<string, string[]>();
+
+    sortedFilteredData.days.forEach((day) => {
+      next.set(
+        timelineLaneId(day.isoDate),
+        sortedFilteredData.events
+          .filter((event) => event.due_date === day.isoDate)
+          .map((event) => event.card_id),
+      );
+    });
+
+    Object.entries(sortedFilteredData.abBuckets).forEach(([bucketKey, items]) => {
+      next.set(bucketLaneId(bucketKey), items.map((item) => item.card_id));
+    });
+
+    next.set(
+      OVERDUE_LANE_ID,
+      (sortedFilteredData.overdue ?? []).map((item) => item.card_id),
+    );
+
+    return next;
+  }, [sortedFilteredData]);
+
+  const sortCardIdsForLane = useCallback((laneId: string | null, cardIds: string[]) => {
+    if (!laneId) return [...cardIds].sort();
+
+    const laneOrder = laneCardOrderMap.get(laneId);
+    if (!laneOrder?.length) return [...cardIds].sort();
+
+    const laneIndex = new Map(laneOrder.map((cardId, index) => [cardId, index]));
+    return [...cardIds].sort((left, right) => {
+      const leftIndex = laneIndex.get(left);
+      const rightIndex = laneIndex.get(right);
+      if (typeof leftIndex === "number" && typeof rightIndex === "number") {
+        return leftIndex - rightIndex;
+      }
+      if (typeof leftIndex === "number") return -1;
+      if (typeof rightIndex === "number") return 1;
+      return left.localeCompare(right);
+    });
+  }, [laneCardOrderMap]);
+
+  const resolveContextMenuTargetIds = useCallback((cardId: string) => {
+    if (selectedCardIdSet.has(cardId) && selectedCardIds.length > 1) {
+      return sortCardIdsForLane(selectionLane, selectedCardIds);
+    }
+
+    if (selectedCardIds.length) {
+      clearSelection();
+    }
+
+    return [cardId];
+  }, [clearSelection, selectedCardIdSet, selectedCardIds, selectionLane, sortCardIdsForLane]);
+
+  const openCardContextMenu = useCallback((cardId: string, x: number, y: number) => {
+    const targetCardIds = resolveContextMenuTargetIds(cardId);
+    openContextMenuAt(cardId, targetCardIds, x, y);
+  }, [openContextMenuAt, resolveContextMenuTargetIds]);
+
+  const handleCardContextMenu = useCallback((e: React.MouseEvent, cardId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openCardContextMenu(cardId, e.clientX, e.clientY);
+  }, [openCardContextMenu]);
+
+  const handleCardContextMenuByKeyboard = useCallback((cardId: string, rect: DOMRect) => {
+    openCardContextMenu(cardId, rect.right + 8, rect.top);
+  }, [openCardContextMenu]);
 
   const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
   const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
@@ -428,6 +516,21 @@ function TimelineBoardPageContent({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [setShowBoardMenu]);
 
+  useEffect(() => {
+    if (!selectedCardIds.length) return;
+
+    const handleWindowClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest("[data-card-id]") || target?.closest("[role='menu']")) {
+        return;
+      }
+      clearSelection();
+    };
+
+    window.addEventListener("click", handleWindowClick);
+    return () => window.removeEventListener("click", handleWindowClick);
+  }, [clearSelection, selectedCardIds.length]);
+
   const handleBoardNavigate = useCallback(
     (board: Board) => {
       navigateBoard(board);
@@ -590,6 +693,13 @@ function TimelineBoardPageContent({
     handleCardContextMenu,
     handleCardContextMenuByKeyboard,
     contextMenu,
+    selectedCardIds: selectedCardIdSet,
+    selectionLeadCardId,
+    onShiftSelect: handleShiftSelect,
+    clearSelection,
+    onActivateCard: setActiveCard,
+    activeCardId,
+    activeLaneId,
     listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange: modeSync.handleListWindowPresetChange,
@@ -651,7 +761,7 @@ function TimelineBoardPageContent({
         screen.contextMenu.open && screen.contextMenu.cardId
           ? {
               ...screen.contextMenu,
-              onClose: () => closeContextMenu("dismiss"),
+              onClose: closeContextMenu,
             }
           : screen.contextMenu
       }

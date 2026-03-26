@@ -99,6 +99,18 @@ type UseTimelineBoardViewModelsArgs = {
   handleCardContextMenu: (e: MouseEvent, cardId: string) => void;
   handleCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  selectedCardIds: ReadonlySet<string>;
+  selectionLeadCardId: string | null;
+  onShiftSelect: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  onClearSelection: () => void;
+  onActivateCard: (cardId: string, laneId: string) => void;
+  activeCardId: string | null;
+  activeLaneId: string | null;
   listBaseDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -227,6 +239,13 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onCardContextMenu: args.handleCardContextMenu,
       onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
       contextMenuCardId: args.contextMenuCardId,
+      selectedCardIds: args.selectedCardIds,
+      selectionLeadCardId: args.selectionLeadCardId,
+      onShiftSelect: args.onShiftSelect,
+      onClearSelection: args.onClearSelection,
+      onActivateCard: args.onActivateCard,
+      activeCardId: args.activeCardId,
+      activeLaneId: args.activeLaneId,
     }),
     [
       args.days,
@@ -268,6 +287,13 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.handleCardContextMenu,
       args.handleCardContextMenuByKeyboard,
       args.contextMenuCardId,
+      args.selectedCardIds,
+      args.selectionLeadCardId,
+      args.onShiftSelect,
+      args.onClearSelection,
+      args.onActivateCard,
+      args.activeCardId,
+      args.activeLaneId,
     ]
   );
 

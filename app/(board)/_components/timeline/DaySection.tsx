@@ -60,6 +60,18 @@ type DaySectionProps = {
     hourHeight?: number;
     activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
     setActiveStackItem: Dispatch<SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
+    selectedCardIds: ReadonlySet<string>;
+    selectionLeadCardId: string | null;
+    onShiftSelect: (args: {
+        cardId: string;
+        laneId: string;
+        activeCardId: string | null;
+        activeLaneId: string | null;
+    }) => void;
+    onClearSelection: () => void;
+    onActivateCard: (cardId: string, laneId: string) => void;
+    activeCardId: string | null;
+    activeLaneId: string | null;
 };
 
 export const DaySection = memo(function DaySection({
@@ -98,6 +110,13 @@ export const DaySection = memo(function DaySection({
     hourHeight,
     activeStackItem,
     setActiveStackItem,
+    selectedCardIds,
+    selectionLeadCardId,
+    onShiftSelect,
+    onClearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
 }: DaySectionProps) {
     return (
         <div className="day-section grid grid-cols-2 h-full min-w-0">
@@ -132,6 +151,13 @@ export const DaySection = memo(function DaySection({
                     hourHeight={hourHeight}
                     activeStackItem={activeStackItem}
                     setActiveStackItem={setActiveStackItem}
+                    selectedCardIds={selectedCardIds}
+                    selectionLeadCardId={selectionLeadCardId}
+                    onShiftSelect={onShiftSelect}
+                    onClearSelection={onClearSelection}
+                    onActivateCard={onActivateCard}
+                    activeCardId={activeCardId}
+                    activeLaneId={activeLaneId}
                 />
             </div>
 
@@ -157,6 +183,13 @@ export const DaySection = memo(function DaySection({
                         onCardContextMenu={onCardContextMenu}
                         onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}
+                        selectedCardIds={selectedCardIds}
+                        selectionLeadCardId={selectionLeadCardId}
+                        onShiftSelect={onShiftSelect}
+                        onClearSelection={onClearSelection}
+                        onActivateCard={onActivateCard}
+                        activeCardId={activeCardId}
+                        activeLaneId={activeLaneId}
                     />
                 </div>
             </div>

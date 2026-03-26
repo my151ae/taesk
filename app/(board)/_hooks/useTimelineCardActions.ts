@@ -320,8 +320,10 @@ export function useTimelineCardActions({
         const response = await fetch(`/api/boards/${targetCardRef.board_id}/cards/${targetCardRef.id}`, { method: "DELETE" });
         if (!response.ok) throw new Error("Failed to delete card");
         setData((prev) => (prev ? applyCardUpdate(prev, { id: cardId } as Card, "DELETE") : prev));
+        return true;
       } catch (error) {
         setCardModalError(error instanceof Error ? error.message : "Failed to delete card");
+        return false;
       } finally {
         if (modalCard?.id === cardId) {
           closeCardModal();
@@ -400,7 +402,7 @@ export function useTimelineCardActions({
   }, [bucketDayMap, createCard, data?.abBuckets]);
 
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
-    if (dataMode !== "api") return;
+    if (dataMode !== "api") return false;
     try {
       const match = findTimelineCardById(data, cardId);
       const sourceEvent = match.event;
@@ -441,8 +443,10 @@ export function useTimelineCardActions({
         body: JSON.stringify({ checked: nextChecked }),
       });
       if (!res.ok) throw new Error();
+      return true;
     } catch {
       fetchTimeline();
+      return false;
     }
   }, [data, dataMode, initialBoardId, setData, fetchTimeline]);
 
@@ -470,7 +474,7 @@ export function useTimelineCardActions({
   }, [setGoogleToast]);
 
   const moveCardByDayOffset = useCallback((cardId: string, offsetDays: number) => {
-    if (!data) return;
+    if (!data) return Promise.resolve(false);
     const todayIso = getIsoDateJst(data.serverNow ?? new Date().toISOString());
     const targetDay = addDays(todayIso, offsetDays);
 
@@ -480,11 +484,11 @@ export function useTimelineCardActions({
     const overdueItem = match.overdueItem;
     const bucketKey = match.bucketKey;
 
-    if (!event && !bucketItem && !overdueItem) return;
+    if (!event && !bucketItem && !overdueItem) return Promise.resolve(false);
 
     const currentDueDate = event?.due_date ?? bucketItem?.due_date ?? overdueItem?.due_date ?? null;
     const currentLocalDay = toLocalDay(currentDueDate);
-    if (currentLocalDay === targetDay) return;
+    if (currentLocalDay === targetDay) return Promise.resolve(true);
 
     const dueBucketFromKey = bucketKey ? (bucketKey.split("_")[1] as DueBucket) : null;
     const updatedCard = {
@@ -517,6 +521,7 @@ export function useTimelineCardActions({
     if (dataMode === "api") {
       applyPatch(cardId, { due_date: withJstMidnight(targetDay) });
     }
+    return Promise.resolve(true);
   }, [data, dataMode, applyPatch, setData]);
 
   return {

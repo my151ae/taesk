@@ -80,6 +80,18 @@ export type DesktopTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  selectedCardIds: ReadonlySet<string>;
+  selectionLeadCardId: string | null;
+  onShiftSelect: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  onClearSelection: () => void;
+  onActivateCard: (cardId: string, laneId: string) => void;
+  activeCardId: string | null;
+  activeLaneId: string | null;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -204,6 +216,13 @@ export function DesktopTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  selectedCardIds,
+  selectionLeadCardId,
+  onShiftSelect,
+  onClearSelection,
+  onActivateCard,
+  activeCardId,
+  activeLaneId,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -293,6 +312,26 @@ export function DesktopTimelineView({
       setActiveStackItem({ kind: "card", id: contextMenuCardId });
     }
   }, [contextMenuCardId]);
+
+  useEffect(() => {
+    if (!selectionLeadCardId) return;
+    setActiveStackItem((current) => {
+      if (current?.kind === "card" && current.id === selectionLeadCardId) {
+        return current;
+      }
+      return { kind: "card", id: selectionLeadCardId };
+    });
+  }, [selectionLeadCardId]);
+
+  useEffect(() => {
+    if (!activeCardId) return;
+    setActiveStackItem((current) => {
+      if (current?.kind === "card" && current.id === activeCardId) {
+        return current;
+      }
+      return { kind: "card", id: activeCardId };
+    });
+  }, [activeCardId]);
 
   useEffect(() => {
     const el = timelineScrollRef.current;
@@ -475,6 +514,13 @@ export function DesktopTimelineView({
                     hourHeight={hourHeight}
                     activeStackItem={activeStackItem}
                     setActiveStackItem={setActiveStackItem}
+                    selectedCardIds={selectedCardIds}
+                    selectionLeadCardId={selectionLeadCardId}
+                    onShiftSelect={onShiftSelect}
+                    onClearSelection={onClearSelection}
+                    onActivateCard={onActivateCard}
+                    activeCardId={activeCardId}
+                    activeLaneId={activeLaneId}
                   />
                 ))}
               </div>

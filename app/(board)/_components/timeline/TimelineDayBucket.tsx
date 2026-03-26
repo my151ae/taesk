@@ -31,6 +31,18 @@ type TimelineDayBucketProps = {
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
+    selectedCardIds: ReadonlySet<string>;
+    selectionLeadCardId: string | null;
+    onShiftSelect: (args: {
+        cardId: string;
+        laneId: string;
+        activeCardId: string | null;
+        activeLaneId: string | null;
+    }) => void;
+    onClearSelection: () => void;
+    onActivateCard: (cardId: string, laneId: string) => void;
+    activeCardId: string | null;
+    activeLaneId: string | null;
 };
 
 type ActiveBucketSection = 'completed' | 'a' | 'b';
@@ -312,6 +324,13 @@ function StaticTimelineRow({
     timeText,
     openSource = 'bucket-list',
     checkedVisualTone = 'default',
+    isSelected = false,
+    selectionLane,
+    onShiftSelect,
+    onClearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
 }: {
     item: TimelineBucketItem | TimelineEvent;
     badgeLabel?: string | null;
@@ -326,6 +345,18 @@ function StaticTimelineRow({
     timeText?: ReactNode;
     openSource?: string;
     checkedVisualTone?: 'default' | 'timeline-dim';
+    isSelected?: boolean;
+    selectionLane?: string | null;
+    onShiftSelect?: (args: {
+        cardId: string;
+        laneId: string;
+        activeCardId: string | null;
+        activeLaneId: string | null;
+    }) => void;
+    onClearSelection?: () => void;
+    onActivateCard?: (cardId: string, laneId: string) => void;
+    activeCardId?: string | null;
+    activeLaneId?: string | null;
 }) {
     return (
         <div
@@ -366,6 +397,13 @@ function StaticTimelineRow({
                 }}
                 onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                 focusGroup="bucket"
+                isSelected={isSelected}
+                selectionLane={selectionLane}
+                onShiftSelect={onShiftSelect}
+                onClearSelection={onClearSelection}
+                onActivateCard={onActivateCard}
+                activeCardId={activeCardId}
+                activeLaneId={activeLaneId}
             />
         </div>
     );
@@ -387,6 +425,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
+    selectedCardIds,
+    selectionLeadCardId,
+    onShiftSelect,
+    onClearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
 }: TimelineDayBucketProps) {
     const activeA = useMemo(() => bucketsA.filter((item) => !item.checked), [bucketsA]);
     const activeB = useMemo(() => bucketsB.filter((item) => !item.checked), [bucketsB]);
@@ -833,6 +878,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                             isContextMenuOpen={contextMenuCardId === item.card_id}
                             onCreateBucketCard={onCreateBucketCard}
+                            isSelected={selectedCardIds.has(item.card_id)}
+                            isActive={selectionLeadCardId === item.card_id || activeCardId === item.card_id}
+                            selectionLane={`bucket:${bucketKey}`}
+                            onShiftSelect={onShiftSelect}
+                            onClearSelection={onClearSelection}
+                            onActivateCard={onActivateCard}
+                            activeCardId={activeCardId}
+                            activeLaneId={activeLaneId}
                         />
                         {renderBucketAddSlot({
                             isOver,
@@ -915,6 +968,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     timeText={buildTimelineCardTimeText(entry.item, { includeDuration: true })}
                     openSource="timeline"
                     checkedVisualTone="timeline-dim"
+                    isSelected={selectedCardIds.has(entry.item.card_id)}
+                    selectionLane={`timeline:${day.isoDate}`}
+                    onShiftSelect={onShiftSelect}
+                    onClearSelection={onClearSelection}
+                    onActivateCard={onActivateCard}
+                    activeCardId={activeCardId}
+                    activeLaneId={activeLaneId}
                 />
             );
         }
@@ -937,6 +997,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 })}
                 openSource="bucket-list"
                 checkedVisualTone="timeline-dim"
+                isSelected={selectedCardIds.has(entry.item.card_id)}
+                selectionLane={`bucket:${day.isoDate}_${entry.sourceBucket}`}
+                onShiftSelect={onShiftSelect}
+                onClearSelection={onClearSelection}
+                onActivateCard={onActivateCard}
+                activeCardId={activeCardId}
+                activeLaneId={activeLaneId}
             />
         );
     };

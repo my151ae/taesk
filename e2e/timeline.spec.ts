@@ -475,6 +475,236 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('supports shift-click multi select within the same timeline lane and switches between bulk and single menus', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const cards = [
+      {
+        id: crypto.randomUUID(),
+        title: 'Shift select lane card 1',
+        due_start: '09:00:00',
+        due_end: '10:00:00',
+        position: 1600,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 531,
+        slug: 'shift-select-lane-card-1',
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Shift select lane card 2',
+        due_start: '10:30:00',
+        due_end: '11:30:00',
+        position: 1610,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 532,
+        slug: 'shift-select-lane-card-2',
+      },
+      {
+        id: crypto.randomUUID(),
+        title: 'Shift select lane card 3',
+        due_start: '12:00:00',
+        due_end: '13:00:00',
+        position: 1620,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: 533,
+        slug: 'shift-select-lane-card-3',
+      },
+    ].map((card) => ({
+      ...card,
+      checklist: { version: 1, lines: [] },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      tags: [],
+      due_date: isoDay,
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }));
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert(cards);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const firstCard = page.locator(`[data-card-id="${cards[0].id}"]`).first();
+      const secondCard = page.locator(`[data-card-id="${cards[1].id}"]`).first();
+      const thirdCard = page.locator(`[data-card-id="${cards[2].id}"]`).first();
+
+      await expect(firstCard).toBeVisible({ timeout: 20_000 });
+      await expect(secondCard).toBeVisible({ timeout: 20_000 });
+      await expect(thirdCard).toBeVisible({ timeout: 20_000 });
+
+      await firstCard.click();
+      await page.keyboard.down('Shift');
+      await secondCard.click();
+      await page.keyboard.up('Shift');
+
+      await expect(firstCard).toHaveAttribute('data-selected', 'true');
+      await expect(secondCard).toHaveAttribute('data-selected', 'true');
+
+      await secondCard.click({ button: 'right' });
+      const menu = page.getByRole('menu', { name: 'カード操作メニュー' });
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem', { name: 'すべて完了にする' })).toBeVisible();
+      await expect(menu.getByRole('menuitem', { name: 'カードを開く' })).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(menu).toBeHidden();
+
+      await thirdCard.click({ button: 'right' });
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem', { name: 'カードを開く' })).toBeVisible();
+      await expect(firstCard).not.toHaveAttribute('data-selected', 'true');
+      await expect(secondCard).not.toHaveAttribute('data-selected', 'true');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
+    }
+  });
+
+  test('supports shift-click multi select in bucket B and overdue lanes', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const todayIso = isoDateJst();
+    const overdueIso = shiftIsoDateJst(-1);
+    const timestamp = new Date().toISOString();
+    const cards = [
+      {
+        id: crypto.randomUUID(),
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 400,
+        slug: 'multi-select-bucket-b-1',
+        title: 'Bucket B 1',
+        position: 3100,
+        due_date: todayIso,
+        due_bucket: 'b',
+        due_bucket_position: 4100,
+      },
+      {
+        id: crypto.randomUUID(),
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 401,
+        slug: 'multi-select-bucket-b-2',
+        title: 'Bucket B 2',
+        position: 3200,
+        due_date: todayIso,
+        due_bucket: 'b',
+        due_bucket_position: 4200,
+      },
+      {
+        id: crypto.randomUUID(),
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 402,
+        slug: 'multi-select-bucket-b-3',
+        title: 'Bucket B 3',
+        position: 3300,
+        due_date: todayIso,
+        due_bucket: 'b',
+        due_bucket_position: 4300,
+      },
+      {
+        id: crypto.randomUUID(),
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 403,
+        slug: 'multi-select-overdue-1',
+        title: 'Overdue 1',
+        position: 3400,
+        due_date: overdueIso,
+        due_bucket: 'b',
+        due_bucket_position: 4400,
+      },
+      {
+        id: crypto.randomUUID(),
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 404,
+        slug: 'multi-select-overdue-2',
+        title: 'Overdue 2',
+        position: 3500,
+        due_date: overdueIso,
+        due_bucket: 'a',
+        due_bucket_position: 4500,
+      },
+    ].map((card) => ({
+      ...card,
+      checklist: { version: 1, lines: [] },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      tags: [],
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }));
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert(cards);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const bucketOne = page.locator(`[data-card-id="${cards[0].id}"]`).first();
+      const bucketTwo = page.locator(`[data-card-id="${cards[1].id}"]`).first();
+      const bucketThree = page.locator(`[data-card-id="${cards[2].id}"]`).first();
+      const overdueOne = page.locator(`[data-testid="overdue-card-${cards[3].id}"]:visible [data-card-id="${cards[3].id}"]`).first();
+      const overdueTwo = page.locator(`[data-testid="overdue-card-${cards[4].id}"]:visible [data-card-id="${cards[4].id}"]`).first();
+
+      await expect(bucketOne).toBeVisible({ timeout: 20_000 });
+      await expect(bucketTwo).toBeVisible({ timeout: 20_000 });
+      await expect(bucketThree).toBeVisible({ timeout: 20_000 });
+      await expect(overdueOne).toBeVisible({ timeout: 20_000 });
+      await expect(overdueTwo).toBeVisible({ timeout: 20_000 });
+
+      await bucketOne.click();
+      await page.keyboard.down('Shift');
+      await bucketTwo.click();
+      await bucketThree.click();
+      await page.keyboard.up('Shift');
+
+      await expect(bucketOne).toHaveAttribute('data-selected', 'true');
+      await expect(bucketTwo).toHaveAttribute('data-selected', 'true');
+      await expect(bucketThree).toHaveAttribute('data-selected', 'true');
+
+      await page.mouse.click(24, 24);
+      await expect(bucketOne).not.toHaveAttribute('data-selected', 'true');
+      await expect(bucketTwo).not.toHaveAttribute('data-selected', 'true');
+      await expect(bucketThree).not.toHaveAttribute('data-selected', 'true');
+
+      await overdueOne.click();
+      await page.keyboard.down('Shift');
+      await overdueTwo.click();
+      await page.keyboard.up('Shift');
+
+      await expect(overdueOne).toHaveAttribute('data-selected', 'true');
+      await expect(overdueTwo).toHaveAttribute('data-selected', 'true');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
+    }
+  });
+
   test('keeps fixed columns for 3-way overlaps and preserves overlap modes on desktop and mobile', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

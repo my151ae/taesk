@@ -59,6 +59,18 @@ type TimelineColumnProps = {
     hourHeight?: number;
     activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
     setActiveStackItem: Dispatch<SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
+    selectedCardIds: ReadonlySet<string>;
+    selectionLeadCardId: string | null;
+    onShiftSelect: (args: {
+        cardId: string;
+        laneId: string;
+        activeCardId: string | null;
+        activeLaneId: string | null;
+    }) => void;
+    onClearSelection: () => void;
+    onActivateCard: (cardId: string, laneId: string) => void;
+    activeCardId: string | null;
+    activeLaneId: string | null;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -104,6 +116,13 @@ export const TimelineColumn = memo(function TimelineColumn({
     hourHeight,
     activeStackItem,
     setActiveStackItem,
+    selectedCardIds,
+    selectionLeadCardId,
+    onShiftSelect,
+    onClearSelection,
+    onActivateCard,
+    activeCardId,
+    activeLaneId,
 }: TimelineColumnProps) {
     // Use default if undefined
     const currentHourHeight = hourHeight ?? HOUR_HEIGHT;
@@ -160,7 +179,10 @@ export const TimelineColumn = memo(function TimelineColumn({
                         minHeight: timelineViewportHeight,
                     }}
                     onDoubleClick={handleDoubleClick}
-                    onClick={(e) => handleSingleClick(e, day.isoDate)}
+                    onClick={(e) => {
+                        onClearSelection();
+                        handleSingleClick(e, day.isoDate);
+                    }}
                 >
                     {/* Phantom Card */}
                     {selectedSlot && selectedSlot.day === day.isoDate && (
@@ -301,6 +323,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             titleClassName="text-emerald-800"
                                             hideLeftColumn={true}
                                             cardId={`calendar-${calendarEvent.id}`}
+                                            onClearSelection={onClearSelection}
                                         />
                                     </div>
                                 );
@@ -308,7 +331,7 @@ export const TimelineColumn = memo(function TimelineColumn({
 
                             const event = item.entry as TimelineEvent;
                             return (
-                <TimelineEventItem
+                                <TimelineEventItem
                                     key={`card-${event.card_id}`}
                                     event={event}
                                     layout={stackedLayout[item.key]}
@@ -324,9 +347,15 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     onCardContextMenu={onCardContextMenu}
                                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                                     isContextMenuOpen={contextMenuCardId === event.card_id}
-                                    isActive={activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id}
+                                    isActive={
+                                        selectionLeadCardId === event.card_id ||
+                                        (activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id)
+                                    }
                                     zIndex={
-                                        activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id
+                                        (
+                                            selectionLeadCardId === event.card_id ||
+                                            (activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id)
+                                        )
                                             ? 30
                                             : (stackedLayout[item.key]?.baseZIndex ?? 20)
                                     }
@@ -348,6 +377,13 @@ export const TimelineColumn = memo(function TimelineColumn({
                                         handleColumnClick(day, endMinutes);
                                     }}
                                     hourHeight={currentHourHeight}
+                                    isSelected={selectedCardIds.has(event.card_id)}
+                                    selectionLane={`timeline:${day.isoDate}`}
+                                    onShiftSelect={onShiftSelect}
+                                    onClearSelection={onClearSelection}
+                                    onActivateCard={onActivateCard}
+                                    activeCardId={activeCardId}
+                                    activeLaneId={activeLaneId}
                                 />
                             );
                         })}

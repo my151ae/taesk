@@ -4,6 +4,7 @@ import {
     CSSProperties,
     KeyboardEvent as ReactKeyboardEvent,
     FocusEvent as ReactFocusEvent,
+    PointerEvent as ReactPointerEvent,
     useRef,
     useCallback
 } from 'react';
@@ -68,6 +69,18 @@ type TimelineCardProps = {
     hideLeftColumn?: boolean;
     shortcutContext?: ShortcutContextDescriptor | null;
     checkedVisualTone?: 'default' | 'timeline-dim';
+    isSelected?: boolean;
+    selectionLane?: string | null;
+    onShiftSelect?: (args: {
+        cardId: string;
+        laneId: string;
+        activeCardId: string | null;
+        activeLaneId: string | null;
+    }) => void;
+    onClearSelection?: () => void;
+    onActivateCard?: (cardId: string, laneId: string) => void;
+    activeCardId?: string | null;
+    activeLaneId?: string | null;
 };
 
 export function TimelineCard({
@@ -105,6 +118,13 @@ export function TimelineCard({
     hideLeftColumn = false,
     shortcutContext,
     checkedVisualTone = 'default',
+    isSelected = false,
+    selectionLane = null,
+    onShiftSelect,
+    onClearSelection,
+    onActivateCard,
+    activeCardId = null,
+    activeLaneId = null,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -137,14 +157,37 @@ export function TimelineCard({
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
 
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+        if (e.shiftKey && onShiftSelect && cardId && selectionLane) {
+            e.preventDefault();
+            e.stopPropagation();
+            onShiftSelect({
+                cardId,
+                laneId: selectionLane,
+                activeCardId,
+                activeLaneId,
+            });
+            wasFocusedRef.current = false;
+            return;
+        }
+
         // ドラッグ動作を阻害しないよう stopPropagation は行わない
-        // マウスダウンの時点でフォーカスがあるかチェック
+        // ポインターダウン時点でフォーカスがあるかチェック
         wasFocusedRef.current = (document.activeElement === containerRef.current);
-    }, []);
+    }, [activeCardId, activeLaneId, cardId, onShiftSelect, selectionLane]);
 
     const handleContainerClick = useCallback((e: React.MouseEvent) => {
+        if (e.shiftKey && onShiftSelect && cardId && selectionLane) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+
         e.stopPropagation(); // イベント伝播を止める
+        if (cardId && selectionLane) {
+            onActivateCard?.(cardId, selectionLane);
+        }
+        onClearSelection?.();
         // コンテナ（タイトル以外）をクリックした場合
         // マウスダウン時に既にフォーカスがあった（＝選択されていた）場合はモーダルを開く
         if (wasFocusedRef.current) {
@@ -153,7 +196,7 @@ export function TimelineCard({
             // フォーカスがなかった場合はフォーカスさせる（選択状態にする）
             containerRef.current?.focus();
         }
-    }, [onOpen]);
+    }, [cardId, onActivateCard, onClearSelection, onOpen, onShiftSelect, selectionLane]);
 
     const renderRightMeta = useCallback(() => {
         if (typeof rightMeta === "string") {
@@ -174,6 +217,12 @@ export function TimelineCard({
         );
     }, [rightMeta]);
     const shortcutAttributes = shortcutContext ? buildShortcutDataAttributes(shortcutContext) : undefined;
+    const handleFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+        if (cardId && selectionLane) {
+            onActivateCard?.(cardId, selectionLane);
+        }
+        onFocus?.(event);
+    }, [cardId, onActivateCard, onFocus, selectionLane]);
 
     return (
         <div
@@ -182,6 +231,7 @@ export function TimelineCard({
                 'relative flex flex-row items-stretch border text-left shadow-sm w-full max-w-full outline-none transition-shadow',
                 backgroundClass, // 背景色を適用
                 isTimelineDimChecked ? 'border-emerald-200/90 shadow-none' : 'border-slate-200',
+                isSelected && "border-sky-500 bg-sky-50/90 shadow-[0_0_0_2px_rgba(14,165,233,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:bg-sky-500 before:content-['']",
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
                 'focus:ring-2 focus:ring-sky-500', // フォーカス時のリング
@@ -191,15 +241,17 @@ export function TimelineCard({
             style={style}
             data-testid={dataTestId}
             data-card-id={cardId}
+            data-selection-lane={selectionLane ?? undefined}
+            data-selected={isSelected ? 'true' : undefined}
             data-checked-visual={isTimelineDimChecked ? 'timeline-dim' : undefined}
             {...shortcutAttributes}
             tabIndex={tabIndex ?? 0}
             role={role}
             data-focus-group={focusGroup}
             data-focus-part={focusGroup ? 'card' : undefined}
-            onMouseDown={handleMouseDown}
+            onPointerDown={handlePointerDown}
             onClick={handleContainerClick}
-            onFocus={onFocus}
+            onFocus={handleFocus}
             onBlur={onBlur}
             onKeyDown={(event) => {
                 // Create next card: Shift+Enter
@@ -282,6 +334,7 @@ export function TimelineCard({
                                         data-focus-part={focusGroup ? 'checkbox' : undefined}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            onClearSelection?.();
                                             onToggleCheck(!checked);
                                         }}
                                         aria-label={checked ? '未完了に戻す' : '完了にする'}

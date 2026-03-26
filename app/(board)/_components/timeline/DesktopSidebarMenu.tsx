@@ -56,6 +56,18 @@ type DesktopSidebarMenuProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  selectedCardIds: ReadonlySet<string>;
+  selectionLeadCardId: string | null;
+  onShiftSelect: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  onClearSelection: () => void;
+  onActivateCard: (cardId: string, laneId: string) => void;
+  activeCardId: string | null;
+  activeLaneId: string | null;
 };
 
 function OverdueSortToggle({
@@ -189,6 +201,14 @@ function SidebarCardRow({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   isContextMenuOpen,
+  isActive = false,
+  isSelected = false,
+  selectionLane,
+  onShiftSelect,
+  onClearSelection,
+  onActivateCard,
+  activeCardId,
+  activeLaneId,
 }: {
   item: {
     card_id: string;
@@ -211,6 +231,19 @@ function SidebarCardRow({
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   isContextMenuOpen: boolean;
+  isActive?: boolean;
+  isSelected?: boolean;
+  selectionLane?: string;
+  onShiftSelect?: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  onClearSelection?: () => void;
+  onActivateCard?: (cardId: string, laneId: string) => void;
+  activeCardId?: string | null;
+  activeLaneId?: string | null;
 }) {
   const card = (
     <div
@@ -234,7 +267,7 @@ function SidebarCardRow({
         onOpen={() => openCardModal(item.short_id, openSource)}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
         paddingClass="py-1"
-        className={clsx("min-h-0", className)}
+        className={clsx("min-h-0", className, isActive && "shadow-md")}
         shortcutContext={{
           scope: "board",
           region: "sidebar",
@@ -243,6 +276,13 @@ function SidebarCardRow({
         }}
         onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
         focusGroup="bucket"
+        isSelected={isSelected}
+        selectionLane={selectionLane}
+        onShiftSelect={onShiftSelect}
+        onClearSelection={onClearSelection}
+        onActivateCard={onActivateCard}
+        activeCardId={activeCardId}
+        activeLaneId={activeLaneId}
       />
     </div>
   );
@@ -279,6 +319,13 @@ export function DesktopSidebarMenu({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  selectedCardIds,
+  selectionLeadCardId,
+  onShiftSelect,
+  onClearSelection,
+  onActivateCard,
+  activeCardId,
+  activeLaneId,
 }: DesktopSidebarMenuProps) {
   const handleToggleSection = (key: SidebarSectionKey) => {
     actions.onExpandedSectionChange(state.expandedSectionKey === key ? null : key);
@@ -331,6 +378,14 @@ export function DesktopSidebarMenu({
                     onCardContextMenu={onCardContextMenu}
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     isContextMenuOpen={contextMenuCardId === item.card_id}
+                    isActive={selectionLeadCardId === item.card_id || activeCardId === item.card_id}
+                    isSelected={selectedCardIds.has(item.card_id)}
+                    selectionLane="overdue"
+                    onShiftSelect={onShiftSelect}
+                    onClearSelection={onClearSelection}
+                    onActivateCard={onActivateCard}
+                    activeCardId={activeCardId}
+                    activeLaneId={activeLaneId}
                   />
                 ))}
               </div>
