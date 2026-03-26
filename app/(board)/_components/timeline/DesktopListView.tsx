@@ -55,21 +55,21 @@ export function DesktopListToolbar({
   onShowGoogleChange,
 }: DesktopListToolbarProps) {
   const todayButtonClassName =
-    "h-8 rounded-full border border-sky-300 bg-sky-200 px-2 text-xs font-medium text-sky-800 hover:bg-sky-300";
+    "inline-flex h-6 shrink-0 items-center rounded-full border border-sky-300 bg-sky-200 px-2.5 text-[11px] font-medium text-sky-800 hover:bg-sky-300";
 
   return (
-    <div className="border-b border-slate-100 bg-white px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="border-b border-slate-100 bg-white px-3">
+      <div className="flex h-8 items-center gap-2 overflow-x-auto">
         <button
           onClick={() => onPrevWeek?.()}
-          className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="7日前へ"
         >
           {"<<"}
         </button>
         <button
           onClick={() => onPrevDay?.()}
-          className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="前日へ"
         >
           {"<"}
@@ -92,14 +92,14 @@ export function DesktopListToolbar({
               (e.currentTarget as HTMLInputElement).blur();
             }
           }}
-          className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+          className="h-6 shrink-0 rounded-full border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700"
           aria-label="基準日"
         />
         <div className="relative">
           <select
             value={listWindowPresetKey}
             onChange={(e) => onListWindowPresetChange?.(e.target.value as ListWindowPresetKey)}
-            className="h-8 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-xs font-medium text-slate-700"
+            className="h-6 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-[11px] font-medium text-slate-700"
             aria-label="表示期間"
           >
             <option value="plus3">{getPresetLabel("plus3")}</option>
@@ -114,27 +114,27 @@ export function DesktopListToolbar({
         </div>
         <button
           onClick={() => onNextDay?.()}
-          className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="翌日へ"
         >
           {">"}
         </button>
         <button
           onClick={() => onNextWeek?.()}
-          className="h-8 w-8 rounded-full border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="7日後へ"
         >
           {">>"}
         </button>
-        <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+        <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
           <input type="checkbox" checked={showUnchecked} onChange={(e) => onShowUncheckedChange(e.target.checked)} />
           Unchecked
         </label>
-        <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+        <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
           <input type="checkbox" checked={showChecked} onChange={(e) => onShowCheckedChange(e.target.checked)} />
           Checked
         </label>
-        <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
+        <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
           <input type="checkbox" checked={showGoogle} onChange={(e) => onShowGoogleChange(e.target.checked)} />
           Google
         </label>

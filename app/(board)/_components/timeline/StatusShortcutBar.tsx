@@ -39,7 +39,7 @@ function KeyChip({ label, disabled = false }: { label: string; disabled?: boolea
   return (
     <span
       className={clsx(
-        "inline-flex min-w-[24px] items-center justify-center rounded-md border px-1.5 py-1 text-[11px] font-bold leading-none shadow-sm",
+        "inline-flex h-5 min-w-[22px] items-center justify-center rounded-md border px-1.5 text-[10px] font-bold leading-none shadow-sm",
         disabled
           ? "border-slate-200 bg-slate-50 text-slate-300 shadow-none"
           : "border-slate-300 bg-white text-slate-700"
@@ -62,7 +62,7 @@ export function StatusShortcutBar({
   return (
     <div
       className={clsx(
-        "flex min-h-10 items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-2 shadow-sm ring-1 ring-black/5 backdrop-blur-sm",
+        "flex h-9 items-center gap-2.5 rounded-2xl border border-slate-200 bg-white/95 px-3 shadow-sm ring-1 ring-black/5 backdrop-blur-sm",
         className
       )}
       data-testid={dataTestId}
@@ -73,9 +73,9 @@ export function StatusShortcutBar({
       data-shortcut-bar-part={resolvedPayload.part ?? ""}
     >
       <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex items-center gap-3 overflow-x-auto">
+        <div className="flex items-center gap-2.5 overflow-x-auto">
           {visibleItems.map((item) => (
-            <div key={item.id} className="flex shrink-0 items-center gap-2">
+            <div key={item.id} className="flex shrink-0 items-center gap-1.5">
               <div className="flex items-center gap-1">
                 {item.keys.map((key, index) => (
                   <div key={`${item.id}-${key}-${index}`} className="flex items-center gap-1">
@@ -84,17 +84,17 @@ export function StatusShortcutBar({
                   </div>
                 ))}
               </div>
-              <span className={clsx("text-xs font-medium", item.enabled ? "text-slate-700" : "text-slate-300")}>
+              <span className={clsx("text-[11px] font-medium leading-none", item.enabled ? "text-slate-700" : "text-slate-300")}>
                 {item.label}
               </span>
             </div>
           ))}
           {overflowCount > 0 ? (
-            <div className="shrink-0 text-xs font-semibold text-slate-500">+{overflowCount}</div>
+            <div className="shrink-0 text-[11px] font-semibold leading-none text-slate-500">+{overflowCount}</div>
           ) : null}
         </div>
       </div>
-      <div className="ml-auto shrink-0 text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <div className="ml-auto shrink-0 text-right text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-slate-400">
         {resolvedPayload.contextLabel}
       </div>
     </div>

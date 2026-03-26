@@ -483,10 +483,7 @@ export function DesktopSidebarMenu({
                 className={clsx("min-h-0 min-w-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
                 aria-hidden={!expanded}
               >
-                <div className="relative flex min-h-10 items-center justify-between border-b border-slate-200/80 px-3 py-1.5">
-                  <span className="pointer-events-none absolute left-3 top-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                    Panel
-                  </span>
+                <div className="relative flex h-8 items-center justify-between border-b border-slate-200/80 px-3">
                   <div className="flex min-w-0 items-center gap-2 leading-tight">
                     <h2 className="truncate text-sm font-semibold leading-tight text-slate-800">{section.label}</h2>
                     <span

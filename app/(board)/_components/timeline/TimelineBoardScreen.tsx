@@ -157,9 +157,9 @@ export default function TimelineBoardScreen({
     }) ?? createEmptyShortcutBarPayload("board");
   }, [desktopShortcutDescriptor, modalProps]);
   const activeTabClassName =
-    "rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
+    "inline-flex h-6 shrink-0 items-center rounded-full bg-slate-200 px-3 text-[11px] font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
   const inactiveTabClassName =
-    "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50";
+    "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 hover:bg-slate-50";
   const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
   const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "3.5rem";
 
@@ -259,8 +259,8 @@ export default function TimelineBoardScreen({
               >
                 {renderDesktopShell(
                   <>
-                    <div className="border-b border-slate-100 bg-white px-3 py-2">
-                      <div className="flex items-center gap-2">
+                    <div className="border-b border-slate-100 bg-white px-3">
+                      <div className="flex h-8 items-center gap-2 overflow-x-auto">
                         {desktop.tabItems.map((item) => {
                           const isActive = item.key === desktop.activeView;
                           return (
@@ -298,8 +298,8 @@ export default function TimelineBoardScreen({
             <>
               {renderDesktopShell(
                 <>
-                  <div className="border-b border-slate-100 bg-white px-3 py-2">
-                    <div className="flex items-center gap-2">
+                  <div className="border-b border-slate-100 bg-white px-3">
+                    <div className="flex h-8 items-center gap-2 overflow-x-auto">
                       {desktop.tabItems.map((item) => {
                         const isActive = item.key === desktop.activeView;
                         return (

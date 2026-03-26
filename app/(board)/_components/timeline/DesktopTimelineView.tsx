@@ -116,13 +116,13 @@ export function DesktopTimelineToolbar({
   onToday,
 }: DesktopTimelineToolbarProps) {
   const buttonClassName =
-    "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
   const todayButtonClassName =
-    "rounded-full border border-sky-300 bg-sky-200 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex h-6 shrink-0 items-center rounded-full border border-sky-300 bg-sky-200 px-2.5 text-[11px] font-medium text-sky-800 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
-    <div className="border-b border-slate-100 bg-white px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="border-b border-slate-100 bg-white px-3">
+      <div className="flex h-8 items-center gap-2 overflow-x-auto">
         <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} className={buttonClassName}>
           {"<<"}
         </button>
@@ -138,12 +138,12 @@ export function DesktopTimelineToolbar({
         <button type="button" onClick={onNextDayRange} disabled={status === "loading"} className={buttonClassName}>
           {">>"}
         </button>
-        <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+        <div className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] text-slate-700">
           <button
             type="button"
             onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
             disabled={status === "loading" || dayRange <= 1}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="表示日数を減らす"
           >
             -
@@ -152,7 +152,7 @@ export function DesktopTimelineToolbar({
             value={dayRange}
             onChange={(event) => onDayRangeChange(Number(event.target.value))}
             disabled={status === "loading"}
-            className="rounded-full border-0 bg-transparent px-1 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-0"
+            className="h-full rounded-full border-0 bg-transparent px-1 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-0"
             aria-label="表示日数"
           >
             {[1, 2, 3, 4, 5, 6, 7].map((days) => (
@@ -165,7 +165,7 @@ export function DesktopTimelineToolbar({
             type="button"
             onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
             disabled={status === "loading" || dayRange >= 7}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="表示日数を増やす"
           >
             +
@@ -370,7 +370,7 @@ export function DesktopTimelineView({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div ref={timelineHeaderRef} className="z-30">
               <div
-                className="grid border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
+                className="grid h-8 border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
                 style={{
                   gridTemplateColumns: desktopGridTemplateColumns,
                 }}
@@ -383,14 +383,14 @@ export function DesktopTimelineView({
                     <div
                       key={day.key}
                       className={clsx(
-                        "min-h-10 px-3 py-1.5 text-center flex items-center justify-between relative",
+                        "relative flex h-full items-center justify-between px-3 text-center",
                         index > 0 ? "border-l border-slate-100" : ""
                       )}
                     >
                       <div className="flex w-full items-center justify-center leading-tight">
                         <span
                           className={clsx(
-                            "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5",
+                            "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5 text-xs font-semibold",
                             isToday
                               ? "bg-sky-200 text-sky-800 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.7)]"
                               : "text-slate-800"
