@@ -67,7 +67,7 @@ type SectionMeasurements = {
     compactEmptyBodyMinHeight: number;
 };
 
-type BucketEmptyStateVariant = 'default' | 'compact' | 'hidden';
+type BucketEmptyStateVariant = 'compact' | 'hidden';
 
 type SectionLayout = {
     bodyHeight: number;
@@ -80,8 +80,8 @@ const FALLBACK_HEADER_HEIGHT_PX = 32;
 const FALLBACK_PEEK_BODY_HEIGHT_PX = 96;
 const MIN_PEEK_BODY_HEIGHT_PX = 64;
 const FALLBACK_COMPLETED_BODY_HEIGHT_PX = 96;
-const FALLBACK_EMPTY_BODY_HEIGHT_PX = 84;
-const COMPACT_EMPTY_BODY_HEIGHT_PX = 32;
+const FALLBACK_EMPTY_BODY_HEIGHT_PX = 40;
+const COMPACT_EMPTY_BODY_HEIGHT_PX = 40;
 const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
 const CONTENT_CHROME_ALLOWANCE_PX = 8;
 const BUCKET_CARD_STACK_CHROME_ALLOWANCE_PX = 16;
@@ -253,8 +253,8 @@ function resolveBucketBodyLayout({
     if (count === 0) {
         if (isPriority) {
             return {
-                bodyHeight: Math.min(emptyBodyMinHeight, availableBodyHeight),
-                emptyStateVariant: 'default',
+                bodyHeight: Math.min(compactEmptyBodyMinHeight, availableBodyHeight),
+                emptyStateVariant: 'compact',
             };
         }
 
@@ -273,6 +273,13 @@ function resolveBucketBodyLayout({
     }
 
     if (!isPriority && availableBodyHeight <= peekMinBodyHeight) {
+        if (availableBodyHeight >= compactEmptyBodyMinHeight) {
+            return {
+                bodyHeight: compactEmptyBodyMinHeight,
+                emptyStateVariant: 'compact',
+            };
+        }
+
         return {
             bodyHeight: 0,
             emptyStateVariant: 'hidden',
@@ -603,8 +610,10 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             : 0;
         const availableAbBodyHeight = Math.max(0, availableBodyHeight - completedBodyHeight);
         const secondarySection: PrimaryBucketSection = abPrioritySection === 'a' ? 'b' : 'a';
-        const priorityNeedsAllSpace = sectionCounts[abPrioritySection] > 0
-            && measurements[abPrioritySection].bodyNaturalHeight > (availableAbBodyHeight - PRIORITY_FIT_TOLERANCE_PX);
+        const hasAnyAbCards = sectionCounts.a > 0 || sectionCounts.b > 0;
+        const secondaryCompactReserve = availableAbBodyHeight >= measurements[secondarySection].compactEmptyBodyMinHeight
+            ? measurements[secondarySection].compactEmptyBodyMinHeight
+            : 0;
 
         const priorityLayout = resolveBucketBodyLayout({
             count: sectionCounts[abPrioritySection],
@@ -612,7 +621,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             peekMinBodyHeight: measurements[abPrioritySection].peekMinBodyHeight,
             emptyBodyMinHeight: measurements[abPrioritySection].emptyBodyMinHeight,
             compactEmptyBodyMinHeight: measurements[abPrioritySection].compactEmptyBodyMinHeight,
-            availableBodyHeight: availableAbBodyHeight,
+            availableBodyHeight: Math.max(0, availableAbBodyHeight - secondaryCompactReserve),
             isPriority: true,
         });
         const secondaryLayout = resolveBucketBodyLayout({
@@ -621,11 +630,9 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             peekMinBodyHeight: measurements[secondarySection].peekMinBodyHeight,
             emptyBodyMinHeight: measurements[secondarySection].emptyBodyMinHeight,
             compactEmptyBodyMinHeight: measurements[secondarySection].compactEmptyBodyMinHeight,
-            availableBodyHeight: priorityNeedsAllSpace
-                ? 0
-                : Math.max(0, availableAbBodyHeight - priorityLayout.bodyHeight),
+            availableBodyHeight: Math.max(0, availableAbBodyHeight - priorityLayout.bodyHeight),
             isPriority: false,
-            allowCompactEmpty: sectionCounts[abPrioritySection] > 0,
+            allowCompactEmpty: sectionCounts[abPrioritySection] > 0 || !hasAnyAbCards,
         });
 
         const bodyHeightMap: Record<ActiveBucketSection, number> = {
@@ -751,45 +758,6 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         </div>
     );
 
-    const renderEmptyBucketDropZone = ({
-        bucketKey,
-        isOver,
-    }: {
-        bucketKey: string;
-        isOver: boolean;
-    }) => (
-        <button
-            type="button"
-            disabled={status === 'loading' || !onCreateBucketCard}
-            tabIndex={-1}
-            data-arrow-skip="true"
-            onClick={(e) => {
-                e.stopPropagation();
-                onCreateBucketCard?.(bucketKey);
-            }}
-            className={clsx(
-                'mx-2 mt-1 flex min-h-[72px] flex-1 items-center justify-center rounded-lg border border-dashed px-3 py-4 text-center transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                isOver
-                    ? 'border-sky-400 bg-sky-50 text-sky-700'
-                    : 'border-slate-300 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
-            )}
-            data-testid={`ab-empty-dropzone-${bucketKey}`}
-        >
-            <span className="flex items-center gap-2 text-[11px] font-semibold">
-                <span
-                    aria-hidden="true"
-                    className={clsx(
-                        'inline-flex h-5 w-5 items-center justify-center rounded-full border text-[12px] leading-none',
-                        isOver ? 'border-sky-400 bg-white text-sky-700' : 'border-slate-300 bg-slate-50 text-slate-500'
-                    )}
-                >
-                    ＋
-                </span>
-                <span>Drop or add card</span>
-            </span>
-        </button>
-    );
-
     const renderCompactEmptyBucketDropZone = ({
         bucketKey,
         isOver,
@@ -807,30 +775,24 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 onCreateBucketCard?.(bucketKey);
             }}
             className={clsx(
-                'mx-2 flex h-7 items-center justify-center rounded-md border border-dashed px-2 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                'mx-2 flex h-8 w-[calc(100%-16px)] items-center justify-center rounded-md border border-dashed px-3 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
                 isOver
                     ? 'border-sky-400 bg-sky-50 text-sky-700'
                     : 'border-slate-300 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
             )}
             data-testid={`ab-compact-empty-dropzone-${bucketKey}`}
         >
-            <span className="relative flex w-full items-center justify-center">
+            <span className="flex items-center gap-2 text-[10px] font-semibold">
                 <span
                     aria-hidden="true"
                     className={clsx(
-                        'absolute inset-x-0 h-px',
-                        isOver ? 'bg-sky-300' : 'bg-slate-300'
-                    )}
-                />
-                <span
-                    aria-hidden="true"
-                    className={clsx(
-                        'relative z-10 inline-flex h-4 w-4 items-center justify-center rounded-full border bg-white text-[9px] leading-none',
+                        'inline-flex h-4 w-4 items-center justify-center rounded-full border bg-white text-[9px] leading-none',
                         isOver ? 'border-sky-400 text-sky-700' : 'border-slate-300 text-slate-500'
                     )}
                 >
                     ＋
                 </span>
+                <span>Drop or add card</span>
             </span>
         </button>
     );
@@ -913,7 +875,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             ref={(node) => setContentRef(section, node)}
             className="min-h-0 min-w-0 space-y-1 pl-[1px] py-[1px]"
         >
-            {items.length > 0 || emptyStateVariant === 'default' ? (
+            {items.length > 0 && emptyStateVariant !== 'compact' ? (
                 renderBucketAddSlot({
                     isOver,
                     sticky: false,
@@ -927,12 +889,10 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 })
             ) : null}
 
-            {items.length === 0 ? (
-                emptyStateVariant === 'compact'
-                    ? renderCompactEmptyBucketDropZone({ bucketKey, isOver })
-                    : emptyStateVariant === 'default'
-                        ? renderEmptyBucketDropZone({ bucketKey, isOver })
-                        : null
+            {emptyStateVariant === 'compact' ? (
+                renderCompactEmptyBucketDropZone({ bucketKey, isOver })
+            ) : items.length === 0 ? (
+                null
             ) : (
                 items.map((item) => (
                     <div key={item.card_id} className="group/item relative">
@@ -1015,7 +975,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     items,
                                     bucketKey,
                                     isOver,
-                                    emptyStateVariant: layout.emptyStateVariant ?? 'default',
+                                    emptyStateVariant: layout.emptyStateVariant ?? 'hidden',
                                 })}
                             </div>
                         </div>
