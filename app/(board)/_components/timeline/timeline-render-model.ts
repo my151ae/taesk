@@ -347,6 +347,17 @@ export const formatAllDayRange = ({
   return startLabel ?? endLabel;
 };
 
+export const formatAllDayInlineLabel = ({
+  title,
+  rangeLabel,
+}: {
+  title?: string | null;
+  rangeLabel?: string | null;
+}) => {
+  const safeTitle = title?.trim() || "Google予定";
+  return rangeLabel ? `${rangeLabel} ${safeTitle}` : safeTitle;
+};
+
 export const formatAllDayMeta = ({
   entry,
   fallbackIsoDate,

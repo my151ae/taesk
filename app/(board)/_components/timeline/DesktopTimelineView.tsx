@@ -30,9 +30,10 @@ import {
   buildDesktopAllDayState,
   buildVisibleDays,
   formatAllDayRange,
+  formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 
-const ALL_DAY_ROW_HEIGHT = 36;
+const ALL_DAY_ROW_HEIGHT = 24;
 
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
@@ -354,6 +355,8 @@ export function DesktopTimelineView({
         visibleDays,
         calendarAllDayByDay,
         rowHeight: ALL_DAY_ROW_HEIGHT,
+        rowGap: 4,
+        minHeight: 34,
       }),
     [calendarAllDayByDay, visibleDays]
   );
@@ -424,8 +427,10 @@ export function DesktopTimelineView({
                       const left = dayWidth * item.start;
                       const width = dayWidth * span;
                       const rangeLabel = formatAllDayRange({ segment: item, visibleDays });
-                      const tzLabel = item.displayTz && item.displayTz !== "Asia/Tokyo" ? item.displayTz : null;
-                      const meta = [rangeLabel, tzLabel].filter(Boolean).join(" · ");
+                      const inlineLabel = formatAllDayInlineLabel({
+                        title: item.title,
+                        rangeLabel,
+                      });
                       return (
                         <button
                           key={`${item.id}-${item.start}-${item.end}`}
@@ -434,21 +439,18 @@ export function DesktopTimelineView({
                           data-focus-part="card"
                           disabled={!onExternalEventClick}
                           onClick={() => onExternalEventClick?.(item.entry)}
-                          className="absolute flex items-start gap-2 rounded-md border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
+                          className="absolute flex h-6 items-center gap-2 overflow-hidden rounded-md border border-emerald-200 bg-white/90 px-2.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
                           style={{
-                            top: 6 + item.row * (ALL_DAY_ROW_HEIGHT + 6),
+                            top: 5 + item.row * (ALL_DAY_ROW_HEIGHT + 4),
                             left: `calc(${left}% + 2px)`,
                             width: `calc(${width}% - 4px)`,
                           }}
-                          title={item.title || "Google予定"}
+                          title={inlineLabel}
                         >
                           <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
                             G
                           </span>
-                          <span className="flex min-w-0 flex-col gap-0.5">
-                            <span className="truncate">{item.title || "Google予定"}</span>
-                            {meta ? <span className="truncate text-[10px] font-normal text-emerald-700">{meta}</span> : null}
-                          </span>
+                          <span className="min-w-0 truncate">{inlineLabel}</span>
                         </button>
                       );
                     })}
