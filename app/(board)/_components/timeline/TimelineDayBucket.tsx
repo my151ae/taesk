@@ -64,23 +64,15 @@ type SectionMeasurements = {
     bodyNaturalHeight: number;
     peekMinBodyHeight: number;
     emptyBodyMinHeight: number;
+    compactEmptyBodyMinHeight: number;
 };
 
-type SectionSizing = {
-    count: number;
-    naturalBodyHeight: number;
-    minBodyHeight: number;
-    enforceMinBodyHeight: boolean;
-};
-
-type PairAllocation = {
-    priorityBodyHeight: number;
-    secondaryBodyHeight: number;
-};
+type BucketEmptyStateVariant = 'default' | 'compact' | 'hidden';
 
 type SectionLayout = {
     bodyHeight: number;
     totalHeight: number;
+    emptyStateVariant?: BucketEmptyStateVariant;
 };
 
 const SECTION_ORDER: readonly ActiveBucketSection[] = ['completed', 'a', 'b'];
@@ -89,8 +81,11 @@ const FALLBACK_PEEK_BODY_HEIGHT_PX = 96;
 const MIN_PEEK_BODY_HEIGHT_PX = 64;
 const FALLBACK_COMPLETED_BODY_HEIGHT_PX = 96;
 const FALLBACK_EMPTY_BODY_HEIGHT_PX = 84;
+const COMPACT_EMPTY_BODY_HEIGHT_PX = 32;
 const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
 const CONTENT_CHROME_ALLOWANCE_PX = 8;
+const BUCKET_CARD_STACK_CHROME_ALLOWANCE_PX = 16;
+const PRIORITY_FIT_TOLERANCE_PX = 2;
 
 const DEFAULT_MEASUREMENTS: Record<ActiveBucketSection, SectionMeasurements> = {
     completed: {
@@ -98,18 +93,21 @@ const DEFAULT_MEASUREMENTS: Record<ActiveBucketSection, SectionMeasurements> = {
         bodyNaturalHeight: 0,
         peekMinBodyHeight: FALLBACK_COMPLETED_BODY_HEIGHT_PX,
         emptyBodyMinHeight: 0,
+        compactEmptyBodyMinHeight: 0,
     },
     a: {
         headerHeight: FALLBACK_HEADER_HEIGHT_PX,
         bodyNaturalHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
         peekMinBodyHeight: FALLBACK_PEEK_BODY_HEIGHT_PX,
         emptyBodyMinHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+        compactEmptyBodyMinHeight: COMPACT_EMPTY_BODY_HEIGHT_PX,
     },
     b: {
         headerHeight: FALLBACK_HEADER_HEIGHT_PX,
         bodyNaturalHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
         peekMinBodyHeight: FALLBACK_PEEK_BODY_HEIGHT_PX,
         emptyBodyMinHeight: FALLBACK_EMPTY_BODY_HEIGHT_PX,
+        compactEmptyBodyMinHeight: COMPACT_EMPTY_BODY_HEIGHT_PX,
     },
 };
 
@@ -191,75 +189,104 @@ function resolveMeasuredPeekHeight(contentNode: HTMLDivElement | null, section: 
     return Math.max(MIN_PEEK_BODY_HEIGHT_PX, firstCardHeight + CONTENT_CHROME_ALLOWANCE_PX);
 }
 
-function pickFallbackPriority(counts: Record<ActiveBucketSection, number>): ActiveBucketSection {
+function resolveRenderedBodyHeight(
+    contentNode: HTMLDivElement | null,
+    scrollContainerNode: HTMLDivElement | null,
+    section: ActiveBucketSection,
+    count: number
+) {
+    if (!contentNode) {
+        return DEFAULT_MEASUREMENTS[section].bodyNaturalHeight;
+    }
+
+    if (count === 0) {
+        return Math.ceil(contentNode.getBoundingClientRect().height) + (section === 'completed' ? 0 : CONTENT_CHROME_ALLOWANCE_PX);
+    }
+
+    const selector = section === 'completed' ? '[data-testid^="completed-card-"]' : '[data-testid^="ab-card-"]';
+    const cardNodes = contentNode.querySelectorAll<HTMLElement>(selector);
+    const lastCardNode = cardNodes.item(cardNodes.length - 1);
+    if (!lastCardNode) {
+        return scrollContainerNode
+            ? Math.ceil(scrollContainerNode.scrollHeight)
+            : DEFAULT_MEASUREMENTS[section].bodyNaturalHeight;
+    }
+
+    const contentRect = contentNode.getBoundingClientRect();
+    const lastCardRect = lastCardNode.getBoundingClientRect();
+    const renderedHeight = Math.ceil(lastCardRect.bottom - contentRect.top);
+    return Math.max(
+        0,
+        renderedHeight + (section === 'completed' ? 0 : BUCKET_CARD_STACK_CHROME_ALLOWANCE_PX)
+    );
+}
+
+function pickFallbackAbPriority(counts: Record<ActiveBucketSection, number>): PrimaryBucketSection {
     if (counts.a > 0) return 'a';
     if (counts.b > 0) return 'b';
-    if (counts.completed > 0) return 'completed';
     return 'a';
 }
 
-function allocatePairHeights({
-    priority,
-    secondary,
+function resolveBucketBodyLayout({
+    count,
+    naturalBodyHeight,
+    peekMinBodyHeight,
+    emptyBodyMinHeight,
+    compactEmptyBodyMinHeight,
     availableBodyHeight,
+    isPriority,
+    allowCompactEmpty = true,
 }: {
-    priority: SectionSizing;
-    secondary: SectionSizing;
+    count: number;
+    naturalBodyHeight: number;
+    peekMinBodyHeight: number;
+    emptyBodyMinHeight: number;
+    compactEmptyBodyMinHeight: number;
     availableBodyHeight: number;
-}): PairAllocation {
+    isPriority: boolean;
+    allowCompactEmpty?: boolean;
+}): Pick<SectionLayout, 'bodyHeight' | 'emptyStateVariant'> {
     if (availableBodyHeight <= 0) {
-        return { priorityBodyHeight: 0, secondaryBodyHeight: 0 };
+        return { bodyHeight: 0, emptyStateVariant: 'hidden' };
     }
 
-    if (priority.naturalBodyHeight <= 0 && secondary.naturalBodyHeight <= 0) {
-        return { priorityBodyHeight: 0, secondaryBodyHeight: 0 };
-    }
+    if (count === 0) {
+        if (isPriority) {
+            return {
+                bodyHeight: Math.min(emptyBodyMinHeight, availableBodyHeight),
+                emptyStateVariant: 'default',
+            };
+        }
 
-    if (secondary.naturalBodyHeight <= 0) {
-        const priorityBodyHeight = Math.min(priority.naturalBodyHeight, availableBodyHeight);
+        if (!allowCompactEmpty) {
+            return { bodyHeight: 0, emptyStateVariant: 'hidden' };
+        }
+
+        if (availableBodyHeight < compactEmptyBodyMinHeight) {
+            return { bodyHeight: 0, emptyStateVariant: 'hidden' };
+        }
+
         return {
-            priorityBodyHeight: priority.enforceMinBodyHeight && priorityBodyHeight < priority.minBodyHeight ? 0 : priorityBodyHeight,
-            secondaryBodyHeight: 0,
+            bodyHeight: Math.min(compactEmptyBodyMinHeight, availableBodyHeight),
+            emptyStateVariant: 'compact',
         };
     }
 
-    if (priority.naturalBodyHeight <= 0) {
-        const secondaryBodyHeight = Math.min(secondary.naturalBodyHeight, availableBodyHeight);
+    if (!isPriority && availableBodyHeight <= peekMinBodyHeight) {
         return {
-            priorityBodyHeight: 0,
-            secondaryBodyHeight: secondaryBodyHeight < secondary.minBodyHeight ? 0 : secondaryBodyHeight,
+            bodyHeight: 0,
+            emptyStateVariant: 'hidden',
         };
     }
 
-    if (priority.naturalBodyHeight + secondary.naturalBodyHeight <= availableBodyHeight) {
-        return {
-            priorityBodyHeight: priority.naturalBodyHeight,
-            secondaryBodyHeight: secondary.naturalBodyHeight,
-        };
-    }
+    const minimumVisibleHeight = isPriority
+        ? Math.min(peekMinBodyHeight, availableBodyHeight)
+        : peekMinBodyHeight;
 
-    let priorityBodyHeight = Math.min(priority.naturalBodyHeight, availableBodyHeight);
-    if (priority.enforceMinBodyHeight && priorityBodyHeight > 0 && priorityBodyHeight < priority.minBodyHeight) {
-        priorityBodyHeight = 0;
-    }
-
-    const remaining = Math.max(0, availableBodyHeight - priorityBodyHeight);
-    if (remaining < secondary.minBodyHeight) {
-        return {
-            priorityBodyHeight: priorityBodyHeight > 0 ? availableBodyHeight : 0,
-            secondaryBodyHeight: 0,
-        };
-    }
-
-    const secondaryBodyHeight = Math.min(secondary.naturalBodyHeight, remaining);
-    if (secondaryBodyHeight > 0 && secondaryBodyHeight < secondary.minBodyHeight) {
-        return {
-            priorityBodyHeight: priorityBodyHeight > 0 ? availableBodyHeight : 0,
-            secondaryBodyHeight: 0,
-        };
-    }
-
-    return { priorityBodyHeight, secondaryBodyHeight };
+    return {
+        bodyHeight: Math.min(Math.max(naturalBodyHeight, minimumVisibleHeight), availableBodyHeight),
+        emptyStateVariant: 'hidden',
+    };
 }
 
 const DroppableBucket = ({
@@ -458,7 +485,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         [activeA.length, activeB.length, completedCount]
     );
 
-    const [prioritySection, setPrioritySection] = useState<ActiveBucketSection>(() => pickFallbackPriority(sectionCounts));
+    const [abPrioritySection, setAbPrioritySection] = useState<PrimaryBucketSection>(() => pickFallbackAbPriority(sectionCounts));
+    const [completedPriority, setCompletedPriority] = useState(() => completedCount > 0 && activeA.length === 0 && activeB.length === 0);
     const [measurements, setMeasurements] = useState<Record<ActiveBucketSection, SectionMeasurements>>(DEFAULT_MEASUREMENTS);
     const previousCountsRef = useRef(sectionCounts);
 
@@ -472,18 +500,36 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         a: null,
         b: null,
     });
+    const scrollContainerRefs = useRef<Record<ActiveBucketSection, HTMLDivElement | null>>({
+        completed: null,
+        a: null,
+        b: null,
+    });
 
     useEffect(() => {
         const previousCounts = previousCountsRef.current;
         previousCountsRef.current = sectionCounts;
 
-        if (previousCounts[prioritySection] > 0 && sectionCounts[prioritySection] === 0) {
-            const next = pickFallbackPriority(sectionCounts);
-            if (next !== prioritySection) {
-                setPrioritySection(next);
-            }
+        if (sectionCounts.a > 0 || sectionCounts.b > 0) {
+            setAbPrioritySection((current) => (
+                sectionCounts[current] > 0 ? current : pickFallbackAbPriority(sectionCounts)
+            ));
         }
-    }, [prioritySection, sectionCounts]);
+
+        if (sectionCounts.completed === 0) {
+            setCompletedPriority(false);
+            return;
+        }
+
+        if (sectionCounts.a === 0 && sectionCounts.b === 0) {
+            setCompletedPriority(true);
+            return;
+        }
+
+        if (previousCounts.completed === 0 && sectionCounts.completed > 0 && sectionCounts.a === 0 && sectionCounts.b === 0) {
+            setCompletedPriority(true);
+        }
+    }, [sectionCounts]);
 
     const recomputeMeasurements = useCallback(() => {
         setMeasurements((current) => {
@@ -493,21 +539,19 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             for (const section of SECTION_ORDER) {
                 const headerNode = headerRefs.current[section];
                 const contentNode = contentRefs.current[section];
+                const scrollContainerNode = scrollContainerRefs.current[section];
                 const count = sectionCounts[section];
                 const measuredHeader = headerNode ? Math.ceil(headerNode.getBoundingClientRect().height) : DEFAULT_MEASUREMENTS[section].headerHeight;
-                const measuredContent = contentNode
-                    ? Math.ceil(contentNode.getBoundingClientRect().height) + (section === 'completed' ? 0 : CONTENT_CHROME_ALLOWANCE_PX)
-                    : DEFAULT_MEASUREMENTS[section].bodyNaturalHeight;
+                const measuredContent = resolveRenderedBodyHeight(contentNode, scrollContainerNode, section, count);
 
                 const peekMinBodyHeight = resolveMeasuredPeekHeight(contentNode, section);
                 const emptyBodyMinHeight = section === 'completed'
                     ? 0
                     : Math.max(FALLBACK_EMPTY_BODY_HEIGHT_PX, count === 0 ? measuredContent : FALLBACK_EMPTY_BODY_HEIGHT_PX);
                 const bodyNaturalHeight = count > 0
-                    ? Math.max(measuredContent, peekMinBodyHeight)
-                    : section === 'completed'
-                        ? 0
-                        : Math.max(measuredContent, emptyBodyMinHeight);
+                    ? measuredContent
+                    : 0;
+                const compactEmptyBodyMinHeight = section === 'completed' ? 0 : COMPACT_EMPTY_BODY_HEIGHT_PX;
 
                 const previous = current[section];
                 const nextMeasurement: SectionMeasurements = {
@@ -515,13 +559,15 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     bodyNaturalHeight,
                     peekMinBodyHeight,
                     emptyBodyMinHeight,
+                    compactEmptyBodyMinHeight,
                 };
 
                 if (
                     previous.headerHeight !== nextMeasurement.headerHeight ||
                     previous.bodyNaturalHeight !== nextMeasurement.bodyNaturalHeight ||
                     previous.peekMinBodyHeight !== nextMeasurement.peekMinBodyHeight ||
-                    previous.emptyBodyMinHeight !== nextMeasurement.emptyBodyMinHeight
+                    previous.emptyBodyMinHeight !== nextMeasurement.emptyBodyMinHeight ||
+                    previous.compactEmptyBodyMinHeight !== nextMeasurement.compactEmptyBodyMinHeight
                 ) {
                     changed = true;
                     next[section] = nextMeasurement;
@@ -544,7 +590,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             if (contentNode) observer.observe(contentNode);
         }
         return () => observer.disconnect();
-    }, [recomputeMeasurements, prioritySection, activeA.length, activeB.length, completedEntries.length, viewportHeight]);
+    }, [recomputeMeasurements, abPrioritySection, completedPriority, activeA.length, activeB.length, completedEntries.length, viewportHeight]);
 
     const containerHeight = viewportHeight ?? FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX;
 
@@ -552,105 +598,58 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         const headerTotalHeight = SECTION_ORDER.reduce((sum, section) => sum + measurements[section].headerHeight, 0);
         const availableBodyHeight = Math.max(0, containerHeight - headerTotalHeight);
 
-        const aSizing: SectionSizing = {
-            count: activeA.length,
-            naturalBodyHeight: activeA.length > 0 ? measurements.a.bodyNaturalHeight : measurements.a.emptyBodyMinHeight,
-            minBodyHeight: activeA.length > 0 ? measurements.a.peekMinBodyHeight : measurements.a.emptyBodyMinHeight,
-            enforceMinBodyHeight: activeA.length === 0,
-        };
-        const bSizing: SectionSizing = {
-            count: activeB.length,
-            naturalBodyHeight: activeB.length > 0 ? measurements.b.bodyNaturalHeight : measurements.b.emptyBodyMinHeight,
-            minBodyHeight: activeB.length > 0 ? measurements.b.peekMinBodyHeight : measurements.b.emptyBodyMinHeight,
-            enforceMinBodyHeight: activeB.length === 0,
-        };
-        const completedSizing: SectionSizing = {
-            count: completedCount,
-            naturalBodyHeight: completedCount > 0 ? measurements.completed.bodyNaturalHeight : 0,
-            minBodyHeight: 0,
-            enforceMinBodyHeight: false,
-        };
+        const completedBodyHeight = completedPriority && completedCount > 0
+            ? Math.min(measurements.completed.bodyNaturalHeight, availableBodyHeight)
+            : 0;
+        const availableAbBodyHeight = Math.max(0, availableBodyHeight - completedBodyHeight);
+        const secondarySection: PrimaryBucketSection = abPrioritySection === 'a' ? 'b' : 'a';
+        const priorityNeedsAllSpace = sectionCounts[abPrioritySection] > 0
+            && measurements[abPrioritySection].bodyNaturalHeight > (availableAbBodyHeight - PRIORITY_FIT_TOLERANCE_PX);
 
-        let completedBodyHeight = 0;
-        let aBodyHeight = 0;
-        let bBodyHeight = 0;
+        const priorityLayout = resolveBucketBodyLayout({
+            count: sectionCounts[abPrioritySection],
+            naturalBodyHeight: measurements[abPrioritySection].bodyNaturalHeight,
+            peekMinBodyHeight: measurements[abPrioritySection].peekMinBodyHeight,
+            emptyBodyMinHeight: measurements[abPrioritySection].emptyBodyMinHeight,
+            compactEmptyBodyMinHeight: measurements[abPrioritySection].compactEmptyBodyMinHeight,
+            availableBodyHeight: availableAbBodyHeight,
+            isPriority: true,
+        });
+        const secondaryLayout = resolveBucketBodyLayout({
+            count: sectionCounts[secondarySection],
+            naturalBodyHeight: measurements[secondarySection].bodyNaturalHeight,
+            peekMinBodyHeight: measurements[secondarySection].peekMinBodyHeight,
+            emptyBodyMinHeight: measurements[secondarySection].emptyBodyMinHeight,
+            compactEmptyBodyMinHeight: measurements[secondarySection].compactEmptyBodyMinHeight,
+            availableBodyHeight: priorityNeedsAllSpace
+                ? 0
+                : Math.max(0, availableAbBodyHeight - priorityLayout.bodyHeight),
+            isPriority: false,
+            allowCompactEmpty: sectionCounts[abPrioritySection] > 0,
+        });
 
-        if (prioritySection === 'completed' && completedSizing.count > 0) {
-            completedBodyHeight = Math.min(completedSizing.naturalBodyHeight, availableBodyHeight);
-            const remainingBodyHeight = Math.max(0, availableBodyHeight - completedBodyHeight);
-            const { priorityBodyHeight, secondaryBodyHeight } = allocatePairHeights({
-                priority: aSizing,
-                secondary: bSizing,
-                availableBodyHeight: remainingBodyHeight,
-            });
-            aBodyHeight = priorityBodyHeight;
-            bBodyHeight = secondaryBodyHeight;
-        } else {
-            const pair = prioritySection === 'b'
-                ? allocatePairHeights({
-                    priority: bSizing,
-                    secondary: aSizing,
-                    availableBodyHeight,
-                })
-                : allocatePairHeights({
-                    priority: aSizing,
-                    secondary: bSizing,
-                    availableBodyHeight,
-                });
-
-            if (prioritySection === 'b') {
-                bBodyHeight = pair.priorityBodyHeight;
-                aBodyHeight = pair.secondaryBodyHeight;
-            } else {
-                aBodyHeight = pair.priorityBodyHeight;
-                bBodyHeight = pair.secondaryBodyHeight;
-            }
-        }
-
-        const sizingMap: Record<ActiveBucketSection, SectionSizing> = {
-            completed: completedSizing,
-            a: aSizing,
-            b: bSizing,
-        };
         const bodyHeightMap: Record<ActiveBucketSection, number> = {
             completed: completedBodyHeight,
-            a: aBodyHeight,
-            b: bBodyHeight,
+            a: 0,
+            b: 0,
+        };
+        const emptyStateVariantMap: Record<PrimaryBucketSection, BucketEmptyStateVariant> = {
+            a: 'hidden',
+            b: 'hidden',
         };
 
-        let remainingBodyHeight = Math.max(
+        bodyHeightMap[abPrioritySection] = priorityLayout.bodyHeight;
+        bodyHeightMap[secondarySection] = secondaryLayout.bodyHeight;
+        emptyStateVariantMap[abPrioritySection] = priorityLayout.emptyStateVariant ?? 'hidden';
+        emptyStateVariantMap[secondarySection] = secondaryLayout.emptyStateVariant ?? 'hidden';
+
+        const unusedAbBodyHeight = Math.max(
             0,
-            availableBodyHeight - (bodyHeightMap.completed + bodyHeightMap.a + bodyHeightMap.b)
+            availableAbBodyHeight - bodyHeightMap.a - bodyHeightMap.b
         );
 
-        const growthOrder: ActiveBucketSection[] = prioritySection === 'completed'
-            ? ['a', 'b', 'completed']
-            : prioritySection === 'b'
-                ? ['a', 'b']
-                : ['b', 'a'];
-
-        for (const section of growthOrder) {
-            if (remainingBodyHeight <= 0) break;
-            const sizing = sizingMap[section];
-            const currentBodyHeight = bodyHeightMap[section];
-            if (sizing.naturalBodyHeight <= currentBodyHeight) continue;
-
-            if (currentBodyHeight === 0 && sizing.minBodyHeight > 0) {
-                if (remainingBodyHeight < sizing.minBodyHeight) {
-                    continue;
-                }
-                const minGrant = Math.min(sizing.naturalBodyHeight, sizing.minBodyHeight);
-                bodyHeightMap[section] = minGrant;
-                remainingBodyHeight -= minGrant;
-            }
-
-            if (remainingBodyHeight <= 0) break;
-
-            if (bodyHeightMap[section] < sizing.naturalBodyHeight) {
-                const extra = Math.min(remainingBodyHeight, sizing.naturalBodyHeight - bodyHeightMap[section]);
-                bodyHeightMap[section] += extra;
-                remainingBodyHeight -= extra;
-            }
+        if (unusedAbBodyHeight > 0) {
+            bodyHeightMap[abPrioritySection] += unusedAbBodyHeight;
         }
 
         return {
@@ -661,19 +660,21 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             a: {
                 bodyHeight: bodyHeightMap.a,
                 totalHeight: measurements.a.headerHeight + bodyHeightMap.a,
+                emptyStateVariant: emptyStateVariantMap.a,
             },
             b: {
                 bodyHeight: bodyHeightMap.b,
                 totalHeight: measurements.b.headerHeight + bodyHeightMap.b,
+                emptyStateVariant: emptyStateVariantMap.b,
             },
         };
     }, [
-        activeA.length,
-        activeB.length,
         completedCount,
         containerHeight,
         measurements,
-        prioritySection,
+        abPrioritySection,
+        completedPriority,
+        sectionCounts,
     ]);
 
     const setHeaderRef = useCallback((section: ActiveBucketSection, node: HTMLButtonElement | null) => {
@@ -686,7 +687,19 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
     const handlePriorityPress = useCallback((section: ActiveBucketSection) => {
         if (section === 'completed' && sectionCounts.completed === 0) return;
-        setPrioritySection(section);
+        if (section === 'completed') {
+            setCompletedPriority((current) => !current);
+            return;
+        }
+
+        setCompletedPriority(false);
+        setAbPrioritySection((current) => {
+            if (current !== section) {
+                return section;
+            }
+
+            return section === 'a' ? 'b' : 'a';
+        });
     }, [sectionCounts.completed]);
 
     const renderBucketAddSlot = ({
@@ -777,6 +790,51 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         </button>
     );
 
+    const renderCompactEmptyBucketDropZone = ({
+        bucketKey,
+        isOver,
+    }: {
+        bucketKey: string;
+        isOver: boolean;
+    }) => (
+        <button
+            type="button"
+            disabled={status === 'loading' || !onCreateBucketCard}
+            tabIndex={-1}
+            data-arrow-skip="true"
+            onClick={(e) => {
+                e.stopPropagation();
+                onCreateBucketCard?.(bucketKey);
+            }}
+            className={clsx(
+                'mx-2 flex h-7 items-center justify-center rounded-md border border-dashed px-2 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                isOver
+                    ? 'border-sky-400 bg-sky-50 text-sky-700'
+                    : 'border-slate-300 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
+            )}
+            data-testid={`ab-compact-empty-dropzone-${bucketKey}`}
+        >
+            <span className="relative flex w-full items-center justify-center">
+                <span
+                    aria-hidden="true"
+                    className={clsx(
+                        'absolute inset-x-0 h-px',
+                        isOver ? 'bg-sky-300' : 'bg-slate-300'
+                    )}
+                />
+                <span
+                    aria-hidden="true"
+                    className={clsx(
+                        'relative z-10 inline-flex h-4 w-4 items-center justify-center rounded-full border bg-white text-[9px] leading-none',
+                        isOver ? 'border-sky-400 text-sky-700' : 'border-slate-300 text-slate-500'
+                    )}
+                >
+                    ＋
+                </span>
+            </span>
+        </button>
+    );
+
     const renderSectionHeader = ({
         label,
         section,
@@ -792,7 +850,9 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         countTestId: string;
         countBadgeTone?: 'neutral' | 'danger' | 'warning' | 'success';
     }) => {
-        const isPriority = prioritySection === section;
+        const isPriority = section === 'completed'
+            ? completedPriority
+            : !completedPriority && abPrioritySection === section;
         const isDisabled = section === 'completed' ? count === 0 : false;
         const lineClass = section === 'completed' ? 'border-b' : 'border-b border-dashed';
 
@@ -841,30 +901,38 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         items,
         bucketKey,
         isOver,
+        emptyStateVariant,
     }: {
         section: PrimaryBucketSection;
         items: readonly TimelineBucketItem[];
         bucketKey: string;
         isOver: boolean;
+        emptyStateVariant: BucketEmptyStateVariant;
     }) => (
         <div
             ref={(node) => setContentRef(section, node)}
             className="min-h-0 min-w-0 space-y-1 pl-[1px] py-[1px]"
         >
-            {renderBucketAddSlot({
-                isOver,
-                sticky: false,
-                testId: `ab-add-top-${bucketKey}`,
-                revealClassName:
-                    'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
-                onClick: (e) => {
-                    e.stopPropagation();
-                    onCreateBucketCard?.(bucketKey);
-                },
-            })}
+            {items.length > 0 || emptyStateVariant === 'default' ? (
+                renderBucketAddSlot({
+                    isOver,
+                    sticky: false,
+                    testId: `ab-add-top-${bucketKey}`,
+                    revealClassName:
+                        'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
+                    onClick: (e) => {
+                        e.stopPropagation();
+                        onCreateBucketCard?.(bucketKey);
+                    },
+                })
+            ) : null}
 
             {items.length === 0 ? (
-                renderEmptyBucketDropZone({ bucketKey, isOver })
+                emptyStateVariant === 'compact'
+                    ? renderCompactEmptyBucketDropZone({ bucketKey, isOver })
+                    : emptyStateVariant === 'default'
+                        ? renderEmptyBucketDropZone({ bucketKey, isOver })
+                        : null
             ) : (
                 items.map((item) => (
                     <div key={item.card_id} className="group/item relative">
@@ -932,10 +1000,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             })}
                             <div
                                 ref={(node) => {
+                                    scrollContainerRefs.current[section] = node;
                                     registerScrollContainer?.(day.isoDate, node, section);
                                 }}
                                 data-ab-scroll-container="true"
-                                className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable]"
+                                className={clsx(
+                                    'min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable]',
+                                    layout.emptyStateVariant === 'compact' ? 'pt-1' : 'pt-2'
+                                )}
                                 style={{ height: `${layout.bodyHeight}px` }}
                             >
                                 {renderBucketContent({
@@ -943,6 +1015,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                     items,
                                     bucketKey,
                                     isOver,
+                                    emptyStateVariant: layout.emptyStateVariant ?? 'default',
                                 })}
                             </div>
                         </div>
@@ -1027,6 +1100,9 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                         countBadgeTone: resolveCompletedCountBadgeTone(completedCount, totalCount),
                     })}
                     <div
+                        ref={(node) => {
+                            scrollContainerRefs.current.completed = node;
+                        }}
                         className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-ab-thin [scrollbar-gutter:stable]"
                         style={{ height: `${layout.bodyHeight}px` }}
                     >

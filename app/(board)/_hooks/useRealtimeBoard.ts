@@ -161,7 +161,7 @@ export function useRealtimeBoard(
                 console.warn('[Realtime] Subscription CLOSED');
             } else if (status === 'CHANNEL_ERROR') {
                 setRealtimeStatus('disconnected');
-                console.error('[Realtime] Subscription CHANNEL_ERROR');
+                console.warn('[Realtime] Subscription CHANNEL_ERROR');
             } else if (status === 'TIMED_OUT') {
                 setRealtimeStatus('disconnected');
                 console.warn('[Realtime] Subscription TIMED_OUT');

@@ -377,7 +377,7 @@ export function TimelineCard({
                                 )}>
                                     <span
                                         className={clsx(
-                                            "truncate leading-tight",
+                                            "line-clamp-2 break-words leading-tight",
                                             !title && "text-slate-400",
                                             titleClassName
                                         )}
@@ -440,7 +440,14 @@ export function TimelineCard({
                                     }}
                                 >
                                     {note ? (() => {
-                                        const lines = note.split(/\r?\n/);
+                                        const lines = note
+                                            .split(/\r?\n/)
+                                            .map((line) => line)
+                                            .filter((line) => {
+                                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                                if (taskMatch) return true;
+                                                return Boolean(line.trim());
+                                            });
                                         return lines.map((line, idx) => {
                                             const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
                                             const isTask = Boolean(taskMatch);
@@ -448,8 +455,6 @@ export function TimelineCard({
                                             const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
                                             const checked = taskMatch?.[2]?.toLowerCase() === 'x';
                                             const text = isTask ? (taskMatch?.[3] ?? '') : line;
-
-                                            if (!text.trim() && !isTask) return null;
 
                                             return (
                                                 <div
@@ -472,7 +477,11 @@ export function TimelineCard({
                                                             ) : null}
                                                         </span>
                                                     ) : null}
-                                                    <span className={clsx(resolvedNoteClampClass)}>{text || '\u00A0'}</span>
+                                                    <span
+                                                        className={clsx('block min-w-0 w-0 flex-1 truncate')}
+                                                    >
+                                                        {text || '\u00A0'}
+                                                    </span>
                                                 </div>
                                             );
                                         });

@@ -110,6 +110,17 @@ async function getElementWidth(locator: Locator, label: string): Promise<number>
   return box.width;
 }
 
+async function getScrollMetrics(locator: Locator): Promise<{ clientHeight: number; scrollHeight: number; scrollTop: number }> {
+  return locator.evaluate((el) => {
+    const element = el as HTMLElement;
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+    };
+  });
+}
+
 async function readLastBlockAction(page: Page): Promise<{
   action: string;
   menuTargetPos: number;
@@ -1395,6 +1406,8 @@ test.describe('@feature:timeline Timeline view', () => {
       const sectionA = page.getByTestId(`bucket-section-a-${todayIso}`).first();
       const sectionB = page.getByTestId(`bucket-section-b-${todayIso}`).first();
       const sectionCompleted = page.getByTestId(`bucket-section-completed-${todayIso}`).first();
+      const sectionAScroller = sectionA.locator('[data-ab-scroll-container="true"]').first();
+      const sectionBScroller = sectionB.locator('[data-ab-scroll-container="true"]').first();
       const completedTimelineEvent = page.locator(`.timeline-col [data-card-id="${completedEventCardId}"]`).first();
 
       await expect(toggleA).toHaveAttribute('aria-pressed', 'true');
@@ -1415,6 +1428,10 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(initialCompletedBox).not.toBeNull();
       expect(initialABox).not.toBeNull();
       expect((initialCompletedBox?.y ?? 0) < (initialABox?.y ?? 0)).toBe(true);
+      const aScrollMetrics = await getScrollMetrics(sectionAScroller);
+      const bScrollMetrics = await getScrollMetrics(sectionBScroller);
+      expect(aScrollMetrics.scrollHeight - aScrollMetrics.clientHeight).toBeLessThanOrEqual(16);
+      expect(bScrollMetrics.clientHeight).toBeGreaterThan(0);
 
       await expect(toggleA).toHaveAttribute('aria-pressed', 'true');
       await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
@@ -1431,7 +1448,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await completedToggle.click();
       await expect(toggleA).toHaveAttribute('aria-pressed', 'false');
-      await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'true');
       await expect(completedToggle).toHaveAttribute('aria-pressed', 'true');
       const completedBCard = page.getByTestId(`completed-card-${completedBCardId}`).first();
       const completedEventCard = page.getByTestId(`completed-card-${completedEventCardId}`).first();
@@ -1458,7 +1475,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(countA).toHaveText('0');
       await expect(completedCount).toHaveText('3/4');
       await expect(toggleA).toHaveAttribute('aria-pressed', 'false');
-      await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible({ timeout: 20_000 });
       await expect(completedToggle).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByTestId(`completed-card-${activeACardId}`)).toBeVisible({ timeout: 20_000 });
@@ -1486,7 +1503,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await completedToggle.click();
       await expect(completedToggle).toHaveAttribute('aria-pressed', 'true');
       await expect(toggleA).toHaveAttribute('aria-pressed', 'false');
-      await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [activeACardId, activeBCardId, completedBCardId, completedEventCardId]);
@@ -1585,6 +1602,179 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId(`completed-card-${bOnlyCardId}`)).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [bOnlyCardId]);
+    }
+  });
+
+  test('shows a compact empty state only for non-priority empty buckets', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const compactIso = shiftIsoDateJst(1);
+    const aCardId = crypto.randomUUID();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: aCardId,
+      title: 'Compact empty A source card',
+      checklist: { version: 1, lines: [] },
+      excerpt: 'single A card to keep B empty and secondary',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 2700,
+      tags: ['compact-empty'],
+      due_date: compactIso,
+      due_start: null,
+      due_end: null,
+      due_bucket: 'a',
+      due_bucket_position: 2700,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      id_short: Math.floor(Math.random() * 100000) + 1260,
+      slug: 'compact-empty-a-source',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const initialSearchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await initialSearchToggle.getAttribute('aria-expanded')) === 'true') {
+        await initialSearchToggle.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const toggleA = page.getByTestId(`bucket-toggle-a-${compactIso}`).first();
+      const toggleB = page.getByTestId(`bucket-toggle-b-${compactIso}`).first();
+      const sectionB = page.getByTestId(`bucket-section-b-${compactIso}`).first();
+
+      await expect(toggleA).toHaveAttribute('aria-pressed', 'true');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
+      await expect(sectionB.locator('[data-testid^="ab-compact-empty-dropzone-"]')).toBeVisible({ timeout: 20_000 });
+      await expect(sectionB.locator('[data-testid^="ab-empty-dropzone-"]')).toHaveCount(0);
+      await expect(sectionB).not.toContainText('Drop or add card');
+
+      await toggleB.click();
+
+      await expect(toggleA).toHaveAttribute('aria-pressed', 'false');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'true');
+      await expect(sectionB.locator('[data-testid^="ab-empty-dropzone-"]')).toBeVisible({ timeout: 20_000 });
+      await expect(sectionB.locator('[data-testid^="ab-compact-empty-dropzone-"]')).toHaveCount(0);
+      await expect(sectionB).toContainText('Drop or add card');
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [aCardId]);
+    }
+  });
+
+  test('keeps the priority bucket visible and compresses the secondary bucket when space runs out', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const tallIso = shiftIsoDateJst(1);
+    const tallACardIds = Array.from({ length: 6 }, () => crypto.randomUUID());
+    const bCardId = crypto.randomUUID();
+    const priorityCards = tallACardIds.map((cardId, index) => ({
+      id: cardId,
+      title: `Priority A ${index + 1}`,
+      checklist: { version: 1, lines: [] },
+      excerpt: `priority bucket card ${index + 1}`,
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 2800 + index * 10,
+      tags: ['priority-height'],
+      due_date: tallIso,
+      due_start: null,
+      due_end: null,
+      due_bucket: 'a',
+      due_bucket_position: 2800 + index * 10,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      id_short: Math.floor(Math.random() * 100000) + 1270 + index,
+      slug: `priority-height-a-${index + 1}`,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }));
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      ...priorityCards,
+      {
+        id: bCardId,
+        title: Array.from({ length: 32 }, (_, index) => `Secondary-B-${index}`).join(' '),
+        checklist: { version: 1, lines: [] },
+        excerpt: 'secondary bucket should collapse to header only',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2810,
+        tags: ['priority-height'],
+        due_date: tallIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b',
+        due_bucket_position: 2810,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1271,
+        slug: 'priority-height-b',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 480 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      const initialSearchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      if ((await initialSearchToggle.getAttribute('aria-expanded')) === 'true') {
+        await initialSearchToggle.click();
+      }
+      await page.getByRole('button', { name: 'Timeline' }).click();
+
+      const toggleA = page.getByTestId(`bucket-toggle-a-${tallIso}`).first();
+      const toggleB = page.getByTestId(`bucket-toggle-b-${tallIso}`).first();
+      const sectionA = page.getByTestId(`bucket-section-a-${tallIso}`).first();
+      const sectionB = page.getByTestId(`bucket-section-b-${tallIso}`).first();
+      const sectionAScroller = sectionA.locator('[data-ab-scroll-container="true"]').first();
+      const sectionBScroller = sectionB.locator('[data-ab-scroll-container="true"]').first();
+
+      await expect(page.getByTestId(`ab-card-${tallACardIds[0]}`).first()).toBeVisible({ timeout: 20_000 });
+      await expect(toggleA).toHaveAttribute('aria-pressed', 'true');
+      await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
+
+      const aMetrics = await getScrollMetrics(sectionAScroller);
+      const bMetrics = await getScrollMetrics(sectionBScroller);
+      expect(aMetrics.scrollHeight).toBeGreaterThan(aMetrics.clientHeight);
+      expect(bMetrics.clientHeight).toBeLessThanOrEqual(71);
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [...tallACardIds, bCardId]);
     }
   });
 

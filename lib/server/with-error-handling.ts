@@ -16,17 +16,33 @@ type RouteHandler<TParams = Record<string, string>, TRequest extends Request = N
   | RouteHandlerWithoutParams<TRequest>
   | RouteHandlerWithParams<TParams, TRequest>;
 
+export function withErrorHandling<TRequest extends Request = NextRequest>(
+  handler: RouteHandlerWithoutParams<TRequest>,
+  label: string
+): (request: TRequest) => Promise<Response | NextResponse>;
+
+export function withErrorHandling<
+  TParams = Record<string, string>,
+  TRequest extends Request = NextRequest
+>(
+  handler: RouteHandlerWithParams<TParams, TRequest>,
+  label: string
+): (
+  request: TRequest,
+  context: RouteContext<TParams>
+) => Promise<Response | NextResponse>;
+
 export function withErrorHandling<
   TParams = Record<string, string>,
   TRequest extends Request = NextRequest
 >(
   handler: RouteHandler<TParams, TRequest>,
   label: string
-): (
-  request: TRequest,
-  context?: RouteContext<TParams>
-) => Promise<Response | NextResponse> {
-  return async (request, context) => {
+) {
+  return async (
+    request: TRequest,
+    context: RouteContext<TParams> | undefined
+  ): Promise<Response | NextResponse> => {
     try {
       if (context) {
         return await (handler as RouteHandlerWithParams<TParams, TRequest>)(request, context);
