@@ -152,6 +152,8 @@ function SidebarRailButton({
       aria-label={label}
       aria-expanded={expanded}
       aria-controls={id}
+      data-focus-group="sidebar"
+      data-focus-part="rail-button"
       onClick={onToggle}
       data-testid={`${id}-toggle`}
       className={clsx(

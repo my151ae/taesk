@@ -14,6 +14,7 @@ import {
 import { getPresetLabel } from "@/app/(board)/_hooks/useTimelineBoardController";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import { TimelineListCard } from "@/app/(board)/_components/timeline/TimelineListCard";
+import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 
 export type DesktopListToolbarProps = {
   onPrevDay?: () => void;
@@ -54,6 +55,21 @@ export function DesktopListToolbar({
   showGoogle,
   onShowGoogleChange,
 }: DesktopListToolbarProps) {
+  const presetOptions = useMemo(
+    () => ([
+      "plus3",
+      "plus2",
+      "plus1",
+      "zero",
+      "minus1",
+      "minus2",
+      "minus3",
+    ] as const).map((preset) => ({
+      value: preset,
+      label: getPresetLabel(preset),
+    })),
+    []
+  );
   const todayButtonClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full border border-sky-300 bg-sky-200 px-2.5 text-[11px] font-medium text-sky-800 hover:bg-sky-300";
 
@@ -62,6 +78,8 @@ export function DesktopListToolbar({
       <div className="flex h-8 items-center gap-2 overflow-x-auto">
         <button
           onClick={() => onPrevWeek?.()}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="7日前へ"
         >
@@ -69,6 +87,8 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onPrevDay?.()}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="前日へ"
         >
@@ -76,6 +96,8 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onToday?.()}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           className={todayButtonClassName}
           aria-label="Today"
         >
@@ -86,6 +108,8 @@ export function DesktopListToolbar({
           value={draftBaseDate}
           onChange={(e) => onDraftBaseDateChange(e.target.value)}
           onBlur={onCommitBaseDate}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -95,25 +119,18 @@ export function DesktopListToolbar({
           className="h-6 shrink-0 rounded-full border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700"
           aria-label="基準日"
         />
-        <div className="relative">
-          <select
-            value={listWindowPresetKey}
-            onChange={(e) => onListWindowPresetChange?.(e.target.value as ListWindowPresetKey)}
-            className="h-6 appearance-none rounded-full border border-slate-200 bg-white pl-2 pr-6 text-[11px] font-medium text-slate-700"
-            aria-label="表示期間"
-          >
-            <option value="plus3">{getPresetLabel("plus3")}</option>
-            <option value="plus2">{getPresetLabel("plus2")}</option>
-            <option value="plus1">{getPresetLabel("plus1")}</option>
-            <option value="zero">{getPresetLabel("zero")}</option>
-            <option value="minus1">{getPresetLabel("minus1")}</option>
-            <option value="minus2">{getPresetLabel("minus2")}</option>
-            <option value="minus3">{getPresetLabel("minus3")}</option>
-          </select>
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">▼</span>
-        </div>
+        <ToolbarMenuSelect
+          value={listWindowPresetKey}
+          options={presetOptions}
+          onChange={(nextValue) => onListWindowPresetChange?.(nextValue as ListWindowPresetKey)}
+          ariaLabel="表示期間"
+          className="pr-2"
+          menuClassName="min-w-[8rem]"
+        />
         <button
           onClick={() => onNextDay?.()}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="翌日へ"
         >
@@ -121,6 +138,8 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onNextWeek?.()}
+          data-focus-group="toolbar"
+          data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
           aria-label="7日後へ"
         >

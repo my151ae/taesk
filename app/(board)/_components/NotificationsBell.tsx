@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { featureFlags } from '@/lib/featureFlags';
@@ -19,8 +20,10 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
   const router = useRouter();
   const [showDrawer, setShowDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const {
     notifications,
@@ -114,24 +117,49 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
     };
   }, [user?.id, startPolling, stopPolling]);
 
-  // Close drawer when clicking outside
   useEffect(() => {
     if (!showDrawer) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (drawerRef.current && !drawerRef.current.contains(event.target as Node)) {
-        setShowDrawer(false);
-      }
+    const updatePanelPosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const desktopWidth = 384;
+      const desktopLeft = Math.min(
+        Math.max(8, rect.right - desktopWidth),
+        window.innerWidth - desktopWidth - 8
+      );
+
+      setPanelPosition({
+        top: window.innerWidth >= 768 ? rect.bottom + 8 : 0,
+        left: window.innerWidth >= 768 ? desktopLeft : 0,
+      });
     };
 
-    // Add listener with a small delay to prevent immediate close
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+
+      setShowDrawer(false);
+    };
+
+    updatePanelPosition();
+    window.addEventListener('resize', updatePanelPosition);
+    window.addEventListener('scroll', updatePanelPosition, true);
+
     const timerId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }, 100);
 
     return () => {
       clearTimeout(timerId);
+      window.removeEventListener('resize', updatePanelPosition);
+      window.removeEventListener('scroll', updatePanelPosition, true);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showDrawer]);
 
@@ -166,12 +194,18 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
   };
 
   return (
-    <div ref={drawerRef} className="relative">
+    <div className="relative">
       {/* Bell Icon Button */}
       <button
+        ref={buttonRef}
+        type="button"
         onClick={() => setShowDrawer(!showDrawer)}
-        className="relative p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+        data-focus-group="header"
+        data-focus-part="control"
+        className="relative cursor-pointer select-none rounded p-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
         aria-label="Notifications"
+        aria-haspopup="dialog"
+        aria-expanded={showDrawer}
       >
         <svg
           className="w-6 h-6"
@@ -197,7 +231,7 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
       </button>
 
       {/* Drawer/Panel */}
-      {showDrawer && (
+      {showDrawer && panelPosition && typeof document !== 'undefined' && createPortal(
         <>
           {/* Backdrop (mobile only) */}
           <div
@@ -206,7 +240,14 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
           />
 
           {/* Drawer content */}
-          <div className="fixed md:absolute right-0 top-0 md:top-full md:mt-2 w-full md:w-96 h-full md:h-auto md:max-h-[600px] bg-white dark:bg-gray-800 shadow-lg border-l md:border md:rounded-lg border-gray-200 dark:border-gray-700 z-50 flex flex-col">
+          <div
+            ref={panelRef}
+            className="fixed z-[120] flex h-full w-full flex-col border-l border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 md:h-auto md:max-h-[600px] md:w-96 md:rounded-lg md:border"
+            style={{
+              top: panelPosition.top,
+              left: panelPosition.left,
+            }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="font-semibold text-lg">Notifications</h3>
@@ -332,7 +373,8 @@ export default function NotificationsBell({ onOpenNotificationSettings }: Notifi
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

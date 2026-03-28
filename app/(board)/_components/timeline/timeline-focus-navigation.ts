@@ -9,14 +9,21 @@ export type TimelineFocusCandidate = {
 };
 
 const HORIZONTAL_THRESHOLD_PX = 10;
+const VERTICAL_THRESHOLD_PX = 10;
 const ANY_FOCUS_ITEM_SELECTOR = "[data-focus-group][data-focus-part]";
 const ARROW_NAVIGABLE_FOCUS_GROUP_PARTS = {
+  header: ["control"],
+  toolbar: ["control"],
   timeline: ["card"],
   bucket: ["card"],
+  sidebar: ["rail-button"],
 } as const;
 const ARROW_NAVIGATION_SOURCE_PARTS = {
+  header: ["control"],
+  toolbar: ["control"],
   timeline: ["card"],
   bucket: ["section-button", "card"],
+  sidebar: ["rail-button"],
 } as const;
 type ArrowNavigableFocusGroup = keyof typeof ARROW_NAVIGABLE_FOCUS_GROUP_PARTS;
 
@@ -55,11 +62,11 @@ function isVisibleElement(element: HTMLElement) {
 
 function isTextEditingTarget(target: HTMLElement) {
   const tagName = target.tagName;
-  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
+  return tagName === "INPUT" || tagName === "TEXTAREA" || target.isContentEditable;
 }
 
 function isArrowNavigableFocusGroup(value?: string | null): value is ArrowNavigableFocusGroup {
-  return value === "timeline" || value === "bucket";
+  return value === "header" || value === "toolbar" || value === "timeline" || value === "bucket" || value === "sidebar";
 }
 
 function buildPartsSelector(focusGroup: ArrowNavigableFocusGroup, parts: readonly string[]) {
@@ -74,8 +81,26 @@ function buildCrossGroupCardSelector() {
     .join(", ");
 }
 
+function buildCrossGroupVerticalSelector() {
+  return [
+    '[data-focus-group="header"][data-focus-part="control"]',
+    '[data-focus-group="toolbar"][data-focus-part="control"]',
+    '[data-focus-group="sidebar"][data-focus-part="rail-button"]',
+    '[data-focus-group="timeline"][data-focus-part="card"]',
+    '[data-focus-group="bucket"][data-focus-part="section-button"]',
+    '[data-focus-group="bucket"][data-focus-part="card"]',
+  ].join(", ");
+}
+
 function buildFocusItemSelector(focusGroup: ArrowNavigableFocusGroup) {
   return buildPartsSelector(focusGroup, ARROW_NAVIGABLE_FOCUS_GROUP_PARTS[focusGroup]);
+}
+
+function buildHorizontalSelector(focusGroup: ArrowNavigableFocusGroup) {
+  if (focusGroup === "timeline" || focusGroup === "bucket") {
+    return buildCrossGroupCardSelector();
+  }
+  return buildFocusItemSelector(focusGroup);
 }
 
 function resolveActiveNavigationItem(element: HTMLElement) {
@@ -105,12 +130,27 @@ export function resolveNextTimelineCardIndex({
   if (currentIndex < 0 || currentIndex >= candidates.length) return null;
 
   if (key === "ArrowUp" || key === "ArrowDown") {
-    const step = key === "ArrowUp" ? -1 : 1;
-    const nextIndex = currentIndex + step;
-    if (nextIndex < 0 || nextIndex >= candidates.length) {
-      return null;
-    }
-    return nextIndex;
+    const current = candidates[currentIndex];
+    if (!current) return null;
+
+    let bestIndex: number | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    candidates.forEach((candidate, index) => {
+      if (index === currentIndex) return;
+      const dx = candidate.centerX - current.centerX;
+      const dy = candidate.centerY - current.centerY;
+      const isValid = key === "ArrowUp" ? dy < -VERTICAL_THRESHOLD_PX : dy > VERTICAL_THRESHOLD_PX;
+      if (!isValid) return;
+
+      const score = (dy * dy) + (dx * dx * 4);
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+
+    return bestIndex;
   }
 
   const current = candidates[currentIndex];
@@ -154,7 +194,7 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
   const resolvedActiveItem = resolveActiveNavigationItem(activeFocusItem);
   if (!resolvedActiveItem) return;
 
-  const { selector: focusGroupSelector, activeItem } = resolvedActiveItem;
+  const { focusGroup, activeItem } = resolvedActiveItem;
 
   const container = event.currentTarget;
   if (!(container instanceof HTMLElement) || !container.contains(activeItem)) return;
@@ -163,9 +203,9 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
   event.stopPropagation();
 
   const selector =
-    event.key === "ArrowLeft" || event.key === "ArrowRight"
-      ? buildCrossGroupCardSelector()
-      : focusGroupSelector;
+    event.key === "ArrowUp" || event.key === "ArrowDown"
+      ? buildCrossGroupVerticalSelector()
+      : buildHorizontalSelector(focusGroup);
 
   const candidates = Array.from(container.querySelectorAll(selector))
     .filter((element): element is HTMLElement => element instanceof HTMLElement)

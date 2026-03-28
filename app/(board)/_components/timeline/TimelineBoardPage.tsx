@@ -507,16 +507,6 @@ function TimelineBoardPageContent({
   });
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (boardMenuRef.current && !boardMenuRef.current.contains(e.target as Node)) {
-        setShowBoardMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [setShowBoardMenu]);
-
-  useEffect(() => {
     if (!selectedCardIds.length) return;
 
     const handleWindowClick = (event: MouseEvent) => {

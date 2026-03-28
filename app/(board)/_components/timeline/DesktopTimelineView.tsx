@@ -32,6 +32,7 @@ import {
   formatAllDayRange,
   formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
+import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 
 const ALL_DAY_ROW_HEIGHT = 24;
 
@@ -116,6 +117,14 @@ export function DesktopTimelineToolbar({
   onNextDayRange,
   onToday,
 }: DesktopTimelineToolbarProps) {
+  const dayRangeOptions = useMemo(
+    () =>
+      [1, 2, 3, 4, 5, 6, 7].map((days) => ({
+        value: String(days),
+        label: `${days} day${days > 1 ? "s" : ""}`,
+      })),
+    []
+  );
   const buttonClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40";
   const todayButtonClassName =
@@ -124,19 +133,19 @@ export function DesktopTimelineToolbar({
   return (
     <div className="border-b border-slate-100 bg-white px-3">
       <div className="flex h-8 items-center gap-2 overflow-x-auto">
-        <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} className={buttonClassName}>
+        <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"<<"}
         </button>
-        <button type="button" onClick={onPrevDay} disabled={status === "loading"} className={buttonClassName}>
+        <button type="button" onClick={onPrevDay} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"<1"}
         </button>
-        <button type="button" onClick={onToday} disabled={status === "loading"} className={todayButtonClassName}>
+        <button type="button" onClick={onToday} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={todayButtonClassName}>
           Today
         </button>
-        <button type="button" onClick={onNextDay} disabled={status === "loading"} className={buttonClassName}>
+        <button type="button" onClick={onNextDay} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"1>"}
         </button>
-        <button type="button" onClick={onNextDayRange} disabled={status === "loading"} className={buttonClassName}>
+        <button type="button" onClick={onNextDayRange} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {">>"}
         </button>
         <div className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] text-slate-700">
@@ -144,28 +153,28 @@ export function DesktopTimelineToolbar({
             type="button"
             onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
             disabled={status === "loading" || dayRange <= 1}
+            data-focus-group="toolbar"
+            data-focus-part="control"
             className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="表示日数を減らす"
           >
             -
           </button>
-          <select
-            value={dayRange}
-            onChange={(event) => onDayRangeChange(Number(event.target.value))}
+          <ToolbarMenuSelect
+            value={String(dayRange)}
+            options={dayRangeOptions}
+            onChange={(nextValue) => onDayRangeChange(Number(nextValue))}
             disabled={status === "loading"}
-            className="h-full rounded-full border-0 bg-transparent px-1 text-center text-xs font-medium text-slate-700 focus:outline-none focus:ring-0"
-            aria-label="表示日数"
-          >
-            {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-              <option key={days} value={days}>
-                {days} day{days > 1 ? "s" : ""}
-              </option>
-            ))}
-          </select>
+            ariaLabel="表示日数"
+            className="h-full border-0 bg-transparent px-1 text-center text-xs font-medium shadow-none hover:bg-transparent"
+            menuClassName="min-w-[7rem]"
+          />
           <button
             type="button"
             onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
             disabled={status === "loading" || dayRange >= 7}
+            data-focus-group="toolbar"
+            data-focus-part="control"
             className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="表示日数を増やす"
           >

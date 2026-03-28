@@ -1,6 +1,7 @@
 import { clsx } from 'clsx';
 import Link from 'next/link';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { Board, TeamView } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
@@ -53,6 +54,12 @@ type TimelineHeaderProps = {
     collapsed?: boolean;
 };
 
+type HeaderMenuPosition = {
+    top: number;
+    left: number;
+    minWidth?: number;
+};
+
 export default function TimelineHeader({
     board,
     modalBoards,
@@ -89,8 +96,16 @@ export default function TimelineHeader({
     const [newBoardName, setNewBoardName] = useState('');
     const [isSubmittingBoard, setIsSubmittingBoard] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showGoogleMenu, setShowGoogleMenu] = useState(false);
     const [showMobileActions, setShowMobileActions] = useState(false);
+    const [boardMenuPosition, setBoardMenuPosition] = useState<HeaderMenuPosition | null>(null);
+    const [googleMenuPosition, setGoogleMenuPosition] = useState<HeaderMenuPosition | null>(null);
+    const [profileMenuPosition, setProfileMenuPosition] = useState<HeaderMenuPosition | null>(null);
+    const boardMenuButtonRef = useRef<HTMLButtonElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
+    const profileMenuButtonRef = useRef<HTMLButtonElement>(null);
+    const googleMenuRef = useRef<HTMLDivElement>(null);
+    const googleMenuButtonRef = useRef<HTMLButtonElement>(null);
     const mobileActionsRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
@@ -144,9 +159,6 @@ export default function TimelineHeader({
         handleBoardNavigate(nextBoard);
     };
 
-    // Click outside handlers for dropdowns
-    useClickOutside(profileMenuRef, () => setShowProfileMenu(false));
-    useClickOutside(boardMenuRef, () => setShowBoardMenu(false));
     useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
 
     useEffect(() => {
@@ -161,9 +173,130 @@ export default function TimelineHeader({
         if (!collapsed) return;
         setShowBoardMenu(false);
         setShowProfileMenu(false);
+        setShowGoogleMenu(false);
         setShowMobileActions(false);
         setIsCreatingBoard(false);
     }, [collapsed, setShowBoardMenu]);
+
+    useEffect(() => {
+        if (!showBoardMenu) return;
+
+        const updateMenuPosition = () => {
+            const rect = boardMenuButtonRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            setBoardMenuPosition({
+                top: rect.bottom + 8,
+                left: rect.left,
+                minWidth: 320,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [showBoardMenu]);
+
+    useEffect(() => {
+        if (!showGoogleMenu) return;
+
+        const updateMenuPosition = () => {
+            const rect = googleMenuButtonRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            setGoogleMenuPosition({
+                top: rect.bottom + 8,
+                left: rect.left,
+                minWidth: 256,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [showGoogleMenu]);
+
+    useEffect(() => {
+        if (!showProfileMenu) return;
+
+        const updateMenuPosition = () => {
+            const rect = profileMenuButtonRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            setProfileMenuPosition({
+                top: rect.bottom + 8,
+                left: Math.max(8, rect.right - 224),
+                minWidth: 224,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [showProfileMenu]);
+
+    useEffect(() => {
+        if (!showBoardMenu) return;
+
+        const listener = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as Node;
+            if (boardMenuButtonRef.current?.contains(target) || boardMenuRef.current?.contains(target)) return;
+            setShowBoardMenu(false);
+        };
+
+        document.addEventListener('mousedown', listener);
+        document.addEventListener('touchstart', listener);
+        return () => {
+            document.removeEventListener('mousedown', listener);
+            document.removeEventListener('touchstart', listener);
+        };
+    }, [showBoardMenu, boardMenuRef, setShowBoardMenu]);
+
+    useEffect(() => {
+        if (!showGoogleMenu) return;
+
+        const listener = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as Node;
+            if (googleMenuButtonRef.current?.contains(target) || googleMenuRef.current?.contains(target)) return;
+            setShowGoogleMenu(false);
+        };
+
+        document.addEventListener('mousedown', listener);
+        document.addEventListener('touchstart', listener);
+        return () => {
+            document.removeEventListener('mousedown', listener);
+            document.removeEventListener('touchstart', listener);
+        };
+    }, [showGoogleMenu]);
+
+    useEffect(() => {
+        if (!showProfileMenu) return;
+
+        const listener = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as Node;
+            if (profileMenuButtonRef.current?.contains(target) || profileMenuRef.current?.contains(target)) return;
+            setShowProfileMenu(false);
+        };
+
+        document.addEventListener('mousedown', listener);
+        document.addEventListener('touchstart', listener);
+        return () => {
+            document.removeEventListener('mousedown', listener);
+            document.removeEventListener('touchstart', listener);
+        };
+    }, [showProfileMenu]);
 
     const boardsByTeamId = useMemo(() => {
         const groups = new Map<string, Board[]>();
@@ -226,8 +359,12 @@ export default function TimelineHeader({
                     {/* Board Switch */}
                     <div ref={boardMenuRef} className="relative shrink-0">
                         <button
+                            ref={boardMenuButtonRef}
+                            type="button"
                             onClick={() => setShowBoardMenu((prev) => !prev)}
-                            className="flex items-center justify-center rounded-full bg-white p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                            data-focus-group="header"
+                            data-focus-part="control"
+                            className="flex cursor-pointer select-none items-center justify-center rounded-full bg-white p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                             aria-haspopup="true"
                             aria-expanded={showBoardMenu}
                             data-testid="board-menu-button"
@@ -237,8 +374,16 @@ export default function TimelineHeader({
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
                             </svg>
                         </button>
-                        {showBoardMenu && (
-                            <div className="absolute left-0 z-40 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                        {showBoardMenu && boardMenuPosition && typeof document !== 'undefined' && createPortal(
+                            <div
+                                ref={boardMenuRef}
+                                className="fixed z-[120] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
+                                style={{
+                                    top: boardMenuPosition.top,
+                                    left: boardMenuPosition.left,
+                                    minWidth: boardMenuPosition.minWidth,
+                                }}
+                            >
                                 <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Teams</p>
                                 <div className="max-h-[70vh] space-y-3 overflow-y-auto px-1 pb-1">
                                     {teamSections.map(({ team, boards }) => (
@@ -343,7 +488,8 @@ export default function TimelineHeader({
                                         <p className="px-2 py-3 text-sm text-slate-500">No teams available</p>
                                     )}
                                 </div>
-                            </div>
+                            </div>,
+                            document.body
                         )}
                     </div>
 
@@ -366,14 +512,19 @@ export default function TimelineHeader({
 
                     {/* Google Calendar Icon + Status Text */}
                     <div className="hidden shrink-0 items-center gap-1 md:flex">
-                        <div className="relative group">
+                        <div ref={googleMenuRef} className="relative">
                             <button
-                                onClick={handleGoogleConnect}
-                                disabled={isGoogleLoading}
+                                ref={googleMenuButtonRef}
+                                type="button"
+                                onClick={() => setShowGoogleMenu((prev) => !prev)}
+                                data-focus-group="header"
+                                data-focus-part="control"
                                 className={clsx(
-                                    "flex items-center justify-center rounded-full p-1 transition-colors",
+                                    "flex cursor-pointer select-none items-center justify-center rounded-full p-1 transition-colors",
                                     googleCalendarStatus === 'success' ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-100 hover:text-emerald-600"
                                 )}
+                                aria-haspopup="true"
+                                aria-expanded={showGoogleMenu}
                                 title={googleStatusText}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -389,37 +540,48 @@ export default function TimelineHeader({
                             </button>
 
                             {/* Popup for Google Calendar settings on hover */}
-                            <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                                <div className="flex flex-col gap-2">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase">Google Calendar</p>
-                                    <p className="text-xs text-slate-700">{googleStatusText}</p>
-                                    {googleCalendarError && (
-                                        <p className="text-xs text-red-600">{googleCalendarError}</p>
-                                    )}
-                                    {googleCalendarStatus === 'success' && (
-                                        <>
-                                            <select
-                                                value={calendarPreset}
-                                                onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}
-                                                className="w-full text-xs rounded-md border border-slate-200 px-2 py-1"
-                                            >
-                                                <option value="visible">Visible Range</option>
-                                                <option value="this-week">This Week</option>
-                                                <option value="next-week">Next Week</option>
-                                            </select>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => refreshGoogleCalendar()} className="flex-1 text-xs bg-slate-50 hover:bg-slate-100 py-1 rounded text-slate-700">Refresh</button>
-                                                <button onClick={handleGoogleConnect} className="flex-1 text-xs bg-slate-50 hover:bg-slate-100 py-1 rounded text-slate-700">Reconnect</button>
-                                            </div>
-                                        </>
-                                    )}
-                                    {googleCalendarStatus !== 'success' && (
-                                        <button onClick={handleGoogleConnect} className="w-full text-xs bg-emerald-600 text-white py-1.5 rounded hover:bg-emerald-700">
-                                            {googleCalendarStatus === 'disconnected' ? 'Connect' : 'Reconnect'}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                            {showGoogleMenu && googleMenuPosition && typeof document !== 'undefined' && createPortal(
+                                <div
+                                    ref={googleMenuRef}
+                                    className="fixed z-[120] rounded-xl border border-slate-100 bg-white p-3 shadow-xl"
+                                    style={{
+                                        top: googleMenuPosition.top,
+                                        left: googleMenuPosition.left,
+                                        minWidth: googleMenuPosition.minWidth,
+                                    }}
+                                >
+                                    <div className="flex flex-col gap-2">
+                                        <p className="text-xs font-semibold text-slate-500 uppercase">Google Calendar</p>
+                                        <p className="text-xs text-slate-700">{googleStatusText}</p>
+                                        {googleCalendarError && (
+                                            <p className="text-xs text-red-600">{googleCalendarError}</p>
+                                        )}
+                                        {googleCalendarStatus === 'success' && (
+                                            <>
+                                                <select
+                                                    value={calendarPreset}
+                                                    onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}
+                                                    className="w-full text-xs rounded-md border border-slate-200 px-2 py-1"
+                                                >
+                                                    <option value="visible">Visible Range</option>
+                                                    <option value="this-week">This Week</option>
+                                                    <option value="next-week">Next Week</option>
+                                                </select>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => refreshGoogleCalendar()} className="flex-1 text-xs bg-slate-50 hover:bg-slate-100 py-1 rounded text-slate-700">Refresh</button>
+                                                    <button onClick={handleGoogleConnect} className="flex-1 text-xs bg-slate-50 hover:bg-slate-100 py-1 rounded text-slate-700">Reconnect</button>
+                                                </div>
+                                            </>
+                                        )}
+                                        {googleCalendarStatus !== 'success' && (
+                                            <button onClick={handleGoogleConnect} className="w-full text-xs bg-emerald-600 text-white py-1.5 rounded hover:bg-emerald-700">
+                                                {googleCalendarStatus === 'disconnected' ? 'Connect' : 'Reconnect'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>,
+                                document.body
+                            )}
                         </div>
                         <span className="text-xs text-slate-500 whitespace-nowrap">{googleStatusText}</span>
                     </div>
@@ -518,6 +680,8 @@ export default function TimelineHeader({
                 <button
                     type="button"
                     onClick={onShortcutsClick}
+                    data-focus-group="header"
+                    data-focus-part="control"
                     className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="h-4 w-4">
@@ -529,9 +693,15 @@ export default function TimelineHeader({
                 {/* Profile Menu */}
                 <div ref={profileMenuRef} className="relative shrink-0">
                     <button
+                        ref={profileMenuButtonRef}
+                        type="button"
                         onClick={() => setShowProfileMenu((prev) => !prev)}
-                        className="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                        data-focus-group="header"
+                        data-focus-part="control"
+                        className="flex cursor-pointer select-none items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
                         data-testid="profile-menu-button"
+                        aria-haspopup="true"
+                        aria-expanded={showProfileMenu}
                     >
                         <div className="h-6 w-6 rounded-full bg-sky-100 text-xs flex items-center justify-center text-sky-600 font-bold">
                             {profileInitial}
@@ -539,13 +709,21 @@ export default function TimelineHeader({
                         <span className="hidden max-w-[140px] truncate text-xs font-medium text-slate-700 md:block">
                             {profileIdentity.label}
                         </span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-slate-400">
-                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4 text-slate-400">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" />
                         </svg>
                     </button>
 
-                    {showProfileMenu && (
-                        <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                    {showProfileMenu && profileMenuPosition && typeof document !== 'undefined' && createPortal(
+                        <div
+                            ref={profileMenuRef}
+                            className="fixed z-[120] origin-top-right rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none"
+                            style={{
+                                top: profileMenuPosition.top,
+                                left: profileMenuPosition.left,
+                                minWidth: profileMenuPosition.minWidth,
+                            }}
+                        >
                             <div className="px-4 py-3 border-b border-slate-100">
                                 <p className="text-sm font-medium text-slate-900">{profileIdentity.label}</p>
                                 <p className="text-xs text-slate-500 truncate">{profileIdentity.secondary || user?.email}</p>
@@ -596,7 +774,8 @@ export default function TimelineHeader({
                                     Sign out
                                 </button>
                             </div>
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
                 </div>

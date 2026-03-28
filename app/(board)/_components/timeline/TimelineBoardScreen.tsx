@@ -21,6 +21,7 @@ import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/Time
 import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
 import { CardContextMenu } from "@/app/(board)/_components/timeline/CardContextMenu";
+import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import {
   createEmptyShortcutBarPayload,
   getShortcutContextFromTarget,
@@ -219,7 +220,12 @@ export default function TimelineBoardScreen({
 
   return (
     <div className="h-screen overflow-x-hidden bg-[#f4f5f7]">
-      <div className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4">
+      <div
+        className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4"
+        onKeyDownCapture={(event) => {
+          handleTimelineCardArrowFocus(event);
+        }}
+      >
         <div
           className={clsx(
             "shrink-0 overflow-hidden transition-[max-height,opacity,transform] duration-200 ease-out",
@@ -234,6 +240,9 @@ export default function TimelineBoardScreen({
         <div
           ref={desktopScopeRef}
           className="hidden min-h-0 flex-1 md:flex md:flex-col"
+          onKeyDownCapture={(event) => {
+            handleTimelineCardArrowFocus(event);
+          }}
           onFocusCapture={(event) => {
             if (modalProps) return;
             setBoardShortcutContextFromTarget(event.target);
@@ -255,6 +264,8 @@ export default function TimelineBoardScreen({
                 <button
                   type="button"
                   onClick={() => setIsHeaderCollapsed((prev) => !prev)}
+                  data-focus-group="header"
+                  data-focus-part="control"
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-800"
                   aria-label={headerToggleLabel}
                   aria-expanded={!isHeaderCollapsed}
@@ -303,6 +314,8 @@ export default function TimelineBoardScreen({
                               key={item.key}
                               type="button"
                               onClick={() => desktop.onTabChange(item.key)}
+                              data-focus-group="toolbar"
+                              data-focus-part="control"
                               className={isActive ? activeTabClassName : inactiveTabClassName}
                               aria-current={isActive ? "page" : undefined}
                             >
@@ -342,6 +355,8 @@ export default function TimelineBoardScreen({
                             key={item.key}
                             type="button"
                             onClick={() => desktop.onTabChange(item.key)}
+                            data-focus-group="toolbar"
+                            data-focus-part="control"
                             className={isActive ? activeTabClassName : inactiveTabClassName}
                             aria-current={isActive ? "page" : undefined}
                           >
