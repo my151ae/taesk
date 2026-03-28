@@ -12,6 +12,10 @@ const HORIZONTAL_THRESHOLD_PX = 10;
 const ANY_FOCUS_ITEM_SELECTOR = "[data-focus-group][data-focus-part]";
 const ARROW_NAVIGABLE_FOCUS_GROUP_PARTS = {
   timeline: ["card"],
+  bucket: ["card"],
+} as const;
+const ARROW_NAVIGATION_SOURCE_PARTS = {
+  timeline: ["card"],
   bucket: ["section-button", "card"],
 } as const;
 type ArrowNavigableFocusGroup = keyof typeof ARROW_NAVIGABLE_FOCUS_GROUP_PARTS;
@@ -21,7 +25,32 @@ function isArrowKey(value: string): value is TimelineArrowKey {
 }
 
 function isVisibleElement(element: HTMLElement) {
-  return !element.hasAttribute("disabled") && (element.offsetParent !== null || element.getClientRects().length > 0);
+  if (element.hasAttribute("disabled")) return false;
+  if (element.offsetParent === null && element.getClientRects().length === 0) return false;
+
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+
+  let current: HTMLElement | null = element.parentElement;
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const clipsX = ["hidden", "clip", "auto", "scroll"].includes(style.overflowX) || ["hidden", "clip", "auto", "scroll"].includes(style.overflow);
+    const clipsY = ["hidden", "clip", "auto", "scroll"].includes(style.overflowY) || ["hidden", "clip", "auto", "scroll"].includes(style.overflow);
+
+    if (clipsX || clipsY) {
+      const parentRect = current.getBoundingClientRect();
+      const horizontallyVisible = rect.right > parentRect.left && rect.left < parentRect.right;
+      const verticallyVisible = rect.bottom > parentRect.top && rect.top < parentRect.bottom;
+
+      if ((clipsX && !horizontallyVisible) || (clipsY && !verticallyVisible)) {
+        return false;
+      }
+    }
+
+    current = current.parentElement;
+  }
+
+  return true;
 }
 
 function isTextEditingTarget(target: HTMLElement) {
@@ -33,10 +62,35 @@ function isArrowNavigableFocusGroup(value?: string | null): value is ArrowNaviga
   return value === "timeline" || value === "bucket";
 }
 
-function buildFocusItemSelector(focusGroup: ArrowNavigableFocusGroup) {
-  return ARROW_NAVIGABLE_FOCUS_GROUP_PARTS[focusGroup]
+function buildPartsSelector(focusGroup: ArrowNavigableFocusGroup, parts: readonly string[]) {
+  return parts
     .map((part) => `[data-focus-group="${focusGroup}"][data-focus-part="${part}"]`)
     .join(", ");
+}
+
+function buildCrossGroupCardSelector() {
+  return (Object.keys(ARROW_NAVIGABLE_FOCUS_GROUP_PARTS) as ArrowNavigableFocusGroup[])
+    .map((focusGroup) => `[data-focus-group="${focusGroup}"][data-focus-part="card"]`)
+    .join(", ");
+}
+
+function buildFocusItemSelector(focusGroup: ArrowNavigableFocusGroup) {
+  return buildPartsSelector(focusGroup, ARROW_NAVIGABLE_FOCUS_GROUP_PARTS[focusGroup]);
+}
+
+function resolveActiveNavigationItem(element: HTMLElement) {
+  const focusGroup = element.dataset.focusGroup;
+  if (!isArrowNavigableFocusGroup(focusGroup)) return null;
+
+  const selector = buildPartsSelector(focusGroup, ARROW_NAVIGATION_SOURCE_PARTS[focusGroup]);
+  const navigableItem = element.closest(selector);
+  if (!(navigableItem instanceof HTMLElement)) return null;
+
+  return {
+    focusGroup,
+    selector,
+    activeItem: navigableItem,
+  };
 }
 
 export function resolveNextTimelineCardIndex({
@@ -94,21 +148,24 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
   const activeElement = document.activeElement;
   if (!(activeElement instanceof HTMLElement)) return;
 
-  const activeItem = activeElement.closest(ANY_FOCUS_ITEM_SELECTOR);
-  if (!(activeItem instanceof HTMLElement)) return;
+  const activeFocusItem = activeElement.closest(ANY_FOCUS_ITEM_SELECTOR);
+  if (!(activeFocusItem instanceof HTMLElement)) return;
+
+  const resolvedActiveItem = resolveActiveNavigationItem(activeFocusItem);
+  if (!resolvedActiveItem) return;
+
+  const { selector: focusGroupSelector, activeItem } = resolvedActiveItem;
 
   const container = event.currentTarget;
   if (!(container instanceof HTMLElement) || !container.contains(activeItem)) return;
 
-  const focusGroup = activeItem.dataset.focusGroup;
-  if (!isArrowNavigableFocusGroup(focusGroup)) return;
-  const selector = buildFocusItemSelector(focusGroup);
-  const allowedParts = ARROW_NAVIGABLE_FOCUS_GROUP_PARTS[focusGroup] as readonly string[];
-  const activePart = activeItem.dataset.focusPart;
-  if (!activePart || !allowedParts.includes(activePart)) return;
-
   event.preventDefault();
   event.stopPropagation();
+
+  const selector =
+    event.key === "ArrowLeft" || event.key === "ArrowRight"
+      ? buildCrossGroupCardSelector()
+      : focusGroupSelector;
 
   const candidates = Array.from(container.querySelectorAll(selector))
     .filter((element): element is HTMLElement => element instanceof HTMLElement)
@@ -128,11 +185,34 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
   if (!candidates.length) return;
 
   const currentIndex = candidates.findIndex(({ element }) => element === activeItem);
-  const nextIndex = resolveNextTimelineCardIndex({
-    key: event.key,
-    currentIndex,
-    candidates: candidates.map(({ candidate }) => candidate),
-  });
+  let nextIndex: number | null;
+
+  if (currentIndex >= 0) {
+    nextIndex = resolveNextTimelineCardIndex({
+      key: event.key,
+      currentIndex,
+      candidates: candidates.map(({ candidate }) => candidate),
+    });
+  } else {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+    const activeRect = activeItem.getBoundingClientRect();
+    const syntheticCandidates: TimelineFocusCandidate[] = [
+      {
+        order: -1,
+        centerX: activeRect.left + activeRect.width / 2,
+        centerY: activeRect.top + activeRect.height / 2,
+      },
+      ...candidates.map(({ candidate }) => candidate),
+    ];
+
+    const resolvedIndex = resolveNextTimelineCardIndex({
+      key: event.key,
+      currentIndex: 0,
+      candidates: syntheticCandidates,
+    });
+    nextIndex = resolvedIndex == null ? null : resolvedIndex - 1;
+  }
 
   if (nextIndex == null) return;
 
