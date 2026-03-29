@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { CardContentHistoryMeta, ProfileSummary } from "@/lib/supabase";
 import CommentsPanel from "@/app/(board)/_components/CommentsPanel";
 
@@ -11,6 +11,11 @@ type CardModalSidebarProps = {
   cardId: string;
   boardId: string;
   profiles: ProfileSummary[];
+  tags: string[];
+  tagInput: string;
+  onTagInputChange: (value: string) => void;
+  onTagInputKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+  onRemoveTag: (tag: string) => void;
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   historyItems: CardContentHistoryMeta[];
@@ -25,6 +30,11 @@ export default function CardModalSidebar({
   cardId,
   boardId,
   profiles,
+  tags,
+  tagInput,
+  onTagInputChange,
+  onTagInputKeyDown,
+  onRemoveTag,
   activeTab,
   onTabChange,
   historyItems,
@@ -39,27 +49,63 @@ export default function CardModalSidebar({
       className="flex-1 min-h-0 border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 w-full sm:flex-none sm:w-[var(--sidebar-width)]"
     >
       <div className="flex-1 min-h-0 flex flex-col p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onTabChange("comments")}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${activeTab === "comments"
-              ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-              : "text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700"
-              }`}
-          >
-            Comments
-          </button>
-          <button
-            type="button"
-            onClick={() => onTabChange("history")}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${activeTab === "history"
-              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-              : "text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700"
-              }`}
-          >
-            履歴
-          </button>
+        <div className="space-y-6">
+          <section className="space-y-2" data-testid="card-modal-tags-panel">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
+              Tags
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-[180px] max-w-full shrink-0">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => onTagInputChange(e.target.value)}
+                  onKeyDown={onTagInputKeyDown}
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 placeholder:text-slate-400"
+                  placeholder="+ Add tag..."
+                />
+              </div>
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-700 shadow-sm dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveTag(tag)}
+                    className="text-sky-500 hover:text-sky-700"
+                    aria-label={`Remove tag ${tag}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onTabChange("comments")}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold ${activeTab === "comments"
+                ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                : "text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+            >
+              Comments
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("history")}
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold ${activeTab === "history"
+                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                : "text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+            >
+              履歴
+            </button>
+          </div>
         </div>
 
         {activeTab === "comments" ? (

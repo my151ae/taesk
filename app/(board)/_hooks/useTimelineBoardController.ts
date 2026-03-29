@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
+import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
 import type {
   ListWindow,
   ListWindowPresetKey,
@@ -34,14 +34,6 @@ type UseTimelineBoardControllerArgs = {
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   updateUrlForList: (args: ListUrlUpdateArgs) => void;
 };
-
-const todayJstIso = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
 const clampTimelineRange = (range: number) => Math.max(1, Math.min(7, Math.round(range)));
 
@@ -140,7 +132,9 @@ export function useTimelineBoardController({
   const [listWindowPresetKey, setListWindowPresetKey] = useState<ListWindowPresetKey>(
     derivePresetFromWindow(initialWindow)
   );
-  const [listAnchorDate, setListAnchorDate] = useState<string>(resolvedState.date ?? todayJstIso());
+  const [listAnchorDate, setListAnchorDate] = useState<string>(
+    resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)
+  );
   const [listAnchorOffset, setListAnchorOffset] = useState<number>(resolvedState.anchorOffset);
 
   useEffect(() => {
@@ -186,7 +180,7 @@ export function useTimelineBoardController({
   const handleSetViewMode = useCallback(
     (mode: "timeline" | "list") => {
       setViewMode(mode);
-      const today = todayJstIso();
+      const today = getCurrentTimelineIsoDateJst(timelineStartHour);
       const currentDayIso = dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedState.date || today;
 
       if (mode === "timeline") {
@@ -208,7 +202,18 @@ export function useTimelineBoardController({
         time: null,
       });
     },
-    [activeDayIndex, dataDays, listAnchorDate, listWindow.after, listWindow.before, resolvedState.date, timelineRange, updateUrlForList, updateUrlForTimeline]
+    [
+      activeDayIndex,
+      dataDays,
+      listAnchorDate,
+      listWindow.after,
+      listWindow.before,
+      resolvedState.date,
+      timelineRange,
+      timelineStartHour,
+      updateUrlForList,
+      updateUrlForTimeline,
+    ]
   );
 
   return {

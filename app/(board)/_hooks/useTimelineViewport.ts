@@ -6,17 +6,23 @@ import {
     TIMELINE_MIN_VIEWPORT,
     TIMELINE_HEADER_ESTIMATE,
     getNowMinutesJst,
-    getIsoDateJst,
+    getTimelineIsoDateJst,
     getTimelineHeight
 } from "@/app/(board)/_utils/timeline-helpers";
 
 interface UseTimelineViewportProps {
     timelineHeaderRef: RefObject<HTMLDivElement | null>;
     serverNow?: string;
+    timelineStartHour?: number;
     hourHeight?: number;
 }
 
-export function useTimelineViewport({ timelineHeaderRef, serverNow, hourHeight = 40 }: UseTimelineViewportProps) {
+export function useTimelineViewport({
+    timelineHeaderRef,
+    serverNow,
+    timelineStartHour = 0,
+    hourHeight = 40,
+}: UseTimelineViewportProps) {
     const [viewportHeight, setViewportHeight] = useState<number | null>(null);
     const [timelineHeaderHeight, setTimelineHeaderHeight] = useState(TIMELINE_HEADER_ESTIMATE);
     const [liveNowMinutes, setLiveNowMinutes] = useState<number | null>(null);
@@ -52,12 +58,12 @@ export function useTimelineViewport({ timelineHeaderRef, serverNow, hourHeight =
         const updateNow = () => {
             const nowIso = new Date().toISOString();
             setLiveNowMinutes(getNowMinutesJst(nowIso));
-            setLiveNowIsoDate(getIsoDateJst(nowIso));
+            setLiveNowIsoDate(getTimelineIsoDateJst(nowIso, timelineStartHour));
         };
         updateNow();
         const interval = window.setInterval(updateNow, 60_000);
         return () => clearInterval(interval);
-    }, [serverNow]);
+    }, [serverNow, timelineStartHour]);
 
     const timelineViewportHeight = useMemo(() => {
         const totalHeight = getTimelineHeight(hourHeight);

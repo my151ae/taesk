@@ -696,11 +696,6 @@ export function CardModal({
                     duration={duration}
                     onDurationChange={handleDurationChange}
                     onBucketChange={handleBucketChange}
-                    tags={tags}
-                    tagInput={tagInput}
-                    onTagInputChange={setTagInput}
-                    onTagInputKeyDown={handleAddTag}
-                    onRemoveTag={handleRemoveTag}
                     cardShortId={card.short_id ?? null}
                     onCopyLink={handleCopyLink}
                     googleSync={{
@@ -877,24 +872,29 @@ export function CardModal({
                                 onMouseDown={startResizing}
                                 className="hidden sm:block w-1 cursor-col-resize bg-slate-100 hover:bg-sky-100"
                             />
-                        <CardModalSidebar
-                            sidebarWidth={sidebarWidth}
-                            cardId={card.id}
-                            boardId={card.board_id}
-                            profiles={profiles}
-                            activeTab={activeSidebarTab}
-                            onTabChange={(tab) => {
-                                setActiveSidebarTab(tab);
-                                if (tab === 'history') {
-                                    setShowSidebar(true);
-                                }
-                            }}
-                            historyItems={historyItems}
-                            historyLoading={historyLoading}
-                            historyError={historyError}
-                            selectedHistoryId={selectedHistoryId}
-                            onSelectHistory={handleSelectHistory}
-                        />
+                            <CardModalSidebar
+                                sidebarWidth={sidebarWidth}
+                                cardId={card.id}
+                                boardId={card.board_id}
+                                profiles={profiles}
+                                tags={tags}
+                                tagInput={tagInput}
+                                onTagInputChange={setTagInput}
+                                onTagInputKeyDown={handleAddTag}
+                                onRemoveTag={handleRemoveTag}
+                                activeTab={activeSidebarTab}
+                                onTabChange={(tab) => {
+                                    setActiveSidebarTab(tab);
+                                    if (tab === 'history') {
+                                        setShowSidebar(true);
+                                    }
+                                }}
+                                historyItems={historyItems}
+                                historyLoading={historyLoading}
+                                historyError={historyError}
+                                selectedHistoryId={selectedHistoryId}
+                                onSelectHistory={handleSelectHistory}
+                            />
                         </>
                     )}
                 </div>

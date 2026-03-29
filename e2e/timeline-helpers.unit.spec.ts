@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { calculateStackedEventLayout, NormalizedTimelineLayoutItem } from '../app/(board)/_utils/timeline-helpers';
+import {
+    calculateStackedEventLayout,
+    getIsoDateJst,
+    getTimelineIsoDateJst,
+    NormalizedTimelineLayoutItem,
+} from '../app/(board)/_utils/timeline-helpers';
 import { buildDesktopAllDayState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
 import {
     formatShortcutKeyLabel,
@@ -167,6 +172,17 @@ test.describe('calculateStackedEventLayout - Time Overlap Logic', () => {
         const layout = calculateStackedEventLayout(items, { hourHeight: 40, timeLabelHeightPx: 16 });
         // target は long (12:00終了) に近接しているため true
         expect(layout['card:target'].isTimeOverlapped).toBe(true);
+    });
+});
+
+test.describe('timeline day boundary helpers', () => {
+    test('getIsoDateJst keeps calendar date on JST midnight boundary', async () => {
+        expect(getIsoDateJst('2026-03-29T15:10:00.000Z')).toBe('2026-03-30');
+    });
+
+    test('getTimelineIsoDateJst shifts today until timeline start hour passes', async () => {
+        expect(getTimelineIsoDateJst('2026-03-29T15:10:00.000Z', 5)).toBe('2026-03-29');
+        expect(getTimelineIsoDateJst('2026-03-29T20:10:00.000Z', 5)).toBe('2026-03-30');
     });
 });
 

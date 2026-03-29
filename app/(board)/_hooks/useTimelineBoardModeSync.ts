@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-import { getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
+import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
 import {
   LIST_WINDOW_PRESETS,
   listWindowRange,
@@ -42,6 +42,7 @@ type UseTimelineBoardModeSyncArgs = {
   ) => Promise<TimelineResponse | null>;
   handleUpdateBoard: (updates: Record<string, unknown>) => void | Promise<void>;
   canPersistBoardPreferences: boolean;
+  timelineStartHour: number;
   listAnchorDate: string;
   setListAnchorDate: (isoDate: string) => void;
   listAnchorOffset: number;
@@ -52,14 +53,6 @@ type UseTimelineBoardModeSyncArgs = {
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   updateUrlForList: (args: ListUrlUpdateArgs) => void;
 };
-
-const todayJstIso = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
 const addDaysToIsoDate = (baseIsoDate: string, delta: number) => {
   const d = new Date(`${baseIsoDate}T00:00:00Z`);
@@ -82,6 +75,7 @@ export function useTimelineBoardModeSync({
   fetchTimeline,
   handleUpdateBoard,
   canPersistBoardPreferences,
+  timelineStartHour,
   listAnchorDate,
   setListAnchorDate,
   listAnchorOffset,
@@ -161,7 +155,7 @@ export function useTimelineBoardModeSync({
     (mode: "timeline" | "list") => {
       if (mode === viewMode) return;
 
-      const today = todayJstIso();
+      const today = getCurrentTimelineIsoDateJst(timelineStartHour);
       const targetDate =
         dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedDate || today;
 
@@ -200,18 +194,30 @@ export function useTimelineBoardModeSync({
       setListAnchorDate,
       setListAnchorOffset,
       viewMode,
+      timelineStartHour,
     ],
   );
 
   const shiftListWindow = useCallback(
     (delta: number) => {
       const nextAnchorOffset = listAnchorOffset + delta;
-      const nextAnchorDate = addDaysToIsoDate(listAnchorDate || todayJstIso(), delta);
+      const nextAnchorDate = addDaysToIsoDate(
+        listAnchorDate || getCurrentTimelineIsoDateJst(timelineStartHour),
+        delta,
+      );
       setListAnchorOffset(nextAnchorOffset);
       setListAnchorDate(nextAnchorDate);
       void fetchListWindow(nextAnchorOffset, listWindow);
     },
-    [fetchListWindow, listAnchorDate, listAnchorOffset, listWindow, setListAnchorDate, setListAnchorOffset],
+    [
+      fetchListWindow,
+      listAnchorDate,
+      listAnchorOffset,
+      listWindow,
+      setListAnchorDate,
+      setListAnchorOffset,
+      timelineStartHour,
+    ],
   );
 
   const handleListPrevDay = useCallback(() => {
@@ -231,11 +237,11 @@ export function useTimelineBoardModeSync({
   }, [shiftListWindow]);
 
   const handleListToday = useCallback(() => {
-    const today = todayJstIso();
+    const today = getCurrentTimelineIsoDateJst(timelineStartHour);
     setListAnchorOffset(0);
     setListAnchorDate(today);
     void fetchListWindow(0, listWindow);
-  }, [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset]);
+  }, [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset, timelineStartHour]);
 
   const handleListWindowPresetChange = useCallback(
     (nextPreset: ListWindowPresetKey) => {
@@ -250,12 +256,12 @@ export function useTimelineBoardModeSync({
   const handleListBaseDateChange = useCallback(
     (nextIsoDate: string) => {
       if (!nextIsoDate) return;
-      const nextAnchorOffset = getDayDiff(nextIsoDate, todayJstIso());
+      const nextAnchorOffset = getDayDiff(nextIsoDate, getCurrentTimelineIsoDateJst(timelineStartHour));
       setListAnchorOffset(nextAnchorOffset);
       setListAnchorDate(nextIsoDate);
       void fetchListWindow(nextAnchorOffset, listWindow);
     },
-    [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset],
+    [fetchListWindow, listWindow, setListAnchorDate, setListAnchorOffset, timelineStartHour],
   );
 
   useEffect(() => {
@@ -306,7 +312,7 @@ export function useTimelineBoardModeSync({
       const anchorDay = dataDays?.[nextAnchorIndex];
       if (anchorDay) {
         setListAnchorDate(anchorDay.isoDate);
-        setListAnchorOffset(getDayDiff(anchorDay.isoDate, todayJstIso()));
+        setListAnchorOffset(getDayDiff(anchorDay.isoDate, getCurrentTimelineIsoDateJst(timelineStartHour)));
         updateUrlForList({
           before: listWindow.before,
           after: listWindow.after,
@@ -335,6 +341,7 @@ export function useTimelineBoardModeSync({
     setListAnchorDate,
     setListAnchorOffset,
     status,
+    timelineStartHour,
     updateUrlForList,
     viewMode,
   ]);

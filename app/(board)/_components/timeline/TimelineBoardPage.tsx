@@ -14,6 +14,7 @@ import { type SidebarSectionKey } from "@/app/(board)/_components/timeline/Deskt
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
+  getCurrentTimelineIsoDateJst,
   type TimelineEvent,
   getNowMinutesJst,
   minuteToPixels,
@@ -56,14 +57,6 @@ type TimelineBoardPageContentProps = {
 
 const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
 const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
-
-const todayJstIso = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
 const deriveListWindowFromRange = (range?: number | null): ListWindow => {
   const normalized = typeof range === "number" ? Math.max(1, Math.round(range)) : 30;
@@ -261,6 +254,7 @@ function TimelineBoardPageContent({
     useTimelineViewport({
       timelineHeaderRef,
       serverNow: data?.serverNow,
+      timelineStartHour,
       hourHeight,
     });
   const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
@@ -407,6 +401,7 @@ function TimelineBoardPageContent({
     updateUrlForTimeline,
     timelineScrollRef,
     dayWindowStartRef,
+    timelineStartHour,
     hourHeight,
   });
 
@@ -611,6 +606,7 @@ function TimelineBoardPageContent({
     fetchTimeline,
     handleUpdateBoard,
     canPersistBoardPreferences: canPersistPreferences,
+    timelineStartHour,
     listAnchorDate,
     setListAnchorDate,
     listAnchorOffset,
@@ -846,7 +842,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [basePath, router]);
 
   const handleMoveToCanonicalUrl = useCallback(() => {
-    const fallbackDate = resolvedState.date ?? todayJstIso();
+    const fallbackDate = resolvedState.date ?? getCurrentTimelineIsoDateJst(5);
     if (resolvedState.view === "timeline") {
       updateUrlForTimeline({
         date: fallbackDate,

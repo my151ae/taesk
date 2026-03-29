@@ -362,7 +362,7 @@ export function DesktopSidebarMenu({
               </p>
             </div>
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
               <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
                 {section.items.map((item) => (
                   <SidebarCardRow
@@ -398,37 +398,37 @@ export function DesktopSidebarMenu({
     }
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="px-2 py-2">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="border-b border-slate-200/80 bg-slate-50 px-2 py-2">
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-              <input
-                type="text"
-                value={state.searchQuery}
-                onChange={(event) => actions.onSearchQueryChange(event.target.value)}
-                placeholder="Search cards..."
-                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-                data-testid="desktop-sidebar-search-input"
-                data-shortcut-scope="board"
-                data-shortcut-region="sidebar"
-                data-shortcut-section="search"
-              />
+            <input
+              type="text"
+              value={state.searchQuery}
+              onChange={(event) => actions.onSearchQueryChange(event.target.value)}
+              placeholder="Search cards..."
+              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              data-testid="desktop-sidebar-search-input"
+              data-shortcut-scope="board"
+              data-shortcut-region="sidebar"
+              data-shortcut-section="search"
+            />
           </div>
         </div>
 
-        {!state.searchQuery.trim() ? (
-          <div className="px-3 py-4">
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-              キーワードを入れると該当カードをここに一覧表示します
-            </p>
-          </div>
-        ) : section.results.length === 0 ? (
-          <div className="px-3 py-4">
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-              一致するカードはありません
-            </p>
-          </div>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+          {!state.searchQuery.trim() ? (
+            <div className="px-3 py-4">
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                キーワードを入れると該当カードをここに一覧表示します
+              </p>
+            </div>
+          ) : section.results.length === 0 ? (
+            <div className="px-3 py-4">
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                一致するカードはありません
+              </p>
+            </div>
+          ) : (
             <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
               {section.results.map((result) => (
                 <SidebarCardRow
@@ -448,8 +448,8 @@ export function DesktopSidebarMenu({
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };

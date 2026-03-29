@@ -362,26 +362,16 @@ test.describe('Comments Feature @feature:comments', () => {
     await expect(commentEditor).toBeVisible();
   });
 
-  test('should edit tags from header actions in modal @comments:modal', async ({ page }) => {
+  test('should show tags editor in sidebar modal panel @comments:modal', async ({ page }) => {
     const currentCard = assertContext(card, 'Card context not initialised');
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await openCardModalViaQuery(page, currentCard);
 
     const modal = page.getByRole('dialog');
-    const tagsButton = modal.getByTestId('card-modal-tags-button');
-    const overflowButton = modal.getByTestId('card-modal-overflow-button');
-
-    if (await tagsButton.isVisible().catch(() => false)) {
-      await tagsButton.click();
-      await expect(modal.getByTestId('card-modal-tags-popover')).toBeVisible();
-      return;
-    }
-
-    await expect(overflowButton).toBeVisible();
-    await overflowButton.click();
-    await expect(modal.getByTestId('card-modal-overflow-menu')).toBeVisible();
-    await expect(modal.getByPlaceholder('+ Add tag...')).toBeVisible();
+    await modal.getByTitle('Show details').click();
+    await expect(modal.getByTestId('card-modal-tags-panel')).toBeVisible();
+    await expect(modal.getByTestId('card-modal-tags-panel').getByPlaceholder('+ Add tag...')).toBeVisible();
   });
 
   test('should move card modal actions into overflow menu on narrow width @comments:modal', async ({ page }) => {
@@ -400,7 +390,6 @@ test.describe('Comments Feature @feature:comments', () => {
 
     const overflowMenu = modal.getByTestId('card-modal-overflow-menu');
     await expect(overflowMenu).toBeVisible();
-    await expect(overflowMenu.getByPlaceholder('+ Add tag...')).toBeVisible();
     await expect(overflowMenu.getByText('Google Calendar', { exact: true })).toBeVisible();
 
     const copyLinkButton = overflowMenu.getByTestId('card-modal-copy-link-overflow');

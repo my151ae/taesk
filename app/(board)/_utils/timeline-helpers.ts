@@ -33,6 +33,8 @@ export const TIMELINE_MIN_VIEWPORT = HOUR_HEIGHT * 8;
 export const AXIS_WIDTH = 80;
 export const TIMELINE_HEADER_ESTIMATE = 64;
 export const DEFAULT_TIMELINE_DAY_RANGE = 7;
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const MS_PER_HOUR = 60 * 60 * 1000;
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -113,9 +115,18 @@ export const getDayDiff = (d1: string, d2: string) => {
 
 export const getIsoDateJst = (timestamp: string) => {
     const current = new Date(timestamp);
-    const jst = new Date(current.getTime() + 9 * 60 * 60 * 1000);
+    const jst = new Date(current.getTime() + JST_OFFSET_MS);
     return jst.toISOString().split('T')[0];
 };
+
+export const getTimelineIsoDateJst = (timestamp: string, dayBoundaryHour: number = 0) => {
+    const current = new Date(timestamp);
+    const shiftedJst = new Date(current.getTime() + JST_OFFSET_MS - dayBoundaryHour * MS_PER_HOUR);
+    return shiftedJst.toISOString().split('T')[0];
+};
+
+export const getCurrentTimelineIsoDateJst = (dayBoundaryHour: number = 0) =>
+    getTimelineIsoDateJst(new Date().toISOString(), dayBoundaryHour);
 
 export const getNowMinutesJst = (timestamp: string) => {
     const current = new Date(timestamp);

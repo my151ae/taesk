@@ -8,7 +8,9 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_HOUR = 60 * 60 * 1000;
 const TIMELINE_DAY_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
+const DEFAULT_TIMELINE_START_HOUR = 5;
 
 type TimelineCardRow = {
   id: string;
@@ -35,9 +37,9 @@ type TimelineCardRow = {
   slug: string | null;
 };
 
-const formatDateJst = (base: Date, offsetDays = 0): string => {
+const formatDateJst = (base: Date, offsetDays = 0, dayBoundaryHour = 0): string => {
   const utcMs = base.getTime();
-  const jstMs = utcMs + JST_OFFSET_MS + offsetDays * MS_PER_DAY;
+  const jstMs = utcMs + JST_OFFSET_MS - dayBoundaryHour * MS_PER_HOUR + offsetDays * MS_PER_DAY;
   const jstDate = new Date(jstMs);
   const year = jstDate.getUTCFullYear();
   const month = `${jstDate.getUTCMonth() + 1}`.padStart(2, '0');
@@ -58,10 +60,10 @@ const toMinutes = (time: string | null) => {
   return h * 60 + m;
 };
 
-const buildDays = (base: Date, startOffset: number, range: number): TimelineDay[] => {
-  const todayIso = formatDateJst(base, 0);
+const buildDays = (base: Date, startOffset: number, range: number, timelineStartHour: number): TimelineDay[] => {
+  const todayIso = formatDateJst(base, 0, timelineStartHour);
   return Array.from({ length: range }, (_, offset) => {
-    const isoDate = formatDateJst(base, startOffset + offset);
+    const isoDate = formatDateJst(base, startOffset + offset, timelineStartHour);
     return {
       key: isoDate,
       label: formatDayLabel(isoDate, todayIso),
@@ -86,6 +88,17 @@ const getHandler = async (
 
   const { boardId } = await params;
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('timeline_start_hour')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const timelineStartHour =
+    typeof profile?.timeline_start_hour === 'number'
+      ? Math.max(0, Math.min(23, Math.trunc(profile.timeline_start_hour)))
+      : DEFAULT_TIMELINE_START_HOUR;
+
   const { data: membership } = await supabase
     .from('board_members')
     .select('role')
@@ -107,7 +120,7 @@ const getHandler = async (
   const range = Math.max(1, Number.isFinite(parsedRange) ? parsedRange : TIMELINE_DAY_RANGE);
 
   const now = new Date();
-  const days = buildDays(now, startOffset, range);
+  const days = buildDays(now, startOffset, range, timelineStartHour);
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const cardsSelect =
@@ -133,7 +146,7 @@ const getHandler = async (
     return acc;
   }, {} as Record<string, TimelineBucketItem[]>);
   const overdue: TimelineOverdueItem[] = [];
-  const todayIso = formatDateJst(now, 0);
+  const todayIso = formatDateJst(now, 0, timelineStartHour);
 
   cards?.forEach((card) => {
     const checklist = normalizeChecklist((card.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof normalizeChecklist>[0]);

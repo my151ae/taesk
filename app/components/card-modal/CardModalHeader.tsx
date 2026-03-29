@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ButtonHTMLAttributes, KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
+import type { ButtonHTMLAttributes, RefObject } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 
@@ -21,7 +21,7 @@ const getProfileInitials = (profile: ProfileSummary): string => {
 
 type BucketOption = { value: DueBucket; label: string };
 type ReminderMinuteOption = 0 | 5 | 10 | 15 | 30 | 60;
-type HeaderActionId = "tags" | "copyLink" | "googleSync";
+type HeaderActionId = "copyLink" | "googleSync";
 
 type CardModalHeaderProps = {
     dueDate: string;
@@ -58,11 +58,6 @@ type CardModalHeaderProps = {
     onTargetBoardChange: (boardId: string) => void;
     onDurationChange: (value: number | "") => void;
     onBucketChange: (bucket: DueBucket) => void;
-    tags: string[];
-    tagInput: string;
-    onTagInputChange: (value: string) => void;
-    onTagInputKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
-    onRemoveTag: (tag: string) => void;
     cardShortId: string | null;
     onCopyLink: () => void;
     googleSync?: {
@@ -75,14 +70,6 @@ type CardModalHeaderProps = {
     onRequestClose: () => void;
     showSidebar: boolean;
     onToggleSidebar: () => void;
-};
-
-type TagEditorProps = {
-    tagInput: string;
-    tags: string[];
-    onTagInputChange: (value: string) => void;
-    onTagInputKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
-    onRemoveTag: (tag: string) => void;
 };
 
 function HeaderActionButton({
@@ -101,74 +88,6 @@ function HeaderActionButton({
         >
             {children}
         </button>
-    );
-}
-
-function TagsEditor({
-    tagInput,
-    tags,
-    onTagInputChange,
-    onTagInputKeyDown,
-    onRemoveTag,
-}: TagEditorProps) {
-    return (
-        <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
-                Tags
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5">
-                <div className="min-w-[160px] flex-1">
-                    <input
-                        type="text"
-                        value={tagInput}
-                        onChange={(e) => onTagInputChange(e.target.value)}
-                        onKeyDown={onTagInputKeyDown}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 placeholder:text-slate-400"
-                        placeholder="+ Add tag..."
-                    />
-                </div>
-                {tags.map((tag) => (
-                    <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-100 bg-white px-2 py-1 text-[10px] font-medium text-sky-600 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
-                    >
-                        {tag}
-                        <button
-                            type="button"
-                            onClick={() => onRemoveTag(tag)}
-                            className="text-sky-400 hover:text-sky-600"
-                            aria-label={`Remove tag ${tag}`}
-                        >
-                            ×
-                        </button>
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function TagsInlineTrigger({
-    tags,
-    onClick,
-    testId,
-}: {
-    tags: string[];
-    onClick: () => void;
-    testId?: string;
-}) {
-    return (
-        <HeaderActionButton
-            onClick={onClick}
-            aria-haspopup="dialog"
-            aria-label="Tags"
-            data-testid={testId}
-        >
-            <span>TAGS</span>
-            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-gray-700 dark:text-gray-300">
-                {tags.length}
-            </span>
-        </HeaderActionButton>
     );
 }
 
@@ -207,11 +126,6 @@ export default function CardModalHeader({
     onTargetBoardChange,
     onDurationChange,
     onBucketChange,
-    tags,
-    tagInput,
-    onTagInputChange,
-    onTagInputKeyDown,
-    onRemoveTag,
     cardShortId,
     onCopyLink,
     googleSync,
@@ -220,7 +134,7 @@ export default function CardModalHeader({
     onToggleSidebar,
 }: CardModalHeaderProps) {
     const actionOrder = useMemo<HeaderActionId[]>(() => {
-        const items: HeaderActionId[] = ["tags"];
+        const items: HeaderActionId[] = [];
         if (cardShortId) {
             items.push("copyLink");
         }
@@ -232,12 +146,10 @@ export default function CardModalHeader({
 
     const actionsContainerRef = useRef<HTMLDivElement | null>(null);
     const overflowMenuRef = useRef<HTMLDivElement | null>(null);
-    const tagsPopoverRef = useRef<HTMLDivElement | null>(null);
     const measureRefs = useRef<Partial<Record<HeaderActionId, HTMLDivElement | null>>>({});
 
     const [visibleActionIds, setVisibleActionIds] = useState<HeaderActionId[]>([]);
     const [showOverflowMenu, setShowOverflowMenu] = useState(false);
-    const [showTagsPopover, setShowTagsPopover] = useState(false);
 
     const overflowActionIds = actionOrder.filter((actionId) => !visibleActionIds.includes(actionId));
 
@@ -285,7 +197,7 @@ export default function CardModalHeader({
         return () => {
             window.cancelAnimationFrame(rafId);
         };
-    }, [recalculateVisibleActions, tags.length, cardShortId, googleSync?.status, googleSync?.connected, googleSync?.canWrite]);
+    }, [recalculateVisibleActions, cardShortId, googleSync?.status, googleSync?.connected, googleSync?.canWrite]);
 
     useEffect(() => {
         const container = actionsContainerRef.current;
@@ -302,52 +214,19 @@ export default function CardModalHeader({
     }, [recalculateVisibleActions]);
 
     useEffect(() => {
-        if (!visibleActionIds.includes("tags")) {
-            setShowTagsPopover(false);
-        }
-    }, [visibleActionIds]);
-
-    useEffect(() => {
         if (overflowActionIds.length === 0) {
             setShowOverflowMenu(false);
         }
     }, [overflowActionIds.length]);
 
     useClickOutside(overflowMenuRef, () => setShowOverflowMenu(false));
-    useClickOutside(tagsPopoverRef, () => setShowTagsPopover(false));
 
     const handleToggleOverflowMenu = () => {
         setShowOverflowMenu((prev) => !prev);
-        setShowTagsPopover(false);
-    };
-
-    const handleToggleTagsPopover = () => {
-        setShowTagsPopover((prev) => !prev);
-        setShowOverflowMenu(false);
     };
 
     const renderInlineAction = (actionId: HeaderActionId) => {
         switch (actionId) {
-            case "tags":
-                return (
-                    <div ref={tagsPopoverRef} className="relative shrink-0" key={actionId}>
-                        <TagsInlineTrigger tags={tags} onClick={handleToggleTagsPopover} testId="card-modal-tags-button" />
-                        {showTagsPopover && (
-                            <div
-                                className="absolute right-0 top-full z-[120] mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
-                                data-testid="card-modal-tags-popover"
-                            >
-                                <TagsEditor
-                                    tagInput={tagInput}
-                                    tags={tags}
-                                    onTagInputChange={onTagInputChange}
-                                    onTagInputKeyDown={onTagInputKeyDown}
-                                    onRemoveTag={onRemoveTag}
-                                />
-                            </div>
-                        )}
-                    </div>
-                );
             case "copyLink":
                 return (
                     <HeaderActionButton
@@ -379,11 +258,6 @@ export default function CardModalHeader({
         <div className="relative z-30 flex flex-col gap-3 border-b border-slate-200 p-3 pb-2 dark:border-gray-700 sm:p-4 sm:pb-3">
             <div className="absolute left-0 top-0 -z-10 opacity-0 pointer-events-none">
                 <div className="flex items-center gap-2 whitespace-nowrap">
-                    {actionOrder.includes("tags") && (
-                        <div ref={(node) => { measureRefs.current.tags = node; }}>
-                            <TagsInlineTrigger tags={tags} onClick={() => { }} />
-                        </div>
-                    )}
                     {actionOrder.includes("copyLink") && (
                         <div ref={(node) => { measureRefs.current.copyLink = node; }}>
                             <HeaderActionButton>Copy Link</HeaderActionButton>
@@ -662,16 +536,6 @@ export default function CardModalHeader({
                                     className="absolute right-0 top-full z-[120] mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
                                     data-testid="card-modal-overflow-menu"
                                 >
-                                    {overflowActionIds.includes("tags") && (
-                                        <TagsEditor
-                                            tagInput={tagInput}
-                                            tags={tags}
-                                            onTagInputChange={onTagInputChange}
-                                            onTagInputKeyDown={onTagInputKeyDown}
-                                            onRemoveTag={onRemoveTag}
-                                        />
-                                    )}
-
                                     {boards.length > 1 && (
                                         <div className="space-y-2">
                                             <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
