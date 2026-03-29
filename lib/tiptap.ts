@@ -730,26 +730,15 @@ export const deriveExcerptFromContent = (
 };
 
 /**
- * 本文の初期値（空taskList 1行）
+ * 本文の初期値（空 paragraph 1行）
  */
 export const buildDefaultBodyContent = (): JSONContent => {
   return {
     type: "doc",
     content: [
       {
-        type: "taskList",
-        content: [
-          {
-            type: "taskItem",
-            attrs: { checked: false },
-            content: [
-              {
-                type: "paragraph",
-                content: [],
-              },
-            ],
-          },
-        ],
+        type: "paragraph",
+        content: [],
       },
     ],
   };

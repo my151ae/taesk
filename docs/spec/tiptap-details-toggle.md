@@ -13,7 +13,6 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
 - `CardModal`
   - タイトル入力、autosave、履歴プレビュー、本文エディタのマウント管理を担当する
   - 本文構造変換は担当しない
-  - `BodyEditorBridge` ではタイトルから本文へ戻す `focusBody` のみを扱う
 - `TiptapEditor`
   - `details` の作成・解除、block handle、block menu を担当する
   - `toggle-details` / `unset-details` の実行後は autosave 経路へ確実に変更を流す
@@ -79,7 +78,6 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
 
 - タイトル/本文境界のキーボード責務は [docs/spec/keyboard-navigation.md](/Users/yossydie/dev/taesk/docs/spec/keyboard-navigation.md) を正とする
 - `details` 内部の Enter / Backspace / Arrow 補正は本文内部挙動として扱う
-- title から本文への移動や本文先頭から title へ戻る仕様は、`details` 導入後も変えない
 
 ## 7. テスト観点
 

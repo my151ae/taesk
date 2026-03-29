@@ -300,8 +300,8 @@ taesk/
 6. **JSON-Only Testing Flow**  
    Playwright は常に `--reporter=json` で実行し、`test-results/batches/*.json` をチケットへ添付。HTML レポートは `npx playwright show-report --port=0` で必要時のみ起動し、プロセスを残さない。
 
-7. **CardModal Boundary Is Focus-Only**  
-   CardModal のタイトル入力欄と本文先頭ブロックの境界は、`ArrowDown` / `ArrowRight` / `ArrowUp` / `ArrowLeft` によるフォーカス移動だけを持つ。`Enter` 分割や `Delete` / `Backspace` 結合、タイトルから本文への画像 paste 転送は持たない。
+7. **CardModal Title And Body Are Independent**  
+   CardModal のタイトル入力欄と本文エディタの間に専用のフォーカスブリッジは持たない。タイトル欄の `Enter` は改行や構造変換を行わず、画像 paste は本文エディタ側だけが扱う。
 
 8. **Shortcut Taxonomy Is Layer-First**  
    shortcut の分類は `scope / region / section / view / part / state` を正本とし、`scope` は `board | modal | context-menu` のレイヤー専用に固定する。`ShortcutsModal` は独立 scope ではなく `scope=modal, region=shortcuts-modal` として扱う。

@@ -4,9 +4,7 @@ import { useEffect, useRef, useCallback, useMemo, useLayoutEffect, useState } fr
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, {
-    BodyEditorBridge,
     BodyEditorShortcutState,
-    FocusTitleRequest,
 } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -132,7 +130,6 @@ export function CardModal({
         canOutdent: false,
     });
 
-    const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
     const {
@@ -153,6 +150,7 @@ export function CardModal({
         showSidebar,
         activeSidebarTab,
     });
+    const shouldFocusTitleOnOpen = !isLoading && !isHistoryPreviewing && title.trim().length === 0;
 
     const stickyTitleChecklistProgress = useMemo(() => {
         const plainText = getTiptapPlainText(normalizeContent(content));
@@ -319,26 +317,6 @@ export function CardModal({
         setMemberSearch,
     });
 
-    const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
-        bodyBridgeRef.current = bridge;
-    }, []);
-
-    const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
-        const input = titleInputRef.current;
-        if (!input) return;
-        let maxLength = input.value.length;
-        let targetPosition = input.value.length;
-
-        input.focus();
-        if (request.mode === 'column') {
-            const nextPos = Math.min(Math.max(request.column ?? maxLength, 0), maxLength);
-            input.setSelectionRange(nextPos, nextPos);
-            return;
-        }
-        const nextPos = Math.min(Math.max(targetPosition, 0), maxLength);
-        input.setSelectionRange(nextPos, nextPos);
-    }, []);
-
     const resizeTitleInput = useCallback(() => {
         const input = titleInputRef.current;
         if (!input) return;
@@ -385,20 +363,8 @@ export function CardModal({
 
     const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (isHistoryPreviewing) return;
-        if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-
-        const bridge = bodyBridgeRef.current;
-        if (!bridge) return;
-
-        const input = event.currentTarget;
-        const selectionStart = input.selectionStart;
-        const selectionEnd = input.selectionEnd;
-        if (selectionStart == null || selectionEnd == null || selectionStart !== selectionEnd) {
-            return;
-        }
-
-        const caret = selectionStart;
-        const isCaretAtEnd = caret === title.length;
+        const nativeEvent = event.nativeEvent as KeyboardEvent & { keyCode?: number };
+        const isImeComposing = nativeEvent.isComposing || nativeEvent.keyCode === 229;
 
         if (event.key === "Enter") {
             event.preventDefault();
@@ -406,21 +372,8 @@ export function CardModal({
             return;
         }
 
-        if (event.key === "ArrowDown") {
-            event.preventDefault();
-            event.stopPropagation();
-            bridge.focusBody(caret);
-            return;
-        }
-
-        if (event.key === "ArrowRight") {
-            if (!isCaretAtEnd) return;
-            event.preventDefault();
-            event.stopPropagation();
-            bridge.focusBody(0);
-            return;
-        }
-    }, [isHistoryPreviewing, title]);
+        if (isImeComposing) return;
+    }, [isHistoryPreviewing]);
 
     const handleAddMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
@@ -783,10 +736,13 @@ export function CardModal({
                                         value={title}
                                         rows={1}
                                         wrap="soft"
+                                        autoFocus={shouldFocusTitleOnOpen}
+                                        data-autofocus={shouldFocusTitleOnOpen ? "true" : undefined}
                                         disabled={isHistoryPreviewing}
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
-                                            setTitle(e.target.value);
+                                            const normalizedTitle = e.target.value.replace(/\r?\n/g, "");
+                                            setTitle(normalizedTitle);
                                             triggerAutoSave();
                                         }}
                                         onKeyDown={handleTitleKeyDown}
@@ -845,8 +801,6 @@ export function CardModal({
                                                     boardId={card.board_id}
                                                     cardId={card.id}
                                                     onEditorError={setEditorError}
-                                                    onRegisterBodyBridge={handleRegisterBodyBridge}
-                                                    onRequestFocusTitle={handleRequestFocusTitle}
                                                     onShortcutStateChange={setBodyShortcutState}
                                                     onChange={(val) => {
                                                         if (isHistoryPreviewing) return;
@@ -857,7 +811,7 @@ export function CardModal({
                                                         }
                                                     }}
                                                     placeholder="メモを入力..."
-                                                    data-autofocus={!isHistoryPreviewing}
+                                                    data-autofocus={!isHistoryPreviewing && !shouldFocusTitleOnOpen}
                                                 />
                                             </div>
                                         )}

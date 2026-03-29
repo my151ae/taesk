@@ -4041,7 +4041,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('moves focus between title and first checklist line with arrow keys on task-list cards', async ({ page }) => {
+  test('does not bridge title and body with ArrowDown', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -4118,26 +4118,10 @@ test.describe('@feature:timeline Timeline view', () => {
       });
       await page.keyboard.press('ArrowDown');
 
-      await expect.poll(async () => {
-        return page.evaluate(() => {
-          const active = document.activeElement;
-          return active instanceof HTMLElement && active.classList.contains('ProseMirror');
-        });
-      }).toBeTruthy();
-
-      await expect.poll(async () => {
-        return page.evaluate(() => {
-          const selection = window.getSelection();
-          const anchorNode = selection?.anchorNode;
-          const anchorOffset = selection?.anchorOffset ?? -1;
-          const lineText = anchorNode?.textContent ?? anchorNode?.parentElement?.textContent ?? '';
-          return { anchorOffset, lineText };
-        });
-      }).toEqual({ anchorOffset: 5, lineText: 'body line' });
-
-      await page.keyboard.press('ArrowUp');
+      await expect(titleInput).toBeFocused();
       await page.keyboard.type('Z');
-      await expect(titleInput).toHaveValue('ArrowZ navigation baseline');
+      await expect(titleInput).toHaveValue(/Arrow.*navigation baseline.*Z/);
+      await expect(firstChecklistLine).toHaveText('body line');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -4209,7 +4193,64 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('supports horizontal title-body arrow movement on task-list cards', async ({ page }) => {
+  test('focuses the title field first when the modal opens with an empty title', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: '',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'body content' }] }],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1890,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:35:00',
+      due_end: '15:35:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 50365,
+      slug: 'empty-title-initial-focus',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      await expect(titleInput).toHaveValue('');
+      await expect(titleInput).toBeFocused();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('does not bridge title and body with ArrowRight or ArrowLeft', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -4287,19 +4328,13 @@ test.describe('@feature:timeline Timeline view', () => {
       });
       await page.keyboard.press('ArrowRight');
       await page.keyboard.type('Q');
-      await expect(firstChecklistLine).toHaveText('Qbody line');
+      await expect(titleInput).toHaveValue('Arrow LR baselineQ');
+      await expect(firstChecklistLine).toHaveText('body line');
 
       await firstChecklistLine.click({ position: { x: 4, y: 8 } });
       await page.keyboard.press('Home');
       await page.keyboard.press('ArrowLeft');
-      await expect.poll(async () => {
-        return page.evaluate(() => {
-          const active = document.activeElement;
-          return active instanceof HTMLTextAreaElement && active.closest('[data-sticky-title]') !== null;
-        });
-      }).toBeTruthy();
-      await page.keyboard.type('Y');
-      await expect(titleInput).toHaveValue('Arrow LR baselineY');
+      await expect(modal.locator('.ProseMirror').first()).toBeFocused();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -4397,7 +4432,6 @@ test.describe('@feature:timeline Timeline view', () => {
       const titleInput = modal.locator('[data-shortcut-context="cardmodal-title"]').first();
       await titleInput.focus();
       await expect(modalBar).toContainText('カードタイトル');
-      await expect(modalBar).toContainText('本文へ');
       await expect(modalBar).toContainText('元に戻す');
       const modalBarBox = await modalBar.boundingBox();
       const titleInputBox = await titleInput.boundingBox();
@@ -4405,11 +4439,11 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(titleInputBox).not.toBeNull();
       expect(modalBarBox!.y).toBeLessThan(titleInputBox!.y);
 
-      await page.keyboard.press('ArrowDown');
+      await modal.locator('.ProseMirror').first().click();
       await expect(modalBar).toContainText('カード本文');
-      await expect(modalBar).toContainText('タイトルへ');
+      await expect(modalBar).not.toContainText('タイトルへ');
 
-      await page.keyboard.press('ArrowUp');
+      await titleInput.focus();
       await expect(modalBar).toContainText('カードタイトル');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
