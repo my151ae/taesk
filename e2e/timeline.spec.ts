@@ -4041,7 +4041,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('does not bridge title and body with ArrowDown', async ({ page }) => {
+  test('bridges title and body with ArrowDown and ArrowUp', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -4118,9 +4118,21 @@ test.describe('@feature:timeline Timeline view', () => {
       });
       await page.keyboard.press('ArrowDown');
 
+      await expect(modal.locator('.ProseMirror').first()).toBeFocused();
+      await expect.poll(async () => {
+        return page.evaluate(() => {
+          const selection = window.getSelection();
+          const anchorNode = selection?.anchorNode;
+          const anchorOffset = selection?.anchorOffset ?? -1;
+          const lineText = anchorNode?.textContent ?? anchorNode?.parentElement?.textContent ?? '';
+          return { anchorOffset, lineText };
+        });
+      }).toEqual({ anchorOffset: 5, lineText: 'body line' });
+
+      await page.keyboard.press('ArrowUp');
       await expect(titleInput).toBeFocused();
       await page.keyboard.type('Z');
-      await expect(titleInput).toHaveValue(/Arrow.*navigation baseline.*Z/);
+      await expect(titleInput).toHaveValue('ArrowZ navigation baseline');
       await expect(firstChecklistLine).toHaveText('body line');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
@@ -4327,14 +4339,16 @@ test.describe('@feature:timeline Timeline view', () => {
         input.setSelectionRange(pos, pos);
       });
       await page.keyboard.press('ArrowRight');
+      await expect(modal.locator('.ProseMirror').first()).toBeFocused();
       await page.keyboard.type('Q');
-      await expect(titleInput).toHaveValue('Arrow LR baselineQ');
-      await expect(firstChecklistLine).toHaveText('body line');
+      await expect(firstChecklistLine).toHaveText('Qbody line');
 
       await firstChecklistLine.click({ position: { x: 4, y: 8 } });
       await page.keyboard.press('Home');
       await page.keyboard.press('ArrowLeft');
-      await expect(modal.locator('.ProseMirror').first()).toBeFocused();
+      await expect(titleInput).toBeFocused();
+      await page.keyboard.type('Y');
+      await expect(titleInput).toHaveValue('Arrow LR baselineY');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -4432,6 +4446,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const titleInput = modal.locator('[data-shortcut-context="cardmodal-title"]').first();
       await titleInput.focus();
       await expect(modalBar).toContainText('カードタイトル');
+      await expect(modalBar).toContainText('本文へ');
       await expect(modalBar).toContainText('元に戻す');
       const modalBarBox = await modalBar.boundingBox();
       const titleInputBox = await titleInput.boundingBox();
@@ -4439,11 +4454,11 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(titleInputBox).not.toBeNull();
       expect(modalBarBox!.y).toBeLessThan(titleInputBox!.y);
 
-      await modal.locator('.ProseMirror').first().click();
+      await page.keyboard.press('ArrowDown');
       await expect(modalBar).toContainText('カード本文');
-      await expect(modalBar).not.toContainText('タイトルへ');
+      await expect(modalBar).toContainText('タイトルへ');
 
-      await titleInput.focus();
+      await page.keyboard.press('ArrowUp');
       await expect(modalBar).toContainText('カードタイトル');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);

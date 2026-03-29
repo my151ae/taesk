@@ -1,7 +1,7 @@
 'use client';
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
-import { EditorState, Selection, Transaction } from '@tiptap/pm/state';
+import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import { DOMSerializer, Fragment, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -42,6 +42,15 @@ import {
     type ResolvedBlockTarget,
 } from '@/app/(board)/_components/tiptap/tiptap-block-actions';
 
+export type FocusTitleRequest = {
+    mode?: 'column' | 'end';
+    column?: number;
+};
+
+export type BodyEditorBridge = {
+    focusBody: (offset?: number | null) => void;
+};
+
 export type BodyEditorShortcutState = {
     canUndo: boolean;
     canRedo: boolean;
@@ -64,6 +73,8 @@ type TiptapEditorProps = {
     boardId?: string;
     cardId?: string;
     onEditorError?: (message: string | null) => void;
+    onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
+    onRequestFocusTitle?: (request: FocusTitleRequest) => void;
     onShortcutStateChange?: (state: BodyEditorShortcutState) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
@@ -77,6 +88,8 @@ export default function TiptapEditor({
     boardId,
     cardId,
     onEditorError,
+    onRegisterBodyBridge,
+    onRequestFocusTitle,
     onShortcutStateChange,
     'data-autofocus': dataAutofocus,
     containerRef
@@ -132,6 +145,37 @@ export default function TiptapEditor({
         return 24;
     }, []);
 
+    const getLeadingTextSelection = useCallback((state: EditorState): Selection | null => {
+        const leadingSelection = Selection.atStart(state.doc);
+        if (!('empty' in leadingSelection) || !leadingSelection.empty) return null;
+        if (!leadingSelection.$from.parent.isTextblock) return null;
+        return leadingSelection;
+    }, []);
+
+    const isSelectionInFirstTextLineState = useCallback((view: {
+        coordsAtPos: (pos: number) => { top: number };
+    }, state: EditorState): boolean => {
+        if (state.doc.childCount === 0 || !state.selection.empty) return false;
+        const { $from, $to } = state.selection;
+        if (!$from.parent.isTextblock || !$to.parent.isTextblock) return false;
+        const leadingSelection = getLeadingTextSelection(state);
+        if (!leadingSelection) return false;
+
+        for (let depth = 0; depth < $from.depth; depth += 1) {
+            if ($from.index(depth) !== 0 || $to.index(depth) !== 0) {
+                return false;
+            }
+        }
+
+        try {
+            const currentCoords = view.coordsAtPos(state.selection.from);
+            const leadingCoords = view.coordsAtPos(leadingSelection.from);
+            return Math.abs(currentCoords.top - leadingCoords.top) <= 1;
+        } catch {
+            return false;
+        }
+    }, [getLeadingTextSelection]);
+
     const isSelectionInLeadingTaskItemState = useCallback((state: EditorState): boolean => {
         if (!state.selection.empty) return false;
         const { $from, $to } = state.selection;
@@ -150,6 +194,11 @@ export default function TiptapEditor({
         }
 
         return false;
+    }, []);
+
+    const setSelectionAtDocStart = useCallback((state: EditorState, dispatch: (tr: Transaction) => void): void => {
+        const tr = state.tr.setSelection(Selection.atStart(state.doc)).scrollIntoView();
+        dispatch(tr);
     }, []);
 
     const runListIndentCommand = useCallback((currentEditor: Editor | null, direction: 'indent' | 'outdent'): boolean => {
@@ -347,6 +396,17 @@ export default function TiptapEditor({
         }
     }, [emitForcedDocChange]);
 
+    const setCursorInLeadingTextblockWithOffset = useCallback((state: EditorState, dispatch: (tr: Transaction) => void, rawOffset: number): boolean => {
+        const leadingSelection = getLeadingTextSelection(state);
+        if (!leadingSelection) return false;
+        const textLength = leadingSelection.$from.parent.textContent.length;
+        const offset = Math.max(0, Math.min(rawOffset, textLength));
+        const position = leadingSelection.from + offset;
+        const tr = state.tr.setSelection(TextSelection.create(state.doc, position)).scrollIntoView();
+        dispatch(tr);
+        return true;
+    }, [getLeadingTextSelection]);
+
     const scrollByOneLineInView = useCallback((view: { dom: Element }, direction: 'up' | 'down'): boolean => {
         const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
         if (!scrollContainer) return false;
@@ -492,7 +552,7 @@ export default function TiptapEditor({
                     return true;
                 }
 
-                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false;
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft') return false;
                 if (!event.isTrusted || event.isComposing) return false;
 
                 const { state } = view;
@@ -515,6 +575,34 @@ export default function TiptapEditor({
                 }
 
                 if (!state.selection.empty) return false;
+
+                if (event.key === 'ArrowUp' && isSelectionInFirstTextLineState(view, state)) {
+                    const scrollTop = findScrollableAncestor(view.dom as HTMLElement)?.scrollTop;
+                    if ((typeof scrollTop !== 'number' || scrollTop <= 1) && onRequestFocusTitle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onRequestFocusTitle({
+                            mode: 'column',
+                            column: state.selection.$from.parentOffset,
+                        });
+                        return true;
+                    }
+                    if (typeof scrollTop === 'number' && scrollTop > 1) {
+                        event.preventDefault();
+                        scrollByOneLineInView(view, 'up');
+                        return true;
+                    }
+                }
+
+                if (event.key === 'ArrowLeft') {
+                    if (isSelectionInFirstTextLineState(view, state) && view.endOfTextblock('left') && onRequestFocusTitle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onRequestFocusTitle({ mode: 'end' });
+                        return true;
+                    }
+                    return false;
+                }
 
                 const scrollContainer = findScrollableAncestor(view.dom as HTMLElement);
                 if (!scrollContainer) return false;
@@ -637,6 +725,33 @@ export default function TiptapEditor({
     useEffect(() => {
         emitShortcutState(editor);
     }, [editor, emitShortcutState]);
+
+    const focusBody = useCallback((offset?: number | null) => {
+        if (!editor) return;
+        const view = editor.view;
+        view.focus();
+        const { state, dispatch } = view;
+        if (typeof offset === 'number' && Number.isFinite(offset)) {
+            if (setCursorInLeadingTextblockWithOffset(state, dispatch, offset)) return;
+        }
+        setSelectionAtDocStart(state, dispatch);
+    }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
+
+    useEffect(() => {
+        if (!onRegisterBodyBridge) return;
+        if (!editor) {
+            onRegisterBodyBridge(null);
+            return;
+        }
+
+        onRegisterBodyBridge({
+            focusBody: (offset?: number | null) => focusBody(offset),
+        });
+
+        return () => {
+            onRegisterBodyBridge(null);
+        };
+    }, [editor, focusBody, onRegisterBodyBridge]);
 
     const handleCopyCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         if (!editor || !event.clipboardData || !editor.isEditable) return;

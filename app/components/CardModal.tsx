@@ -4,7 +4,9 @@ import { useEffect, useRef, useCallback, useMemo, useLayoutEffect, useState } fr
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, {
+    BodyEditorBridge,
     BodyEditorShortcutState,
+    FocusTitleRequest,
 } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
@@ -130,6 +132,7 @@ export function CardModal({
         canOutdent: false,
     });
 
+    const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
     const {
@@ -317,6 +320,23 @@ export function CardModal({
         setMemberSearch,
     });
 
+    const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
+        bodyBridgeRef.current = bridge;
+    }, []);
+
+    const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
+        const input = titleInputRef.current;
+        if (!input) return;
+
+        input.focus();
+        const maxLength = input.value.length;
+        const nextPos =
+            request.mode === "end"
+                ? maxLength
+                : Math.min(Math.max(request.column ?? maxLength, 0), maxLength);
+        input.setSelectionRange(nextPos, nextPos);
+    }, []);
+
     const resizeTitleInput = useCallback(() => {
         const input = titleInputRef.current;
         if (!input) return;
@@ -373,7 +393,29 @@ export function CardModal({
         }
 
         if (isImeComposing) return;
-    }, [isHistoryPreviewing]);
+
+        const bridge = bodyBridgeRef.current;
+        if (!bridge) return;
+
+        const input = event.currentTarget;
+        const selectionStart = input.selectionStart;
+        const selectionEnd = input.selectionEnd;
+        if (selectionStart == null || selectionEnd == null || selectionStart !== selectionEnd) {
+            return;
+        }
+
+        if (event.key === "ArrowRight" && selectionStart !== title.length) {
+            return;
+        }
+
+        if (event.key !== "ArrowDown" && event.key !== "ArrowRight") {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        bridge.focusBody(event.key === "ArrowDown" ? selectionStart : 0);
+    }, [isHistoryPreviewing, title.length]);
 
     const handleAddMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
@@ -801,6 +843,8 @@ export function CardModal({
                                                     boardId={card.board_id}
                                                     cardId={card.id}
                                                     onEditorError={setEditorError}
+                                                    onRegisterBodyBridge={handleRegisterBodyBridge}
+                                                    onRequestFocusTitle={handleRequestFocusTitle}
                                                     onShortcutStateChange={setBodyShortcutState}
                                                     onChange={(val) => {
                                                         if (isHistoryPreviewing) return;

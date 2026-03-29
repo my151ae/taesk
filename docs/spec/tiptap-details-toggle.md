@@ -78,6 +78,7 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
 
 - タイトル/本文境界のキーボード責務は [docs/spec/keyboard-navigation.md](/Users/yossydie/dev/taesk/docs/spec/keyboard-navigation.md) を正とする
 - `details` 内部の Enter / Backspace / Arrow 補正は本文内部挙動として扱う
+- title から本文への `ArrowDown` / `ArrowRight` と、本文先頭から title へ戻る `ArrowUp` / `ArrowLeft` は `details` 導入後も変えない
 
 ## 7. テスト観点
 

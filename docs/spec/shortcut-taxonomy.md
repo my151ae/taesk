@@ -124,6 +124,18 @@ MVP では主に `active` と `readonly` を使う。
 - main-panel なら `activeView`
 - card open source など、呼び出し元が既に知っている文脈
 
+## Modal Boundary Rules
+
+CardModal の title/body 境界は矢印キーによる focus-only とする。
+
+- title -> body: `ArrowDown`
+- title -> body start: `ArrowRight`
+- body -> title: `ArrowUp`
+- body -> title end: `ArrowLeft`
+- title の `Enter` は境界移動や構造変換を行わない
+
+詳細は [keyboard-navigation.md](./keyboard-navigation.md) を参照。
+
 ## Registry Notes
 
 - registry は shortcut 表示定義の SSOT
