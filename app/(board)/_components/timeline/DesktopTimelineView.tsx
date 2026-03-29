@@ -33,6 +33,7 @@ import {
   formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
+import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
 const ALL_DAY_ROW_HEIGHT = 24;
 
@@ -63,6 +64,7 @@ export type DesktopTimelineViewProps = {
   handleEventKeyDown: (event: TimelineEvent, native: React.KeyboardEvent<HTMLElement>) => void;
   handleColumnClick: (day: TimelineDay, minutes: number) => void;
   onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
+  onRequestCreateBucketCard: (request: BucketCreateRequest) => void;
   handleResizeStart: (e: React.PointerEvent, cardId: string, startMinutes: number, duration: number, edge: "top" | "bottom") => void;
   handleResizeMove: (e: React.PointerEvent) => void;
   handleResizeEnd: (e: React.PointerEvent) => void;
@@ -208,6 +210,7 @@ export function DesktopTimelineView({
   handleEventKeyDown,
   handleColumnClick,
   onCreateBucketCard,
+  onRequestCreateBucketCard,
   handleResizeStart,
   handleResizeMove,
   handleResizeEnd,
@@ -513,6 +516,7 @@ export function DesktopTimelineView({
                     bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
                     bucketIndicator={bucketIndicator}
                     onCreateBucketCard={onCreateBucketCard}
+                    onRequestCreateBucketCard={onRequestCreateBucketCard}
                     viewportHeight={abViewportHeight}
                     registerAbScrollContainer={registerAbScrollContainer}
                     floatingLayerTop={floatingLayerTop}

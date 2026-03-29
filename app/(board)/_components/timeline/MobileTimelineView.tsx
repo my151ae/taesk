@@ -29,6 +29,7 @@ import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/ti
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
+import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import {
   useTimelineZoomStore,
@@ -409,6 +410,7 @@ function MobileAbBucket({
   bucketKey,
   items,
   openCardModal,
+  onRequestCreateBucketCard,
   onCreateBucketCard,
   onToggleCheck,
   bucketIndicator,
@@ -420,6 +422,7 @@ function MobileAbBucket({
   bucketKey: string;
   items: TimelineBucketItem[];
   openCardModal: (shortId: string | null, source: string) => void;
+  onRequestCreateBucketCard: (request: BucketCreateRequest) => void;
   onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
@@ -471,13 +474,23 @@ function MobileAbBucket({
         {items.length === 0 ? (
           renderAddButton("bottom", (e) => {
             e.stopPropagation();
-            onCreateBucketCard(bucketKey);
+            onRequestCreateBucketCard({
+              bucketKey,
+              clientX: e.clientX,
+              clientY: e.clientY,
+              anchorRect: e.currentTarget.getBoundingClientRect(),
+            });
           })
         ) : (
           <>
             {renderAddButton("top", (e) => {
               e.stopPropagation();
-              onCreateBucketCard(bucketKey);
+              onRequestCreateBucketCard({
+                bucketKey,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                anchorRect: e.currentTarget.getBoundingClientRect(),
+              });
             })}
             {items.map((item) => (
               <Fragment key={item.card_id}>
@@ -493,7 +506,13 @@ function MobileAbBucket({
                 />
                 {renderAddButton("bottom", (e) => {
                   e.stopPropagation();
-                  onCreateBucketCard(bucketKey, item.card_id);
+                  onRequestCreateBucketCard({
+                    bucketKey,
+                    afterCardId: item.card_id,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    anchorRect: e.currentTarget.getBoundingClientRect(),
+                  });
                 })}
               </Fragment>
             ))}
@@ -523,6 +542,7 @@ type MobileTimelineViewProps = {
   timelineViewportHeight: number;
   openCardModal: (shortId: string | null, source: string) => void;
   onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
+  onRequestCreateBucketCard: (request: BucketCreateRequest) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   status: string;
   activeDrag: DragAndDropBindings["activeDrag"];
@@ -562,6 +582,7 @@ export default function MobileTimelineView({
   timelineViewportHeight,
   openCardModal,
   onCreateBucketCard,
+  onRequestCreateBucketCard,
   onToggleCheck,
   status,
   sensors,
@@ -885,6 +906,7 @@ export default function MobileTimelineView({
                       bucketKey={section.bucket}
                       items={items}
                       openCardModal={openCardModal}
+                      onRequestCreateBucketCard={onRequestCreateBucketCard}
                       onCreateBucketCard={onCreateBucketCard}
                       onToggleCheck={onToggleCheck}
                       bucketIndicator={bucketIndicator}

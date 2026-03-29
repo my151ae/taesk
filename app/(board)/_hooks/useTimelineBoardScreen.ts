@@ -21,13 +21,14 @@ import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoar
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
+import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
 export type TimelineBoardScreenContentProps = Omit<
   TimelineBoardScreenProps,
-  "parseResult" | "onResetInvalidUrl" | "onMoveToCanonicalUrl"
+  "parseResult" | "onResetInvalidUrl" | "onMoveToCanonicalUrl" | "bucketCreateMenu"
 >;
 
 type UseTimelineBoardScreenArgs = {
@@ -100,6 +101,7 @@ type UseTimelineBoardScreenArgs = {
   handleEventKeyDown: DragAndDropBindings["handleEventKeyDown"];
   handleColumnClick: (day: TimelineResponse["days"][number], minutes: number) => void;
   handleBucketClick: (bucketKey: string, afterCardId?: string) => void;
+  handleBucketCreateRequest: (request: BucketCreateRequest) => void;
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -245,6 +247,7 @@ export function useTimelineBoardScreen({
   handleEventKeyDown,
   handleColumnClick,
   handleBucketClick,
+  handleBucketCreateRequest,
   sensors,
   handleDragStart,
   handleDragMove,
@@ -378,6 +381,7 @@ export function useTimelineBoardScreen({
     handleEventKeyDown,
     handleColumnClick,
     handleBucketClick,
+    handleBucketCreateRequest,
     sensors,
     handleDragStart,
     handleDragMove,

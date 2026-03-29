@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import type { BucketCreateRequest } from './bucket-create-request';
 import { TimelineBucketCard } from './TimelineBucketCard';
 import {
     TimelineCard,
@@ -28,6 +29,7 @@ type TimelineDayBucketProps = {
     onToggleCheck: (cardId: string, checked: boolean) => void;
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
+    onRequestCreateBucketCard?: (request: BucketCreateRequest) => void;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
@@ -456,6 +458,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onToggleCheck,
     bucketIndicator,
     onCreateBucketCard,
+    onRequestCreateBucketCard,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
@@ -738,7 +741,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             ) : null}
             <button
                 type="button"
-                disabled={status === 'loading' || !onCreateBucketCard}
+                disabled={status === 'loading' || !onRequestCreateBucketCard}
                 tabIndex={-1}
                 data-arrow-skip="true"
                 onClick={onClick}
@@ -767,12 +770,17 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     }) => (
         <button
             type="button"
-            disabled={status === 'loading' || !onCreateBucketCard}
+            disabled={status === 'loading' || !onRequestCreateBucketCard}
             tabIndex={-1}
             data-arrow-skip="true"
             onClick={(e) => {
                 e.stopPropagation();
-                onCreateBucketCard?.(bucketKey);
+                onRequestCreateBucketCard?.({
+                    bucketKey,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    anchorRect: e.currentTarget.getBoundingClientRect(),
+                });
             }}
             className={clsx(
                 'mx-2 flex h-8 w-[calc(100%-16px)] items-center justify-center rounded-md border border-dashed px-3 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
@@ -884,7 +892,12 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                         'md:pointer-events-none md:opacity-0 md:group-hover/section:pointer-events-auto md:group-hover/section:opacity-100 md:group-focus-within/section:pointer-events-auto md:group-focus-within/section:opacity-100',
                     onClick: (e) => {
                         e.stopPropagation();
-                        onCreateBucketCard?.(bucketKey);
+                        onRequestCreateBucketCard?.({
+                            bucketKey,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                            anchorRect: e.currentTarget.getBoundingClientRect(),
+                        });
                     },
                 })
             ) : null}
@@ -922,7 +935,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                 'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',
                             onClick: (e) => {
                                 e.stopPropagation();
-                                onCreateBucketCard?.(bucketKey, item.card_id);
+                                onRequestCreateBucketCard?.({
+                                    bucketKey,
+                                    afterCardId: item.card_id,
+                                    clientX: e.clientX,
+                                    clientY: e.clientY,
+                                    anchorRect: e.currentTarget.getBoundingClientRect(),
+                                });
                             },
                         })}
                     </div>

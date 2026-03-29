@@ -2,6 +2,7 @@ import { memo, type Dispatch, type SetStateAction } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { TimelineColumn } from './TimelineColumn';
 import { TimelineDayBucket } from './TimelineDayBucket';
+import type { BucketCreateRequest } from './bucket-create-request';
 import type {
     TimelineDay,
     TimelineEvent,
@@ -46,6 +47,7 @@ type DaySectionProps = {
     bucketsB: readonly TimelineBucketItem[];
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
+    onRequestCreateBucketCard?: (request: BucketCreateRequest) => void;
     viewportHeight?: number;
     registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
     floatingLayerTop: number;
@@ -98,6 +100,7 @@ export const DaySection = memo(function DaySection({
     bucketsB,
     bucketIndicator,
     onCreateBucketCard,
+    onRequestCreateBucketCard,
     viewportHeight,
     registerAbScrollContainer,
     floatingLayerTop,
@@ -180,6 +183,7 @@ export const DaySection = memo(function DaySection({
                         onToggleCheck={onToggleCheck}
                         bucketIndicator={bucketIndicator}
                         onCreateBucketCard={onCreateBucketCard}
+                        onRequestCreateBucketCard={onRequestCreateBucketCard}
                         onCardContextMenu={onCardContextMenu}
                         onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                         contextMenuCardId={contextMenuCardId}

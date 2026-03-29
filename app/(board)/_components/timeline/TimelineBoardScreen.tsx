@@ -108,6 +108,17 @@ export type TimelineBoardScreenProps = {
         open: false;
         cardId: string | null;
       };
+  bucketCreateMenu:
+    | {
+        open: true;
+        x: number;
+        y: number;
+        items: CardContextMenuProps["items"];
+        onClose: CardContextMenuProps["onClose"];
+      }
+    | {
+        open: false;
+      };
 };
 
 export default function TimelineBoardScreen({
@@ -123,6 +134,7 @@ export default function TimelineBoardScreen({
   modalProps,
   cardModalError,
   contextMenu,
+  bucketCreateMenu,
 }: TimelineBoardScreenProps) {
   const desktopScopeRef = useRef<HTMLDivElement | null>(null);
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
@@ -403,6 +415,14 @@ export default function TimelineBoardScreen({
             y={contextMenu.y}
             onClose={contextMenu.onClose}
             items={contextMenu.items}
+          />
+        ) : null}
+        {bucketCreateMenu.open ? (
+          <CardContextMenu
+            x={bucketCreateMenu.x}
+            y={bucketCreateMenu.y}
+            onClose={bucketCreateMenu.onClose}
+            items={bucketCreateMenu.items}
           />
         ) : null}
       </div>

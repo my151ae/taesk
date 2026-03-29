@@ -45,6 +45,8 @@ export const useTimelineScrollSync = ({
   const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const lastScrollRestoreKeyRef = useRef<string | null>(null);
   const scrollRestoreAttemptRef = useRef(0);
+  const autoScrollAttemptRef = useRef(0);
+  const initialOpenScrollDoneRef = useRef(false);
   const programmaticScrollRef = useRef(false);
 
   const useDebounce = <TArgs extends unknown[]>(callback: (...args: TArgs) => void, delay: number) => {
@@ -85,7 +87,13 @@ export const useTimelineScrollSync = ({
     return timeMinutes;
   }, [urlTime]);
 
+  const shouldPreferNowIndicatorOnOpen =
+    !initialOpenScrollDoneRef.current &&
+    isTimelineViewMounted &&
+    indicatorMinutes != null;
+
   useEffect(() => {
+    if (shouldPreferNowIndicatorOnOpen) return;
     if (urlTimeMinutes == null || !timelineScrollRef.current || !isTimelineViewMounted) return;
 
     const restoreKey = `${urlDate ?? ""}|${urlRange ?? ""}|${urlTimeMinutes}`;
@@ -135,31 +143,61 @@ export const useTimelineScrollSync = ({
       cancelled = true;
       programmaticScrollRef.current = false;
     };
-  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, timelineStartHour, hourHeight]);
+  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
   useEffect(() => {
-    if (urlTime != null) {
+    if (!shouldPreferNowIndicatorOnOpen && urlTime != null) {
       if (!hasAutoScrolled) setHasAutoScrolled(true);
       return;
     }
 
     if (!isTimelineViewMounted || !timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
 
-    const container = timelineScrollRef.current;
-    const target = minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight) - container.clientHeight / 2;
-    const clampedTop = Math.max(0, Math.min(target, container.scrollHeight - container.clientHeight));
+    autoScrollAttemptRef.current = 0;
+    let cancelled = false;
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+    const tryCenterNowIndicator = () => {
+      if (cancelled) return;
+      const container = timelineScrollRef.current;
+      if (!container) return;
+
+      const desiredTop = minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight) - container.clientHeight / 2;
+      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const clampedTop = Math.max(0, Math.min(desiredTop, maxTop));
+
+      if (Math.abs(container.scrollTop - clampedTop) >= 2) {
+        container.scrollTo({ top: clampedTop, behavior: "auto" });
+      }
+
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const isCloseEnough = Math.abs(container.scrollTop - clampedTop) < 2;
+      if (isCloseEnough) {
+        initialOpenScrollDoneRef.current = true;
+        programmaticScrollRef.current = false;
+        setHasAutoScrolled(true);
+        return;
+      }
+
+      autoScrollAttemptRef.current += 1;
+      const timedOut = now - startedAt > 3000;
+      if (!timedOut && autoScrollAttemptRef.current <= 180) {
+        requestAnimationFrame(tryCenterNowIndicator);
+        return;
+      }
+
+      initialOpenScrollDoneRef.current = true;
+      programmaticScrollRef.current = false;
+      setHasAutoScrolled(true);
+    };
 
     programmaticScrollRef.current = true;
-    container.scrollTo({
-      top: clampedTop,
-      behavior: "auto",
-    });
-
-    requestAnimationFrame(() => {
+    requestAnimationFrame(tryCenterNowIndicator);
+    return () => {
+      cancelled = true;
       programmaticScrollRef.current = false;
-    });
-    setHasAutoScrolled(true);
-  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, timelineStartHour, hourHeight]);
+    };
+  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
   const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode });
   stateRef.current = { data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode };

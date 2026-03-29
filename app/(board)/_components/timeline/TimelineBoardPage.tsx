@@ -11,6 +11,7 @@ import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
 import { type SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
   type TimelineEvent,
@@ -262,6 +263,30 @@ function TimelineBoardPageContent({
       serverNow: data?.serverNow,
       hourHeight,
     });
+  const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
+  const indicatorTop =
+    indicatorMinutes != null
+      ? minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight)
+      : null;
+  const {
+    timelineScrollRef,
+    desktopTimelineScrollRef,
+    mobileTimelineScrollRef,
+    debouncedHandleScroll,
+    handleTimelineViewMount,
+  } = useTimelineScrollSync({
+    viewMode,
+    urlDate: resolvedState.view === "timeline" ? resolvedState.date : null,
+    urlRange: resolvedState.view === "timeline" ? resolvedState.timelineRange : null,
+    urlTime: resolvedState.view === "timeline" ? resolvedState.time : null,
+    data,
+    activeDayIndex,
+    dayRange: timelineRange,
+    indicatorMinutes,
+    updateUrlForTimeline,
+    timelineStartHour,
+    hourHeight,
+  });
 
   const { searchQuery, setSearchQuery, filteredData, searchResults } = useTimelineFiltering(data);
   const sortedFilteredData = useMemo(() => {
@@ -344,18 +369,26 @@ function TimelineBoardPageContent({
     openCardContextMenu(cardId, rect.right + 8, rect.top);
   }, [openCardContextMenu]);
 
+  const closeBucketCreateMenu = useCallback(() => {
+    setBucketCreateMenu((prev) => (prev.open
+      ? { open: false, bucketKey: null, x: 0, y: 0 }
+      : prev));
+  }, []);
+
+  const handleBucketCreateRequest = useCallback((request: BucketCreateRequest) => {
+    closeContextMenu("dismiss");
+    const x = request.clientX ?? request.anchorRect?.left ?? 0;
+    const y = request.clientY ?? request.anchorRect?.bottom ?? request.anchorRect?.top ?? 0;
+    setBucketCreateMenu({
+      open: true,
+      bucketKey: request.bucketKey,
+      afterCardId: request.afterCardId,
+      x,
+      y,
+    });
+  }, [closeContextMenu]);
+
   const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
-  const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
-  const timelineScrollRef = useMemo(
-    () =>
-      ({
-        get current() {
-          return desktopTimelineScrollRef.current || mobileTimelineScrollRef.current;
-        },
-      }) as React.RefObject<HTMLDivElement>,
-    [],
-  );
 
   const {
     handlePrevDay,
@@ -454,6 +487,29 @@ function TimelineBoardPageContent({
     data,
   });
 
+  const [bucketCreateMenu, setBucketCreateMenu] = useState<{
+    open: boolean;
+    bucketKey: string | null;
+    afterCardId?: string;
+    x: number;
+    y: number;
+  }>({
+    open: false,
+    bucketKey: null,
+    x: 0,
+    y: 0,
+  });
+
+  const confirmBucketCardCreation = useCallback(() => {
+    setBucketCreateMenu((prev) => {
+      if (!(prev.open && prev.bucketKey)) {
+        return prev;
+      }
+      handleBucketClick(prev.bucketKey, prev.afterCardId);
+      return { open: false, bucketKey: null, x: 0, y: 0 };
+    });
+  }, [handleBucketClick]);
+
   const handleGoogleConnect = useCallback(() => {
     if (typeof window === "undefined") return;
     window.location.href = "/api/integrations/google-calendar/connect";
@@ -482,26 +538,6 @@ function TimelineBoardPageContent({
     abScrollContainersRef,
     bucketDayMap,
     dataMode,
-    timelineStartHour,
-    hourHeight,
-  });
-
-  const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
-  const indicatorTop =
-    indicatorMinutes != null
-      ? minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight)
-      : null;
-
-  const { debouncedHandleScroll, handleTimelineViewMount } = useTimelineScrollSync({
-    viewMode,
-    urlDate: resolvedState.view === "timeline" ? resolvedState.date : null,
-    urlRange: resolvedState.view === "timeline" ? resolvedState.timelineRange : null,
-    urlTime: resolvedState.view === "timeline" ? resolvedState.time : null,
-    data,
-    activeDayIndex,
-    dayRange: timelineRange,
-    indicatorMinutes,
-    updateUrlForTimeline,
     timelineStartHour,
     hourHeight,
   });
@@ -673,6 +709,7 @@ function TimelineBoardPageContent({
     handleEventKeyDown,
     handleColumnClick,
     handleBucketClick,
+    handleBucketCreateRequest,
     sensors,
     handleDragStart,
     handleDragMove,
@@ -754,6 +791,20 @@ function TimelineBoardPageContent({
               onClose: closeContextMenu,
             }
           : screen.contextMenu
+      }
+      bucketCreateMenu={
+        bucketCreateMenu.open
+          ? {
+              open: true,
+              x: bucketCreateMenu.x,
+              y: bucketCreateMenu.y,
+              items: [
+                { label: "追加", onClick: confirmBucketCardCreation },
+                { label: "キャンセル", onClick: closeBucketCreateMenu },
+              ],
+              onClose: () => closeBucketCreateMenu(),
+            }
+          : { open: false }
       }
     />
   );

@@ -38,6 +38,7 @@ import type {
   DesktopListToolbarProps,
   DesktopListViewProps,
 } from "@/app/(board)/_components/timeline/DesktopListView";
+import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import { useDesktopListState } from "@/app/(board)/_hooks/useDesktopListState";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -89,6 +90,7 @@ type UseTimelineBoardViewModelsArgs = {
   handleEventKeyDown: (event: TimelineEvent, native: KeyboardEvent<HTMLElement>) => void;
   handleColumnClick: (day: TimelineDay, minutes: number) => void;
   handleBucketClick: (bucketKey: string, afterCardId?: string) => void;
+  handleBucketCreateRequest: (request: BucketCreateRequest) => void;
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -229,6 +231,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       handleEventKeyDown: args.handleEventKeyDown,
       handleColumnClick: args.handleColumnClick,
       onCreateBucketCard: args.handleBucketClick,
+      onRequestCreateBucketCard: args.handleBucketCreateRequest,
       sensors: args.sensors,
       handleDragStart: args.handleDragStart,
       handleDragMove: args.handleDragMove,
@@ -277,6 +280,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.handleEventKeyDown,
       args.handleColumnClick,
       args.handleBucketClick,
+      args.handleBucketCreateRequest,
       args.sensors,
       args.handleDragStart,
       args.handleDragMove,
@@ -399,6 +403,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       timelineViewportHeight: args.timelineViewportHeight,
       openCardModal: args.openCardModal,
       onCreateBucketCard: args.handleBucketClick,
+      onRequestCreateBucketCard: args.handleBucketCreateRequest,
       onToggleCheck: args.handleToggleCardChecked,
       status: args.status,
       activeDrag: args.activeDrag,
