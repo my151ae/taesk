@@ -13,7 +13,8 @@ Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中
   - `liveNowMinutes`, `liveNowIsoDate`: JST に変換した現在時刻
   - `availableBoards`: ボード切り替え用リスト
   - `modalCard`, `cardModalStatus`, `modalProfiles`: CardModal のロード状態
-  - `searchQuery`, `selectedTags`, `sortBy`, `showFilters`, `filteredData`, `hasActiveFilters`, `availableTags`: `useTimelineFiltering`（内部で `useBoardFilters`）で管理
+  - `searchQuery`, `sortBy`, `showFilters`, `filteredData`, `hasActiveFilters`, `availableTags`, `tagSummaries`: `useTimelineFiltering`（内部で `useBoardFilters`）で管理
+  - `selectedTags`: 左パネル `Tag` セクション専用 state として `TimelineBoardPage` から右パネルへ渡す。`Timeline` / 通常 `List` には影響させない
   - `realtimeStatus`: `useTimelineData` 経由で `useRealtimeBoard` が提供
 
 ### 描画構造（抜粋）
@@ -42,7 +43,7 @@ TimelineBoardPage
 ### Header
 
 - ボード選択: `/api/boards` から取得したリストをフライアウトとして表示。`signOut` ボタンも同じメニュー内に配置。
-- フィルター: `useTimelineFiltering` の状態を双方向バインドし、タグ・優先度・ソート順を切り替えると Timeline / A/B のレンダリング内容が更新される。
+- フィルター: `useTimelineFiltering` は検索や補助情報を管理する。左パネル由来の専用 state は各セクションで分離し、`Tag` の選択は Tag 右パネルにのみ反映する。
 - 通知関連: `NotificationsBell` と `NotificationSettings` は `app/(board)/_components/` 配下の共通コンポーネントをそのまま利用。Timeline ヘッダー内にモーダルを開く導線を提供する。
 - Sync インジケーター: 現状は `realtimeStatus` のみを表示。
 
@@ -59,7 +60,7 @@ TimelineBoardPage
 ### A/B Lists
 
 - `buildAbMeta` により表示中の日付ごとに `A/B` セクションを生成し、キーは `${isoDate}_a` / `${isoDate}_b` を使用する。
-- `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタし、タグ/優先度検索に合わせて表示リストを更新。
+- `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタするのは、共通の board 表示に関わる条件のみ。左パネル `Tag` セクションの選択状態はここへ混ぜない。
 - ドラッグ対象として `useDroppable` を設定し、 `bucketPosition` を使って降順ソート。
 
 ### CardModal & CommentsPanel
@@ -114,7 +115,7 @@ interface ActiveDragState {
 
 | Hook / Store | 役割 | 主な戻り値 |
 | --- | --- | --- |
-| `useTimelineFiltering` | 検索・タグ・並び順を管理。Timeline と A/B を同時にフィルタ。 | `searchQuery`, `selectedTags`, `setSortBy`, `filteredData`, `hasActiveFilters`, `availableTags` |
+| `useTimelineFiltering` | 検索・並び順・タグ補助情報を管理。共通 board 表示に必要なデータを返す。 | `searchQuery`, `filteredData`, `hasActiveFilters`, `availableTags`, `tagSummaries` |
 | `useRealtimeBoard(boardId, callbacks)` | Supabase Realtime (cards/comments) を購読し、差分を UI に反映 | `{ realtimeStatus }` |
 | `useSyncQueue()` | オフラインキュー (`taesk-sync-queue`) を監視し、オンライン状態と統計を返す | `{ isOnline, syncQueueStats }` |
 | `useCommentsStore()` | コメントリストと pending キューを管理。Realtime からの upsert/delete も反映 | `fetchComments`, `upsertComment`, `removeComment`, `pendingCount` |

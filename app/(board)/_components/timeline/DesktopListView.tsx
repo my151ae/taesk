@@ -257,6 +257,10 @@ export function DesktopListView({
     });
 
     return allItems
+      .filter(({ item }) => {
+        if (!selectedTag) return true;
+        return (item.tags ?? []).includes(selectedTag);
+      })
       .filter(({ item }) => (item.checked ? showChecked : showUnchecked))
       .sort((left, right) => {
         const leftDate = left.item.due_date ?? "9999-12-31";
@@ -272,7 +276,7 @@ export function DesktopListView({
 
         return (left.item.title ?? "").localeCompare(right.item.title ?? "");
       });
-  }, [variant, eventsByDay, abBuckets, overdue, showChecked, showUnchecked]);
+  }, [variant, selectedTag, eventsByDay, abBuckets, overdue, showChecked, showUnchecked]);
 
   const daysWithEvents = useMemo(() => {
     return days.filter((day) => {

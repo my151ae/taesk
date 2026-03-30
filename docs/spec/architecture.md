@@ -130,8 +130,9 @@ app/layout.tsx
 - Timeline と A/B の drop、event resize、drag overlay 用の導出値を 1 箇所で管理する。
 
 ### useTimelineFiltering
-- `searchQuery`, `selectedTags`, `sortBy`, `showFilters` を管理し、`events` と `abBuckets` を同時にフィルタする。
-- 内部で `useBoardFilters` を利用し、`availableTags` / `hasActiveFilters` などの補助情報も返す。
+- `searchQuery`, `sortBy`, `showFilters` を管理し、共通 board 表示向けの `events` / `abBuckets` / `overdue` を返す。
+- 内部で `useBoardFilters` を利用し、`availableTags` / `tagSummaries` / `hasActiveFilters` などの補助情報も返す。
+- 左パネルごとの専用 state はここへ混ぜず、`Tag` の選択状態は右パネル Tag 表示専用として別管理する。
 
 ### useCommentsStore
 - コメントとそのローカルキュー (`comment-queue`) を Zustand で管理。

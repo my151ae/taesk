@@ -31,12 +31,6 @@ export type TimelineTagSummary = {
     count: number;
 };
 
-const matchesSelectedTags = (item: FilterableTimelineItem, selectedTags: string[]) => {
-    if (selectedTags.length === 0) return true;
-    const tagSet = new Set(item.tags ?? []);
-    return selectedTags.every((tag: string) => tagSet.has(tag));
-};
-
 const matchesSearchQuery = (item: FilterableTimelineItem, searchQuery: string) => {
     if (!searchQuery.trim()) return true;
 
@@ -81,24 +75,8 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
 
     const filteredData = useMemo(() => {
         if (!data) return null;
-        const filterItem = (item: FilterableTimelineItem) => matchesSelectedTags(item, selectedTags);
-
-        const filteredEvents = data.events.filter((event) => filterItem(event));
-
-        const filteredBuckets = Object.entries(data.abBuckets).reduce((acc, [key, items]) => {
-            acc[key] = items.filter((item) => filterItem(item));
-            return acc;
-        }, {} as Record<string, TimelineBucketItem[]>);
-
-        const filteredOverdue = data.overdue.filter((item: TimelineOverdueItem) => filterItem(item));
-
-        return {
-            ...data,
-            events: filteredEvents,
-            abBuckets: filteredBuckets,
-            overdue: filteredOverdue,
-        };
-    }, [data, selectedTags]);
+        return data;
+    }, [data]);
 
     const searchResults = useMemo(() => {
         if (!data || !searchQuery.trim()) return [] as TimelineSearchResultItem[];
@@ -151,8 +129,8 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
     }, [data, searchQuery]);
 
     const hasActiveFilters = useMemo(() => {
-        return searchQuery.trim() !== '' || selectedTags.length > 0;
-    }, [searchQuery, selectedTags]);
+        return searchQuery.trim() !== '';
+    }, [searchQuery]);
 
     const availableTags = useMemo(() => {
         const tags = new Set<string>();
