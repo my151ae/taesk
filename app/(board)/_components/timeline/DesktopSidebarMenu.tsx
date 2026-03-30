@@ -9,21 +9,24 @@ import {
 } from "@/app/(board)/_components/timeline/TimelineCard";
 import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
-import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
+import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
-export type SidebarSectionKey = "overdue" | "search";
+export type SidebarSectionKey = "overdue" | "search" | "tags";
 type SidebarSectionTone = "danger" | "neutral";
 
 export type DesktopSidebarMenuState = {
   expandedSectionKey: SidebarSectionKey | null;
   searchQuery: string;
+  selectedTags: readonly string[];
 };
 
 export type DesktopSidebarMenuActions = {
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
   onSearchQueryChange: (value: string) => void;
+  onTagToggle: (value: string) => void;
+  onTagClear: () => void;
 };
 
 export type DesktopSidebarSection =
@@ -42,6 +45,14 @@ export type DesktopSidebarSection =
       label: string;
       count: number;
       results: readonly TimelineSearchResultItem[];
+    }
+  | {
+      key: "tags";
+      tone: "neutral";
+      id: string;
+      label: string;
+      count: number;
+      tags: readonly TimelineTagSummary[];
     };
 
 type DesktopSidebarMenuProps = {
@@ -116,6 +127,15 @@ function SearchIcon() {
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <circle cx="11" cy="11" r="6" />
       <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-4.2-4.2" />
+    </svg>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 5h7l2 2v7l-8 8-6-6 8-8Z" />
+      <circle cx="14.5" cy="9.5" r="1.25" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -339,6 +359,8 @@ export function DesktopSidebarMenu({
         return <OverdueIcon />;
       case "search":
         return <SearchIcon />;
+      case "tags":
+        return <TagIcon />;
       default:
         return null;
     }
@@ -397,56 +419,111 @@ export function DesktopSidebarMenu({
       );
     }
 
-    return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="border-b border-slate-200/80 bg-slate-50 px-2 py-2">
-          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-            <input
-              type="text"
-              value={state.searchQuery}
-              onChange={(event) => actions.onSearchQueryChange(event.target.value)}
-              placeholder="Search cards..."
-              className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-              data-testid="desktop-sidebar-search-input"
-              data-shortcut-scope="board"
-              data-shortcut-region="sidebar"
-              data-shortcut-section="search"
-            />
+    if (section.key === "search") {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="border-b border-slate-200/80 bg-slate-50 px-2 py-2">
+            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <input
+                type="text"
+                value={state.searchQuery}
+                onChange={(event) => actions.onSearchQueryChange(event.target.value)}
+                placeholder="Search cards..."
+                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                data-testid="desktop-sidebar-search-input"
+                data-shortcut-scope="board"
+                data-shortcut-region="sidebar"
+                data-shortcut-section="search"
+              />
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+            {!state.searchQuery.trim() ? (
+              <div className="px-3 py-4">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                  キーワードを入れると該当カードをここに一覧表示します
+                </p>
+              </div>
+            ) : section.results.length === 0 ? (
+              <div className="px-3 py-4">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                  一致するカードはありません
+                </p>
+              </div>
+            ) : (
+              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
+                {section.results.map((result) => (
+                  <SidebarCardRow
+                    key={`${result.kind}:${result.item.card_id}`}
+                    item={result.item}
+                    badgeLabel={result.badgeLabel}
+                    timeText={result.timeText}
+                    openSource="search"
+                    shortcutSection="search"
+                    testId={`search-card-${result.kind}-${result.item.card_id}`}
+                    className="bg-white"
+                    onToggleCheck={onToggleCheck}
+                    openCardModal={openCardModal}
+                    onCardContextMenu={onCardContextMenu}
+                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                    isContextMenuOpen={contextMenuCardId === result.item.card_id}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
+      );
+    }
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-          {!state.searchQuery.trim() ? (
-            <div className="px-3 py-4">
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50 px-3 py-2">
+          <p className="text-[11px] font-medium text-slate-500">
+            {state.selectedTags.length > 0 ? `${state.selectedTags.length} 件選択中` : "タグで絞り込めます"}
+          </p>
+          <button
+            type="button"
+            onClick={actions.onTagClear}
+            disabled={state.selectedTags.length === 0}
+            className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+          {section.tags.length === 0 ? (
+            <div className="px-1 py-2">
               <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                キーワードを入れると該当カードをここに一覧表示します
-              </p>
-            </div>
-          ) : section.results.length === 0 ? (
-            <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                一致するカードはありません
+                利用できるタグはまだありません
               </p>
             </div>
           ) : (
-            <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-              {section.results.map((result) => (
-                <SidebarCardRow
-                  key={`${result.kind}:${result.item.card_id}`}
-                  item={result.item}
-                  badgeLabel={result.badgeLabel}
-                  timeText={result.timeText}
-                  openSource="search"
-                  shortcutSection="search"
-                  testId={`search-card-${result.kind}-${result.item.card_id}`}
-                  className="bg-white"
-                  onToggleCheck={onToggleCheck}
-                  openCardModal={openCardModal}
-                  onCardContextMenu={onCardContextMenu}
-                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                  isContextMenuOpen={contextMenuCardId === result.item.card_id}
-                />
-              ))}
+            <div className="space-y-1">
+              {section.tags.map((tag) => {
+                const selected = state.selectedTags.includes(tag.name);
+                return (
+                  <button
+                    key={tag.name}
+                    type="button"
+                    onClick={() => actions.onTagToggle(tag.name)}
+                    data-testid={`desktop-sidebar-tag-${tag.name}`}
+                    className={clsx(
+                      "flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left transition",
+                      selected
+                        ? "border-slate-300 bg-white text-slate-900 shadow-sm"
+                        : "border-transparent bg-white/60 text-slate-700 hover:border-slate-200 hover:bg-white"
+                    )}
+                  >
+                    <span className="min-w-0 truncate text-sm font-medium">#{tag.name}</span>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                      {tag.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

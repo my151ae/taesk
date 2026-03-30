@@ -282,7 +282,15 @@ function TimelineBoardPageContent({
     hourHeight,
   });
 
-  const { searchQuery, setSearchQuery, filteredData, searchResults } = useTimelineFiltering(data);
+  const {
+    searchQuery,
+    setSearchQuery,
+    filteredData,
+    searchResults,
+    selectedTags,
+    setSelectedTags,
+    tagSummaries,
+  } = useTimelineFiltering(data);
   const sortedFilteredData = useMemo(() => {
     if (!filteredData) return null;
     return {
@@ -696,6 +704,9 @@ function TimelineBoardPageContent({
     searchQuery,
     setSearchQuery,
     searchResults,
+    selectedTags,
+    setSelectedTags,
+    tagSummaries,
     indicatorTop,
     liveNowIsoDate,
     timelineViewportHeight,

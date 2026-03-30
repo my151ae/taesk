@@ -26,6 +26,11 @@ export type TimelineSearchResultItem = {
     timeText: string | null;
 };
 
+export type TimelineTagSummary = {
+    name: string;
+    count: number;
+};
+
 const matchesSelectedTags = (item: FilterableTimelineItem, selectedTags: string[]) => {
     if (selectedTags.length === 0) return true;
     const tagSet = new Set(item.tags ?? []);
@@ -163,6 +168,35 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         return Array.from(tags).sort();
     }, [data?.events, data?.abBuckets, data?.overdue]);
 
+    const tagSummaries = useMemo(() => {
+        const counts = new Map<string, number>();
+
+        data?.events?.forEach((event) => {
+            (event.tags ?? []).forEach((tag) => {
+                counts.set(tag, (counts.get(tag) ?? 0) + 1);
+            });
+        });
+        Object.values(data?.abBuckets ?? {}).forEach((items) => {
+            (items ?? []).forEach((item) => {
+                (item.tags ?? []).forEach((tag) => {
+                    counts.set(tag, (counts.get(tag) ?? 0) + 1);
+                });
+            });
+        });
+        (data?.overdue ?? []).forEach((item) => {
+            (item.tags ?? []).forEach((tag) => {
+                counts.set(tag, (counts.get(tag) ?? 0) + 1);
+            });
+        });
+
+        return Array.from(counts.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((left, right) => {
+                if (right.count !== left.count) return right.count - left.count;
+                return left.name.localeCompare(right.name);
+            });
+    }, [data?.events, data?.abBuckets, data?.overdue]);
+
     return {
         searchQuery,
         setSearchQuery,
@@ -176,5 +210,6 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         searchResults,
         hasActiveFilters,
         availableTags,
+        tagSummaries,
     };
 }

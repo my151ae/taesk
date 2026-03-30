@@ -15,7 +15,7 @@ import type {
   TimelineResponse,
   UserProfile,
 } from "@/app/(board)/_utils/timeline-helpers";
-import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
+import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
@@ -92,6 +92,9 @@ type UseTimelineBoardScreenArgs = {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
+  selectedTags: string[];
+  setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
+  tagSummaries: TimelineTagSummary[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   timelineViewportHeight: number;
@@ -238,6 +241,9 @@ export function useTimelineBoardScreen({
   searchQuery,
   setSearchQuery,
   searchResults,
+  selectedTags,
+  setSelectedTags,
+  tagSummaries,
   indicatorTop,
   liveNowIsoDate,
   timelineViewportHeight,
@@ -372,6 +378,9 @@ export function useTimelineBoardScreen({
     searchQuery,
     setSearchQuery,
     searchResults,
+    selectedTags,
+    setSelectedTags,
+    tagSummaries,
     indicatorTop,
     liveNowIsoDate,
     timelineViewportHeight,

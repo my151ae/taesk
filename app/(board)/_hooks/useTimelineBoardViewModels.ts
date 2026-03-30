@@ -15,7 +15,7 @@ import type {
   TimelineEvent,
   TimelineOverdueItem,
 } from "@/app/(board)/_utils/timeline-helpers";
-import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
+import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -81,6 +81,9 @@ type UseTimelineBoardViewModelsArgs = {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
+  selectedTags: string[];
+  setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
+  tagSummaries: TimelineTagSummary[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   timelineViewportHeight: number;
@@ -127,20 +130,28 @@ type UseTimelineBoardViewModelsArgs = {
 };
 
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
+  const { onExpandedSectionChange, setSearchQuery, setSelectedTags } = args;
+  const selectedTag = args.selectedTags[0] ?? null;
+  const isTagMode = args.expandedSectionKey === "tags";
+
   const leftPanelState = useMemo<DesktopSidebarMenuState>(
     () => ({
       expandedSectionKey: args.expandedSectionKey,
       searchQuery: args.searchQuery,
+      selectedTags: args.selectedTags,
     }),
-    [args.expandedSectionKey, args.searchQuery]
+    [args.expandedSectionKey, args.searchQuery, args.selectedTags]
   );
 
   const leftPanelActions = useMemo<DesktopSidebarMenuActions>(
     () => ({
-      onExpandedSectionChange: args.onExpandedSectionChange,
-      onSearchQueryChange: args.setSearchQuery,
+      onExpandedSectionChange,
+      onSearchQueryChange: setSearchQuery,
+      onTagToggle: (value: string) =>
+        setSelectedTags((prev) => (prev.length === 1 && prev[0] === value ? [] : [value])),
+      onTagClear: () => setSelectedTags([]),
     }),
-    [args.onExpandedSectionChange, args.setSearchQuery]
+    [onExpandedSectionChange, setSearchQuery, setSelectedTags]
   );
 
   const leftPanelSections = useMemo<DesktopSidebarSection[]>(
@@ -161,15 +172,23 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         count: args.searchQuery.trim() ? args.searchResults.length : 0,
         results: args.searchResults,
       },
+      {
+        key: "tags",
+        tone: "neutral",
+        id: "desktop-sidebar-tags-panel",
+        label: "Tag",
+        count: args.tagSummaries.length,
+        tags: args.tagSummaries,
+      },
     ],
-    [args.overdue, args.searchQuery, args.searchResults]
+    [args.overdue, args.searchQuery, args.searchResults, args.tagSummaries]
   );
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(
-    () => (args.expandedSectionKey === "search" ? ["list"] : ["timeline", "list"]),
+    () => (args.expandedSectionKey === "search" || args.expandedSectionKey === "tags" ? ["list"] : ["timeline", "list"]),
     [args.expandedSectionKey]
   );
-  const fallbackKey = args.expandedSectionKey === "search" ? "list" : "timeline";
+  const fallbackKey = args.expandedSectionKey === "search" || args.expandedSectionKey === "tags" ? "list" : "timeline";
   const activeKey = availableKeys.includes(args.viewMode) ? args.viewMode : fallbackKey;
 
   const listState = useDesktopListState({
@@ -302,6 +321,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   );
 
   const listToolbar: DesktopListToolbarProps = {
+    variant: isTagMode ? "tags" : "default",
+    title: "List",
+    summaryText: isTagMode && selectedTag ? `#${selectedTag}` : null,
     onPrevDay: args.handleListPrevDay,
     onNextDay: args.handleListNextDay,
     onPrevWeek: args.handleListPrevWeek,
@@ -327,9 +349,12 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
 
   const listBody = useMemo<DesktopListViewProps>(
     () => ({
+      variant: isTagMode ? "tags" : "default",
+      selectedTag,
       days: args.days,
       eventsByDay: args.eventsByDay,
       abBuckets: args.abBuckets,
+      overdue: args.overdue,
       calendarEventsByDay: args.calendarEventsByDay,
       calendarAllDayEventsByDay: args.calendarAllDayEventsByDay,
       openCardModal: args.openCardModal,
@@ -346,6 +371,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.days,
       args.eventsByDay,
       args.abBuckets,
+      args.overdue,
       args.calendarEventsByDay,
       args.calendarAllDayEventsByDay,
       args.openCardModal,
@@ -354,6 +380,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.handleCardContextMenu,
       args.status,
       args.listReverse,
+      isTagMode,
+      selectedTag,
       listState.showUnchecked,
       listState.showChecked,
       listState.showGoogle,

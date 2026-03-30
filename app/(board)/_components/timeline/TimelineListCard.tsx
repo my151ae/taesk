@@ -5,11 +5,11 @@ import {
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
-import type { TimelineBucketItem, TimelineEvent } from "@/app/(board)/_utils/timeline-helpers";
+import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type TimelineListCardProps = {
-  item: TimelineEvent | TimelineBucketItem;
-  kind: "event" | "bucket";
+  item: TimelineEvent | TimelineBucketItem | TimelineOverdueItem;
+  kind: "event" | "bucket" | "overdue";
   variant: "desktop" | "mobile";
   openSource: string;
   bucketLabel?: string | null;
@@ -29,8 +29,11 @@ export function TimelineListCard({
   onCardContextMenu,
 }: TimelineListCardProps) {
   const isEvent = kind === "event";
+  const isOverdue = kind === "overdue";
   const timeText = isEvent
     ? buildTimelineCardTimeText(item, { includeDuration: true })
+    : isOverdue
+      ? buildTimelineCardTimeText(item, { includeDate: true, includeDuration: true })
     : buildTimelineCardTimeText(item, {
         includeDate: true,
         includeTime: false,
@@ -53,7 +56,7 @@ export function TimelineListCard({
         content={item.content ?? null}
         onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
         cardId={item.card_id}
-        badgeLabel={bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : null)}
+        badgeLabel={bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null)}
         timeText={timeText}
         timePlacement={timeText ? "out-top" : "inline"}
         note={item.excerpt ?? undefined}
