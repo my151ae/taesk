@@ -5,9 +5,17 @@ import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
 
 export type SortOption = 'none' | 'due_date_asc' | 'due_date_desc';
 
-export function useBoardFilters() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+type UseBoardFiltersArgs = {
+  initialSearchQuery?: string;
+  initialSelectedTags?: string[];
+};
+
+export function useBoardFilters({
+  initialSearchQuery = '',
+  initialSelectedTags = [],
+}: UseBoardFiltersArgs = {}) {
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialSelectedTags);
   const [sortBy, setSortBy] = useState<SortOption>('none');
   const [showFilters, setShowFilters] = useState(false);
 

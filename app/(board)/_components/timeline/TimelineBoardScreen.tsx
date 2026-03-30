@@ -87,6 +87,10 @@ export type TimelineBoardScreenProps = {
     viewMode: "timeline" | "list";
     timelineProps: MobileTimelineBaseProps;
     listProps: MobileListProps;
+    contextBar: {
+      label: string;
+      onReset: () => void;
+    } | null;
     overdueSortOrder: OverdueSortOrder;
     onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   };
@@ -389,6 +393,20 @@ export default function TimelineBoardScreen({
 
         {mobile.viewMode === "timeline" ? (
           <div className="flex-1 overflow-hidden md:hidden">
+            {mobile.contextBar ? (
+              <div className="border-b border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium text-slate-600">{mobile.contextBar.label}</span>
+                  <button
+                    type="button"
+                    onClick={mobile.contextBar.onReset}
+                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700"
+                  >
+                    List
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <MobileTimelineView
               {...mobile.timelineProps}
               overdueSortOrder={mobile.overdueSortOrder}
@@ -397,6 +415,20 @@ export default function TimelineBoardScreen({
           </div>
         ) : (
           <div className="flex-1 overflow-hidden md:hidden">
+            {mobile.contextBar ? (
+              <div className="border-b border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium text-slate-600">{mobile.contextBar.label}</span>
+                  <button
+                    type="button"
+                    onClick={mobile.contextBar.onReset}
+                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700"
+                  >
+                    Default
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <MobileListView {...mobile.listProps} />
           </div>
         )}

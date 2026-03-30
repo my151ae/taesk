@@ -6,6 +6,8 @@
 
 現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
 - 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で右パネル表示を切り替える方針をデフォルトとする。
+- board navigation / URL state の canonical contract は `lp` / `rp` を使い、left context が right panel のデータ文脈を規定する。
+- desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
 - Tag はその最初の適用例で、右パネルは Tag 専用 List を使い、日付移動・表示期間・Google 切替は持たない。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
 

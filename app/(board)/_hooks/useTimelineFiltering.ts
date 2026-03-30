@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { useBoardFilters } from "@/app/(board)/_hooks/useBoardFilters";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
@@ -61,7 +61,15 @@ const compareSearchResults = (a: TimelineSearchResultItem, b: TimelineSearchResu
     return (a.item.title ?? "").localeCompare(b.item.title ?? "");
 };
 
-export function useTimelineFiltering(data: TimelineResponse | null) {
+type UseTimelineFilteringArgs = {
+    initialSearchQuery?: string;
+    initialSelectedTags?: string[];
+};
+
+export function useTimelineFiltering(
+    data: TimelineResponse | null,
+    { initialSearchQuery = "", initialSelectedTags = [] }: UseTimelineFilteringArgs = {},
+) {
     const {
         searchQuery,
         setSearchQuery,
@@ -71,7 +79,24 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
         setSortBy,
         showFilters,
         setShowFilters,
-    } = useBoardFilters();
+    } = useBoardFilters({
+        initialSearchQuery,
+        initialSelectedTags,
+    });
+
+    useEffect(() => {
+        if (searchQuery !== initialSearchQuery) {
+            setSearchQuery(initialSearchQuery);
+        }
+    }, [initialSearchQuery, searchQuery, setSearchQuery]);
+
+    useEffect(() => {
+        const current = selectedTags.join("\u0000");
+        const next = initialSelectedTags.join("\u0000");
+        if (current !== next) {
+            setSelectedTags(initialSelectedTags);
+        }
+    }, [initialSelectedTags, selectedTags, setSelectedTags]);
 
     const filteredData = useMemo(() => {
         if (!data) return null;

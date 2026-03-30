@@ -23,6 +23,10 @@ import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow } from "@/app/(board)/_hooks/useTimelineUrlState";
+import {
+  serializeBoardUiStateToSearchParams,
+  type LeftPanelMode,
+} from "@/app/(board)/_hooks/useTimelineUrlState";
 import { useTimelineScrollSync } from "@/app/(board)/_hooks/useTimelineScrollSync";
 import { useTimelineData } from "@/app/(board)/_hooks/useTimelineData";
 import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
@@ -52,6 +56,7 @@ type TimelineBoardPageContentProps = {
   setDayWindowStart: ReturnType<typeof useTimelineUrlState>["setDayWindowStart"];
   updateUrlForTimeline: ReturnType<typeof useTimelineUrlState>["updateUrlForTimeline"];
   updateUrlForList: ReturnType<typeof useTimelineUrlState>["updateUrlForList"];
+  updateBoardUiState: ReturnType<typeof useTimelineUrlState>["updateBoardUiState"];
   setCard: ReturnType<typeof useTimelineUrlState>["setCard"];
 };
 
@@ -74,6 +79,11 @@ const canPersistBoardPreferences = (board: Board) => {
 const timelineLaneId = (isoDate: string) => `timeline:${isoDate}`;
 const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
 const OVERDUE_LANE_ID = "overdue";
+
+const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
+  if (mode === "overdue" || mode === "search" || mode === "tags") return mode;
+  return null;
+};
 
 function InvalidTimelineUrlState({
   code,
@@ -121,13 +131,19 @@ function TimelineBoardPageContent({
   setDayWindowStart,
   updateUrlForTimeline,
   updateUrlForList,
+  updateBoardUiState,
   setCard,
 }: TimelineBoardPageContentProps) {
   const router = useRouter();
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
-  const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>("overdue");
+  const activeLeftSectionKey = leftPanelModeToSidebarSection(resolvedState.leftPanelMode);
+  const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
+
+  useEffect(() => {
+    setExpandedSectionKey(activeLeftSectionKey);
+  }, [activeLeftSectionKey]);
 
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
@@ -290,7 +306,11 @@ function TimelineBoardPageContent({
     selectedTags,
     setSelectedTags,
     tagSummaries,
-  } = useTimelineFiltering(data);
+  } = useTimelineFiltering(data, {
+    initialSearchQuery: resolvedState.leftPanelMode === "search" ? resolvedState.searchQuery : "",
+    initialSelectedTags:
+      resolvedState.leftPanelMode === "tags" && resolvedState.tag ? [resolvedState.tag] : [],
+  });
   const sortedFilteredData = useMemo(() => {
     if (!filteredData) return null;
     return {
@@ -626,6 +646,87 @@ function TimelineBoardPageContent({
     updateUrlForList,
   });
 
+  const handleSearchQueryChange = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      updateBoardUiState({
+        leftPanelMode: "search",
+        rightPanelMode: "list",
+        searchQuery: value,
+        method: "replace",
+      });
+    },
+    [setSearchQuery, updateBoardUiState],
+  );
+
+  const handleSelectedTagsChange = useCallback(
+    (updater: React.SetStateAction<string[]>) => {
+      const next = typeof updater === "function" ? updater(selectedTags) : updater;
+      setSelectedTags(next);
+      updateBoardUiState({
+        leftPanelMode: "tags",
+        rightPanelMode: "list",
+        tag: next[0] ?? null,
+        method: "replace",
+      });
+    },
+    [selectedTags, setSelectedTags, updateBoardUiState],
+  );
+
+  const handleExpandedSectionChange = useCallback(
+    (key: SidebarSectionKey | null) => {
+      if (key === null) {
+        setExpandedSectionKey(null);
+        return;
+      }
+
+      const isSameContext = activeLeftSectionKey === key;
+      const isExpanded = expandedSectionKey === key;
+      if (isSameContext && isExpanded) {
+        setExpandedSectionKey(null);
+        return;
+      }
+
+      setExpandedSectionKey(key);
+
+      if (key === "overdue") {
+        updateBoardUiState({
+          leftPanelMode: "overdue",
+          rightPanelMode: "timeline",
+          method: "replace",
+        });
+        return;
+      }
+
+      if (key === "search") {
+        updateBoardUiState({
+          leftPanelMode: "search",
+          rightPanelMode: "list",
+          searchQuery,
+          method: "replace",
+        });
+        return;
+      }
+
+      updateBoardUiState({
+        leftPanelMode: "tags",
+        rightPanelMode: "list",
+        tag: selectedTags[0] ?? resolvedState.tag ?? null,
+        method: "replace",
+      });
+    },
+    [activeLeftSectionKey, expandedSectionKey, resolvedState.tag, searchQuery, selectedTags, updateBoardUiState],
+  );
+
+  const handleResetToDefaultList = useCallback(() => {
+    updateBoardUiState({
+      leftPanelMode: "none",
+      rightPanelMode: "list",
+      method: "replace",
+    });
+    setExpandedSectionKey(null);
+  }, [updateBoardUiState]);
+
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
     sortedFilteredData?.events?.forEach((event) => {
@@ -673,7 +774,10 @@ function TimelineBoardPageContent({
     viewMode,
     onShortcutsClick: () => setShowShortcutsModal(true),
     expandedSectionKey,
-    onExpandedSectionChange: setExpandedSectionKey,
+    activeLeftPanelMode: resolvedState.leftPanelMode,
+    activeLeftSectionKey,
+    onExpandedSectionChange: handleExpandedSectionChange,
+    onResetToDefaultList: handleResetToDefaultList,
     days: data?.days ?? [],
     activeDayIndex,
     effectiveDayRange,
@@ -702,10 +806,10 @@ function TimelineBoardPageContent({
     abBuckets: sortedFilteredData?.abBuckets ?? {},
     overdue: sortedFilteredData?.overdue ?? [],
     searchQuery,
-    setSearchQuery,
+    setSearchQuery: handleSearchQueryChange,
     searchResults,
     selectedTags,
-    setSelectedTags,
+    setSelectedTags: handleSelectedTagsChange,
     tagSummaries,
     indicatorTop,
     liveNowIsoDate,
@@ -837,6 +941,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     resolvedState,
     dayWindowStartRef,
     setDayWindowStart,
+    updateBoardUiState,
     updateUrlForTimeline,
     updateUrlForList,
     setCard,
@@ -845,7 +950,6 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     defaultTimelineRange: initialBoard.day_range,
     defaultListBefore: defaultListWindow.before,
     defaultListAfter: defaultListWindow.after,
-    defaultView: "timeline",
   });
 
   const handleResetInvalidUrl = useCallback(() => {
@@ -853,22 +957,19 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   }, [basePath, router]);
 
   const handleMoveToCanonicalUrl = useCallback(() => {
-    const fallbackDate = resolvedState.date ?? getCurrentTimelineIsoDateJst(5);
-    if (resolvedState.view === "timeline") {
-      updateUrlForTimeline({
-        date: fallbackDate,
-        range: resolvedState.timelineRange,
-        time: null,
-      });
-      return;
-    }
-    updateUrlForList({
-      before: resolvedState.listWindow.before,
-      after: resolvedState.listWindow.after,
-      date: fallbackDate,
-      time: null,
+    const params = serializeBoardUiStateToSearchParams({
+      state: {
+        leftPanelMode: "overdue",
+        rightPanelMode: "timeline",
+        date: null,
+        tag: null,
+        searchQuery: "",
+        showChecked: true,
+        showUnchecked: true,
+      },
     });
-  }, [resolvedState, updateUrlForList, updateUrlForTimeline]);
+    router.replace(`${basePath}?${params.toString()}`, { scroll: false });
+  }, [basePath, router]);
 
   if (!parseResult.ok) {
     return (
@@ -889,6 +990,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       resolvedState={resolvedState}
       dayWindowStartRef={dayWindowStartRef}
       setDayWindowStart={setDayWindowStart}
+      updateBoardUiState={updateBoardUiState}
       updateUrlForTimeline={updateUrlForTimeline}
       updateUrlForList={updateUrlForList}
       setCard={setCard}

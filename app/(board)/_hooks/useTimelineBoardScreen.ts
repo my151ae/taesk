@@ -21,6 +21,7 @@ import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoar
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
 import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
+import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
@@ -60,8 +61,11 @@ type UseTimelineBoardScreenArgs = {
   handleGoogleConnect: () => void;
   viewMode: "timeline" | "list";
   onShortcutsClick: () => void;
+  activeLeftPanelMode: LeftPanelMode;
+  activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
+  onResetToDefaultList: () => void;
   days: TimelineResponse["days"];
   activeDayIndex: number;
   effectiveDayRange: number;
@@ -209,8 +213,11 @@ export function useTimelineBoardScreen({
   handleGoogleConnect,
   viewMode,
   onShortcutsClick,
+  activeLeftPanelMode,
+  activeLeftSectionKey,
   expandedSectionKey,
   onExpandedSectionChange,
+  onResetToDefaultList,
   days,
   activeDayIndex,
   effectiveDayRange,
@@ -343,6 +350,8 @@ export function useTimelineBoardScreen({
 
   const viewModels: ViewModels = useTimelineBoardViewModels({
     viewMode,
+    activeLeftPanelMode,
+    activeLeftSectionKey,
     expandedSectionKey,
     onExpandedSectionChange,
     days,
@@ -508,6 +517,22 @@ export function useTimelineBoardScreen({
       viewMode,
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
+      contextBar:
+        activeLeftPanelMode !== "none" && activeLeftPanelMode !== "timeline-nav"
+          ? {
+              label:
+                activeLeftPanelMode === "tags"
+                  ? selectedTags[0]
+                    ? `#${selectedTags[0]}`
+                    : "Tag"
+                  : activeLeftPanelMode === "search"
+                    ? searchQuery.trim()
+                      ? `"${searchQuery.trim()}"`
+                      : "Search"
+                    : "Overdue",
+              onReset: onResetToDefaultList,
+            }
+          : null,
       overdueSortOrder,
       onOverdueSortOrderChange,
     },

@@ -17,6 +17,7 @@ export type SidebarSectionKey = "overdue" | "search" | "tags";
 type SidebarSectionTone = "danger" | "neutral";
 
 export type DesktopSidebarMenuState = {
+  activeSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   searchQuery: string;
   selectedTags: readonly string[];
@@ -442,7 +443,7 @@ export function DesktopSidebarMenu({
             {!state.searchQuery.trim() ? (
               <div className="px-3 py-4">
                 <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  キーワードを入れると該当カードをここに一覧表示します
+                  キーワードを入れると、右パネルに検索結果を表示します
                 </p>
               </div>
             ) : section.results.length === 0 ? (
@@ -452,24 +453,10 @@ export function DesktopSidebarMenu({
                 </p>
               </div>
             ) : (
-              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-                {section.results.map((result) => (
-                  <SidebarCardRow
-                    key={`${result.kind}:${result.item.card_id}`}
-                    item={result.item}
-                    badgeLabel={result.badgeLabel}
-                    timeText={result.timeText}
-                    openSource="search"
-                    shortcutSection="search"
-                    testId={`search-card-${result.kind}-${result.item.card_id}`}
-                    className="bg-white"
-                    onToggleCheck={onToggleCheck}
-                    openCardModal={openCardModal}
-                    onCardContextMenu={onCardContextMenu}
-                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                    isContextMenuOpen={contextMenuCardId === result.item.card_id}
-                  />
-                ))}
+              <div className="px-3 py-4">
+                <p className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-600">
+                  {section.results.length} 件の一致があります。右パネルの List で確認できます。
+                </p>
               </div>
             )}
           </div>
@@ -542,7 +529,7 @@ export function DesktopSidebarMenu({
             label={section.label}
             count={section.count}
             tone={section.tone}
-            expanded={state.expandedSectionKey === section.key}
+            expanded={state.activeSectionKey === section.key}
             onToggle={() => handleToggleSection(section.key)}
           >
             {getSectionIcon(section.key)}

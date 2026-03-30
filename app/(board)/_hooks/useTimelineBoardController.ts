@@ -152,6 +152,11 @@ export function useTimelineBoardController({
     setTimelineRange(nextTimelineRange);
     setListWindow(nextListWindow);
     setListWindowPresetKey(derivePresetFromWindow(nextListWindow));
+    setActiveDayIndex(
+      resolvedState.view === "timeline"
+        ? 0
+        : Math.max(0, Math.min(nextListWindow.before, nextListWindow.before + nextListWindow.after))
+    );
     if (resolvedState.view === "list" && resolvedState.date) {
       setListAnchorDate(resolvedState.date);
     }

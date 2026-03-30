@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import { getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
 
 type UseTimelineUrlStateArgs = {
@@ -9,10 +9,11 @@ type UseTimelineUrlStateArgs = {
   defaultTimelineRange?: number | null;
   defaultListBefore?: number | null;
   defaultListAfter?: number | null;
-  defaultView?: TimelineViewMode;
 };
 
 export type TimelineViewMode = "timeline" | "list";
+export type LeftPanelMode = "none" | "timeline-nav" | "overdue" | "tags" | "search";
+export type RightPanelMode = "timeline" | "list";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
 export type ListWindowPresetKey =
@@ -24,19 +25,36 @@ export type ListWindowPresetKey =
   | "minus2"
   | "minus3";
 
+export type BoardUiState = {
+  leftPanel: {
+    mode: LeftPanelMode;
+    state: {
+      date?: string | null;
+      tag?: string | null;
+      q?: string | null;
+    };
+  };
+  rightPanel: {
+    mode: RightPanelMode;
+    state: {
+      checked?: boolean;
+      unchecked?: boolean;
+    };
+  };
+};
+
 export type UrlParseErrorCode =
-  | "MISSING_VIEW"
-  | "INVALID_VIEW"
+  | "LEGACY_QUERY"
   | "UNKNOWN_PARAM"
-  | "MISSING_RANGE"
-  | "INVALID_RANGE"
-  | "MISSING_BEFORE"
-  | "INVALID_BEFORE"
-  | "MISSING_AFTER"
-  | "INVALID_AFTER"
-  | "INVALID_WINDOW"
+  | "MISSING_LP"
+  | "MISSING_RP"
+  | "INVALID_LP"
+  | "INVALID_RP"
   | "INVALID_DATE"
-  | "INVALID_TIME";
+  | "INVALID_TAG"
+  | "INVALID_Q"
+  | "INVALID_CHECKED"
+  | "INVALID_UNCHECKED";
 
 export type UrlParseResult =
   | { ok: true }
@@ -44,10 +62,17 @@ export type UrlParseResult =
 
 export type ResolvedTimelineUrlState = {
   hasQuery: boolean;
-  hasExplicitView: boolean;
+  hasExplicitBoardState: boolean;
   view: TimelineViewMode;
+  leftPanelMode: LeftPanelMode;
+  rightPanelMode: RightPanelMode;
+  boardUiState: BoardUiState;
   date: string | null;
   time: number | null;
+  tag: string | null;
+  searchQuery: string;
+  showChecked: boolean;
+  showUnchecked: boolean;
   card: string | null;
   timelineRange: number;
   listWindow: ListWindow;
@@ -72,9 +97,25 @@ type ListUrlUpdateArgs = {
   card?: string | null;
 };
 
-const KNOWN_KEYS = new Set(["view", "card", "date", "time", "range", "before", "after"]);
-const TIMELINE_KEYS = new Set(["view", "range", "date", "time", "card"]);
-const LIST_KEYS = new Set(["view", "before", "after", "date", "time", "card"]);
+type BoardUrlUpdateArgs = {
+  leftPanelMode?: LeftPanelMode;
+  rightPanelMode?: RightPanelMode;
+  date?: string | null;
+  tag?: string | null;
+  searchQuery?: string | null;
+  showChecked?: boolean;
+  showUnchecked?: boolean;
+  card?: string | null;
+  method?: UrlUpdateMethod;
+};
+
+type ParseDefaults = {
+  timelineRange: number;
+  listWindow: ListWindow;
+};
+
+const LEGACY_KEYS = new Set(["view", "range", "before", "after", "time"]);
+const KNOWN_KEYS = new Set(["lp", "rp", "date", "tag", "q", "checked", "unchecked", "card"]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ZERO_LIST_WINDOW: ListWindow = { before: 15, after: 15 };
 
@@ -92,10 +133,24 @@ const normalizeCardValue = (value: string | null | undefined) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const parseIntegerStrict = (value: string | null) => {
-  if (value == null) return null;
-  if (!/^-?\d+$/.test(value)) return null;
-  return Number.parseInt(value, 10);
+const normalizeTagValue = (value: string | null) => {
+  if (value == null) return { ok: true as const, value: null };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false as const };
+  return { ok: true as const, value: trimmed };
+};
+
+const normalizeQueryValue = (value: string | null) => {
+  if (value == null) return { ok: true as const, value: null };
+  const trimmed = value.trim();
+  return { ok: true as const, value: trimmed.length > 0 ? trimmed : null };
+};
+
+const parseBooleanStrict = (value: string | null) => {
+  if (value == null) return { ok: true as const, value: null };
+  if (value === "1") return { ok: true as const, value: true };
+  if (value === "0") return { ok: true as const, value: false };
+  return { ok: false as const };
 };
 
 const isValidIsoDate = (value: string) => {
@@ -124,12 +179,301 @@ const normalizeListWindow = (before: number, after: number): ListWindow => {
   return { before: normalizedBefore, after: normalizedAfter };
 };
 
+const isLeftPanelMode = (value: string | null): value is LeftPanelMode =>
+  value === "none" || value === "timeline-nav" || value === "overdue" || value === "tags" || value === "search";
+
+const isRightPanelMode = (value: string | null): value is RightPanelMode =>
+  value === "timeline" || value === "list";
+
+const buildDefaultResolvedState = (
+  defaults: ParseDefaults,
+  hasQuery: boolean,
+  card: string | null,
+): ResolvedTimelineUrlState => ({
+  hasQuery,
+  hasExplicitBoardState: false,
+  view: "timeline",
+  leftPanelMode: "overdue",
+  rightPanelMode: "timeline",
+  boardUiState: {
+    leftPanel: { mode: "overdue", state: { date: null, tag: null, q: null } },
+    rightPanel: { mode: "timeline", state: {} },
+  },
+  date: null,
+  time: null,
+  tag: null,
+  searchQuery: "",
+  showChecked: true,
+  showUnchecked: true,
+  card,
+  timelineRange: defaults.timelineRange,
+  listWindow: defaults.listWindow,
+  anchorOffset: 0,
+  startOffset: 0,
+});
+
+export function normalizeBoardUiState(
+  input: {
+    leftPanelMode: LeftPanelMode;
+    rightPanelMode: RightPanelMode;
+    date?: string | null;
+    tag?: string | null;
+    searchQuery?: string | null;
+    showChecked?: boolean | null;
+    showUnchecked?: boolean | null;
+  },
+  defaults?: ParseDefaults,
+): ResolvedTimelineUrlState {
+  const safeDefaults = defaults ?? {
+    timelineRange: 2,
+    listWindow: ZERO_LIST_WINDOW,
+  };
+  const card = null;
+  const today = todayJstIso();
+  let leftPanelMode = input.leftPanelMode;
+  let rightPanelMode = input.rightPanelMode;
+  let date = input.date && isValidIsoDate(input.date) ? input.date : null;
+  let tag = input.tag?.trim() ? input.tag.trim() : null;
+  let searchQuery = input.searchQuery?.trim() ? input.searchQuery.trim() : "";
+  let showChecked = input.showChecked ?? true;
+  let showUnchecked = input.showUnchecked ?? true;
+
+  if (leftPanelMode === "none" && rightPanelMode === "timeline") {
+    leftPanelMode = "timeline-nav";
+  }
+  if (leftPanelMode === "timeline-nav") {
+    rightPanelMode = "timeline";
+  }
+  if (leftPanelMode === "tags") {
+    rightPanelMode = "list";
+  }
+  if (leftPanelMode === "search") {
+    rightPanelMode = "list";
+  }
+  if (leftPanelMode === "none") {
+    rightPanelMode = "list";
+  }
+  if (leftPanelMode === "overdue" && rightPanelMode !== "timeline" && rightPanelMode !== "list") {
+    rightPanelMode = "timeline";
+  }
+
+  if (leftPanelMode === "tags" && searchQuery) {
+    searchQuery = "";
+  } else if (leftPanelMode === "search" && tag) {
+    tag = null;
+  } else if (searchQuery && tag) {
+    if (leftPanelMode === "search") {
+      tag = null;
+    } else if (leftPanelMode === "tags") {
+      searchQuery = "";
+    } else {
+      leftPanelMode = "search";
+      rightPanelMode = "list";
+      tag = null;
+    }
+  } else if (searchQuery && leftPanelMode !== "search") {
+    leftPanelMode = "search";
+    rightPanelMode = "list";
+  } else if (tag && leftPanelMode !== "tags") {
+    leftPanelMode = "tags";
+    rightPanelMode = "list";
+  }
+
+  if (!(leftPanelMode === "timeline-nav" && rightPanelMode === "timeline")) {
+    date = null;
+  }
+  if (!(leftPanelMode === "tags" && rightPanelMode === "list")) {
+    tag = null;
+    showChecked = true;
+    showUnchecked = true;
+  }
+  if (!(leftPanelMode === "search" && rightPanelMode === "list")) {
+    searchQuery = "";
+  }
+
+  const anchorOffset = date ? getDayDiff(date, today) : 0;
+  const view = rightPanelMode;
+
+  return {
+    hasQuery: true,
+    hasExplicitBoardState: true,
+    view,
+    leftPanelMode,
+    rightPanelMode,
+    boardUiState: {
+      leftPanel: {
+        mode: leftPanelMode,
+        state: {
+          date,
+          tag,
+          q: searchQuery || null,
+        },
+      },
+      rightPanel: {
+        mode: rightPanelMode,
+        state:
+          leftPanelMode === "tags" && rightPanelMode === "list"
+            ? {
+                checked: showChecked,
+                unchecked: showUnchecked,
+              }
+            : {},
+      },
+    },
+    date,
+    time: null,
+    tag,
+    searchQuery,
+    showChecked,
+    showUnchecked,
+    card,
+    timelineRange: safeDefaults.timelineRange,
+    listWindow: safeDefaults.listWindow,
+    anchorOffset,
+    startOffset: view === "list" ? anchorOffset - safeDefaults.listWindow.before : anchorOffset,
+  };
+}
+
+export function serializeBoardUiStateToSearchParams(args: {
+  state: Pick<
+    ResolvedTimelineUrlState,
+    "leftPanelMode" | "rightPanelMode" | "date" | "tag" | "searchQuery" | "showChecked" | "showUnchecked"
+  >;
+  card?: string | null;
+}) {
+  const normalized = normalizeBoardUiState({
+    leftPanelMode: args.state.leftPanelMode,
+    rightPanelMode: args.state.rightPanelMode,
+    date: args.state.date,
+    tag: args.state.tag,
+    searchQuery: args.state.searchQuery,
+    showChecked: args.state.showChecked,
+    showUnchecked: args.state.showUnchecked,
+  });
+
+  const params = new URLSearchParams();
+  params.set("lp", normalized.leftPanelMode);
+  params.set("rp", normalized.rightPanelMode);
+
+  if (normalized.leftPanelMode === "timeline-nav" && normalized.rightPanelMode === "timeline" && normalized.date) {
+    params.set("date", normalized.date);
+  }
+  if (normalized.leftPanelMode === "tags" && normalized.rightPanelMode === "list" && normalized.tag) {
+    params.set("tag", normalized.tag);
+    params.set("checked", normalized.showChecked ? "1" : "0");
+    params.set("unchecked", normalized.showUnchecked ? "1" : "0");
+  }
+  if (normalized.leftPanelMode === "search" && normalized.rightPanelMode === "list" && normalized.searchQuery) {
+    params.set("q", normalized.searchQuery);
+  }
+
+  const card = normalizeCardValue(args.card);
+  if (card) params.set("card", card);
+
+  return params;
+}
+
+export function parseBoardUiStateFromSearchParams(
+  searchParams: URLSearchParams | ReadonlyURLSearchParams,
+  defaults?: ParseDefaults,
+): { parseResult: UrlParseResult; resolvedState: ResolvedTimelineUrlState } {
+  const keys = Array.from(new Set(Array.from(searchParams.keys())));
+  const hasQuery = keys.length > 0;
+  const card = normalizeCardValue(searchParams.get("card"));
+  const nonCardKeys = keys.filter((key) => key !== "card");
+  const safeDefaults = defaults ?? {
+    timelineRange: 2,
+    listWindow: ZERO_LIST_WINDOW,
+  };
+  const defaultResolved = buildDefaultResolvedState(safeDefaults, hasQuery, card);
+
+  if (nonCardKeys.length === 0) {
+    return { parseResult: { ok: true }, resolvedState: defaultResolved };
+  }
+
+  const legacyKeys = nonCardKeys.filter((key) => LEGACY_KEYS.has(key));
+  if (legacyKeys.length > 0) {
+    return {
+      parseResult: { ok: false, code: "LEGACY_QUERY", detail: legacyKeys.join(",") },
+      resolvedState: defaultResolved,
+    };
+  }
+
+  const unknownKeys = nonCardKeys.filter((key) => !KNOWN_KEYS.has(key));
+  if (unknownKeys.length > 0) {
+    return {
+      parseResult: { ok: false, code: "UNKNOWN_PARAM", detail: unknownKeys.join(",") },
+      resolvedState: defaultResolved,
+    };
+  }
+
+  const rawLp = searchParams.get("lp");
+  if (!rawLp) {
+    return { parseResult: { ok: false, code: "MISSING_LP" }, resolvedState: defaultResolved };
+  }
+  if (!isLeftPanelMode(rawLp)) {
+    return { parseResult: { ok: false, code: "INVALID_LP" }, resolvedState: defaultResolved };
+  }
+
+  const rawRp = searchParams.get("rp");
+  if (!rawRp && rawLp !== "overdue") {
+    return { parseResult: { ok: false, code: "MISSING_RP" }, resolvedState: defaultResolved };
+  }
+  if (rawRp && !isRightPanelMode(rawRp)) {
+    return { parseResult: { ok: false, code: "INVALID_RP" }, resolvedState: defaultResolved };
+  }
+
+  const rawDate = searchParams.get("date");
+  if (rawDate != null && !isValidIsoDate(rawDate)) {
+    return { parseResult: { ok: false, code: "INVALID_DATE" }, resolvedState: defaultResolved };
+  }
+
+  const parsedTag = normalizeTagValue(searchParams.get("tag"));
+  if (!parsedTag.ok) {
+    return { parseResult: { ok: false, code: "INVALID_TAG" }, resolvedState: defaultResolved };
+  }
+  const parsedQuery = normalizeQueryValue(searchParams.get("q"));
+  if (!parsedQuery.ok) {
+    return { parseResult: { ok: false, code: "INVALID_Q" }, resolvedState: defaultResolved };
+  }
+  const parsedChecked = parseBooleanStrict(searchParams.get("checked"));
+  if (!parsedChecked.ok) {
+    return { parseResult: { ok: false, code: "INVALID_CHECKED" }, resolvedState: defaultResolved };
+  }
+  const parsedUnchecked = parseBooleanStrict(searchParams.get("unchecked"));
+  if (!parsedUnchecked.ok) {
+    return { parseResult: { ok: false, code: "INVALID_UNCHECKED" }, resolvedState: defaultResolved };
+  }
+
+  const normalized = normalizeBoardUiState(
+    {
+      leftPanelMode: rawLp,
+      rightPanelMode: (rawRp ?? "timeline") as RightPanelMode,
+      date: rawDate,
+      tag: parsedTag.value,
+      searchQuery: parsedQuery.value,
+      showChecked: parsedChecked.value ?? true,
+      showUnchecked: parsedUnchecked.value ?? true,
+    },
+    safeDefaults,
+  );
+
+  return {
+    parseResult: { ok: true },
+    resolvedState: {
+      ...normalized,
+      hasQuery,
+      hasExplicitBoardState: true,
+      card,
+    },
+  };
+}
+
 export const useTimelineUrlState = ({
   basePath,
   defaultTimelineRange,
   defaultListBefore,
   defaultListAfter,
-  defaultView = "timeline",
 }: UseTimelineUrlStateArgs) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -137,145 +481,20 @@ export const useTimelineUrlState = ({
 
   const normalizedDefaults = useMemo(() => {
     const timelineRange = clampTimelineRange(defaultTimelineRange ?? 2);
-    const listWindow = normalizeListWindow(defaultListBefore ?? ZERO_LIST_WINDOW.before, defaultListAfter ?? ZERO_LIST_WINDOW.after);
-    const view: TimelineViewMode = defaultView === "list" ? "list" : "timeline";
+    const listWindow = normalizeListWindow(
+      defaultListBefore ?? ZERO_LIST_WINDOW.before,
+      defaultListAfter ?? ZERO_LIST_WINDOW.after,
+    );
     return {
       timelineRange,
       listWindow,
-      view,
     };
-  }, [defaultListAfter, defaultListBefore, defaultTimelineRange, defaultView]);
+  }, [defaultListAfter, defaultListBefore, defaultTimelineRange]);
 
-  const { parseResult, resolvedState } = useMemo((): {
-    parseResult: UrlParseResult;
-    resolvedState: ResolvedTimelineUrlState;
-  } => {
-    const keys = Array.from(new Set(Array.from(searchParams.keys())));
-    const hasQuery = keys.length > 0;
-    const card = normalizeCardValue(searchParams.get("card"));
-    const nonCardKeys = keys.filter((key) => key !== "card");
-    const today = todayJstIso();
-
-    const buildDefaultResolved = (): ResolvedTimelineUrlState => ({
-      hasQuery,
-      hasExplicitView: false,
-      view: normalizedDefaults.view,
-      date: null,
-      time: null,
-      card,
-      timelineRange: normalizedDefaults.timelineRange,
-      listWindow: normalizedDefaults.listWindow,
-      anchorOffset: 0,
-      startOffset: normalizedDefaults.view === "list" ? -normalizedDefaults.listWindow.before : 0,
-    });
-
-    if (nonCardKeys.length === 0) {
-      return { parseResult: { ok: true }, resolvedState: buildDefaultResolved() };
-    }
-
-    const view = searchParams.get("view");
-    if (!view) {
-      const unknown = nonCardKeys.filter((key) => !KNOWN_KEYS.has(key));
-      if (unknown.length > 0) {
-        return {
-          parseResult: { ok: false, code: "UNKNOWN_PARAM", detail: unknown.join(",") },
-          resolvedState: buildDefaultResolved(),
-        };
-      }
-      return { parseResult: { ok: false, code: "MISSING_VIEW" }, resolvedState: buildDefaultResolved() };
-    }
-
-    if (view !== "timeline" && view !== "list") {
-      return { parseResult: { ok: false, code: "INVALID_VIEW" }, resolvedState: buildDefaultResolved() };
-    }
-
-    const allowed = view === "timeline" ? TIMELINE_KEYS : LIST_KEYS;
-    const unknownParams = keys.filter((key) => !allowed.has(key));
-    if (unknownParams.length > 0) {
-      return {
-        parseResult: { ok: false, code: "UNKNOWN_PARAM", detail: unknownParams.join(",") },
-        resolvedState: buildDefaultResolved(),
-      };
-    }
-
-    const rawDate = searchParams.get("date");
-    if (rawDate != null && !isValidIsoDate(rawDate)) {
-      return { parseResult: { ok: false, code: "INVALID_DATE" }, resolvedState: buildDefaultResolved() };
-    }
-    const date = rawDate ?? null;
-
-    const rawTime = searchParams.get("time");
-    const parsedTime = parseIntegerStrict(rawTime);
-    if (rawTime != null && (parsedTime == null || parsedTime < 0 || parsedTime > 1439)) {
-      return { parseResult: { ok: false, code: "INVALID_TIME" }, resolvedState: buildDefaultResolved() };
-    }
-    const time = parsedTime ?? null;
-
-    if (view === "timeline") {
-      const rawRange = searchParams.get("range");
-      if (rawRange == null) {
-        return { parseResult: { ok: false, code: "MISSING_RANGE" }, resolvedState: buildDefaultResolved() };
-      }
-      const parsedRange = parseIntegerStrict(rawRange);
-      if (parsedRange == null || parsedRange < 1 || parsedRange > 7) {
-        return { parseResult: { ok: false, code: "INVALID_RANGE" }, resolvedState: buildDefaultResolved() };
-      }
-      const anchorOffset = date ? getDayDiff(date, today) : 0;
-      return {
-        parseResult: { ok: true },
-        resolvedState: {
-          hasQuery,
-          hasExplicitView: true,
-          view,
-          date,
-          time,
-          card,
-          timelineRange: parsedRange,
-          listWindow: normalizedDefaults.listWindow,
-          anchorOffset,
-          startOffset: anchorOffset,
-        },
-      };
-    }
-
-    const rawBefore = searchParams.get("before");
-    if (rawBefore == null) {
-      return { parseResult: { ok: false, code: "MISSING_BEFORE" }, resolvedState: buildDefaultResolved() };
-    }
-    const parsedBefore = parseIntegerStrict(rawBefore);
-    if (parsedBefore == null || parsedBefore < 0) {
-      return { parseResult: { ok: false, code: "INVALID_BEFORE" }, resolvedState: buildDefaultResolved() };
-    }
-
-    const rawAfter = searchParams.get("after");
-    if (rawAfter == null) {
-      return { parseResult: { ok: false, code: "MISSING_AFTER" }, resolvedState: buildDefaultResolved() };
-    }
-    const parsedAfter = parseIntegerStrict(rawAfter);
-    if (parsedAfter == null || parsedAfter < 0) {
-      return { parseResult: { ok: false, code: "INVALID_AFTER" }, resolvedState: buildDefaultResolved() };
-    }
-    if (parsedBefore + parsedAfter + 1 > 120) {
-      return { parseResult: { ok: false, code: "INVALID_WINDOW" }, resolvedState: buildDefaultResolved() };
-    }
-
-    const anchorOffset = date ? getDayDiff(date, today) : 0;
-    return {
-      parseResult: { ok: true },
-      resolvedState: {
-        hasQuery,
-        hasExplicitView: true,
-        view,
-        date,
-        time,
-        card,
-        timelineRange: normalizedDefaults.timelineRange,
-        listWindow: { before: parsedBefore, after: parsedAfter },
-        anchorOffset,
-        startOffset: anchorOffset - parsedBefore,
-      },
-    };
-  }, [searchParams, normalizedDefaults]);
+  const { parseResult, resolvedState } = useMemo(
+    () => parseBoardUiStateFromSearchParams(searchParams, normalizedDefaults),
+    [normalizedDefaults, searchParams],
+  );
 
   const [dayWindowStart, setDayWindowStart] = useState(resolvedState.startOffset);
   const dayWindowStartRef = useRef(resolvedState.startOffset);
@@ -303,80 +522,81 @@ export const useTimelineUrlState = ({
     [path, router],
   );
 
-  const buildBaseParams = useCallback(
-    (explicitCard?: string | null) => {
-      const params = new URLSearchParams();
-      const card = explicitCard === undefined ? resolvedState.card : normalizeCardValue(explicitCard);
-      if (card) params.set("card", card);
-      return params;
+  const updateBoardUiState = useCallback(
+    ({
+      leftPanelMode,
+      rightPanelMode,
+      date,
+      tag,
+      searchQuery,
+      showChecked,
+      showUnchecked,
+      card,
+      method,
+    }: BoardUrlUpdateArgs) => {
+      const params = serializeBoardUiStateToSearchParams({
+        state: {
+          leftPanelMode: leftPanelMode ?? resolvedState.leftPanelMode,
+          rightPanelMode: rightPanelMode ?? resolvedState.rightPanelMode,
+          date: date === undefined ? resolvedState.date : date,
+          tag: tag === undefined ? resolvedState.tag : tag,
+          searchQuery: searchQuery === undefined ? resolvedState.searchQuery : (searchQuery ?? ""),
+          showChecked: showChecked ?? resolvedState.showChecked,
+          showUnchecked: showUnchecked ?? resolvedState.showUnchecked,
+        },
+        card: card === undefined ? resolvedState.card : card,
+      });
+
+      navigateWithParams(params, method ?? "replace");
     },
-    [resolvedState.card],
+    [navigateWithParams, resolvedState],
   );
 
   const updateUrlForTimeline = useCallback(
-    ({ date, range, time, method, card }: TimelineUrlUpdateArgs) => {
-      const params = buildBaseParams(card);
-      params.set("view", "timeline");
-      params.set("range", String(clampTimelineRange(range)));
-      if (date && isValidIsoDate(date)) {
-        params.set("date", date);
-      }
-      if (typeof time === "number" && Number.isFinite(time) && time >= 0 && time <= 1439) {
-        params.set("time", String(Math.round(time)));
-      }
-      navigateWithParams(params, method ?? "replace");
+    ({ date, method, card }: TimelineUrlUpdateArgs) => {
+      const nextLeftPanelMode: LeftPanelMode =
+        resolvedState.leftPanelMode === "overdue" ? "overdue" : "timeline-nav";
+      updateBoardUiState({
+        leftPanelMode: nextLeftPanelMode,
+        rightPanelMode: "timeline",
+        date: date ?? resolvedState.date ?? todayJstIso(),
+        card,
+        method,
+      });
     },
-    [buildBaseParams, navigateWithParams],
+    [resolvedState.date, resolvedState.leftPanelMode, updateBoardUiState],
   );
 
   const updateUrlForList = useCallback(
-    ({ date, before, after, time, method, card }: ListUrlUpdateArgs) => {
-      const params = buildBaseParams(card);
-      const window = normalizeListWindow(before, after);
-      params.set("view", "list");
-      params.set("before", String(window.before));
-      params.set("after", String(window.after));
-      if (date && isValidIsoDate(date)) {
-        params.set("date", date);
-      }
-      if (typeof time === "number" && Number.isFinite(time) && time >= 0 && time <= 1439) {
-        params.set("time", String(Math.round(time)));
-      }
-      navigateWithParams(params, method ?? "replace");
+    ({ method, card }: ListUrlUpdateArgs) => {
+      const nextLeftPanelMode: LeftPanelMode =
+        resolvedState.leftPanelMode === "timeline-nav" ? "none" : resolvedState.leftPanelMode;
+      updateBoardUiState({
+        leftPanelMode: nextLeftPanelMode,
+        rightPanelMode: "list",
+        card,
+        method,
+      });
     },
-    [buildBaseParams, navigateWithParams],
+    [resolvedState.leftPanelMode, updateBoardUiState],
   );
 
   const setCard = useCallback(
     (card: string | null, options?: { method?: UrlUpdateMethod }) => {
       const method = options?.method ?? "replace";
       const normalizedCard = normalizeCardValue(card);
-      if (!resolvedState.hasExplicitView) {
+      if (!resolvedState.hasExplicitBoardState) {
         const params = new URLSearchParams();
         if (normalizedCard) params.set("card", normalizedCard);
         navigateWithParams(params, method);
         return;
       }
-      if (resolvedState.view === "timeline") {
-        updateUrlForTimeline({
-          date: resolvedState.date,
-          range: resolvedState.timelineRange,
-          time: resolvedState.time,
-          card: normalizedCard,
-          method,
-        });
-        return;
-      }
-      updateUrlForList({
-        date: resolvedState.date,
-        before: resolvedState.listWindow.before,
-        after: resolvedState.listWindow.after,
-        time: resolvedState.time,
+      updateBoardUiState({
         card: normalizedCard,
         method,
       });
     },
-    [navigateWithParams, resolvedState, updateUrlForList, updateUrlForTimeline],
+    [navigateWithParams, resolvedState.hasExplicitBoardState, updateBoardUiState],
   );
 
   return {
@@ -385,6 +605,7 @@ export const useTimelineUrlState = ({
     dayWindowStart,
     setDayWindowStart,
     dayWindowStartRef,
+    updateBoardUiState,
     updateUrlForTimeline,
     updateUrlForList,
     setCard,

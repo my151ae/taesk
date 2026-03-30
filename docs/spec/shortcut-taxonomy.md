@@ -2,6 +2,8 @@
 
 Taesk の shortcut registry と status shortcut bar は、以下の taxonomy を SSOT として使う。
 
+この taxonomy は shortcut 解決専用であり、board navigation / URL state の SSOT ではない。`lp` / `rp` を中心とした `BoardUiState` は別モデルとして扱う。
+
 ## 目的
 
 - shortcut の表示条件を UI 構造に沿って安定して表現する

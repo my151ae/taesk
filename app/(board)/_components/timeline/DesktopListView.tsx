@@ -18,7 +18,7 @@ import { TimelineListCard } from "@/app/(board)/_components/timeline/TimelineLis
 import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 
 export type DesktopListToolbarProps = {
-  variant?: "default" | "tags";
+  variant?: "default" | "tags" | "search" | "overdue";
   title?: string;
   summaryText?: string | null;
   onPrevDay?: () => void;
@@ -80,7 +80,7 @@ export function DesktopListToolbar({
   const todayButtonClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full border border-sky-300 bg-sky-200 px-2.5 text-[11px] font-medium text-sky-800 hover:bg-sky-300";
 
-  if (variant === "tags") {
+  if (variant === "tags" || variant === "search" || variant === "overdue") {
     return (
       <div className="border-b border-slate-100 bg-white px-3">
         <div className="flex h-8 items-center gap-2 overflow-x-auto">
@@ -91,14 +91,18 @@ export function DesktopListToolbar({
               </span>
             ) : null}
           </div>
-          <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
-            <input type="checkbox" checked={showUnchecked} onChange={(e) => onShowUncheckedChange(e.target.checked)} />
-            Unchecked
-          </label>
-          <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
-            <input type="checkbox" checked={showChecked} onChange={(e) => onShowCheckedChange(e.target.checked)} />
-            Checked
-          </label>
+          {variant === "tags" ? (
+            <>
+              <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
+                <input type="checkbox" checked={showUnchecked} onChange={(e) => onShowUncheckedChange(e.target.checked)} />
+                Unchecked
+              </label>
+              <label className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700">
+                <input type="checkbox" checked={showChecked} onChange={(e) => onShowCheckedChange(e.target.checked)} />
+                Checked
+              </label>
+            </>
+          ) : null}
         </div>
       </div>
     );
@@ -194,7 +198,14 @@ export function DesktopListToolbar({
 }
 
 export type DesktopListViewProps = {
-  variant?: "default" | "tags";
+  variant?: "default" | "tags" | "search" | "overdue";
+  searchQuery?: string;
+  searchResults?: Array<{
+    kind: "event" | "bucket" | "overdue";
+    item: TimelineEvent | TimelineBucketItem | TimelineOverdueItem;
+    badgeLabel: string;
+    timeText: string | null;
+  }>;
   selectedTag?: string | null;
   days: TimelineDay[];
   eventsByDay: Record<string, TimelineEvent[]>;
@@ -215,6 +226,8 @@ export type DesktopListViewProps = {
 
 export function DesktopListView({
   variant = "default",
+  searchQuery,
+  searchResults = [],
   selectedTag,
   days,
   eventsByDay,
@@ -289,6 +302,22 @@ export function DesktopListView({
     return Array.from(uniqueItems.values());
   }, [variant, selectedTag, eventsByDay, abBuckets, overdue, showChecked, showUnchecked]);
 
+  const overdueItems = useMemo(
+    () =>
+      overdue
+        .filter((item) => (item.checked ? showChecked : showUnchecked))
+        .sort((left, right) => {
+          const leftDate = left.due_date ?? "9999-12-31";
+          const rightDate = right.due_date ?? "9999-12-31";
+          if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+          const leftTime = left.due_start ?? left.due_end ?? "99:99";
+          const rightTime = right.due_start ?? right.due_end ?? "99:99";
+          if (leftTime !== rightTime) return leftTime.localeCompare(rightTime);
+          return (left.title ?? "").localeCompare(right.title ?? "");
+        }),
+    [overdue, showChecked, showUnchecked],
+  );
+
   const daysWithEvents = useMemo(() => {
     return days.filter((day) => {
       const timelineEvents = eventsByDay[day.isoDate] ?? [];
@@ -340,6 +369,65 @@ export function DesktopListView({
                 variant="desktop"
                 openSource="tag-list-view"
                 bucketLabel={entry.kind === "bucket" ? entry.bucketLabel : undefined}
+                openCardModal={openCardModal}
+                onToggleCheck={onToggleCheck}
+                onCardContextMenu={onCardContextMenu}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (variant === "search") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-4 py-3">
+        {!searchQuery?.trim() ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            キーワードを入力すると検索結果が表示されます
+          </p>
+        ) : searchResults.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            一致するカードはありません
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {searchResults.map((result) => (
+              <TimelineListCard
+                key={`${result.kind}:${result.item.card_id}`}
+                item={result.item}
+                kind={result.kind}
+                variant="desktop"
+                bucketLabel={result.kind === "bucket" ? result.badgeLabel : undefined}
+                openSource="desktop-search-list-view"
+                openCardModal={openCardModal}
+                onToggleCheck={onToggleCheck}
+                onCardContextMenu={onCardContextMenu}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (variant === "overdue") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-4 py-3">
+        {overdueItems.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            未完了の期限超過カードはありません
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {overdueItems.map((item) => (
+              <TimelineListCard
+                key={item.card_id}
+                item={item}
+                kind="overdue"
+                variant="desktop"
+                openSource="desktop-overdue-list-view"
                 openCardModal={openCardModal}
                 onToggleCheck={onToggleCheck}
                 onCardContextMenu={onCardContextMenu}

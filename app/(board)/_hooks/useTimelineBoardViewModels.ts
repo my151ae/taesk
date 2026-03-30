@@ -24,6 +24,7 @@ import type {
 } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
+import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type {
   DesktopSidebarMenuActions,
   DesktopSidebarMenuState,
@@ -46,6 +47,8 @@ export type DesktopMainPanelViewMode = "timeline" | "list";
 
 type UseTimelineBoardViewModelsArgs = {
   viewMode: DesktopMainPanelViewMode;
+  activeLeftPanelMode: LeftPanelMode;
+  activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
   days: TimelineDay[];
@@ -131,33 +134,31 @@ type UseTimelineBoardViewModelsArgs = {
 
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
   const { onExpandedSectionChange, setSearchQuery, setSelectedTags } = args;
-  const { handleViewModeChange } = args;
   const selectedTag = args.selectedTags[0] ?? null;
-  const isTagMode = args.expandedSectionKey === "tags";
+  const isTagMode = args.activeLeftPanelMode === "tags";
+  const isSearchMode = args.activeLeftPanelMode === "search";
+  const isOverdueMode = args.activeLeftPanelMode === "overdue";
+  const activeSidebarSectionKey = args.activeLeftSectionKey;
 
   const leftPanelState = useMemo<DesktopSidebarMenuState>(
     () => ({
+      activeSectionKey: activeSidebarSectionKey,
       expandedSectionKey: args.expandedSectionKey,
       searchQuery: args.searchQuery,
       selectedTags: args.selectedTags,
     }),
-    [args.expandedSectionKey, args.searchQuery, args.selectedTags]
+    [activeSidebarSectionKey, args.expandedSectionKey, args.searchQuery, args.selectedTags]
   );
 
   const leftPanelActions = useMemo<DesktopSidebarMenuActions>(
     () => ({
-      onExpandedSectionChange: (key) => {
-        onExpandedSectionChange(key);
-        if (key === "search" || key === "tags") {
-          handleViewModeChange("list");
-        }
-      },
+      onExpandedSectionChange,
       onSearchQueryChange: setSearchQuery,
       onTagToggle: (value: string) =>
         setSelectedTags((prev) => (prev.length === 1 && prev[0] === value ? [] : [value])),
       onTagClear: () => setSelectedTags([]),
     }),
-    [handleViewModeChange, onExpandedSectionChange, setSearchQuery, setSelectedTags]
+    [onExpandedSectionChange, setSearchQuery, setSelectedTags]
   );
 
   const leftPanelSections = useMemo<DesktopSidebarSection[]>(
@@ -191,16 +192,26 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   );
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(
-    () => (args.expandedSectionKey === "search" || args.expandedSectionKey === "tags" ? ["list"] : ["timeline", "list"]),
-    [args.expandedSectionKey]
+    () => {
+      if (args.activeLeftPanelMode === "timeline-nav") return ["timeline", "list"];
+      if (args.activeLeftPanelMode === "overdue") return ["timeline", "list"];
+      if (args.activeLeftPanelMode === "none") return ["timeline", "list"];
+      return ["list"];
+    },
+    [args.activeLeftPanelMode]
   );
-  const fallbackKey = args.expandedSectionKey === "search" || args.expandedSectionKey === "tags" ? "list" : "timeline";
+  const fallbackKey = args.activeLeftPanelMode === "overdue" || args.activeLeftPanelMode === "timeline-nav"
+    ? "timeline"
+    : "list";
   const activeKey = availableKeys.includes(args.viewMode) ? args.viewMode : fallbackKey;
 
   const listState = useDesktopListState({
     listBaseDate: args.listBaseDate,
     fallbackBaseDate: args.days[0]?.isoDate ?? "",
   });
+
+  const timelineEventsByDay = useMemo(() => args.eventsByDay, [args.eventsByDay]);
+  const timelineBuckets = useMemo(() => args.abBuckets, [args.abBuckets]);
 
   const timelineToolbar = useMemo<DesktopTimelineToolbarProps>(
     () => ({
@@ -245,8 +256,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       timelineHeaderRef: args.timelineHeaderRef,
       registerAbScrollContainer: args.registerAbScrollContainer,
       status: args.status,
-      eventsByDay: args.eventsByDay,
-      abBuckets: args.abBuckets,
+      eventsByDay: timelineEventsByDay,
+      abBuckets: timelineBuckets,
       indicatorTop: args.indicatorTop,
       indicatorDayIso: args.liveNowIsoDate,
       timelineViewportHeight: args.timelineViewportHeight,
@@ -294,8 +305,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.timelineHeaderRef,
       args.registerAbScrollContainer,
       args.status,
-      args.eventsByDay,
-      args.abBuckets,
+      timelineEventsByDay,
+      timelineBuckets,
       args.indicatorTop,
       args.liveNowIsoDate,
       args.timelineViewportHeight,
@@ -327,9 +338,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   );
 
   const listToolbar: DesktopListToolbarProps = {
-    variant: isTagMode ? "tags" : "default",
+    variant: isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default",
     title: "List",
-    summaryText: isTagMode && selectedTag ? `#${selectedTag}` : null,
+    summaryText: isTagMode && selectedTag ? `#${selectedTag}` : isSearchMode && args.searchQuery.trim() ? `"${args.searchQuery.trim()}"` : isOverdueMode ? "Overdue" : null,
     onPrevDay: args.handleListPrevDay,
     onNextDay: args.handleListNextDay,
     onPrevWeek: args.handleListPrevWeek,
@@ -346,16 +357,18 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
     listWindowPresetKey: args.listWindowPresetKey,
     onListWindowPresetChange: args.handleListWindowPresetChange,
     showUnchecked: listState.showUnchecked,
-    onShowUncheckedChange: listState.setShowUnchecked,
-    showChecked: listState.showChecked,
-    onShowCheckedChange: listState.setShowChecked,
-    showGoogle: listState.showGoogle,
-    onShowGoogleChange: listState.setShowGoogle,
+      onShowUncheckedChange: listState.setShowUnchecked,
+      showChecked: listState.showChecked,
+      onShowCheckedChange: listState.setShowChecked,
+      showGoogle: listState.showGoogle,
+      onShowGoogleChange: listState.setShowGoogle,
   };
 
   const listBody = useMemo<DesktopListViewProps>(
     () => ({
-      variant: isTagMode ? "tags" : "default",
+      variant: isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default",
+      searchQuery: args.searchQuery,
+      searchResults: args.searchResults,
       selectedTag,
       days: args.days,
       eventsByDay: args.eventsByDay,
@@ -387,6 +400,10 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.status,
       args.listReverse,
       isTagMode,
+      isSearchMode,
+      isOverdueMode,
+      args.searchQuery,
+      args.searchResults,
       selectedTag,
       listState.showUnchecked,
       listState.showChecked,
@@ -427,8 +444,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onMount: args.handleTimelineViewMount,
       onScroll: args.debouncedHandleScroll,
       registerAbScrollContainer: args.registerAbScrollContainer,
-      eventsByDay: args.eventsByDay,
-      abBuckets: args.abBuckets,
+      eventsByDay: timelineEventsByDay,
+      abBuckets: timelineBuckets,
       overdue: args.overdue,
       calendarEventsByDay: args.calendarEventsByDay,
       calendarAllDayByDay: args.calendarAllDayEventsByDay,
@@ -456,9 +473,18 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       contextMenuCardId: args.contextMenuCardId,
     },
     list: {
+      variant: (isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default") as
+        | "default"
+        | "tags"
+        | "search"
+        | "overdue",
+      summaryText: isTagMode && selectedTag ? `#${selectedTag}` : isSearchMode && args.searchQuery.trim() ? `"${args.searchQuery.trim()}"` : isOverdueMode ? "Overdue" : null,
+      searchResults: args.searchResults,
+      selectedTag,
       days: args.days,
       eventsByDay: args.eventsByDay,
       abBuckets: args.abBuckets,
+      overdue: args.overdue,
       calendarEventsByDay: args.calendarEventsByDay,
       calendarAllDayEventsByDay: args.calendarAllDayEventsByDay,
       openCardModal: args.openCardModal,
@@ -475,6 +501,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onListWindowPresetChange: args.handleListWindowPresetChange,
       listReverse: args.listReverse,
       onListBaseDateChange: args.handleListBaseDateChange,
+      showChecked: listState.showChecked,
+      showUnchecked: listState.showUnchecked,
+      showGoogle: listState.showGoogle,
     },
   };
 
