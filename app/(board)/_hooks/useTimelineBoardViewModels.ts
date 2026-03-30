@@ -131,6 +131,7 @@ type UseTimelineBoardViewModelsArgs = {
 
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
   const { onExpandedSectionChange, setSearchQuery, setSelectedTags } = args;
+  const { handleViewModeChange } = args;
   const selectedTag = args.selectedTags[0] ?? null;
   const isTagMode = args.expandedSectionKey === "tags";
 
@@ -145,13 +146,18 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
 
   const leftPanelActions = useMemo<DesktopSidebarMenuActions>(
     () => ({
-      onExpandedSectionChange,
+      onExpandedSectionChange: (key) => {
+        onExpandedSectionChange(key);
+        if (key === "search" || key === "tags") {
+          handleViewModeChange("list");
+        }
+      },
       onSearchQueryChange: setSearchQuery,
       onTagToggle: (value: string) =>
         setSelectedTags((prev) => (prev.length === 1 && prev[0] === value ? [] : [value])),
       onTagClear: () => setSelectedTags([]),
     }),
-    [onExpandedSectionChange, setSearchQuery, setSelectedTags]
+    [handleViewModeChange, onExpandedSectionChange, setSearchQuery, setSelectedTags]
   );
 
   const leftPanelSections = useMemo<DesktopSidebarSection[]>(

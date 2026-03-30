@@ -147,28 +147,34 @@ export function useTimelineFiltering(data: TimelineResponse | null) {
     }, [data?.events, data?.abBuckets, data?.overdue]);
 
     const tagSummaries = useMemo(() => {
-        const counts = new Map<string, number>();
+        const counts = new Map<string, Set<string>>();
 
         data?.events?.forEach((event) => {
             (event.tags ?? []).forEach((tag) => {
-                counts.set(tag, (counts.get(tag) ?? 0) + 1);
+                const next = counts.get(tag) ?? new Set<string>();
+                next.add(event.card_id);
+                counts.set(tag, next);
             });
         });
         Object.values(data?.abBuckets ?? {}).forEach((items) => {
             (items ?? []).forEach((item) => {
                 (item.tags ?? []).forEach((tag) => {
-                    counts.set(tag, (counts.get(tag) ?? 0) + 1);
+                    const next = counts.get(tag) ?? new Set<string>();
+                    next.add(item.card_id);
+                    counts.set(tag, next);
                 });
             });
         });
         (data?.overdue ?? []).forEach((item) => {
             (item.tags ?? []).forEach((tag) => {
-                counts.set(tag, (counts.get(tag) ?? 0) + 1);
+                const next = counts.get(tag) ?? new Set<string>();
+                next.add(item.card_id);
+                counts.set(tag, next);
             });
         });
 
         return Array.from(counts.entries())
-            .map(([name, count]) => ({ name, count }))
+            .map(([name, cardIds]) => ({ name, count: cardIds.size }))
             .sort((left, right) => {
                 if (right.count !== left.count) return right.count - left.count;
                 return left.name.localeCompare(right.name);
