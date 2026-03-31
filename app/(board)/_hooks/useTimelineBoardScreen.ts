@@ -97,6 +97,7 @@ type UseTimelineBoardScreenArgs = {
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
   tagResults: TimelineSearchResultItem[];
+  availableTags: string[];
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
@@ -250,6 +251,7 @@ export function useTimelineBoardScreen({
   setSearchQuery,
   searchResults,
   tagResults,
+  availableTags,
   selectedTags,
   setSelectedTags,
   tagSummaries,
@@ -573,6 +575,7 @@ export function useTimelineBoardScreen({
             card: modalCard,
             boards: availableBoards,
             profiles: modalProfiles,
+            availableTags,
             onSave: handleCardModalSave,
             onDelete: handleCardModalDelete,
             onMoveToBoard: () => {},

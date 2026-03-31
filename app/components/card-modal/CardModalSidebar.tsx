@@ -12,6 +12,7 @@ type CardModalSidebarProps = {
   boardId: string;
   profiles: ProfileSummary[];
   tags: string[];
+  availableTags: string[];
   tagInput: string;
   onTagInputChange: (value: string) => void;
   onTagInputKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
@@ -31,6 +32,7 @@ export default function CardModalSidebar({
   boardId,
   profiles,
   tags,
+  availableTags,
   tagInput,
   onTagInputChange,
   onTagInputKeyDown,
@@ -43,17 +45,17 @@ export default function CardModalSidebar({
   selectedHistoryId,
   onSelectHistory,
 }: CardModalSidebarProps) {
+  const tagSuggestionListId = `card-modal-tag-suggestions-${cardId}`;
+  const selectableTags = availableTags.filter((tag) => !tags.includes(tag));
+
   return (
     <div
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       className="flex-1 min-h-0 border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 w-full sm:flex-none sm:w-[var(--sidebar-width)]"
     >
-      <div className="flex-1 min-h-0 flex flex-col p-6">
-        <div className="space-y-6">
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-6 pt-3">
+        <div className="space-y-5">
           <section className="space-y-2" data-testid="card-modal-tags-panel">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
-              Tags
-            </label>
             <div className="flex flex-wrap items-center gap-2">
               <div className="w-[180px] max-w-full shrink-0">
                 <input
@@ -61,9 +63,15 @@ export default function CardModalSidebar({
                   value={tagInput}
                   onChange={(e) => onTagInputChange(e.target.value)}
                   onKeyDown={onTagInputKeyDown}
+                  list={tagSuggestionListId}
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 placeholder:text-slate-400"
-                  placeholder="+ Add tag..."
+                  placeholder="TAGS Add or Select"
                 />
+                <datalist id={tagSuggestionListId}>
+                  {selectableTags.map((tag) => (
+                    <option key={tag} value={tag} />
+                  ))}
+                </datalist>
               </div>
               {tags.map((tag) => (
                 <span

@@ -46,6 +46,7 @@ interface CardModalProps {
     card: Card;
     boards: Board[];
     profiles: ProfileSummary[];
+    availableTags?: string[];
     onSave: (payload: CardModalSavePayload) => void;
     onDelete: (id: string) => void;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
@@ -63,6 +64,7 @@ export function CardModal({
     onSave,
     onDelete,
     profiles,
+    availableTags = [],
     onMoveToBoard,
     onClose,
     isLoading,
@@ -171,6 +173,19 @@ export function CardModal({
         );
         return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
     }, [content]);
+
+    const mergedAvailableTags = useMemo(() => {
+        const nextTags = new Set<string>();
+        availableTags.forEach((tag) => {
+            const normalized = tag.trim();
+            if (normalized) nextTags.add(normalized);
+        });
+        tags.forEach((tag) => {
+            const normalized = tag.trim();
+            if (normalized) nextTags.add(normalized);
+        });
+        return Array.from(nextTags).sort((left, right) => left.localeCompare(right));
+    }, [availableTags, tags]);
 
     const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; forceHistorySnapshot?: boolean; }) => {
         const normalizedDueDate = dueDate || null;
@@ -438,13 +453,28 @@ export function CardModal({
         if (isHistoryPreviewing) return;
         if (e.key === 'Enter' && tagInput.trim()) {
             e.preventDefault();
-            if (!tags.includes(tagInput.trim())) {
-                setTags([...tags, tagInput.trim()]);
+            const nextTag = tagInput.trim();
+            if (!tags.includes(nextTag)) {
+                setTags([...tags, nextTag]);
                 triggerAutoSave();
             }
             setTagInput('');
         }
     };
+
+    const handleTagInputChange = useCallback((value: string) => {
+        if (isHistoryPreviewing) return;
+        setTagInput(value);
+
+        const trimmedValue = value.trim();
+        if (!trimmedValue || tags.includes(trimmedValue) || !mergedAvailableTags.includes(trimmedValue)) {
+            return;
+        }
+
+        setTags([...tags, trimmedValue]);
+        setTagInput('');
+        triggerAutoSave();
+    }, [isHistoryPreviewing, mergedAvailableTags, setTagInput, setTags, tags, triggerAutoSave]);
 
     const handleRemoveTag = (tagToRemove: string) => {
         if (isHistoryPreviewing) return;
@@ -878,8 +908,9 @@ export function CardModal({
                                 boardId={card.board_id}
                                 profiles={profiles}
                                 tags={tags}
+                                availableTags={mergedAvailableTags}
                                 tagInput={tagInput}
-                                onTagInputChange={setTagInput}
+                                onTagInputChange={handleTagInputChange}
                                 onTagInputKeyDown={handleAddTag}
                                 onRemoveTag={handleRemoveTag}
                                 activeTab={activeSidebarTab}
