@@ -31,9 +31,9 @@
 - CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/spec/keyboard-navigation.md` を参照すること。
 - 左パネルのセクション追加は、**別ページを新設せず** `/b/...` の既存レイアウト内で完結させることをデフォルトとする。
 - board navigation の canonical URL は `lp` / `rp` を使い、旧 `view` / `before` / `after` / `range` / `time` 契約は救済しない。契約外 URL は invalid URL として扱う。
-- left context (`lp`) が右パネルのデータ文脈を規定し、right panel (`rp`) は表示形のみを表す。desktop / mobile で別の state model を持たせない。
-- 左パネル項目ごとに右パネルを専用表示へ切り替えてよいが、ベースとなる見た目は Timeline 既存コンポーネントを再利用すること。
-- Tag セクションの右パネルは Tag 専用 List とし、日付移動・期間・Google 切替は置かず、`List` 見出し + `Unchecked` / `Checked` のみを表示する。
+- board navigation は no-exception contract を採用し、`lp` は left section、`rp` は right panel mode のみを表す。`lp` が `rp` を暗黙変更してはいけない。
+- canonical default は `lp=none&rp=timeline` とする。invalid URL からの reset 先も同一 canonical URL とする。
+- `Search` / `Overdue` / `Tags` は left self-contained とし、入力・選択・結果表示は左パネル内で完結させる。
 - 右パネル上部は今後も 2 段構成をデフォルトとし、1段目はレイアウト種別（例: `Timeline` / `List`）、2段目はその左パネル項目に対応する専用メニューを配置する。行高・余白は既存 Timeline / List ヘッダーに合わせて統一する。
 
 ## Build, Test, and Development Commands

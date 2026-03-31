@@ -2009,33 +2009,15 @@ test.describe('@feature:timeline Timeline view', () => {
       const overduePanel = page.getByTestId('desktop-sidebar-overdue-panel');
       const overdueCount = page.getByTestId('desktop-sidebar-overdue-panel-count');
       const searchToggle = page.getByTestId('desktop-sidebar-search-panel-toggle');
+      const timelineTab = page.getByRole('button', { name: 'Timeline' });
       const sidebarShell = page.getByTestId('desktop-sidebar-shell');
       const mainPanel = page.getByTestId('desktop-main-panel');
 
       await expect(overdueToggle).toBeVisible();
       await expect(overdueCount).toHaveText('1');
-      await expect(overduePanel).toBeVisible();
       await expect(sidebarShell).toBeVisible();
       await expect(mainPanel).toBeVisible();
-      await expect(page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible`).first()).toBeVisible();
-
-      const initialSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
-      const initialMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
-
-      await overdueToggle.click();
-      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'false');
-      await expect(overduePanel).toBeHidden();
-      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeLessThan(initialSidebarWidth);
-      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeGreaterThan(initialMainWidth);
-      const collapsedSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
-      const collapsedMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
-
-      await overdueToggle.click();
-      await expect(overdueToggle).toHaveAttribute('aria-expanded', 'true');
-      await expect(overduePanel).toBeVisible();
-      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(collapsedSidebarWidth);
-      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeLessThan(collapsedMainWidth);
-
+      await expect(timelineTab).toHaveAttribute('aria-current', 'page');
       const searchPanel = page.getByTestId('desktop-sidebar-search-panel');
       const searchCount = page.getByTestId('desktop-sidebar-search-panel-count');
       const searchInput = page.getByTestId('desktop-sidebar-search-input');
@@ -2047,39 +2029,46 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(searchToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(searchPanel).toBeVisible();
       await expect(searchInput).toBeVisible();
+      await expect(timelineTab).toHaveAttribute('aria-current', 'page');
       await expect(overdueToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(overduePanel).toBeHidden();
-      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(collapsedSidebarWidth);
 
       await searchInput.fill('Sidebar Search');
 
       await expect(searchCount).toHaveText('2');
       await expect(overdueCount).toHaveText('1');
+      await expect(timelineTab).toHaveAttribute('aria-current', 'page');
       await expect(page.locator(`[data-testid="search-card-overdue-${overdueCardId}"]:visible`).first()).toBeVisible();
       await expect(page.locator(`[data-testid="search-card-bucket-${bucketCardId}"]:visible`).first()).toBeVisible();
-
-      await searchToggle.click();
-      await expect(searchToggle).toHaveAttribute('aria-expanded', 'false');
-      await expect(searchPanel).toBeHidden();
-      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeLessThan(initialSidebarWidth);
-      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeGreaterThan(initialMainWidth);
 
       const listTab = page.getByRole('button', { name: 'List' });
       await listTab.click();
       await expect(listTab).toHaveAttribute('aria-current', 'page');
-      const listCollapsedSidebarWidth = await getElementWidth(sidebarShell, 'desktop sidebar shell');
-      const listCollapsedMainWidth = await getElementWidth(mainPanel, 'desktop main panel');
 
       await overdueToggle.click();
       await expect(overdueToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(overduePanel).toBeVisible();
       await expect(overdueCount).toHaveText('1');
       await expect(searchPanel).toBeHidden();
-      await expect.poll(() => getElementWidth(sidebarShell, 'desktop sidebar shell')).toBeGreaterThan(listCollapsedSidebarWidth);
-      await expect.poll(() => getElementWidth(mainPanel, 'desktop main panel')).toBeLessThan(listCollapsedMainWidth);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
     }
+  });
+
+  test('shows invalid url UI and resets to canonical default', async ({ page }) => {
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.goto(`${boardContext.canonicalPath}?lp=overdue`);
+
+    await expect(page.getByRole('heading', { name: 'Invalid/legacy URL' })).toBeVisible();
+    await expect(page.getByText('MISSING_RP')).toBeVisible();
+
+    await page.getByRole('button', { name: 'URLをリセット' }).click();
+    await expect(page).toHaveURL(new RegExp(`\\?lp=none&rp=timeline$`));
+    await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
   });
 
   test('toggles overdue sort order in the desktop sidebar', async ({ page }) => {

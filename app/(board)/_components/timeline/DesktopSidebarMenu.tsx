@@ -54,6 +54,7 @@ export type DesktopSidebarSection =
       label: string;
       count: number;
       tags: readonly TimelineTagSummary[];
+      results: readonly TimelineSearchResultItem[];
     };
 
 type DesktopSidebarMenuProps = {
@@ -330,6 +331,77 @@ function buildOverdueTimeText(item: TimelineOverdueItem) {
   });
 }
 
+function renderSidebarResultRows({
+  results,
+  shortcutSection,
+  openSource,
+  testIdPrefix,
+  onToggleCheck,
+  openCardModal,
+  onCardContextMenu,
+  onCardContextMenuByKeyboard,
+  contextMenuCardId,
+  selectedCardIds,
+  selectionLeadCardId,
+  onShiftSelect,
+  onClearSelection,
+  onActivateCard,
+  activeCardId,
+  activeLaneId,
+}: {
+  results: readonly TimelineSearchResultItem[];
+  shortcutSection: ShortcutSection;
+  openSource: string;
+  testIdPrefix: string;
+  onToggleCheck: (cardId: string, checked: boolean) => void;
+  openCardModal: (shortId: string | null, source: string) => void;
+  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
+  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
+  contextMenuCardId: string | null;
+  selectedCardIds: ReadonlySet<string>;
+  selectionLeadCardId: string | null;
+  onShiftSelect: (args: {
+    cardId: string;
+    laneId: string;
+    activeCardId: string | null;
+    activeLaneId: string | null;
+  }) => void;
+  onClearSelection: () => void;
+  onActivateCard: (cardId: string, laneId: string) => void;
+  activeCardId: string | null;
+  activeLaneId: string | null;
+}) {
+  return (
+    <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
+      {results.map((result) => (
+        <SidebarCardRow
+          key={`${result.kind}:${result.item.card_id}`}
+          item={result.item}
+          badgeLabel={result.badgeLabel}
+          timeText={result.timeText}
+          openSource={openSource}
+          shortcutSection={shortcutSection}
+          testId={`${testIdPrefix}-${result.kind}-${result.item.card_id}`}
+          className="bg-white"
+          onToggleCheck={onToggleCheck}
+          openCardModal={openCardModal}
+          onCardContextMenu={onCardContextMenu}
+          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+          isContextMenuOpen={contextMenuCardId === result.item.card_id}
+          isActive={selectionLeadCardId === result.item.card_id || activeCardId === result.item.card_id}
+          isSelected={selectedCardIds.has(result.item.card_id)}
+          selectionLane={shortcutSection}
+          onShiftSelect={onShiftSelect}
+          onClearSelection={onClearSelection}
+          onActivateCard={onActivateCard}
+          activeCardId={activeCardId}
+          activeLaneId={activeLaneId}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function DesktopSidebarMenu({
   state,
   actions,
@@ -443,7 +515,7 @@ export function DesktopSidebarMenu({
             {!state.searchQuery.trim() ? (
               <div className="px-3 py-4">
                 <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  キーワードを入れると、右パネルに検索結果を表示します
+                  キーワードを入れると、このパネル内に一致カードを表示します
                 </p>
               </div>
             ) : section.results.length === 0 ? (
@@ -453,10 +525,25 @@ export function DesktopSidebarMenu({
                 </p>
               </div>
             ) : (
-              <div className="px-3 py-4">
-                <p className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-600">
-                  {section.results.length} 件の一致があります。右パネルの List で確認できます。
-                </p>
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+                {renderSidebarResultRows({
+                  results: section.results,
+                  shortcutSection: "search",
+                  openSource: "search",
+                  testIdPrefix: "search-card",
+                  onToggleCheck,
+                  openCardModal,
+                  onCardContextMenu,
+                  onCardContextMenuByKeyboard,
+                  contextMenuCardId,
+                  selectedCardIds,
+                  selectionLeadCardId,
+                  onShiftSelect,
+                  onClearSelection,
+                  onActivateCard,
+                  activeCardId,
+                  activeLaneId,
+                })}
               </div>
             )}
           </div>
@@ -488,29 +575,64 @@ export function DesktopSidebarMenu({
               </p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {section.tags.map((tag) => {
-                const selected = state.selectedTags.includes(tag.name);
-                return (
-                  <button
-                    key={tag.name}
-                    type="button"
-                    onClick={() => actions.onTagToggle(tag.name)}
-                    data-testid={`desktop-sidebar-tag-${tag.name}`}
-                    className={clsx(
-                      "flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left transition",
-                      selected
-                        ? "border-slate-300 bg-white text-slate-900 shadow-sm"
-                        : "border-transparent bg-white/60 text-slate-700 hover:border-slate-200 hover:bg-white"
-                    )}
-                  >
-                    <span className="min-w-0 truncate text-sm font-medium">#{tag.name}</span>
-                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                      {tag.count}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                {section.tags.map((tag) => {
+                  const selected = state.selectedTags.includes(tag.name);
+                  return (
+                    <button
+                      key={tag.name}
+                      type="button"
+                      onClick={() => actions.onTagToggle(tag.name)}
+                      data-testid={`desktop-sidebar-tag-${tag.name}`}
+                      className={clsx(
+                        "flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left transition",
+                        selected
+                          ? "border-slate-300 bg-white text-slate-900 shadow-sm"
+                          : "border-transparent bg-white/60 text-slate-700 hover:border-slate-200 hover:bg-white"
+                      )}
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium">#{tag.name}</span>
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                        {tag.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {state.selectedTags.length === 0 ? (
+                <div className="px-1 py-1">
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                    タグを選ぶと、このパネル内に一致カードを表示します
+                  </p>
+                </div>
+              ) : section.results.length === 0 ? (
+                <div className="px-1 py-1">
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                    選択中のタグに一致するカードはありません
+                  </p>
+                </div>
+              ) : (
+                renderSidebarResultRows({
+                  results: section.results,
+                  shortcutSection: "search",
+                  openSource: "tag-sidebar",
+                  testIdPrefix: "tag-card",
+                  onToggleCheck,
+                  openCardModal,
+                  onCardContextMenu,
+                  onCardContextMenuByKeyboard,
+                  contextMenuCardId,
+                  selectedCardIds,
+                  selectionLeadCardId,
+                  onShiftSelect,
+                  onClearSelection,
+                  onActivateCard,
+                  activeCardId,
+                  activeLaneId,
+                })
+              )}
             </div>
           )}
         </div>

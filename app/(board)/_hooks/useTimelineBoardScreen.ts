@@ -96,6 +96,7 @@ type UseTimelineBoardScreenArgs = {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
+  tagResults: TimelineSearchResultItem[];
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
@@ -248,6 +249,7 @@ export function useTimelineBoardScreen({
   searchQuery,
   setSearchQuery,
   searchResults,
+  tagResults,
   selectedTags,
   setSelectedTags,
   tagSummaries,
@@ -387,6 +389,7 @@ export function useTimelineBoardScreen({
     searchQuery,
     setSearchQuery,
     searchResults,
+    tagResults,
     selectedTags,
     setSelectedTags,
     tagSummaries,
@@ -518,7 +521,7 @@ export function useTimelineBoardScreen({
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
       contextBar:
-        activeLeftPanelMode !== "none" && activeLeftPanelMode !== "timeline-nav"
+        activeLeftPanelMode !== "none"
           ? {
               label:
                 activeLeftPanelMode === "tags"

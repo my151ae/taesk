@@ -14,13 +14,8 @@ import {
 import { getPresetLabel } from '@/app/(board)/_hooks/useTimelineBoardController';
 import type { ListWindowPresetKey } from '@/app/(board)/_hooks/useTimelineUrlState';
 import { TimelineListCard } from '@/app/(board)/_components/timeline/TimelineListCard';
-import type { TimelineSearchResultItem } from '@/app/(board)/_hooks/useTimelineFiltering';
 
 type MobileListViewProps = {
-    variant?: 'default' | 'tags' | 'search' | 'overdue';
-    summaryText?: string | null;
-    searchResults?: TimelineSearchResultItem[];
-    selectedTag?: string | null;
     days: TimelineDay[];
     eventsByDay: Record<string, TimelineEvent[]>;
     abBuckets: Record<string, TimelineBucketItem[]>;
@@ -47,10 +42,6 @@ type MobileListViewProps = {
 };
 
 export default function MobileListView({
-    variant = 'default',
-    summaryText,
-    searchResults = [],
-    selectedTag,
     days,
     eventsByDay,
     abBuckets,
@@ -142,136 +133,6 @@ export default function MobileListView({
     ]);
 
     const displayDays = listReverse ? [...daysWithEvents].reverse() : daysWithEvents;
-
-    const tagItems = useMemo(() => {
-        if (variant !== 'tags') return [];
-        const allItems = [
-            ...Object.values(eventsByDay).flat().map((item) => ({ kind: 'event' as const, item, bucketLabel: undefined })),
-            ...Object.entries(abBuckets).flatMap(([bucketKey, items]) => items.map((item) => ({
-                kind: 'bucket' as const,
-                item,
-                bucketLabel: bucketKey.endsWith('_a') ? 'A' : 'B',
-            }))),
-            ...overdue.map((item) => ({ kind: 'overdue' as const, item, bucketLabel: undefined })),
-        ];
-
-        return allItems
-            .filter(({ item }) => !selectedTag || (item.tags ?? []).includes(selectedTag))
-            .filter(({ item }) => (item.checked ? showChecked : showUnchecked));
-    }, [variant, eventsByDay, abBuckets, overdue, selectedTag, showChecked, showUnchecked]);
-
-    const overdueItems = useMemo(
-        () => overdue.filter((item) => (item.checked ? showChecked : showUnchecked)),
-        [overdue, showChecked, showUnchecked],
-    );
-
-    if (variant === 'search') {
-        return (
-            <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
-                    {summaryText ? <div className="text-xs font-medium text-slate-600">{summaryText}</div> : null}
-                </div>
-                <div className="px-4 py-3">
-                    {searchResults.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                            一致するカードはありません
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {searchResults.map((result) => (
-                                <TimelineListCard
-                                    key={`${result.kind}:${result.item.card_id}`}
-                                    item={result.item}
-                                    kind={result.kind}
-                                    variant="mobile"
-                                    openSource="mobile-search-list-view"
-                                    bucketLabel={result.kind === 'bucket' ? result.badgeLabel : undefined}
-                                    openCardModal={openCardModal}
-                                    onToggleCheck={onToggleCheck}
-                                    onCardContextMenu={onCardContextMenu}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
-    if (variant === 'tags') {
-        return (
-            <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
-                    {summaryText ? <div className="text-xs font-medium text-slate-600">{summaryText}</div> : null}
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                        <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
-                            <input type="checkbox" checked={showUnchecked} onChange={(e) => setShowUnchecked(e.target.checked)} />
-                            Unchecked
-                        </label>
-                        <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">
-                            <input type="checkbox" checked={showChecked} onChange={(e) => setShowChecked(e.target.checked)} />
-                            Checked
-                        </label>
-                    </div>
-                </div>
-                <div className="px-4 py-3">
-                    {tagItems.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                            該当するカードはありません
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {tagItems.map((entry) => (
-                                <TimelineListCard
-                                    key={`${entry.kind}:${entry.item.card_id}`}
-                                    item={entry.item}
-                                    kind={entry.kind}
-                                    variant="mobile"
-                                    openSource="mobile-tag-list-view"
-                                    bucketLabel={entry.bucketLabel}
-                                    openCardModal={openCardModal}
-                                    onToggleCheck={onToggleCheck}
-                                    onCardContextMenu={onCardContextMenu}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
-    if (variant === 'overdue') {
-        return (
-            <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
-                    {summaryText ? <div className="text-xs font-medium text-slate-600">{summaryText}</div> : null}
-                </div>
-                <div className="px-4 py-3">
-                    {overdueItems.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                            未完了の期限超過カードはありません
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {overdueItems.map((item) => (
-                                <TimelineListCard
-                                    key={item.card_id}
-                                    item={item}
-                                    kind="overdue"
-                                    variant="mobile"
-                                    openSource="mobile-overdue-list-view"
-                                    openCardModal={openCardModal}
-                                    onToggleCheck={onToggleCheck}
-                                    onCardContextMenu={onCardContextMenu}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">

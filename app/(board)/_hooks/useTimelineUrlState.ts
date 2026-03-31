@@ -12,7 +12,7 @@ type UseTimelineUrlStateArgs = {
 };
 
 export type TimelineViewMode = "timeline" | "list";
-export type LeftPanelMode = "none" | "timeline-nav" | "overdue" | "tags" | "search";
+export type LeftPanelMode = "none" | "overdue" | "tags" | "search";
 export type RightPanelMode = "timeline" | "list";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
@@ -29,17 +29,13 @@ export type BoardUiState = {
   leftPanel: {
     mode: LeftPanelMode;
     state: {
-      date?: string | null;
       tag?: string | null;
       q?: string | null;
     };
   };
   rightPanel: {
     mode: RightPanelMode;
-    state: {
-      checked?: boolean;
-      unchecked?: boolean;
-    };
+    state: Record<string, never>;
   };
 };
 
@@ -115,7 +111,7 @@ type ParseDefaults = {
 };
 
 const LEGACY_KEYS = new Set(["view", "range", "before", "after", "time"]);
-const KNOWN_KEYS = new Set(["lp", "rp", "date", "tag", "q", "checked", "unchecked", "card"]);
+const KNOWN_KEYS = new Set(["lp", "rp", "date", "tag", "q", "card"]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ZERO_LIST_WINDOW: ListWindow = { before: 15, after: 15 };
 
@@ -146,13 +142,6 @@ const normalizeQueryValue = (value: string | null) => {
   return { ok: true as const, value: trimmed.length > 0 ? trimmed : null };
 };
 
-const parseBooleanStrict = (value: string | null) => {
-  if (value == null) return { ok: true as const, value: null };
-  if (value === "1") return { ok: true as const, value: true };
-  if (value === "0") return { ok: true as const, value: false };
-  return { ok: false as const };
-};
-
 const isValidIsoDate = (value: string) => {
   if (!ISO_DATE_PATTERN.test(value)) return false;
   const [yearRaw, monthRaw, dayRaw] = value.split("-");
@@ -180,7 +169,7 @@ const normalizeListWindow = (before: number, after: number): ListWindow => {
 };
 
 const isLeftPanelMode = (value: string | null): value is LeftPanelMode =>
-  value === "none" || value === "timeline-nav" || value === "overdue" || value === "tags" || value === "search";
+  value === "none" || value === "overdue" || value === "tags" || value === "search";
 
 const isRightPanelMode = (value: string | null): value is RightPanelMode =>
   value === "timeline" || value === "list";
@@ -193,10 +182,10 @@ const buildDefaultResolvedState = (
   hasQuery,
   hasExplicitBoardState: false,
   view: "timeline",
-  leftPanelMode: "overdue",
+  leftPanelMode: "none",
   rightPanelMode: "timeline",
   boardUiState: {
-    leftPanel: { mode: "overdue", state: { date: null, tag: null, q: null } },
+    leftPanel: { mode: "none", state: { tag: null, q: null } },
     rightPanel: { mode: "timeline", state: {} },
   },
   date: null,
@@ -238,56 +227,15 @@ export function normalizeBoardUiState(
   let showChecked = input.showChecked ?? true;
   let showUnchecked = input.showUnchecked ?? true;
 
-  if (leftPanelMode === "none" && rightPanelMode === "timeline") {
-    leftPanelMode = "timeline-nav";
-  }
-  if (leftPanelMode === "timeline-nav") {
-    rightPanelMode = "timeline";
-  }
-  if (leftPanelMode === "tags") {
-    rightPanelMode = "list";
-  }
-  if (leftPanelMode === "search") {
-    rightPanelMode = "list";
-  }
-  if (leftPanelMode === "none") {
-    rightPanelMode = "list";
-  }
-  if (leftPanelMode === "overdue" && rightPanelMode !== "timeline" && rightPanelMode !== "list") {
-    rightPanelMode = "timeline";
-  }
-
-  if (leftPanelMode === "tags" && searchQuery) {
-    searchQuery = "";
-  } else if (leftPanelMode === "search" && tag) {
-    tag = null;
-  } else if (searchQuery && tag) {
-    if (leftPanelMode === "search") {
-      tag = null;
-    } else if (leftPanelMode === "tags") {
-      searchQuery = "";
-    } else {
-      leftPanelMode = "search";
-      rightPanelMode = "list";
-      tag = null;
-    }
-  } else if (searchQuery && leftPanelMode !== "search") {
-    leftPanelMode = "search";
-    rightPanelMode = "list";
-  } else if (tag && leftPanelMode !== "tags") {
-    leftPanelMode = "tags";
-    rightPanelMode = "list";
-  }
-
-  if (!(leftPanelMode === "timeline-nav" && rightPanelMode === "timeline")) {
+  if (rightPanelMode !== "timeline") {
     date = null;
   }
-  if (!(leftPanelMode === "tags" && rightPanelMode === "list")) {
+  if (leftPanelMode !== "tags") {
     tag = null;
     showChecked = true;
     showUnchecked = true;
   }
-  if (!(leftPanelMode === "search" && rightPanelMode === "list")) {
+  if (leftPanelMode !== "search") {
     searchQuery = "";
   }
 
@@ -304,21 +252,11 @@ export function normalizeBoardUiState(
       leftPanel: {
         mode: leftPanelMode,
         state: {
-          date,
           tag,
           q: searchQuery || null,
         },
       },
-      rightPanel: {
-        mode: rightPanelMode,
-        state:
-          leftPanelMode === "tags" && rightPanelMode === "list"
-            ? {
-                checked: showChecked,
-                unchecked: showUnchecked,
-              }
-            : {},
-      },
+      rightPanel: { mode: rightPanelMode, state: {} },
     },
     date,
     time: null,
@@ -355,15 +293,13 @@ export function serializeBoardUiStateToSearchParams(args: {
   params.set("lp", normalized.leftPanelMode);
   params.set("rp", normalized.rightPanelMode);
 
-  if (normalized.leftPanelMode === "timeline-nav" && normalized.rightPanelMode === "timeline" && normalized.date) {
+  if (normalized.rightPanelMode === "timeline" && normalized.date) {
     params.set("date", normalized.date);
   }
-  if (normalized.leftPanelMode === "tags" && normalized.rightPanelMode === "list" && normalized.tag) {
+  if (normalized.leftPanelMode === "tags" && normalized.tag) {
     params.set("tag", normalized.tag);
-    params.set("checked", normalized.showChecked ? "1" : "0");
-    params.set("unchecked", normalized.showUnchecked ? "1" : "0");
   }
-  if (normalized.leftPanelMode === "search" && normalized.rightPanelMode === "list" && normalized.searchQuery) {
+  if (normalized.leftPanelMode === "search" && normalized.searchQuery) {
     params.set("q", normalized.searchQuery);
   }
 
@@ -416,7 +352,7 @@ export function parseBoardUiStateFromSearchParams(
   }
 
   const rawRp = searchParams.get("rp");
-  if (!rawRp && rawLp !== "overdue") {
+  if (!rawRp) {
     return { parseResult: { ok: false, code: "MISSING_RP" }, resolvedState: defaultResolved };
   }
   if (rawRp && !isRightPanelMode(rawRp)) {
@@ -436,24 +372,13 @@ export function parseBoardUiStateFromSearchParams(
   if (!parsedQuery.ok) {
     return { parseResult: { ok: false, code: "INVALID_Q" }, resolvedState: defaultResolved };
   }
-  const parsedChecked = parseBooleanStrict(searchParams.get("checked"));
-  if (!parsedChecked.ok) {
-    return { parseResult: { ok: false, code: "INVALID_CHECKED" }, resolvedState: defaultResolved };
-  }
-  const parsedUnchecked = parseBooleanStrict(searchParams.get("unchecked"));
-  if (!parsedUnchecked.ok) {
-    return { parseResult: { ok: false, code: "INVALID_UNCHECKED" }, resolvedState: defaultResolved };
-  }
-
   const normalized = normalizeBoardUiState(
     {
       leftPanelMode: rawLp,
-      rightPanelMode: (rawRp ?? "timeline") as RightPanelMode,
+      rightPanelMode: rawRp,
       date: rawDate,
       tag: parsedTag.value,
       searchQuery: parsedQuery.value,
-      showChecked: parsedChecked.value ?? true,
-      showUnchecked: parsedUnchecked.value ?? true,
     },
     safeDefaults,
   );
@@ -554,10 +479,8 @@ export const useTimelineUrlState = ({
 
   const updateUrlForTimeline = useCallback(
     ({ date, method, card }: TimelineUrlUpdateArgs) => {
-      const nextLeftPanelMode: LeftPanelMode =
-        resolvedState.leftPanelMode === "overdue" ? "overdue" : "timeline-nav";
       updateBoardUiState({
-        leftPanelMode: nextLeftPanelMode,
+        leftPanelMode: resolvedState.leftPanelMode,
         rightPanelMode: "timeline",
         date: date ?? resolvedState.date ?? todayJstIso(),
         card,
@@ -569,10 +492,8 @@ export const useTimelineUrlState = ({
 
   const updateUrlForList = useCallback(
     ({ method, card }: ListUrlUpdateArgs) => {
-      const nextLeftPanelMode: LeftPanelMode =
-        resolvedState.leftPanelMode === "timeline-nav" ? "none" : resolvedState.leftPanelMode;
       updateBoardUiState({
-        leftPanelMode: nextLeftPanelMode,
+        leftPanelMode: resolvedState.leftPanelMode,
         rightPanelMode: "list",
         card,
         method,

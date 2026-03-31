@@ -5,10 +5,11 @@
 ## UI Scope
 
 現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
-- 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で右パネル表示を切り替える方針をデフォルトとする。
-- board navigation / URL state の canonical contract は `lp` / `rp` を使い、left context が right panel のデータ文脈を規定する。
+- 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で完結させることをデフォルトとする。
+- board navigation / URL state の canonical contract は strict `lp` / `rp` を使い、`lp` は left section、`rp` は right panel mode のみを表す。
 - desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
-- Tag はその最初の適用例で、右パネルは Tag 専用 List を使い、日付移動・表示期間・Google 切替は持たない。
+- canonical default は `lp=none&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
+- `Search` / `Overdue` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
 
 ## 📋 Table of Contents

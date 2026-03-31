@@ -84,6 +84,7 @@ type UseTimelineBoardViewModelsArgs = {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
+  tagResults: TimelineSearchResultItem[];
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
@@ -134,10 +135,6 @@ type UseTimelineBoardViewModelsArgs = {
 
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
   const { onExpandedSectionChange, setSearchQuery, setSelectedTags } = args;
-  const selectedTag = args.selectedTags[0] ?? null;
-  const isTagMode = args.activeLeftPanelMode === "tags";
-  const isSearchMode = args.activeLeftPanelMode === "search";
-  const isOverdueMode = args.activeLeftPanelMode === "overdue";
   const activeSidebarSectionKey = args.activeLeftSectionKey;
 
   const leftPanelState = useMemo<DesktopSidebarMenuState>(
@@ -186,24 +183,18 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         label: "Tag",
         count: args.tagSummaries.length,
         tags: args.tagSummaries,
+        results: args.tagResults,
       },
     ],
-    [args.overdue, args.searchQuery, args.searchResults, args.tagSummaries]
+    [args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries]
   );
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(
-    () => {
-      if (args.activeLeftPanelMode === "timeline-nav") return ["timeline", "list"];
-      if (args.activeLeftPanelMode === "overdue") return ["timeline", "list"];
-      if (args.activeLeftPanelMode === "none") return ["timeline", "list"];
-      return ["list"];
-    },
-    [args.activeLeftPanelMode]
+    () => ["timeline", "list"],
+    []
   );
-  const fallbackKey = args.activeLeftPanelMode === "overdue" || args.activeLeftPanelMode === "timeline-nav"
-    ? "timeline"
-    : "list";
-  const activeKey = availableKeys.includes(args.viewMode) ? args.viewMode : fallbackKey;
+  const fallbackKey: DesktopMainPanelViewMode = args.viewMode;
+  const activeKey = args.viewMode;
 
   const listState = useDesktopListState({
     listBaseDate: args.listBaseDate,
@@ -338,9 +329,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   );
 
   const listToolbar: DesktopListToolbarProps = {
-    variant: isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default",
-    title: "List",
-    summaryText: isTagMode && selectedTag ? `#${selectedTag}` : isSearchMode && args.searchQuery.trim() ? `"${args.searchQuery.trim()}"` : isOverdueMode ? "Overdue" : null,
     onPrevDay: args.handleListPrevDay,
     onNextDay: args.handleListNextDay,
     onPrevWeek: args.handleListPrevWeek,
@@ -366,10 +354,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
 
   const listBody = useMemo<DesktopListViewProps>(
     () => ({
-      variant: isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default",
-      searchQuery: args.searchQuery,
-      searchResults: args.searchResults,
-      selectedTag,
       days: args.days,
       eventsByDay: args.eventsByDay,
       abBuckets: args.abBuckets,
@@ -399,12 +383,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.handleCardContextMenu,
       args.status,
       args.listReverse,
-      isTagMode,
-      isSearchMode,
-      isOverdueMode,
-      args.searchQuery,
-      args.searchResults,
-      selectedTag,
       listState.showUnchecked,
       listState.showChecked,
       listState.showGoogle,
@@ -473,14 +451,6 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       contextMenuCardId: args.contextMenuCardId,
     },
     list: {
-      variant: (isTagMode ? "tags" : isSearchMode ? "search" : isOverdueMode ? "overdue" : "default") as
-        | "default"
-        | "tags"
-        | "search"
-        | "overdue",
-      summaryText: isTagMode && selectedTag ? `#${selectedTag}` : isSearchMode && args.searchQuery.trim() ? `"${args.searchQuery.trim()}"` : isOverdueMode ? "Overdue" : null,
-      searchResults: args.searchResults,
-      selectedTag,
       days: args.days,
       eventsByDay: args.eventsByDay,
       abBuckets: args.abBuckets,

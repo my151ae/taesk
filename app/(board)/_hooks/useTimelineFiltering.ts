@@ -61,6 +61,72 @@ const compareSearchResults = (a: TimelineSearchResultItem, b: TimelineSearchResu
     return (a.item.title ?? "").localeCompare(b.item.title ?? "");
 };
 
+const dedupeSearchResults = (results: TimelineSearchResultItem[]) => {
+    const uniqueItems = new Map<string, TimelineSearchResultItem>();
+    results
+        .sort(compareSearchResults)
+        .forEach((entry) => {
+            if (!uniqueItems.has(entry.item.card_id)) {
+                uniqueItems.set(entry.item.card_id, entry);
+            }
+        });
+    return Array.from(uniqueItems.values());
+};
+
+const collectSidebarResults = ({
+    data,
+    includeItem,
+}: {
+    data: TimelineResponse;
+    includeItem: (item: TimelineSidebarCardItem) => boolean;
+}) => {
+    const results: TimelineSearchResultItem[] = [];
+
+    data.overdue.forEach((item) => {
+        if (!includeItem(item)) return;
+        results.push({
+            kind: "overdue",
+            item,
+            badgeLabel: item.due_bucket?.toUpperCase() ?? "O",
+            timeText: buildTimelineCardTimeText(item, {
+                includeDate: true,
+                includeDuration: true,
+            }),
+        });
+    });
+
+    data.events.forEach((item) => {
+        if (!includeItem(item)) return;
+        results.push({
+            kind: "event",
+            item,
+            badgeLabel: item.due_bucket?.toUpperCase() ?? "T",
+            timeText: buildTimelineCardTimeText(item, {
+                includeDate: true,
+                includeDuration: true,
+            }),
+        });
+    });
+
+    Object.entries(data.abBuckets).forEach(([bucketKey, items]) => {
+        const badgeLabel = bucketKey.endsWith("_a") ? "A" : bucketKey.endsWith("_b") ? "B" : "L";
+        items.forEach((item) => {
+            if (!includeItem(item)) return;
+            results.push({
+                kind: "bucket",
+                item,
+                badgeLabel,
+                timeText: buildTimelineCardTimeText(item, {
+                    includeDate: true,
+                    includeDuration: true,
+                }),
+            });
+        });
+    });
+
+    return dedupeSearchResults(results);
+};
+
 type UseTimelineFilteringArgs = {
     initialSearchQuery?: string;
     initialSelectedTags?: string[];
@@ -105,53 +171,20 @@ export function useTimelineFiltering(
 
     const searchResults = useMemo(() => {
         if (!data || !searchQuery.trim()) return [] as TimelineSearchResultItem[];
-
-        const results: TimelineSearchResultItem[] = [];
-
-        data.overdue.forEach((item) => {
-            if (!matchesSearchQuery(item, searchQuery)) return;
-            results.push({
-                kind: "overdue",
-                item,
-                badgeLabel: item.due_bucket?.toUpperCase() ?? "O",
-                timeText: buildTimelineCardTimeText(item, {
-                    includeDate: true,
-                    includeDuration: true,
-                }),
-            });
+        return collectSidebarResults({
+            data,
+            includeItem: (item) => matchesSearchQuery(item, searchQuery),
         });
-
-        data.events.forEach((item) => {
-            if (!matchesSearchQuery(item, searchQuery)) return;
-            results.push({
-                kind: "event",
-                item,
-                badgeLabel: item.due_bucket?.toUpperCase() ?? "T",
-                timeText: buildTimelineCardTimeText(item, {
-                    includeDate: true,
-                    includeDuration: true,
-                }),
-            });
-        });
-
-        Object.entries(data.abBuckets).forEach(([bucketKey, items]) => {
-            const badgeLabel = bucketKey.endsWith("_a") ? "A" : bucketKey.endsWith("_b") ? "B" : "L";
-            items.forEach((item) => {
-                if (!matchesSearchQuery(item, searchQuery)) return;
-                results.push({
-                    kind: "bucket",
-                    item,
-                    badgeLabel,
-                    timeText: buildTimelineCardTimeText(item, {
-                        includeDate: true,
-                        includeDuration: true,
-                    }),
-                });
-            });
-        });
-
-        return results.sort(compareSearchResults);
     }, [data, searchQuery]);
+
+    const tagResults = useMemo(() => {
+        const selectedTag = selectedTags[0];
+        if (!data || !selectedTag) return [] as TimelineSearchResultItem[];
+        return collectSidebarResults({
+            data,
+            includeItem: (item) => (item.tags ?? []).includes(selectedTag),
+        });
+    }, [data, selectedTags]);
 
     const hasActiveFilters = useMemo(() => {
         return searchQuery.trim() !== '';
@@ -217,6 +250,7 @@ export function useTimelineFiltering(
         setShowFilters,
         filteredData,
         searchResults,
+        tagResults,
         hasActiveFilters,
         availableTags,
         tagSummaries,

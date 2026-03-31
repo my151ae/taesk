@@ -303,6 +303,7 @@ function TimelineBoardPageContent({
     setSearchQuery,
     filteredData,
     searchResults,
+    tagResults,
     selectedTags,
     setSelectedTags,
     tagSummaries,
@@ -651,7 +652,6 @@ function TimelineBoardPageContent({
       setSearchQuery(value);
       updateBoardUiState({
         leftPanelMode: "search",
-        rightPanelMode: "list",
         searchQuery: value,
         method: "replace",
       });
@@ -665,7 +665,6 @@ function TimelineBoardPageContent({
       setSelectedTags(next);
       updateBoardUiState({
         leftPanelMode: "tags",
-        rightPanelMode: "list",
         tag: next[0] ?? null,
         method: "replace",
       });
@@ -692,7 +691,6 @@ function TimelineBoardPageContent({
       if (key === "overdue") {
         updateBoardUiState({
           leftPanelMode: "overdue",
-          rightPanelMode: "timeline",
           method: "replace",
         });
         return;
@@ -701,7 +699,6 @@ function TimelineBoardPageContent({
       if (key === "search") {
         updateBoardUiState({
           leftPanelMode: "search",
-          rightPanelMode: "list",
           searchQuery,
           method: "replace",
         });
@@ -710,7 +707,6 @@ function TimelineBoardPageContent({
 
       updateBoardUiState({
         leftPanelMode: "tags",
-        rightPanelMode: "list",
         tag: selectedTags[0] ?? resolvedState.tag ?? null,
         method: "replace",
       });
@@ -721,7 +717,6 @@ function TimelineBoardPageContent({
   const handleResetToDefaultList = useCallback(() => {
     updateBoardUiState({
       leftPanelMode: "none",
-      rightPanelMode: "list",
       method: "replace",
     });
     setExpandedSectionKey(null);
@@ -808,6 +803,7 @@ function TimelineBoardPageContent({
     searchQuery,
     setSearchQuery: handleSearchQueryChange,
     searchResults,
+    tagResults,
     selectedTags,
     setSelectedTags: handleSelectedTagsChange,
     tagSummaries,
@@ -889,10 +885,32 @@ function TimelineBoardPageContent({
     <TimelineBoardScreen
       parseResult={{ ok: true }}
       onResetInvalidUrl={() => {
-        router.replace(basePath, { scroll: false });
+        const params = serializeBoardUiStateToSearchParams({
+          state: {
+            leftPanelMode: "none",
+            rightPanelMode: "timeline",
+            date: null,
+            tag: null,
+            searchQuery: "",
+            showChecked: true,
+            showUnchecked: true,
+          },
+        });
+        router.replace(`${basePath}?${params.toString()}`, { scroll: false });
       }}
       onMoveToCanonicalUrl={() => {
-        router.replace(basePath, { scroll: false });
+        const params = serializeBoardUiStateToSearchParams({
+          state: {
+            leftPanelMode: "none",
+            rightPanelMode: "timeline",
+            date: null,
+            tag: null,
+            searchQuery: "",
+            showChecked: true,
+            showUnchecked: true,
+          },
+        });
+        router.replace(`${basePath}?${params.toString()}`, { scroll: false });
       }}
       {...screen}
       contextMenu={
@@ -953,13 +971,24 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   });
 
   const handleResetInvalidUrl = useCallback(() => {
-    router.replace(basePath, { scroll: false });
+    const params = serializeBoardUiStateToSearchParams({
+      state: {
+        leftPanelMode: "none",
+        rightPanelMode: "timeline",
+        date: null,
+        tag: null,
+        searchQuery: "",
+        showChecked: true,
+        showUnchecked: true,
+      },
+    });
+    router.replace(`${basePath}?${params.toString()}`, { scroll: false });
   }, [basePath, router]);
 
   const handleMoveToCanonicalUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "overdue",
+        leftPanelMode: "none",
         rightPanelMode: "timeline",
         date: null,
         tag: null,
