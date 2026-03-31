@@ -375,7 +375,7 @@ export function parseBoardUiStateFromSearchParams(
   const normalized = normalizeBoardUiState(
     {
       leftPanelMode: rawLp,
-      rightPanelMode: rawRp,
+      rightPanelMode: rawRp as RightPanelMode,
       date: rawDate,
       tag: parsedTag.value,
       searchQuery: parsedQuery.value,
