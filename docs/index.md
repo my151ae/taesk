@@ -8,7 +8,7 @@
 - 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で完結させることをデフォルトとする。
 - board navigation / URL state の canonical contract は strict `lp` / `rp` を使い、`lp` は left section、`rp` は right panel mode のみを表す。
 - desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
-- canonical default は `lp=none&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
+- canonical default は `lp=overdue&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
 - `Search` / `Overdue` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
 

@@ -12,6 +12,15 @@ const defaults = {
 };
 
 test.describe("board navigation canonical url helpers", () => {
+  test("empty query resolves to overdue timeline default", async () => {
+    const parsed = parseBoardUiStateFromSearchParams(new URLSearchParams(), defaults);
+
+    expect(parsed.parseResult).toEqual({ ok: true });
+    expect(parsed.resolvedState.leftPanelMode).toBe("overdue");
+    expect(parsed.resolvedState.rightPanelMode).toBe("timeline");
+    expect(parsed.resolvedState.date).toBeNull();
+  });
+
   test("search timeline round-trip preserves q without forcing list", async () => {
     const params = serializeBoardUiStateToSearchParams({
       state: {

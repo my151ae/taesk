@@ -2067,7 +2067,7 @@ test.describe('@feature:timeline Timeline view', () => {
     await expect(page.getByText('MISSING_RP')).toBeVisible();
 
     await page.getByRole('button', { name: 'URLをリセット' }).click();
-    await expect(page).toHaveURL(new RegExp(`\\?lp=none&rp=timeline$`));
+    await expect(page).toHaveURL(new RegExp(`\\?lp=overdue&rp=timeline$`));
     await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
   });
 

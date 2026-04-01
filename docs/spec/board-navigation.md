@@ -4,7 +4,7 @@
 
 - `lp` は left panel section、`rp` は right panel mode を表す。
 - `lp` は `rp` を変更しない。left/right の state model は完全に分離する。
-- canonical default は `lp=none&rp=timeline`。
+- canonical default は `lp=overdue&rp=timeline`。
 - `Search` / `Overdue` / `Tags` は left self-contained とし、right-panel dedicated view は持たせない。
 
 ## Panel Ownership
@@ -31,7 +31,7 @@
 - 旧 `view` / `before` / `after` / `range` / `time` query は invalid URL とする。
 - `lp` または `rp` が欠ける URL は invalid URL とする。
 - contract 外の mode や query も invalid URL とする。
-- invalid URL の reset / canonical move 先は `lp=none&rp=timeline`。
+- invalid URL の reset / canonical move 先は `lp=overdue&rp=timeline`。
 
 ## Desktop Behavior
 

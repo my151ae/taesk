@@ -526,14 +526,13 @@ function TimelineBoardPageContent({
   });
 
   const confirmBucketCardCreation = useCallback(() => {
-    setBucketCreateMenu((prev) => {
-      if (!(prev.open && prev.bucketKey)) {
-        return prev;
-      }
-      handleBucketClick(prev.bucketKey, prev.afterCardId);
-      return { open: false, bucketKey: null, x: 0, y: 0 };
-    });
-  }, [handleBucketClick]);
+    if (!(bucketCreateMenu.open && bucketCreateMenu.bucketKey)) {
+      return;
+    }
+
+    handleBucketClick(bucketCreateMenu.bucketKey, bucketCreateMenu.afterCardId);
+    setBucketCreateMenu({ open: false, bucketKey: null, x: 0, y: 0 });
+  }, [bucketCreateMenu, handleBucketClick]);
 
   const handleGoogleConnect = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -717,10 +716,10 @@ function TimelineBoardPageContent({
 
   const handleResetToDefaultList = useCallback(() => {
     updateBoardUiState({
-      leftPanelMode: "none",
+      leftPanelMode: "overdue",
       method: "replace",
     });
-    setExpandedSectionKey(null);
+    setExpandedSectionKey("overdue");
   }, [updateBoardUiState]);
 
   const eventsByDay = useMemo(() => {
@@ -889,7 +888,7 @@ function TimelineBoardPageContent({
       onResetInvalidUrl={() => {
         const params = serializeBoardUiStateToSearchParams({
           state: {
-            leftPanelMode: "none",
+            leftPanelMode: "overdue",
             rightPanelMode: "timeline",
             date: null,
             tag: null,
@@ -903,7 +902,7 @@ function TimelineBoardPageContent({
       onMoveToCanonicalUrl={() => {
         const params = serializeBoardUiStateToSearchParams({
           state: {
-            leftPanelMode: "none",
+            leftPanelMode: "overdue",
             rightPanelMode: "timeline",
             date: null,
             tag: null,
@@ -975,7 +974,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleResetInvalidUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "none",
+        leftPanelMode: "overdue",
         rightPanelMode: "timeline",
         date: null,
         tag: null,
@@ -990,7 +989,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleMoveToCanonicalUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "none",
+        leftPanelMode: "overdue",
         rightPanelMode: "timeline",
         date: null,
         tag: null,

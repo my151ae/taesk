@@ -81,12 +81,17 @@ export function CardContextMenu({ x, y, items, onClose }: CardContextMenuProps) 
                         const nextIndex = (activeIndex + direction + items.length) % items.length;
                         setActiveIndex(nextIndex);
                         itemRefs.current[nextIndex]?.focus();
-                    } else if (e.key === "Enter" || e.key === " ") {
+                    } else if (e.key === "Enter") {
                         e.preventDefault();
                         const activeItem = items[activeIndex];
                         if (activeItem) {
-                            activeItem.onClick();
-                            onClose("action");
+                            itemRefs.current[activeIndex]?.click();
+                        }
+                    } else if (e.key === " ") {
+                        e.preventDefault();
+                        const activeItem = items[activeIndex];
+                        if (activeItem) {
+                            itemRefs.current[activeIndex]?.click();
                         }
                     }
                 }}

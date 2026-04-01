@@ -182,10 +182,10 @@ const buildDefaultResolvedState = (
   hasQuery,
   hasExplicitBoardState: false,
   view: "timeline",
-  leftPanelMode: "none",
+  leftPanelMode: "overdue",
   rightPanelMode: "timeline",
   boardUiState: {
-    leftPanel: { mode: "none", state: { tag: null, q: null } },
+    leftPanel: { mode: "overdue", state: { tag: null, q: null } },
     rightPanel: { mode: "timeline", state: {} },
   },
   date: null,
