@@ -140,6 +140,8 @@ type UseTimelineBoardScreenArgs = {
   onActivateCard: (cardId: string, laneId: string) => void;
   activeCardId: string | null;
   activeLaneId: string | null;
+  pendingTitleEditCardId: string | null;
+  onPendingTitleEditConsumed: () => void;
   listAnchorDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -284,6 +286,8 @@ export function useTimelineBoardScreen({
   onActivateCard,
   activeCardId,
   activeLaneId,
+  pendingTitleEditCardId,
+  onPendingTitleEditConsumed,
   listAnchorDate,
   listWindowPresetKey,
   handleListWindowPresetChange,
@@ -424,6 +428,8 @@ export function useTimelineBoardScreen({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    pendingTitleEditCardId,
+    onPendingTitleEditConsumed,
     listBaseDate: listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange,

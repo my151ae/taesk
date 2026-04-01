@@ -75,6 +75,8 @@ type DaySectionProps = {
     onActivateCard: (cardId: string, laneId: string) => void;
     activeCardId: string | null;
     activeLaneId: string | null;
+    pendingTitleEditCardId: string | null;
+    onPendingTitleEditConsumed: () => void;
 };
 
 export const DaySection = memo(function DaySection({
@@ -122,6 +124,8 @@ export const DaySection = memo(function DaySection({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    pendingTitleEditCardId,
+    onPendingTitleEditConsumed,
 }: DaySectionProps) {
     return (
         <div className="day-section grid grid-cols-2 h-full min-w-0">
@@ -164,6 +168,8 @@ export const DaySection = memo(function DaySection({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    pendingTitleEditCardId={pendingTitleEditCardId}
+                    onPendingTitleEditConsumed={onPendingTitleEditConsumed}
                 />
             </div>
 
@@ -198,6 +204,8 @@ export const DaySection = memo(function DaySection({
                         onActivateCard={onActivateCard}
                         activeCardId={activeCardId}
                         activeLaneId={activeLaneId}
+                        pendingTitleEditCardId={pendingTitleEditCardId}
+                        onPendingTitleEditConsumed={onPendingTitleEditConsumed}
                     />
                 </div>
             </div>

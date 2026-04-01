@@ -36,6 +36,8 @@ type TimelineBucketCardProps = {
     onActivateCard?: (cardId: string, laneId: string) => void;
     activeCardId?: string | null;
     activeLaneId?: string | null;
+    autoStartTitleEdit?: boolean;
+    onAutoStartTitleEditConsumed?: () => void;
 };
 
 export const TimelineBucketCard = ({
@@ -57,6 +59,8 @@ export const TimelineBucketCard = ({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    autoStartTitleEdit = false,
+    onAutoStartTitleEditConsumed,
 }: TimelineBucketCardProps) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
@@ -138,6 +142,8 @@ export const TimelineBucketCard = ({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    autoStartTitleEdit={autoStartTitleEdit}
+                    onAutoStartTitleEditConsumed={onAutoStartTitleEditConsumed}
                     inlineTitleEdit
                     onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
                     onTitleEditStateChange={setIsEditingTitle}

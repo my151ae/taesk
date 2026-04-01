@@ -97,6 +97,8 @@ export type DesktopTimelineViewProps = {
   onActivateCard: (cardId: string, laneId: string) => void;
   activeCardId: string | null;
   activeLaneId: string | null;
+  pendingTitleEditCardId: string | null;
+  onPendingTitleEditConsumed: () => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -238,6 +240,8 @@ export function DesktopTimelineView({
   onActivateCard,
   activeCardId,
   activeLaneId,
+  pendingTitleEditCardId,
+  onPendingTitleEditConsumed,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -539,6 +543,8 @@ export function DesktopTimelineView({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    pendingTitleEditCardId={pendingTitleEditCardId}
+                    onPendingTitleEditConsumed={onPendingTitleEditConsumed}
                   />
                 ))}
               </div>

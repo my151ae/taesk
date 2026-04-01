@@ -162,6 +162,7 @@ function TimelineBoardPageContent({
     setActiveCard,
     handleShiftSelect,
   } = useTimelineCardSelection();
+  const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
 
   const {
     contextMenu,
@@ -515,6 +516,11 @@ function TimelineBoardPageContent({
     bucketDayMap,
     refreshGoogleCalendar,
     data,
+    onCardCreated: (cardId, laneId) => {
+      clearSelection();
+      setActiveCard(cardId, laneId);
+      setPendingTitleEditCardId(cardId);
+    },
   });
 
   const [bucketCreateMenu, setBucketCreateMenu] = useState<{
@@ -841,6 +847,8 @@ function TimelineBoardPageContent({
     onActivateCard: setActiveCard,
     activeCardId,
     activeLaneId,
+    pendingTitleEditCardId,
+    onPendingTitleEditConsumed: () => setPendingTitleEditCardId(null),
     listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange: modeSync.handleListWindowPresetChange,

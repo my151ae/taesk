@@ -87,6 +87,8 @@ type TimelineCardProps = {
     inlineTitleEdit?: boolean;
     onRenameTitle?: (nextTitle: string) => Promise<void>;
     onTitleEditStateChange?: (editing: boolean) => void;
+    autoStartTitleEdit?: boolean;
+    onAutoStartTitleEditConsumed?: () => void;
 };
 
 export function TimelineCard({
@@ -134,6 +136,8 @@ export function TimelineCard({
     inlineTitleEdit = false,
     onRenameTitle,
     onTitleEditStateChange,
+    autoStartTitleEdit = false,
+    onAutoStartTitleEditConsumed,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -208,6 +212,27 @@ export function TimelineCard({
         }
         onClearSelection?.();
     }, [cardId, onActivateCard, onClearSelection, selectionLane]);
+
+    useEffect(() => {
+        if (!autoStartTitleEdit) return;
+
+        if (!inlineTitleEdit || !onRenameTitle) {
+            onAutoStartTitleEditConsumed?.();
+            return;
+        }
+
+        activateCardForTitleEditing();
+        setDraftTitle(title);
+        setIsEditingTitle(true);
+        onAutoStartTitleEditConsumed?.();
+    }, [
+        activateCardForTitleEditing,
+        autoStartTitleEdit,
+        inlineTitleEdit,
+        onAutoStartTitleEditConsumed,
+        onRenameTitle,
+        title,
+    ]);
 
     const commitTitleChange = useCallback(async () => {
         if (!inlineTitleEdit || !onRenameTitle || isSubmittingTitleRef.current) {

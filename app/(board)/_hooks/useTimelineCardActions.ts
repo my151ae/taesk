@@ -38,8 +38,31 @@ interface UseTimelineCardActionsProps {
   bucketDayMap: Record<string, string | null>;
   refreshGoogleCalendar: () => Promise<void> | void;
   data: TimelineResponse | null;
-  onCardCreated?: (cardId: string) => void;
+  onCardCreated?: (cardId: string, laneId: string) => void;
 }
+
+const resolveCreatedCardLaneId = (card: Card) => {
+  if (card.due_bucket && card.due_date) {
+    const localDay = toLocalDay(card.due_date);
+    if (localDay) {
+      const bucketKey = `${localDay}_${card.due_bucket}`;
+      return `bucket:${bucketKey}`;
+    }
+  }
+
+  if (card.due_date) {
+    const localDay = toLocalDay(card.due_date);
+    if (localDay) {
+      return `timeline:${localDay}`;
+    }
+  }
+
+  if (card.due_date) {
+    return `timeline:${getIsoDateJst(card.due_date)}`;
+  }
+
+  return "overdue";
+};
 
 const addDays = (isoDate: string, offsetDays: number) => {
   const [y, m, d] = isoDate.split("-").map((v) => Number(v));
@@ -377,7 +400,7 @@ export function useTimelineCardActions({
     [modalCard, closeCardModal, setData, setCardModalError, data, initialBoardId]
   );
 
-  const createCard = useCallback(async (payload: Partial<Card>, options?: { openModal?: boolean }) => {
+  const createCard = useCallback(async (payload: Partial<Card>, options?: { openModal?: boolean; focusLaneId?: string }) => {
     if (dataMode !== "api") return;
 
     const optimisticId = payload.id ?? crypto.randomUUID();
@@ -396,7 +419,7 @@ export function useTimelineCardActions({
       if (body.card) {
         const newCard = body.card;
         setData((prev) => (prev ? applyCardUpdate(prev, newCard, "UPDATE") : prev));
-        onCardCreated?.(newCard.id);
+        onCardCreated?.(newCard.id, options?.focusLaneId ?? resolveCreatedCardLaneId(newCard));
         if (options?.openModal !== false && newCard.short_id) openCardModal(newCard.short_id, "create-card");
       }
     } catch {
@@ -418,7 +441,7 @@ export function useTimelineCardActions({
       due_start: minutesToTime(minutes),
       due_end: minutesToTime(minutes + 60),
     };
-    createCard(payload, { openModal: false });
+    createCard(payload, { openModal: false, focusLaneId: `timeline:${day.isoDate}` });
   }, [createCard]);
 
   const handleBucketClick = useCallback((bucketKey: string, afterCardId?: string) => {
@@ -442,7 +465,7 @@ export function useTimelineCardActions({
       due_bucket_position: position,
     };
 
-    createCard(payload, { openModal: false });
+    createCard(payload, { openModal: false, focusLaneId: `bucket:${bucketKey}` });
   }, [bucketDayMap, createCard, data?.abBuckets]);
 
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {

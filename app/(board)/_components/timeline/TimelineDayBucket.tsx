@@ -46,6 +46,8 @@ type TimelineDayBucketProps = {
     onActivateCard: (cardId: string, laneId: string) => void;
     activeCardId: string | null;
     activeLaneId: string | null;
+    pendingTitleEditCardId: string | null;
+    onPendingTitleEditConsumed: () => void;
 };
 
 type ActiveBucketSection = 'completed' | 'a' | 'b';
@@ -369,6 +371,8 @@ function StaticTimelineRow({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    autoStartTitleEdit = false,
+    onAutoStartTitleEditConsumed,
 }: {
     item: TimelineBucketItem | TimelineEvent;
     badgeLabel?: string | null;
@@ -396,6 +400,8 @@ function StaticTimelineRow({
     onActivateCard?: (cardId: string, laneId: string) => void;
     activeCardId?: string | null;
     activeLaneId?: string | null;
+    autoStartTitleEdit?: boolean;
+    onAutoStartTitleEditConsumed?: () => void;
 }) {
     return (
         <div
@@ -443,6 +449,8 @@ function StaticTimelineRow({
                 onActivateCard={onActivateCard}
                 activeCardId={activeCardId}
                 activeLaneId={activeLaneId}
+                autoStartTitleEdit={autoStartTitleEdit}
+                onAutoStartTitleEditConsumed={onAutoStartTitleEditConsumed}
                 inlineTitleEdit
                 onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
             />
@@ -475,6 +483,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    pendingTitleEditCardId,
+    onPendingTitleEditConsumed,
 }: TimelineDayBucketProps) {
     const activeA = useMemo(() => bucketsA.filter((item) => !item.checked), [bucketsA]);
     const activeB = useMemo(() => bucketsB.filter((item) => !item.checked), [bucketsB]);
@@ -934,6 +944,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             onActivateCard={onActivateCard}
                             activeCardId={activeCardId}
                             activeLaneId={activeLaneId}
+                            autoStartTitleEdit={pendingTitleEditCardId === item.card_id}
+                            onAutoStartTitleEditConsumed={onPendingTitleEditConsumed}
                         />
                         {renderBucketAddSlot({
                             isOver,
@@ -1034,6 +1046,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    autoStartTitleEdit={pendingTitleEditCardId === entry.item.card_id}
+                    onAutoStartTitleEditConsumed={onPendingTitleEditConsumed}
                 />
             );
         }
@@ -1063,6 +1077,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 onActivateCard={onActivateCard}
                 activeCardId={activeCardId}
                 activeLaneId={activeLaneId}
+                autoStartTitleEdit={pendingTitleEditCardId === entry.item.card_id}
+                onAutoStartTitleEditConsumed={onPendingTitleEditConsumed}
             />
         );
     };

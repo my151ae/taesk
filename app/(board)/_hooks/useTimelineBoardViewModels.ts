@@ -120,6 +120,8 @@ type UseTimelineBoardViewModelsArgs = {
   onActivateCard: (cardId: string, laneId: string) => void;
   activeCardId: string | null;
   activeLaneId: string | null;
+  pendingTitleEditCardId: string | null;
+  onPendingTitleEditConsumed: () => void;
   listBaseDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -276,6 +278,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onActivateCard: args.onActivateCard,
       activeCardId: args.activeCardId,
       activeLaneId: args.activeLaneId,
+      pendingTitleEditCardId: args.pendingTitleEditCardId,
+      onPendingTitleEditConsumed: args.onPendingTitleEditConsumed,
     }),
     [
       args.days,
@@ -325,6 +329,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.onActivateCard,
       args.activeCardId,
       args.activeLaneId,
+      args.pendingTitleEditCardId,
+      args.onPendingTitleEditConsumed,
     ]
   );
 

@@ -137,6 +137,7 @@ export function CardModal({
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
+    const didFocusTitleOnOpenRef = useRef(false);
 
     const {
         historyItems,
@@ -157,6 +158,10 @@ export function CardModal({
         activeSidebarTab,
     });
     const shouldFocusTitleOnOpen = !isLoading && !isHistoryPreviewing && title.trim().length === 0;
+
+    useEffect(() => {
+        didFocusTitleOnOpenRef.current = false;
+    }, [card.id]);
 
     const stickyTitleChecklistProgress = useMemo(() => {
         const plainText = getTiptapPlainText(normalizeContent(content));
@@ -364,6 +369,29 @@ export function CardModal({
     useLayoutEffect(() => {
         resizeTitleInput();
     }, [resizeTitleInput, title, isLoading]);
+
+    useLayoutEffect(() => {
+        if (!shouldFocusTitleOnOpen || didFocusTitleOnOpenRef.current) {
+            return;
+        }
+
+        const input = titleInputRef.current;
+        if (!input) {
+            return;
+        }
+
+        didFocusTitleOnOpenRef.current = true;
+
+        const frameId = requestAnimationFrame(() => {
+            input.focus();
+            const caretPosition = input.value.length;
+            input.setSelectionRange(caretPosition, caretPosition);
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
+    }, [shouldFocusTitleOnOpen, card.id]);
 
     useLayoutEffect(() => {
         const input = titleInputRef.current;
@@ -806,6 +834,7 @@ export function CardModal({
                                         rows={1}
                                         wrap="soft"
                                         autoFocus={shouldFocusTitleOnOpen}
+                                        data-testid="card-modal-title-input"
                                         data-autofocus={shouldFocusTitleOnOpen ? "true" : undefined}
                                         disabled={isHistoryPreviewing}
                                         onChange={(e) => {

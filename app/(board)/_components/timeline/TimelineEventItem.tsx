@@ -46,6 +46,8 @@ type TimelineEventItemProps = {
     onActivateCard?: (cardId: string, laneId: string) => void;
     activeCardId?: string | null;
     activeLaneId?: string | null;
+    autoStartTitleEdit?: boolean;
+    onAutoStartTitleEditConsumed?: () => void;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -77,6 +79,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    autoStartTitleEdit = false,
+    onAutoStartTitleEditConsumed,
 }: TimelineEventItemProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
@@ -169,6 +173,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    autoStartTitleEdit={autoStartTitleEdit}
+                    onAutoStartTitleEditConsumed={onAutoStartTitleEditConsumed}
                     inlineTitleEdit
                     onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(event.card_id, nextTitle).then(() => undefined) : undefined}
                     onTitleEditStateChange={setIsEditingTitle}

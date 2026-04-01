@@ -6143,6 +6143,78 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('opens empty-title card with focus on title input', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: '',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [],
+      },
+      excerpt: '',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1898,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:30:00',
+      due_end: '16:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5045,
+      slug: 'untitled-card-focus',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.getByTestId('card-modal-title-input');
+      await expect(titleInput).toBeFocused();
+
+      await expect.poll(async () => {
+        return titleInput.evaluate((element) => {
+          const input = element as HTMLTextAreaElement;
+          return {
+            valueLength: input.value.length,
+            selectionStart: input.selectionStart,
+            selectionEnd: input.selectionEnd,
+          };
+        });
+      }).toEqual({
+        valueLength: 0,
+        selectionStart: 0,
+        selectionEnd: 0,
+      });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('shows validation error when pasted image exceeds size limit', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
