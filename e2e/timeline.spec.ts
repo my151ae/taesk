@@ -88,10 +88,16 @@ async function clearLastBlockAction(page: Page): Promise<void> {
   });
 }
 
-async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excerpt: string | null; title: string | null } | null> {
+async function fetchSavedCard(cardId: string): Promise<{
+  content: unknown;
+  excerpt: string | null;
+  title: string | null;
+  checked: boolean | null;
+  updatedAt: string | null;
+} | null> {
   const { data, error } = await supabaseAdmin
     .from('cards')
-    .select('content, excerpt, title')
+    .select('content, excerpt, title, checked, updated_at')
     .eq('id', cardId)
     .maybeSingle();
 
@@ -99,7 +105,15 @@ async function fetchSavedCard(cardId: string): Promise<{ content: unknown; excer
     throw new Error(`Failed to fetch saved card ${cardId}: ${error.message}`);
   }
 
-  return data ? { content: data.content, excerpt: data.excerpt ?? null, title: data.title ?? null } : null;
+  return data
+    ? {
+        content: data.content,
+        excerpt: data.excerpt ?? null,
+        title: data.title ?? null,
+        checked: data.checked ?? null,
+        updatedAt: data.updated_at ?? null,
+      }
+    : null;
 }
 
 async function getElementWidth(locator: Locator, label: string): Promise<number> {
@@ -5823,6 +5837,245 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(2);
       await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
     } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('dims checked task lines and toggles completed line visibility in the modal sidebar', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Visible task' }] }],
+            },
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hidden task' }] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Completed line visibility',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[ ] Visible task\n[x] Hidden task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1897,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:20:00',
+      due_end: '16:20:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5044,
+      slug: 'completed-line-visibility',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const checkedTaskLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first();
+      const uncheckedTaskLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="false"] p').first();
+      const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
+
+      await expect(checkedTaskLine).toBeVisible();
+      await expect(uncheckedTaskLine).toBeVisible();
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
+
+      const checkedLineStyles = await checkedTaskLine.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          color: style.color,
+          textDecorationLine: style.textDecorationLine,
+        };
+      });
+      expect(checkedLineStyles.color).toBe('rgb(148, 163, 184)');
+      expect(checkedLineStyles.textDecorationLine).toContain('line-through');
+
+      if (!(await completedLinesPanel.isVisible())) {
+        await modal.getByTitle('Show details').click();
+      }
+      await expect(completedLinesPanel).toBeVisible();
+      const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
+      await expect(showCompletedLines).toBeChecked();
+
+      const savedBeforeToggle = await fetchSavedCard(cardId);
+      expect(Date.parse(savedBeforeToggle?.updatedAt ?? '')).toBe(Date.parse(timestamp));
+
+      await showCompletedLines.uncheck();
+      await expect(showCompletedLines).not.toBeChecked();
+      await expect(checkedTaskLine).toBeHidden();
+      await expect(uncheckedTaskLine).toBeVisible();
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
+
+      await showCompletedLines.check();
+      await expect(showCompletedLines).toBeChecked();
+      await expect(checkedTaskLine).toBeVisible();
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
+
+      const savedAfterToggle = await fetchSavedCard(cardId);
+      expect(savedAfterToggle).toMatchObject({
+        title: 'Completed line visibility',
+        checked: false,
+        excerpt: '[ ] Visible task\n[x] Hidden task',
+      });
+      expect(Date.parse(savedAfterToggle?.updatedAt ?? '')).toBe(Date.parse(timestamp));
+      expect(savedAfterToggle?.content).toEqual(initialContent);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('resets completed line visibility on modal reopen and does not autosave during history preview', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const historyId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const historyExcerpt = '[x] Completed task history preview entry';
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Completed task' }] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'History preview completed lines',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[x] Completed task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1898,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:30:00',
+      due_end: '16:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5045,
+      slug: 'history-preview-completed-lines',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    const { error: historyError } = await supabaseAdmin.from('card_content_history').insert({
+      id: historyId,
+      card_id: cardId,
+      board_id: boardContext.boardId,
+      content: initialContent,
+      excerpt: historyExcerpt,
+      saved_by: testUserId,
+      created_at: timestamp,
+    });
+
+    expect(historyError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
+      if (!(await completedLinesPanel.isVisible())) {
+        await modal.getByTitle('Show details').click();
+      }
+      await expect(completedLinesPanel).toBeVisible();
+      const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
+      await showCompletedLines.uncheck();
+      await expect(showCompletedLines).not.toBeChecked();
+      await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
+
+      await modal.getByRole('button', { name: '履歴' }).click();
+      await expect(modal.getByText('履歴プレビュー中', { exact: true })).toHaveCount(0);
+      await modal.getByRole('button', { name: historyExcerpt }).click();
+      await expect(modal.getByText('履歴プレビュー中', { exact: true })).toBeVisible();
+
+      const savedBeforePreviewToggle = await fetchSavedCard(cardId);
+      await showCompletedLines.check();
+      await expect(showCompletedLines).toBeChecked();
+
+      await expect.poll(async () => {
+        const savedCard = await fetchSavedCard(cardId);
+        return savedCard?.updatedAt ?? null;
+      }, { timeout: 5000, intervals: [500, 1000] }).toBe(savedBeforePreviewToggle?.updatedAt ?? null);
+
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const reopenedModal = page.getByRole('dialog');
+      await expect(reopenedModal).toBeVisible();
+      const reopenedCompletedLinesPanel = reopenedModal.getByTestId('card-modal-completed-lines-panel');
+      if (!(await reopenedCompletedLinesPanel.isVisible())) {
+        await reopenedModal.getByTitle('Show details').click();
+      }
+      await expect(reopenedCompletedLinesPanel).toBeVisible();
+      await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).toBeChecked();
+    } finally {
+      await supabaseAdmin.from('card_content_history').delete().eq('card_id', cardId);
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
   });

@@ -19,6 +19,8 @@ type CardModalSidebarProps = {
   onRemoveTag: (tag: string) => void;
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
+  showCompletedLines: boolean;
+  onShowCompletedLinesChange: (next: boolean) => void;
   historyItems: CardContentHistoryMeta[];
   historyLoading: boolean;
   historyError: string | null;
@@ -39,6 +41,8 @@ export default function CardModalSidebar({
   onRemoveTag,
   activeTab,
   onTabChange,
+  showCompletedLines,
+  onShowCompletedLinesChange,
   historyItems,
   historyLoading,
   historyError,
@@ -90,6 +94,19 @@ export default function CardModalSidebar({
                 </span>
               ))}
             </div>
+          </section>
+
+          <section className="space-y-2" data-testid="card-modal-completed-lines-panel">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={showCompletedLines}
+                onChange={(event) => onShowCompletedLinesChange(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                data-testid="card-modal-show-completed-lines"
+              />
+              <span>完了行を表示</span>
+            </label>
           </section>
 
           <div className="flex items-center gap-2 pt-1">

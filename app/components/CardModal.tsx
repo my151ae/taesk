@@ -127,6 +127,7 @@ export function CardModal({
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
     const [activeShortcutDescriptor, setActiveShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
+    const [showCompletedLines, setShowCompletedLines] = useState(true);
     const [bodyShortcutState, setBodyShortcutState] = useState<BodyEditorShortcutState>({
         canUndo: false,
         canRedo: false,
@@ -283,6 +284,7 @@ export function CardModal({
         resetDraft,
         resetHistoryState,
         setShowSidebar,
+        setShowCompletedLines,
         setContent,
         setTitle,
         setChecked,
@@ -865,6 +867,7 @@ export function CardModal({
                                                     key={isHistoryPreviewing ? `${card.id}-preview-${selectedHistoryId}` : card.id}
                                                     initialContent={isHistoryPreviewing ? previewHistoryContent : content}
                                                     editable={!isHistoryPreviewing}
+                                                    showCompletedLines={showCompletedLines}
                                                     boardId={card.board_id}
                                                     cardId={card.id}
                                                     onEditorError={setEditorError}
@@ -920,6 +923,8 @@ export function CardModal({
                                         setShowSidebar(true);
                                     }
                                 }}
+                                showCompletedLines={showCompletedLines}
+                                onShowCompletedLinesChange={setShowCompletedLines}
                                 historyItems={historyItems}
                                 historyLoading={historyLoading}
                                 historyError={historyError}

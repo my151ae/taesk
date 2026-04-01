@@ -70,6 +70,7 @@ type TiptapEditorProps = {
     onChange?: (content: JSONContent) => void;
     placeholder?: string;
     editable?: boolean;
+    showCompletedLines?: boolean;
     boardId?: string;
     cardId?: string;
     onEditorError?: (message: string | null) => void;
@@ -85,6 +86,7 @@ export default function TiptapEditor({
     onChange,
     placeholder = "Type '/' for commands…",
     editable = true,
+    showCompletedLines = true,
     boardId,
     cardId,
     onEditorError,
@@ -1010,6 +1012,10 @@ export default function TiptapEditor({
                     return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
                 }
 
+                if (!showCompletedLines && target.nodeType === 'taskItem' && node.attrs?.checked === true) {
+                    return false;
+                }
+
                 const isDuplicate = nextTargets.some((candidate) => candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType);
                 if (!isDuplicate) {
                     nextTargets.push(target);
@@ -1021,7 +1027,7 @@ export default function TiptapEditor({
         };
 
         measureBlocks();
-    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
+    }, [editor, getBlockTargetAtPos, layoutVersion, showCompletedLines, suppressBlockUi]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
         if (rootRef.current === node) {
@@ -1111,6 +1117,7 @@ export default function TiptapEditor({
         <div
             ref={assignRootRef}
             className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
+            data-show-completed-lines={showCompletedLines ? 'true' : 'false'}
             onClick={(event) => {
                 if (event.target === event.currentTarget) {
                     editor.chain().focus().run();

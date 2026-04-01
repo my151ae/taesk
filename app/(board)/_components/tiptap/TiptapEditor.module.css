@@ -131,6 +131,18 @@
     padding: 0 !important;
 }
 
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div) {
+    color: #94a3b8;
+}
+
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div p) {
+    text-decoration: line-through;
+}
+
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"]) {
+    display: none !important;
+}
+
 /* 
  * チェックリスト内のpタグのマージンを強力にリセット 
  * .ProseMirror p のスタイル（margin: 0.5em）よりも優先させるためにセレクタを重ねる

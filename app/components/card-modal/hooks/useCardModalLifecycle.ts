@@ -12,6 +12,7 @@ type UseCardModalLifecycleArgs = {
   resetDraft: (card: Card) => void;
   resetHistoryState: () => void;
   setShowSidebar: (value: boolean) => void;
+  setShowCompletedLines: (value: boolean) => void;
   setContent: (value: JSONContent) => void;
   setTitle: (value: string) => void;
   setChecked: (value: boolean) => void;
@@ -28,6 +29,7 @@ export function useCardModalLifecycle({
   resetDraft,
   resetHistoryState,
   setShowSidebar,
+  setShowCompletedLines,
   setContent,
   setTitle,
   setChecked,
@@ -63,8 +65,9 @@ export function useCardModalLifecycle({
       hasPendingChangesRef.current = false;
       hasAutoSavedEditsRef.current = false;
       resetHistoryState();
+      setShowCompletedLines(true);
     }
-  }, [card, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef]);
+  }, [card, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef, setShowCompletedLines]);
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) return;
