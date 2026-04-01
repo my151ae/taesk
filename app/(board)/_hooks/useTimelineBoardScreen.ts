@@ -76,6 +76,7 @@ type UseTimelineBoardScreenArgs = {
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
   handleToggleCardChecked: (cardId: string, checked: boolean) => Promise<boolean>;
+  handleRenameCardTitle: (cardId: string, nextTitle: string) => Promise<boolean>;
   activeResize: DragAndDropBindings["activeResize"];
   handleResizeStart: DragAndDropBindings["handleResizeStart"];
   handleResizeMove: DragAndDropBindings["handleResizeMove"];
@@ -230,6 +231,7 @@ export function useTimelineBoardScreen({
   handleTimelineViewMount,
   openCardModal,
   handleToggleCardChecked,
+  handleRenameCardTitle,
   activeResize,
   handleResizeStart,
   handleResizeMove,
@@ -482,6 +484,7 @@ export function useTimelineBoardScreen({
     onCardContextMenu: handleCardContextMenu,
     onCardContextMenuByKeyboard: handleCardContextMenuByKeyboard,
     contextMenuCardId: contextMenu.cardId,
+    onRenameCardTitle: handleRenameCardTitle,
     selectedCardIds,
     selectionLeadCardId,
     onShiftSelect,
@@ -501,9 +504,15 @@ export function useTimelineBoardScreen({
       overdueSortOrder,
       onOverdueSortOrderChange,
       timelineToolbarProps: viewModels.desktop.mainPanel.views.timeline.toolbar,
-      timelineViewProps: viewModels.desktop.mainPanel.views.timeline.body,
+      timelineViewProps: {
+        ...viewModels.desktop.mainPanel.views.timeline.body,
+        onRenameCardTitle: handleRenameCardTitle,
+      },
       listToolbarProps: viewModels.desktop.mainPanel.views.list.toolbar,
-      listViewProps: viewModels.desktop.mainPanel.views.list.body,
+      listViewProps: {
+        ...viewModels.desktop.mainPanel.views.list.body,
+        onRenameCardTitle: handleRenameCardTitle,
+      },
       dndProps: {
         sensors,
         handleDragStart,

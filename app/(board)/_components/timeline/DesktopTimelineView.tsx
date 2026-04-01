@@ -69,6 +69,7 @@ export type DesktopTimelineViewProps = {
   handleResizeMove: (e: React.PointerEvent) => void;
   handleResizeEnd: (e: React.PointerEvent) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
   sensors: DragAndDropBindings["sensors"];
   handleDragStart: DragAndDropBindings["handleDragStart"];
   handleDragMove: DragAndDropBindings["handleDragMove"];
@@ -215,6 +216,7 @@ export function DesktopTimelineView({
   handleResizeMove,
   handleResizeEnd,
   onToggleCheck,
+  onRenameCardTitle,
   sensors,
   handleDragStart,
   handleDragMove,
@@ -523,6 +525,7 @@ export function DesktopTimelineView({
                     status={status}
                     openCardModal={openCardModal}
                     onToggleCheck={onToggleCheck}
+                    onRenameCardTitle={onRenameCardTitle}
                     onCardContextMenu={onCardContextMenu}
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     contextMenuCardId={contextMenuCardId}

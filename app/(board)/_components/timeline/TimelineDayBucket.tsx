@@ -27,6 +27,7 @@ type TimelineDayBucketProps = {
     status: string;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     bucketIndicator: BucketIndicator | null;
     onCreateBucketCard?: (bucketKey: string, afterCardId?: string) => void;
     onRequestCreateBucketCard?: (request: BucketCreateRequest) => void;
@@ -351,6 +352,7 @@ function StaticTimelineRow({
     badgeLabel,
     openCardModal,
     onToggleCheck,
+    onRenameCardTitle,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     dataTestId,
@@ -372,6 +374,7 @@ function StaticTimelineRow({
     badgeLabel?: string | null;
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     dataTestId?: string;
@@ -440,6 +443,8 @@ function StaticTimelineRow({
                 onActivateCard={onActivateCard}
                 activeCardId={activeCardId}
                 activeLaneId={activeLaneId}
+                inlineTitleEdit
+                onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
             />
         </div>
     );
@@ -456,6 +461,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     status,
     openCardModal,
     onToggleCheck,
+    onRenameCardTitle,
     bucketIndicator,
     onCreateBucketCard,
     onRequestCreateBucketCard,
@@ -914,6 +920,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             bucketKey={bucketKey}
                             openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
                             onToggleCheck={onToggleCheck}
+                            onRenameCardTitle={onRenameCardTitle}
                             showFallbackBottomLine={bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id}
                             onCardContextMenu={onCardContextMenu}
                             onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}

@@ -56,6 +56,7 @@ type DaySectionProps = {
     // 共通
     openCardModal: (shortId: string | null, source: string) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     contextMenuCardId: string | null;
@@ -107,6 +108,7 @@ export const DaySection = memo(function DaySection({
     status,
     openCardModal,
     onToggleCheck,
+    onRenameCardTitle,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     contextMenuCardId,
@@ -143,6 +145,7 @@ export const DaySection = memo(function DaySection({
                     handleResizeMove={handleResizeMove}
                     handleResizeEnd={handleResizeEnd}
                     onToggleCheck={onToggleCheck}
+                    onRenameCardTitle={onRenameCardTitle}
                     shrinkToHalf={false}
                     setSelectedSlot={setSelectedSlot}
                     calendarEvents={calendarEvents}
@@ -181,6 +184,7 @@ export const DaySection = memo(function DaySection({
                         status={status}
                         openCardModal={openCardModal}
                         onToggleCheck={onToggleCheck}
+                        onRenameCardTitle={onRenameCardTitle}
                         bucketIndicator={bucketIndicator}
                         onCreateBucketCard={onCreateBucketCard}
                         onRequestCreateBucketCard={onRequestCreateBucketCard}

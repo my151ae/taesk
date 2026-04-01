@@ -2161,6 +2161,199 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('renames desktop list titles inline without opening the modal and keeps mobile list read-only', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const initialTitle = 'Desktop list inline title';
+    const renamedTitle = 'Desktop list renamed';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: initialTitle,
+      checklist: { version: 1, lines: [] },
+      excerpt: 'desktop list inline edit card',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1830,
+      tags: [],
+      due_date: isoDateJst(),
+      due_start: null,
+      due_end: null,
+      due_bucket: 'a',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: Math.floor(Math.random() * 100000) + 950,
+      slug: 'desktop-list-inline-title',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(`${boardContext.canonicalPath}?lp=overdue&rp=list`);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const listCard = page.locator(`[data-card-id="${cardId}"]`).first();
+      await expect(listCard).toBeVisible({ timeout: 20_000 });
+
+      const titleDisplay = listCard.getByTestId('timeline-card-title-display');
+      await expect(titleDisplay).toContainText(initialTitle);
+
+      let renameRequests = 0;
+      await page.route(new RegExp(`/api/boards/${boardContext.boardId}/cards/${cardId}$`), async (route) => {
+        if (route.request().method() === 'PATCH') {
+          renameRequests += 1;
+        }
+        await route.continue();
+      });
+
+      await titleDisplay.click();
+      const titleInput = listCard.getByTestId('timeline-card-title-input');
+      await expect(titleInput).toBeVisible();
+      await expect(page.getByTestId('card-modal-overlay')).toHaveCount(0);
+
+      await titleInput.fill(renamedTitle);
+      await titleInput.dispatchEvent('compositionstart');
+      await titleInput.press('Enter');
+      await expect(titleInput).toBeVisible();
+      await expect.poll(() => renameRequests).toBe(0);
+
+      const renameRequestPromise = page.waitForRequest((request) => {
+        return request.method() === 'PATCH' && request.url().includes(`/api/boards/${boardContext?.boardId}/cards/${cardId}`);
+      });
+
+      await titleInput.dispatchEvent('compositionend');
+      await titleInput.press('Enter');
+
+      const renameRequest = await renameRequestPromise;
+      const renamePayload = renameRequest.postDataJSON() as Record<string, unknown>;
+      expect(renamePayload).toMatchObject({
+        title: renamedTitle,
+        slug: 'desktop-list-renamed',
+      });
+      expect(renamePayload).not.toHaveProperty('content');
+      expect(renamePayload).not.toHaveProperty('excerpt');
+
+      await expect(listCard.getByTestId('timeline-card-title-display')).toContainText(renamedTitle);
+      await expect(listCard).toBeFocused();
+
+      await page.getByTestId('desktop-sidebar-overdue-panel-toggle').focus();
+      await listCard.click({ position: { x: 24, y: 24 } });
+      await expect(page.getByTestId('card-modal-overlay')).toHaveCount(0);
+      await listCard.click({ position: { x: 24, y: 24 } });
+      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.goto(`${boardContext.canonicalPath}?lp=overdue&rp=list`);
+      const mobileCard = page.locator(`[data-card-id="${cardId}"]:visible`).first();
+      await expect(mobileCard).toBeVisible({ timeout: 20_000 });
+      await mobileCard.getByTestId('timeline-card-title-display').click();
+      await expect(mobileCard.getByTestId('timeline-card-title-input')).toHaveCount(0);
+    } finally {
+      await page.unroute(new RegExp(`/api/boards/${boardContext.boardId}/cards/${cardId}$`));
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('rolls back overdue title inline rename when the PATCH fails', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const overdueCardId = crypto.randomUUID();
+    const overdueShortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const originalTitle = 'Desktop overdue rename rollback';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: overdueCardId,
+      title: originalTitle,
+      checklist: { version: 1, lines: [] },
+      excerpt: 'desktop overdue rename rollback card',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1840,
+      tags: [],
+      due_date: shiftIsoDateJst(-2),
+      due_start: null,
+      due_end: null,
+      due_bucket: 'a',
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: overdueShortId,
+      id_short: Math.floor(Math.random() * 100000) + 960,
+      slug: 'desktop-overdue-rename-rollback',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.route(new RegExp(`/api/boards/${boardContext.boardId}/cards/${overdueCardId}$`), async (route) => {
+        if (route.request().method() === 'PATCH') {
+          await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { message: 'rename failed' } }),
+          });
+          return;
+        }
+        await route.continue();
+      });
+
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      await page.getByTestId('desktop-sidebar-overdue-panel-toggle').click();
+
+      const overdueCard = page.locator(`[data-testid="overdue-card-${overdueCardId}"]:visible [data-card-id="${overdueCardId}"]`).first();
+      await expect(overdueCard).toBeVisible({ timeout: 20_000 });
+
+      await overdueCard.getByTestId('timeline-card-title-display').click();
+      const titleInput = overdueCard.getByTestId('timeline-card-title-input');
+      await expect(titleInput).toBeVisible();
+      await titleInput.fill('Desktop overdue rename failed');
+      await titleInput.press('Enter');
+
+      await expect(overdueCard.getByTestId('timeline-card-title-display')).toContainText(originalTitle);
+      await expect(overdueCard).toBeFocused();
+
+      const { data: savedCard, error: fetchError } = await supabaseAdmin
+        .from('cards')
+        .select('title')
+        .eq('id', overdueCardId)
+        .maybeSingle();
+      expect(fetchError).toBeNull();
+      expect(savedCard?.title).toBe(originalTitle);
+    } finally {
+      await page.unroute(new RegExp(`/api/boards/${boardContext.boardId}/cards/${overdueCardId}$`));
+      await supabaseAdmin.from('cards').delete().eq('id', overdueCardId);
+    }
+  });
+
   test('collapses overdue into a mobile sheet and keeps overdue drag working', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

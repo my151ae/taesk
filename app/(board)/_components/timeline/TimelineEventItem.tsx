@@ -1,4 +1,4 @@
-import { FocusEvent, KeyboardEvent, PointerEvent, memo } from 'react';
+import { FocusEvent, KeyboardEvent, PointerEvent, memo, useState } from 'react';
 import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
@@ -23,6 +23,7 @@ type TimelineEventItemProps = {
     handleResizeMove: (e: PointerEvent) => void;
     handleResizeEnd: (e: PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     onClearGhost: () => void;
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
@@ -58,6 +59,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
+    onRenameCardTitle,
     onClearGhost,
     timelineStartHour = 0,
     onCardContextMenu,
@@ -76,6 +78,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     activeCardId,
     activeLaneId,
 }: TimelineEventItemProps) {
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
     let displayStart = event.due_start;
@@ -98,7 +101,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             data={{ kind: 'event', event, cardId: event.card_id }}
             attachListenersToChild
             // コンテキストメニュー表示中はDnD無効化
-            disabled={isContextMenuOpen}
+            disabled={isContextMenuOpen || isEditingTitle}
         >
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
@@ -166,6 +169,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    inlineTitleEdit
+                    onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(event.card_id, nextTitle).then(() => undefined) : undefined}
+                    onTitleEditStateChange={setIsEditingTitle}
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"

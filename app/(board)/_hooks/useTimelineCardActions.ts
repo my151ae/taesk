@@ -49,6 +49,50 @@ const addDays = (isoDate: string, offsetDays: number) => {
   return new Date(nextUtc).toISOString().split("T")[0];
 };
 
+function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: string): Card | null {
+  const match = findTimelineCardById(data, cardId);
+  const sourceEvent = match.event;
+  const sourceBucketItem = match.bucketItem;
+  const sourceOverdueItem = match.overdueItem;
+  const dueBucketFromKey = match.bucketKey ? (match.bucketKey.split("_")[1] as DueBucket) : null;
+
+  if (!sourceEvent && !sourceBucketItem && !sourceOverdueItem) {
+    return null;
+  }
+
+  return {
+    id: cardId,
+    title: sourceEvent?.title ?? sourceBucketItem?.title ?? sourceOverdueItem?.title ?? "Untitled card",
+    checklist: sourceEvent?.checklist ?? sourceBucketItem?.checklist ?? sourceOverdueItem?.checklist ?? null,
+    content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? buildDefaultBodyContent(""),
+    excerpt: sourceEvent?.excerpt ?? sourceBucketItem?.excerpt ?? sourceOverdueItem?.excerpt ?? null,
+    list_id: "",
+    board_id: "",
+    position: 0,
+    user_id: null,
+    tags: sourceEvent?.tags ?? sourceBucketItem?.tags ?? sourceOverdueItem?.tags ?? [],
+    due_date: sourceEvent?.due_date ?? sourceBucketItem?.due_date ?? sourceOverdueItem?.due_date ?? null,
+    due_start: sourceEvent?.due_start ?? sourceBucketItem?.due_start ?? sourceOverdueItem?.due_start ?? null,
+    due_end: sourceEvent?.due_end ?? sourceBucketItem?.due_end ?? sourceOverdueItem?.due_end ?? null,
+    start_reminder_enabled: sourceEvent?.start_reminder_enabled ?? sourceBucketItem?.start_reminder_enabled ?? sourceOverdueItem?.start_reminder_enabled ?? false,
+    start_reminder_minutes: sourceEvent?.start_reminder_minutes ?? sourceBucketItem?.start_reminder_minutes ?? sourceOverdueItem?.start_reminder_minutes ?? 0,
+    end_reminder_enabled: sourceEvent?.end_reminder_enabled ?? sourceBucketItem?.end_reminder_enabled ?? sourceOverdueItem?.end_reminder_enabled ?? false,
+    end_reminder_minutes: sourceEvent?.end_reminder_minutes ?? sourceBucketItem?.end_reminder_minutes ?? sourceOverdueItem?.end_reminder_minutes ?? 0,
+    due_bucket: sourceEvent?.due_bucket ?? sourceBucketItem?.due_bucket ?? sourceOverdueItem?.due_bucket ?? dueBucketFromKey,
+    due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
+    duration: sourceEvent?.duration ?? sourceBucketItem?.duration ?? sourceOverdueItem?.duration ?? sourceEvent?.durationMinutes ?? 60,
+    checked: sourceEvent?.checked ?? sourceBucketItem?.checked ?? sourceOverdueItem?.checked ?? false,
+    assigned_to: sourceEvent?.assigned_to ?? sourceBucketItem?.assigned_to ?? sourceOverdueItem?.assigned_to ?? null,
+    assignee_id: sourceEvent?.assignee_id ?? sourceBucketItem?.assignee_id ?? sourceOverdueItem?.assignee_id ?? null,
+    assignee_ids: sourceEvent?.assignee_ids ?? sourceBucketItem?.assignee_ids ?? sourceOverdueItem?.assignee_ids ?? null,
+    short_id: sourceEvent?.short_id ?? sourceBucketItem?.short_id ?? sourceOverdueItem?.short_id ?? null,
+    id_short: null,
+    slug: sourceEvent?.slug ?? sourceBucketItem?.slug ?? sourceOverdueItem?.slug ?? null,
+    created_at: "",
+    updated_at: "",
+  };
+}
+
 export function useTimelineCardActions({
   initialBoardId,
   dataMode,
@@ -403,37 +447,11 @@ export function useTimelineCardActions({
 
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
     if (dataMode !== "api") return false;
+    const previousSnapshot = data;
     try {
-      const match = findTimelineCardById(data, cardId);
-      const sourceEvent = match.event;
-      const sourceBucketItem = match.bucketItem;
-      const sourceOverdueItem = match.overdueItem;
-      const dueBucketFromKey = match.bucketKey ? (match.bucketKey.split("_")[1] as DueBucket) : null;
-
-      const updatedCard = {
-        id: cardId,
-        title: sourceEvent?.title ?? sourceBucketItem?.title ?? sourceOverdueItem?.title ?? "Untitled card",
-        content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? null,
-        excerpt: sourceEvent?.excerpt ?? sourceBucketItem?.excerpt ?? sourceOverdueItem?.excerpt ?? null,
-        checklist: sourceEvent?.checklist ?? sourceBucketItem?.checklist ?? sourceOverdueItem?.checklist ?? null,
-        tags: sourceEvent?.tags ?? sourceBucketItem?.tags ?? sourceOverdueItem?.tags ?? [],
-        checked: nextChecked,
-        assignee_id: sourceEvent?.assignee_id ?? sourceBucketItem?.assignee_id ?? sourceOverdueItem?.assignee_id ?? null,
-        assignee_ids: sourceEvent?.assignee_ids ?? sourceBucketItem?.assignee_ids ?? sourceOverdueItem?.assignee_ids ?? null,
-        assigned_to: sourceEvent?.assigned_to ?? sourceBucketItem?.assigned_to ?? sourceOverdueItem?.assigned_to ?? null,
-        duration: sourceEvent?.duration ?? sourceBucketItem?.duration ?? sourceOverdueItem?.duration ?? sourceEvent?.durationMinutes ?? 60,
-        short_id: sourceEvent?.short_id ?? sourceBucketItem?.short_id ?? sourceOverdueItem?.short_id ?? null,
-        slug: sourceEvent?.slug ?? sourceBucketItem?.slug ?? sourceOverdueItem?.slug ?? null,
-        due_date: sourceEvent?.due_date ?? sourceBucketItem?.due_date ?? sourceOverdueItem?.due_date ?? null,
-        due_start: sourceEvent?.due_start ?? sourceBucketItem?.due_start ?? sourceOverdueItem?.due_start ?? null,
-        due_end: sourceEvent?.due_end ?? sourceBucketItem?.due_end ?? sourceOverdueItem?.due_end ?? null,
-        start_reminder_enabled: sourceEvent?.start_reminder_enabled ?? sourceBucketItem?.start_reminder_enabled ?? sourceOverdueItem?.start_reminder_enabled ?? false,
-        start_reminder_minutes: sourceEvent?.start_reminder_minutes ?? sourceBucketItem?.start_reminder_minutes ?? sourceOverdueItem?.start_reminder_minutes ?? 0,
-        end_reminder_enabled: sourceEvent?.end_reminder_enabled ?? sourceBucketItem?.end_reminder_enabled ?? sourceOverdueItem?.end_reminder_enabled ?? false,
-        end_reminder_minutes: sourceEvent?.end_reminder_minutes ?? sourceBucketItem?.end_reminder_minutes ?? sourceOverdueItem?.end_reminder_minutes ?? 0,
-        due_bucket: sourceEvent?.due_bucket ?? sourceBucketItem?.due_bucket ?? sourceOverdueItem?.due_bucket ?? dueBucketFromKey,
-        due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
-      } as Card;
+      const baseCard = buildCardFromTimelineMatch(data, cardId);
+      if (!baseCard) return false;
+      const updatedCard = { ...baseCard, checked: nextChecked };
 
       setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
 
@@ -445,10 +463,61 @@ export function useTimelineCardActions({
       if (!res.ok) throw new Error();
       return true;
     } catch {
-      fetchTimeline();
+      if (previousSnapshot) {
+        setData(previousSnapshot);
+      } else {
+        fetchTimeline();
+      }
+      setErrorMessage("カードの完了状態を更新できませんでした");
       return false;
     }
-  }, [data, dataMode, initialBoardId, setData, fetchTimeline]);
+  }, [data, dataMode, initialBoardId, setData, fetchTimeline, setErrorMessage]);
+
+  const handleRenameCardTitle = useCallback(async (cardId: string, nextTitle: string) => {
+    if (dataMode !== "api") return false;
+    const trimmedTitle = nextTitle.trim();
+    if (!trimmedTitle) return false;
+
+    const previousSnapshot = data;
+    const baseCard = buildCardFromTimelineMatch(data, cardId);
+    if (!baseCard) return false;
+
+    const nextSlug = slugify(trimmedTitle);
+    const updatedCard: Card = {
+      ...baseCard,
+      title: trimmedTitle,
+      slug: nextSlug,
+    };
+
+    setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
+
+    try {
+      const response = await fetch(`/api/boards/${initialBoardId}/cards/${cardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          slug: nextSlug,
+        }),
+      });
+      const body = await response.json().catch(() => null) as { card?: Card; error?: { message?: string } } | null;
+      if (!response.ok) {
+        throw new Error(body?.error?.message || "Failed to rename card");
+      }
+      if (body?.card) {
+        setData((prev) => (prev ? applyCardUpdate(prev, body.card, "UPDATE") : prev));
+      }
+      return true;
+    } catch (error) {
+      if (previousSnapshot) {
+        setData(previousSnapshot);
+      } else {
+        void fetchTimeline();
+      }
+      setErrorMessage(error instanceof Error ? error.message : "カードタイトルを更新できませんでした");
+      return false;
+    }
+  }, [data, dataMode, fetchTimeline, initialBoardId, setData, setErrorMessage]);
 
   const handleExternalEventClick = useCallback(async (entry: ExternalCalendarEntry) => {
     // 変換機能を一時的に停止
@@ -471,7 +540,7 @@ export function useTimelineCardActions({
       alert("変換失敗");
     }
     */
-  }, [setGoogleToast]);
+  }, []);
 
   const moveCardByDayOffset = useCallback((cardId: string, offsetDays: number) => {
     if (!data) return Promise.resolve(false);
@@ -529,6 +598,7 @@ export function useTimelineCardActions({
     handleCardModalSave,
     handleCardModalDelete,
     handleToggleCardChecked,
+    handleRenameCardTitle,
     handleColumnClick,
     handleBucketClick,
     handleExternalEventClick,

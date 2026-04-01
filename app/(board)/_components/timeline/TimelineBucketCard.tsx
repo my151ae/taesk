@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import { useState } from 'react';
 import clsx from 'clsx';
 import { TimelineBucketItem } from '@/app/(board)/_utils/timeline-helpers';
 import { buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
@@ -16,6 +17,7 @@ type TimelineBucketCardProps = {
     bucketKey: string;
     openCardModal: (shortId: string | null) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     showFallbackBottomLine?: boolean;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
@@ -41,6 +43,7 @@ export const TimelineBucketCard = ({
     bucketKey,
     openCardModal,
     onToggleCheck,
+    onRenameCardTitle,
     showFallbackBottomLine = false,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
@@ -55,6 +58,7 @@ export const TimelineBucketCard = ({
     activeCardId,
     activeLaneId,
 }: TimelineBucketCardProps) => {
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
     const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
         data: { type: 'bucket-item-top', bucketKey, cardId: item.card_id },
@@ -70,7 +74,7 @@ export const TimelineBucketCard = ({
             id={`bucket:${item.card_id}`}
             data={{ kind: 'bucket', cardId: item.card_id, bucketKey, item }}
             // コンテキストメニュー表示中はDnD無効化
-            disabled={isContextMenuOpen}
+            disabled={isContextMenuOpen || isEditingTitle}
         >
             <div className="relative min-w-0 pt-4 select-none has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
@@ -134,6 +138,9 @@ export const TimelineBucketCard = ({
                     onActivateCard={onActivateCard}
                     activeCardId={activeCardId}
                     activeLaneId={activeLaneId}
+                    inlineTitleEdit
+                    onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
+                    onTitleEditStateChange={setIsEditingTitle}
                 />
             </div>
         </DraggableCard>

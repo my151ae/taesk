@@ -5,8 +5,11 @@ import {
     KeyboardEvent as ReactKeyboardEvent,
     FocusEvent as ReactFocusEvent,
     PointerEvent as ReactPointerEvent,
+    MouseEvent as ReactMouseEvent,
+    useEffect,
     useRef,
-    useCallback
+    useCallback,
+    useState
 } from 'react';
 import type { JSONContent } from '@tiptap/react';
 import type { Checklist } from '@/lib/checklist';
@@ -81,6 +84,9 @@ type TimelineCardProps = {
     onActivateCard?: (cardId: string, laneId: string) => void;
     activeCardId?: string | null;
     activeLaneId?: string | null;
+    inlineTitleEdit?: boolean;
+    onRenameTitle?: (nextTitle: string) => Promise<void>;
+    onTitleEditStateChange?: (editing: boolean) => void;
 };
 
 export function TimelineCard({
@@ -125,9 +131,15 @@ export function TimelineCard({
     onActivateCard,
     activeCardId = null,
     activeLaneId = null,
+    inlineTitleEdit = false,
+    onRenameTitle,
+    onTitleEditStateChange,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
+    const titleInputRef = useRef<HTMLInputElement | null>(null);
+    const isComposingRef = useRef(false);
+    const isSubmittingTitleRef = useRef(false);
     const resolvedNoteClampClass =
         noteClampClass ?? (notePreviewLines >= 3 ? TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS : 'line-clamp-2');
     const notePreviewMaxHeightEm = notePreviewLines > 0
@@ -153,11 +165,99 @@ export function TimelineCard({
     const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
     const hasBodySection = Boolean(note || checklistProgressLabel);
     const isTimelineDimChecked = checked && checkedVisualTone === 'timeline-dim';
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [draftTitle, setDraftTitle] = useState(title);
 
     // クリック開始時にフォーカスがあったかどうかを保持するref
     const wasFocusedRef = useRef(false);
 
+    useEffect(() => {
+        if (!isEditingTitle) {
+            setDraftTitle(title);
+        }
+    }, [isEditingTitle, title]);
+
+    useEffect(() => {
+        onTitleEditStateChange?.(isEditingTitle);
+    }, [isEditingTitle, onTitleEditStateChange]);
+
+    useEffect(() => {
+        if (!isEditingTitle) return;
+        const input = titleInputRef.current;
+        if (!input) return;
+        input.focus();
+        input.select();
+    }, [isEditingTitle]);
+
+    const restoreCardFocus = useCallback(() => {
+        requestAnimationFrame(() => {
+            containerRef.current?.focus();
+        });
+    }, []);
+
+    const finishTitleEditing = useCallback((nextEditing: boolean) => {
+        setIsEditingTitle(nextEditing);
+        if (!nextEditing) {
+            restoreCardFocus();
+        }
+    }, [restoreCardFocus]);
+
+    const activateCardForTitleEditing = useCallback(() => {
+        if (cardId && selectionLane) {
+            onActivateCard?.(cardId, selectionLane);
+        }
+        onClearSelection?.();
+    }, [cardId, onActivateCard, onClearSelection, selectionLane]);
+
+    const commitTitleChange = useCallback(async () => {
+        if (!inlineTitleEdit || !onRenameTitle || isSubmittingTitleRef.current) {
+            finishTitleEditing(false);
+            return;
+        }
+
+        const trimmedTitle = draftTitle.trim();
+        const previousTitle = title;
+        if (!trimmedTitle || trimmedTitle === previousTitle) {
+            setDraftTitle(previousTitle);
+            finishTitleEditing(false);
+            return;
+        }
+
+        isSubmittingTitleRef.current = true;
+        finishTitleEditing(false);
+        try {
+            await onRenameTitle(trimmedTitle);
+        } catch {
+            setDraftTitle(previousTitle);
+        } finally {
+            isSubmittingTitleRef.current = false;
+        }
+    }, [draftTitle, finishTitleEditing, inlineTitleEdit, onRenameTitle, title]);
+
+    const cancelTitleEditing = useCallback(() => {
+        setDraftTitle(title);
+        finishTitleEditing(false);
+    }, [finishTitleEditing, title]);
+
+    const handleTitleDisplayPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        if (!inlineTitleEdit) return;
+        event.stopPropagation();
+    }, [inlineTitleEdit]);
+
+    const handleTitleDisplayClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+        if (!inlineTitleEdit || !onRenameTitle) return;
+        event.preventDefault();
+        event.stopPropagation();
+        activateCardForTitleEditing();
+        setDraftTitle(title);
+        setIsEditingTitle(true);
+    }, [activateCardForTitleEditing, inlineTitleEdit, onRenameTitle, title]);
+
     const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+        if (isEditingTitle) {
+            e.stopPropagation();
+            return;
+        }
         if (e.shiftKey && onShiftSelect && cardId && selectionLane) {
             e.preventDefault();
             e.stopPropagation();
@@ -174,9 +274,13 @@ export function TimelineCard({
         // ドラッグ動作を阻害しないよう stopPropagation は行わない
         // ポインターダウン時点でフォーカスがあるかチェック
         wasFocusedRef.current = (document.activeElement === containerRef.current);
-    }, [activeCardId, activeLaneId, cardId, onShiftSelect, selectionLane]);
+    }, [activeCardId, activeLaneId, cardId, isEditingTitle, onShiftSelect, selectionLane]);
 
     const handleContainerClick = useCallback((e: React.MouseEvent) => {
+        if (isEditingTitle) {
+            e.stopPropagation();
+            return;
+        }
         if (e.shiftKey && onShiftSelect && cardId && selectionLane) {
             e.preventDefault();
             e.stopPropagation();
@@ -196,7 +300,7 @@ export function TimelineCard({
             // フォーカスがなかった場合はフォーカスさせる（選択状態にする）
             containerRef.current?.focus();
         }
-    }, [cardId, onActivateCard, onClearSelection, onOpen, onShiftSelect, selectionLane]);
+    }, [cardId, isEditingTitle, onActivateCard, onClearSelection, onOpen, onShiftSelect, selectionLane]);
 
     const renderRightMeta = useCallback(() => {
         if (typeof rightMeta === "string") {
@@ -266,6 +370,11 @@ export function TimelineCard({
 
                 // Open card details: Enter
                 if (event.key === 'Enter') {
+                    if (isEditingTitle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
                     event.preventDefault();
                     event.stopPropagation();
                     onOpen();
@@ -283,6 +392,11 @@ export function TimelineCard({
 
                 // Toggle Check: Space
                 if (event.key === ' ') {
+                    if (isEditingTitle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
                     event.preventDefault();
                     event.stopPropagation();
                     onToggleCheck(!checked);
@@ -376,16 +490,70 @@ export function TimelineCard({
                                     isTimelineDimChecked ? 'text-slate-400' : 'text-slate-800'
                                 )}>
                                     <span
-                                        className={clsx(
-                                            "line-clamp-2 break-words leading-tight",
-                                            !title && "text-slate-400",
-                                            titleClassName
-                                        )}
+                                        className="min-w-0"
                                         data-focus-group={focusGroup}
                                         data-focus-part={focusGroup ? 'title' : undefined}
                                         tabIndex={-1}
                                     >
-                                        {title || "Untitled card"}
+                                        {isEditingTitle ? (
+                                            <input
+                                                ref={titleInputRef}
+                                                type="text"
+                                                value={draftTitle}
+                                                maxLength={255}
+                                                data-testid="timeline-card-title-input"
+                                                className={clsx(
+                                                    'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
+                                                    titleClassName
+                                                )}
+                                                onPointerDown={(event) => {
+                                                    event.stopPropagation();
+                                                }}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                }}
+                                                onChange={(event) => {
+                                                    setDraftTitle(event.target.value);
+                                                }}
+                                                onCompositionStart={() => {
+                                                    isComposingRef.current = true;
+                                                }}
+                                                onCompositionEnd={() => {
+                                                    isComposingRef.current = false;
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    event.stopPropagation();
+                                                    if (event.key === 'Enter') {
+                                                        if (isComposingRef.current) return;
+                                                        event.preventDefault();
+                                                        void commitTitleChange();
+                                                        return;
+                                                    }
+                                                    if (event.key === 'Escape') {
+                                                        event.preventDefault();
+                                                        cancelTitleEditing();
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    if (isComposingRef.current) return;
+                                                    void commitTitleChange();
+                                                }}
+                                            />
+                                        ) : (
+                                            <span
+                                                className={clsx(
+                                                    "line-clamp-2 break-words leading-tight",
+                                                    inlineTitleEdit && onRenameTitle && "cursor-text rounded px-0.5 hover:bg-sky-50",
+                                                    !title && "text-slate-400",
+                                                    titleClassName
+                                                )}
+                                                data-testid="timeline-card-title-display"
+                                                onPointerDown={handleTitleDisplayPointerDown}
+                                                onClick={handleTitleDisplayClick}
+                                            >
+                                                {title || "Untitled card"}
+                                            </span>
+                                        )}
                                     </span>
                                     {timePlacement === 'inline' && timeText ? (
                                         <span className="text-[10px] font-normal text-slate-500">{timeText}</span>

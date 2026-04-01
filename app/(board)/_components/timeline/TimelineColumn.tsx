@@ -48,6 +48,7 @@ type TimelineColumnProps = {
     handleResizeMove: (e: React.PointerEvent) => void;
     handleResizeEnd: (e: React.PointerEvent) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
     shrinkToHalf?: boolean;
     setSelectedSlot: (slot: { day: string, minutes: number } | null) => void;
     calendarEvents: ExternalCalendarEntry[];
@@ -105,6 +106,7 @@ export const TimelineColumn = memo(function TimelineColumn({
     handleResizeMove,
     handleResizeEnd,
     onToggleCheck,
+    onRenameCardTitle,
     shrinkToHalf = false,
     setSelectedSlot,
     calendarEvents,
@@ -342,6 +344,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     handleResizeMove={handleResizeMove}
                                     handleResizeEnd={handleResizeEnd}
                                     onToggleCheck={onToggleCheck}
+                                    onRenameCardTitle={onRenameCardTitle}
                                     onClearGhost={() => setSelectedSlot(null)}
                                     timelineStartHour={timelineStartHour}
                                     onCardContextMenu={onCardContextMenu}

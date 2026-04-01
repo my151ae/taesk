@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import clsx from "clsx";
 
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
@@ -66,6 +67,7 @@ type DesktopSidebarMenuProps = {
   allowOverdueDrag: boolean;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
@@ -221,6 +223,7 @@ function SidebarCardRow({
   className,
   draggable = false,
   onToggleCheck,
+  onRenameCardTitle,
   openCardModal,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
@@ -233,6 +236,7 @@ function SidebarCardRow({
   onActivateCard,
   activeCardId,
   activeLaneId,
+  inlineTitleEdit = false,
 }: {
   item: {
     card_id: string;
@@ -268,7 +272,10 @@ function SidebarCardRow({
   onActivateCard?: (cardId: string, laneId: string) => void;
   activeCardId?: string | null;
   activeLaneId?: string | null;
+  inlineTitleEdit?: boolean;
+  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
 }) {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const card = (
     <div
       className="relative min-w-0 select-none pt-4 has-[:focus]:z-10"
@@ -307,6 +314,9 @@ function SidebarCardRow({
         onActivateCard={onActivateCard}
         activeCardId={activeCardId}
         activeLaneId={activeLaneId}
+        inlineTitleEdit={inlineTitleEdit}
+        onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
+        onTitleEditStateChange={setIsEditingTitle}
       />
     </div>
   );
@@ -317,7 +327,7 @@ function SidebarCardRow({
     <DraggableCard
       id={`overdue:${item.card_id}`}
       data={{ kind: "overdue", cardId: item.card_id, item }}
-      disabled={isContextMenuOpen}
+      disabled={isContextMenuOpen || isEditingTitle}
     >
       {card}
     </DraggableCard>
@@ -337,6 +347,7 @@ function renderSidebarResultRows({
   openSource,
   testIdPrefix,
   onToggleCheck,
+  onRenameCardTitle,
   openCardModal,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
@@ -354,6 +365,7 @@ function renderSidebarResultRows({
   openSource: string;
   testIdPrefix: string;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
   openCardModal: (shortId: string | null, source: string) => void;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
@@ -384,6 +396,7 @@ function renderSidebarResultRows({
           testId={`${testIdPrefix}-${result.kind}-${result.item.card_id}`}
           className="bg-white"
           onToggleCheck={onToggleCheck}
+          onRenameCardTitle={onRenameCardTitle}
           openCardModal={openCardModal}
           onCardContextMenu={onCardContextMenu}
           onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
@@ -411,6 +424,7 @@ export function DesktopSidebarMenu({
   allowOverdueDrag,
   openCardModal,
   onToggleCheck,
+  onRenameCardTitle,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
@@ -471,6 +485,7 @@ export function DesktopSidebarMenu({
                     className={allowOverdueDrag ? "bg-white" : "bg-slate-50"}
                     draggable={allowOverdueDrag}
                     onToggleCheck={onToggleCheck}
+                    onRenameCardTitle={onRenameCardTitle}
                     openCardModal={openCardModal}
                     onCardContextMenu={onCardContextMenu}
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
@@ -532,6 +547,7 @@ export function DesktopSidebarMenu({
                   openSource: "search",
                   testIdPrefix: "search-card",
                   onToggleCheck,
+                  onRenameCardTitle: undefined,
                   openCardModal,
                   onCardContextMenu,
                   onCardContextMenuByKeyboard,
@@ -620,6 +636,7 @@ export function DesktopSidebarMenu({
                   openSource: "tag-sidebar",
                   testIdPrefix: "tag-card",
                   onToggleCheck,
+                  onRenameCardTitle: undefined,
                   openCardModal,
                   onCardContextMenu,
                   onCardContextMenuByKeyboard,

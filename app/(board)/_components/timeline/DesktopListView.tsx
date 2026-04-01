@@ -170,9 +170,10 @@ export type DesktopListViewProps = {
   overdue?: TimelineOverdueItem[];
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   calendarAllDayEventsByDay: Record<string, ExternalCalendarEntry[]>;
-  openCardModal: (shortId: string | null, source: string) => void;
-  onToggleCheck: (cardId: string, checked: boolean) => void;
-  onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
+    openCardModal: (shortId: string | null, source: string) => void;
+    onToggleCheck: (cardId: string, checked: boolean) => void;
+    onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
+    onExternalEventClick?: (entry: ExternalCalendarEntry) => void;
   onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
   status?: string;
   listReverse?: boolean;
@@ -188,9 +189,10 @@ export function DesktopListView({
   overdue = [],
   calendarEventsByDay,
   calendarAllDayEventsByDay,
-  openCardModal,
-  onToggleCheck,
-  onExternalEventClick,
+    openCardModal,
+    onToggleCheck,
+    onRenameCardTitle,
+    onExternalEventClick,
   onCardContextMenu,
   status,
   listReverse = false,
@@ -290,6 +292,7 @@ export function DesktopListView({
                       openSource="list-view"
                       openCardModal={openCardModal}
                       onToggleCheck={onToggleCheck}
+                      onRenameCardTitle={onRenameCardTitle}
                       onCardContextMenu={onCardContextMenu}
                     />
                   ))}
@@ -327,6 +330,7 @@ export function DesktopListView({
                           bucketLabel={item.bkey.toUpperCase()}
                           openCardModal={openCardModal}
                           onToggleCheck={onToggleCheck}
+                          onRenameCardTitle={onRenameCardTitle}
                           onCardContextMenu={onCardContextMenu}
                         />
                       ))}

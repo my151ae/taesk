@@ -15,6 +15,7 @@ type TimelineListCardProps = {
   bucketLabel?: string | null;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
+  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
   onCardContextMenu?: (e: React.MouseEvent, cardId: string) => void;
 };
 
@@ -26,6 +27,7 @@ export function TimelineListCard({
   bucketLabel,
   openCardModal,
   onToggleCheck,
+  onRenameCardTitle,
   onCardContextMenu,
 }: TimelineListCardProps) {
   const isEvent = kind === "event";
@@ -76,6 +78,12 @@ export function TimelineListCard({
           part: "card",
         }}
         focusGroup="bucket"
+        inlineTitleEdit={variant === "desktop"}
+        onRenameTitle={
+          variant === "desktop" && onRenameCardTitle
+            ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined)
+            : undefined
+        }
       />
     </div>
   );
