@@ -56,7 +56,7 @@ export function applyCardUpdate(
     const localDay = toLocalDay(card.due_date ?? null);
     const hasTime = Boolean(card.due_start && card.due_end);
     const todayIso = getIsoDateJst(new Date().toISOString());
-    const isOverdue = Boolean(localDay && localDay < todayIso && !card.checked);
+    const isOverdue = Boolean(localDay && localDay < todayIso);
 
     // 2. Add new instance for INSERT/UPDATE
     // Keep the same logic as `app/api/boards/[boardId]/timeline/route.ts`:

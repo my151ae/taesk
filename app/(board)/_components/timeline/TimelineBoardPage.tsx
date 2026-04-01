@@ -320,6 +320,10 @@ function TimelineBoardPageContent({
       overdue: sortTimelineOverdueItems(filteredData.overdue, overdueSortOrder),
     };
   }, [filteredData, overdueSortOrder]);
+  const visibleOverdueItems = useMemo(
+    () => (sortedFilteredData?.overdue ?? []).filter((item) => !item.checked),
+    [sortedFilteredData?.overdue],
+  );
 
   const laneCardOrderMap = useMemo(() => {
     if (!sortedFilteredData) return new Map<string, string[]>();
@@ -799,7 +803,7 @@ function TimelineBoardPageContent({
     handleNextDayRange,
     eventsByDay,
     abBuckets: sortedFilteredData?.abBuckets ?? {},
-    overdue: sortedFilteredData?.overdue ?? [],
+    overdue: visibleOverdueItems,
     searchQuery,
     setSearchQuery: handleSearchQueryChange,
     searchResults,

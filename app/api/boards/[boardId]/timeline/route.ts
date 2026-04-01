@@ -151,7 +151,7 @@ const getHandler = async (
   cards?.forEach((card) => {
     const checklist = normalizeChecklist((card.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof normalizeChecklist>[0]);
     const dateOnly = toJstDate(card.due_date);
-    const isOverdue = Boolean(dateOnly && dateOnly < todayIso && !card.checked);
+    const isOverdue = Boolean(dateOnly && dateOnly < todayIso);
 
     const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
     const hasTime = card.due_start && card.due_end;

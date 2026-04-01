@@ -271,7 +271,7 @@ function SidebarCardRow({
 }) {
   const card = (
     <div
-      className="relative min-w-0 pt-4 has-[:focus]:z-10"
+      className="relative min-w-0 select-none pt-4 has-[:focus]:z-10"
       data-testid={testId}
       onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
     >
