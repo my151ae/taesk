@@ -66,6 +66,8 @@ export function TimelineListCard({
         notePreviewLines={3}
         rightMeta={null}
         onOpen={() => openCardModal(item.short_id, openSource)}
+        openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
+        showOpenButton
         paddingClass="py-1"
         className={clsx(
           "min-h-0",

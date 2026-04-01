@@ -89,6 +89,7 @@ type TimelineCardProps = {
     onTitleEditStateChange?: (editing: boolean) => void;
     autoStartTitleEdit?: boolean;
     onAutoStartTitleEditConsumed?: () => void;
+    showOpenButton?: boolean;
 };
 
 export function TimelineCard({
@@ -138,6 +139,7 @@ export function TimelineCard({
     onTitleEditStateChange,
     autoStartTitleEdit = false,
     onAutoStartTitleEditConsumed,
+    showOpenButton = false,
 }: TimelineCardProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
@@ -169,6 +171,7 @@ export function TimelineCard({
     const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
     const hasBodySection = Boolean(note || checklistProgressLabel);
     const isTimelineDimChecked = checked && checkedVisualTone === 'timeline-dim';
+    const inlineBadgeLabel = badgeLabel && !['A', 'B'].includes(badgeLabel.toUpperCase()) ? badgeLabel : null;
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [draftTitle, setDraftTitle] = useState(title);
 
@@ -345,6 +348,11 @@ export function TimelineCard({
             </span>
         );
     }, [rightMeta]);
+    const handleOpenButtonClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpen();
+    }, [onOpen]);
     const shortcutAttributes = shortcutContext ? buildShortcutDataAttributes(shortcutContext) : undefined;
     const handleFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
         if (cardId && selectionLane) {
@@ -514,72 +522,107 @@ export function TimelineCard({
                                     'flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold',
                                     isTimelineDimChecked ? 'text-slate-400' : 'text-slate-800'
                                 )}>
-                                    <span
-                                        className="min-w-0"
-                                        data-focus-group={focusGroup}
-                                        data-focus-part={focusGroup ? 'title' : undefined}
-                                        tabIndex={-1}
-                                    >
-                                        {isEditingTitle ? (
-                                            <input
-                                                ref={titleInputRef}
-                                                type="text"
-                                                value={draftTitle}
-                                                maxLength={255}
-                                                data-testid="timeline-card-title-input"
-                                                className={clsx(
-                                                    'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
-                                                    titleClassName
-                                                )}
-                                                onPointerDown={(event) => {
-                                                    event.stopPropagation();
-                                                }}
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                }}
-                                                onChange={(event) => {
-                                                    setDraftTitle(event.target.value);
-                                                }}
-                                                onCompositionStart={() => {
-                                                    isComposingRef.current = true;
-                                                }}
-                                                onCompositionEnd={() => {
-                                                    isComposingRef.current = false;
-                                                }}
-                                                onKeyDown={(event) => {
-                                                    event.stopPropagation();
-                                                    if (event.key === 'Enter') {
+                                    <div className="flex min-w-0 items-start gap-1">
+                                        <span
+                                            className="min-w-0 flex-1"
+                                            data-focus-group={focusGroup}
+                                            data-focus-part={focusGroup ? 'title' : undefined}
+                                            tabIndex={-1}
+                                        >
+                                            {isEditingTitle ? (
+                                                <input
+                                                    ref={titleInputRef}
+                                                    type="text"
+                                                    value={draftTitle}
+                                                    maxLength={255}
+                                                    data-testid="timeline-card-title-input"
+                                                    className={clsx(
+                                                        'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
+                                                        titleClassName
+                                                    )}
+                                                    onPointerDown={(event) => {
+                                                        event.stopPropagation();
+                                                    }}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                    }}
+                                                    onChange={(event) => {
+                                                        setDraftTitle(event.target.value);
+                                                    }}
+                                                    onCompositionStart={() => {
+                                                        isComposingRef.current = true;
+                                                    }}
+                                                    onCompositionEnd={() => {
+                                                        isComposingRef.current = false;
+                                                    }}
+                                                    onKeyDown={(event) => {
+                                                        event.stopPropagation();
+                                                        if (event.key === 'Enter') {
+                                                            if (isComposingRef.current) return;
+                                                            event.preventDefault();
+                                                            void commitTitleChange();
+                                                            return;
+                                                        }
+                                                        if (event.key === 'Escape') {
+                                                            event.preventDefault();
+                                                            cancelTitleEditing();
+                                                        }
+                                                    }}
+                                                    onBlur={() => {
                                                         if (isComposingRef.current) return;
-                                                        event.preventDefault();
                                                         void commitTitleChange();
-                                                        return;
-                                                    }
-                                                    if (event.key === 'Escape') {
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span
+                                                    className={clsx(
+                                                        "line-clamp-2 break-words leading-tight",
+                                                        inlineTitleEdit && onRenameTitle && "cursor-text rounded px-0.5 hover:bg-sky-50",
+                                                        !title && "text-slate-400",
+                                                        titleClassName
+                                                    )}
+                                                    data-testid="timeline-card-title-display"
+                                                    onPointerDown={handleTitleDisplayPointerDown}
+                                                    onClick={handleTitleDisplayClick}
+                                                >
+                                                    {title || "Untitled card"}
+                                                </span>
+                                            )}
+                                        </span>
+                                        {showOpenButton ? (
+                                            <div className="flex shrink-0 items-center gap-1 pl-1">
+                                                {inlineBadgeLabel ? (
+                                                    <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-500 shadow-sm">
+                                                        {inlineBadgeLabel}
+                                                    </span>
+                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    aria-label="カードを開く"
+                                                    data-testid={openButtonTestId}
+                                                    className={clsx(
+                                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                                                        isTimelineDimChecked
+                                                            ? "border-slate-200 bg-white/80 text-slate-400 hover:border-slate-300 hover:text-slate-500"
+                                                            : "border-slate-200 bg-white text-slate-500 hover:border-sky-300 hover:text-sky-600"
+                                                    )}
+                                                    onClick={handleOpenButtonClick}
+                                                    onPointerDown={(event) => {
                                                         event.preventDefault();
-                                                        cancelTitleEditing();
-                                                    }
-                                                }}
-                                                onBlur={() => {
-                                                    if (isComposingRef.current) return;
-                                                    void commitTitleChange();
-                                                }}
-                                            />
-                                        ) : (
-                                            <span
-                                                className={clsx(
-                                                    "line-clamp-2 break-words leading-tight",
-                                                    inlineTitleEdit && onRenameTitle && "cursor-text rounded px-0.5 hover:bg-sky-50",
-                                                    !title && "text-slate-400",
-                                                    titleClassName
-                                                )}
-                                                data-testid="timeline-card-title-display"
-                                                onPointerDown={handleTitleDisplayPointerDown}
-                                                onClick={handleTitleDisplayClick}
-                                            >
-                                                {title || "Untitled card"}
-                                            </span>
-                                        )}
-                                    </span>
+                                                        event.stopPropagation();
+                                                    }}
+                                                    tabIndex={-1}
+                                                >
+                                                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M14 5h5v5" />
+                                                        <path d="M10 14 19 5" />
+                                                        <path d="M19 14v4a1 1 0 0 1-1 1h-4" />
+                                                        <path d="M10 5H6a1 1 0 0 0-1 1v4" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </div>
                                     {timePlacement === 'inline' && timeText ? (
                                         <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
                                     ) : null}
@@ -700,7 +743,7 @@ export function TimelineCard({
 
                 {timePlacement === 'out-top' && timeText ? (
                     <div className={clsx(
-                        'absolute -top-4 left-[6px] z-10 max-w-[calc(100%-32px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold pointer-events-none',
+                        'absolute -top-4 left-[6px] z-10 max-w-[calc(100%-40px)] overflow-hidden text-ellipsis whitespace-nowrap pl-0 pr-1 text-[10px] font-semibold pointer-events-none',
                         isTimelineDimChecked ? 'text-slate-400 opacity-40' : 'text-slate-600'
                     )}>
                         {timeText}
@@ -721,24 +764,6 @@ export function TimelineCard({
                 </div>
             ) : null}
 
-            {badgeLabel && !['A', 'B'].includes(badgeLabel.toUpperCase()) ? (
-                <button
-                    type="button"
-                    className="absolute top-[3px] right-[6px] flex items-center justify-center rounded-md bg-slate-100 px-1.5 py-0.5"
-                    aria-label="カードを開く"
-                    data-testid={openButtonTestId}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpen();
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    tabIndex={-1}
-                >
-                    <span className="text-[10px] font-bold leading-none text-slate-500">
-                        {badgeLabel || ''}
-                    </span>
-                </button>
-            ) : null}
         </div>
     );
 }

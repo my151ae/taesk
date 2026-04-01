@@ -359,6 +359,7 @@ function StaticTimelineRow({
     onCardContextMenuByKeyboard,
     dataTestId,
     badgeTestId,
+    openButtonTestId,
     notePreviewLines = 3,
     cardClassName,
     timeText,
@@ -383,6 +384,7 @@ function StaticTimelineRow({
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     dataTestId?: string;
     badgeTestId?: string;
+    openButtonTestId?: string;
     notePreviewLines?: number;
     cardClassName?: string;
     timeText?: ReactNode;
@@ -431,6 +433,8 @@ function StaticTimelineRow({
                 notePreviewLines={notePreviewLines}
                 rightMeta={null}
                 onOpen={() => openCardModal(item.short_id, openSource)}
+                openButtonTestId={openButtonTestId}
+                showOpenButton
                 paddingClass="py-1"
                 className={clsx('min-h-0', cardClassName)}
                 checkedVisualTone={checkedVisualTone}
@@ -1036,6 +1040,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     dataTestId={`completed-card-${entry.item.card_id}`}
                     badgeTestId={`completed-badge-${entry.item.card_id}`}
+                    openButtonTestId={`cardOpenButton-timeline-${entry.item.card_id}`}
                     timeText={buildTimelineCardTimeText(entry.item, { includeDuration: true })}
                     openSource="timeline"
                     checkedVisualTone="timeline-dim"
@@ -1063,6 +1068,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                 dataTestId={`completed-card-${entry.item.card_id}`}
                 badgeTestId={`completed-badge-${entry.item.card_id}`}
+                openButtonTestId={`cardOpenButton-bucket-list-${entry.item.card_id}`}
                 timeText={buildTimelineCardTimeText(entry.item, {
                     includeDate: true,
                     includeTime: false,

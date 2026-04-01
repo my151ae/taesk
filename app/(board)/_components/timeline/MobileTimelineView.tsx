@@ -266,6 +266,8 @@ function MobileTimelineColumn({
                   rightMeta={undefined}
                   timePlacement="out-top"
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
+                  openButtonTestId={`cardOpenButton-mobile-timeline-${event.card_id}`}
+                  showOpenButton
                   dataTestId="timeline-event"
                   className={`w-full h-full pt-0 ${activeStackItem?.kind === "card" && activeStackItem.id === event.card_id ? "ring-2 ring-sky-400 shadow-md" : ""}`}
                   tabIndex={0}
@@ -996,6 +998,8 @@ function MobileBucketCard({
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={3}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
+          openButtonTestId={`cardOpenButton-mobile-ab-${item.card_id}`}
+          showOpenButton
           timePlacement="out-top"
           paddingClass="py-1"
           className="w-full min-h-0"

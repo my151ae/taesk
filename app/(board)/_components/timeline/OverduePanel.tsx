@@ -71,6 +71,7 @@ function OverdueCardRow({
           notePreviewLines={3}
           onOpen={() => openCardModal(item.short_id, "overdue")}
           openButtonTestId={`cardOpenButton-overdue-${item.card_id}`}
+          showOpenButton
           paddingClass="py-1"
           className="min-h-0 border-rose-200 bg-rose-50/80"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}

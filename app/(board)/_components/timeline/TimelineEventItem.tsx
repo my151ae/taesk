@@ -141,6 +141,8 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onOpen={() => {
                         openCardModal(event.short_id, 'timeline');
                     }}
+                    openButtonTestId={`cardOpenButton-timeline-${event.card_id}`}
+                    showOpenButton
                     dataTestId="timeline-event"
                     tabIndex={0}
                     role="group"

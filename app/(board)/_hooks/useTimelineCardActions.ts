@@ -87,7 +87,7 @@ function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: strin
     id: cardId,
     title: sourceEvent?.title ?? sourceBucketItem?.title ?? sourceOverdueItem?.title ?? "Untitled card",
     checklist: sourceEvent?.checklist ?? sourceBucketItem?.checklist ?? sourceOverdueItem?.checklist ?? null,
-    content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? buildDefaultBodyContent(""),
+    content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? buildDefaultBodyContent(),
     excerpt: sourceEvent?.excerpt ?? sourceBucketItem?.excerpt ?? sourceOverdueItem?.excerpt ?? null,
     list_id: "",
     board_id: "",
@@ -528,7 +528,8 @@ export function useTimelineCardActions({
         throw new Error(body?.error?.message || "Failed to rename card");
       }
       if (body?.card) {
-        setData((prev) => (prev ? applyCardUpdate(prev, body.card, "UPDATE") : prev));
+        const renamedCard = body.card;
+        setData((prev) => (prev ? applyCardUpdate(prev, renamedCard, "UPDATE") : prev));
       }
       return true;
     } catch (error) {

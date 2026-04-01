@@ -297,6 +297,7 @@ function SidebarCardRow({
         notePreviewLines={3}
         onOpen={() => openCardModal(item.short_id, openSource)}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
+        showOpenButton
         paddingClass="py-1"
         className={clsx("min-h-0", className, isActive && "shadow-md")}
         shortcutContext={{

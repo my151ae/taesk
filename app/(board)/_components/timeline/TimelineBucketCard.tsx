@@ -121,6 +121,7 @@ export const TimelineBucketCard = ({
                         openCardModal(item.short_id);
                     }}
                     openButtonTestId={`cardOpenButton-${item.card_id}`}
+                    showOpenButton
                     paddingClass="py-1"
                     className={clsx(
                         "min-h-0 cursor-grab active:cursor-grabbing",
