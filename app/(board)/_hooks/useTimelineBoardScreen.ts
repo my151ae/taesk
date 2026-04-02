@@ -65,6 +65,7 @@ type UseTimelineBoardScreenArgs = {
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
+  onOpenNotificationsPanel: () => void;
   onResetToDefaultList: () => void;
   days: TimelineResponse["days"];
   activeDayIndex: number;
@@ -222,6 +223,7 @@ export function useTimelineBoardScreen({
   activeLeftSectionKey,
   expandedSectionKey,
   onExpandedSectionChange,
+  onOpenNotificationsPanel,
   onResetToDefaultList,
   days,
   activeDayIndex,
@@ -364,6 +366,7 @@ export function useTimelineBoardScreen({
     activeLeftSectionKey,
     expandedSectionKey,
     onExpandedSectionChange,
+    onOpenNotificationSettings: () => setShowNotificationSettings(true),
     days,
     activeDayIndex,
     intendedDayRange,
@@ -457,6 +460,7 @@ export function useTimelineBoardScreen({
     setShowBoardMenu,
     boardMenuRef: boardMenuRef as React.RefObject<HTMLDivElement>,
     setShowNotificationSettings,
+    onOpenNotificationsPanel,
     setShowProfileSettings,
     onOpenBoardSettings,
     onOpenTeamSettings,
@@ -485,6 +489,7 @@ export function useTimelineBoardScreen({
     actions: viewModels.desktop.leftPanel.actions,
     sections: viewModels.desktop.leftPanel.sections,
     allowOverdueDrag: viewModels.desktop.leftPanel.allowOverdueDrag,
+    onOpenNotificationSettings: viewModels.desktop.leftPanel.onOpenNotificationSettings,
     openCardModal,
     onToggleCheck: handleToggleCardChecked,
     onCardContextMenu: handleCardContextMenu,
@@ -538,7 +543,7 @@ export function useTimelineBoardScreen({
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
       contextBar:
-        activeLeftPanelMode !== "none"
+        activeLeftPanelMode !== "none" && activeLeftPanelMode !== "notifications"
           ? {
               label:
                 activeLeftPanelMode === "tags"

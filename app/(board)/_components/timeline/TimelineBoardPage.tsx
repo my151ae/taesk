@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 
 import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
+import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -81,7 +82,7 @@ const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
 const OVERDUE_LANE_ID = "overdue";
 
 const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
-  if (mode === "overdue" || mode === "search" || mode === "tags") return mode;
+  if (mode === "overdue" || mode === "notifications" || mode === "search" || mode === "tags") return mode;
   return null;
 };
 
@@ -716,6 +717,14 @@ function TimelineBoardPageContent({
         return;
       }
 
+      if (key === "notifications") {
+        updateBoardUiState({
+          leftPanelMode: "notifications",
+          method: "replace",
+        });
+        return;
+      }
+
       updateBoardUiState({
         leftPanelMode: "tags",
         tag: selectedTags[0] ?? resolvedState.tag ?? null,
@@ -731,6 +740,14 @@ function TimelineBoardPageContent({
       method: "replace",
     });
     setExpandedSectionKey("overdue");
+  }, [updateBoardUiState]);
+
+  const handleOpenNotificationsPanel = useCallback(() => {
+    updateBoardUiState({
+      leftPanelMode: "notifications",
+      method: "replace",
+    });
+    setExpandedSectionKey("notifications");
   }, [updateBoardUiState]);
 
   const eventsByDay = useMemo(() => {
@@ -783,6 +800,7 @@ function TimelineBoardPageContent({
     activeLeftPanelMode: resolvedState.leftPanelMode,
     activeLeftSectionKey,
     onExpandedSectionChange: handleExpandedSectionChange,
+    onOpenNotificationsPanel: handleOpenNotificationsPanel,
     onResetToDefaultList: handleResetToDefaultList,
     days: data?.days ?? [],
     activeDayIndex,
@@ -985,6 +1003,11 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     defaultListAfter: defaultListWindow.after,
   });
 
+  const effectiveParseResult =
+    !featureFlags.notifications && resolvedState.leftPanelMode === "notifications"
+      ? ({ ok: false, code: "INVALID_LP" } as const)
+      : parseResult;
+
   const handleResetInvalidUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
@@ -1015,10 +1038,10 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     router.replace(`${basePath}?${params.toString()}`, { scroll: false });
   }, [basePath, router]);
 
-  if (!parseResult.ok) {
+  if (!effectiveParseResult.ok) {
     return (
       <InvalidTimelineUrlState
-        code={parseResult.code}
+        code={effectiveParseResult.code}
         onResetInvalidUrl={handleResetInvalidUrl}
         onMoveToCanonicalUrl={handleMoveToCanonicalUrl}
       />

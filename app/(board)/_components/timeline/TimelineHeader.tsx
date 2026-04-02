@@ -30,6 +30,7 @@ type TimelineHeaderProps = {
     setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
     boardMenuRef: React.RefObject<HTMLDivElement>;
     setShowNotificationSettings: (show: boolean) => void;
+    onOpenNotificationsPanel: () => void;
     setShowProfileSettings: (show: boolean) => void;
     profile: UserProfile | null;
     user: User | null;
@@ -69,6 +70,7 @@ export default function TimelineHeader({
     setShowBoardMenu,
     boardMenuRef,
     setShowNotificationSettings,
+    onOpenNotificationsPanel,
     setShowProfileSettings,
     profile,
     user,
@@ -587,7 +589,7 @@ export default function TimelineHeader({
                     </div>
 
                     <div className="hidden shrink-0 items-center gap-1.5 md:flex">
-                        <NotificationsBell onOpenNotificationSettings={() => setShowNotificationSettings(true)} />
+                        <NotificationsBell onOpenNotificationsPanel={onOpenNotificationsPanel} />
                     </div>
                 </div>
 

@@ -321,7 +321,14 @@ export interface CommentWithAuthor extends Comment {
   author: ProfileSummary;
 }
 
-export type NotificationType = 'mention' | 'assignee_changed' | 'due_soon' | 'comment_reply';
+export type NotificationType =
+  | 'mention'
+  | 'assignee_changed'
+  | 'due_soon'
+  | 'comment_reply'
+  | 'comment_created'
+  | 'comment_replied'
+  | 'test';
 
 export interface Notification {
   id: string;
@@ -329,11 +336,18 @@ export interface Notification {
   type: NotificationType;
   payload: {
     card_id?: string;
+    card_title?: string | null;
     comment_id?: string;
     message: string;
     comment_body?: string | null;
     card_short_id?: string | null;
     card_slug?: string | null;
+    change_summary?: string | null;
+    time_change?: {
+      field?: 'start' | 'end' | string;
+      before?: string | null;
+      after?: string | null;
+    } | null;
     [key: string]: unknown;
   };
   read_at: string | null;

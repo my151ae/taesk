@@ -15,6 +15,7 @@ type TimelineBoardHeaderProps = {
   setShowBoardMenu: (show: boolean | ((prev: boolean) => boolean)) => void;
   boardMenuRef: RefObject<HTMLDivElement>;
   setShowNotificationSettings: (show: boolean) => void;
+  onOpenNotificationsPanel: () => void;
   setShowProfileSettings: (show: boolean) => void;
   onOpenBoardSettings: (boardId: string | null | undefined) => void;
   onOpenTeamSettings: (teamId: string | null | undefined) => void;
@@ -48,6 +49,7 @@ export default function TimelineBoardHeader({
   setShowBoardMenu,
   boardMenuRef,
   setShowNotificationSettings,
+  onOpenNotificationsPanel,
   setShowProfileSettings,
   onOpenBoardSettings,
   onOpenTeamSettings,
@@ -82,6 +84,7 @@ export default function TimelineBoardHeader({
         setShowBoardMenu={setShowBoardMenu}
         boardMenuRef={boardMenuRef}
         setShowNotificationSettings={setShowNotificationSettings}
+        onOpenNotificationsPanel={onOpenNotificationsPanel}
         setShowProfileSettings={setShowProfileSettings}
         onOpenBoardSettings={onOpenBoardSettings}
         onOpenTeamSettings={onOpenTeamSettings}

@@ -51,6 +51,7 @@ type UseTimelineBoardViewModelsArgs = {
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
+  onOpenNotificationSettings: () => void;
   days: TimelineDay[];
   activeDayIndex: number;
   intendedDayRange: number;
@@ -490,6 +491,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         sections: leftPanelSections,
         actions: leftPanelActions,
         allowOverdueDrag: activeKey === "timeline",
+        onOpenNotificationSettings: args.onOpenNotificationSettings,
       },
       mainPanel,
     },
