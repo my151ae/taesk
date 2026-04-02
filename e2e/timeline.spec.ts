@@ -6011,13 +6011,11 @@ test.describe('@feature:timeline Timeline view', () => {
       }
       await expect(completedLinesPanel).toBeVisible();
       const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
-      await expect(showCompletedLines).toBeChecked();
+      await expect(showCompletedLines).not.toBeChecked();
 
       const savedBeforeToggle = await fetchSavedCard(cardId);
       expect(Date.parse(savedBeforeToggle?.updatedAt ?? '')).toBe(Date.parse(timestamp));
 
-      await showCompletedLines.uncheck();
-      await expect(showCompletedLines).not.toBeChecked();
       await expect(checkedTaskLine).toBeHidden();
       await expect(uncheckedTaskLine).toBeVisible();
       await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
@@ -6359,7 +6357,7 @@ test.describe('@feature:timeline Timeline view', () => {
         await reopenedModal.getByTitle('Show details').click();
       }
       await expect(reopenedCompletedLinesPanel).toBeVisible();
-      await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).toBeChecked();
+      await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).not.toBeChecked();
     } finally {
       await supabaseAdmin.from('card_content_history').delete().eq('card_id', cardId);
       await supabaseAdmin.from('cards').delete().eq('id', cardId);

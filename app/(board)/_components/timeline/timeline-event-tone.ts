@@ -6,6 +6,8 @@ const NEAR_START_WINDOW_MINUTES = 60;
 type TimelineEventTone = {
   backgroundClass: string;
   borderClassName?: string;
+  titleBackgroundClassName?: string;
+  titleClassName?: string;
 };
 
 const DEFAULT_TONE: TimelineEventTone = {

@@ -59,6 +59,19 @@ export default function CardModalSidebar({
     >
       <div className="flex-1 min-h-0 flex flex-col px-6 pb-6 pt-3">
         <div className="space-y-5">
+          <section className="space-y-2" data-testid="card-modal-completed-lines-panel">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={showCompletedLines}
+                onChange={(event) => onShowCompletedLinesChange(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                data-testid="card-modal-show-completed-lines"
+              />
+              <span>完了行を表示</span>
+            </label>
+          </section>
+
           <section className="space-y-2" data-testid="card-modal-tags-panel">
             <div className="flex flex-wrap items-center gap-2">
               <div className="w-[180px] max-w-full shrink-0">
@@ -94,19 +107,6 @@ export default function CardModalSidebar({
                 </span>
               ))}
             </div>
-          </section>
-
-          <section className="space-y-2" data-testid="card-modal-completed-lines-panel">
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={showCompletedLines}
-                onChange={(event) => onShowCompletedLinesChange(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                data-testid="card-modal-show-completed-lines"
-              />
-              <span>完了行を表示</span>
-            </label>
           </section>
 
           <div className="flex items-center gap-2 pt-1">

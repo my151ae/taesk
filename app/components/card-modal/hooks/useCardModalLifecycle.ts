@@ -68,7 +68,7 @@ export function useCardModalLifecycle({
       hasPendingChangesRef.current = false;
       hasAutoSavedEditsRef.current = false;
       resetHistoryState();
-      setShowCompletedLines(true);
+      setShowCompletedLines(false);
     }
   }, [card, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef, setShowCompletedLines]);
 

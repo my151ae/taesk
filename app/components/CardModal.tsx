@@ -127,7 +127,7 @@ export function CardModal({
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
     const [activeShortcutDescriptor, setActiveShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
-    const [showCompletedLines, setShowCompletedLines] = useState(true);
+    const [showCompletedLines, setShowCompletedLines] = useState(false);
     const [bodyShortcutState, setBodyShortcutState] = useState<BodyEditorShortcutState>({
         canUndo: false,
         canRedo: false,
