@@ -178,23 +178,29 @@ function formatRelativeDateTime(iso: string) {
   const target = new Date(iso);
   const diffMs = target.getTime() - Date.now();
   const diffMinutes = Math.round(diffMs / 60000);
-  const absolute = target.toLocaleString("ja-JP");
+  const absolute = new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(target);
 
   if (Math.abs(diffMinutes) < 1) {
-    return { relative: "たった今", absolute };
+    return { relative: `たった今 [ ${absolute} ]`, absolute };
   }
   if (Math.abs(diffMinutes) < 60) {
-    return { relative: RELATIVE_TIME_FORMATTER.format(diffMinutes, "minute"), absolute };
+    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffMinutes, "minute")} [ ${absolute} ]`, absolute };
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (Math.abs(diffHours) < 24) {
-    return { relative: RELATIVE_TIME_FORMATTER.format(diffHours, "hour"), absolute };
+    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffHours, "hour")} [ ${absolute} ]`, absolute };
   }
 
   const diffDays = Math.round(diffHours / 24);
   if (Math.abs(diffDays) < 7) {
-    return { relative: RELATIVE_TIME_FORMATTER.format(diffDays, "day"), absolute };
+    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffDays, "day")} [ ${absolute} ]`, absolute };
   }
 
   return { relative: absolute, absolute };
