@@ -280,16 +280,26 @@ export default function CardModalHeader({
 
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                 <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-sm sm:gap-6">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
-                            <input
-                                type="date"
-                                value={dueDate ? new Date(dueDate).toISOString().split("T")[0] : ""}
-                                onChange={(e) => onDueDateChange(e.target.value)}
-                                className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
-                            />
-                        </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <button
+                            type="button"
+                            onClick={onRequestClose}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                            aria-label="Close modal"
+                        >
+                            <span className="text-base leading-none">✕</span>
+                        </button>
+
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 text-sm sm:gap-6">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
+                                <input
+                                    type="date"
+                                    value={dueDate ? new Date(dueDate).toISOString().split("T")[0] : ""}
+                                    onChange={(e) => onDueDateChange(e.target.value)}
+                                    className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
+                                />
+                            </div>
 
                         {dueDate && (
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -506,6 +516,7 @@ export default function CardModalHeader({
                                 </div>
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
 
@@ -519,17 +530,18 @@ export default function CardModalHeader({
 
                     {overflowActionIds.length > 0 && (
                         <div ref={overflowMenuRef} className="relative shrink-0">
-                            <HeaderActionButton
+                            <button
+                                type="button"
                                 onClick={handleToggleOverflowMenu}
                                 aria-expanded={showOverflowMenu}
                                 aria-label="Card modal actions"
                                 data-testid="card-modal-overflow-button"
-                                className="w-9 justify-center px-0"
+                                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                             >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                                 </svg>
-                            </HeaderActionButton>
+                            </button>
 
                             {showOverflowMenu && (
                                 <div
@@ -613,24 +625,16 @@ export default function CardModalHeader({
                         type="button"
                         onClick={onToggleSidebar}
                         className={clsx(
-                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all duration-200",
                             showSidebar
                                 ? "bg-sky-50 text-sky-500 ring-1 ring-sky-200 dark:bg-sky-900/40 dark:ring-sky-800"
                                 : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
                         )}
                         title={showSidebar ? "Hide details" : "Show details"}
                     >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onRequestClose}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                        aria-label="Close modal"
-                    >
-                        <span className="text-xl leading-none">✕</span>
                     </button>
                 </div>
             </div>
