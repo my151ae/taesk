@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
     calculateStackedEventLayout,
     getIsoDateJst,
+    getMsUntilNextTimelineBoundary,
     getTimelineIsoDateJst,
     NormalizedTimelineLayoutItem,
 } from '../app/(board)/_utils/timeline-helpers';
@@ -183,6 +184,11 @@ test.describe('timeline day boundary helpers', () => {
     test('getTimelineIsoDateJst shifts today until timeline start hour passes', async () => {
         expect(getTimelineIsoDateJst('2026-03-29T15:10:00.000Z', 5)).toBe('2026-03-29');
         expect(getTimelineIsoDateJst('2026-03-29T20:10:00.000Z', 5)).toBe('2026-03-30');
+    });
+
+    test('getMsUntilNextTimelineBoundary returns remaining time until next timeline day turnover', async () => {
+        expect(getMsUntilNextTimelineBoundary('2026-03-29T19:30:00.000Z', 5)).toBe(30 * 60 * 1000);
+        expect(getMsUntilNextTimelineBoundary('2026-03-29T20:10:00.000Z', 5)).toBe(23 * 60 * 60 * 1000 + 50 * 60 * 1000);
     });
 });
 

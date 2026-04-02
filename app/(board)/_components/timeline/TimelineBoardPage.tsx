@@ -247,6 +247,7 @@ function TimelineBoardPageContent({
   } = useTimelineData({
     initialBoard,
     dayRange: intendedDayRange,
+    timelineStartHour,
     dayWindowStartRef,
     setDayWindowStart,
     buildMockTimelineResponse,

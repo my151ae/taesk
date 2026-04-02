@@ -128,6 +128,15 @@ export const getTimelineIsoDateJst = (timestamp: string, dayBoundaryHour: number
 export const getCurrentTimelineIsoDateJst = (dayBoundaryHour: number = 0) =>
     getTimelineIsoDateJst(new Date().toISOString(), dayBoundaryHour);
 
+export const getMsUntilNextTimelineBoundary = (timestamp: string, dayBoundaryHour: number = 0) => {
+    const current = new Date(timestamp);
+    const shiftedMs = current.getTime() + JST_OFFSET_MS - dayBoundaryHour * MS_PER_HOUR;
+    const shifted = new Date(shiftedMs);
+    const nextBoundary = new Date(shiftedMs);
+    nextBoundary.setUTCHours(24, 0, 0, 0);
+    return Math.max(0, nextBoundary.getTime() - shifted.getTime());
+};
+
 export const getNowMinutesJst = (timestamp: string) => {
     const current = new Date(timestamp);
     const minutes = current.getUTCMinutes();

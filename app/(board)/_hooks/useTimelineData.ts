@@ -8,7 +8,12 @@ import { useSyncQueue } from "@/app/(board)/_hooks/useSyncQueue";
 import { useRealtimeBoard } from "@/app/(board)/_hooks/useRealtimeBoard";
 import { useCommentsStore } from "@/app/(board)/_stores/comments-store";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
-import type { TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
+import {
+  getCurrentTimelineIsoDateJst,
+  getMsUntilNextTimelineBoundary,
+  getTimelineIsoDateJst,
+  type TimelineResponse,
+} from "@/app/(board)/_utils/timeline-helpers";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 type DataMode = "api" | "mock";
@@ -16,6 +21,7 @@ type DataMode = "api" | "mock";
 type UseTimelineDataArgs = {
   initialBoard: Board;
   dayRange: number;
+  timelineStartHour: number;
   dayWindowStartRef: MutableRefObject<number>;
   setDayWindowStart: (value: number) => void;
   buildMockTimelineResponse: () => TimelineResponse;
@@ -24,6 +30,7 @@ type UseTimelineDataArgs = {
 export const useTimelineData = ({
   initialBoard,
   dayRange,
+  timelineStartHour,
   dayWindowStartRef,
   setDayWindowStart,
   buildMockTimelineResponse,
@@ -124,6 +131,54 @@ export const useTimelineData = ({
   useEffect(() => {
     fetchTimeline();
   }, [fetchTimeline]);
+
+  useEffect(() => {
+    if (!initialBoard.id) return;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    const scheduleBoundaryRefresh = () => {
+      const delay = getMsUntilNextTimelineBoundary(new Date().toISOString(), timelineStartHour) + 1000;
+      timeoutId = window.setTimeout(async () => {
+        if (cancelled) return;
+        await fetchTimeline(undefined, { silent: true });
+        if (cancelled) return;
+        scheduleBoundaryRefresh();
+      }, delay);
+    };
+
+    scheduleBoundaryRefresh();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId != null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [fetchTimeline, initialBoard.id, timelineStartHour]);
+
+  useEffect(() => {
+    if (!initialBoard.id) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+
+      const currentTimelineIsoDate = getCurrentTimelineIsoDateJst(timelineStartHour);
+      const dataTimelineIsoDate = data?.serverNow
+        ? getTimelineIsoDateJst(data.serverNow, timelineStartHour)
+        : null;
+
+      if (dataTimelineIsoDate !== currentTimelineIsoDate) {
+        void fetchTimeline(undefined, { silent: true });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [data?.serverNow, fetchTimeline, initialBoard.id, timelineStartHour]);
 
   useEffect(() => {
     if (!initialBoard.id) return;
