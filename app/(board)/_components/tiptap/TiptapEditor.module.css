@@ -6,6 +6,8 @@
 
 .editor {
     position: relative;
+    --taesk-marker-gutter: 1.25rem;
+    --taesk-marker-gap: 0.5rem;
 }
 
 .blockActionHandle {
@@ -97,12 +99,12 @@
     padding: 0 !important;
 }
 
-/* tiptap taskList を横並びにする */
+/* tiptap taskList は marker gutter と本文カラムを分離する */
 .editor :global(ul[data-type="taskList"] > li) {
-    display: flex !important;
-    align-items: baseline !important;
-    /* Align to text baseline as requested */
-    gap: 0.5rem !important;
+    display: grid !important;
+    grid-template-columns: var(--taesk-marker-gutter) minmax(0, 1fr);
+    column-gap: var(--taesk-marker-gap) !important;
+    align-items: start !important;
     margin-bottom: 0.1rem;
     padding-left: 0 !important;
     width: 100%;
@@ -110,22 +112,22 @@
 
 /* チェックボックス側 */
 .editor :global(ul[data-type="taskList"] > li > label) {
-    flex: 0 0 auto !important;
+    grid-column: 1;
     margin-top: 0 !important;
-    /* Remove manual margin */
     margin-right: 0 !important;
     display: flex;
     align-items: center;
+    justify-content: center;
+    width: var(--taesk-marker-gutter);
+    min-width: var(--taesk-marker-gutter);
     transform: translateY(0.1em);
-    /* Fine tune vertical position */
     user-select: none;
     cursor: pointer;
 }
 
-/* テキスト側（div）が縮まず残り幅を取る） */
-/* テキスト側（div）が縮まず残り幅を取る） */
+/* テキスト側（div）が残り幅を取る） */
 .editor :global(ul[data-type="taskList"] > li > div) {
-    flex: 1 1 auto !important;
+    grid-column: 2;
     min-width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -147,7 +149,6 @@
  * チェックリスト内のpタグのマージンを強力にリセット 
  * .ProseMirror p のスタイル（margin: 0.5em）よりも優先させるためにセレクタを重ねる
  */
-.editor :global(ul[data-type="taskList"] li p),
 .editor :global(ul[data-type="taskList"] > li > div > p) {
     display: block !important;
     margin-top: 0 !important;
@@ -155,18 +156,80 @@
     padding: 0 !important;
 }
 
-/* Ensure standard lists have bullets/numbers */
-/* Ensure standard lists have bullets/numbers with tight spacing */
+/* Standard lists use custom markers so they share the same gutter contract as task lists. */
 .editor :global(.ProseMirror ul:not([data-type="taskList"])),
 .editor :global(.ProseMirror ol) {
-    padding-left: 1.5em;
+    list-style: none !important;
+    padding-left: 0 !important;
     margin-top: 0.2em !important;
     margin-bottom: 0.2em !important;
+}
+
+.editor :global(.ProseMirror ol) {
+    counter-reset: taesk-ordered-list;
 }
 
 .editor :global(.ProseMirror li) {
     margin-top: 0.1em !important;
     margin-bottom: 0.1em !important;
+}
+
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li),
+.editor :global(.ProseMirror ol > li) {
+    display: grid;
+    grid-template-columns: var(--taesk-marker-gutter) minmax(0, 1fr);
+    column-gap: var(--taesk-marker-gap);
+    align-items: start;
+    padding-left: 0 !important;
+}
+
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li)::before,
+.editor :global(.ProseMirror ol > li)::before {
+    grid-column: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--taesk-marker-gutter);
+    min-width: var(--taesk-marker-gutter);
+    color: #64748b;
+}
+
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li)::before {
+    content: "•";
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.editor :global(.ProseMirror ol > li) {
+    counter-increment: taesk-ordered-list;
+}
+
+.editor :global(.ProseMirror ol > li)::before {
+    content: counter(taesk-ordered-list) ".";
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > p),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > h1),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > h2),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > h3),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > div[data-type="details"]),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > blockquote),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > pre),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > ul),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > ol),
+.editor :global(.ProseMirror ol > li > p),
+.editor :global(.ProseMirror ol > li > h1),
+.editor :global(.ProseMirror ol > li > h2),
+.editor :global(.ProseMirror ol > li > h3),
+.editor :global(.ProseMirror ol > li > div[data-type="details"]),
+.editor :global(.ProseMirror ol > li > blockquote),
+.editor :global(.ProseMirror ol > li > pre),
+.editor :global(.ProseMirror ol > li > ul),
+.editor :global(.ProseMirror ol > li > ol) {
+    grid-column: 2;
+    min-width: 0;
 }
 
 /* Placeholder styling */
@@ -257,7 +320,7 @@
     content: "";
     display: block;
     position: absolute;
-    left: var(--taesk-underline-left, 0px);
+    left: 0;
     right: 0;
     bottom: 0;
     border-bottom: 1px solid #e5e7eb;
@@ -266,8 +329,8 @@
 
 .editor :global(.ProseMirror div[data-type="details"]) {
     display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr);
-    column-gap: 0.5rem;
+    grid-template-columns: var(--taesk-marker-gutter) minmax(0, 1fr);
+    column-gap: var(--taesk-marker-gap);
     align-items: start;
     margin: 0.15rem 0;
 }
@@ -276,7 +339,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.25rem;
+    width: var(--taesk-marker-gutter);
     height: 1.5rem;
     margin: 0;
     padding: 0;

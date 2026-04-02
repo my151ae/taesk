@@ -6040,7 +6040,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('renders per-block ruling from heading and checklist row starts', async ({ page }) => {
+  test('renders per-block ruling for paragraphs, lists, and details without li borders', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -6060,6 +6060,19 @@ test.describe('@feature:timeline Timeline view', () => {
           type: 'heading',
           attrs: { level: 2 },
           content: [{ type: 'text', text: 'Section heading' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Body paragraph' }],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Bullet item' }] }],
+            },
+          ],
         },
         {
           type: 'taskList',
@@ -6083,15 +6096,34 @@ test.describe('@feature:timeline Timeline view', () => {
             },
           ],
         },
+        {
+          type: 'details',
+          attrs: { open: true },
+          content: [
+            {
+              type: 'detailsSummary',
+              content: [{ type: 'text', text: 'Details summary' }],
+            },
+            {
+              type: 'detailsContent',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Details body' }],
+                },
+              ],
+            },
+          ],
+        },
       ],
     };
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,
-      title: 'Nested checklist underline',
+      title: 'Block ruling coverage',
       checklist: { version: 1, lines: [] },
       content: initialContent,
-      excerpt: '[ ] Parent task\n  [ ] Nested task',
+      excerpt: 'Body paragraph\n- Bullet item\n[ ] Parent task\n  [ ] Nested task\nDetails summary',
       board_id: boardContext.boardId,
       list_id: boardContext.listId,
       user_id: testUserId,
@@ -6107,7 +6139,7 @@ test.describe('@feature:timeline Timeline view', () => {
       assignee_ids: null,
       short_id: shortId,
       id_short: 5145,
-      slug: 'nested-checklist-underline',
+      slug: 'block-ruling-coverage',
       created_at: timestamp,
       updated_at: timestamp,
     });
@@ -6122,39 +6154,67 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const heading = bodyEditor.locator('h2').first();
+      const paragraph = bodyEditor.locator(':scope > p').first();
+      const bulletItem = bodyEditor.locator(':scope > ul:not([data-type="taskList"]) > li').first();
+      const bulletLine = bulletItem.locator(':scope > p').first();
       const topTaskItem = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
       const topTaskLine = topTaskItem.locator(':scope > div > p').first();
       const nestedTaskItem = topTaskItem.locator(':scope > div > ul[data-type="taskList"] > li').first();
       const nestedTaskLine = nestedTaskItem.locator(':scope > div > p').first();
+      const detailsSummary = bodyEditor.locator('summary').first();
 
       await expect(heading).toHaveText('Section heading');
+      await expect(paragraph).toHaveText('Body paragraph');
+      await expect(bulletLine).toHaveText('Bullet item');
       await expect(topTaskLine).toHaveText('Parent task');
       await expect(nestedTaskLine).toHaveText('Nested task');
+      await expect(detailsSummary).toHaveText('Details summary');
 
       const lineStyles = await bodyEditor.evaluate((editorRoot) => {
         const heading = editorRoot.querySelector(':scope > h2');
+        const paragraph = editorRoot.querySelector(':scope > p');
+        const bulletItem = editorRoot.querySelector(':scope > ul:not([data-type="taskList"]) > li');
+        const bulletParagraph = bulletItem?.querySelector(':scope > p');
         const taskItem = editorRoot.querySelector(':scope > ul[data-type="taskList"] > li');
+        const taskLabel = taskItem?.querySelector(':scope > label');
         if (!(heading instanceof HTMLElement) || !(taskItem instanceof HTMLElement)) {
           return null;
         }
         const topParagraph = taskItem.querySelector(':scope > div > p');
         const nestedTaskItem = taskItem.querySelector(':scope > div > ul[data-type="taskList"] > li');
         const nestedParagraph = nestedTaskItem?.querySelector(':scope > div > p');
+        const detailsSummary = editorRoot.querySelector('summary');
+        const bulletItemStyle = bulletItem ? window.getComputedStyle(bulletItem) : null;
         const topTaskItemStyle = window.getComputedStyle(taskItem);
+        const paragraphAfterStyle = paragraph ? window.getComputedStyle(paragraph, '::after') : null;
+        const bulletParagraphAfterStyle = bulletParagraph ? window.getComputedStyle(bulletParagraph, '::after') : null;
+        const bulletMarkerStyle = bulletItem ? window.getComputedStyle(bulletItem, '::before') : null;
+        const taskLabelStyle = taskLabel ? window.getComputedStyle(taskLabel) : null;
         const topParagraphStyle = topParagraph ? window.getComputedStyle(topParagraph) : null;
         const nestedTaskItemStyle = nestedTaskItem ? window.getComputedStyle(nestedTaskItem) : null;
         const nestedParagraphStyle = nestedParagraph ? window.getComputedStyle(nestedParagraph) : null;
         const headingAfterStyle = window.getComputedStyle(heading, '::after');
+        const detailsSummaryAfterStyle = detailsSummary ? window.getComputedStyle(detailsSummary, '::after') : null;
         const topParagraphAfterStyle = topParagraph ? window.getComputedStyle(topParagraph, '::after') : null;
         const nestedParagraphAfterStyle = nestedParagraph ? window.getComputedStyle(nestedParagraph, '::after') : null;
 
         return {
+          paragraphAfterBorderBottomWidth: paragraphAfterStyle?.borderBottomWidth ?? null,
+          paragraphAfterLeft: paragraphAfterStyle?.left ?? null,
+          bulletItemBorderBottomWidth: bulletItemStyle?.borderBottomWidth ?? null,
+          bulletParagraphAfterBorderBottomWidth: bulletParagraphAfterStyle?.borderBottomWidth ?? null,
+          bulletParagraphAfterLeft: bulletParagraphAfterStyle?.left ?? null,
+          bulletMarkerDisplay: bulletMarkerStyle?.display ?? null,
+          bulletMarkerWidth: bulletMarkerStyle?.width ?? null,
           topTaskItemBorderBottomWidth: topTaskItemStyle.borderBottomWidth,
+          taskLabelWidth: taskLabelStyle?.width ?? null,
           topParagraphBorderBottomWidth: topParagraphStyle?.borderBottomWidth ?? null,
           nestedTaskItemBorderBottomWidth: nestedTaskItemStyle?.borderBottomWidth ?? null,
           nestedParagraphBorderBottomWidth: nestedParagraphStyle?.borderBottomWidth ?? null,
           headingAfterBorderBottomWidth: headingAfterStyle.borderBottomWidth,
           headingAfterLeft: headingAfterStyle.left,
+          detailsSummaryAfterBorderBottomWidth: detailsSummaryAfterStyle?.borderBottomWidth ?? null,
+          detailsSummaryAfterLeft: detailsSummaryAfterStyle?.left ?? null,
           topParagraphAfterBorderBottomWidth: topParagraphAfterStyle?.borderBottomWidth ?? null,
           topParagraphAfterLeft: topParagraphAfterStyle?.left ?? null,
           nestedParagraphAfterBorderBottomWidth: nestedParagraphAfterStyle?.borderBottomWidth ?? null,
@@ -6165,16 +6225,23 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(lineStyles).not.toBeNull();
       expect(lineStyles?.headingAfterBorderBottomWidth).toBe('1px');
       expect(lineStyles?.headingAfterLeft).toBe('0px');
+      expect(lineStyles?.paragraphAfterBorderBottomWidth).toBe('1px');
+      expect(lineStyles?.paragraphAfterLeft).toBe('0px');
+      expect(lineStyles?.bulletItemBorderBottomWidth).toBe('0px');
+      expect(lineStyles?.bulletParagraphAfterBorderBottomWidth).toBe('1px');
+      expect(lineStyles?.bulletParagraphAfterLeft).toBe('0px');
+      expect(lineStyles?.bulletMarkerDisplay).toBe('flex');
+      expect(lineStyles?.bulletMarkerWidth).toBe(lineStyles?.taskLabelWidth);
       expect(lineStyles.topTaskItemBorderBottomWidth).toBe('0px');
       expect(lineStyles.topParagraphBorderBottomWidth).toBe('0px');
       expect(lineStyles?.topParagraphAfterBorderBottomWidth).toBe('1px');
-      expect(typeof lineStyles?.topParagraphAfterLeft).toBe('string');
-      expect(lineStyles?.topParagraphAfterLeft === '0px' || lineStyles?.topParagraphAfterLeft.startsWith('-')).toBe(true);
+      expect(lineStyles?.topParagraphAfterLeft).toBe('0px');
       expect(lineStyles.nestedTaskItemBorderBottomWidth).toBe('0px');
       expect(lineStyles.nestedParagraphBorderBottomWidth).toBe('0px');
       expect(lineStyles?.nestedParagraphAfterBorderBottomWidth).toBe('1px');
-      expect(typeof lineStyles?.nestedParagraphAfterLeft).toBe('string');
-      expect(lineStyles?.nestedParagraphAfterLeft === '0px' || lineStyles?.nestedParagraphAfterLeft.startsWith('-')).toBe(true);
+      expect(lineStyles?.nestedParagraphAfterLeft).toBe('0px');
+      expect(lineStyles?.detailsSummaryAfterBorderBottomWidth).toBe('1px');
+      expect(lineStyles?.detailsSummaryAfterLeft).toBe('0px');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
