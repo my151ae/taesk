@@ -54,7 +54,7 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
   const [assigneeTouched, setAssigneeTouched] = useState(false);
   const [targetBoardId, setTargetBoardId] = useState(card.board_id);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history">("comments");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history" | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
 
   const filteredProfiles = useMemo(() => {
@@ -111,7 +111,7 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setMemberSearch("");
     setAssigneeTouched(false);
     setTargetBoardId(nextCard.board_id);
-    setActiveSidebarTab("comments");
+    setActiveSidebarTab(null);
     setEditorError(null);
   }, []);
 

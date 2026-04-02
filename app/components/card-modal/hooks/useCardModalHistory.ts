@@ -10,7 +10,7 @@ type UseCardModalHistoryProps = {
   boardId: string;
   cardId: string;
   showSidebar: boolean;
-  activeSidebarTab: "comments" | "history";
+  activeSidebarTab: "comments" | "history" | null;
 };
 
 export function useCardModalHistory({

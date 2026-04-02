@@ -225,7 +225,6 @@
     margin-bottom: 0.5rem !important;
 }
 
-/* 各段落に行単位の下線を設定 */
 .editor :global(.ProseMirror) {
     font-size: 16px;
     line-height: 1.5;
@@ -233,17 +232,36 @@
     min-width: 0;
     max-width: 100%;
     padding-left: 2.5rem;
+    overflow-x: hidden;
 }
 
 .editor :global(.ProseMirror p),
-.editor :global(.ProseMirror ul[data-type="taskList"] li),
+.editor :global(.ProseMirror h1),
+.editor :global(.ProseMirror h2),
+.editor :global(.ProseMirror h3),
 .editor :global(.ProseMirror summary) {
     margin: 0 !important;
     padding-bottom: 2px !important;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: none;
     line-height: 1.5;
     overflow-wrap: anywhere;
     word-break: break-word;
+    position: relative;
+}
+
+.editor :global(.ProseMirror p)::after,
+.editor :global(.ProseMirror h1)::after,
+.editor :global(.ProseMirror h2)::after,
+.editor :global(.ProseMirror h3)::after,
+.editor :global(.ProseMirror summary)::after {
+    content: "";
+    display: block;
+    position: absolute;
+    left: var(--taesk-underline-left, 0px);
+    right: 0;
+    bottom: 0;
+    border-bottom: 1px solid #e5e7eb;
+    pointer-events: none;
 }
 
 .editor :global(.ProseMirror div[data-type="details"]) {
@@ -287,7 +305,7 @@
     display: block;
     margin: 0 !important;
     padding-bottom: 2px !important;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: none;
     line-height: 1.5;
     list-style: none;
 }
@@ -300,9 +318,10 @@
     margin-top: 0.15rem;
 }
 
-/* チェックリスト内の p 要素の二重線を防止 */
-.editor :global(.ProseMirror ul[data-type="taskList"] li p) {
+/* task item は li 直下の先頭 paragraph を行本体として扱う */
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > p) {
     border-bottom: none !important;
+    padding-bottom: 2px !important;
 }
 
 /* タスクリストアイテムの内部 div のマージンリセット */
@@ -312,9 +331,11 @@
 }
 
 /* Dark mode support */
-:global(.dark) .editor :global(.ProseMirror p),
-:global(.dark) .editor :global(.ProseMirror ul[data-type="taskList"] li),
-:global(.dark) .editor :global(.ProseMirror summary) {
+:global(.dark) .editor :global(.ProseMirror p)::after,
+:global(.dark) .editor :global(.ProseMirror h1)::after,
+:global(.dark) .editor :global(.ProseMirror h2)::after,
+:global(.dark) .editor :global(.ProseMirror h3)::after,
+:global(.dark) .editor :global(.ProseMirror summary)::after {
     border-bottom-color: #374151;
 }
 

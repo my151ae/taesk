@@ -1011,4 +1011,84 @@ test.describe('Comments Performance @feature:comments', () => {
     expect(firstOpenRequests).toBeLessThanOrEqual(10);
     expect(secondOpenRequests).toBeLessThanOrEqual(10);
   });
+
+  test('should open card modal from card click without board navigation reload @perf', async ({ page }) => {
+    const currentBoard = assertContext(board, 'Board context not initialized');
+    const currentCard = card ?? await createTestCard(currentBoard);
+    card = currentCard;
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loadBoard(page, currentBoard);
+
+    const boardPath = new URL(page.url()).pathname;
+    const boardRefreshRequests: string[] = [];
+    const memberRequests: string[] = [];
+    const cardRequests: string[] = [];
+    const commentRequests: string[] = [];
+    const calendarSyncRequests: string[] = [];
+
+    page.on('request', (request) => {
+      const url = request.url();
+
+      if (url.includes(`/api/cards/${currentCard.shortId}`)) {
+        cardRequests.push(url);
+      }
+      if (url.includes('/api/boards/') && url.includes('/members')) {
+        memberRequests.push(url);
+      }
+      if (url.includes(`/api/cards/${currentCard.id}/comments`)) {
+        commentRequests.push(url);
+      }
+      if (url.includes('/api/calendar-sync/')) {
+        calendarSyncRequests.push(url);
+      }
+
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname === boardPath && parsed.searchParams.get('card') === currentCard.shortId) {
+          boardRefreshRequests.push(url);
+          return;
+        }
+        if (
+          parsed.pathname === boardPath &&
+          parsed.searchParams.has('_rsc') &&
+          parsed.searchParams.get('card') === currentCard.shortId
+        ) {
+          boardRefreshRequests.push(url);
+        }
+      } catch {
+        // Ignore invalid URLs captured by the browser.
+      }
+    });
+
+    const openButton = page.locator(`[data-card-id="${currentCard.id}"] [aria-label="カードを開く"]`).first();
+    await openButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    const openStartedAt = Date.now();
+    await openButton.click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    const modalVisibleMs = Date.now() - openStartedAt;
+
+    await expect(page).toHaveURL(new RegExp(`[?&]card=${currentCard.shortId}(?:&|$)`), { timeout: 5000 });
+    await page.waitForTimeout(1500);
+
+    console.log(
+      JSON.stringify({
+        perf: 'card-modal-open-click',
+        modalVisibleMs,
+        boardRefreshRequests,
+        cardRequests,
+        memberRequests,
+        commentRequests,
+        calendarSyncRequests,
+      })
+    );
+
+    expect(boardRefreshRequests).toHaveLength(0);
+    expect(cardRequests.length).toBeGreaterThan(0);
+    expect(memberRequests).toHaveLength(0);
+    expect(commentRequests).toHaveLength(0);
+    expect(calendarSyncRequests).toHaveLength(0);
+    expect(modalVisibleMs).toBeLessThan(5000);
+  });
 });

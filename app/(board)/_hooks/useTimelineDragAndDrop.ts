@@ -358,6 +358,22 @@ export function useTimelineDragAndDrop({
         [abScrollContainersRef]
     );
 
+    const isPointerInAbColumn = useCallback(
+        (pointerX: number): boolean => {
+            const containers = abScrollContainersRef?.current;
+            if (!containers) return false;
+            for (const el of Object.values(containers)) {
+                if (!el) continue;
+                const rect = el.getBoundingClientRect();
+                if (pointerX >= rect.left && pointerX <= rect.right) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        [abScrollContainersRef]
+    );
+
     const resolvePointerForAutoScroll = useCallback(
         (event: DragMoveEvent) => ({
             x: resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current),
@@ -374,10 +390,11 @@ export function useTimelineDragAndDrop({
                 resolvePointer: resolvePointerForAutoScroll,
                 timelineScrollRef,
                 findAbScrollContainerAtPointer,
+                isPointerInAbColumn,
                 hasActiveDrag: () => Boolean(activeDragRef.current),
             });
         },
-        [findAbScrollContainerAtPointer, resolvePointerForAutoScroll, timelineScrollRef]
+        [findAbScrollContainerAtPointer, isPointerInAbColumn, resolvePointerForAutoScroll, timelineScrollRef]
     );
 
     const handleDragMove = (event: DragMoveEvent) => {

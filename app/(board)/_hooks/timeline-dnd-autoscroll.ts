@@ -60,6 +60,7 @@ export function updateAutoScroll(args: {
   resolvePointer: (event: DragMoveEvent) => { x: number | null; y: number | null };
   timelineScrollRef: RefObject<HTMLDivElement>;
   findAbScrollContainerAtPointer: (x: number, y: number) => HTMLDivElement | null;
+  isPointerInAbColumn: (x: number) => boolean;
   hasActiveDrag: () => boolean;
 }) {
   const {
@@ -68,6 +69,7 @@ export function updateAutoScroll(args: {
     resolvePointer,
     timelineScrollRef,
     findAbScrollContainerAtPointer,
+    isPointerInAbColumn,
     hasActiveDrag,
   } = args;
 
@@ -96,6 +98,7 @@ export function updateAutoScroll(args: {
     const match = visualTop?.closest?.('[data-ab-scroll-container="true"]') as HTMLDivElement | null | undefined;
     return match ?? findAbScrollContainerAtPointer(pointerX, pointerY);
   })();
+  const pointerInAbColumn = hoveredAbEl ? true : isPointerInAbColumn(pointerX);
 
   const timelineEl = timelineScrollRef.current;
   const hoveredTimelineEl = (() => {
@@ -121,7 +124,7 @@ export function updateAutoScroll(args: {
       ? timelineEl
       : visualAb
         ? hoveredAbEl
-        : hoveredAbEl ?? hoveredTimelineEl ?? null;
+        : hoveredAbEl ?? (pointerInAbColumn ? null : hoveredTimelineEl) ?? null;
 
   if (!targetEl) {
     stopAutoScroll(state);

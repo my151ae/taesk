@@ -289,6 +289,7 @@ export function CardModal({
         resetDraft,
         resetHistoryState,
         setShowSidebar,
+        setActiveSidebarTab,
         setShowCompletedLines,
         setContent,
         setTitle,

@@ -17,7 +17,7 @@ type CardModalSidebarProps = {
   onTagInputChange: (value: string) => void;
   onTagInputKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
   onRemoveTag: (tag: string) => void;
-  activeTab: SidebarTab;
+  activeTab: SidebarTab | null;
   onTabChange: (tab: SidebarTab) => void;
   showCompletedLines: boolean;
   onShowCompletedLinesChange: (next: boolean) => void;
@@ -141,7 +141,7 @@ export default function CardModalSidebar({
               initialProfiles={profiles}
             />
           </div>
-        ) : (
+        ) : activeTab === "history" ? (
           <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
             {historyLoading && (
               <p className="text-xs text-slate-500">履歴を読み込み中...</p>
@@ -170,6 +170,10 @@ export default function CardModalSidebar({
                 </p>
               </button>
             ))}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-xs text-slate-400 dark:text-gray-500">
+            Comments または 履歴を選択
           </div>
         )}
       </div>

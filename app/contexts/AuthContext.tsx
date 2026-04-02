@@ -12,7 +12,15 @@ type AuthContextType = {
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const FALLBACK_AUTH_CONTEXT: AuthContextType = {
+  user: null,
+  loading: true,
+  signInWithGoogle: async () => {},
+  signInWithPassword: async () => {},
+  signOut: async () => {},
+}
+
+const AuthContext = createContext<AuthContextType>(FALLBACK_AUTH_CONTEXT)
 
 // Check if auth bypass is enabled (for testing)
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
@@ -126,8 +134,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
   return context
 }

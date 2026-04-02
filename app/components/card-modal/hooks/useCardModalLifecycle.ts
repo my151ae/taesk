@@ -12,6 +12,7 @@ type UseCardModalLifecycleArgs = {
   resetDraft: (card: Card) => void;
   resetHistoryState: () => void;
   setShowSidebar: (value: boolean) => void;
+  setActiveSidebarTab: (value: "comments" | "history" | null) => void;
   setShowCompletedLines: (value: boolean) => void;
   setContent: (value: JSONContent) => void;
   setTitle: (value: string) => void;
@@ -29,6 +30,7 @@ export function useCardModalLifecycle({
   resetDraft,
   resetHistoryState,
   setShowSidebar,
+  setActiveSidebarTab,
   setShowCompletedLines,
   setContent,
   setTitle,
@@ -53,8 +55,9 @@ export function useCardModalLifecycle({
     const media = window.matchMedia("(min-width: 640px)");
     if (media.matches) {
       setShowSidebar(true);
+      setActiveSidebarTab(null);
     }
-  }, [setShowSidebar]);
+  }, [setActiveSidebarTab, setShowSidebar]);
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) {

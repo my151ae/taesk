@@ -6040,6 +6040,146 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('renders per-block ruling from heading and checklist row starts', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Section heading' }],
+        },
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent task' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: false },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested task' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Nested checklist underline',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[ ] Parent task\n  [ ] Nested task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1898,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:25:00',
+      due_end: '16:25:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5145,
+      slug: 'nested-checklist-underline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const heading = bodyEditor.locator('h2').first();
+      const topTaskItem = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
+      const topTaskLine = topTaskItem.locator(':scope > div > p').first();
+      const nestedTaskItem = topTaskItem.locator(':scope > div > ul[data-type="taskList"] > li').first();
+      const nestedTaskLine = nestedTaskItem.locator(':scope > div > p').first();
+
+      await expect(heading).toHaveText('Section heading');
+      await expect(topTaskLine).toHaveText('Parent task');
+      await expect(nestedTaskLine).toHaveText('Nested task');
+
+      const lineStyles = await bodyEditor.evaluate((editorRoot) => {
+        const heading = editorRoot.querySelector(':scope > h2');
+        const taskItem = editorRoot.querySelector(':scope > ul[data-type="taskList"] > li');
+        if (!(heading instanceof HTMLElement) || !(taskItem instanceof HTMLElement)) {
+          return null;
+        }
+        const topParagraph = taskItem.querySelector(':scope > div > p');
+        const nestedTaskItem = taskItem.querySelector(':scope > div > ul[data-type="taskList"] > li');
+        const nestedParagraph = nestedTaskItem?.querySelector(':scope > div > p');
+        const topTaskItemStyle = window.getComputedStyle(taskItem);
+        const topParagraphStyle = topParagraph ? window.getComputedStyle(topParagraph) : null;
+        const nestedTaskItemStyle = nestedTaskItem ? window.getComputedStyle(nestedTaskItem) : null;
+        const nestedParagraphStyle = nestedParagraph ? window.getComputedStyle(nestedParagraph) : null;
+        const headingAfterStyle = window.getComputedStyle(heading, '::after');
+        const topParagraphAfterStyle = topParagraph ? window.getComputedStyle(topParagraph, '::after') : null;
+        const nestedParagraphAfterStyle = nestedParagraph ? window.getComputedStyle(nestedParagraph, '::after') : null;
+
+        return {
+          topTaskItemBorderBottomWidth: topTaskItemStyle.borderBottomWidth,
+          topParagraphBorderBottomWidth: topParagraphStyle?.borderBottomWidth ?? null,
+          nestedTaskItemBorderBottomWidth: nestedTaskItemStyle?.borderBottomWidth ?? null,
+          nestedParagraphBorderBottomWidth: nestedParagraphStyle?.borderBottomWidth ?? null,
+          headingAfterBorderBottomWidth: headingAfterStyle.borderBottomWidth,
+          headingAfterLeft: headingAfterStyle.left,
+          topParagraphAfterBorderBottomWidth: topParagraphAfterStyle?.borderBottomWidth ?? null,
+          topParagraphAfterLeft: topParagraphAfterStyle?.left ?? null,
+          nestedParagraphAfterBorderBottomWidth: nestedParagraphAfterStyle?.borderBottomWidth ?? null,
+          nestedParagraphAfterLeft: nestedParagraphAfterStyle?.left ?? null,
+        };
+      });
+
+      expect(lineStyles).not.toBeNull();
+      expect(lineStyles?.headingAfterBorderBottomWidth).toBe('1px');
+      expect(lineStyles?.headingAfterLeft).toBe('0px');
+      expect(lineStyles.topTaskItemBorderBottomWidth).toBe('0px');
+      expect(lineStyles.topParagraphBorderBottomWidth).toBe('0px');
+      expect(lineStyles?.topParagraphAfterBorderBottomWidth).toBe('1px');
+      expect(typeof lineStyles?.topParagraphAfterLeft).toBe('string');
+      expect(lineStyles?.topParagraphAfterLeft === '0px' || lineStyles?.topParagraphAfterLeft.startsWith('-')).toBe(true);
+      expect(lineStyles.nestedTaskItemBorderBottomWidth).toBe('0px');
+      expect(lineStyles.nestedParagraphBorderBottomWidth).toBe('0px');
+      expect(lineStyles?.nestedParagraphAfterBorderBottomWidth).toBe('1px');
+      expect(typeof lineStyles?.nestedParagraphAfterLeft).toBe('string');
+      expect(lineStyles?.nestedParagraphAfterLeft === '0px' || lineStyles?.nestedParagraphAfterLeft.startsWith('-')).toBe(true);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('resets completed line visibility on modal reopen and does not autosave during history preview', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

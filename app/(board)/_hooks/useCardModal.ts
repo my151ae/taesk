@@ -3,7 +3,6 @@ import { Card, Board, ProfileSummary } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
 import { TimelineResponse } from '@/app/(board)/_utils/timeline-helpers';
 import { useBoardMembersStore } from '@/app/(board)/_stores/board-members-store';
-import { useCommentsStore } from '@/app/(board)/_stores/comments-store';
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
 import { normalizeChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 import { normalizeContent } from '@/lib/tiptap';
@@ -32,8 +31,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
     const cardModalShortIdRef = useRef<string | null>(null);
     const cardModalStatusRef = useRef<CardModalStatus>('idle');
     const hasFallbackCardRef = useRef(false);
-    const { getMembers: getStoredMembers, setMembers: setStoredMembers, shouldRefetch } = useBoardMembersStore();
-    const loadComments = useCommentsStore(state => state.loadComments);
+    const { getMembers: getStoredMembers, setMembers: setStoredMembers } = useBoardMembersStore();
 
     // Derived target ID to avoid multiple Effect triggers
     const targetShortId = useMemo(() => activeCardId || cardIdFromUrl, [activeCardId, cardIdFromUrl]);
@@ -249,7 +247,6 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
 
                 if (nextCard) {
                     setCardModalStatus('ready');
-                    loadComments(nextCard.id);
                 } else {
                     setCardModalError('Card not found');
                     if (hasFallbackCardRef.current) {
@@ -280,7 +277,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isModalClosing, activeCardId, loadComments]);
+    }, [targetShortId, isModalClosing, activeCardId]);
 
     // Load Board Members
     useEffect(() => {
@@ -293,9 +290,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                 if (!cancelled) {
                     setModalProfiles(cached.map(member => member.profile));
                 }
-                if (!shouldRefetch(boardId)) {
-                    return;
-                }
+                return;
             }
 
             try {
@@ -326,7 +321,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
         return () => {
             cancelled = true;
         };
-    }, [modalCard?.board_id, initialBoard.id, getStoredMembers, setStoredMembers, shouldRefetch]);
+    }, [modalCard?.board_id, initialBoard.id, getStoredMembers, setStoredMembers]);
 
     return {
         modalCard,

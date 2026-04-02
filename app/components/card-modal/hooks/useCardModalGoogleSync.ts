@@ -52,32 +52,6 @@ export function useCardModalGoogleSync({
     setLastGoogleEventId(lastGoogleEventIdFromCard);
   }, [card.id, lastGoogleEventIdFromCard, syncStatusFromCard]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadSyncStatus = async () => {
-      try {
-        const res = await fetch(`/api/calendar-sync/${card.id}`);
-        const body = await res.json().catch(() => null);
-        if (!res.ok) {
-          console.warn("[CardModal][GoogleSync] status fetch failed", { cardId: card.id, status: res.status, body });
-          return;
-        }
-        if (cancelled) return;
-        const nextStatus = body?.status as SyncStatus;
-        const nextLast = body?.last_google_event_id ?? body?.google_event_id ?? null;
-        setSyncStatus(nextStatus);
-        setLastGoogleEventId(nextLast);
-      } catch (error) {
-        if (cancelled) return;
-        console.warn("[CardModal][GoogleSync] status fetch error", { cardId: card.id, error });
-      }
-    };
-    void loadSyncStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, [card.id]);
-
   const handleResyncRequest = useCallback(async () => {
     const nextTitle = title.trim();
     if (!nextTitle) return;

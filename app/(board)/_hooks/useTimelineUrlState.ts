@@ -447,6 +447,32 @@ export const useTimelineUrlState = ({
     [path, router],
   );
 
+  const navigateWithNativeHistory = useCallback(
+    (params: URLSearchParams, method: UrlUpdateMethod = "replace") => {
+      if (typeof window === "undefined") {
+        navigateWithParams(params, method);
+        return;
+      }
+
+      const currentPath = window.location.pathname;
+      const currentSearch = window.location.search;
+      const effectivePath = path ?? currentPath;
+      const query = params.toString();
+      const nextUrl = query ? `${effectivePath}?${query}` : effectivePath;
+      const currentUrl = `${currentPath}${currentSearch}`;
+
+      if (currentUrl === nextUrl) return;
+
+      if (method === "push") {
+        window.history.pushState(null, "", nextUrl);
+        return;
+      }
+
+      window.history.replaceState(null, "", nextUrl);
+    },
+    [navigateWithParams, path],
+  );
+
   const updateBoardUiState = useCallback(
     ({
       leftPanelMode,
@@ -509,15 +535,35 @@ export const useTimelineUrlState = ({
       if (!resolvedState.hasExplicitBoardState) {
         const params = new URLSearchParams();
         if (normalizedCard) params.set("card", normalizedCard);
-        navigateWithParams(params, method);
+        navigateWithNativeHistory(params, method);
         return;
       }
-      updateBoardUiState({
+      const params = serializeBoardUiStateToSearchParams({
+        state: {
+          leftPanelMode: resolvedState.leftPanelMode,
+          rightPanelMode: resolvedState.rightPanelMode,
+          date: resolvedState.date,
+          tag: resolvedState.tag,
+          searchQuery: resolvedState.searchQuery,
+          showChecked: resolvedState.showChecked,
+          showUnchecked: resolvedState.showUnchecked,
+        },
         card: normalizedCard,
-        method,
       });
+
+      navigateWithNativeHistory(params, method);
     },
-    [navigateWithParams, resolvedState.hasExplicitBoardState, updateBoardUiState],
+    [
+      navigateWithNativeHistory,
+      resolvedState.date,
+      resolvedState.hasExplicitBoardState,
+      resolvedState.leftPanelMode,
+      resolvedState.rightPanelMode,
+      resolvedState.searchQuery,
+      resolvedState.showChecked,
+      resolvedState.showUnchecked,
+      resolvedState.tag,
+    ],
   );
 
   return {
