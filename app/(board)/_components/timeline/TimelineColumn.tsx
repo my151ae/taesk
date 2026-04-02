@@ -74,6 +74,8 @@ type TimelineColumnProps = {
     activeLaneId: string | null;
     pendingTitleEditCardId: string | null;
     onPendingTitleEditConsumed: () => void;
+    currentIsoDate: string | null;
+    currentMinutes: number | null;
 };
 
 const DroppableColumn = ({ children, day }: { children: ReactNode; day: TimelineDay }) => {
@@ -129,6 +131,8 @@ export const TimelineColumn = memo(function TimelineColumn({
     activeLaneId,
     pendingTitleEditCardId,
     onPendingTitleEditConsumed,
+    currentIsoDate,
+    currentMinutes,
 }: TimelineColumnProps) {
     // Use default if undefined
     const currentHourHeight = hourHeight ?? HOUR_HEIGHT;
@@ -393,6 +397,8 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     activeLaneId={activeLaneId}
                                     autoStartTitleEdit={pendingTitleEditCardId === event.card_id}
                                     onAutoStartTitleEditConsumed={onPendingTitleEditConsumed}
+                                    currentIsoDate={currentIsoDate}
+                                    currentMinutes={currentMinutes}
                                 />
                             );
                         })}

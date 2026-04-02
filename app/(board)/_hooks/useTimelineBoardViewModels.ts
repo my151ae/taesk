@@ -91,6 +91,7 @@ type UseTimelineBoardViewModelsArgs = {
   tagSummaries: TimelineTagSummary[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
+  liveNowMinutes: number | null;
   timelineViewportHeight: number;
   activeDrag: ActiveDragState | null;
   pointerPreview: PointerPreviewState;
@@ -281,6 +282,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       activeLaneId: args.activeLaneId,
       pendingTitleEditCardId: args.pendingTitleEditCardId,
       onPendingTitleEditConsumed: args.onPendingTitleEditConsumed,
+      currentIsoDate: args.liveNowIsoDate,
+      currentMinutes: args.liveNowMinutes,
     }),
     [
       args.days,
@@ -332,6 +335,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.activeLaneId,
       args.pendingTitleEditCardId,
       args.onPendingTitleEditConsumed,
+      args.liveNowMinutes,
     ]
   );
 
@@ -456,6 +460,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onCardContextMenu: args.handleCardContextMenu,
       onCardContextMenuByKeyboard: args.handleCardContextMenuByKeyboard,
       contextMenuCardId: args.contextMenuCardId,
+      currentIsoDate: args.liveNowIsoDate,
+      currentMinutes: args.liveNowMinutes,
     },
     list: {
       days: args.days,

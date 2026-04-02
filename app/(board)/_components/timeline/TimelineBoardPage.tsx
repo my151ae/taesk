@@ -18,6 +18,7 @@ import {
   getCurrentTimelineIsoDateJst,
   type TimelineEvent,
   getNowMinutesJst,
+  getTimelineIsoDateJst,
   minuteToPixels,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
@@ -275,7 +276,10 @@ function TimelineBoardPageContent({
       timelineStartHour,
       hourHeight,
     });
-  const indicatorMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
+  const currentTimelineMinutes = liveNowMinutes ?? (data ? getNowMinutesJst(data.serverNow) : null);
+  const currentTimelineIsoDate =
+    liveNowIsoDate ?? (data ? getTimelineIsoDateJst(data.serverNow, timelineStartHour) : null);
+  const indicatorMinutes = currentTimelineMinutes;
   const indicatorTop =
     indicatorMinutes != null
       ? minuteToPixels(indicatorMinutes, timelineStartHour, hourHeight)
@@ -839,7 +843,8 @@ function TimelineBoardPageContent({
     setSelectedTags: handleSelectedTagsChange,
     tagSummaries,
     indicatorTop,
-    liveNowIsoDate,
+    liveNowIsoDate: currentTimelineIsoDate,
+    liveNowMinutes: currentTimelineMinutes,
     timelineViewportHeight,
     activeDrag,
     pointerPreview,

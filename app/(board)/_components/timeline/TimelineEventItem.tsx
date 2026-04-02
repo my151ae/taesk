@@ -2,6 +2,7 @@ import { FocusEvent, KeyboardEvent, PointerEvent, memo, useState } from 'react';
 import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
+import { resolveTimelineEventTone } from './timeline-event-tone';
 import {
     TimelineEvent,
     minuteToPixels,
@@ -48,6 +49,8 @@ type TimelineEventItemProps = {
     activeLaneId?: string | null;
     autoStartTitleEdit?: boolean;
     onAutoStartTitleEditConsumed?: () => void;
+    currentIsoDate: string | null;
+    currentMinutes: number | null;
 };
 
 export const TimelineEventItem = memo(function TimelineEventItem({
@@ -81,8 +84,11 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     activeLaneId,
     autoStartTitleEdit = false,
     onAutoStartTitleEditConsumed,
+    currentIsoDate,
+    currentMinutes,
 }: TimelineEventItemProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const tone = resolveTimelineEventTone(event, currentIsoDate, currentMinutes);
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
     let displayStart = event.due_start;
@@ -165,7 +171,10 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                         "w-full h-full pt-0 transition-[box-shadow,transform,ring-color]",
                         isActive && "ring-2 ring-sky-400 shadow-md"
                     )}
-                    backgroundClass="bg-gradient-to-r from-white from-40% to-white/10"
+                    backgroundClass={tone.backgroundClass}
+                    borderClassName={tone.borderClassName}
+                    titleBackgroundClassName={tone.titleBackgroundClassName}
+                    titleClassName={tone.titleClassName}
                     checkedVisualTone="timeline-dim"
                     onCreateNext={onCreateNext}
                     isSelected={isSelected}

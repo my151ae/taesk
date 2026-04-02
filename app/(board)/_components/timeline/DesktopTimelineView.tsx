@@ -99,6 +99,8 @@ export type DesktopTimelineViewProps = {
   activeLaneId: string | null;
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
+  currentIsoDate: string | null;
+  currentMinutes: number | null;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -242,6 +244,8 @@ export function DesktopTimelineView({
   activeLaneId,
   pendingTitleEditCardId,
   onPendingTitleEditConsumed,
+  currentIsoDate,
+  currentMinutes,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -540,12 +544,14 @@ export function DesktopTimelineView({
                     selectionLeadCardId={selectionLeadCardId}
                     onShiftSelect={onShiftSelect}
                     onClearSelection={onClearSelection}
-                    onActivateCard={onActivateCard}
-                    activeCardId={activeCardId}
-                    activeLaneId={activeLaneId}
-                    pendingTitleEditCardId={pendingTitleEditCardId}
-                    onPendingTitleEditConsumed={onPendingTitleEditConsumed}
-                  />
+                        onActivateCard={onActivateCard}
+                        activeCardId={activeCardId}
+                        activeLaneId={activeLaneId}
+                        pendingTitleEditCardId={pendingTitleEditCardId}
+                        onPendingTitleEditConsumed={onPendingTitleEditConsumed}
+                        currentIsoDate={currentIsoDate}
+                        currentMinutes={currentMinutes}
+                      />
                 ))}
               </div>
             </div>

@@ -63,11 +63,14 @@ type TimelineCardProps = {
     notePreviewLines?: number;
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
+    borderClassName?: string;
     onCreateNext?: () => void;
     /** フォーカス復帰用のカードID */
     cardId?: string;
     /** タイトル部分に適用する追加のクラス */
     titleClassName?: string;
+    /** タイトルの背景に適用する追加のクラス */
+    titleBackgroundClassName?: string;
     /** 左側のチェックボックス列を非表示にするか */
     hideLeftColumn?: boolean;
     shortcutContext?: ShortcutContextDescriptor | null;
@@ -121,9 +124,11 @@ export function TimelineCard({
     noteClampClass,
     notePreviewLines = 2,
     backgroundClass = 'bg-white',
+    borderClassName,
     onCreateNext,
     cardId,
     titleClassName,
+    titleBackgroundClassName,
     hideLeftColumn = false,
     shortcutContext,
     checkedVisualTone = 'default',
@@ -172,6 +177,10 @@ export function TimelineCard({
     const hasBodySection = Boolean(note || checklistProgressLabel);
     const isTimelineDimChecked = checked && checkedVisualTone === 'timeline-dim';
     const inlineBadgeLabel = badgeLabel && !['A', 'B'].includes(badgeLabel.toUpperCase()) ? badgeLabel : null;
+    const resolvedBackgroundClass = isTimelineDimChecked ? 'bg-slate-100' : backgroundClass;
+    const resolvedBorderClassName = borderClassName ?? (isTimelineDimChecked ? 'border-slate-200 shadow-none' : 'border-slate-200');
+    const checkedTextClassName = isTimelineDimChecked ? 'text-slate-400 line-through decoration-slate-400 decoration-1' : '';
+    const checkedMetaTextClassName = isTimelineDimChecked ? 'text-slate-400' : '';
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [draftTitle, setDraftTitle] = useState(title);
 
@@ -366,8 +375,8 @@ export function TimelineCard({
             ref={containerRef}
             className={clsx(
                 'relative flex flex-row items-stretch border text-left shadow-sm w-full max-w-full outline-none transition-shadow',
-                backgroundClass, // 背景色を適用
-                isTimelineDimChecked ? 'border-emerald-200/90 shadow-none' : 'border-slate-200',
+                resolvedBackgroundClass,
+                resolvedBorderClassName,
                 isSelected && "border-sky-500 bg-sky-50/90 shadow-[0_0_0_2px_rgba(14,165,233,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:bg-sky-500 before:content-['']",
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
@@ -506,10 +515,7 @@ export function TimelineCard({
                             )}
 
                             <div
-                                className={clsx(
-                                    'flex min-w-0 items-center',
-                                    isTimelineDimChecked ? 'opacity-35' : ''
-                                )}
+                                className="flex min-w-0 items-center"
                                 style={{
                                     minHeight: CARD_TOP_ROW_MIN_HEIGHT,
                                     paddingLeft: CARD_RIGHT_CELL_X_PADDING,
@@ -520,7 +526,8 @@ export function TimelineCard({
                             >
                                 <div className={clsx(
                                     'flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold',
-                                    isTimelineDimChecked ? 'text-slate-400' : 'text-slate-800'
+                                    'text-slate-800',
+                                    checkedTextClassName
                                 )}>
                                     <div className="flex min-w-0 items-start gap-1">
                                         <span
@@ -538,6 +545,7 @@ export function TimelineCard({
                                                     data-testid="timeline-card-title-input"
                                                     className={clsx(
                                                         'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
+                                                        titleBackgroundClassName,
                                                         titleClassName
                                                     )}
                                                     onPointerDown={(event) => {
@@ -577,8 +585,9 @@ export function TimelineCard({
                                                 <span
                                                     className={clsx(
                                                         "line-clamp-2 break-words leading-tight",
-                                                        inlineTitleEdit && onRenameTitle && "cursor-text rounded px-0.5 hover:bg-sky-50",
+                                                        inlineTitleEdit && onRenameTitle && (titleBackgroundClassName ? "cursor-text" : "cursor-text rounded px-0.5 hover:bg-sky-50"),
                                                         !title && "text-slate-400",
+                                                        titleBackgroundClassName,
                                                         titleClassName
                                                     )}
                                                     data-testid="timeline-card-title-display"
@@ -624,7 +633,7 @@ export function TimelineCard({
                                         ) : null}
                                     </div>
                                     {timePlacement === 'inline' && timeText ? (
-                                        <span className="text-[10px] font-normal text-slate-500">{timeText}</span>
+                                        <span className={clsx("text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>
                                     ) : null}
                                 </div>
                             </div>
@@ -634,7 +643,7 @@ export function TimelineCard({
                             <div
                                 className={clsx(
                                     'grid min-h-0 min-w-0 flex-1 border-t',
-                                    isTimelineDimChecked ? 'border-slate-100 opacity-35' : 'border-slate-200'
+                                    isTimelineDimChecked ? 'border-slate-100' : 'border-slate-200'
                                 )}
                                 style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
                             >
@@ -651,7 +660,8 @@ export function TimelineCard({
                                             <div
                                                 className={clsx(
                                                     'flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none tabular-nums',
-                                                    isTimelineDimChecked ? 'text-slate-400' : 'text-slate-500'
+                                                    'text-slate-500',
+                                                    checkedMetaTextClassName
                                                 )}
                                                 aria-label={`チェックリスト ${checklistProgressLabel}`}
                                             >
@@ -666,7 +676,8 @@ export function TimelineCard({
                                 <div
                                     className={clsx(
                                         'flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pt-1 text-[10px] leading-tight',
-                                        isTimelineDimChecked ? 'text-slate-400' : 'text-slate-600'
+                                        'text-slate-600',
+                                        checkedTextClassName
                                     )}
                                     style={{
                                         ...(note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : {}),

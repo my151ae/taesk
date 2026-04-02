@@ -105,6 +105,7 @@ type UseTimelineBoardScreenArgs = {
   tagSummaries: TimelineTagSummary[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
+  liveNowMinutes: number | null;
   timelineViewportHeight: number;
   activeDrag: DragAndDropBindings["activeDrag"];
   pointerPreview: DragAndDropBindings["pointerPreview"];
@@ -263,6 +264,7 @@ export function useTimelineBoardScreen({
   tagSummaries,
   indicatorTop,
   liveNowIsoDate,
+  liveNowMinutes,
   timelineViewportHeight,
   activeDrag,
   pointerPreview,
@@ -406,6 +408,7 @@ export function useTimelineBoardScreen({
     tagSummaries,
     indicatorTop,
     liveNowIsoDate,
+    liveNowMinutes,
     timelineViewportHeight,
     activeDrag,
     pointerPreview,

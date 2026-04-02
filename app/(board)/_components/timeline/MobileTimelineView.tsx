@@ -25,6 +25,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
+import { resolveTimelineEventTone } from "@/app/(board)/_components/timeline/timeline-event-tone";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
@@ -66,6 +67,8 @@ function MobileTimelineColumn({
   hourHeight,
   activeStackItem,
   setActiveStackItem,
+  currentIsoDate,
+  currentMinutes,
 }: {
   day: TimelineDay;
   events: TimelineEvent[];
@@ -84,6 +87,8 @@ function MobileTimelineColumn({
   hourHeight: number;
   activeStackItem: { kind: StackedTimelineItemKind; id: string } | null;
   setActiveStackItem: React.Dispatch<React.SetStateAction<{ kind: StackedTimelineItemKind; id: string } | null>>;
+  currentIsoDate: string | null;
+  currentMinutes: number | null;
 }) {
   const { setNodeRef } = useDroppable({ id: `day:${day.isoDate}`, data: { type: "timeline-column", day } });
   const { combinedItems, stackedLayout } = buildStackedTimelineColumnLayout({
@@ -219,6 +224,7 @@ function MobileTimelineColumn({
           }
 
           const event = item.entry as TimelineEvent;
+          const tone = resolveTimelineEventTone(event, currentIsoDate, currentMinutes);
           const start = getMinutesFromTime(event.due_start ?? null) ?? 0;
           const duration = event.durationMinutes ?? 60;
           const top = minuteToPixels(start, timelineStartHour, hourHeight);
@@ -270,6 +276,10 @@ function MobileTimelineColumn({
                   showOpenButton
                   dataTestId="timeline-event"
                   className={`w-full h-full pt-0 ${activeStackItem?.kind === "card" && activeStackItem.id === event.card_id ? "ring-2 ring-sky-400 shadow-md" : ""}`}
+                  backgroundClass={tone.backgroundClass}
+                  borderClassName={tone.borderClassName}
+                  titleBackgroundClassName={tone.titleBackgroundClassName}
+                  titleClassName={tone.titleClassName}
                   tabIndex={0}
                   focusGroup="timeline"
                   onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(event.card_id, rect)}
@@ -561,6 +571,8 @@ type MobileTimelineViewProps = {
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
+  currentIsoDate: string | null;
+  currentMinutes: number | null;
   overdueSortOrder: OverdueSortOrder;
   onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
 };
@@ -601,6 +613,8 @@ export default function MobileTimelineView({
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
+  currentIsoDate,
+  currentMinutes,
   overdueSortOrder,
   onOverdueSortOrderChange,
 }: MobileTimelineViewProps) {
@@ -888,6 +902,8 @@ export default function MobileTimelineView({
                   hourHeight={hourHeight}
                   activeStackItem={activeStackItem}
                   setActiveStackItem={setActiveStackItem}
+                  currentIsoDate={currentIsoDate}
+                  currentMinutes={currentMinutes}
                 />
               </div>
             </div>
