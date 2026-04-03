@@ -49,6 +49,7 @@ export type FocusTitleRequest = {
 
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
+    insertLeadingParagraphAndFocus: () => boolean;
 };
 
 export type BodyEditorShortcutState = {
@@ -554,7 +555,7 @@ export default function TiptapEditor({
                     return true;
                 }
 
-                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft') return false;
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft' && event.key !== 'Backspace') return false;
                 if (!event.isTrusted || event.isComposing) return false;
 
                 const { state } = view;
@@ -598,6 +599,16 @@ export default function TiptapEditor({
 
                 if (event.key === 'ArrowLeft') {
                     if (isSelectionInFirstTextLineState(view, state) && view.endOfTextblock('left') && onRequestFocusTitle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onRequestFocusTitle({ mode: 'end' });
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (event.key === 'Backspace') {
+                    if (isSelectionInFirstTextLineState(view, state) && state.selection.$from.parentOffset === 0 && onRequestFocusTitle) {
                         event.preventDefault();
                         event.stopPropagation();
                         onRequestFocusTitle({ mode: 'end' });
@@ -739,6 +750,23 @@ export default function TiptapEditor({
         setSelectionAtDocStart(state, dispatch);
     }, [editor, setCursorInLeadingTextblockWithOffset, setSelectionAtDocStart]);
 
+    const insertLeadingParagraphAndFocus = useCallback((): boolean => {
+        if (!editor || !editor.isEditable) return false;
+
+        const paragraph = editor.schema.nodes.paragraph?.create();
+        if (!paragraph) return false;
+
+        const { state, dispatch } = editor.view;
+        const tr = state.tr.insert(0, paragraph);
+        tr.setSelection(Selection.atStart(tr.doc));
+        tr.scrollIntoView();
+
+        dispatch(tr);
+        emitForcedDocChange(editor, tr.doc);
+        editor.view.focus();
+        return true;
+    }, [editor, emitForcedDocChange]);
+
     useEffect(() => {
         if (!onRegisterBodyBridge) return;
         if (!editor) {
@@ -748,12 +776,13 @@ export default function TiptapEditor({
 
         onRegisterBodyBridge({
             focusBody: (offset?: number | null) => focusBody(offset),
+            insertLeadingParagraphAndFocus,
         });
 
         return () => {
             onRegisterBodyBridge(null);
         };
-    }, [editor, focusBody, onRegisterBodyBridge]);
+    }, [editor, focusBody, insertLeadingParagraphAndFocus, onRegisterBodyBridge]);
 
     const handleCopyCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         if (!editor || !event.clipboardData || !editor.isEditable) return;

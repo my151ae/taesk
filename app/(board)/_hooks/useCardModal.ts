@@ -234,6 +234,16 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
 
                 if (abortController.signal.aborted) return;
 
+                if (response.status === 404) {
+                    setCardModalError('Card not found');
+                    if (hasFallbackCardRef.current) {
+                        setCardModalStatus('ready');
+                    } else {
+                        setCardModalStatus('error');
+                    }
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error(body?.error?.message || `Failed to load card (status ${response.status})`);
                 }

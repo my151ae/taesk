@@ -4415,7 +4415,7 @@ test.describe('@feature:timeline Timeline view', () => {
   });
 
 
-  test('does not change title-body boundary on Enter from title', async ({ page }) => {
+  test('inserts a leading paragraph and moves focus to body on Enter from title except during IME composition', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -4468,12 +4468,25 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(titleInput).toHaveValue('Enter from title test');
 
       await titleInput.focus();
+      await titleInput.dispatchEvent('compositionstart');
       await page.keyboard.press('Enter');
-
       await expect(titleInput).toBeFocused();
       await expect(titleInput).toHaveValue('Enter from title test');
       await expect(modal.locator('.ProseMirror > ul[data-type="taskList"]')).toHaveCount(0);
       await expect(modal.locator('div.tiptap.ProseMirror.prose.prose-slate').first()).toContainText('existing body text');
+      await expect(modal.locator('.ProseMirror > p')).toHaveCount(1);
+
+      await titleInput.dispatchEvent('compositionend');
+      await page.keyboard.press('Enter');
+
+      const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
+      const firstParagraph = modal.locator('.ProseMirror > p').nth(0);
+      const secondParagraph = modal.locator('.ProseMirror > p').nth(1);
+
+      await expect(bodyEditor).toBeFocused();
+      await expect(firstParagraph).toBeVisible();
+      await expect(firstParagraph).toHaveText('');
+      await expect(secondParagraph).toContainText('existing body text');
 
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
@@ -4624,6 +4637,90 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(titleInput).toBeFocused();
       await page.keyboard.type('Y');
       await expect(titleInput).toHaveValue('Arrow LR baselineY');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves focus to title end without changing body when Backspace is pressed at the start of the first body line', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Backspace bridge baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'body line' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1892,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:45:00',
+      due_end: '15:45:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 50375,
+      slug: 'backspace-bridge-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
+
+      await expect(titleInput).toHaveValue('Backspace bridge baseline');
+      await expect(firstChecklistLine).toHaveText('body line');
+
+      await firstChecklistLine.click({ position: { x: 4, y: 8 } });
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Backspace');
+
+      await expect(titleInput).toBeFocused();
+      await page.keyboard.type('Z');
+      await expect(titleInput).toHaveValue('Backspace bridge baselineZ');
+      await expect(firstChecklistLine).toHaveText('body line');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

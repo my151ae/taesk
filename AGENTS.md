@@ -28,7 +28,7 @@
 現在の運用UIは **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
 - Kanban 関連（`KanbanBoardClient` 等）の修正・言及は、明示的な依頼がない限り行わない。
 - 不具合報告が `/b/...` に関する場合、Timeline 側のみを対象に調査・修正する。
-- CardModal のタイトル/本文境界は「矢印によるフォーカス移動のみ」を正とする。詳細は `docs/spec/keyboard-navigation.md` を参照すること。
+- CardModal のタイトル/本文境界は、矢印によるフォーカス移動に加えて、タイトル欄の通常の `Enter` で本文1行目へ標準 paragraph を追加して本文へ移し、本文先頭行頭の `Backspace` では本文を変えずタイトル末尾へ戻す。IME 確定中の `Enter` は除外する。詳細は `docs/spec/keyboard-navigation.md` を参照すること。
 - 左パネルのセクション追加は、**別ページを新設せず** `/b/...` の既存レイアウト内で完結させることをデフォルトとする。
 - board navigation の canonical URL は `lp` / `rp` を使い、旧 `view` / `before` / `after` / `range` / `time` 契約は救済しない。契約外 URL は invalid URL として扱う。
 - board navigation は no-exception contract を採用し、`lp` は left section、`rp` は right panel mode のみを表す。`lp` が `rp` を暗黙変更してはいけない。

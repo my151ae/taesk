@@ -138,6 +138,7 @@ export function CardModal({
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
     const didFocusTitleOnOpenRef = useRef(false);
+    const titleIsComposingRef = useRef(false);
 
     const {
         historyItems,
@@ -430,15 +431,16 @@ export function CardModal({
     const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (isHistoryPreviewing) return;
         const nativeEvent = event.nativeEvent as KeyboardEvent & { keyCode?: number };
-        const isImeComposing = nativeEvent.isComposing || nativeEvent.keyCode === 229;
+        const isImeComposing = titleIsComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229;
+
+        if (isImeComposing) return;
 
         if (event.key === "Enter") {
             event.preventDefault();
             event.stopPropagation();
+            bodyBridgeRef.current?.insertLeadingParagraphAndFocus();
             return;
         }
-
-        if (isImeComposing) return;
 
         const bridge = bodyBridgeRef.current;
         if (!bridge) return;
@@ -843,6 +845,15 @@ export function CardModal({
                                             const normalizedTitle = e.target.value.replace(/\r?\n/g, "");
                                             setTitle(normalizedTitle);
                                             triggerAutoSave();
+                                        }}
+                                        onCompositionStart={() => {
+                                            titleIsComposingRef.current = true;
+                                        }}
+                                        onCompositionEnd={() => {
+                                            titleIsComposingRef.current = false;
+                                        }}
+                                        onBlur={() => {
+                                            titleIsComposingRef.current = false;
                                         }}
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
