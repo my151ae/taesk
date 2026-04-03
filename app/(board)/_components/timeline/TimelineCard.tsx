@@ -605,6 +605,24 @@ export function TimelineCard({
                                                         {inlineBadgeLabel}
                                                     </span>
                                                 ) : null}
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={clsx(
+                                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
+                                                        isTimelineDimChecked
+                                                            ? "border-slate-200 bg-white/80 text-slate-300"
+                                                            : "border-slate-200 bg-white text-slate-400"
+                                                    )}
+                                                >
+                                                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                                                        <circle cx="9" cy="7" r="1.25" />
+                                                        <circle cx="15" cy="7" r="1.25" />
+                                                        <circle cx="9" cy="12" r="1.25" />
+                                                        <circle cx="15" cy="12" r="1.25" />
+                                                        <circle cx="9" cy="17" r="1.25" />
+                                                        <circle cx="15" cy="17" r="1.25" />
+                                                    </svg>
+                                                </span>
                                                 <button
                                                     type="button"
                                                     aria-label="カードを開く"
