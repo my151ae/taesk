@@ -35,13 +35,11 @@ export function useTimelineContextMenu({ focusCardById }: UseTimelineContextMenu
     });
   }, []);
 
-  const closeContextMenu = useCallback((reason: "action" | "dismiss") => {
+  const closeContextMenu = useCallback((_reason: "action" | "dismiss") => {
     setContextMenu((prev) => ({ ...prev, open: false, cardId: null, targetCardIds: [] }));
-    if (reason === "action") {
-      requestAnimationFrame(() => {
-        focusCardById(lastContextMenuCardIdRef.current);
-      });
-    }
+    requestAnimationFrame(() => {
+      focusCardById(lastContextMenuCardIdRef.current);
+    });
   }, [focusCardById]);
 
   return {

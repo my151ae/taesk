@@ -1486,10 +1486,16 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const completedBFocusable = page.locator(`[data-testid="completed-card-${completedBCardId}"] [data-card-id="${completedBCardId}"]`);
       await completedBFocusable.focus();
-      await page.keyboard.press('Delete');
-      await expect(page.getByRole('menu', { name: 'カード操作メニュー' })).toBeVisible();
+      await expect(completedBFocusable).toBeFocused();
       await page.keyboard.press('Escape');
-      await expect(page.getByRole('menu', { name: 'カード操作メニュー' })).toBeHidden();
+      const cardMenu = page.getByRole('menu', { name: 'カード操作メニュー' });
+      await expect(cardMenu).toBeVisible();
+      await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();
+      await page.keyboard.press('ArrowDown');
+      await expect(cardMenu.getByRole('menuitem', { name: '完了にする' })).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(cardMenu).toBeHidden();
+      await expect(completedBFocusable).toBeFocused();
 
       await completedToggle.click();
       await expect(completedToggle).toHaveAttribute('aria-pressed', 'true');
@@ -4866,13 +4872,24 @@ test.describe('@feature:timeline Timeline view', () => {
       const boardBar = page.getByTestId('board-shortcut-bar');
       await expect(boardBar).toBeVisible();
       await expect(boardBar).toContainText('タイムライン');
-      await expect(boardBar).toContainText('詳細');
+      await expect(boardBar).toContainText('開く');
       await expect(boardBar).toContainText('完了');
       const boardBarBox = await boardBar.boundingBox();
       const eventCardBox = await eventCard.boundingBox();
       expect(boardBarBox).not.toBeNull();
       expect(eventCardBox).not.toBeNull();
       expect(boardBarBox!.y).toBeLessThan(eventCardBox!.y);
+
+      await page.keyboard.press('Escape');
+      const cardMenu = page.getByRole('menu', { name: 'カード操作メニュー' });
+      await expect(cardMenu).toBeVisible();
+      await expect(boardBar).toContainText('タイムライン');
+      await expect(boardBar).toContainText('閉じる');
+      await expect(boardBar).toContainText('選択');
+      await expect(boardBar).toContainText('決定');
+      await page.keyboard.press('Escape');
+      await expect(cardMenu).toBeHidden();
+      await expect(eventCard).toBeFocused();
 
       await page.keyboard.press('Enter');
 
@@ -4900,6 +4917,100 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.keyboard.press('ArrowUp');
       await expect(modalBar).toContainText('カードタイトル');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('supports keyboard shortcuts in the card context menu and restores focus on close', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `CM${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Context menu keyboard test',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'context menu body line' }],
+          },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1894,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:00:00',
+      due_end: '16:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5040,
+      slug: 'context-menu-keyboard-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const eventCard = page.locator(`[data-card-id="${cardId}"][data-shortcut-context="timeline-card"]`).first();
+      await expect(eventCard).toBeVisible();
+      await eventCard.focus();
+      await expect(eventCard).toBeFocused();
+
+      await page.keyboard.press('Escape');
+
+      const cardMenu = page.getByRole('menu', { name: 'カード操作メニュー' });
+      const boardBar = page.getByTestId('board-shortcut-bar');
+      await expect(cardMenu).toBeVisible();
+      await expect(boardBar).toContainText('閉じる');
+      await expect(boardBar).toContainText('選択');
+      await expect(boardBar).toContainText('決定');
+      await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();
+
+      await page.keyboard.press('ArrowDown');
+      await expect(cardMenu.getByRole('menuitem', { name: '完了にする' })).toBeFocused();
+
+      await page.keyboard.press('ArrowUp');
+      await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();
+
+      await page.keyboard.press('Enter');
+
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+      await expect(boardBar).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(modal).toBeHidden();
+      await eventCard.focus();
+      await expect(eventCard).toBeFocused();
+
+      await page.keyboard.press('Escape');
+      await expect(cardMenu).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(cardMenu).toBeHidden();
+      await expect(eventCard).toBeFocused();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

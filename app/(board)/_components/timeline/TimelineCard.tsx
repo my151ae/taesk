@@ -423,8 +423,8 @@ export function TimelineCard({
                     return;
                 }
 
-                // Context menu: Delete
-                if (event.key === 'Delete') {
+                // Context menu: Escape
+                if (event.key === 'Escape') {
                     event.preventDefault();
                     event.stopPropagation();
                     const rect = containerRef.current?.getBoundingClientRect();

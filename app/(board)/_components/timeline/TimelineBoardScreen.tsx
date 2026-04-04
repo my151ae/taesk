@@ -169,12 +169,35 @@ export default function TimelineBoardScreen({
 
   const boardShortcutPayload = useMemo(() => {
     if (modalProps) return createEmptyShortcutBarPayload("board");
+    if (contextMenu.open && contextMenu.cardId) {
+      const sourceCard = typeof document !== "undefined"
+        ? document.querySelector(`[data-card-id="${contextMenu.cardId}"]`)
+        : null;
+      const sourceDescriptor = getShortcutContextFromTarget(sourceCard);
+      return resolveShortcutBarPayload({
+        scope: "context-menu",
+        region: sourceDescriptor?.region ?? "main-panel",
+        section: sourceDescriptor?.section ?? null,
+        view: sourceDescriptor?.view ?? desktop.activeView,
+        part: sourceDescriptor?.part ?? "card",
+        state: "active",
+      }) ?? createEmptyShortcutBarPayload("context-menu");
+    }
+    if (bucketCreateMenu.open) {
+      return resolveShortcutBarPayload({
+        scope: "context-menu",
+        region: "main-panel",
+        view: desktop.activeView,
+        part: "card",
+        state: "active",
+      }) ?? createEmptyShortcutBarPayload("context-menu");
+    }
     if (!desktopShortcutDescriptor) return createEmptyShortcutBarPayload("board");
     return resolveShortcutBarPayload({
       ...desktopShortcutDescriptor,
       state: "active",
     }) ?? createEmptyShortcutBarPayload("board");
-  }, [desktopShortcutDescriptor, modalProps]);
+  }, [bucketCreateMenu.open, contextMenu.cardId, contextMenu.open, desktop.activeView, desktopShortcutDescriptor, modalProps]);
   const activeTabClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full bg-slate-200 px-3 text-[11px] font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
   const inactiveTabClassName =
