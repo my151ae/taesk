@@ -483,9 +483,26 @@
 }
 
 /* task item は li 直下の先頭 paragraph を行本体として扱う */
-.editor :global(.ProseMirror ul[data-type="taskList"] li > div > p) {
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > p),
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > h1),
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > h2),
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > h3),
+.editor :global(.ProseMirror ul[data-type="taskList"] li > div > summary),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) li > p),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) li > h1),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) li > h2),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) li > h3),
+.editor :global(.ProseMirror ul:not([data-type="taskList"]) li > summary),
+.editor :global(.ProseMirror ol li > p),
+.editor :global(.ProseMirror ol li > h1),
+.editor :global(.ProseMirror ol li > h2),
+.editor :global(.ProseMirror ol li > h3),
+.editor :global(.ProseMirror ol li > summary) {
     border-bottom: none !important;
-    padding-bottom: 2px !important;
+    min-height: var(--taesk-body-line-box);
+    box-sizing: border-box;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
 }
 
 /* タスクリストアイテムの内部 div のマージンリセット */
