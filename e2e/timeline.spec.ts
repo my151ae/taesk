@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page, type Request } from '@playwright/test';
 import { parseMarkdownToTiptapContent, serializeTiptapContentToMarkdown } from '@/lib/tiptap';
 import type { JSONContent } from '@tiptap/react';
 import {
@@ -2532,6 +2532,33 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.mouse.up();
       await expect(overdueOverlay).toHaveCount(0);
       await expect(overdueCard).toBeVisible();
+
+      const viewportSize = page.viewportSize();
+      if (!viewportSize) {
+        throw new Error('Missing viewport size for mobile overdue drag test');
+      }
+
+      let invalidDropPatchCount = 0;
+      const invalidDropRequestHandler = (request: Request) => {
+        if (
+          request.method() === 'PATCH' &&
+          request.url().includes(`/api/boards/${boardContext.boardId}/cards/${overdueCardId}`)
+        ) {
+          invalidDropPatchCount += 1;
+        }
+      };
+      page.on('request', invalidDropRequestHandler);
+
+      await dragLocatorToPoint(page, overdueCard, {
+        x: viewportSize.width + 120,
+        y: overdueBox.y + Math.max(18, overdueBox.height * 0.5),
+      });
+      await expect(overdueOverlay).toBeVisible();
+      await page.mouse.up();
+      await expect(overdueOverlay).toHaveCount(0);
+      await expect(overdueCard).toBeVisible();
+      await expect.poll(() => invalidDropPatchCount, { timeout: 1_500 }).toBe(0);
+      page.off('request', invalidDropRequestHandler);
 
       const timelineGrid = page.locator('[data-testid="timeline-grid"]:visible').first();
       const timelineBox = await timelineGrid.boundingBox();

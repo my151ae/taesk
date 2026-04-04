@@ -94,6 +94,17 @@ export type InteractionState =
     | { mode: 'dragging'; dragSession: DragSession }
     | { mode: 'resizing'; resize: ActiveResizeState };
 
+type ExplicitDropTarget =
+    | {
+        type: 'timeline-column';
+        day: TimelineDay;
+        rect: { top: number; height: number };
+    }
+    | {
+        type: 'ab-bucket';
+        bucketKey: string;
+    };
+
 export const bucketsFirstCollisionDetection: CollisionDetection = (args) => {
     const pointer = args.pointerCoordinates;
     if (pointer && typeof document !== 'undefined') {
@@ -322,6 +333,70 @@ export function useTimelineDragAndDrop({
         [data?.days]
     );
 
+    const resolveDragEndClientPoint = useCallback(
+        (event: DragEndEvent) => {
+            const translated = event.active.rect.current?.translated;
+            if (translated) {
+                return {
+                    x: translated.left + (translated.width ?? 0) / 2,
+                    y: translated.top + (translated.height ?? 0) / 2,
+                };
+            }
+            const x = resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current);
+            const y = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
+            if (x == null || y == null) return null;
+            return { x, y };
+        },
+        []
+    );
+
+    const isClientPointInsideViewport = useCallback((point: { x: number; y: number } | null) => {
+        if (!point || typeof window === 'undefined') return false;
+        return (
+            point.x >= 0 &&
+            point.y >= 0 &&
+            point.x <= window.innerWidth &&
+            point.y <= window.innerHeight
+        );
+    }, []);
+
+    const resolveExplicitDropTargetAtPoint = useCallback(
+        (point: { x: number; y: number } | null): ExplicitDropTarget | null => {
+            if (!isClientPointInsideViewport(point)) return null;
+            if (typeof document === 'undefined' || !point) return null;
+            const top = document.elementFromPoint(point.x, point.y);
+            if (!top) return null;
+
+            const timelineColumn = top.closest?.('[data-dnd="timeline-column"]') as HTMLElement | null | undefined;
+            if (timelineColumn) {
+                const dayIso = timelineColumn.getAttribute('data-day-iso');
+                const day = dayIso ? data?.days?.find((entry) => entry.isoDate === dayIso) ?? null : null;
+                if (day) {
+                    const rect = timelineColumn.getBoundingClientRect();
+                    return {
+                        type: 'timeline-column',
+                        day,
+                        rect: { top: rect.top, height: rect.height },
+                    };
+                }
+            }
+
+            const bucketEl = top.closest?.('[data-dnd="ab-bucket"]') as HTMLElement | null | undefined;
+            if (bucketEl) {
+                const bucketKey = bucketEl.getAttribute('data-bucket-key');
+                if (bucketKey) {
+                    return {
+                        type: 'ab-bucket',
+                        bucketKey,
+                    };
+                }
+            }
+
+            return null;
+        },
+        [data?.days, isClientPointInsideViewport]
+    );
+
     const stopDragAutoScroll = useCallback(() => {
         stopAutoScroll(dragAutoScrollRef.current);
     }, []);
@@ -481,16 +556,16 @@ export function useTimelineDragAndDrop({
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over, delta } = event;
-        const pointerX = resolvePointerClientX(event, latestPointerRef.current, dragStartPointerRef.current);
-        const pointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
-        const visualTimelineTarget = resolveTimelineTargetAtPointer(pointerX, pointerY);
+        const dragEndPoint = resolveDragEndClientPoint(event);
+        const explicitDropTarget = resolveExplicitDropTargetAtPoint(dragEndPoint);
         stopDragAutoScroll();
         stopPointerTracking();
         const completedDrag =
             interactionStateRef.current.mode === 'dragging' ? interactionStateRef.current.dragSession : null;
         resetInteractionState();
 
-        if (!over && !visualTimelineTarget) return;
+        if (!isClientPointInsideViewport(dragEndPoint)) return;
+        if (!over && !explicitDropTarget) return;
         const cardId = active.data.current?.cardId as string | undefined;
         if (!cardId) return;
 
@@ -504,7 +579,7 @@ export function useTimelineDragAndDrop({
             ? (active.data.current?.item as TimelineOverdueItem | undefined)
             : undefined;
 
-        const overType = visualTimelineTarget ? 'timeline-column' : over?.data.current?.type;
+        const overType = explicitDropTarget?.type ?? over?.data.current?.type;
 
         if (overType === 'bucket-item-top' || overType === 'bucket-item-bottom') {
             const bucketKey = over?.data.current?.bucketKey as string | undefined;
@@ -540,13 +615,16 @@ export function useTimelineDragAndDrop({
         }
 
         if (overType === 'timeline-column' && completedDrag) {
-            const day = visualTimelineTarget?.day ?? (over?.data.current?.day as TimelineDay | undefined);
+            const day =
+                explicitDropTarget?.type === 'timeline-column'
+                    ? explicitDropTarget.day
+                    : (over?.data.current?.day as TimelineDay | undefined);
             if (!day) return;
             const scrollTop = timelineScrollRef.current?.scrollTop ?? 0;
             const pointerMinutes = pointerMinutesFromEvent(event, {
                 scrollTop,
-                columnRect: visualTimelineTarget?.rect
-                    ? { top: visualTimelineTarget.rect.top, height: visualTimelineTarget.rect.height }
+                columnRect: explicitDropTarget?.type === 'timeline-column'
+                    ? explicitDropTarget.rect
                     : over?.rect
                         ? { top: over.rect.top, height: over.rect.height }
                         : undefined,
@@ -583,7 +661,10 @@ export function useTimelineDragAndDrop({
         }
 
         if (overType === 'ab-bucket') {
-            const bucketKey = over?.data.current?.bucketKey as string;
+            const bucketKey =
+                explicitDropTarget?.type === 'ab-bucket'
+                    ? explicitDropTarget.bucketKey
+                    : (over?.data.current?.bucketKey as string);
             const dayIso = bucketDayMap[bucketKey] ?? null;
             const bucketItems = data?.abBuckets?.[bucketKey] ?? [];
             const fallbackTargetCardId =
