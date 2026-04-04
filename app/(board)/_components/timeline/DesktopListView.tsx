@@ -79,6 +79,7 @@ export function DesktopListToolbar({
       <div className="flex h-8 items-center gap-2 overflow-x-auto">
         <button
           onClick={() => onPrevWeek?.()}
+          data-testid="list-toolbar-prev-week"
           data-focus-group="toolbar"
           data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
@@ -88,6 +89,7 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onPrevDay?.()}
+          data-testid="list-toolbar-prev-day"
           data-focus-group="toolbar"
           data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
@@ -97,6 +99,7 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onToday?.()}
+          data-testid="list-toolbar-today"
           data-focus-group="toolbar"
           data-focus-part="control"
           className={todayButtonClassName}
@@ -125,11 +128,13 @@ export function DesktopListToolbar({
           options={presetOptions}
           onChange={(nextValue) => onListWindowPresetChange?.(nextValue as ListWindowPresetKey)}
           ariaLabel="表示期間"
+          buttonTestId="list-toolbar-window-select"
           className="pr-2"
           menuClassName="min-w-[8rem]"
         />
         <button
           onClick={() => onNextDay?.()}
+          data-testid="list-toolbar-next-day"
           data-focus-group="toolbar"
           data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
@@ -139,6 +144,7 @@ export function DesktopListToolbar({
         </button>
         <button
           onClick={() => onNextWeek?.()}
+          data-testid="list-toolbar-next-week"
           data-focus-group="toolbar"
           data-focus-part="control"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50"

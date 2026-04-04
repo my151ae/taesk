@@ -138,6 +138,7 @@ function TimelineBoardPageContent({
 }: TimelineBoardPageContentProps) {
   const router = useRouter();
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
+  const pendingToolbarFocusSelectorRef = useRef<string | null>(null);
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
   const activeLeftSectionKey = leftPanelModeToSidebarSection(resolvedState.leftPanelMode);
   const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
@@ -151,6 +152,13 @@ function TimelineBoardPageContent({
     if (!cardId) return;
     const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
     target?.focus();
+  }, []);
+
+  const scheduleToolbarFocusRestore = useCallback(() => {
+    if (typeof document === "undefined") return;
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const testId = activeElement?.dataset.testid;
+    pendingToolbarFocusSelectorRef.current = testId ? `[data-testid="${testId.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]` : null;
   }, []);
 
   const {
@@ -640,14 +648,61 @@ function TimelineBoardPageContent({
   const handleDayRangeUpdate = useCallback(
     (newRange: number) => {
       if (viewMode !== "timeline") return;
+      scheduleToolbarFocusRestore();
       handleDayRangeChange(newRange);
       setTimelineRange(newRange);
       if (canPersistPreferences) {
         void handleUpdateBoard({ day_range: newRange });
       }
     },
-    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, setTimelineRange, viewMode],
+    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
   );
+
+  const handlePrevDayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handlePrevDay();
+  }, [handlePrevDay, scheduleToolbarFocusRestore]);
+
+  const handleNextDayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleNextDay();
+  }, [handleNextDay, scheduleToolbarFocusRestore]);
+
+  const handlePrevDayRangeWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handlePrevDayRange();
+  }, [handlePrevDayRange, scheduleToolbarFocusRestore]);
+
+  const handleNextDayRangeWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleNextDayRange();
+  }, [handleNextDayRange, scheduleToolbarFocusRestore]);
+
+  const handleTodayClickWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleTodayClick();
+  }, [handleTodayClick, scheduleToolbarFocusRestore]);
+
+  useEffect(() => {
+    const selector = pendingToolbarFocusSelectorRef.current;
+    if (!selector || status === "loading") return;
+
+    const restoreFocus = () => {
+      const target = document.querySelector<HTMLElement>(selector);
+      if (!target) return;
+      if (target.matches("[disabled]")) return;
+      if (target.getClientRects().length === 0) return;
+      target.focus();
+      pendingToolbarFocusSelectorRef.current = null;
+    };
+
+    const firstFrame = window.requestAnimationFrame(() => {
+      const secondFrame = window.requestAnimationFrame(restoreFocus);
+      return () => window.cancelAnimationFrame(secondFrame);
+    });
+
+    return () => window.cancelAnimationFrame(firstFrame);
+  }, [activeDayIndex, intendedDayRange, listAnchorDate, listWindowPresetKey, status, viewMode]);
 
   const modeSync = useTimelineBoardModeSync({
     viewMode,
@@ -675,6 +730,36 @@ function TimelineBoardPageContent({
     updateUrlForTimeline,
     updateUrlForList,
   });
+
+  const handleListTodayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListToday();
+  }, [modeSync, scheduleToolbarFocusRestore]);
+
+  const handleListWindowPresetChangeWithFocusRestore = useCallback((nextPreset: ListWindowPresetKey) => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListWindowPresetChange(nextPreset);
+  }, [modeSync, scheduleToolbarFocusRestore]);
+
+  const handleListPrevDayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListPrevDay();
+  }, [modeSync, scheduleToolbarFocusRestore]);
+
+  const handleListNextDayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListNextDay();
+  }, [modeSync, scheduleToolbarFocusRestore]);
+
+  const handleListPrevWeekWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListPrevWeek();
+  }, [modeSync, scheduleToolbarFocusRestore]);
+
+  const handleListNextWeekWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    modeSync.handleListNextWeek();
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleSearchQueryChange = useCallback(
     (value: string) => {
@@ -801,7 +886,7 @@ function TimelineBoardPageContent({
     signOut,
     intendedDayRange,
     onDayRangeChange: handleDayRangeUpdate,
-    onTodayClick: viewMode === "list" ? modeSync.handleListToday : handleTodayClick,
+    onTodayClick: viewMode === "list" ? handleListTodayWithFocusRestore : handleTodayClickWithFocusRestore,
     realtimeStatus,
     googleToast,
     googleStatusText,
@@ -840,10 +925,10 @@ function TimelineBoardPageContent({
     timelineStartHour,
     registerAbScrollContainer,
     status,
-    handlePrevDay,
-    handleNextDay,
-    handlePrevDayRange,
-    handleNextDayRange,
+    handlePrevDay: handlePrevDayWithFocusRestore,
+    handleNextDay: handleNextDayWithFocusRestore,
+    handlePrevDayRange: handlePrevDayRangeWithFocusRestore,
+    handleNextDayRange: handleNextDayRangeWithFocusRestore,
     eventsByDay,
     abBuckets: sortedFilteredData?.abBuckets ?? {},
     overdue: visibleOverdueItems,
@@ -887,14 +972,14 @@ function TimelineBoardPageContent({
     onPendingTitleEditConsumed: () => setPendingTitleEditCardId(null),
     listAnchorDate,
     listWindowPresetKey,
-    handleListWindowPresetChange: modeSync.handleListWindowPresetChange,
+    handleListWindowPresetChange: handleListWindowPresetChangeWithFocusRestore,
     listReverse: listWindow.before > 0,
     handleListBaseDateChange: modeSync.handleListBaseDateChange,
-    handleListPrevDay: modeSync.handleListPrevDay,
-    handleListNextDay: modeSync.handleListNextDay,
-    handleListPrevWeek: modeSync.handleListPrevWeek,
-    handleListNextWeek: modeSync.handleListNextWeek,
-    handleListToday: modeSync.handleListToday,
+    handleListPrevDay: handleListPrevDayWithFocusRestore,
+    handleListNextDay: handleListNextDayWithFocusRestore,
+    handleListPrevWeek: handleListPrevWeekWithFocusRestore,
+    handleListNextWeek: handleListNextWeekWithFocusRestore,
+    handleListToday: handleListTodayWithFocusRestore,
     handleViewModeChange: modeSync.handleViewModeChange,
     showShareDialog,
     setShowShareDialog,

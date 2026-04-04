@@ -16,6 +16,7 @@ type ToolbarMenuSelectProps<T extends string> = {
   onChange: (value: T) => void;
   ariaLabel: string;
   disabled?: boolean;
+  buttonTestId?: string;
   className?: string;
   menuClassName?: string;
 };
@@ -26,6 +27,7 @@ export function ToolbarMenuSelect<T extends string>({
   onChange,
   ariaLabel,
   disabled = false,
+  buttonTestId,
   className,
   menuClassName,
 }: ToolbarMenuSelectProps<T>) {
@@ -118,6 +120,7 @@ export function ToolbarMenuSelect<T extends string>({
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         disabled={disabled}
+        data-testid={buttonTestId}
         data-focus-group="toolbar"
         data-focus-part="control"
         onClick={(event) => {

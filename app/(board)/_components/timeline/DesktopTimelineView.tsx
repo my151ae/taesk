@@ -140,19 +140,19 @@ export function DesktopTimelineToolbar({
   return (
     <div className="border-b border-slate-100 bg-white px-3">
       <div className="flex h-8 items-center gap-2 overflow-x-auto">
-        <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
+        <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} data-testid="timeline-toolbar-prev-range" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"<<"}
         </button>
-        <button type="button" onClick={onPrevDay} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
+        <button type="button" onClick={onPrevDay} disabled={status === "loading"} data-testid="timeline-toolbar-prev-day" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"<1"}
         </button>
-        <button type="button" onClick={onToday} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={todayButtonClassName}>
+        <button type="button" onClick={onToday} disabled={status === "loading"} data-testid="timeline-toolbar-today" data-focus-group="toolbar" data-focus-part="control" className={todayButtonClassName}>
           Today
         </button>
-        <button type="button" onClick={onNextDay} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
+        <button type="button" onClick={onNextDay} disabled={status === "loading"} data-testid="timeline-toolbar-next-day" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"1>"}
         </button>
-        <button type="button" onClick={onNextDayRange} disabled={status === "loading"} data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
+        <button type="button" onClick={onNextDayRange} disabled={status === "loading"} data-testid="timeline-toolbar-next-range" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {">>"}
         </button>
         <div className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] text-slate-700">
@@ -160,6 +160,7 @@ export function DesktopTimelineToolbar({
             type="button"
             onClick={() => onDayRangeChange(Math.max(1, dayRange - 1))}
             disabled={status === "loading" || dayRange <= 1}
+            data-testid="timeline-toolbar-range-minus"
             data-focus-group="toolbar"
             data-focus-part="control"
             className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
@@ -173,6 +174,7 @@ export function DesktopTimelineToolbar({
             onChange={(nextValue) => onDayRangeChange(Number(nextValue))}
             disabled={status === "loading"}
             ariaLabel="表示日数"
+            buttonTestId="timeline-toolbar-range-select"
             className="h-full border-0 bg-transparent px-1 text-center text-xs font-medium shadow-none hover:bg-transparent"
             menuClassName="min-w-[7rem]"
           />
@@ -180,6 +182,7 @@ export function DesktopTimelineToolbar({
             type="button"
             onClick={() => onDayRangeChange(Math.min(7, dayRange + 1))}
             disabled={status === "loading" || dayRange >= 7}
+            data-testid="timeline-toolbar-range-plus"
             data-focus-group="toolbar"
             data-focus-part="control"
             className="flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"

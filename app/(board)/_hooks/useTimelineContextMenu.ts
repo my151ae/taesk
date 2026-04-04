@@ -35,8 +35,9 @@ export function useTimelineContextMenu({ focusCardById }: UseTimelineContextMenu
     });
   }, []);
 
-  const closeContextMenu = useCallback((_reason: "action" | "dismiss") => {
+  const closeContextMenu = useCallback((reason: "action" | "dismiss") => {
     setContextMenu((prev) => ({ ...prev, open: false, cardId: null, targetCardIds: [] }));
+    if (reason !== "dismiss") return;
     requestAnimationFrame(() => {
       focusCardById(lastContextMenuCardIdRef.current);
     });

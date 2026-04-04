@@ -72,6 +72,41 @@ const addDays = (isoDate: string, offsetDays: number) => {
   return new Date(nextUtc).toISOString().split("T")[0];
 };
 
+const CARD_ACTION_FOCUS_SELECTOR = [
+  '[data-focus-group="timeline"][data-focus-part="card"]',
+  '[data-focus-group="bucket"][data-focus-part="section-button"]',
+  '[data-focus-group="bucket"][data-focus-part="card"]',
+  '[data-focus-group="bucket"][data-focus-part="add-button"]',
+  '[data-focus-group="sidebar"][data-focus-part="rail-button"]',
+].join(", ");
+
+const isVisibleFocusTarget = (element: HTMLElement) => {
+  if (!element.isConnected) return false;
+  if (element.matches("[disabled]")) return false;
+  if (element.getAttribute("aria-hidden") === "true") return false;
+  if (element.closest('[aria-hidden="true"]')) return false;
+  return element.getClientRects().length > 0;
+};
+
+const escapeAttributeValue = (value: string) =>
+  value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+
+const getFocusTargetSelector = (element: HTMLElement | null) => {
+  if (!element) return null;
+
+  const cardId = element.dataset.cardId;
+  if (cardId) {
+    return `[data-card-id="${escapeAttributeValue(cardId)}"]`;
+  }
+
+  const testId = element.dataset.testid;
+  if (testId) {
+    return `[data-testid="${escapeAttributeValue(testId)}"]`;
+  }
+
+  return null;
+};
+
 function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: string): Card | null {
   const match = findTimelineCardById(data, cardId);
   const sourceEvent = match.event;
@@ -137,6 +172,69 @@ export function useTimelineCardActions({
   const historyRetryContextRef = useRef<{ boardId: string; cardId: string; content: unknown } | null>(null);
   const [googleToast, setGoogleToast] = useState<string | null>(null);
   const [historySaveWarning, setHistorySaveWarning] = useState<string | null>(null);
+
+  const getVisibleFocusTargets = useCallback(() => {
+    if (typeof document === "undefined") return [] as HTMLElement[];
+    return Array.from(document.querySelectorAll<HTMLElement>(CARD_ACTION_FOCUS_SELECTOR)).filter(isVisibleFocusTarget);
+  }, []);
+
+  const planCardActionFocusTarget = useCallback((cardId: string) => {
+    if (typeof document === "undefined") return null;
+
+    const source = document.querySelector<HTMLElement>(`[data-card-id="${cardId}"]`);
+    const candidates = getVisibleFocusTargets();
+    if (!candidates.length) return null;
+
+    const plannedSelectors: string[] = [];
+    const pushSelector = (selector: string | null) => {
+      if (!selector || plannedSelectors.includes(selector)) return;
+      plannedSelectors.push(selector);
+    };
+
+    if (source) {
+      const sourceIndex = candidates.indexOf(source);
+      if (sourceIndex >= 0) {
+        pushSelector(getFocusTargetSelector(candidates[sourceIndex - 1] ?? null));
+        const sectionButton = source
+          .closest("section")
+          ?.querySelector<HTMLElement>('[data-focus-group="bucket"][data-focus-part="section-button"]');
+        pushSelector(getFocusTargetSelector(sectionButton ?? null));
+        pushSelector(getFocusTargetSelector(candidates[sourceIndex + 1] ?? null));
+      }
+    }
+
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (activeElement) {
+      const activeIndex = candidates.indexOf(activeElement);
+      if (activeIndex >= 0) {
+        pushSelector(getFocusTargetSelector(candidates[activeIndex - 1] ?? null));
+        pushSelector(getFocusTargetSelector(candidates[activeIndex + 1] ?? null));
+      }
+    }
+
+    pushSelector(getFocusTargetSelector(candidates[0] ?? null));
+
+    return plannedSelectors;
+  }, [getVisibleFocusTargets]);
+
+  const restoreCardActionFocus = useCallback((plannedSelectors: string[] | null) => {
+    if (typeof window === "undefined") return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        for (const selector of plannedSelectors ?? []) {
+          const target = document.querySelector<HTMLElement>(selector);
+          if (target && isVisibleFocusTarget(target)) {
+            target.focus();
+            return;
+          }
+        }
+
+        const fallbackTarget = getVisibleFocusTargets()[0] ?? null;
+        fallbackTarget?.focus();
+      });
+    });
+  }, [getVisibleFocusTargets]);
 
   const postHistorySnapshot = useCallback(
     async (params: { boardId: string; cardId: string; content: unknown; signal?: AbortSignal }) => {
@@ -364,6 +462,7 @@ export function useTimelineCardActions({
 
   const handleCardModalDelete = useCallback(
     async (cardId: string) => {
+      const plannedFocusTarget = planCardActionFocusTarget(cardId);
       let targetCardRef: { id: string; board_id: string } | null = modalCard && modalCard.id === cardId
         ? { id: modalCard.id, board_id: modalCard.board_id }
         : null;
@@ -387,6 +486,7 @@ export function useTimelineCardActions({
         const response = await fetch(`/api/boards/${targetCardRef.board_id}/cards/${targetCardRef.id}`, { method: "DELETE" });
         if (!response.ok) throw new Error("Failed to delete card");
         setData((prev) => (prev ? applyCardUpdate(prev, { id: cardId } as Card, "DELETE") : prev));
+        restoreCardActionFocus(plannedFocusTarget);
         return true;
       } catch (error) {
         setCardModalError(error instanceof Error ? error.message : "Failed to delete card");
@@ -397,7 +497,7 @@ export function useTimelineCardActions({
         }
       }
     },
-    [modalCard, closeCardModal, setData, setCardModalError, data, initialBoardId]
+    [modalCard, closeCardModal, setData, setCardModalError, data, initialBoardId, planCardActionFocusTarget, restoreCardActionFocus]
   );
 
   const createCard = useCallback(async (payload: Partial<Card>, options?: { openModal?: boolean; focusLaneId?: string }) => {
@@ -471,6 +571,7 @@ export function useTimelineCardActions({
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
     if (dataMode !== "api") return false;
     const previousSnapshot = data;
+    const plannedFocusTarget = planCardActionFocusTarget(cardId);
     try {
       const baseCard = buildCardFromTimelineMatch(data, cardId);
       if (!baseCard) return false;
@@ -484,6 +585,7 @@ export function useTimelineCardActions({
         body: JSON.stringify({ checked: nextChecked }),
       });
       if (!res.ok) throw new Error();
+      restoreCardActionFocus(plannedFocusTarget);
       return true;
     } catch {
       if (previousSnapshot) {
@@ -494,7 +596,7 @@ export function useTimelineCardActions({
       setErrorMessage("カードの完了状態を更新できませんでした");
       return false;
     }
-  }, [data, dataMode, initialBoardId, setData, fetchTimeline, setErrorMessage]);
+  }, [data, dataMode, initialBoardId, setData, fetchTimeline, setErrorMessage, planCardActionFocusTarget, restoreCardActionFocus]);
 
   const handleRenameCardTitle = useCallback(async (cardId: string, nextTitle: string) => {
     if (dataMode !== "api") return false;
