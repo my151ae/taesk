@@ -183,7 +183,7 @@ export default function ProfileSettings({ onProfileUpdated }: ProfileSettingsPro
       } finally {
         usernameRequestAbortRef.current = null;
       }
-    }, 350);
+    }, 32);
 
     return () => {
       if (usernameCheckTimeoutRef.current) {

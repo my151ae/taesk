@@ -138,23 +138,23 @@
     color: #94a3b8;
 }
 
-.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div p) {
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > p),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h1),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h2),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h3),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > summary) {
     text-decoration: line-through;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"]) {
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-completion-visibility="hidden"]) {
     display: none !important;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="false"]) {
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length]) {
     position: relative;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="false"])::before,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::before,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::before,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::before,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::before {
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length])::before {
     content: "";
     grid-column: 1 / -1;
     display: block;
@@ -163,11 +163,7 @@
     background: #cbd5e1;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="false"])::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after {
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length])::after {
     position: absolute;
     top: -0.2rem;
     left: 50%;
@@ -186,33 +182,10 @@
     font-weight: 600;
     line-height: 1;
     z-index: 1;
+    content: attr(data-hidden-run-length);
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="false"])::after {
-    content: "①";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after {
-    content: "②";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after {
-    content: "③";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after {
-    content: "④";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="false"])::after {
-    content: "⑤";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"]:last-child))::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"]:last-child))::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after,
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after {
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"][data-hidden-run-start="true"][data-hidden-run-length])::after {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -224,26 +197,7 @@
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1;
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"]:last-child))::after {
-    content: "①";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"]:last-child))::after {
-    content: "②";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after {
-    content: "③";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after {
-    content: "④";
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"]:has(> li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"] + li[data-checked="true"]:last-child))::after {
-    content: "⑤";
+    content: attr(data-hidden-run-length);
 }
 
 /* 

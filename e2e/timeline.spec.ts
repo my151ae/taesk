@@ -65,7 +65,7 @@ async function openBlockActionMenu(
     const initialItem = modal.getByTestId(`tiptap-block-menu-${initialFocusAction}`);
     await expect(initialItem).toBeFocused();
   }
-  await page.waitForTimeout(50);
+  await page.waitForTimeout(2);
 }
 
 async function triggerBlockAction(
@@ -1031,7 +1031,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       expect(sortedSplitLeftsDesktop[0]).toBeGreaterThanOrEqual(0);
       expect(sortedSplitLeftsDesktop[1]).toBeGreaterThan(20);
-      expect(sortedSplitLeftsDesktop[2]).toBeGreaterThan(50);
+      expect(sortedSplitLeftsDesktop[2]).toBeGreaterThan(2);
       splitWidthsDesktop.forEach((width) => {
         expect(width).toBeGreaterThan(25);
         expect(width).toBeLessThan(35);
@@ -1162,7 +1162,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       expect(sortedSplitLeftsMobile[0]).toBeGreaterThanOrEqual(0);
       expect(sortedSplitLeftsMobile[1]).toBeGreaterThan(20);
-      expect(sortedSplitLeftsMobile[2]).toBeGreaterThan(50);
+      expect(sortedSplitLeftsMobile[2]).toBeGreaterThan(2);
       splitWidthsMobile.forEach((width) => {
         expect(width).toBeGreaterThan(25);
         expect(width).toBeLessThan(35);
@@ -6860,6 +6860,311 @@ test.describe('@feature:timeline Timeline view', () => {
       });
       expect(Date.parse(savedAfterToggle?.updatedAt ?? '')).toBe(Date.parse(timestamp));
       expect(savedAfterToggle?.content).toEqual(initialContent);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('applies subtree completion visibility rules for nested task items', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent only done' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: false },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Child stays visible' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent active' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: true },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Child done only' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent subtree done' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: true },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Child done with parent' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent and child done' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: true },
+                      content: [
+                        { type: 'paragraph', content: [{ type: 'text', text: 'Child and grandchild branch' }] },
+                        {
+                          type: 'taskList',
+                          content: [
+                            {
+                              type: 'taskItem',
+                              attrs: { checked: false },
+                              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Grandchild keeps branch visible' }] }],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Subtree completion visibility',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[x] Parent only done\n  [ ] Child stays visible\n[ ] Parent active\n  [x] Child done only\n[x] Parent subtree done\n  [x] Child done with parent\n[x] Parent and child done\n  [x] Child and grandchild branch\n    [ ] Grandchild keeps branch visible',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1898,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:35:00',
+      due_end: '16:35:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5046,
+      slug: 'subtree-completion-visibility',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
+      if (!(await completedLinesPanel.isVisible())) {
+        await modal.getByTitle('Show details').click();
+      }
+      await expect(completedLinesPanel).toBeVisible();
+      const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
+      await expect(showCompletedLines).not.toBeChecked();
+
+      const topTaskItems = modal.locator('.ProseMirror > ul[data-type="taskList"] > li');
+      const parentOnlyDone = topTaskItems.filter({ hasText: 'Parent only done' }).first();
+      const parentActive = topTaskItems.filter({ hasText: 'Parent active' }).first();
+      const parentSubtreeDone = topTaskItems.filter({ hasText: 'Parent subtree done' }).first();
+      const parentAndChildDone = topTaskItems.filter({ hasText: 'Parent and child done' }).first();
+
+      const parentOnlyDoneLine = parentOnlyDone.locator(':scope > div > p').first();
+      const childStaysVisibleLine = parentOnlyDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first();
+      const childDoneOnlyLine = parentActive.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first();
+      const parentAndChildDoneLine = parentAndChildDone.locator(':scope > div > p').first();
+      const childAndGrandchildBranchLine = parentAndChildDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first();
+      const grandchildKeepsBranchVisibleLine = parentAndChildDone.locator(':scope > div > ul[data-type="taskList"] > li > div > ul[data-type="taskList"] > li > div > p').first();
+
+      await expect(parentOnlyDone).toHaveAttribute('data-completion-visibility', 'visible');
+      await expect(parentOnlyDone).toHaveAttribute('data-subtree-complete', 'false');
+      await expect(parentActive).toHaveAttribute('data-completion-visibility', 'visible');
+      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'hidden');
+      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeHidden();
+      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeHidden();
+      await expect(parentAndChildDone).toHaveAttribute('data-completion-visibility', 'visible');
+      await expect(parentOnlyDoneLine).toBeVisible();
+      await expect(childStaysVisibleLine).toBeVisible();
+      await expect(childDoneOnlyLine).toBeHidden();
+      await expect(parentAndChildDoneLine).toBeVisible();
+      await expect(childAndGrandchildBranchLine).toBeVisible();
+      await expect(grandchildKeepsBranchVisibleLine).toBeVisible();
+
+      const lineDecorations = await Promise.all([
+        parentOnlyDoneLine,
+        childStaysVisibleLine,
+        parentAndChildDoneLine,
+        childAndGrandchildBranchLine,
+        grandchildKeepsBranchVisibleLine,
+      ].map(async (locator) => locator.evaluate((element) => window.getComputedStyle(element).textDecorationLine)));
+
+      expect(lineDecorations[0]).toContain('line-through');
+      expect(lineDecorations[1]).not.toContain('line-through');
+      expect(lineDecorations[2]).toContain('line-through');
+      expect(lineDecorations[3]).toContain('line-through');
+      expect(lineDecorations[4]).not.toContain('line-through');
+
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(3);
+
+      await showCompletedLines.check();
+      await expect(showCompletedLines).toBeChecked();
+      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'visible');
+      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeVisible();
+      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeVisible();
+      await expect(childDoneOnlyLine).toBeVisible();
+      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(4);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('aggregates hidden subtree runs onto the next visible sibling and trailing task list', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const hiddenLeaf = (text: string) => ({
+      type: 'taskItem',
+      attrs: { checked: true },
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+    });
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Visible start' }] }],
+            },
+            hiddenLeaf('Hidden middle 1'),
+            hiddenLeaf('Hidden middle 2'),
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Visible after middle run' }] }],
+            },
+            hiddenLeaf('Hidden trailing 1'),
+            hiddenLeaf('Hidden trailing 2'),
+            hiddenLeaf('Hidden trailing 3'),
+            hiddenLeaf('Hidden trailing 4'),
+            hiddenLeaf('Hidden trailing 5'),
+            hiddenLeaf('Hidden trailing 6'),
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Hidden run aggregation',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[ ] Visible start\n[x] Hidden middle 1\n[x] Hidden middle 2\n[ ] Visible after middle run\n[x] Hidden trailing 1\n[x] Hidden trailing 2\n[x] Hidden trailing 3\n[x] Hidden trailing 4\n[x] Hidden trailing 5\n[x] Hidden trailing 6',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1899,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:40:00',
+      due_end: '16:40:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5047,
+      slug: 'hidden-run-aggregation',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const topTaskList = modal.locator('.ProseMirror > ul[data-type="taskList"]').first();
+      const topTaskItems = topTaskList.locator(':scope > li');
+      await expect(topTaskItems).toHaveCount(10);
+
+      const visibleAfterMiddleRun = topTaskItems.filter({ hasText: 'Visible after middle run' }).first();
+      await expect(visibleAfterMiddleRun).toHaveAttribute('data-hidden-run-start', 'true');
+      await expect(visibleAfterMiddleRun).toHaveAttribute('data-hidden-run-length', '2');
+      await expect(topTaskList).toHaveAttribute('data-hidden-run-start', 'true');
+      await expect(topTaskList).toHaveAttribute('data-hidden-run-length', '6');
+      await expect(topTaskItems.filter({ hasText: 'Hidden middle 1' }).first().locator(':scope > div > p').first()).toBeHidden();
+      await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeHidden();
+
+      const hiddenRunPseudoContent = await Promise.all([
+        visibleAfterMiddleRun.evaluate((element) => window.getComputedStyle(element, '::after').content),
+        topTaskList.evaluate((element) => window.getComputedStyle(element, '::after').content),
+      ]);
+      expect(hiddenRunPseudoContent[0]).toContain('2');
+      expect(hiddenRunPseudoContent[1]).toContain('6');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

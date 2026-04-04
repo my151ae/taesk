@@ -69,8 +69,8 @@ const getHandler = async (
     }
 
     const url = new URL(request.url);
-    const rawLimit = Number(url.searchParams.get('limit') ?? 50);
-    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 50;
+    const rawLimit = Number(url.searchParams.get('limit') ?? 2);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 2) : 50;
 
     const { data: history, error } = await supabase
       .from('card_content_history')

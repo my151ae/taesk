@@ -71,6 +71,28 @@ type ActiveBlockMenuTarget = {
     resolvedTarget: ResolvedBlockTarget;
 };
 
+type TaskItemVisibility = 'visible' | 'hidden';
+
+type TaskItemCompletionMeta = {
+    pos: number;
+    selfChecked: boolean;
+    allNestedTaskItemsChecked: boolean;
+    subtreeComplete: boolean;
+    visibility: TaskItemVisibility;
+    hiddenRunStart: boolean;
+    hiddenRunLength: number;
+};
+
+type TaskListCompletionMeta = {
+    pos: number;
+    trailingHiddenRunLength: number;
+};
+
+type TaskCompletionSnapshot = {
+    itemMetaByPos: Map<number, TaskItemCompletionMeta>;
+    listMetaByPos: Map<number, TaskListCompletionMeta>;
+};
+
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -85,6 +107,127 @@ type TiptapEditorProps = {
     onShortcutStateChange?: (state: BodyEditorShortcutState) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
+};
+
+const buildTaskCompletionSnapshot = (doc: ProseMirrorNode, showCompletedLines: boolean): TaskCompletionSnapshot => {
+    const itemMetaByPos = new Map<number, TaskItemCompletionMeta>();
+    const listMetaByPos = new Map<number, TaskListCompletionMeta>();
+
+    const visitTaskItem = (node: ProseMirrorNode, pos: number): TaskItemCompletionMeta => {
+        let allNestedTaskItemsChecked = true;
+
+        node.forEach((child, offset) => {
+            if (child.type.name !== 'taskList') return;
+            const childPos = pos + offset + 1;
+            const childListMeta = visitTaskList(child, childPos);
+            allNestedTaskItemsChecked = allNestedTaskItemsChecked && childListMeta.allTaskItemsChecked;
+        });
+
+        const selfChecked = Boolean(node.attrs?.checked);
+        const subtreeComplete = selfChecked && allNestedTaskItemsChecked;
+        const visibility: TaskItemVisibility = !showCompletedLines && subtreeComplete ? 'hidden' : 'visible';
+        const meta: TaskItemCompletionMeta = {
+            pos,
+            selfChecked,
+            allNestedTaskItemsChecked,
+            subtreeComplete,
+            visibility,
+            hiddenRunStart: false,
+            hiddenRunLength: 0,
+        };
+        itemMetaByPos.set(pos, meta);
+        return meta;
+    };
+
+    const visitTaskList = (node: ProseMirrorNode, pos: number): { allTaskItemsChecked: boolean } => {
+        const directChildItems: TaskItemCompletionMeta[] = [];
+        let allTaskItemsChecked = true;
+
+        node.forEach((child, offset) => {
+            if (child.type.name !== 'taskItem') return;
+            const childPos = pos + offset + 1;
+            const meta = visitTaskItem(child, childPos);
+            directChildItems.push(meta);
+            allTaskItemsChecked = allTaskItemsChecked && meta.subtreeComplete;
+        });
+
+        let trailingHiddenRunLength = 0;
+        for (const meta of directChildItems) {
+            if (meta.visibility === 'hidden') {
+                trailingHiddenRunLength += 1;
+                continue;
+            }
+
+            if (trailingHiddenRunLength > 0) {
+                meta.hiddenRunStart = true;
+                meta.hiddenRunLength = trailingHiddenRunLength;
+                trailingHiddenRunLength = 0;
+            }
+        }
+
+        listMetaByPos.set(pos, {
+            pos,
+            trailingHiddenRunLength,
+        });
+
+        return { allTaskItemsChecked };
+    };
+
+    const visitNode = (node: ProseMirrorNode, pos: number) => {
+        node.forEach((child, offset) => {
+            const childPos = pos + offset + 1;
+            if (child.type.name === 'taskList') {
+                visitTaskList(child, childPos);
+                return;
+            }
+            visitNode(child, childPos);
+        });
+    };
+
+    visitNode(doc, -1);
+
+    return {
+        itemMetaByPos,
+        listMetaByPos,
+    };
+};
+
+const applyTaskCompletionAttributes = (
+    view: Editor['view'],
+    root: HTMLDivElement | null,
+    snapshot: TaskCompletionSnapshot,
+) => {
+    if (!root) return;
+
+    root
+        .querySelectorAll<HTMLElement>('li[data-type="taskItem"], ul[data-type="taskList"]')
+        .forEach((element) => {
+            element.removeAttribute('data-completion-visibility');
+            element.removeAttribute('data-subtree-complete');
+            element.removeAttribute('data-hidden-run-start');
+            element.removeAttribute('data-hidden-run-length');
+        });
+
+    snapshot.itemMetaByPos.forEach((meta, pos) => {
+        const nodeDom = view.nodeDOM(pos);
+        if (!(nodeDom instanceof HTMLElement)) return;
+
+        nodeDom.setAttribute('data-completion-visibility', meta.visibility);
+        nodeDom.setAttribute('data-subtree-complete', meta.subtreeComplete ? 'true' : 'false');
+
+        if (meta.hiddenRunStart && meta.hiddenRunLength > 0) {
+            nodeDom.setAttribute('data-hidden-run-start', 'true');
+            nodeDom.setAttribute('data-hidden-run-length', String(meta.hiddenRunLength));
+        }
+    });
+
+    snapshot.listMetaByPos.forEach((meta, pos) => {
+        if (meta.trailingHiddenRunLength <= 0) return;
+        const nodeDom = view.nodeDOM(pos);
+        if (!(nodeDom instanceof HTMLElement)) return;
+        nodeDom.setAttribute('data-hidden-run-start', 'true');
+        nodeDom.setAttribute('data-hidden-run-length', String(meta.trailingHiddenRunLength));
+    });
 };
 
 export default function TiptapEditor({
@@ -1065,7 +1208,15 @@ export default function TiptapEditor({
     }, [editor, editable]);
 
     useLayoutEffect(() => {
-        if (!editor || suppressBlockUi) {
+        if (!editor) {
+            setRenderableBlocks([]);
+            return;
+        }
+
+        const taskCompletionSnapshot = buildTaskCompletionSnapshot(editor.state.doc, showCompletedLines);
+        applyTaskCompletionAttributes(editor.view, rootRef.current, taskCompletionSnapshot);
+
+        if (suppressBlockUi) {
             setRenderableBlocks([]);
             return;
         }
@@ -1088,7 +1239,10 @@ export default function TiptapEditor({
                     return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
                 }
 
-                if (!showCompletedLines && target.nodeType === 'taskItem' && node.attrs?.checked === true) {
+                if (
+                    target.nodeType === 'taskItem' &&
+                    taskCompletionSnapshot.itemMetaByPos.get(target.blockPos)?.visibility === 'hidden'
+                ) {
                     return false;
                 }
 

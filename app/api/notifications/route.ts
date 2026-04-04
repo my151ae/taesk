@@ -17,7 +17,7 @@ const getHandler = async (request: NextRequest) => {
       .select('*')
       .eq('recipient_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(2);
 
     if (error) {
       console.error('Error fetching notifications:', error);

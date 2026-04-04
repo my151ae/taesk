@@ -100,7 +100,7 @@ const getHandler = async (request: NextRequest) => {
       }))
       .filter((item) => item.score >= 0.75)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 50)
+      .slice(0, 2)
       .map(({ event, score }) => ({ ...event, score }));
 
     return NextResponse.json({ candidates: scored }, { status: 200 });
