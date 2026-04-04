@@ -33,11 +33,16 @@ export function ToolbarMenuSelect<T extends string>({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; minWidth: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef(false);
   const keyboardTogglePendingRef = useRef(false);
   const listboxId = useId();
 
-  useClickOutside(rootRef, () => {
+  useClickOutside(rootRef, (event) => {
+    const target = event.target as Node | null;
+    if (target && menuRef.current?.contains(target)) {
+      return;
+    }
     setOpen(false);
   });
 
@@ -160,6 +165,7 @@ export function ToolbarMenuSelect<T extends string>({
       {open && menuPosition && typeof document !== "undefined"
         ? createPortal(
             <div
+              ref={menuRef}
               id={listboxId}
               role="listbox"
               tabIndex={-1}
