@@ -24,7 +24,7 @@ import {
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
-import { useTimelineUrlState, type ListWindow } from "@/app/(board)/_hooks/useTimelineUrlState";
+import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
   serializeBoardUiStateToSearchParams,
   type LeftPanelMode,

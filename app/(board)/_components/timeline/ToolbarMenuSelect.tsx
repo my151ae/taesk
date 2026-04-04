@@ -32,10 +32,12 @@ export function ToolbarMenuSelect<T extends string>({
   menuClassName,
 }: ToolbarMenuSelectProps<T>) {
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; minWidth: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const suppressNextClickRef = useRef(false);
   const keyboardTogglePendingRef = useRef(false);
   const listboxId = useId();
@@ -57,6 +59,18 @@ export function ToolbarMenuSelect<T extends string>({
     setOpen(false);
     buttonRef.current?.focus();
   }, []);
+
+  const selectOption = useCallback((nextValue: T) => {
+    // 変更処理側が押下元ボタンを識別できるよう、先にフォーカスを戻す
+    buttonRef.current?.focus();
+    onChange(nextValue);
+    setOpen(false);
+  }, [onChange]);
+
+  const selectedIndex = useMemo(() => {
+    const index = options.findIndex((option) => option.value === value);
+    return index >= 0 ? index : 0;
+  }, [options, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +94,15 @@ export function ToolbarMenuSelect<T extends string>({
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex(selectedIndex);
+    const frame = window.requestAnimationFrame(() => {
+      optionRefs.current[selectedIndex]?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, selectedIndex]);
 
   const handleToggle = useCallback(() => {
     if (disabled) return;
@@ -183,24 +206,47 @@ export function ToolbarMenuSelect<T extends string>({
                 minWidth: menuPosition.minWidth,
               }}
               onKeyDown={(event) => {
+                if (!options.length) return;
+
                 if (event.key === "Escape") {
                   event.preventDefault();
                   closeMenu();
+                  return;
+                }
+
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const direction = event.key === "ArrowDown" ? 1 : -1;
+                  const nextIndex = (activeIndex + direction + options.length) % options.length;
+                  setActiveIndex(nextIndex);
+                  optionRefs.current[nextIndex]?.focus();
+                  return;
+                }
+
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  const activeOption = options[activeIndex];
+                  if (!activeOption) return;
+                  selectOption(activeOption.value);
                 }
               }}
             >
-              {options.map((option) => {
+              {options.map((option, index) => {
                 const isSelected = option.value === value;
                 return (
                   <button
                     key={option.value}
+                    ref={(node) => {
+                      optionRefs.current[index] = node;
+                    }}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
                     data-arrow-skip="true"
+                    tabIndex={index === activeIndex ? 0 : -1}
+                    onFocus={() => setActiveIndex(index)}
                     onClick={() => {
-                      onChange(option.value);
-                      closeMenu();
+                      selectOption(option.value);
                     }}
                     className={clsx(
                       "flex w-full items-center rounded-xl px-3 py-2 text-left text-[11px] font-medium transition-colors",
