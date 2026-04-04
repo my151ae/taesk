@@ -21,6 +21,7 @@ export type ResolvedBlockTarget = {
   topLevelIndex: number | null;
   parentListPos: number | null;
   parentListNode: ProseMirrorNode | null;
+  parentListIndex: number | null;
   itemIndex: number | null;
 };
 
@@ -86,6 +87,17 @@ function createDefaultDoc(state: EditorState): ProseMirrorNode {
   return state.schema.nodeFromJSON(buildDefaultBodyContent());
 }
 
+function isSameTopLevelListType(
+  currentList: ProseMirrorNode | null,
+  adjacentNode: ProseMirrorNode | undefined,
+): adjacentNode is ProseMirrorNode {
+  return Boolean(
+    currentList &&
+    adjacentNode &&
+    adjacentNode.type.name === currentList.type.name,
+  );
+}
+
 export function canMoveBlock(
   state: EditorState,
   target: ResolvedBlockTarget,
@@ -95,7 +107,17 @@ export function canMoveBlock(
 
   if (target.parentListNode && target.itemIndex != null) {
     const nextIndex = target.itemIndex + delta;
-    return nextIndex >= 0 && nextIndex < target.parentListNode.childCount;
+    if (nextIndex >= 0 && nextIndex < target.parentListNode.childCount) {
+      return true;
+    }
+
+    if (target.parentListIndex != null) {
+      const docChildren = getNodeChildren(state.doc);
+      const adjacentNode = docChildren[target.parentListIndex + delta];
+      return isSameTopLevelListType(target.parentListNode, adjacentNode);
+    }
+
+    return false;
   }
 
   if (target.topLevelIndex != null) {
@@ -234,16 +256,75 @@ export function buildMoveBlockTransaction(
   if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
     const children = getNodeChildren(target.parentListNode);
     const nextIndex = target.itemIndex + delta;
-    const nextChildren = [...children];
-    const [movedChild] = nextChildren.splice(target.itemIndex, 1);
-    nextChildren.splice(nextIndex, 0, movedChild);
+    const [movedChild] = children.slice(target.itemIndex, target.itemIndex + 1);
+    if (!movedChild) {
+      return null;
+    }
 
-    const tr = state.tr.replaceWith(
-      target.parentListPos,
-      target.parentListPos + target.parentListNode.nodeSize,
-      target.parentListNode.copy(Fragment.fromArray(nextChildren)),
-    );
-    const selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, nextIndex) + 2;
+    if (nextIndex >= 0 && nextIndex < children.length) {
+      const nextChildren = [...children];
+      nextChildren.splice(target.itemIndex, 1);
+      nextChildren.splice(nextIndex, 0, movedChild);
+
+      const tr = state.tr.replaceWith(
+        target.parentListPos,
+        target.parentListPos + target.parentListNode.nodeSize,
+        target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+      );
+      const selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, nextIndex) + 2;
+      return setSelectionForAction(tr, selectionPos, 1);
+    }
+
+    if (target.parentListIndex == null) {
+      return null;
+    }
+
+    const docChildren = getNodeChildren(state.doc);
+    const adjacentListIndex = target.parentListIndex + delta;
+    const adjacentListNode = docChildren[adjacentListIndex];
+    if (!isSameTopLevelListType(target.parentListNode, adjacentListNode)) {
+      return null;
+    }
+
+    const remainingChildren = children.filter((_, index) => index !== target.itemIndex);
+    const adjacentChildren = getNodeChildren(adjacentListNode);
+    const mergedAdjacentChildren =
+      direction === "up"
+        ? [...adjacentChildren, movedChild]
+        : [movedChild, ...adjacentChildren];
+    const mergedAdjacentNode = adjacentListNode.copy(Fragment.fromArray(mergedAdjacentChildren));
+
+    let nextDocChildren: ProseMirrorNode[];
+    let movedListIndex: number;
+    let movedItemIndex: number;
+
+    if (direction === "up") {
+      nextDocChildren = [
+        ...docChildren.slice(0, adjacentListIndex),
+        mergedAdjacentNode,
+        ...(remainingChildren.length > 0
+          ? [target.parentListNode.copy(Fragment.fromArray(remainingChildren))]
+          : []),
+        ...docChildren.slice(target.parentListIndex + 1),
+      ];
+      movedListIndex = adjacentListIndex;
+      movedItemIndex = adjacentChildren.length;
+    } else {
+      nextDocChildren = [
+        ...docChildren.slice(0, target.parentListIndex),
+        ...(remainingChildren.length > 0
+          ? [target.parentListNode.copy(Fragment.fromArray(remainingChildren))]
+          : []),
+        mergedAdjacentNode,
+        ...docChildren.slice(adjacentListIndex + 1),
+      ];
+      movedListIndex = remainingChildren.length > 0 ? target.parentListIndex + 1 : target.parentListIndex;
+      movedItemIndex = 0;
+    }
+
+    const tr = state.tr.replaceWith(0, state.doc.content.size, Fragment.fromArray(nextDocChildren));
+    const selectionPos =
+      getTopLevelOffset(nextDocChildren, movedListIndex) + getTopLevelOffset(mergedAdjacentChildren, movedItemIndex) + 2;
     return setSelectionForAction(tr, selectionPos, 1);
   }
 

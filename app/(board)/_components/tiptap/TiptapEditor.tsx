@@ -66,6 +66,11 @@ type RenderableBlockActionTarget = {
     rect: DOMRect | null;
 };
 
+type ActiveBlockMenuTarget = {
+    renderTarget: RenderableBlockActionTarget;
+    resolvedTarget: ResolvedBlockTarget;
+};
+
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -103,7 +108,7 @@ export default function TiptapEditor({
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const [menuTarget, setMenuTarget] = useState<RenderableBlockActionTarget | null>(null);
+    const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
@@ -274,6 +279,7 @@ export default function TiptapEditor({
                         topLevelIndex: $pos.index(depth - 2),
                         parentListPos: null,
                         parentListNode: null,
+                        parentListIndex: null,
                         itemIndex: null,
                     };
                 }
@@ -289,6 +295,7 @@ export default function TiptapEditor({
                     topLevelIndex: $pos.index(depth - 1),
                     parentListPos: null,
                     parentListNode: null,
+                    parentListIndex: null,
                     itemIndex: null,
                 };
             }
@@ -308,6 +315,7 @@ export default function TiptapEditor({
                         topLevelIndex: null,
                         parentListPos: $pos.before(depth - 1),
                         parentListNode: parentList,
+                        parentListIndex: $pos.index(depth - 2),
                         itemIndex: $pos.index(depth - 1),
                     };
                 }
@@ -323,6 +331,7 @@ export default function TiptapEditor({
                     topLevelIndex: $pos.index(0),
                     parentListPos: null,
                     parentListNode: null,
+                    parentListIndex: null,
                     itemIndex: null,
                 };
             }
@@ -365,6 +374,32 @@ export default function TiptapEditor({
             rect,
         };
     }, [getBlockTargetRect, resolveBlockTargetAtPos]);
+
+    const resolveRenderableBlockTarget = useCallback((state: EditorState, target: RenderableBlockActionTarget | null): ResolvedBlockTarget | null => {
+        if (!target) return null;
+
+        const candidates = Array.from(new Set([
+            target.pos,
+            Math.min(target.blockPos + 1, state.doc.content.size),
+            target.blockPos,
+        ]));
+
+        for (const candidatePos of candidates) {
+            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
+            if (resolvedTarget && resolvedTarget.nodeType === target.nodeType) {
+                return resolvedTarget;
+            }
+        }
+
+        for (const candidatePos of candidates) {
+            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
+            if (resolvedTarget) {
+                return resolvedTarget;
+            }
+        }
+
+        return null;
+    }, [resolveBlockTargetAtPos]);
 
     const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
         if (isUpdatingRef.current) return;
@@ -1090,24 +1125,19 @@ export default function TiptapEditor({
     }
 
     const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
-    const resolvedMenuTarget = menuTarget ? resolveBlockTargetAtPos(editor.state, menuTarget.pos) : null;
+    const resolvedMenuTarget = menuTarget?.resolvedTarget ?? null;
     const menuItems = menuTarget
-        ? getBlockActionItems(menuTarget.nodeType, {
+        ? getBlockActionItems(menuTarget.renderTarget.nodeType, {
             canMoveUp: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'up') : false,
             canMoveDown: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'down') : false,
         })
         : [];
 
-    const menuAnchor = (() => {
-        if (!editor || !menuTarget) return null;
-        return getBlockTargetAtPos(editor.view, editor.state, menuTarget.pos);
-    })();
-
-    const menuTop = menuAnchor?.rect && rootRect ? Math.max(menuAnchor.rect.top - rootRect.top, 4) : 0;
+    const menuTop = menuTarget?.renderTarget.rect && rootRect ? Math.max(menuTarget.renderTarget.rect.top - rootRect.top, 4) : 0;
     const menuLeft = 44;
 
     const handleBlockAction = (action: BlockActionType) => {
-        if (!menuTarget) return;
+        if (!menuTarget || !resolvedMenuTarget) return;
         if (typeof window !== 'undefined') {
             (window as typeof window & {
                 __TAESK_LAST_BLOCK_ACTION__?: {
@@ -1119,37 +1149,61 @@ export default function TiptapEditor({
                 };
             }).__TAESK_LAST_BLOCK_ACTION__ = {
                 action,
-                menuTargetPos: menuTarget.pos,
-                menuTargetNodeType: menuTarget.nodeType,
+                menuTargetPos: resolvedMenuTarget.pos,
+                menuTargetNodeType: menuTarget.renderTarget.nodeType,
                 resolvedTargetPos: resolvedMenuTarget?.pos ?? null,
                 resolvedNodeType: resolvedMenuTarget?.nodeType ?? null,
             };
         }
         switch (action) {
-            case 'move-up':
-                moveBlock(menuTarget.pos, 'up');
+            case 'move-up': {
+                const transaction = buildMoveBlockTransaction(editor.state, resolvedMenuTarget, 'up');
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'move-down':
-                moveBlock(menuTarget.pos, 'down');
+            }
+            case 'move-down': {
+                const transaction = buildMoveBlockTransaction(editor.state, resolvedMenuTarget, 'down');
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'insert-above':
-                insertParagraphBeforeBlock(menuTarget.pos);
+            }
+            case 'insert-above': {
+                const transaction = buildInsertParagraphBeforeBlockTransaction(editor.state, resolvedMenuTarget);
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'insert-below':
-                insertParagraphAfterBlock(menuTarget.pos);
+            }
+            case 'insert-below': {
+                const transaction = buildInsertParagraphAfterBlockTransaction(editor.state, resolvedMenuTarget);
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'duplicate':
-                duplicateBlock(menuTarget.pos);
+            }
+            case 'duplicate': {
+                const transaction = buildDuplicateBlockTransaction(editor.state, resolvedMenuTarget);
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'delete':
-                deleteBlock(menuTarget.pos);
+            }
+            case 'delete': {
+                const transaction = buildDeleteBlockTransaction(editor.state, resolvedMenuTarget);
+                applyBlockActionTransaction(editor, transaction);
                 break;
-            case 'toggle-details':
-                toggleBlockAsDetails(menuTarget.pos);
+            }
+            case 'toggle-details': {
+                const selection = createToggleDetailsSelection(editor.state, resolvedMenuTarget);
+                if (!selection) break;
+                editor.view.dispatch(editor.state.tr.setSelection(selection));
+                insertDetailsAtSelection(editor);
+                editor.view.focus();
+                closeBlockMenu();
                 break;
-            case 'unset-details':
-                unsetDetailsAtTarget(menuTarget.pos);
+            }
+            case 'unset-details': {
+                const selection = createUnsetDetailsSelection(editor.state, resolvedMenuTarget);
+                if (!selection) break;
+                editor.view.dispatch(editor.state.tr.setSelection(selection));
+                unsetActiveDetails(editor);
+                editor.view.focus();
+                closeBlockMenu();
                 break;
+            }
         }
         closeBlockMenu();
     };
@@ -1189,7 +1243,12 @@ export default function TiptapEditor({
                         onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            setMenuTarget(target);
+                            const resolvedTarget = resolveRenderableBlockTarget(editor.state, target);
+                            if (!resolvedTarget) return;
+                            setMenuTarget({
+                                renderTarget: target,
+                                resolvedTarget,
+                            });
                             setIsMenuOpen(true);
                         }}
                     >
@@ -1198,7 +1257,7 @@ export default function TiptapEditor({
                 );
             })}
             <EditorContent editor={editor} />
-            {isMenuOpen && menuTarget && menuAnchor?.rect && rootRect ? (
+            {isMenuOpen && menuTarget?.renderTarget.rect && rootRect ? (
                 <BlockActionMenu
                     top={menuTop}
                     left={menuLeft}

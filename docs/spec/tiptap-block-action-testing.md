@@ -47,6 +47,8 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 ### `move-up` / `move-down`
 
 - top-level block も doc 直下 list item も、target 特定後は **children 配列の並べ替え + `replaceWith(...)`** で安定する。
+- 子 `taskList` / `bulletList` / `orderedList` を持つ top-level 親 `taskItem` / `listItem` も、subtree を保持したまま同一 list 内で reorder される前提で検証する。
+- target boundary も合わせて固定する。親 item には handle が 1 件出る一方、nested child item には handle を出さない。
 - shortcut 実行は menu debug を経由しないため、保存 JSON の並び順と autosave 経路で確認する。
 
 ## 推奨テスト方針
@@ -62,7 +64,7 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 
 ```bash
 PW_WORKERS=1 npx playwright test e2e/timeline.spec.ts \
-  --grep "supports block actions|updates top-level paragraphs|duplicates heading|disabled move|move paragraph|move details|move list item|shortcut move|supported top-level blocks|pressing Escape closes block menu" \
+  --grep "supports block actions|updates top-level paragraphs|duplicates heading|disabled move|move paragraph|move details|move list item|move nested task parent|shortcut move|shortcut move nested task parent|supported top-level blocks|pressing Escape closes block menu" \
   --reporter=json > test-results/playwright-block-actions.json
 ```
 

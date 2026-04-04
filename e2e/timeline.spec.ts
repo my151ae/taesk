@@ -6038,6 +6038,405 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('moves top-level task item with nested task list up within the same list', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action move nested task parent',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First parent task' }] }],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Second parent task' }] },
+                  {
+                    type: 'taskList',
+                    content: [
+                      {
+                        type: 'taskItem',
+                        attrs: { checked: false },
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested child task' }] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: '[ ] First parent task\n[x] Second parent task\n  [ ] Nested child task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1887,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:40:00',
+      due_end: '14:40:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5034,
+      slug: 'block-action-move-nested-task-parent',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const taskItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
+      await expect(taskItemHandles).toHaveCount(2);
+
+      const topTaskItems = modal.locator('.ProseMirror > ul[data-type="taskList"] > li');
+      await expect(topTaskItems).toHaveCount(2);
+      const secondTopTaskItem = topTaskItems.nth(1);
+      const nestedTaskItems = secondTopTaskItem.locator(':scope > div > ul[data-type="taskList"] > li');
+      await expect(nestedTaskItems).toHaveCount(1);
+
+      const nestedTaskHandle = nestedTaskItems
+        .locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
+      await expect(nestedTaskHandle).toHaveCount(0);
+
+      await openBlockActionMenu(page, modal, taskItemHandles.nth(1), 'move-up');
+      await expect(modal.getByTestId('tiptap-block-menu-move-down')).toHaveAttribute('aria-disabled', 'true');
+      await triggerBlockAction(page, modal, taskItemHandles.nth(1), 'move-up', 'move-up');
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as {
+            content?: Array<{
+              type?: string;
+              content?: Array<{
+                attrs?: { checked?: boolean };
+                content?: Array<{
+                  type?: string;
+                  content?: Array<{
+                    attrs?: { checked?: boolean };
+                    content?: Array<{ content?: Array<{ text?: string }> }>;
+                  }>;
+                } | { content?: Array<{ text?: string }> }>;
+              }>;
+            }>;
+          } | null;
+          const listNode = Array.isArray(content?.content) ? content.content[0] : null;
+          const itemTexts = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => item?.content?.[0]?.content?.[0]?.text ?? null)
+            : [];
+          const checkedStates = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => item?.attrs?.checked ?? null)
+            : [];
+          const nestedTexts = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => {
+                const nestedList = item?.content?.find((child) => child?.type === 'taskList');
+                return Array.isArray(nestedList?.content)
+                  ? nestedList.content.map((nestedItem) => nestedItem?.content?.[0]?.content?.[0]?.text ?? null)
+                  : [];
+              })
+            : [];
+          return { itemTexts, checkedStates, nestedTexts };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          itemTexts: ['Second parent task', 'First parent task'],
+          checkedStates: [true, false],
+          nestedTexts: [['Nested child task'], []],
+        });
+
+      const reorderedTaskItems = modal.locator('.ProseMirror > ul[data-type="taskList"] > li');
+      await expect(reorderedTaskItems.first().locator(':scope > div > p').first()).toHaveText('Second parent task');
+      await expect(
+        reorderedTaskItems.first().locator(':scope > div > ul[data-type="taskList"] > li > div > p').first(),
+      ).toHaveText('Nested child task');
+      await expect(
+        reorderedTaskItems
+          .first()
+          .locator(':scope > div > ul[data-type="taskList"] > li [data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]'),
+      ).toHaveCount(0);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('enables both move directions for a middle top-level task item with nested task list', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action nested task middle move availability',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First sibling task' }] }],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Middle parent task' }] },
+                  {
+                    type: 'taskList',
+                    content: [
+                      {
+                        type: 'taskItem',
+                        attrs: { checked: false },
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested middle child' }] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Last sibling task' }] }],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: '[ ] First sibling task\n[ ] Middle parent task\n  [ ] Nested middle child\n[ ] Last sibling task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1884,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:10:00',
+      due_end: '14:10:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5031,
+      slug: 'block-action-nested-task-middle-move-availability',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const taskItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
+      await expect(taskItemHandles).toHaveCount(3);
+
+      await openBlockActionMenu(page, modal, taskItemHandles.nth(1), 'move-up');
+      await expect(modal.getByTestId('tiptap-block-menu-move-up')).not.toHaveAttribute('aria-disabled', 'true');
+      await expect(modal.getByTestId('tiptap-block-menu-move-down')).not.toHaveAttribute('aria-disabled', 'true');
+      await page.keyboard.press('Escape');
+      await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('enables move for nested parent task across adjacent top-level task lists', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action adjacent top-level task lists',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First isolated task' }] }],
+              },
+            ],
+          },
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Middle isolated parent' }] },
+                  {
+                    type: 'taskList',
+                    content: [
+                      {
+                        type: 'taskItem',
+                        attrs: { checked: false },
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested isolated child' }] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Last isolated task' }] }],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: '[ ] First isolated task\n[ ] Middle isolated parent\n  [ ] Nested isolated child\n[ ] Last isolated task',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1883,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:00:00',
+      due_end: '14:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5030,
+      slug: 'block-action-adjacent-top-level-task-lists',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const taskItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
+      await expect(taskItemHandles).toHaveCount(3);
+
+      await openBlockActionMenu(page, modal, taskItemHandles.nth(1), 'move-up');
+      await expect(modal.getByTestId('tiptap-block-menu-move-up')).not.toHaveAttribute('aria-disabled', 'true');
+      await expect(modal.getByTestId('tiptap-block-menu-move-down')).not.toHaveAttribute('aria-disabled', 'true');
+      await modal.getByTestId('tiptap-block-menu-move-up').click();
+      await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as {
+            content?: Array<{
+              type?: string;
+              content?: Array<{
+                content?: Array<{
+                  type?: string;
+                  content?: Array<{
+                    content?: Array<{ text?: string }>;
+                  }>;
+                } | { content?: Array<{ text?: string }> }>;
+              }>;
+            }>;
+          } | null;
+          const topLevelNodes = Array.isArray(content?.content) ? content.content : [];
+          const taskLists = topLevelNodes.filter((node) => node?.type === 'taskList');
+          const listTaskTexts = taskLists.map((listNode) =>
+            Array.isArray(listNode?.content)
+              ? listNode.content.map((item) => item?.content?.[0]?.content?.[0]?.text ?? null)
+              : [],
+          );
+          const nestedTexts = taskLists.map((listNode) =>
+            Array.isArray(listNode?.content)
+              ? listNode.content.map((item) => {
+                  const nestedList = item?.content?.find((child) => child?.type === 'taskList');
+                  return Array.isArray(nestedList?.content)
+                    ? nestedList.content.map((nestedItem) => nestedItem?.content?.[0]?.content?.[0]?.text ?? null)
+                    : [];
+                })
+              : [],
+          );
+          return { listTaskTexts, nestedTexts };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          listTaskTexts: [
+            ['First isolated task', 'Middle isolated parent'],
+            ['Last isolated task'],
+          ],
+          nestedTexts: [
+            [[], ['Nested isolated child']],
+            [[]],
+          ],
+        });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('moves heading with Mod-Shift-ArrowUp shortcut', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
@@ -6110,6 +6509,131 @@ test.describe('@feature:timeline Timeline view', () => {
         .toMatchObject({
           firstTwoTypes: ['heading', 'paragraph'],
           firstText: 'Shortcut heading',
+        });
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('moves top-level task item with nested task list with shortcut', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+Shift+ArrowUp' : 'Control+Shift+ArrowUp';
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Block action shortcut move nested task parent',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'First shortcut parent' }] }],
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'Second shortcut parent' }] },
+                  {
+                    type: 'taskList',
+                    content: [
+                      {
+                        type: 'taskItem',
+                        attrs: { checked: false },
+                        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested shortcut child' }] }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      excerpt: '[ ] First shortcut parent\n[x] Second shortcut parent\n  [ ] Nested shortcut child',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1886,
+      tags: [],
+      due_date: isoDay,
+      due_start: '13:30:00',
+      due_end: '14:30:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5033,
+      slug: 'block-action-shortcut-move-nested-task-parent',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      await modal.locator('.ProseMirror > ul[data-type="taskList"] > li:nth-child(2) > div > p').click();
+      await page.keyboard.press(moveUpShortcut);
+
+      await expect
+        .poll(async () => {
+          const nextCard = await fetchSavedCard(cardId);
+          const content = nextCard?.content as {
+            content?: Array<{
+              content?: Array<{
+                attrs?: { checked?: boolean };
+                content?: Array<{
+                  type?: string;
+                  content?: Array<{
+                    content?: Array<{ content?: Array<{ text?: string }> }>;
+                  }>;
+                } | { content?: Array<{ text?: string }> }>;
+              }>;
+            }>;
+          } | null;
+          const listNode = Array.isArray(content?.content) ? content.content[0] : null;
+          const itemTexts = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => item?.content?.[0]?.content?.[0]?.text ?? null)
+            : [];
+          const checkedStates = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => item?.attrs?.checked ?? null)
+            : [];
+          const nestedTexts = Array.isArray(listNode?.content)
+            ? listNode.content.map((item) => {
+                const nestedList = item?.content?.find((child) => child?.type === 'taskList');
+                return Array.isArray(nestedList?.content)
+                  ? nestedList.content.map((nestedItem) => nestedItem?.content?.[0]?.content?.[0]?.text ?? null)
+                  : [];
+              })
+            : [];
+          return { itemTexts, checkedStates, nestedTexts };
+        }, { timeout: 20000, intervals: [500, 1000, 2000] })
+        .toMatchObject({
+          itemTexts: ['Second shortcut parent', 'First shortcut parent'],
+          checkedStates: [true, false],
+          nestedTexts: [['Nested shortcut child'], []],
         });
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
