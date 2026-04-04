@@ -11,6 +11,8 @@ import {
 } from './TimelineCard';
 
 const DROP_ZONE_MARGIN_PX = 12;
+const resolveBucketShortcutSection = (bucketKey: string): 'a' | 'b' =>
+    bucketKey.endsWith('_a') ? 'a' : 'b';
 
 type TimelineBucketCardProps = {
     item: TimelineBucketItem;
@@ -131,6 +133,7 @@ export const TimelineBucketCard = ({
                         scope: 'board',
                         region: 'main-panel',
                         view: 'timeline',
+                        section: resolveBucketShortcutSection(bucketKey),
                         part: 'card',
                     }}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}

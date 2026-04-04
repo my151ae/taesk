@@ -16,6 +16,7 @@ import {
     getMinutesFromTime,
 } from '@/app/(board)/_utils/timeline-helpers';
 import type { BucketIndicator } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
+import type { ShortcutSection } from '@/app/(board)/_components/timeline/shortcut-bar-registry';
 
 type TimelineDayBucketProps = {
     day: TimelineDay;
@@ -124,6 +125,8 @@ function bucketSectionFrameClass(section: ActiveBucketSection, isOver = false) {
         isOver ? 'border-sky-200 bg-sky-50/60' : ''
     );
 }
+
+const resolveShortcutSection = (section: ActiveBucketSection): ShortcutSection => section;
 
 function compareNullableNumber(a: number | null | undefined, b: number | null | undefined) {
     const left = a ?? Number.MAX_SAFE_INTEGER;
@@ -443,6 +446,7 @@ function StaticTimelineRow({
                     scope: 'board',
                     region: 'main-panel',
                     view: 'timeline',
+                    section: 'completed',
                     part: 'card',
                 }}
                 onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
@@ -898,6 +902,14 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         const isDisabled = section === 'completed' ? count === 0 : false;
         const lineClass = section === 'completed' ? 'border-b' : 'border-b border-dashed';
 
+        const shortcutAttributes = buildShortcutDataAttributes({
+            scope: 'board',
+            region: 'main-panel',
+            view: 'timeline',
+            section: resolveShortcutSection(section),
+            part: 'section-button',
+        });
+
         return (
             <button
                 ref={(node) => setHeaderRef(section, node)}
@@ -908,6 +920,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 data-focus-part="section-button"
                 disabled={isDisabled}
                 onClick={() => handlePriorityPress(section)}
+                {...shortcutAttributes}
                 className={clsx(
                     'flex min-h-8 w-full min-w-0 select-none items-center justify-between gap-3 px-2 py-1 text-left transition-colors duration-150',
                     lineClass,

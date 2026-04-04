@@ -2,9 +2,9 @@
 
 export type ShortcutScope = "board" | "modal" | "context-menu";
 export type ShortcutRegion = "sidebar" | "main-panel" | "modal-title" | "modal-body" | "shortcuts-modal";
-export type ShortcutSection = "overdue" | "search";
+export type ShortcutSection = "overdue" | "search" | "a" | "b" | "completed";
 export type ShortcutView = "timeline" | "list";
-export type ShortcutPart = "card" | "checkbox" | "title" | "editor" | "add-button";
+export type ShortcutPart = "card" | "checkbox" | "title" | "editor" | "add-button" | "section-button";
 export type ShortcutState = "active" | "editing" | "readonly" | "dragging" | "menu-open";
 export type LegacyShortcutContext = "timeline-card" | "cardmodal-title" | "cardmodal-editor";
 export type ShortcutCapabilities = {
@@ -89,6 +89,9 @@ const REGION_ORDER: Record<ShortcutRegion, number> = {
 const SECTION_ORDER: Record<ShortcutSection, number> = {
   overdue: 1,
   search: 2,
+  a: 3,
+  b: 4,
+  completed: 5,
 };
 
 const VIEW_ORDER: Record<ShortcutView, number> = {
@@ -102,6 +105,7 @@ const PART_ORDER: Record<ShortcutPart, number> = {
   title: 3,
   editor: 4,
   "add-button": 5,
+  "section-button": 6,
 };
 
 const SCOPE_LABELS: Record<ShortcutScope, string> = {
@@ -121,6 +125,9 @@ const REGION_LABELS: Record<ShortcutRegion, string> = {
 const SECTION_LABELS: Record<ShortcutSection, string> = {
   overdue: "Overdue",
   search: "Search",
+  a: "A",
+  b: "B",
+  completed: "Completed",
 };
 
 const VIEW_LABELS: Record<ShortcutView, string> = {
@@ -134,6 +141,7 @@ const PART_LABELS: Record<ShortcutPart, string> = {
   title: "Title",
   editor: "Editor",
   "add-button": "Add button",
+  "section-button": "Section button",
 };
 
 const LEGACY_CONTEXT_ALIASES: Record<LegacyShortcutContext, ShortcutContextDescriptor> = {
@@ -219,6 +227,19 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     label: "完了",
     priorityBand: 1,
     displayOrder: 20,
+    visibleWhen: ({ state, descriptor }) => state === "active" && descriptor.section !== "completed",
+  },
+  {
+    id: "board-main-timeline-reopen-completed",
+    scope: "board",
+    regions: ["main-panel"],
+    views: ["timeline"],
+    sections: ["completed"],
+    parts: ["card"],
+    keys: ["Space"],
+    label: "未完了",
+    priorityBand: 1,
+    displayOrder: 19,
     visibleWhen: ACTIVE_ONLY,
   },
   {
@@ -280,6 +301,32 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     label: "メニュー",
     priorityBand: 1,
     displayOrder: 26,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "board-main-timeline-section-prioritize-enter",
+    scope: "board",
+    regions: ["main-panel"],
+    views: ["timeline"],
+    sections: ["a", "b", "completed"],
+    parts: ["section-button"],
+    keys: ["Enter"],
+    label: "優先表示",
+    priorityBand: 1,
+    displayOrder: 9,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "board-main-timeline-section-prioritize-space",
+    scope: "board",
+    regions: ["main-panel"],
+    views: ["timeline"],
+    sections: ["a", "b", "completed"],
+    parts: ["section-button"],
+    keys: ["Space"],
+    label: "優先表示",
+    priorityBand: 1,
+    displayOrder: 29,
     visibleWhen: ACTIVE_ONLY,
   },
   {
@@ -726,7 +773,7 @@ function readRegion(value: string | null): ShortcutRegion | null {
 }
 
 function readSection(value: string | null): ShortcutSection | null {
-  return value === "overdue" || value === "search" ? value : null;
+  return value === "overdue" || value === "search" || value === "a" || value === "b" || value === "completed" ? value : null;
 }
 
 function readView(value: string | null): ShortcutView | null {
@@ -734,7 +781,7 @@ function readView(value: string | null): ShortcutView | null {
 }
 
 function readPart(value: string | null): ShortcutPart | null {
-  return value === "card" || value === "checkbox" || value === "title" || value === "editor" || value === "add-button" ? value : null;
+  return value === "card" || value === "checkbox" || value === "title" || value === "editor" || value === "add-button" || value === "section-button" ? value : null;
 }
 
 function readLegacyContext(value: string | null): LegacyShortcutContext | null {
