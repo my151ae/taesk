@@ -4726,6 +4726,74 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('deletes an empty leading paragraph before moving focus to title end on Backspace', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Backspace empty paragraph baseline',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph' },
+          { type: 'paragraph', content: [{ type: 'text', text: 'remaining body line' }] },
+        ],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1893,
+      tags: [],
+      due_date: isoDay,
+      due_start: '14:46:00',
+      due_end: '15:46:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 50376,
+      slug: 'backspace-empty-paragraph-baseline',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      const firstParagraph = modal.locator('.ProseMirror > p').nth(0);
+
+      await expect(modal.locator('.ProseMirror > p')).toHaveCount(2);
+      await firstParagraph.click({ position: { x: 4, y: 8 } });
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Backspace');
+
+      await expect(titleInput).toBeFocused();
+      await expect(modal.locator('.ProseMirror > p')).toHaveCount(1);
+      await expect(modal.locator('.ProseMirror > p').nth(0)).toContainText('remaining body line');
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
   test('shows context-aware shortcut bars for timeline cards and card modal regions', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

@@ -609,6 +609,18 @@ export default function TiptapEditor({
 
                 if (event.key === 'Backspace') {
                     if (isSelectionInFirstTextLineState(view, state) && state.selection.$from.parentOffset === 0 && onRequestFocusTitle) {
+                        const target = resolveBlockTargetAtPos(state, state.selection.from);
+                        const isEmptyLeadingParagraph =
+                            target?.nodeType === 'paragraph' &&
+                            target.topLevelIndex === 0 &&
+                            target.parentListNode == null &&
+                            state.selection.$from.parent.textContent.length === 0;
+
+                        if (isEmptyLeadingParagraph) {
+                            const transaction = buildDeleteBlockTransaction(state, target);
+                            applyBlockActionTransactionToView(view, transaction);
+                        }
+
                         event.preventDefault();
                         event.stopPropagation();
                         onRequestFocusTitle({ mode: 'end' });

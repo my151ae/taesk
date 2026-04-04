@@ -307,7 +307,7 @@ taesk/
    Playwright は常に `--reporter=json` で実行し、`test-results/batches/*.json` をチケットへ添付。HTML レポートは `npx playwright show-report --port=0` で必要時のみ起動し、プロセスを残さない。
 
 7. **CardModal Boundary Has Explicit Title Body Bridge Rules**  
-   CardModal のタイトル入力欄と本文エディタの間では、`ArrowDown` / `ArrowRight` / `ArrowUp` / `ArrowLeft` のフォーカス移動を持つ。タイトル欄の通常の `Enter` は本文1行目へ標準 paragraph を追加して本文へ移し、本文先頭行頭の `Backspace` は本文を変更せずタイトル末尾へ戻す。IME 確定中の `Enter` は移動しない。
+   CardModal のタイトル入力欄と本文エディタの間では、`ArrowDown` / `ArrowRight` / `ArrowUp` / `ArrowLeft` のフォーカス移動を持つ。タイトル欄の通常の `Enter` は本文1行目へ標準 paragraph を追加して本文へ移し、本文先頭行頭の `Backspace` は空の top-level paragraph だけ削除してタイトル末尾へ戻す。その他の先頭行では本文を変更せずタイトル末尾へ戻す。IME 確定中の `Enter` は移動しない。
 
 8. **Shortcut Taxonomy Is Layer-First**  
    shortcut の分類は `scope / region / section / view / part / state` を正本とし、`scope` は `board | modal | context-menu` のレイヤー専用に固定する。`ShortcutsModal` は独立 scope ではなく `scope=modal, region=shortcuts-modal` として扱う。
