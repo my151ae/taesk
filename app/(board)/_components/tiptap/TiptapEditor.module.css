@@ -8,6 +8,7 @@
     position: relative;
     --taesk-marker-gutter: 1.25rem;
     --taesk-marker-gap: 0.5rem;
+    --taesk-body-line-box: calc(1.5em + 2px);
 }
 
 .blockActionHandle {
@@ -120,7 +121,7 @@
     justify-content: center;
     width: var(--taesk-marker-gutter);
     min-width: var(--taesk-marker-gutter);
-    transform: translateY(0.1em);
+    min-height: var(--taesk-body-line-box);
     user-select: none;
     cursor: pointer;
 }
@@ -291,13 +292,14 @@
     justify-content: center;
     width: var(--taesk-marker-gutter);
     min-width: var(--taesk-marker-gutter);
+    min-height: var(--taesk-body-line-box);
     color: #64748b;
+    line-height: 1;
 }
 
 .editor :global(.ProseMirror ul:not([data-type="taskList"]) > li)::before {
     content: "•";
     font-size: 0.9rem;
-    line-height: 1.5;
 }
 
 .editor :global(.ProseMirror ol > li) {
@@ -307,7 +309,6 @@
 .editor :global(.ProseMirror ol > li)::before {
     content: counter(taesk-ordered-list) ".";
     font-size: 0.95rem;
-    line-height: 1.5;
 }
 
 .editor :global(.ProseMirror ul:not([data-type="taskList"]) > li > p),
