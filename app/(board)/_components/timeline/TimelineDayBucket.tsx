@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import type { BucketCreateRequest } from './bucket-create-request';
+import { buildShortcutDataAttributes } from '@/app/(board)/_components/timeline/shortcut-bar-registry';
 import { TimelineBucketCard } from './TimelineBucketCard';
 import {
     TimelineCard,
@@ -734,6 +735,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
     const renderBucketAddSlot = ({
         isOver,
+        bucketKey,
+        afterCardId,
         onClick,
         testId,
         sticky = false,
@@ -741,45 +744,71 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         showDropLine = false,
     }: {
         isOver: boolean;
+        bucketKey: string;
+        afterCardId?: string;
         onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
         testId: string;
         sticky?: boolean;
         revealClassName?: string;
         showDropLine?: boolean;
-    }) => (
-        <div
-            className={clsx(
-                'pointer-events-none relative mx-[1px] h-0 shrink-0',
-                sticky ? 'sticky top-0 z-10' : 'z-10'
-            )}
-        >
-            {showDropLine && isOver ? (
-                <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 top-0 h-0.5 -translate-y-1/2 bg-sky-400"
-                />
-            ) : null}
-            <button
-                type="button"
-                disabled={status === 'loading' || !onRequestCreateBucketCard}
-                tabIndex={-1}
-                data-arrow-skip="true"
-                onClick={onClick}
+    }) => {
+        const shortcutAttributes = buildShortcutDataAttributes({
+            scope: 'board',
+            region: 'main-panel',
+            view: 'timeline',
+            part: 'add-button',
+        });
+
+        return (
+            <div
                 className={clsx(
-                    'pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                    'scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300',
-                    !isOver && revealClassName,
-                    isOver
-                        ? 'border-sky-400 bg-sky-50 text-sky-700'
-                        : 'border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
+                    'pointer-events-none relative mx-[1px] h-0 shrink-0',
+                    sticky ? 'sticky top-0 z-10' : 'z-10'
                 )}
-                aria-label="Add card"
-                data-testid={testId}
             >
-                <span aria-hidden="true">＋</span>
-            </button>
-        </div>
-    );
+                {showDropLine && isOver ? (
+                    <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 top-0 h-0.5 -translate-y-1/2 bg-sky-400"
+                    />
+                ) : null}
+                <button
+                    type="button"
+                    disabled={status === 'loading' || !onRequestCreateBucketCard}
+                    tabIndex={-1}
+                    data-focus-group="bucket"
+                    data-focus-part="add-button"
+                    {...shortcutAttributes}
+                    onKeyDown={(e) => {
+                        if ((e.key !== ' ' && e.key !== 'Enter') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+                            return;
+                        }
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRequestCreateBucketCard?.({
+                            bucketKey,
+                            afterCardId,
+                            anchorRect: e.currentTarget.getBoundingClientRect(),
+                            focusElement: e.currentTarget,
+                        });
+                    }}
+                    onClick={onClick}
+                    className={clsx(
+                        'pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 select-none items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] caret-transparent transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                        'scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300',
+                        !isOver && revealClassName,
+                        isOver
+                            ? 'border-sky-400 bg-sky-50 text-sky-700'
+                            : 'border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
+                    )}
+                    aria-label="Add card"
+                    data-testid={testId}
+                >
+                    <span aria-hidden="true" className="select-none">＋</span>
+                </button>
+            </div>
+        );
+    };
 
     const renderCompactEmptyBucketDropZone = ({
         bucketKey,
@@ -787,43 +816,66 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     }: {
         bucketKey: string;
         isOver: boolean;
-    }) => (
-        <button
-            type="button"
-            disabled={status === 'loading' || !onRequestCreateBucketCard}
-            tabIndex={-1}
-            data-arrow-skip="true"
-            onClick={(e) => {
-                e.stopPropagation();
-                onRequestCreateBucketCard?.({
-                    bucketKey,
-                    clientX: e.clientX,
-                    clientY: e.clientY,
-                    anchorRect: e.currentTarget.getBoundingClientRect(),
-                });
-            }}
-            className={clsx(
-                'mx-2 flex h-8 w-[calc(100%-16px)] items-center justify-center rounded-md border border-dashed px-3 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                isOver
-                    ? 'border-sky-400 bg-sky-50 text-sky-700'
-                    : 'border-slate-300 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
-            )}
-            data-testid={`ab-compact-empty-dropzone-${bucketKey}`}
-        >
-            <span className="flex items-center gap-2 text-[10px] font-semibold">
-                <span
-                    aria-hidden="true"
-                    className={clsx(
-                        'inline-flex h-4 w-4 items-center justify-center rounded-full border bg-white text-[9px] leading-none',
-                        isOver ? 'border-sky-400 text-sky-700' : 'border-slate-300 text-slate-500'
-                    )}
-                >
-                    ＋
+    }) => {
+        const shortcutAttributes = buildShortcutDataAttributes({
+            scope: 'board',
+            region: 'main-panel',
+            view: 'timeline',
+            part: 'add-button',
+        });
+
+        return (
+            <button
+                type="button"
+                disabled={status === 'loading' || !onRequestCreateBucketCard}
+                tabIndex={-1}
+                data-focus-group="bucket"
+                data-focus-part="add-button"
+                {...shortcutAttributes}
+                onKeyDown={(e) => {
+                    if ((e.key !== ' ' && e.key !== 'Enter') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+                        return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRequestCreateBucketCard?.({
+                        bucketKey,
+                        anchorRect: e.currentTarget.getBoundingClientRect(),
+                        focusElement: e.currentTarget,
+                    });
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestCreateBucketCard?.({
+                        bucketKey,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        anchorRect: e.currentTarget.getBoundingClientRect(),
+                    });
+                }}
+                className={clsx(
+                    'mx-2 flex h-8 w-[calc(100%-16px)] items-center justify-center rounded-md border border-dashed px-3 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
+                    isOver
+                        ? 'border-sky-400 bg-sky-50 text-sky-700'
+                        : 'border-slate-300 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700'
+                )}
+                data-testid={`ab-compact-empty-dropzone-${bucketKey}`}
+            >
+                <span className="flex items-center gap-2 text-[10px] font-semibold">
+                    <span
+                        aria-hidden="true"
+                        className={clsx(
+                            'inline-flex h-4 w-4 items-center justify-center rounded-full border bg-white text-[9px] leading-none',
+                            isOver ? 'border-sky-400 text-sky-700' : 'border-slate-300 text-slate-500'
+                        )}
+                    >
+                        ＋
+                    </span>
+                    <span>Drop or add card</span>
                 </span>
-                <span>Drop or add card</span>
-            </span>
-        </button>
-    );
+            </button>
+        );
+    };
 
     const renderSectionHeader = ({
         label,
@@ -906,6 +958,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             {items.length > 0 && emptyStateVariant !== 'compact' ? (
                 renderBucketAddSlot({
                     isOver,
+                    bucketKey,
+                    afterCardId: undefined,
                     sticky: false,
                     testId: `ab-add-top-${bucketKey}`,
                     revealClassName:
@@ -953,6 +1007,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                         />
                         {renderBucketAddSlot({
                             isOver,
+                            bucketKey,
+                            afterCardId: item.card_id,
                             testId: `ab-add-after-${item.card_id}`,
                             revealClassName:
                                 'md:pointer-events-none md:opacity-0 md:group-hover/item:pointer-events-auto md:group-hover/item:opacity-100 md:group-focus-within/item:pointer-events-auto md:group-focus-within/item:opacity-100',

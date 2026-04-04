@@ -29,7 +29,6 @@ type TimelineEventItemProps = {
     timelineStartHour?: number;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     isContextMenuOpen: boolean;
-    onCreateNext?: () => void;
     hourHeight?: number;
     zIndex?: number;
     isActive?: boolean;
@@ -69,7 +68,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     timelineStartHour = 0,
     onCardContextMenu,
     isContextMenuOpen,
-    onCreateNext,
     hourHeight,
     zIndex,
     isActive = false,
@@ -176,7 +174,6 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     titleBackgroundClassName={tone.titleBackgroundClassName}
                     titleClassName={tone.titleClassName}
                     checkedVisualTone="timeline-dim"
-                    onCreateNext={onCreateNext}
                     isSelected={isSelected}
                     selectionLane={selectionLane}
                     onShiftSelect={onShiftSelect}

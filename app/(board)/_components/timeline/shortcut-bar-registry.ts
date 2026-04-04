@@ -4,7 +4,7 @@ export type ShortcutScope = "board" | "modal" | "context-menu";
 export type ShortcutRegion = "sidebar" | "main-panel" | "modal-title" | "modal-body" | "shortcuts-modal";
 export type ShortcutSection = "overdue" | "search";
 export type ShortcutView = "timeline" | "list";
-export type ShortcutPart = "card" | "checkbox" | "title" | "editor";
+export type ShortcutPart = "card" | "checkbox" | "title" | "editor" | "add-button";
 export type ShortcutState = "active" | "editing" | "readonly" | "dragging" | "menu-open";
 export type LegacyShortcutContext = "timeline-card" | "cardmodal-title" | "cardmodal-editor";
 export type ShortcutCapabilities = {
@@ -101,6 +101,7 @@ const PART_ORDER: Record<ShortcutPart, number> = {
   checkbox: 2,
   title: 3,
   editor: 4,
+  "add-button": 5,
 };
 
 const SCOPE_LABELS: Record<ShortcutScope, string> = {
@@ -132,6 +133,7 @@ const PART_LABELS: Record<ShortcutPart, string> = {
   checkbox: "Checkbox",
   title: "Title",
   editor: "Editor",
+  "add-button": "Add button",
 };
 
 const LEGACY_CONTEXT_ALIASES: Record<LegacyShortcutContext, ShortcutContextDescriptor> = {
@@ -220,19 +222,6 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     visibleWhen: ACTIVE_ONLY,
   },
   {
-    id: "board-main-timeline-create-next",
-    scope: "board",
-    regions: ["main-panel"],
-    views: ["timeline"],
-    parts: ["card"],
-    legacyContexts: ["timeline-card"],
-    keys: ["⇧", "Enter"],
-    label: "カード追加",
-    priorityBand: 2,
-    displayOrder: 30,
-    visibleWhen: ACTIVE_ONLY,
-  },
-  {
     id: "board-main-timeline-open-menu",
     scope: "board",
     regions: ["main-panel"],
@@ -267,6 +256,30 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     label: "完了",
     priorityBand: 1,
     displayOrder: 20,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "board-main-timeline-add-button-open-menu",
+    scope: "board",
+    regions: ["main-panel"],
+    views: ["timeline"],
+    parts: ["add-button"],
+    keys: ["Space"],
+    label: "メニュー",
+    priorityBand: 1,
+    displayOrder: 25,
+    visibleWhen: ACTIVE_ONLY,
+  },
+  {
+    id: "board-main-timeline-add-button-open-menu-enter",
+    scope: "board",
+    regions: ["main-panel"],
+    views: ["timeline"],
+    parts: ["add-button"],
+    keys: ["Enter"],
+    label: "メニュー",
+    priorityBand: 1,
+    displayOrder: 26,
     visibleWhen: ACTIVE_ONLY,
   },
   {
@@ -721,7 +734,7 @@ function readView(value: string | null): ShortcutView | null {
 }
 
 function readPart(value: string | null): ShortcutPart | null {
-  return value === "card" || value === "checkbox" || value === "title" || value === "editor" ? value : null;
+  return value === "card" || value === "checkbox" || value === "title" || value === "editor" || value === "add-button" ? value : null;
 }
 
 function readLegacyContext(value: string | null): LegacyShortcutContext | null {

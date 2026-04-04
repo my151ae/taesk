@@ -64,7 +64,6 @@ type TimelineCardProps = {
     /** 背景色のクラス（デフォルト: bg-white） */
     backgroundClass?: string;
     borderClassName?: string;
-    onCreateNext?: () => void;
     /** フォーカス復帰用のカードID */
     cardId?: string;
     /** タイトル部分に適用する追加のクラス */
@@ -125,7 +124,6 @@ export function TimelineCard({
     notePreviewLines = 2,
     backgroundClass = 'bg-white',
     borderClassName,
-    onCreateNext,
     cardId,
     titleClassName,
     titleBackgroundClassName,
@@ -400,16 +398,6 @@ export function TimelineCard({
             onFocus={handleFocus}
             onBlur={onBlur}
             onKeyDown={(event) => {
-                // Create next card: Shift+Enter
-                if (event.key === 'Enter' && event.shiftKey) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (onCreateNext) {
-                        onCreateNext();
-                    }
-                    return;
-                }
-
                 // Open card details: Enter
                 if (event.key === 'Enter') {
                     if (isEditingTitle) {

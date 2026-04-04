@@ -6,6 +6,7 @@ export type TimelineFocusCandidate = {
   order: number;
   centerX: number;
   centerY: number;
+  focusPart?: string;
 };
 
 const HORIZONTAL_THRESHOLD_PX = 10;
@@ -15,14 +16,14 @@ const ARROW_NAVIGABLE_FOCUS_GROUP_PARTS = {
   header: ["control"],
   toolbar: ["control"],
   timeline: ["card"],
-  bucket: ["card"],
+  bucket: ["section-button", "card", "add-button"],
   sidebar: ["rail-button"],
 } as const;
 const ARROW_NAVIGATION_SOURCE_PARTS = {
   header: ["control"],
   toolbar: ["control"],
   timeline: ["card"],
-  bucket: ["section-button", "card"],
+  bucket: ["section-button", "card", "add-button"],
   sidebar: ["rail-button"],
 } as const;
 type ArrowNavigableFocusGroup = keyof typeof ARROW_NAVIGABLE_FOCUS_GROUP_PARTS;
@@ -76,8 +77,12 @@ function buildPartsSelector(focusGroup: ArrowNavigableFocusGroup, parts: readonl
 }
 
 function buildCrossGroupCardSelector() {
-  return (Object.keys(ARROW_NAVIGABLE_FOCUS_GROUP_PARTS) as ArrowNavigableFocusGroup[])
-    .map((focusGroup) => `[data-focus-group="${focusGroup}"][data-focus-part="card"]`)
+  return [
+    '[data-focus-group="timeline"][data-focus-part="card"]',
+    '[data-focus-group="bucket"][data-focus-part="card"]',
+    '[data-focus-group="bucket"][data-focus-part="add-button"]',
+    '[data-focus-group="sidebar"][data-focus-part="rail-button"]',
+  ]
     .join(", ");
 }
 
@@ -89,7 +94,24 @@ function buildCrossGroupVerticalSelector() {
     '[data-focus-group="timeline"][data-focus-part="card"]',
     '[data-focus-group="bucket"][data-focus-part="section-button"]',
     '[data-focus-group="bucket"][data-focus-part="card"]',
+    '[data-focus-group="bucket"][data-focus-part="add-button"]',
   ].join(", ");
+}
+
+function getFocusPartPriority(focusPart?: string) {
+  if (focusPart === "card") return 0;
+  if (focusPart === "section-button") return 150;
+  if (focusPart === "add-button") return 300;
+  return 75;
+}
+
+function findSidebarShell(container: HTMLElement) {
+  return container.querySelector('[data-testid="desktop-sidebar-shell"]');
+}
+
+function isInSidebarShell(element: HTMLElement, container: HTMLElement) {
+  const sidebarShell = findSidebarShell(container);
+  return Boolean(sidebarShell instanceof HTMLElement && sidebarShell.contains(element));
 }
 
 function buildFocusItemSelector(focusGroup: ArrowNavigableFocusGroup) {
@@ -143,7 +165,7 @@ export function resolveNextTimelineCardIndex({
       const isValid = key === "ArrowUp" ? dy < -VERTICAL_THRESHOLD_PX : dy > VERTICAL_THRESHOLD_PX;
       if (!isValid) return;
 
-      const score = (dy * dy) + (dx * dx * 4);
+      const score = (dy * dy) + (dx * dx * 4) + getFocusPartPriority(candidate.focusPart);
       if (score < bestScore) {
         bestScore = score;
         bestIndex = index;
@@ -166,7 +188,7 @@ export function resolveNextTimelineCardIndex({
     const isValid = key === "ArrowLeft" ? dx < -HORIZONTAL_THRESHOLD_PX : dx > HORIZONTAL_THRESHOLD_PX;
     if (!isValid) return;
 
-    const score = (dx * dx) + (dy * dy * 4);
+    const score = (dx * dx) + (dy * dy * 4) + getFocusPartPriority(candidate.focusPart);
     if (score < bestScore) {
       bestScore = score;
       bestIndex = index;
@@ -199,6 +221,10 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
   const container = event.currentTarget;
   if (!(container instanceof HTMLElement) || !container.contains(activeItem)) return;
 
+  if (focusGroup === "sidebar" && event.key === "ArrowRight") {
+    return;
+  }
+
   event.preventDefault();
   event.stopPropagation();
 
@@ -209,6 +235,11 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
 
   const candidates = Array.from(container.querySelectorAll(selector))
     .filter((element): element is HTMLElement => element instanceof HTMLElement)
+    .filter((element) => (
+      event.key === "ArrowUp" || event.key === "ArrowDown"
+        ? isInSidebarShell(element, container) === isInSidebarShell(activeItem, container)
+        : true
+    ))
     .filter(isVisibleElement)
     .map((element, order) => {
       const rect = element.getBoundingClientRect();
@@ -218,6 +249,7 @@ export function handleTimelineCardArrowFocus(event: React.KeyboardEvent<HTMLElem
           order,
           centerX: rect.left + rect.width / 2,
           centerY: rect.top + rect.height / 2,
+          focusPart: element.dataset.focusPart,
         },
       };
     });

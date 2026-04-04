@@ -4,4 +4,5 @@ export type BucketCreateRequest = {
   clientX?: number;
   clientY?: number;
   anchorRect?: DOMRect;
+  focusElement?: HTMLElement | null;
 };

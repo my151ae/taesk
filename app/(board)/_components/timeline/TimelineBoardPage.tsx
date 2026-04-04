@@ -404,16 +404,27 @@ function TimelineBoardPageContent({
     openCardContextMenu(cardId, rect.right + 8, rect.top);
   }, [openCardContextMenu]);
 
-  const closeBucketCreateMenu = useCallback(() => {
+  const closeBucketCreateMenu = useCallback((reason: "action" | "dismiss" = "dismiss") => {
     setBucketCreateMenu((prev) => (prev.open
       ? { open: false, bucketKey: null, x: 0, y: 0 }
       : prev));
+    if (reason === "dismiss") {
+      const focusElement = bucketCreateFocusRef.current;
+      if (focusElement) {
+        requestAnimationFrame(() => {
+          focusElement.focus();
+        });
+      }
+      return;
+    }
+    bucketCreateFocusRef.current = null;
   }, []);
 
   const handleBucketCreateRequest = useCallback((request: BucketCreateRequest) => {
     closeContextMenu("dismiss");
     const x = request.clientX ?? request.anchorRect?.left ?? 0;
     const y = request.clientY ?? request.anchorRect?.bottom ?? request.anchorRect?.top ?? 0;
+    bucketCreateFocusRef.current = request.focusElement ?? null;
     setBucketCreateMenu({
       open: true,
       bucketKey: request.bucketKey,
@@ -541,6 +552,7 @@ function TimelineBoardPageContent({
     x: 0,
     y: 0,
   });
+  const bucketCreateFocusRef = useRef<HTMLElement | null>(null);
 
   const confirmBucketCardCreation = useCallback(() => {
     if (!(bucketCreateMenu.open && bucketCreateMenu.bucketKey)) {
@@ -968,9 +980,9 @@ function TimelineBoardPageContent({
               y: bucketCreateMenu.y,
               items: [
                 { label: "追加", onClick: confirmBucketCardCreation },
-                { label: "キャンセル", onClick: closeBucketCreateMenu },
+                { label: "キャンセル", onClick: () => closeBucketCreateMenu("dismiss") },
               ],
-              onClose: () => closeBucketCreateMenu(),
+              onClose: (reason) => closeBucketCreateMenu(reason),
             }
           : { open: false }
       }

@@ -135,7 +135,6 @@ export const TimelineBucketCard = ({
                     }}
                     onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
                     focusGroup="bucket"
-                    onCreateNext={() => onCreateBucketCard?.(bucketKey, item.card_id)}
                     isSelected={isSelected}
                     selectionLane={selectionLane}
                     onShiftSelect={onShiftSelect}

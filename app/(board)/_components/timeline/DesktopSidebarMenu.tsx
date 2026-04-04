@@ -359,6 +359,45 @@ function SidebarRailButton({
       data-focus-group="sidebar"
       data-focus-part="rail-button"
       onClick={onToggle}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowRight" || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+          return;
+        }
+
+        const root = event.currentTarget.closest('[data-testid="desktop-sidebar-shell"]') ?? document;
+        const visiblePanel = root.querySelector<HTMLElement>('[id^="desktop-sidebar-"][aria-hidden="false"]');
+        const panel = visiblePanel ?? document.getElementById(id);
+        if (!panel || panel.hidden || panel.getAttribute("aria-hidden") === "true") {
+          return;
+        }
+
+        const focusableSelector = [
+          '[data-focus-group][data-focus-part][tabindex]:not([tabindex="-1"])',
+          'button:not([disabled])',
+          'a[href]',
+          'input:not([disabled])',
+          'textarea:not([disabled])',
+          'select:not([disabled])',
+          '[tabindex]:not([tabindex="-1"])',
+        ].join(", ");
+
+        const nextTarget = Array.from(panel.querySelectorAll(focusableSelector))
+          .filter((element): element is HTMLElement => element instanceof HTMLElement)
+          .find((element) => {
+            const rect = element.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+
+        if (!nextTarget) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        window.requestAnimationFrame(() => {
+          nextTarget.focus();
+        });
+      }}
       data-testid={`${id}-toggle`}
       className={clsx(
         "group relative flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-150",

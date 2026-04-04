@@ -383,10 +383,6 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             return current;
                                         });
                                     }}
-                                    onCreateNext={() => {
-                                        const endMinutes = (getMinutesFromTime(event.due_start ?? null) ?? 0) + (event.durationMinutes ?? 60);
-                                        handleColumnClick(day, endMinutes);
-                                    }}
                                     hourHeight={currentHourHeight}
                                     isSelected={selectedCardIds.has(event.card_id)}
                                     selectionLane={`timeline:${day.isoDate}`}
