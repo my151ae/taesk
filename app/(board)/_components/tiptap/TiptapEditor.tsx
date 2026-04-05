@@ -41,6 +41,12 @@ import {
     type MoveBlockDirection,
     type ResolvedBlockTarget,
 } from '@/app/(board)/_components/tiptap/tiptap-block-actions';
+import {
+    TaskCompletionVisibility,
+    getTaskCompletionState,
+    isTopLevelTaskItemHandleVisible,
+    setTaskCompletionVisibilityMeta,
+} from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
 
 export type FocusTitleRequest = {
     mode?: 'column' | 'end';
@@ -71,28 +77,6 @@ type ActiveBlockMenuTarget = {
     resolvedTarget: ResolvedBlockTarget;
 };
 
-type TaskItemVisibility = 'visible' | 'hidden';
-
-type TaskItemCompletionMeta = {
-    pos: number;
-    selfChecked: boolean;
-    allNestedTaskItemsChecked: boolean;
-    subtreeComplete: boolean;
-    visibility: TaskItemVisibility;
-    hiddenRunStart: boolean;
-    hiddenRunLength: number;
-};
-
-type TaskListCompletionMeta = {
-    pos: number;
-    trailingHiddenRunLength: number;
-};
-
-type TaskCompletionSnapshot = {
-    itemMetaByPos: Map<number, TaskItemCompletionMeta>;
-    listMetaByPos: Map<number, TaskListCompletionMeta>;
-};
-
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -109,133 +93,12 @@ type TiptapEditorProps = {
     containerRef?: RefObject<HTMLDivElement>;
 };
 
-const buildTaskCompletionSnapshot = (doc: ProseMirrorNode, showCompletedLines: boolean): TaskCompletionSnapshot => {
-    const itemMetaByPos = new Map<number, TaskItemCompletionMeta>();
-    const listMetaByPos = new Map<number, TaskListCompletionMeta>();
-
-    const visitTaskItem = (node: ProseMirrorNode, pos: number): TaskItemCompletionMeta => {
-        let allNestedTaskItemsChecked = true;
-
-        node.forEach((child, offset) => {
-            if (child.type.name !== 'taskList') return;
-            const childPos = pos + offset + 1;
-            const childListMeta = visitTaskList(child, childPos);
-            allNestedTaskItemsChecked = allNestedTaskItemsChecked && childListMeta.allTaskItemsChecked;
-        });
-
-        const selfChecked = Boolean(node.attrs?.checked);
-        const subtreeComplete = selfChecked && allNestedTaskItemsChecked;
-        const visibility: TaskItemVisibility = !showCompletedLines && subtreeComplete ? 'hidden' : 'visible';
-        const meta: TaskItemCompletionMeta = {
-            pos,
-            selfChecked,
-            allNestedTaskItemsChecked,
-            subtreeComplete,
-            visibility,
-            hiddenRunStart: false,
-            hiddenRunLength: 0,
-        };
-        itemMetaByPos.set(pos, meta);
-        return meta;
-    };
-
-    const visitTaskList = (node: ProseMirrorNode, pos: number): { allTaskItemsChecked: boolean } => {
-        const directChildItems: TaskItemCompletionMeta[] = [];
-        let allTaskItemsChecked = true;
-
-        node.forEach((child, offset) => {
-            if (child.type.name !== 'taskItem') return;
-            const childPos = pos + offset + 1;
-            const meta = visitTaskItem(child, childPos);
-            directChildItems.push(meta);
-            allTaskItemsChecked = allTaskItemsChecked && meta.subtreeComplete;
-        });
-
-        let trailingHiddenRunLength = 0;
-        for (const meta of directChildItems) {
-            if (meta.visibility === 'hidden') {
-                trailingHiddenRunLength += 1;
-                continue;
-            }
-
-            if (trailingHiddenRunLength > 0) {
-                meta.hiddenRunStart = true;
-                meta.hiddenRunLength = trailingHiddenRunLength;
-                trailingHiddenRunLength = 0;
-            }
-        }
-
-        listMetaByPos.set(pos, {
-            pos,
-            trailingHiddenRunLength,
-        });
-
-        return { allTaskItemsChecked };
-    };
-
-    const visitNode = (node: ProseMirrorNode, pos: number) => {
-        node.forEach((child, offset) => {
-            const childPos = pos + offset + 1;
-            if (child.type.name === 'taskList') {
-                visitTaskList(child, childPos);
-                return;
-            }
-            visitNode(child, childPos);
-        });
-    };
-
-    visitNode(doc, -1);
-
-    return {
-        itemMetaByPos,
-        listMetaByPos,
-    };
-};
-
-const applyTaskCompletionAttributes = (
-    view: Editor['view'],
-    root: HTMLDivElement | null,
-    snapshot: TaskCompletionSnapshot,
-) => {
-    if (!root) return;
-
-    root
-        .querySelectorAll<HTMLElement>('li[data-type="taskItem"], ul[data-type="taskList"]')
-        .forEach((element) => {
-            element.removeAttribute('data-completion-visibility');
-            element.removeAttribute('data-subtree-complete');
-            element.removeAttribute('data-hidden-run-start');
-            element.removeAttribute('data-hidden-run-length');
-        });
-
-    snapshot.itemMetaByPos.forEach((meta, pos) => {
-        const nodeDom = view.nodeDOM(pos);
-        if (!(nodeDom instanceof HTMLElement)) return;
-
-        nodeDom.setAttribute('data-completion-visibility', meta.visibility);
-        nodeDom.setAttribute('data-subtree-complete', meta.subtreeComplete ? 'true' : 'false');
-
-        if (meta.hiddenRunStart && meta.hiddenRunLength > 0) {
-            nodeDom.setAttribute('data-hidden-run-start', 'true');
-            nodeDom.setAttribute('data-hidden-run-length', String(meta.hiddenRunLength));
-        }
-    });
-
-    snapshot.listMetaByPos.forEach((meta, pos) => {
-        if (meta.trailingHiddenRunLength <= 0) return;
-        const nodeDom = view.nodeDOM(pos);
-        if (!(nodeDom instanceof HTMLElement)) return;
-        nodeDom.setAttribute('data-hidden-run-start', 'true');
-        nodeDom.setAttribute('data-hidden-run-length', String(meta.trailingHiddenRunLength));
-    });
-};
-
 export default function TiptapEditor({
     initialContent,
     onChange,
     placeholder = "Type '/' for commands…",
     editable = true,
-    showCompletedLines = true,
+    showCompletedLines = false,
     boardId,
     cardId,
     onEditorError,
@@ -717,6 +580,9 @@ export default function TiptapEditor({
                     return '';
                 },
                 showOnlyCurrent: true,
+            }),
+            TaskCompletionVisibility.configure({
+                showCompletedLines,
             }),
         ],
         content: initialContent || { type: 'doc', content: [] },
@@ -1207,22 +1073,32 @@ export default function TiptapEditor({
         }
     }, [editor, editable]);
 
+    useEffect(() => {
+        if (!editor) return;
+        const pluginState = getTaskCompletionState(editor.state);
+        if (pluginState?.showCompletedLines === showCompletedLines) return;
+        editor.view.dispatch(setTaskCompletionVisibilityMeta(editor.state.tr, showCompletedLines));
+        invalidateLayout();
+    }, [editor, invalidateLayout, showCompletedLines]);
+
     useLayoutEffect(() => {
         if (!editor) {
             setRenderableBlocks([]);
             return;
         }
 
-        const taskCompletionSnapshot = buildTaskCompletionSnapshot(editor.state.doc, showCompletedLines);
-        applyTaskCompletionAttributes(editor.view, rootRef.current, taskCompletionSnapshot);
-
-        if (suppressBlockUi) {
-            setRenderableBlocks([]);
-            return;
-        }
-
         const measureBlocks = () => {
+            if (suppressBlockUi) {
+                setRenderableBlocks([]);
+                return;
+            }
+
             const nextTargets: RenderableBlockActionTarget[] = [];
+            const root = rootRef.current;
+            const topLevelTaskItems = root
+                ? Array.from(root.querySelectorAll<HTMLElement>('.ProseMirror > ul[data-type="taskList"] > li[data-checked]'))
+                : [];
+            let topLevelTaskItemIndex = 0;
             editor.state.doc.descendants((node, pos) => {
                 if (
                     node.type.name !== 'details' &&
@@ -1235,20 +1111,27 @@ export default function TiptapEditor({
                 }
 
                 const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
-                if (!target?.rect) {
-                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
+                let targetRect = target?.rect ?? null;
+
+                if (target?.nodeType === 'taskItem') {
+                    const taskItemElement = topLevelTaskItems[topLevelTaskItemIndex] ?? null;
+                    topLevelTaskItemIndex += 1;
+                    if (!isTopLevelTaskItemHandleVisible(editor.state, target.blockPos)) {
+                        return false;
+                    }
+                    targetRect = taskItemElement?.getBoundingClientRect() ?? targetRect;
                 }
 
-                if (
-                    target.nodeType === 'taskItem' &&
-                    taskCompletionSnapshot.itemMetaByPos.get(target.blockPos)?.visibility === 'hidden'
-                ) {
-                    return false;
+                if (!target || !targetRect) {
+                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
                 }
 
                 const isDuplicate = nextTargets.some((candidate) => candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType);
                 if (!isDuplicate) {
-                    nextTargets.push(target);
+                    nextTargets.push({
+                        ...target,
+                        rect: targetRect,
+                    });
                 }
 
                 return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
@@ -1256,8 +1139,11 @@ export default function TiptapEditor({
             setRenderableBlocks(nextTargets);
         };
 
-        measureBlocks();
-    }, [editor, getBlockTargetAtPos, layoutVersion, showCompletedLines, suppressBlockUi]);
+        const frameId = window.requestAnimationFrame(measureBlocks);
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
         if (rootRef.current === node) {

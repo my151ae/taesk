@@ -134,7 +134,11 @@
     padding: 0 !important;
 }
 
-.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div) {
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > p),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h1),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h2),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > h3),
+.editor :global(ul[data-type="taskList"] > li[data-checked="true"] > div > summary) {
     color: #94a3b8;
 }
 

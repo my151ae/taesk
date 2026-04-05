@@ -6819,20 +6819,6 @@ test.describe('@feature:timeline Timeline view', () => {
       const uncheckedTaskLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="false"] p').first();
       const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
 
-      await expect(checkedTaskLine).toBeVisible();
-      await expect(uncheckedTaskLine).toBeVisible();
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
-
-      const checkedLineStyles = await checkedTaskLine.evaluate((element) => {
-        const style = window.getComputedStyle(element);
-        return {
-          color: style.color,
-          textDecorationLine: style.textDecorationLine,
-        };
-      });
-      expect(checkedLineStyles.color).toBe('rgb(148, 163, 184)');
-      expect(checkedLineStyles.textDecorationLine).toContain('line-through');
-
       if (!(await completedLinesPanel.isVisible())) {
         await modal.getByTitle('Show details').click();
       }
@@ -6851,6 +6837,16 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(showCompletedLines).toBeChecked();
       await expect(checkedTaskLine).toBeVisible();
       await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
+
+      const checkedLineStyles = await checkedTaskLine.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          color: style.color,
+          textDecorationLine: style.textDecorationLine,
+        };
+      });
+      expect(checkedLineStyles.color).toBe('rgb(148, 163, 184)');
+      expect(checkedLineStyles.textDecorationLine).toContain('line-through');
 
       const savedAfterToggle = await fetchSavedCard(cardId);
       expect(savedAfterToggle).toMatchObject({
