@@ -56,14 +56,14 @@ export function getBlockActionItems(
 }
 
 export function BlockActionMenu({
-  top,
-  left,
+  anchorRect,
+  containerRect,
   items,
   onClose,
   onSelect,
 }: {
-  top: number;
-  left: number;
+  anchorRect: DOMRect | null;
+  containerRect: DOMRect | null;
   items: BlockActionItem[];
   onClose: () => void;
   onSelect: (action: BlockActionType) => void;
@@ -82,6 +82,13 @@ export function BlockActionMenu({
       itemRefs.current[nextActiveIndex]?.focus();
     });
   }, [items]);
+
+  if (!anchorRect || !containerRect) {
+    return null;
+  }
+
+  const top = Math.max(anchorRect.top - containerRect.top, 4);
+  const left = Math.max(anchorRect.left - containerRect.left - 4, 44);
 
   return (
     <div

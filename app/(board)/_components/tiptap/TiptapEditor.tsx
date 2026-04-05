@@ -8,6 +8,7 @@ import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
+import DragHandle from '@tiptap/extension-drag-handle';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
@@ -44,9 +45,16 @@ import {
 import {
     TaskCompletionVisibility,
     getTaskCompletionState,
-    isTopLevelTaskItemHandleVisible,
     setTaskCompletionVisibilityMeta,
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
+import {
+    applyDragHandleMetadata,
+    cloneDomRect,
+    createVirtualElementFromRectRef,
+    getDragHandleAnchorRect,
+    shouldShowDragHandleForTarget,
+    type DragHandleMenuTarget,
+} from '@/app/(board)/_components/tiptap/tiptap-drag-handle';
 
 export type FocusTitleRequest = {
     mode?: 'column' | 'end';
@@ -65,15 +73,8 @@ export type BodyEditorShortcutState = {
     canOutdent: boolean;
 };
 
-type RenderableBlockActionTarget = {
-    pos: number;
-    blockPos: number;
-    nodeType: BlockNodeType;
-    rect: DOMRect | null;
-};
-
 type ActiveBlockMenuTarget = {
-    renderTarget: RenderableBlockActionTarget;
+    renderTarget: DragHandleMenuTarget['renderTarget'];
     resolvedTarget: ResolvedBlockTarget;
 };
 
@@ -114,11 +115,16 @@ export default function TiptapEditor({
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
+    const dragHandleElementRef = useRef<HTMLButtonElement | null>(null);
+    const dragHandleAnchorRectRef = useRef<DOMRect | null>(null);
+    const dragHandleTargetRef = useRef<DragHandleMenuTarget | null>(null);
+    const isHoveringDragHandleRef = useRef(false);
+    const openDragHandleMenuRef = useRef<() => void>(() => {});
+    const handleDragHandleNodeChangeRef = useRef<(nextEditor: Editor, pos: number) => void>(() => {});
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
-    const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
@@ -355,53 +361,31 @@ export default function TiptapEditor({
         return true;
     }, [closeBlockMenu, onChange]);
 
-    const getBlockTargetRect = useCallback((view: Editor['view'], pos: number): DOMRect | null => {
-        const nodeDom = view.nodeDOM(pos);
-        if (!(nodeDom instanceof HTMLElement)) {
-            return null;
-        }
-        if (nodeDom.dataset.type === 'details') {
-            const summary = nodeDom.querySelector(':scope > summary');
-            if (summary instanceof HTMLElement) {
-                return summary.getBoundingClientRect();
-            }
-        }
-        return nodeDom.getBoundingClientRect();
-    }, []);
-
-    const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): RenderableBlockActionTarget | null => {
-        const target = resolveBlockTargetAtPos(state, pos);
-        if (!target) return null;
-        const rect = getBlockTargetRect(view, target.pos);
-        return {
-            pos,
-            blockPos: target.pos,
-            nodeType: target.nodeType,
-            rect,
-        };
-    }, [getBlockTargetRect, resolveBlockTargetAtPos]);
-
-    const resolveRenderableBlockTarget = useCallback((state: EditorState, target: RenderableBlockActionTarget | null): ResolvedBlockTarget | null => {
-        if (!target) return null;
-
+    const resolveBlockMenuTargetFromPos = useCallback((view: Editor['view'], state: EditorState, pos: number): DragHandleMenuTarget | null => {
         const candidates = Array.from(new Set([
-            target.pos,
-            Math.min(target.blockPos + 1, state.doc.content.size),
-            target.blockPos,
+            pos,
+            Math.max(0, Math.min(pos + 1, state.doc.content.size)),
+            Math.max(0, pos - 1),
         ]));
 
         for (const candidatePos of candidates) {
             const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
-            if (resolvedTarget && resolvedTarget.nodeType === target.nodeType) {
-                return resolvedTarget;
+            if (!resolvedTarget || !shouldShowDragHandleForTarget(state, resolvedTarget)) {
+                continue;
             }
-        }
-
-        for (const candidatePos of candidates) {
-            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
-            if (resolvedTarget) {
-                return resolvedTarget;
+            const rect = getDragHandleAnchorRect(view, resolvedTarget);
+            if (!rect) {
+                continue;
             }
+            return {
+                renderTarget: {
+                    pos: candidatePos,
+                    blockPos: resolvedTarget.pos,
+                    nodeType: resolvedTarget.nodeType,
+                    rect,
+                },
+                resolvedTarget,
+            };
         }
 
         return null;
@@ -535,6 +519,74 @@ export default function TiptapEditor({
         }
     }, [boardId, cardId, closeBlockMenu, onEditorError, onChange]);
 
+    const syncDragHandleElement = useCallback((target: DragHandleMenuTarget | null) => {
+        dragHandleTargetRef.current = target;
+        dragHandleAnchorRectRef.current = target ? cloneDomRect(target.renderTarget.rect) : null;
+        if (dragHandleElementRef.current) {
+            applyDragHandleMetadata(dragHandleElementRef.current, target);
+        }
+    }, []);
+
+    const clearDragHandleTarget = useCallback(() => {
+        syncDragHandleElement(null);
+    }, [syncDragHandleElement]);
+
+    const handleDragHandleNodeChange = useCallback((nextEditor: Editor, pos: number) => {
+        if (suppressBlockUiRef.current || isMenuOpenRef.current) {
+            return;
+        }
+
+        if (pos < 0) {
+            if (isHoveringDragHandleRef.current) {
+                return;
+            }
+            clearDragHandleTarget();
+            return;
+        }
+
+        const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, pos);
+        syncDragHandleElement(nextTarget);
+    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, syncDragHandleElement]);
+
+    const syncDragHandleTargetFromCoords = useCallback((nextEditor: Editor, clientX: number, clientY: number) => {
+        if (suppressBlockUiRef.current || isMenuOpenRef.current) {
+            return;
+        }
+
+        const positionAtCoords = nextEditor.view.posAtCoords({
+            left: clientX,
+            top: clientY,
+        });
+
+        if (!positionAtCoords) {
+            clearDragHandleTarget();
+            return;
+        }
+
+        const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, positionAtCoords.pos);
+        syncDragHandleElement(nextTarget);
+    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, syncDragHandleElement]);
+
+    handleDragHandleNodeChangeRef.current = handleDragHandleNodeChange;
+
+    openDragHandleMenuRef.current = () => {
+        const target = dragHandleTargetRef.current;
+        if (!target?.renderTarget.rect) {
+            return;
+        }
+
+        setMenuTarget({
+            renderTarget: {
+                ...target.renderTarget,
+                rect: cloneDomRect(target.renderTarget.rect),
+            },
+            resolvedTarget: target.resolvedTarget,
+        });
+        setIsMenuOpen(true);
+    };
+
+    const dragHandleVirtualElement = useRef(createVirtualElementFromRectRef(dragHandleAnchorRectRef));
+
     const editor = useEditor({
         immediatelyRender: false,
         extensions: [
@@ -580,6 +632,49 @@ export default function TiptapEditor({
                     return '';
                 },
                 showOnlyCurrent: true,
+            }),
+            DragHandle.configure({
+                nested: true,
+                computePositionConfig: {
+                    placement: 'left-start',
+                    strategy: 'absolute',
+                },
+                render: () => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.tabIndex = -1;
+                    button.setAttribute('aria-label', 'ブロックメニューを開く');
+                    button.dataset.testid = 'tiptap-block-handle';
+                    button.className = styles.blockActionHandle;
+                    button.style.pointerEvents = 'none';
+                    button.innerHTML = `<span class="${styles.blockActionHandleDots}">⋮⋮</span>`;
+                    button.addEventListener('mousedown', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    });
+                    button.addEventListener('mouseenter', () => {
+                        isHoveringDragHandleRef.current = true;
+                    });
+                    button.addEventListener('mouseleave', () => {
+                        isHoveringDragHandleRef.current = false;
+                    });
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openDragHandleMenuRef.current();
+                    });
+                    button.addEventListener('dragstart', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+                    }, true);
+                    dragHandleElementRef.current = button;
+                    return button;
+                },
+                getReferencedVirtualElement: () => dragHandleVirtualElement.current,
+                onNodeChange: (data: { editor: Editor; pos?: number }) => {
+                    handleDragHandleNodeChangeRef.current(data.editor, data.pos ?? -1);
+                },
             }),
             TaskCompletionVisibility.configure({
                 showCompletedLines,
@@ -790,6 +885,11 @@ export default function TiptapEditor({
     }, [closeBlockMenu, editor, resolveBlockTargetAtPos, unsetActiveDetails]);
 
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
+    const suppressBlockUiRef = useRef(suppressBlockUi);
+    const isMenuOpenRef = useRef(isMenuOpen);
+
+    suppressBlockUiRef.current = suppressBlockUi;
+    isMenuOpenRef.current = isMenuOpen;
 
     useEffect(() => {
         emitShortcutState(editor);
@@ -1081,69 +1181,94 @@ export default function TiptapEditor({
         invalidateLayout();
     }, [editor, invalidateLayout, showCompletedLines]);
 
-    useLayoutEffect(() => {
-        if (!editor) {
-            setRenderableBlocks([]);
+    useEffect(() => {
+        if (!editor) return;
+
+        if (suppressBlockUi) {
+            clearDragHandleTarget();
             return;
         }
 
-        const measureBlocks = () => {
-            if (suppressBlockUi) {
-                setRenderableBlocks([]);
-                return;
-            }
+        if (isMenuOpen) {
+            editor.commands.lockDragHandle();
+            return;
+        }
 
-            const nextTargets: RenderableBlockActionTarget[] = [];
-            const root = rootRef.current;
-            const topLevelTaskItems = root
-                ? Array.from(root.querySelectorAll<HTMLElement>('.ProseMirror > ul[data-type="taskList"] > li[data-checked]'))
-                : [];
-            let topLevelTaskItemIndex = 0;
-            editor.state.doc.descendants((node, pos) => {
-                if (
-                    node.type.name !== 'details' &&
-                    node.type.name !== 'paragraph' &&
-                    node.type.name !== 'heading' &&
-                    node.type.name !== 'taskItem' &&
-                    node.type.name !== 'listItem'
-                ) {
-                    return true;
-                }
+        editor.commands.unlockDragHandle();
+    }, [clearDragHandleTarget, editor, isMenuOpen, suppressBlockUi]);
 
-                const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
-                let targetRect = target?.rect ?? null;
+    useEffect(() => {
+        if (!editor || suppressBlockUi) return;
 
-                if (target?.nodeType === 'taskItem') {
-                    const taskItemElement = topLevelTaskItems[topLevelTaskItemIndex] ?? null;
-                    topLevelTaskItemIndex += 1;
-                    if (!isTopLevelTaskItemHandleVisible(editor.state, target.blockPos)) {
-                        return false;
-                    }
-                    targetRect = taskItemElement?.getBoundingClientRect() ?? targetRect;
-                }
+        const editorDom = editor.view.dom;
 
-                if (!target || !targetRect) {
-                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
-                }
-
-                const isDuplicate = nextTargets.some((candidate) => candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType);
-                if (!isDuplicate) {
-                    nextTargets.push({
-                        ...target,
-                        rect: targetRect,
-                    });
-                }
-
-                return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
-            });
-            setRenderableBlocks(nextTargets);
+        const handleMouseMove = (event: MouseEvent) => {
+            syncDragHandleTargetFromCoords(editor, event.clientX, event.clientY);
         };
 
-        const frameId = window.requestAnimationFrame(measureBlocks);
+        const handleMouseLeave = (event: MouseEvent) => {
+            const relatedTarget = event.relatedTarget;
+            const dragHandleElement = dragHandleElementRef.current;
+            if (dragHandleElement && relatedTarget instanceof Node && dragHandleElement.contains(relatedTarget)) {
+                return;
+            }
+            if (relatedTarget instanceof Node && editorDom.contains(relatedTarget)) {
+                return;
+            }
+            if (isHoveringDragHandleRef.current) {
+                return;
+            }
+            if (isMenuOpenRef.current) {
+                return;
+            }
+            clearDragHandleTarget();
+        };
+
+        editorDom.addEventListener('mousemove', handleMouseMove, { passive: true });
+        editorDom.addEventListener('mouseleave', handleMouseLeave);
+
+        return () => {
+            editorDom.removeEventListener('mousemove', handleMouseMove);
+            editorDom.removeEventListener('mouseleave', handleMouseLeave);
+        };
+    }, [clearDragHandleTarget, editor, suppressBlockUi, syncDragHandleTargetFromCoords]);
+
+    useLayoutEffect(() => {
+        if (!editor || !menuTarget) return;
+
+        const frameId = window.requestAnimationFrame(() => {
+            const nextRect = getDragHandleAnchorRect(editor.view, menuTarget.resolvedTarget);
+            if (!nextRect) return;
+
+            const currentRect = menuTarget.renderTarget.rect;
+            const sameRect =
+                Math.abs(currentRect.top - nextRect.top) < 0.5 &&
+                Math.abs(currentRect.left - nextRect.left) < 0.5 &&
+                Math.abs(currentRect.width - nextRect.width) < 0.5 &&
+                Math.abs(currentRect.height - nextRect.height) < 0.5;
+
+            dragHandleAnchorRectRef.current = cloneDomRect(nextRect);
+            if (sameRect) return;
+
+            setMenuTarget((current) => {
+                if (!current || current.resolvedTarget.pos !== menuTarget.resolvedTarget.pos) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    renderTarget: {
+                        ...current.renderTarget,
+                        rect: cloneDomRect(nextRect),
+                    },
+                };
+            });
+        });
+
         return () => {
             window.cancelAnimationFrame(frameId);
         };
-    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
+    }, [editor, layoutVersion, menuTarget]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
         if (rootRef.current === node) {
@@ -1172,9 +1297,6 @@ export default function TiptapEditor({
             canMoveDown: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'down') : false,
         })
         : [];
-
-    const menuTop = menuTarget?.renderTarget.rect && rootRect ? Math.max(menuTarget.renderTarget.rect.top - rootRect.top, 4) : 0;
-    const menuLeft = 44;
 
     const handleBlockAction = (action: BlockActionType) => {
         if (!menuTarget || !resolvedMenuTarget) return;
@@ -1261,46 +1383,11 @@ export default function TiptapEditor({
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
         >
-            {renderableBlocks.map((target, index) => {
-                if (!target.rect || !rootRect) return null;
-                return (
-                    <button
-                        key={`${target.blockPos}-${target.nodeType}`}
-                        type="button"
-                        tabIndex={-1}
-                        aria-label="ブロックメニューを開く"
-                        data-testid="tiptap-block-handle"
-                        data-block-index={index}
-                        data-block-node-type={target.nodeType}
-                        data-block-pos={target.pos}
-                        data-block-start-pos={target.blockPos}
-                        className={styles.blockActionHandle}
-                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 12 }}
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const resolvedTarget = resolveRenderableBlockTarget(editor.state, target);
-                            if (!resolvedTarget) return;
-                            setMenuTarget({
-                                renderTarget: target,
-                                resolvedTarget,
-                            });
-                            setIsMenuOpen(true);
-                        }}
-                    >
-                        <span className={styles.blockActionHandleDots}>⋮⋮</span>
-                    </button>
-                );
-            })}
             <EditorContent editor={editor} />
             {isMenuOpen && menuTarget?.renderTarget.rect && rootRect ? (
                 <BlockActionMenu
-                    top={menuTop}
-                    left={menuLeft}
+                    anchorRect={menuTarget.renderTarget.rect}
+                    containerRect={rootRect}
                     items={menuItems}
                     onClose={closeBlockMenu}
                     onSelect={handleBlockAction}

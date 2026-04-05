@@ -80,6 +80,30 @@ async function triggerBlockAction(
   await expect(modal.getByTestId('tiptap-block-menu')).toHaveCount(0);
 }
 
+async function countVisibleTopLevelTaskItemHandles(modal: Locator): Promise<number> {
+  const topLevelTaskItemLines = modal.locator('.ProseMirror > ul[data-type="taskList"] > li > div > p');
+  const handle = modal.getByTestId('tiptap-block-handle');
+  const seen = new Set<string>();
+  const count = await topLevelTaskItemLines.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const line = topLevelTaskItemLines.nth(index);
+    if (!(await line.isVisible())) {
+      continue;
+    }
+
+    await line.hover();
+    await expect(handle).toBeVisible();
+    const nodeType = await handle.getAttribute('data-block-node-type');
+    const blockStartPos = await handle.getAttribute('data-block-start-pos');
+    if (nodeType === 'taskItem' && blockStartPos) {
+      seen.add(blockStartPos);
+    }
+  }
+
+  return seen.size;
+}
+
 async function clearLastBlockAction(page: Page): Promise<void> {
   await page.evaluate(() => {
     delete (window as typeof window & {
@@ -6740,8 +6764,7 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(2);
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(1);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -6831,12 +6854,12 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await expect(checkedTaskLine).toBeHidden();
       await expect(uncheckedTaskLine).toBeVisible();
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(1);
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(1);
 
       await showCompletedLines.check();
       await expect(showCompletedLines).toBeChecked();
       await expect(checkedTaskLine).toBeVisible();
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(2);
 
       const checkedLineStyles = await checkedTaskLine.evaluate((element) => {
         const style = window.getComputedStyle(element);
@@ -7048,7 +7071,7 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(lineDecorations[3]).toContain('line-through');
       expect(lineDecorations[4]).not.toContain('line-through');
 
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(3);
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(3);
 
       await showCompletedLines.check();
       await expect(showCompletedLines).toBeChecked();
@@ -7056,7 +7079,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeVisible();
       await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeVisible();
       await expect(childDoneOnlyLine).toBeVisible();
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(4);
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(4);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
