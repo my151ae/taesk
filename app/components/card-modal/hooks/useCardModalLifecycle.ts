@@ -18,6 +18,7 @@ type UseCardModalLifecycleArgs = {
   setTitle: (value: string) => void;
   setChecked: (value: boolean) => void;
   setEditorError: (message: string | null) => void;
+  clearExpandedHiddenRuns: () => void;
   hasPendingChangesRef: React.MutableRefObject<boolean>;
   hasAutoSavedEditsRef: React.MutableRefObject<boolean>;
   clearAutoSaveTimers: () => void;
@@ -36,6 +37,7 @@ export function useCardModalLifecycle({
   setTitle,
   setChecked,
   setEditorError,
+  clearExpandedHiddenRuns,
   hasPendingChangesRef,
   hasAutoSavedEditsRef,
   clearAutoSaveTimers,
@@ -61,6 +63,7 @@ export function useCardModalLifecycle({
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) {
+      clearExpandedHiddenRuns();
       cardIdRef.current = card.id;
       hasAppliedInitialLoadRef.current = false;
       previousLoadingRef.current = null;
@@ -70,7 +73,7 @@ export function useCardModalLifecycle({
       resetHistoryState();
       setShowCompletedLines(false);
     }
-  }, [card, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef, setShowCompletedLines]);
+  }, [card, clearExpandedHiddenRuns, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef, setShowCompletedLines]);
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) return;
@@ -156,12 +159,13 @@ export function useCardModalLifecycle({
 
     return () => {
       document.removeEventListener("keydown", trapFocus);
+      clearExpandedHiddenRuns();
       clearAutoSaveTimers();
       if (previousActiveElement && document.body.contains(previousActiveElement)) {
         previousActiveElement.focus();
       }
     };
-  }, [clearAutoSaveTimers]);
+  }, [clearAutoSaveTimers, clearExpandedHiddenRuns]);
 
   return {
     dialogRef,

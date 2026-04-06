@@ -7168,12 +7168,21 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(topTaskItems.filter({ hasText: 'Hidden middle 1' }).first().locator(':scope > div > p').first()).toBeHidden();
       await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeHidden();
 
-      const hiddenRunPseudoContent = await Promise.all([
-        visibleAfterMiddleRun.evaluate((element) => window.getComputedStyle(element, '::after').content),
-        topTaskList.evaluate((element) => window.getComputedStyle(element, '::after').content),
-      ]);
-      expect(hiddenRunPseudoContent[0]).toContain('2');
-      expect(hiddenRunPseudoContent[1]).toContain('6');
+      const hiddenRunBadges = modal.getByTestId('tiptap-hidden-run-badge');
+      await expect(hiddenRunBadges).toHaveCount(2);
+      await expect(hiddenRunBadges.nth(0)).toHaveText('2');
+      await expect(hiddenRunBadges.nth(1)).toHaveText('6');
+
+      await hiddenRunBadges.nth(0).click();
+      await expect(topTaskItems.filter({ hasText: 'Hidden middle 1' }).first().locator(':scope > div > p').first()).toBeVisible();
+      await expect(topTaskItems.filter({ hasText: 'Hidden middle 2' }).first().locator(':scope > div > p').first()).toBeVisible();
+      await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeHidden();
+      await expect(hiddenRunBadges).toHaveCount(1);
+      await expect(hiddenRunBadges.first()).toHaveText('6');
+
+      await hiddenRunBadges.first().click();
+      await expect(hiddenRunBadges).toHaveCount(1);
+      await expect(hiddenRunBadges.first()).toHaveText('6');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -7472,6 +7481,11 @@ test.describe('@feature:timeline Timeline view', () => {
       await showCompletedLines.uncheck();
       await expect(showCompletedLines).not.toBeChecked();
       await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
+      const hiddenRunBadge = modal.getByTestId('tiptap-hidden-run-badge').first();
+      await expect(hiddenRunBadge).toBeVisible();
+      await hiddenRunBadge.click();
+      await expect(modal.getByTestId('tiptap-hidden-run-badge')).toHaveCount(0);
+      await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeVisible();
 
       await modal.getByRole('button', { name: '履歴' }).click();
       await expect(modal.getByText('履歴プレビュー中', { exact: true })).toHaveCount(0);
@@ -7499,6 +7513,8 @@ test.describe('@feature:timeline Timeline view', () => {
       }
       await expect(reopenedCompletedLinesPanel).toBeVisible();
       await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).not.toBeChecked();
+      await expect(reopenedModal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
+      await expect(reopenedModal.getByTestId('tiptap-hidden-run-badge').first()).toBeVisible();
     } finally {
       await supabaseAdmin.from('card_content_history').delete().eq('card_id', cardId);
       await supabaseAdmin.from('cards').delete().eq('id', cardId);

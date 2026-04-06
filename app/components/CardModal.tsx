@@ -166,6 +166,10 @@ export function CardModal({
         didFocusTitleOnOpenRef.current = false;
     }, [card.id]);
 
+    const clearExpandedHiddenRuns = useCallback(() => {
+        bodyBridgeRef.current?.clearExpandedHiddenRuns();
+    }, []);
+
     const stickyTitleChecklistProgress = useMemo(() => {
         const plainText = getTiptapPlainText(normalizeContent(content));
         const progress = plainText.split(/\r?\n/).reduce(
@@ -298,6 +302,7 @@ export function CardModal({
         setTitle,
         setChecked,
         setEditorError,
+        clearExpandedHiddenRuns,
         hasPendingChangesRef,
         hasAutoSavedEditsRef,
         clearAutoSaveTimers,
