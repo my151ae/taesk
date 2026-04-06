@@ -116,9 +116,11 @@ export default function TiptapEditor({
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
     const dragHandleElementRef = useRef<HTMLButtonElement | null>(null);
+    const menuElementRef = useRef<HTMLDivElement | null>(null);
     const dragHandleAnchorRectRef = useRef<DOMRect | null>(null);
     const dragHandleTargetRef = useRef<DragHandleMenuTarget | null>(null);
     const isHoveringDragHandleRef = useRef(false);
+    const isHoveringMenuRef = useRef(false);
     const openDragHandleMenuRef = useRef<() => void>(() => {});
     const handleDragHandleNodeChangeRef = useRef<(nextEditor: Editor, pos: number) => void>(() => {});
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
@@ -127,6 +129,7 @@ export default function TiptapEditor({
     const [layoutVersion, setLayoutVersion] = useState(0);
 
     const closeBlockMenu = useCallback(() => {
+        isHoveringMenuRef.current = false;
         setIsMenuOpen(false);
         setMenuTarget(null);
     }, []);
@@ -295,7 +298,7 @@ export default function TiptapEditor({
                         itemIndex: null,
                     };
                 }
-                return null;
+                continue;
             }
 
             if (node.type.name === 'details' && depth >= 1 && $pos.node(depth - 1).type.name === 'doc') {
@@ -331,7 +334,7 @@ export default function TiptapEditor({
                         itemIndex: $pos.index(depth - 1),
                     };
                 }
-                return null;
+                continue;
             }
 
             if ((node.type.name === 'paragraph' || node.type.name === 'heading') && $pos.node(depth - 1).type.name === 'doc') {
@@ -531,13 +534,47 @@ export default function TiptapEditor({
         syncDragHandleElement(null);
     }, [syncDragHandleElement]);
 
+    const shouldKeepCurrentMenuTarget = useCallback(() => {
+        return isHoveringDragHandleRef.current || isHoveringMenuRef.current;
+    }, []);
+
+    const syncDragHandleMenuTarget = useCallback((nextEditor: Editor, nextTarget: DragHandleMenuTarget | null) => {
+        if (suppressBlockUiRef.current) {
+            return;
+        }
+
+        const currentTarget = dragHandleTargetRef.current;
+        const currentBlockPos = currentTarget?.resolvedTarget.pos ?? null;
+        const nextBlockPos = nextTarget?.resolvedTarget.pos ?? null;
+
+        if (isMenuOpenRef.current) {
+            if (!nextTarget) {
+                if (shouldKeepCurrentMenuTarget()) {
+                    return;
+                }
+                return;
+            }
+
+            if (currentBlockPos !== null && currentBlockPos === nextBlockPos) {
+                syncDragHandleElement(nextTarget);
+                return;
+            }
+
+            nextEditor.commands.unlockDragHandle();
+            setIsMenuOpen(false);
+            setMenuTarget(null);
+        }
+
+        syncDragHandleElement(nextTarget);
+    }, [shouldKeepCurrentMenuTarget, syncDragHandleElement]);
+
     const handleDragHandleNodeChange = useCallback((nextEditor: Editor, pos: number) => {
-        if (suppressBlockUiRef.current || isMenuOpenRef.current) {
+        if (suppressBlockUiRef.current) {
             return;
         }
 
         if (pos < 0) {
-            if (isHoveringDragHandleRef.current) {
+            if (shouldKeepCurrentMenuTarget()) {
                 return;
             }
             clearDragHandleTarget();
@@ -545,11 +582,11 @@ export default function TiptapEditor({
         }
 
         const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, pos);
-        syncDragHandleElement(nextTarget);
-    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, syncDragHandleElement]);
+        syncDragHandleMenuTarget(nextEditor, nextTarget);
+    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, shouldKeepCurrentMenuTarget, syncDragHandleMenuTarget]);
 
     const syncDragHandleTargetFromCoords = useCallback((nextEditor: Editor, clientX: number, clientY: number) => {
-        if (suppressBlockUiRef.current || isMenuOpenRef.current) {
+        if (suppressBlockUiRef.current) {
             return;
         }
 
@@ -559,13 +596,16 @@ export default function TiptapEditor({
         });
 
         if (!positionAtCoords) {
+            if (shouldKeepCurrentMenuTarget()) {
+                return;
+            }
             clearDragHandleTarget();
             return;
         }
 
         const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, positionAtCoords.pos);
-        syncDragHandleElement(nextTarget);
-    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, syncDragHandleElement]);
+        syncDragHandleMenuTarget(nextEditor, nextTarget);
+    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, shouldKeepCurrentMenuTarget, syncDragHandleMenuTarget]);
 
     handleDragHandleNodeChangeRef.current = handleDragHandleNodeChange;
 
@@ -1209,13 +1249,17 @@ export default function TiptapEditor({
         const handleMouseLeave = (event: MouseEvent) => {
             const relatedTarget = event.relatedTarget;
             const dragHandleElement = dragHandleElementRef.current;
+            const menuElement = menuElementRef.current;
             if (dragHandleElement && relatedTarget instanceof Node && dragHandleElement.contains(relatedTarget)) {
+                return;
+            }
+            if (menuElement && relatedTarget instanceof Node && menuElement.contains(relatedTarget)) {
                 return;
             }
             if (relatedTarget instanceof Node && editorDom.contains(relatedTarget)) {
                 return;
             }
-            if (isHoveringDragHandleRef.current) {
+            if (shouldKeepCurrentMenuTarget()) {
                 return;
             }
             if (isMenuOpenRef.current) {
@@ -1231,7 +1275,7 @@ export default function TiptapEditor({
             editorDom.removeEventListener('mousemove', handleMouseMove);
             editorDom.removeEventListener('mouseleave', handleMouseLeave);
         };
-    }, [clearDragHandleTarget, editor, suppressBlockUi, syncDragHandleTargetFromCoords]);
+    }, [clearDragHandleTarget, editor, shouldKeepCurrentMenuTarget, suppressBlockUi, syncDragHandleTargetFromCoords]);
 
     useLayoutEffect(() => {
         if (!editor || !menuTarget) return;
@@ -1389,7 +1433,11 @@ export default function TiptapEditor({
                     anchorRect={menuTarget.renderTarget.rect}
                     containerRect={rootRect}
                     items={menuItems}
+                    menuRootRef={menuElementRef}
                     onClose={closeBlockMenu}
+                    onHoverChange={(hovering) => {
+                        isHoveringMenuRef.current = hovering;
+                    }}
                     onSelect={handleBlockAction}
                 />
             ) : null}

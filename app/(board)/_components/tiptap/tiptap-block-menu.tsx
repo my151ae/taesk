@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { useClickOutside } from "@/app/(board)/_hooks/useClickOutside";
 import styles from "./TiptapEditor.module.css";
 
@@ -59,13 +59,17 @@ export function BlockActionMenu({
   anchorRect,
   containerRect,
   items,
+  menuRootRef,
   onClose,
+  onHoverChange,
   onSelect,
 }: {
   anchorRect: DOMRect | null;
   containerRect: DOMRect | null;
   items: BlockActionItem[];
+  menuRootRef?: Ref<HTMLDivElement>;
   onClose: () => void;
+  onHoverChange?: (hovering: boolean) => void;
   onSelect: (action: BlockActionType) => void;
 }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -92,11 +96,25 @@ export function BlockActionMenu({
 
   return (
     <div
-      ref={menuRef}
+      ref={(node) => {
+        menuRef.current = node;
+        if (!menuRootRef) return;
+        if (typeof menuRootRef === "function") {
+          menuRootRef(node);
+          return;
+        }
+        menuRootRef.current = node;
+      }}
       className={styles.blockActionMenu}
       style={{ top, left }}
       role="menu"
       data-testid="tiptap-block-menu"
+      onMouseEnter={() => {
+        onHoverChange?.(true);
+      }}
+      onMouseLeave={() => {
+        onHoverChange?.(false);
+      }}
       onMouseDown={(event) => {
         event.stopPropagation();
       }}
