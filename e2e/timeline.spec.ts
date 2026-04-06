@@ -81,27 +81,17 @@ async function triggerBlockAction(
 }
 
 async function countVisibleTopLevelTaskItemHandles(modal: Locator): Promise<number> {
-  const topLevelTaskItemLines = modal.locator('.ProseMirror > ul[data-type="taskList"] > li > div > p');
-  const handle = modal.getByTestId('tiptap-block-handle');
-  const seen = new Set<string>();
-  const count = await topLevelTaskItemLines.count();
+  const handles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
+  const count = await handles.count();
+  let visibleCount = 0;
 
   for (let index = 0; index < count; index += 1) {
-    const line = topLevelTaskItemLines.nth(index);
-    if (!(await line.isVisible())) {
-      continue;
-    }
-
-    await line.hover();
-    await expect(handle).toBeVisible();
-    const nodeType = await handle.getAttribute('data-block-node-type');
-    const blockStartPos = await handle.getAttribute('data-block-start-pos');
-    if (nodeType === 'taskItem' && blockStartPos) {
-      seen.add(blockStartPos);
+    if (await handles.nth(index).isVisible()) {
+      visibleCount += 1;
     }
   }
 
-  return seen.size;
+  return visibleCount;
 }
 
 async function clearLastBlockAction(page: Page): Promise<void> {

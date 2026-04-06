@@ -8,7 +8,6 @@ import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
-import DragHandle from '@tiptap/extension-drag-handle';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
@@ -45,16 +44,9 @@ import {
 import {
     TaskCompletionVisibility,
     getTaskCompletionState,
+    isTopLevelTaskItemHandleVisible,
     setTaskCompletionVisibilityMeta,
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
-import {
-    applyDragHandleMetadata,
-    cloneDomRect,
-    createVirtualElementFromRectRef,
-    getDragHandleAnchorRect,
-    shouldShowDragHandleForTarget,
-    type DragHandleMenuTarget,
-} from '@/app/(board)/_components/tiptap/tiptap-drag-handle';
 
 export type FocusTitleRequest = {
     mode?: 'column' | 'end';
@@ -74,8 +66,16 @@ export type BodyEditorShortcutState = {
 };
 
 type ActiveBlockMenuTarget = {
-    renderTarget: DragHandleMenuTarget['renderTarget'];
-    resolvedTarget: ResolvedBlockTarget;
+    blockPos: number;
+    nodeType: BlockNodeType;
+    fallbackAnchorRect: DOMRect | null;
+};
+
+type RenderableBlockActionTarget = {
+    pos: number;
+    blockPos: number;
+    nodeType: BlockNodeType;
+    rect: DOMRect | null;
 };
 
 type TiptapEditorProps = {
@@ -115,21 +115,13 @@ export default function TiptapEditor({
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const dragHandleElementRef = useRef<HTMLButtonElement | null>(null);
-    const menuElementRef = useRef<HTMLDivElement | null>(null);
-    const dragHandleAnchorRectRef = useRef<DOMRect | null>(null);
-    const dragHandleTargetRef = useRef<DragHandleMenuTarget | null>(null);
-    const isHoveringDragHandleRef = useRef(false);
-    const isHoveringMenuRef = useRef(false);
-    const openDragHandleMenuRef = useRef<() => void>(() => {});
-    const handleDragHandleNodeChangeRef = useRef<(nextEditor: Editor, pos: number) => void>(() => {});
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
+    const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
 
     const closeBlockMenu = useCallback(() => {
-        isHoveringMenuRef.current = false;
         setIsMenuOpen(false);
         setMenuTarget(null);
     }, []);
@@ -364,36 +356,6 @@ export default function TiptapEditor({
         return true;
     }, [closeBlockMenu, onChange]);
 
-    const resolveBlockMenuTargetFromPos = useCallback((view: Editor['view'], state: EditorState, pos: number): DragHandleMenuTarget | null => {
-        const candidates = Array.from(new Set([
-            pos,
-            Math.max(0, Math.min(pos + 1, state.doc.content.size)),
-            Math.max(0, pos - 1),
-        ]));
-
-        for (const candidatePos of candidates) {
-            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
-            if (!resolvedTarget || !shouldShowDragHandleForTarget(state, resolvedTarget)) {
-                continue;
-            }
-            const rect = getDragHandleAnchorRect(view, resolvedTarget);
-            if (!rect) {
-                continue;
-            }
-            return {
-                renderTarget: {
-                    pos: candidatePos,
-                    blockPos: resolvedTarget.pos,
-                    nodeType: resolvedTarget.nodeType,
-                    rect,
-                },
-                resolvedTarget,
-            };
-        }
-
-        return null;
-    }, [resolveBlockTargetAtPos]);
-
     const emitDocChange = useCallback((nextEditor: Editor, nextDoc: ProseMirrorNode) => {
         if (isUpdatingRef.current) return;
         if (lastAppliedDocRef.current && nextDoc.eq(lastAppliedDocRef.current)) return;
@@ -522,110 +484,81 @@ export default function TiptapEditor({
         }
     }, [boardId, cardId, closeBlockMenu, onEditorError, onChange]);
 
-    const syncDragHandleElement = useCallback((target: DragHandleMenuTarget | null) => {
-        dragHandleTargetRef.current = target;
-        dragHandleAnchorRectRef.current = target ? cloneDomRect(target.renderTarget.rect) : null;
-        if (dragHandleElementRef.current) {
-            applyDragHandleMetadata(dragHandleElementRef.current, target);
-        }
+    const cloneDomRect = useCallback((rect: DOMRect | DOMRectReadOnly): DOMRect => {
+        return new DOMRect(rect.x, rect.y, rect.width, rect.height);
     }, []);
 
-    const clearDragHandleTarget = useCallback(() => {
-        syncDragHandleElement(null);
-    }, [syncDragHandleElement]);
-
-    const shouldKeepCurrentMenuTarget = useCallback(() => {
-        return isHoveringDragHandleRef.current || isHoveringMenuRef.current;
-    }, []);
-
-    const syncDragHandleMenuTarget = useCallback((nextEditor: Editor, nextTarget: DragHandleMenuTarget | null) => {
-        if (suppressBlockUiRef.current) {
-            return;
+    const getBlockTargetRect = useCallback((view: Editor['view'], target: ResolvedBlockTarget): DOMRect | null => {
+        const nodeDom = view.nodeDOM(target.pos);
+        if (!(nodeDom instanceof HTMLElement)) {
+            return null;
         }
 
-        const currentTarget = dragHandleTargetRef.current;
-        const currentBlockPos = currentTarget?.resolvedTarget.pos ?? null;
-        const nextBlockPos = nextTarget?.resolvedTarget.pos ?? null;
+        if (target.nodeType === 'details') {
+            const summary = nodeDom.querySelector(':scope > summary');
+            if (summary instanceof HTMLElement) {
+                return cloneDomRect(summary.getBoundingClientRect());
+            }
+        }
 
-        if (isMenuOpenRef.current) {
-            if (!nextTarget) {
-                if (shouldKeepCurrentMenuTarget()) {
-                    return;
+        if (target.nodeType === 'taskItem') {
+            const taskItem = nodeDom.matches('li[data-type="taskItem"]')
+                ? nodeDom
+                : nodeDom.closest('li[data-type="taskItem"]');
+            if (taskItem instanceof HTMLElement) {
+                const row = taskItem.querySelector(':scope > div');
+                if (row instanceof HTMLElement) {
+                    return cloneDomRect(row.getBoundingClientRect());
                 }
-                return;
+                return cloneDomRect(taskItem.getBoundingClientRect());
             }
+        }
 
-            if (currentBlockPos !== null && currentBlockPos === nextBlockPos) {
-                syncDragHandleElement(nextTarget);
-                return;
+        return cloneDomRect(nodeDom.getBoundingClientRect());
+    }, [cloneDomRect]);
+
+    const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): RenderableBlockActionTarget | null => {
+        const target = resolveBlockTargetAtPos(state, pos);
+        if (!target) return null;
+
+        if (target.nodeType === 'taskItem' && !isTopLevelTaskItemHandleVisible(state, target.pos)) {
+            return null;
+        }
+
+        const rect = getBlockTargetRect(view, target);
+        return {
+            pos,
+            blockPos: target.pos,
+            nodeType: target.nodeType,
+            rect,
+        };
+    }, [getBlockTargetRect, resolveBlockTargetAtPos]);
+
+    const resolveRenderableBlockTarget = useCallback((state: EditorState, target: Pick<RenderableBlockActionTarget, 'pos' | 'blockPos' | 'nodeType'> | null): ResolvedBlockTarget | null => {
+        if (!target) return null;
+
+        const candidates = Array.from(new Set([
+            target.pos,
+            Math.max(0, Math.min(target.blockPos + 1, state.doc.content.size)),
+            target.blockPos,
+        ]));
+
+        for (const candidatePos of candidates) {
+            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
+            if (resolvedTarget && resolvedTarget.nodeType === target.nodeType) {
+                return resolvedTarget;
             }
-
-            nextEditor.commands.unlockDragHandle();
-            setIsMenuOpen(false);
-            setMenuTarget(null);
         }
 
-        syncDragHandleElement(nextTarget);
-    }, [shouldKeepCurrentMenuTarget, syncDragHandleElement]);
-
-    const handleDragHandleNodeChange = useCallback((nextEditor: Editor, pos: number) => {
-        if (suppressBlockUiRef.current) {
-            return;
-        }
-
-        if (pos < 0) {
-            if (shouldKeepCurrentMenuTarget()) {
-                return;
+        for (const candidatePos of candidates) {
+            const resolvedTarget = resolveBlockTargetAtPos(state, candidatePos);
+            if (resolvedTarget) {
+                return resolvedTarget;
             }
-            clearDragHandleTarget();
-            return;
         }
 
-        const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, pos);
-        syncDragHandleMenuTarget(nextEditor, nextTarget);
-    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, shouldKeepCurrentMenuTarget, syncDragHandleMenuTarget]);
-
-    const syncDragHandleTargetFromCoords = useCallback((nextEditor: Editor, clientX: number, clientY: number) => {
-        if (suppressBlockUiRef.current) {
-            return;
-        }
-
-        const positionAtCoords = nextEditor.view.posAtCoords({
-            left: clientX,
-            top: clientY,
-        });
-
-        if (!positionAtCoords) {
-            if (shouldKeepCurrentMenuTarget()) {
-                return;
-            }
-            clearDragHandleTarget();
-            return;
-        }
-
-        const nextTarget = resolveBlockMenuTargetFromPos(nextEditor.view, nextEditor.state, positionAtCoords.pos);
-        syncDragHandleMenuTarget(nextEditor, nextTarget);
-    }, [clearDragHandleTarget, resolveBlockMenuTargetFromPos, shouldKeepCurrentMenuTarget, syncDragHandleMenuTarget]);
-
-    handleDragHandleNodeChangeRef.current = handleDragHandleNodeChange;
-
-    openDragHandleMenuRef.current = () => {
-        const target = dragHandleTargetRef.current;
-        if (!target?.renderTarget.rect) {
-            return;
-        }
-
-        setMenuTarget({
-            renderTarget: {
-                ...target.renderTarget,
-                rect: cloneDomRect(target.renderTarget.rect),
-            },
-            resolvedTarget: target.resolvedTarget,
-        });
-        setIsMenuOpen(true);
-    };
-
-    const dragHandleVirtualElement = useRef(createVirtualElementFromRectRef(dragHandleAnchorRectRef));
+        return null;
+    }, [resolveBlockTargetAtPos]);
 
     const editor = useEditor({
         immediatelyRender: false,
@@ -672,49 +605,6 @@ export default function TiptapEditor({
                     return '';
                 },
                 showOnlyCurrent: true,
-            }),
-            DragHandle.configure({
-                nested: true,
-                computePositionConfig: {
-                    placement: 'left-start',
-                    strategy: 'absolute',
-                },
-                render: () => {
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.tabIndex = -1;
-                    button.setAttribute('aria-label', 'ブロックメニューを開く');
-                    button.dataset.testid = 'tiptap-block-handle';
-                    button.className = styles.blockActionHandle;
-                    button.style.pointerEvents = 'none';
-                    button.innerHTML = `<span class="${styles.blockActionHandleDots}">⋮⋮</span>`;
-                    button.addEventListener('mousedown', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    });
-                    button.addEventListener('mouseenter', () => {
-                        isHoveringDragHandleRef.current = true;
-                    });
-                    button.addEventListener('mouseleave', () => {
-                        isHoveringDragHandleRef.current = false;
-                    });
-                    button.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        openDragHandleMenuRef.current();
-                    });
-                    button.addEventListener('dragstart', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-                    }, true);
-                    dragHandleElementRef.current = button;
-                    return button;
-                },
-                getReferencedVirtualElement: () => dragHandleVirtualElement.current,
-                onNodeChange: (data: { editor: Editor; pos?: number }) => {
-                    handleDragHandleNodeChangeRef.current(data.editor, data.pos ?? -1);
-                },
             }),
             TaskCompletionVisibility.configure({
                 showCompletedLines,
@@ -925,11 +815,6 @@ export default function TiptapEditor({
     }, [closeBlockMenu, editor, resolveBlockTargetAtPos, unsetActiveDetails]);
 
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
-    const suppressBlockUiRef = useRef(suppressBlockUi);
-    const isMenuOpenRef = useRef(isMenuOpen);
-
-    suppressBlockUiRef.current = suppressBlockUi;
-    isMenuOpenRef.current = isMenuOpen;
 
     useEffect(() => {
         emitShortcutState(editor);
@@ -1221,98 +1106,106 @@ export default function TiptapEditor({
         invalidateLayout();
     }, [editor, invalidateLayout, showCompletedLines]);
 
-    useEffect(() => {
-        if (!editor) return;
-
-        if (suppressBlockUi) {
-            clearDragHandleTarget();
-            return;
-        }
-
-        if (isMenuOpen) {
-            editor.commands.lockDragHandle();
-            return;
-        }
-
-        editor.commands.unlockDragHandle();
-    }, [clearDragHandleTarget, editor, isMenuOpen, suppressBlockUi]);
-
-    useEffect(() => {
-        if (!editor || suppressBlockUi) return;
-
-        const editorDom = editor.view.dom;
-
-        const handleMouseMove = (event: MouseEvent) => {
-            syncDragHandleTargetFromCoords(editor, event.clientX, event.clientY);
-        };
-
-        const handleMouseLeave = (event: MouseEvent) => {
-            const relatedTarget = event.relatedTarget;
-            const dragHandleElement = dragHandleElementRef.current;
-            const menuElement = menuElementRef.current;
-            if (dragHandleElement && relatedTarget instanceof Node && dragHandleElement.contains(relatedTarget)) {
-                return;
-            }
-            if (menuElement && relatedTarget instanceof Node && menuElement.contains(relatedTarget)) {
-                return;
-            }
-            if (relatedTarget instanceof Node && editorDom.contains(relatedTarget)) {
-                return;
-            }
-            if (shouldKeepCurrentMenuTarget()) {
-                return;
-            }
-            if (isMenuOpenRef.current) {
-                return;
-            }
-            clearDragHandleTarget();
-        };
-
-        editorDom.addEventListener('mousemove', handleMouseMove, { passive: true });
-        editorDom.addEventListener('mouseleave', handleMouseLeave);
-
-        return () => {
-            editorDom.removeEventListener('mousemove', handleMouseMove);
-            editorDom.removeEventListener('mouseleave', handleMouseLeave);
-        };
-    }, [clearDragHandleTarget, editor, shouldKeepCurrentMenuTarget, suppressBlockUi, syncDragHandleTargetFromCoords]);
-
     useLayoutEffect(() => {
-        if (!editor || !menuTarget) return;
+        if (!editor) {
+            setRenderableBlocks([]);
+            return;
+        }
 
         const frameId = window.requestAnimationFrame(() => {
-            const nextRect = getDragHandleAnchorRect(editor.view, menuTarget.resolvedTarget);
-            if (!nextRect) return;
+            if (suppressBlockUi) {
+                setRenderableBlocks([]);
+                return;
+            }
 
-            const currentRect = menuTarget.renderTarget.rect;
-            const sameRect =
-                Math.abs(currentRect.top - nextRect.top) < 0.5 &&
-                Math.abs(currentRect.left - nextRect.left) < 0.5 &&
-                Math.abs(currentRect.width - nextRect.width) < 0.5 &&
-                Math.abs(currentRect.height - nextRect.height) < 0.5;
-
-            dragHandleAnchorRectRef.current = cloneDomRect(nextRect);
-            if (sameRect) return;
-
-            setMenuTarget((current) => {
-                if (!current || current.resolvedTarget.pos !== menuTarget.resolvedTarget.pos) {
-                    return current;
+            const nextTargets: RenderableBlockActionTarget[] = [];
+            editor.state.doc.descendants((node, pos) => {
+                if (
+                    node.type.name !== 'details' &&
+                    node.type.name !== 'paragraph' &&
+                    node.type.name !== 'heading' &&
+                    node.type.name !== 'taskItem' &&
+                    node.type.name !== 'listItem'
+                ) {
+                    return true;
                 }
 
-                return {
-                    ...current,
-                    renderTarget: {
-                        ...current.renderTarget,
-                        rect: cloneDomRect(nextRect),
-                    },
-                };
+                const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
+                if (!target?.rect) {
+                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
+                }
+
+                const isDuplicate = nextTargets.some((candidate) => (
+                    candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType
+                ));
+                if (!isDuplicate) {
+                    nextTargets.push(target);
+                }
+
+                return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
             });
+            setRenderableBlocks(nextTargets);
         });
 
         return () => {
             window.cancelAnimationFrame(frameId);
         };
-    }, [editor, layoutVersion, menuTarget]);
+    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const root = rootRef.current;
+        const editorDom = editor.view.dom;
+        if (!root) return;
+
+        const observer = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(() => {
+                invalidateLayout();
+            })
+            : null;
+
+        observer?.observe(root);
+        if (editorDom instanceof HTMLElement) {
+            observer?.observe(editorDom);
+        }
+
+        return () => {
+            observer?.disconnect();
+        };
+    }, [editor, invalidateLayout]);
+
+    useLayoutEffect(() => {
+        if (!menuTarget) return;
+
+        const nextAnchor = renderableBlocks.find((target) => (
+            target.blockPos === menuTarget.blockPos && target.nodeType === menuTarget.nodeType
+        ))?.rect ?? null;
+
+        if (!nextAnchor) return;
+
+        setMenuTarget((current) => {
+            if (!current || current.blockPos !== menuTarget.blockPos || current.nodeType !== menuTarget.nodeType) {
+                return current;
+            }
+
+            const currentRect = current.fallbackAnchorRect;
+            if (
+                currentRect &&
+                Math.abs(currentRect.top - nextAnchor.top) < 0.5 &&
+                Math.abs(currentRect.left - nextAnchor.left) < 0.5 &&
+                Math.abs(currentRect.width - nextAnchor.width) < 0.5 &&
+                Math.abs(currentRect.height - nextAnchor.height) < 0.5
+            ) {
+                return current;
+            }
+
+            return {
+                ...current,
+                fallbackAnchorRect: cloneDomRect(nextAnchor),
+            };
+        });
+    }, [cloneDomRect, layoutVersion, menuTarget, renderableBlocks]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
         if (rootRef.current === node) {
@@ -1334,9 +1227,19 @@ export default function TiptapEditor({
     }
 
     const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
-    const resolvedMenuTarget = menuTarget?.resolvedTarget ?? null;
+    const activeRenderableMenuTarget = menuTarget
+        ? renderableBlocks.find((target) => target.blockPos === menuTarget.blockPos && target.nodeType === menuTarget.nodeType) ?? null
+        : null;
+    const resolvedMenuTarget = menuTarget
+        ? resolveRenderableBlockTarget(editor.state, activeRenderableMenuTarget ?? {
+            pos: Math.max(0, Math.min(menuTarget.blockPos + 1, editor.state.doc.content.size)),
+            blockPos: menuTarget.blockPos,
+            nodeType: menuTarget.nodeType,
+        })
+        : null;
+    const menuAnchorRect = activeRenderableMenuTarget?.rect ?? menuTarget?.fallbackAnchorRect ?? null;
     const menuItems = menuTarget
-        ? getBlockActionItems(menuTarget.renderTarget.nodeType, {
+        ? getBlockActionItems(menuTarget.nodeType, {
             canMoveUp: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'up') : false,
             canMoveDown: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'down') : false,
         })
@@ -1356,7 +1259,7 @@ export default function TiptapEditor({
             }).__TAESK_LAST_BLOCK_ACTION__ = {
                 action,
                 menuTargetPos: resolvedMenuTarget.pos,
-                menuTargetNodeType: menuTarget.renderTarget.nodeType,
+                menuTargetNodeType: menuTarget.nodeType,
                 resolvedTargetPos: resolvedMenuTarget?.pos ?? null,
                 resolvedNodeType: resolvedMenuTarget?.nodeType ?? null,
             };
@@ -1427,17 +1330,48 @@ export default function TiptapEditor({
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
         >
+            {renderableBlocks.map((target, index) => {
+                if (!target.rect || !rootRect) return null;
+                return (
+                    <button
+                        key={`${target.blockPos}-${target.nodeType}`}
+                        type="button"
+                        tabIndex={-1}
+                        aria-label="ブロックメニューを開く"
+                        data-testid="tiptap-block-handle"
+                        data-block-index={index}
+                        data-block-node-type={target.nodeType}
+                        data-block-pos={target.pos}
+                        data-block-start-pos={target.blockPos}
+                        className={styles.blockActionHandle}
+                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 12 }}
+                        onMouseDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (!target.rect) return;
+                            setMenuTarget({
+                                blockPos: target.blockPos,
+                                nodeType: target.nodeType,
+                                fallbackAnchorRect: cloneDomRect(target.rect),
+                            });
+                            setIsMenuOpen(true);
+                        }}
+                    >
+                        <span className={styles.blockActionHandleDots}>⋮⋮</span>
+                    </button>
+                );
+            })}
             <EditorContent editor={editor} />
-            {isMenuOpen && menuTarget?.renderTarget.rect && rootRect ? (
+            {isMenuOpen && menuAnchorRect && rootRect ? (
                 <BlockActionMenu
-                    anchorRect={menuTarget.renderTarget.rect}
+                    anchorRect={menuAnchorRect}
                     containerRect={rootRect}
                     items={menuItems}
-                    menuRootRef={menuElementRef}
                     onClose={closeBlockMenu}
-                    onHoverChange={(hovering) => {
-                        isHoveringMenuRef.current = hovering;
-                    }}
                     onSelect={handleBlockAction}
                 />
             ) : null}
