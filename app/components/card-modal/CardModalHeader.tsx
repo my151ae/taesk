@@ -133,6 +133,7 @@ export default function CardModalHeader({
     showSidebar,
     onToggleSidebar,
 }: CardModalHeaderProps) {
+    const [mobileMetaExpanded, setMobileMetaExpanded] = useState(false);
     const actionOrder = useMemo<HeaderActionId[]>(() => {
         const items: HeaderActionId[] = [];
         if (cardShortId) {
@@ -225,6 +226,14 @@ export default function CardModalHeader({
         setShowOverflowMenu((prev) => !prev);
     };
 
+    useEffect(() => {
+        if (!dueDate) {
+            setMobileMetaExpanded(false);
+        }
+    }, [dueDate]);
+
+    const hasMobileExpandableMeta = Boolean(dueDate);
+
     const renderInlineAction = (actionId: HeaderActionId) => {
         switch (actionId) {
             case "copyLink":
@@ -280,7 +289,7 @@ export default function CardModalHeader({
 
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                 <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="flex items-start gap-1.5 sm:gap-2">
                         <button
                             type="button"
                             onClick={onRequestClose}
@@ -290,19 +299,47 @@ export default function CardModalHeader({
                             <span className="text-base leading-none">✕</span>
                         </button>
 
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 text-sm sm:gap-6">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
-                                <input
-                                    type="date"
-                                    value={dueDate ? new Date(dueDate).toISOString().split("T")[0] : ""}
-                                    onChange={(e) => onDueDateChange(e.target.value)}
-                                    className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
-                                />
+                        <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
+                                    <input
+                                        type="date"
+                                        value={dueDate ? new Date(dueDate).toISOString().split("T")[0] : ""}
+                                        onChange={(e) => onDueDateChange(e.target.value)}
+                                        className="min-w-0 rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
+                                    />
+                                </div>
+                                {hasMobileExpandableMeta && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobileMetaExpanded((prev) => !prev)}
+                                        className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 md:hidden"
+                                        aria-expanded={mobileMetaExpanded}
+                                        aria-label={mobileMetaExpanded ? "詳細を閉じる" : "詳細を開く"}
+                                    >
+                                        <span>{mobileMetaExpanded ? "閉じる" : "詳細"}</span>
+                                        <svg
+                                            className={clsx("h-3 w-3 transition-transform", mobileMetaExpanded && "rotate-180")}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
 
-                        {dueDate && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <div className="mt-3 flex min-w-0 flex-col gap-3 md:mt-0 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:text-sm sm:gap-6">
+                                {dueDate && (
+                                    <div
+                                        className={clsx(
+                                            "flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2",
+                                            mobileMetaExpanded ? "flex" : "hidden",
+                                            "md:flex"
+                                        )}
+                                    >
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Start</span>
                                     <input
@@ -410,11 +447,17 @@ export default function CardModalHeader({
                                         </select>
                                     )}
                                 </div>
-                            </div>
-                        )}
+                                    </div>
+                                )}
 
-                        {dueDate && (
-                            <div className="flex items-center gap-2 sm:border-l sm:border-slate-100 sm:pl-4 sm:dark:border-gray-700">
+                                {dueDate && (
+                                    <div
+                                        className={clsx(
+                                            "items-center gap-2 sm:border-l sm:border-slate-100 sm:pl-4 sm:dark:border-gray-700",
+                                            mobileMetaExpanded ? "flex" : "hidden",
+                                            "md:flex"
+                                        )}
+                                    >
                                 <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap text-slate-400 dark:text-gray-500">Members</span>
                                 <div className="relative flex flex-wrap items-center gap-1.5">
                                     {selectedAssignees.map((member) => (
@@ -514,8 +557,9 @@ export default function CardModalHeader({
                                         </div>
                                     )}
                                 </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
                         </div>
                     </div>
                 </div>
