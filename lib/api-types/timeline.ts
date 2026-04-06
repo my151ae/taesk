@@ -103,3 +103,29 @@ export interface TimelineResponse {
   range?: number;
   availableTags?: string[];
 }
+
+export interface TrashCardItem {
+  card_id: string;
+  title: string;
+  content?: JSONContent | null;
+  excerpt?: string | null;
+  due_date: string | null;
+  due_start: string | null;
+  due_end: string | null;
+  checked: boolean;
+  tags: string[];
+  assignee_id?: string | null;
+  assignee_ids?: string[] | null;
+  assigned_to?: string | null;
+  due_bucket?: DueBucket | null;
+  due_bucket_position?: number | null;
+  duration?: number | null;
+  short_id: string | null;
+  slug: string | null;
+  deleted_at: string;
+  purge_after_at: string;
+}
+
+export interface TrashResponse {
+  items: TrashCardItem[];
+}

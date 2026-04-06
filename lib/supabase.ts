@@ -108,6 +108,8 @@ export interface Card {
   short_id: string | null;
   id_short: number | null;
   slug: string | null;
+  deleted_at: string | null;
+  purge_after_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -211,7 +213,7 @@ export interface ActivityLog {
   id: string;
   board_id: string;
   user_id: string | null;
-  action: 'created' | 'updated' | 'deleted' | 'moved';
+  action: 'created' | 'updated' | 'deleted' | 'moved' | 'restored';
   entity_type: 'card' | 'list';
   entity_id: string | null;
   entity_title: string | null;

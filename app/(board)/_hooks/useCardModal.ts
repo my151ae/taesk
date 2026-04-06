@@ -15,9 +15,10 @@ type UseCardModalProps = {
     dataMode: 'api' | 'mock';
     data: TimelineResponse | null;
     setCardInUrl: (card: string | null, options?: { method?: UrlUpdateMethod }) => void;
+    onResolveTrashedCard?: () => void;
 };
 
-export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: UseCardModalProps) {
+export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onResolveTrashedCard }: UseCardModalProps) {
     const searchParams = useSearchParams();
     const cardIdFromUrl = searchParams?.get('card');
 
@@ -76,6 +77,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                 checked: eventCard.checked,
                 short_id: eventCard.short_id,
                 slug: eventCard.slug,
+                deleted_at: null,
+                purge_after_at: null,
                 due_date: eventCard.due_date,
                 due_start: eventCard.due_start,
                 due_end: eventCard.due_end,
@@ -113,6 +116,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                     checked: bucketItem.checked,
                     short_id: bucketItem.short_id,
                     slug: bucketItem.slug,
+                    deleted_at: null,
+                    purge_after_at: null,
                     due_date: bucketItem.due_date,
                     due_start: bucketItem.due_start,
                     due_end: bucketItem.due_end,
@@ -149,6 +154,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
                 checked: overdueItem.checked,
                 short_id: overdueItem.short_id,
                 slug: overdueItem.slug,
+                deleted_at: null,
+                purge_after_at: null,
                 due_date: overdueItem.due_date,
                 due_start: overdueItem.due_start,
                 due_end: overdueItem.due_end,
@@ -200,9 +207,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
         if (!targetShortId) {
             if (isModalClosing) setIsModalClosing(false);
             cardModalShortIdRef.current = null;
-            setModalProfiles([]);
-            setCardModalStatus('idle');
-            setCardModalError(null);
+            setModalProfiles((prev) => (prev.length ? [] : prev));
+            setCardModalStatus((prev) => (prev === 'idle' ? prev : 'idle'));
+            setCardModalError((prev) => (prev === null ? prev : null));
             return;
         }
 
@@ -250,6 +257,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
 
                 const nextCard = body?.card ?? null;
                 setModalCardOverride(nextCard);
+                if (nextCard?.deleted_at) {
+                    onResolveTrashedCard?.();
+                }
 
                 if (Array.isArray(body?.profiles) && body.profiles.length > 0) {
                     setModalProfiles(body.profiles);
@@ -287,7 +297,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl }: Use
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isModalClosing, activeCardId]);
+    }, [targetShortId, isModalClosing, activeCardId, onResolveTrashedCard]);
 
     // Load Board Members
     useEffect(() => {

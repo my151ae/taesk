@@ -146,6 +146,8 @@ function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: strin
     short_id: sourceEvent?.short_id ?? sourceBucketItem?.short_id ?? sourceOverdueItem?.short_id ?? null,
     id_short: null,
     slug: sourceEvent?.slug ?? sourceBucketItem?.slug ?? sourceOverdueItem?.slug ?? null,
+    deleted_at: null,
+    purge_after_at: null,
     created_at: "",
     updated_at: "",
   };

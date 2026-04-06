@@ -129,7 +129,8 @@ const getHandler = async (
   const { data: cards, error: fetchError } = await supabase
     .from('cards')
     .select(cardsSelect)
-    .eq('board_id', boardId);
+    .eq('board_id', boardId)
+    .is('deleted_at', null);
 
   if (fetchError) {
     console.error('[timeline] Failed to fetch cards', fetchError);

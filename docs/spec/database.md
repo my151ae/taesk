@@ -140,6 +140,8 @@ CREATE TABLE public.cards (
   short_id TEXT UNIQUE,
   id_short INTEGER NULL,
   slug TEXT NULL,
+  deleted_at TIMESTAMPTZ NULL,
+  purge_after_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -147,6 +149,8 @@ CREATE TABLE public.cards (
 CREATE INDEX idx_cards_board ON public.cards(board_id);
 CREATE INDEX idx_cards_board_due_date ON public.cards(board_id, due_date);
 CREATE INDEX idx_cards_due_bucket_position ON public.cards(due_bucket, due_bucket_position DESC NULLS LAST);
+CREATE INDEX idx_cards_board_deleted_at ON public.cards(board_id, deleted_at);
+CREATE INDEX idx_cards_purge_after_at ON public.cards(purge_after_at) WHERE deleted_at IS NOT NULL;
 ```
 
 - `due_date` があり `due_start`/`due_end` が両方ある場合は Timeline イベントとして表示。  
@@ -155,6 +159,9 @@ CREATE INDEX idx_cards_due_bucket_position ON public.cards(due_bucket, due_bucke
 - `due_bucket` が未指定の場合は UI 側で `b` をフォールバックとして扱う。  
 - `due_bucket_position` は降順で並ぶ floating number。DnD 時に `Date.now()` を使いユニーク値を割り当てる。
 - `checked` は Timeline の完了チェックボックスや A/B カードにもそのまま反映される。
+- `deleted_at` が入ったカードは active Timeline から除外され、Trash にのみ表示される。
+- `purge_after_at` は trash move 時に `deleted_at + 30 days` を記録し、昇順で Trash 一覧を並べる。
+- trash move では card 行を保持し、Google Calendar / 画像 cleanup は走らない。完全削除時のみ destructive cleanup を実行する。
 
 ## comments
 
@@ -195,7 +202,7 @@ CREATE TABLE public.activity_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   board_id UUID NOT NULL REFERENCES public.boards(id) ON DELETE CASCADE,
   user_id UUID NULL,
-  action TEXT NOT NULL CHECK (action IN ('created','updated','deleted','moved')),
+  action TEXT NOT NULL CHECK (action IN ('created','updated','deleted','moved','restored')),
   entity_type TEXT NOT NULL CHECK (entity_type IN ('card','list')),
   entity_id TEXT NULL,
   entity_title TEXT NULL,

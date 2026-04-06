@@ -102,10 +102,10 @@ export function useTimelineCardContextMenuItems({
         },
       },
       {
-        label: "削除",
+        label: "ゴミ箱へ移動",
         variant: "danger",
         onClick: async () => {
-          if (!confirm("カードを削除しますか？")) return;
+          if (!confirm("カードをゴミ箱へ移動しますか？")) return;
           await runForTargetCards((cardId) => handleCardModalDelete(cardId));
         },
       },

@@ -12,7 +12,7 @@ type UseTimelineUrlStateArgs = {
 };
 
 export type TimelineViewMode = "timeline" | "list";
-export type LeftPanelMode = "none" | "overdue" | "notifications" | "tags" | "search";
+export type LeftPanelMode = "none" | "overdue" | "notifications" | "tags" | "search" | "trash";
 export type RightPanelMode = "timeline" | "list";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
@@ -169,7 +169,7 @@ const normalizeListWindow = (before: number, after: number): ListWindow => {
 };
 
 const isLeftPanelMode = (value: string | null): value is LeftPanelMode =>
-  value === "none" || value === "overdue" || value === "notifications" || value === "tags" || value === "search";
+  value === "none" || value === "overdue" || value === "notifications" || value === "tags" || value === "search" || value === "trash";
 
 const isRightPanelMode = (value: string | null): value is RightPanelMode =>
   value === "timeline" || value === "list";

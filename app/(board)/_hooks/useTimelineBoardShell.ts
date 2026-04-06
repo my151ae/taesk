@@ -10,6 +10,19 @@ import type { BoardMember } from "@/app/(board)/_stores/board-members-store";
 type ProfileResponse = ProfileSummary | null;
 const LAST_BOARD_COOKIE = "taesk-last-board-id";
 
+function areProfilesEqual(left: ProfileResponse, right: ProfileResponse): boolean {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  return (
+    left.id === right.id &&
+    left.email === right.email &&
+    left.username === right.username &&
+    left.full_name === right.full_name &&
+    left.avatar_url === right.avatar_url &&
+    left.timeline_start_hour === right.timeline_start_hour
+  );
+}
+
 type UseTimelineBoardShellProps = {
   initialBoard: Board;
   currentBoardId: string;
@@ -39,7 +52,7 @@ export function useTimelineBoardShell({
       const response = await fetch("/api/profiles");
       if (!response.ok) return;
       const data = (await response.json()) as ProfileResponse;
-      setProfile(data);
+      setProfile((prev) => (areProfilesEqual(prev, data) ? prev : data));
       const hour = data?.timeline_start_hour;
       if (typeof hour === "number") {
         onTimelineStartHour?.(hour);

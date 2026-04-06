@@ -170,8 +170,7 @@
 .editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length])::after {
     position: absolute;
     top: -0.2rem;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0.125rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;

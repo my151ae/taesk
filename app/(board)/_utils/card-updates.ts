@@ -52,6 +52,10 @@ export function applyCardUpdate(
         return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
     }
 
+    if (card.deleted_at) {
+        return { ...prev, events: nextEvents, abBuckets: nextBuckets, overdue: nextOverdue };
+    }
+
     const checklist = normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST);
     const localDay = toLocalDay(card.due_date ?? null);
     const hasTime = Boolean(card.due_start && card.due_end);

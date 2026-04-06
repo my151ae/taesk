@@ -16,8 +16,9 @@ import { useNotificationsStore } from "@/app/(board)/_stores/notifications-store
 import { featureFlags } from "@/lib/featureFlags";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { Notification } from "@/lib/supabase";
+import type { TrashCardItem } from "@/lib/api-types/timeline";
 
-export type SidebarSectionKey = "overdue" | "notifications" | "search" | "tags";
+export type SidebarSectionKey = "overdue" | "notifications" | "search" | "tags" | "trash";
 type SidebarSectionTone = "danger" | "neutral";
 
 export type DesktopSidebarMenuState = {
@@ -66,6 +67,14 @@ export type DesktopSidebarSection =
       count: number;
       tags: readonly TimelineTagSummary[];
       results: readonly TimelineSearchResultItem[];
+    }
+  | {
+      key: "trash";
+      tone: "neutral";
+      id: string;
+      label: string;
+      count: number;
+      items: readonly TrashCardItem[];
     };
 
 export type DesktopSidebarHeaderSlot =
@@ -84,6 +93,7 @@ type DesktopSidebarMenuProps = {
   onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   allowOverdueDrag: boolean;
   onOpenNotificationSettings: () => void;
+  onRestoreTrashCard: (cardId: string) => Promise<boolean>;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
@@ -159,6 +169,16 @@ function TagIcon() {
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M10 5h7l2 2v7l-8 8-6-6 8-8Z" />
       <circle cx="14.5" cy="9.5" r="1.25" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 7V5.75A1.75 1.75 0 0 1 10.75 4h2.5A1.75 1.75 0 0 1 15 5.75V7" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7l.7 11.2A2 2 0 0 0 9.7 20h4.6a2 2 0 0 0 1.99-1.8L17 7" />
     </svg>
   );
 }
@@ -561,6 +581,24 @@ function buildOverdueTimeText(item: TimelineOverdueItem) {
   });
 }
 
+function buildTrashTimeText(item: TrashCardItem) {
+  const purgeAt = new Date(item.purge_after_at);
+  const deletedAt = new Date(item.deleted_at);
+  const purgeText = new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(purgeAt);
+  const deletedText = new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(deletedAt);
+  return `削除 ${deletedText} / 完全削除 ${purgeText}`;
+}
+
 function renderSidebarResultRows({
   results,
   shortcutSection,
@@ -644,6 +682,7 @@ export function DesktopSidebarMenu({
   onOverdueSortOrderChange,
   allowOverdueDrag,
   onOpenNotificationSettings,
+  onRestoreTrashCard,
   openCardModal,
   onToggleCheck,
   onRenameCardTitle,
@@ -692,11 +731,13 @@ export function DesktopSidebarMenu({
     const overdueSection = sections.find((section) => section.key === "overdue");
     const searchSection = sections.find((section) => section.key === "search");
     const tagsSection = sections.find((section) => section.key === "tags");
+    const trashSection = sections.find((section) => section.key === "trash");
     return [
       overdueSection,
       notificationSection,
       searchSection,
       tagsSection,
+      trashSection,
     ].filter((section): section is DesktopSidebarSection => Boolean(section));
   }, [notificationSection, sections]);
 
@@ -744,6 +785,8 @@ export function DesktopSidebarMenu({
         return <SearchIcon />;
       case "tags":
         return <TagIcon />;
+      case "trash":
+        return <TrashIcon />;
       default:
         return null;
     }
@@ -939,6 +982,67 @@ export function DesktopSidebarMenu({
               </div>
             )}
           </div>
+        </div>
+      );
+    }
+
+    if (section.key === "trash") {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {section.items.length === 0 ? (
+            <div className="px-3 py-4">
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                ゴミ箱は空です
+              </p>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+              <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2">
+                {section.items.map((item) => (
+                  <div
+                    key={item.card_id}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                    data-testid={`trash-card-${item.card_id}`}
+                  >
+                    <div className="min-w-0">
+                      <TimelineCard
+                        title={item.title || ""}
+                        checked={item.checked}
+                        content={item.content ?? null}
+                        note={item.excerpt ?? undefined}
+                        noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
+                        notePreviewLines={3}
+                        cardId={item.card_id}
+                        badgeLabel="TR"
+                        timeText={buildTrashTimeText(item)}
+                        timePlacement="out-top"
+                        onOpen={() => openCardModal(item.short_id, "trash")}
+                        openButtonTestId={`cardOpenButton-trash-${item.card_id}`}
+                        showOpenButton
+                        onToggleCheck={() => {}}
+                        hideLeftColumn
+                        className="min-h-0 bg-white"
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-slate-500">
+                        残り {Math.max(0, Math.ceil((new Date(item.purge_after_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} 日
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void onRestoreTrashCard(item.card_id);
+                        }}
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900"
+                      >
+                        復元
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }

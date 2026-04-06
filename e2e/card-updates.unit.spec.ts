@@ -66,4 +66,22 @@ test.describe("applyCardUpdate", () => {
     expect(next.overdue[0]?.card_id).toBe("card-1");
     expect(next.overdue[0]?.checked).toBe(true);
   });
+
+  test("trashed card の realtime UPDATE は active view に再投入しない", async () => {
+    const prev = applyCardUpdate(createTimelineResponse(), createCard({
+      due_date: "2026-04-02T00:00:00.000Z",
+      due_bucket: "b",
+    }), "INSERT");
+
+    const next = applyCardUpdate(prev, createCard({
+      due_date: "2026-04-02T00:00:00.000Z",
+      due_bucket: "b",
+      deleted_at: "2026-04-07T00:00:00.000Z",
+      purge_after_at: "2026-05-07T00:00:00.000Z",
+    }), "UPDATE");
+
+    expect(next.events).toHaveLength(0);
+    expect(next.abBuckets["2026-04-02_b"]).toHaveLength(0);
+    expect(next.overdue).toHaveLength(0);
+  });
 });

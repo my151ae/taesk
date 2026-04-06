@@ -8,6 +8,9 @@ import type { Board } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import type { Card } from "@/lib/supabase";
+import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
@@ -22,6 +25,7 @@ import {
   minuteToPixels,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
+import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
@@ -83,8 +87,40 @@ const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
 const OVERDUE_LANE_ID = "overdue";
 
 const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
-  if (mode === "overdue" || mode === "notifications" || mode === "search" || mode === "tags") return mode;
+  if (mode === "overdue" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
   return null;
+};
+
+const sortTrashItems = (items: TrashCardItem[]) =>
+  [...items].sort((left, right) => {
+    const purgeDiff = new Date(left.purge_after_at).getTime() - new Date(right.purge_after_at).getTime();
+    if (purgeDiff !== 0) return purgeDiff;
+    return new Date(left.deleted_at).getTime() - new Date(right.deleted_at).getTime();
+  });
+
+const mapCardToTrashItem = (card: Partial<Card> & { id: string }): TrashCardItem | null => {
+  if (!card.deleted_at || !card.purge_after_at) return null;
+  return {
+    card_id: card.id,
+    title: card.title ?? "",
+    content: card.content ?? null,
+    excerpt: card.excerpt ?? null,
+    due_date: card.due_date ?? null,
+    due_start: card.due_start ?? null,
+    due_end: card.due_end ?? null,
+    checked: card.checked ?? false,
+    tags: card.tags ?? [],
+    assignee_id: card.assignee_id ?? null,
+    assignee_ids: card.assignee_ids ?? null,
+    assigned_to: card.assigned_to ?? null,
+    due_bucket: card.due_bucket ?? null,
+    due_bucket_position: card.due_bucket_position ?? null,
+    duration: card.duration ?? null,
+    short_id: card.short_id ?? null,
+    slug: card.slug ?? null,
+    deleted_at: card.deleted_at,
+    purge_after_at: card.purge_after_at,
+  };
 };
 
 function InvalidTimelineUrlState({
@@ -143,6 +179,22 @@ function TimelineBoardPageContent({
   const activeLeftSectionKey = leftPanelModeToSidebarSection(resolvedState.leftPanelMode);
   const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
+  const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
+
+  const handleRealtimeTrashChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
+    setTrashItems((prev) => {
+      if (payload.eventType === "DELETE") {
+        return prev.filter((item) => item.card_id !== payload.old.id);
+      }
+
+      const nextTrashItem = mapCardToTrashItem(payload.new as Card);
+      const existing = prev.filter((item) => item.card_id !== payload.new.id);
+      if (!nextTrashItem) {
+        return existing;
+      }
+      return sortTrashItems([...existing, nextTrashItem]);
+    });
+  }, []);
 
   useEffect(() => {
     setExpandedSectionKey(activeLeftSectionKey);
@@ -259,7 +311,29 @@ function TimelineBoardPageContent({
     dayWindowStartRef,
     setDayWindowStart,
     buildMockTimelineResponse,
+    onRealtimeCardChange: handleRealtimeTrashChange,
   });
+
+  const fetchTrash = useCallback(async () => {
+    const response = await fetch(`/api/boards/${currentBoard.id}/trash`, { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const body = await response.json().catch(() => null);
+    setTrashItems(sortTrashItems(body?.items ?? []));
+  }, [currentBoard.id]);
+
+  useEffect(() => {
+    void fetchTrash();
+  }, [fetchTrash]);
+
+  const handleResolveTrashedCard = useCallback(() => {
+    updateBoardUiState({
+      leftPanelMode: "trash",
+      method: "replace",
+    });
+    setExpandedSectionKey("trash");
+  }, [updateBoardUiState]);
 
   const {
     modalCard,
@@ -275,6 +349,7 @@ function TimelineBoardPageContent({
     dataMode,
     data,
     setCardInUrl: setCard,
+    onResolveTrashedCard: handleResolveTrashedCard,
   });
 
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -516,7 +591,7 @@ function TimelineBoardPageContent({
   const {
     applyPatch,
     handleCardModalSave,
-    handleCardModalDelete,
+    handleCardModalDelete: handleTrashCardMove,
     handleToggleCardChecked,
     handleRenameCardTitle,
     handleColumnClick,
@@ -547,6 +622,34 @@ function TimelineBoardPageContent({
       setPendingTitleEditCardId(cardId);
     },
   });
+
+  const handleRestoreCard = useCallback(async (cardId: string) => {
+    try {
+      const response = await fetch(`/api/boards/${currentBoard.id}/cards/${cardId}/restore`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.card) {
+        throw new Error(body?.error?.message || "Failed to restore card");
+      }
+
+      setTrashItems((prev) => prev.filter((item) => item.card_id !== cardId));
+      setData((prev) => (prev ? applyCardUpdate(prev, body.card as Card, "UPDATE") : prev));
+      setModalCardOverride(body.card as Card);
+      return true;
+    } catch (error) {
+      setCardModalError(error instanceof Error ? error.message : "Failed to restore card");
+      return false;
+    }
+  }, [currentBoard.id, setCardModalError, setData, setModalCardOverride]);
+
+  const handleCardModalDelete = useCallback(async (cardId: string) => {
+    const success = await handleTrashCardMove(cardId);
+    if (success) {
+      void fetchTrash();
+    }
+    return success;
+  }, [fetchTrash, handleTrashCardMove]);
 
   const [bucketCreateMenu, setBucketCreateMenu] = useState<{
     open: boolean;
@@ -827,6 +930,14 @@ function TimelineBoardPageContent({
         return;
       }
 
+      if (key === "trash") {
+        updateBoardUiState({
+          leftPanelMode: "trash",
+          method: "replace",
+        });
+        return;
+      }
+
       updateBoardUiState({
         leftPanelMode: "tags",
         tag: selectedTags[0] ?? resolvedState.tag ?? null,
@@ -940,6 +1051,7 @@ function TimelineBoardPageContent({
     selectedTags,
     setSelectedTags: handleSelectedTagsChange,
     tagSummaries,
+    trashItems,
     indicatorTop,
     liveNowIsoDate: currentTimelineIsoDate,
     liveNowMinutes: currentTimelineMinutes,
@@ -1005,6 +1117,7 @@ function TimelineBoardPageContent({
     modalProfiles,
     handleCardModalSave,
     handleCardModalDelete,
+    handleRestoreCard,
     closeCardModal,
     historySaveWarning,
     retryHistorySave,

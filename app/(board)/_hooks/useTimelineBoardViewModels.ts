@@ -16,6 +16,7 @@ import type {
   TimelineOverdueItem,
 } from "@/app/(board)/_utils/timeline-helpers";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
+import type { TrashCardItem } from "@/lib/api-types/timeline";
 import type {
   ActiveDragState,
   ActiveResizeState,
@@ -89,6 +90,7 @@ type UseTimelineBoardViewModelsArgs = {
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
+  trashItems: TrashCardItem[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   liveNowMinutes: number | null;
@@ -189,8 +191,16 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         tags: args.tagSummaries,
         results: args.tagResults,
       },
+      {
+        key: "trash",
+        tone: "neutral",
+        id: "desktop-sidebar-trash-panel",
+        label: "Trash",
+        count: args.trashItems.length,
+        items: args.trashItems,
+      },
     ],
-    [args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries]
+    [args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries, args.trashItems]
   );
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(

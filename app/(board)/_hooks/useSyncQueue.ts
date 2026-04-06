@@ -4,6 +4,7 @@ import { useAuth } from '@/app/contexts/AuthContext';
 
 export function useSyncQueue() {
     const { user } = useAuth();
+    const userId = user?.id ?? null;
     const [isOnline, setIsOnline] = useState(true);
     const [syncQueueStats, setSyncQueueStats] = useState({ pending: 0, failed: 0, total: 0, lastSyncedAt: null as number | null });
 
@@ -71,7 +72,7 @@ export function useSyncQueue() {
         };
 
         syncOnLoad();
-    }, [refreshStats, user]);
+    }, [refreshStats, userId]);
 
     // Update sync queue stats periodically
     useEffect(() => {

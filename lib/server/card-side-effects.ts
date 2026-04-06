@@ -8,7 +8,7 @@ import {
   syncCardToCalendar,
 } from "@/lib/calendarSyncService";
 
-type ActivityAction = "created" | "updated" | "moved" | "deleted";
+type ActivityAction = "created" | "updated" | "moved" | "deleted" | "restored";
 
 type ActivityLogInput = {
   boardId: string;

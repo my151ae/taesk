@@ -25,6 +25,7 @@ type UseTimelineDataArgs = {
   dayWindowStartRef: MutableRefObject<number>;
   setDayWindowStart: (value: number) => void;
   buildMockTimelineResponse: () => TimelineResponse;
+  onRealtimeCardChange?: (payload: RealtimePostgresChangesPayload<Card>) => void;
 };
 
 export const useTimelineData = ({
@@ -34,6 +35,7 @@ export const useTimelineData = ({
   dayWindowStartRef,
   setDayWindowStart,
   buildMockTimelineResponse,
+  onRealtimeCardChange,
 }: UseTimelineDataArgs) => {
   const [data, setData] = useState<TimelineResponse | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -114,13 +116,15 @@ export const useTimelineData = ({
     setData((prev) => {
       if (!prev) return prev;
 
-      const { eventType, new: newRecord } = payload;
+      const { eventType } = payload;
+      const record = eventType === "DELETE" ? (payload.old as Card) : (payload.new as Card);
       if (eventType === "INSERT" || eventType === "UPDATE" || eventType === "DELETE") {
-        return applyCardUpdate(prev, newRecord as Card, eventType);
+        return applyCardUpdate(prev, record, eventType);
       }
       return prev;
     });
-  }, []);
+    onRealtimeCardChange?.(payload);
+  }, [onRealtimeCardChange]);
 
   const { realtimeStatus } = useRealtimeBoard(initialBoard.id, {
     onCardChange: handleCardChange,

@@ -5,7 +5,7 @@
 - `lp` は left panel section、`rp` は right panel mode を表す。
 - `lp` は `rp` を変更しない。left/right の state model は完全に分離する。
 - canonical default は `lp=overdue&rp=timeline`。
-- `Search` / `Overdue` / `Tags` は left self-contained とし、right-panel dedicated view は持たせない。
+- `Search` / `Overdue` / `Tags` / `Trash` は left self-contained とし、right-panel dedicated view は持たせない。
 
 ## Panel Ownership
 
@@ -14,6 +14,7 @@
   - `overdue`
   - `search`
   - `tags`
+  - `trash`
 - Right panel:
   - `timeline`
   - `list`
@@ -46,6 +47,11 @@
   - 選択後 0 件なら empty state を表示する。
   - 選択後に一致があれば左パネル内に card rows を表示する。
   - 右パネル mode は変更しない。
+- Trash:
+  - 左パネル内の trash cards で完結する。
+  - 並び順は `purge_after_at asc, deleted_at asc`。
+  - 主操作は復元。
+  - 右パネル mode は変更しない。
 
 ## Mobile Behavior
 
@@ -60,6 +66,8 @@
 - `lp=search&rp=list&q=...` が valid。
 - `lp=tags&rp=timeline&tag=...` が valid。
 - `lp=tags&rp=list&tag=...` が valid。
+- `lp=trash&rp=timeline` が valid。
+- `lp=trash&rp=list` が valid。
 - `lp` / `rp` 欠落 URL は invalid。
 - Search は right panel mode を変えない。
 - Search results は left sidebar にのみ出る。

@@ -4,7 +4,6 @@ import { clampChecklist, EMPTY_CHECKLIST } from '@/lib/checklist';
 import { normalizeContent, deriveExcerptFromContent } from '@/lib/tiptap';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 import { authorizeBoardMutation } from '@/lib/server/board-request';
-import { createServiceRoleSupabaseClient } from '@/lib/server/supabaseAdmin';
 import {
   runCardMutationWithFallback,
   stripUndefinedValues,
@@ -15,11 +14,10 @@ import {
   validationFailedResponse,
 } from '@/lib/server/cards-api-service';
 import {
-  deleteCardFromCalendarBestEffort,
   logCardActivity,
   syncPatchedCardToCalendar,
 } from '@/lib/server/card-side-effects';
-import { CARD_IMAGE_BUCKET, buildCardImageStoragePrefix } from '@/lib/tiptap-images';
+import { mapCardRowToTrashItem } from '@/lib/server/trash';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -59,57 +57,6 @@ const UpdateCardSchema = z.object({
   slug: z.string().max(255).optional(),
   duration: z.number().int().min(0).nullable().optional(),
 });
-
-const STORAGE_LIST_PAGE_SIZE = 100;
-
-const deleteCardImagesBestEffort = async (boardId: string, cardId: string) => {
-  const admin = createServiceRoleSupabaseClient();
-  const prefix = buildCardImageStoragePrefix(boardId, cardId);
-  const targetPaths: string[] = [];
-  let offset = 0;
-
-  try {
-    while (true) {
-      const { data, error } = await admin.storage.from(CARD_IMAGE_BUCKET).list(prefix, {
-        limit: STORAGE_LIST_PAGE_SIZE,
-        offset,
-        sortBy: { column: 'name', order: 'asc' },
-      });
-
-      if (error) {
-        console.warn('[cards DELETE] failed to list card images', { boardId, cardId, error });
-        return;
-      }
-
-      if (!data || data.length === 0) break;
-
-      for (const item of data) {
-        if (!item?.name) continue;
-        targetPaths.push(`${prefix}${item.name}`);
-      }
-
-      if (data.length < STORAGE_LIST_PAGE_SIZE) break;
-      offset += data.length;
-    }
-
-    if (targetPaths.length === 0) return;
-
-    for (let i = 0; i < targetPaths.length; i += STORAGE_LIST_PAGE_SIZE) {
-      const chunk = targetPaths.slice(i, i + STORAGE_LIST_PAGE_SIZE);
-      const { error } = await admin.storage.from(CARD_IMAGE_BUCKET).remove(chunk);
-      if (error) {
-        console.warn('[cards DELETE] failed to remove card images', {
-          boardId,
-          cardId,
-          count: chunk.length,
-          error,
-        });
-      }
-    }
-  } catch (error) {
-    console.warn('[cards DELETE] unexpected storage cleanup failure', { boardId, cardId, error });
-  }
-};
 
 /**
  * PATCH /api/boards/[boardId]/cards/[cardId]
@@ -248,23 +195,40 @@ const deleteHandler = async (
   }
   const { supabase, user } = auth.data;
 
-  // Get card info before deletion
   const { data: card } = await supabase
     .from('cards')
-    .select('title')
+    .select('id, title, content, excerpt, due_date, due_start, due_end, checked, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at')
     .eq('id', cardId)
     .eq('board_id', boardId)
-    .single();
+    .maybeSingle();
 
-  if (card) {
-    await deleteCardFromCalendarBestEffort(supabase, user.id, cardId);
+  if (!card) {
+    return NextResponse.json(
+      { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+      { status: 404 }
+    );
   }
 
-  const { error } = await supabase
+  if (card.deleted_at) {
+    return NextResponse.json(
+      { card, trash_item: mapCardRowToTrashItem(card) },
+      { status: 200 }
+    );
+  }
+
+  const deletedAt = new Date().toISOString();
+  const purgeAfterAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: trashedCard, error } = await supabase
     .from('cards')
-    .delete()
+    .update({
+      deleted_at: deletedAt,
+      purge_after_at: purgeAfterAt,
+    })
     .eq('id', cardId)
-    .eq('board_id', boardId);
+    .eq('board_id', boardId)
+    .select('*')
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json(
@@ -274,19 +238,18 @@ const deleteHandler = async (
   }
 
   // Log activity
-  if (card) {
-    logCardActivity(supabase, {
-      boardId,
-      userId: user.id,
-      action: 'deleted',
-      cardId,
-      cardTitle: card.title ?? null,
-    });
-  }
+  logCardActivity(supabase, {
+    boardId,
+    userId: user.id,
+    action: 'deleted',
+    cardId,
+    cardTitle: card.title ?? null,
+  });
 
-  await deleteCardImagesBestEffort(boardId, cardId);
-
-  return new NextResponse(null, { status: 204 });
+  return NextResponse.json(
+    { card: trashedCard, trash_item: trashedCard ? mapCardRowToTrashItem(trashedCard) : null },
+    { status: 200 }
+  );
 };
 
 export const PATCH = withErrorHandling(patchHandler, 'cards-patch');

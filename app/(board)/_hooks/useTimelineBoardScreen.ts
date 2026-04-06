@@ -23,6 +23,7 @@ import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/ti
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
+import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -103,6 +104,7 @@ type UseTimelineBoardScreenArgs = {
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
+  trashItems: TrashCardItem[];
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   liveNowMinutes: number | null;
@@ -179,6 +181,7 @@ type UseTimelineBoardScreenArgs = {
   modalProfiles: ProfileSummary[];
   handleCardModalSave: NonNullable<TimelineBoardScreenProps["modalProps"]>["onSave"];
   handleCardModalDelete: (cardId: string) => Promise<boolean>;
+  handleRestoreCard: (cardId: string) => Promise<boolean>;
   closeCardModal: () => void;
   historySaveWarning: string | null;
   retryHistorySave: () => void;
@@ -262,6 +265,7 @@ export function useTimelineBoardScreen({
   selectedTags,
   setSelectedTags,
   tagSummaries,
+  trashItems,
   indicatorTop,
   liveNowIsoDate,
   liveNowMinutes,
@@ -327,6 +331,7 @@ export function useTimelineBoardScreen({
   modalProfiles,
   handleCardModalSave,
   handleCardModalDelete,
+  handleRestoreCard,
   closeCardModal,
   historySaveWarning,
   retryHistorySave,
@@ -406,6 +411,7 @@ export function useTimelineBoardScreen({
     selectedTags,
     setSelectedTags,
     tagSummaries,
+    trashItems,
     indicatorTop,
     liveNowIsoDate,
     liveNowMinutes,
@@ -493,6 +499,7 @@ export function useTimelineBoardScreen({
     sections: viewModels.desktop.leftPanel.sections,
     allowOverdueDrag: viewModels.desktop.leftPanel.allowOverdueDrag,
     onOpenNotificationSettings: viewModels.desktop.leftPanel.onOpenNotificationSettings,
+    onRestoreTrashCard: handleRestoreCard,
     openCardModal,
     onToggleCheck: handleToggleCardChecked,
     onCardContextMenu: handleCardContextMenu,
@@ -553,11 +560,13 @@ export function useTimelineBoardScreen({
                   ? selectedTags[0]
                     ? `#${selectedTags[0]}`
                     : "Tag"
-                  : activeLeftPanelMode === "search"
+                   : activeLeftPanelMode === "search"
                     ? searchQuery.trim()
                       ? `"${searchQuery.trim()}"`
                       : "Search"
-                    : "Overdue",
+                    : activeLeftPanelMode === "trash"
+                      ? "Trash"
+                      : "Overdue",
               onReset: onResetToDefaultList,
             }
           : null,
@@ -601,6 +610,7 @@ export function useTimelineBoardScreen({
             availableTags,
             onSave: handleCardModalSave,
             onDelete: handleCardModalDelete,
+            onRestore: handleRestoreCard,
             onMoveToBoard: () => {},
             onClose: closeCardModal,
             isLoading: cardModalStatus === "loading",

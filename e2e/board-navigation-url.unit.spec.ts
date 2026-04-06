@@ -101,6 +101,30 @@ test.describe("board navigation canonical url helpers", () => {
     expect(parsed.resolvedState.tag).toBe("Memo");
   });
 
+  test("trash round-trip preserves lp without extra params", async () => {
+    const params = serializeBoardUiStateToSearchParams({
+      state: {
+        leftPanelMode: "trash",
+        rightPanelMode: "list",
+        date: "2026-03-31",
+        tag: "Memo",
+        searchQuery: "meeting",
+        showChecked: true,
+        showUnchecked: true,
+      },
+    });
+
+    expect(params.toString()).toBe("lp=trash&rp=list");
+
+    const parsed = parseBoardUiStateFromSearchParams(params, defaults);
+    expect(parsed.parseResult).toEqual({ ok: true });
+    expect(parsed.resolvedState.leftPanelMode).toBe("trash");
+    expect(parsed.resolvedState.rightPanelMode).toBe("list");
+    expect(parsed.resolvedState.date).toBeNull();
+    expect(parsed.resolvedState.tag).toBeNull();
+    expect(parsed.resolvedState.searchQuery).toBe("");
+  });
+
   test("normalize drops params that do not belong to the current panel mode", async () => {
     const normalized = normalizeBoardUiState(
       {

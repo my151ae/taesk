@@ -35,6 +35,8 @@ export function buildOptimisticCard(payload: Partial<Card>, boardId: string, opt
     short_id: payload.short_id ?? null,
     id_short: payload.id_short ?? null,
     slug: payload.slug ?? null,
+    deleted_at: payload.deleted_at ?? null,
+    purge_after_at: payload.purge_after_at ?? null,
     created_at: payload.created_at ?? nowIso,
     updated_at: payload.updated_at ?? nowIso,
   };

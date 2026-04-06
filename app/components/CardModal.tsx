@@ -49,6 +49,7 @@ interface CardModalProps {
     availableTags?: string[];
     onSave: (payload: CardModalSavePayload) => void;
     onDelete: (id: string) => void;
+    onRestore?: (id: string) => void | Promise<void> | Promise<boolean>;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
     onClose: () => void;
     isLoading?: boolean;
@@ -63,6 +64,7 @@ export function CardModal({
     boards,
     onSave,
     onDelete,
+    onRestore,
     profiles,
     availableTags = [],
     onMoveToBoard,
@@ -798,6 +800,32 @@ export function CardModal({
                             >
                                 履歴なしで閉じる
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {card.deleted_at && (
+                    <div className="mx-4 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="font-semibold">このカードはゴミ箱にあります</p>
+                                <p className="mt-1">
+                                    {card.purge_after_at
+                                        ? `完全削除予定: ${new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(card.purge_after_at))}`
+                                        : "30日後に自動で完全削除されます"}
+                                </p>
+                            </div>
+                            {onRestore ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void onRestore(card.id);
+                                    }}
+                                    className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 font-semibold text-white hover:bg-amber-700"
+                                >
+                                    復元
+                                </button>
+                            ) : null}
                         </div>
                     </div>
                 )}
