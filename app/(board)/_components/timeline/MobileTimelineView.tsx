@@ -674,7 +674,7 @@ export default function MobileTimelineView({
       const targetLeft = paneIndex * paneWidth;
       const aligned = Math.abs(rail.scrollLeft - targetLeft) <= 1;
       if (!aligned) {
-        snapToPaneIndex(paneIndex, "smooth", false);
+        snapToPaneIndex(paneIndex, touchSnapDisabled ? "auto" : "smooth", false);
         return;
       }
       if (touchSnapDisabled) {
@@ -722,7 +722,7 @@ export default function MobileTimelineView({
     if (Math.abs(deltaX) >= SWIPE_COMMIT_DISTANCE_PX && Math.abs(deltaX) > Math.abs(deltaY)) {
       nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, gesture.startIndex + (deltaX < 0 ? 1 : -1)));
     }
-    snapToPaneIndex(nextIndex, "smooth", true);
+    snapToPaneIndex(nextIndex, "auto", true);
   }, [activeDrag, snapToPaneIndex, windowDayStates.length]);
 
   const mobileCollisionDetection = useMemo<CollisionDetection>(() => {
@@ -767,7 +767,7 @@ export default function MobileTimelineView({
           <div
             ref={railRef}
             data-testid="mobile-timeline-rail"
-            className={`flex flex-1 ${(activeDrag || touchSnapDisabled) ? "overflow-x-hidden [scroll-snap-type:none]" : "overflow-x-auto snap-x snap-mandatory"} overflow-y-hidden`}
+            className={`flex flex-1 ${activeDrag ? "overflow-x-hidden [scroll-snap-type:none]" : touchSnapDisabled ? "overflow-x-auto [scroll-snap-type:none]" : "overflow-x-auto snap-x snap-mandatory"} overflow-y-hidden`}
             onScroll={handleRailScroll}
             onTouchStart={handleRailTouchStart}
             onTouchEnd={handleRailTouchEnd}
