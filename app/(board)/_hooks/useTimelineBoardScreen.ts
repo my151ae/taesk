@@ -2,9 +2,7 @@
 
 import { useMemo } from "react";
 
-import TimelineBoardScreen, {
-  type TimelineBoardScreenProps,
-} from "@/app/(board)/_components/timeline/TimelineBoardScreen";
+import { type TimelineBoardScreenProps } from "@/app/(board)/_components/timeline/TimelineBoardScreen";
 import type { ShortcutBarConfig } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { Board, ProfileSummary, TeamView } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -24,6 +22,7 @@ import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlSta
 import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
+import type { SharedPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -63,11 +62,12 @@ type UseTimelineBoardScreenArgs = {
   viewMode: "timeline" | "list";
   onShortcutsClick: () => void;
   activeLeftPanelMode: LeftPanelMode;
+  mobileLeftPanelMode: LeftPanelMode;
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
+  onMobileLeftPanelSelect: (key: SharedPanelSectionKey) => void;
   onOpenNotificationsPanel: () => void;
-  onResetToDefaultList: () => void;
   days: TimelineResponse["days"];
   activeDayIndex: number;
   effectiveDayRange: number;
@@ -224,11 +224,12 @@ export function useTimelineBoardScreen({
   viewMode,
   onShortcutsClick,
   activeLeftPanelMode,
+  mobileLeftPanelMode,
   activeLeftSectionKey,
   expandedSectionKey,
   onExpandedSectionChange,
+  onMobileLeftPanelSelect,
   onOpenNotificationsPanel,
-  onResetToDefaultList,
   days,
   activeDayIndex,
   effectiveDayRange,
@@ -552,26 +553,50 @@ export function useTimelineBoardScreen({
       viewMode,
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
-      contextBar:
-        activeLeftPanelMode !== "none" && activeLeftPanelMode !== "notifications"
-          ? {
-              label:
-                activeLeftPanelMode === "tags"
-                  ? selectedTags[0]
-                    ? `#${selectedTags[0]}`
-                    : "Tag"
-                   : activeLeftPanelMode === "search"
-                    ? searchQuery.trim()
-                      ? `"${searchQuery.trim()}"`
-                      : "Search"
-                    : activeLeftPanelMode === "trash"
-                      ? "Trash"
-                      : "Overdue",
-              onReset: onResetToDefaultList,
-            }
-          : null,
-      overdueSortOrder,
-      onOverdueSortOrderChange,
+      leftPanelProps,
+      selector: {
+        currentSection:
+          mobileLeftPanelMode === "search" || mobileLeftPanelMode === "tags" || mobileLeftPanelMode === "trash"
+            ? mobileLeftPanelMode
+            : "overdue",
+        selectorItems: [
+          { key: "overdue", label: "Overdue" },
+          { key: "search", label: "Search" },
+          { key: "tags", label: "Tags" },
+          { key: "trash", label: "Trash" },
+        ],
+        currentLabel:
+          mobileLeftPanelMode === "search"
+            ? searchQuery.trim() || "Search"
+            : mobileLeftPanelMode === "tags"
+              ? selectedTags[0]
+                ? `#${selectedTags[0]}`
+                : "Tags"
+              : mobileLeftPanelMode === "trash"
+                ? "Trash"
+                : "Overdue",
+        currentCount:
+          mobileLeftPanelMode === "search"
+            ? searchQuery.trim()
+              ? searchResults.length
+              : 0
+            : mobileLeftPanelMode === "tags"
+              ? selectedTags.length > 0
+                ? tagResults.length
+                : 0
+              : mobileLeftPanelMode === "trash"
+                ? trashItems.length
+                : overdue.length,
+        onSelect: onMobileLeftPanelSelect,
+        headerAccessory:
+          mobileLeftPanelMode === "overdue"
+            ? {
+                kind: "overdue-sort",
+                order: overdueSortOrder,
+                onChange: onOverdueSortOrderChange,
+              }
+            : null,
+      },
     },
     dialogsProps: {
       showShareDialog,

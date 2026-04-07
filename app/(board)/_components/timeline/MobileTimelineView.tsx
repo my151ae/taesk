@@ -19,7 +19,6 @@ import {
   type StackedTimelineItemKind,
 } from "@/app/(board)/_utils/timeline-helpers";
 import { bucketKeyToDueBucket } from "@/lib/bucket-normalization";
-import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
 import {
   TimelineCard,
@@ -28,7 +27,6 @@ import {
 import { resolveTimelineEventTone } from "@/app/(board)/_components/timeline/timeline-event-tone";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
-import { OverduePanel } from "@/app/(board)/_components/timeline/OverduePanel";
 import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import { bucketsFirstCollisionDetection, type useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
@@ -306,117 +304,6 @@ function MobileTimelineColumn({
   );
 }
 
-function MobileOverdueSection({
-  items,
-  expanded,
-  onToggle,
-  overdueSortOrder,
-  onOverdueSortOrderChange,
-  openCardModal,
-  onToggleCheck,
-  onCardContextMenu,
-  onCardContextMenuByKeyboard,
-  contextMenuCardId,
-}: {
-  items: TimelineOverdueItem[];
-  expanded: boolean;
-  onToggle: () => void;
-  overdueSortOrder: OverdueSortOrder;
-  onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
-  openCardModal: (shortId: string | null, source: string) => void;
-  onToggleCheck: (cardId: string, checked: boolean) => void;
-  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
-  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
-  contextMenuCardId: string | null;
-}) {
-  const nextOrder = overdueSortOrder === "oldest" ? "newest" : "oldest";
-  const currentLabel = overdueSortOrder === "oldest" ? "古い順" : "新しい順";
-  const nextLabel = nextOrder === "oldest" ? "古い順" : "新しい順";
-
-  return (
-    <div className="border-b border-rose-100 bg-rose-50/40 px-3 py-2">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls="mobile-overdue-sheet"
-          data-testid="mobile-overdue-toggle"
-          onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center justify-between rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-left shadow-sm transition-colors hover:bg-rose-100/70"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-900">
-              Overdue
-            </span>
-            <span
-              className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-rose-800 shadow-sm ring-1 ring-rose-200"
-              data-testid="mobile-overdue-count"
-            >
-              {items.length}
-            </span>
-          </div>
-          <span
-            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-rose-700 transition-transform duration-150 ease-out ${expanded ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
-            </svg>
-          </span>
-        </button>
-
-        <button
-          type="button"
-          data-testid="mobile-overdue-sort-toggle"
-          data-order={overdueSortOrder}
-          onClick={() => onOverdueSortOrderChange(nextOrder)}
-          aria-label={`Overdue の並び順を${nextLabel}に切り替え`}
-          title={`現在: ${currentLabel}`}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-white/90 px-2.5 py-2 text-[10px] font-semibold text-rose-800 shadow-sm transition-colors hover:bg-white"
-        >
-          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d={overdueSortOrder === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"} />
-          </svg>
-          <span>{currentLabel}</span>
-        </button>
-      </div>
-
-      <div
-        id="mobile-overdue-sheet"
-        data-testid="mobile-overdue-sheet"
-        aria-hidden={!expanded}
-        className="overflow-hidden transition-[max-height,opacity] duration-150 ease-out"
-        style={{
-          maxHeight: expanded ? "240px" : "0px",
-          opacity: expanded ? 1 : 0,
-        }}
-      >
-        <div
-          className="pt-2"
-          style={{
-            height: "clamp(168px, 28svh, 240px)",
-          }}
-        >
-          <OverduePanel
-            items={items}
-            variant="mobile"
-            openCardModal={openCardModal}
-            onToggleCheck={onToggleCheck}
-            onCardContextMenu={onCardContextMenu}
-            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-            contextMenuCardId={contextMenuCardId}
-            hideHeader
-            compactEmptyState
-            emptyStateMessage="未完了の期限超過カードはありません"
-            className="h-full border-amber-200 bg-amber-50/50"
-            contentClassName="space-y-3 px-2 pb-2 pt-2"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MobileAbBucket({
   sectionLabel,
   bucketKey,
@@ -573,8 +460,6 @@ type MobileTimelineViewProps = {
   contextMenuCardId: string | null;
   currentIsoDate: string | null;
   currentMinutes: number | null;
-  overdueSortOrder: OverdueSortOrder;
-  onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
 };
 
 export default function MobileTimelineView({
@@ -615,8 +500,6 @@ export default function MobileTimelineView({
   contextMenuCardId,
   currentIsoDate,
   currentMinutes,
-  overdueSortOrder,
-  onOverdueSortOrderChange,
 }: MobileTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -625,7 +508,6 @@ export default function MobileTimelineView({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const swipeLockedRef = useRef(false);
-  const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
   const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);
 
   useEffect(() => {
@@ -856,19 +738,6 @@ export default function MobileTimelineView({
               </div>
             </div>
           )}
-
-          <MobileOverdueSection
-            items={overdue}
-            expanded={isOverdueExpanded}
-            onToggle={() => setIsOverdueExpanded((current) => !current)}
-            overdueSortOrder={overdueSortOrder}
-            onOverdueSortOrderChange={onOverdueSortOrderChange}
-            openCardModal={openCardModal}
-            onToggleCheck={onToggleCheck}
-            onCardContextMenu={onCardContextMenu}
-            onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-            contextMenuCardId={contextMenuCardId}
-          />
 
           <div
             className="grid flex-1 overflow-hidden"

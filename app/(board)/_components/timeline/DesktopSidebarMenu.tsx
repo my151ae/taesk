@@ -3,13 +3,6 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 
-import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
-import {
-  TimelineCard,
-  TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
-} from "@/app/(board)/_components/timeline/TimelineCard";
-import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import { useNotificationsStore } from "@/app/(board)/_stores/notifications-store";
@@ -17,6 +10,13 @@ import { featureFlags } from "@/lib/featureFlags";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { Notification } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
+import {
+  OverdueSectionBody,
+  SearchSectionBody,
+  SharedPanelHeader,
+  TagsSectionBody,
+  TrashSectionBody,
+} from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 
 export type SidebarSectionKey = "overdue" | "notifications" | "search" | "tags" | "trash";
 type SidebarSectionTone = "danger" | "neutral";
@@ -452,227 +452,6 @@ function SidebarRailButton({
   );
 }
 
-function SidebarCardRow({
-  item,
-  badgeLabel,
-  timeText,
-  openSource,
-  shortcutSection,
-  testId,
-  className,
-  draggable = false,
-  onToggleCheck,
-  onRenameCardTitle,
-  openCardModal,
-  onCardContextMenu,
-  onCardContextMenuByKeyboard,
-  isContextMenuOpen,
-  isActive = false,
-  isSelected = false,
-  selectionLane,
-  onShiftSelect,
-  onClearSelection,
-  onActivateCard,
-  activeCardId,
-  activeLaneId,
-  inlineTitleEdit = false,
-}: {
-  item: {
-    card_id: string;
-    title: string;
-    checked: boolean;
-    checklist?: TimelineOverdueItem["checklist"];
-    content?: TimelineOverdueItem["content"];
-    excerpt?: string | null;
-    short_id: string | null;
-  };
-  badgeLabel: string;
-  timeText: string | null;
-  openSource: string;
-  shortcutSection: ShortcutSection;
-  testId: string;
-  className?: string;
-  draggable?: boolean;
-  onToggleCheck: (cardId: string, checked: boolean) => void;
-  openCardModal: (shortId: string | null, source: string) => void;
-  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
-  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
-  isContextMenuOpen: boolean;
-  isActive?: boolean;
-  isSelected?: boolean;
-  selectionLane?: string;
-  onShiftSelect?: (args: {
-    cardId: string;
-    laneId: string;
-    activeCardId: string | null;
-    activeLaneId: string | null;
-  }) => void;
-  onClearSelection?: () => void;
-  onActivateCard?: (cardId: string, laneId: string) => void;
-  activeCardId?: string | null;
-  activeLaneId?: string | null;
-  inlineTitleEdit?: boolean;
-  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
-}) {
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const card = (
-    <div
-      className="relative min-w-0 select-none pt-4 has-[:focus]:z-10"
-      data-testid={testId}
-      onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
-    >
-      <TimelineCard
-        title={item.title || ""}
-        checked={item.checked}
-        checklist={item.checklist}
-        content={item.content ?? null}
-        onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
-        cardId={item.card_id}
-        badgeLabel={badgeLabel}
-        timeText={timeText}
-        timePlacement="out-top"
-        note={item.excerpt ?? undefined}
-        noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-        notePreviewLines={3}
-        onOpen={() => openCardModal(item.short_id, openSource)}
-        openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
-        showOpenButton
-        paddingClass="py-1"
-        className={clsx("min-h-0", className, isActive && "shadow-md")}
-        shortcutContext={{
-          scope: "board",
-          region: "sidebar",
-          section: shortcutSection,
-          part: "card",
-        }}
-        onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
-        focusGroup="bucket"
-        isSelected={isSelected}
-        selectionLane={selectionLane}
-        onShiftSelect={onShiftSelect}
-        onClearSelection={onClearSelection}
-        onActivateCard={onActivateCard}
-        activeCardId={activeCardId}
-        activeLaneId={activeLaneId}
-        inlineTitleEdit={inlineTitleEdit}
-        onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
-        onTitleEditStateChange={setIsEditingTitle}
-      />
-    </div>
-  );
-
-  if (!draggable) return card;
-
-  return (
-    <DraggableCard
-      id={`overdue:${item.card_id}`}
-      data={{ kind: "overdue", cardId: item.card_id, item }}
-      disabled={isContextMenuOpen || isEditingTitle}
-    >
-      {card}
-    </DraggableCard>
-  );
-}
-
-function buildOverdueTimeText(item: TimelineOverdueItem) {
-  return buildTimelineCardTimeText(item, {
-    includeDate: true,
-    includeDuration: true,
-  });
-}
-
-function buildTrashTimeText(item: TrashCardItem) {
-  const purgeAt = new Date(item.purge_after_at);
-  const deletedAt = new Date(item.deleted_at);
-  const purgeText = new Intl.DateTimeFormat("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(purgeAt);
-  const deletedText = new Intl.DateTimeFormat("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(deletedAt);
-  return `削除 ${deletedText} / 完全削除 ${purgeText}`;
-}
-
-function renderSidebarResultRows({
-  results,
-  shortcutSection,
-  openSource,
-  testIdPrefix,
-  onToggleCheck,
-  onRenameCardTitle,
-  openCardModal,
-  onCardContextMenu,
-  onCardContextMenuByKeyboard,
-  contextMenuCardId,
-  selectedCardIds,
-  selectionLeadCardId,
-  onShiftSelect,
-  onClearSelection,
-  onActivateCard,
-  activeCardId,
-  activeLaneId,
-}: {
-  results: readonly TimelineSearchResultItem[];
-  shortcutSection: ShortcutSection;
-  openSource: string;
-  testIdPrefix: string;
-  onToggleCheck: (cardId: string, checked: boolean) => void;
-  onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
-  openCardModal: (shortId: string | null, source: string) => void;
-  onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
-  onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
-  contextMenuCardId: string | null;
-  selectedCardIds: ReadonlySet<string>;
-  selectionLeadCardId: string | null;
-  onShiftSelect: (args: {
-    cardId: string;
-    laneId: string;
-    activeCardId: string | null;
-    activeLaneId: string | null;
-  }) => void;
-  onClearSelection: () => void;
-  onActivateCard: (cardId: string, laneId: string) => void;
-  activeCardId: string | null;
-  activeLaneId: string | null;
-}) {
-  return (
-    <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-      {results.map((result) => (
-        <SidebarCardRow
-          key={`${result.kind}:${result.item.card_id}`}
-          item={result.item}
-          badgeLabel={result.badgeLabel}
-          timeText={result.timeText}
-          openSource={openSource}
-          shortcutSection={shortcutSection}
-          testId={`${testIdPrefix}-${result.kind}-${result.item.card_id}`}
-          className="bg-white"
-          onToggleCheck={onToggleCheck}
-          onRenameCardTitle={onRenameCardTitle}
-          openCardModal={openCardModal}
-          onCardContextMenu={onCardContextMenu}
-          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-          isContextMenuOpen={contextMenuCardId === result.item.card_id}
-          isActive={selectionLeadCardId === result.item.card_id || activeCardId === result.item.card_id}
-          isSelected={selectedCardIds.has(result.item.card_id)}
-          selectionLane={shortcutSection}
-          onShiftSelect={onShiftSelect}
-          onClearSelection={onClearSelection}
-          onActivateCard={onActivateCard}
-          activeCardId={activeCardId}
-          activeLaneId={activeLaneId}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function DesktopSidebarMenu({
   state,
   actions,
@@ -807,54 +586,23 @@ export function DesktopSidebarMenu({
   const renderSectionContent = (section: DesktopSidebarSection) => {
     if (section.key === "overdue") {
       return (
-        <div className="flex min-h-0 flex-1 flex-col">
-          {!allowOverdueDrag ? (
-            <div className="px-3 pt-3">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-                List表示中はドラッグ移動を停止しています
-              </p>
-            </div>
-          ) : null}
-          {section.items.length === 0 ? (
-            <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-rose-200 bg-rose-50/70 px-3 py-3 text-[11px] text-rose-700/80">
-                未完了の期限超過カードはありません
-              </p>
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-              <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-                {section.items.map((item) => (
-                  <SidebarCardRow
-                    key={item.card_id}
-                    item={item}
-                    badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
-                    timeText={buildOverdueTimeText(item)}
-                    openSource="overdue"
-                    shortcutSection="overdue"
-                    testId={`overdue-card-${item.card_id}`}
-                    className={allowOverdueDrag ? "bg-white" : "bg-slate-50"}
-                    draggable={allowOverdueDrag}
-                    onToggleCheck={onToggleCheck}
-                    onRenameCardTitle={onRenameCardTitle}
-                    openCardModal={openCardModal}
-                    onCardContextMenu={onCardContextMenu}
-                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                    isContextMenuOpen={contextMenuCardId === item.card_id}
-                    isActive={selectionLeadCardId === item.card_id || activeCardId === item.card_id}
-                    isSelected={selectedCardIds.has(item.card_id)}
-                    selectionLane="overdue"
-                    onShiftSelect={onShiftSelect}
-                    onClearSelection={onClearSelection}
-                    onActivateCard={onActivateCard}
-                    activeCardId={activeCardId}
-                    activeLaneId={activeLaneId}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <OverdueSectionBody
+          items={section.items}
+          allowDrag={allowOverdueDrag}
+          openCardModal={openCardModal}
+          onToggleCheck={onToggleCheck}
+          onRenameCardTitle={onRenameCardTitle}
+          onCardContextMenu={onCardContextMenu}
+          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+          contextMenuCardId={contextMenuCardId}
+          selectedCardIds={selectedCardIds}
+          selectionLeadCardId={selectionLeadCardId}
+          onShiftSelect={onShiftSelect}
+          onClearSelection={onClearSelection}
+          onActivateCard={onActivateCard}
+          activeCardId={activeCardId}
+          activeLaneId={activeLaneId}
+        />
       );
     }
 
@@ -928,212 +676,58 @@ export function DesktopSidebarMenu({
 
     if (section.key === "search") {
       return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-slate-200/80 bg-slate-50 px-2 py-2">
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-              <input
-                type="text"
-                value={state.searchQuery}
-                onChange={(event) => actions.onSearchQueryChange(event.target.value)}
-                placeholder="Search cards..."
-                className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-                data-testid="desktop-sidebar-search-input"
-                data-shortcut-scope="board"
-                data-shortcut-region="sidebar"
-                data-shortcut-section="search"
-              />
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-            {!state.searchQuery.trim() ? (
-              <div className="px-3 py-4">
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  キーワードを入れると、このパネル内に一致カードを表示します
-                </p>
-              </div>
-            ) : section.results.length === 0 ? (
-              <div className="px-3 py-4">
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  一致するカードはありません
-                </p>
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-                {renderSidebarResultRows({
-                  results: section.results,
-                  shortcutSection: "search",
-                  openSource: "search",
-                  testIdPrefix: "search-card",
-                  onToggleCheck,
-                  onRenameCardTitle: undefined,
-                  openCardModal,
-                  onCardContextMenu,
-                  onCardContextMenuByKeyboard,
-                  contextMenuCardId,
-                  selectedCardIds,
-                  selectionLeadCardId,
-                  onShiftSelect,
-                  onClearSelection,
-                  onActivateCard,
-                  activeCardId,
-                  activeLaneId,
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <SearchSectionBody
+          query={state.searchQuery}
+          results={section.results}
+          onQueryChange={actions.onSearchQueryChange}
+          openCardModal={openCardModal}
+          onToggleCheck={onToggleCheck}
+          onRenameCardTitle={undefined}
+          onCardContextMenu={onCardContextMenu}
+          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+          contextMenuCardId={contextMenuCardId}
+          selectedCardIds={selectedCardIds}
+          selectionLeadCardId={selectionLeadCardId}
+          onShiftSelect={onShiftSelect}
+          onClearSelection={onClearSelection}
+          onActivateCard={onActivateCard}
+          activeCardId={activeCardId}
+          activeLaneId={activeLaneId}
+        />
       );
     }
 
     if (section.key === "trash") {
       return (
-        <div className="flex min-h-0 flex-1 flex-col">
-          {section.items.length === 0 ? (
-            <div className="px-3 py-4">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                ゴミ箱は空です
-              </p>
-            </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-              <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2">
-                {section.items.map((item) => (
-                  <div
-                    key={item.card_id}
-                    className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
-                    data-testid={`trash-card-${item.card_id}`}
-                  >
-                    <div className="min-w-0">
-                      <TimelineCard
-                        title={item.title || ""}
-                        checked={item.checked}
-                        content={item.content ?? null}
-                        note={item.excerpt ?? undefined}
-                        noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-                        notePreviewLines={3}
-                        cardId={item.card_id}
-                        badgeLabel="TR"
-                        timeText={buildTrashTimeText(item)}
-                        timePlacement="out-top"
-                        onOpen={() => openCardModal(item.short_id, "trash")}
-                        openButtonTestId={`cardOpenButton-trash-${item.card_id}`}
-                        showOpenButton
-                        onToggleCheck={() => {}}
-                        hideLeftColumn
-                        className="min-h-0 bg-white"
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-slate-500">
-                        残り {Math.max(0, Math.ceil((new Date(item.purge_after_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} 日
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void onRestoreTrashCard(item.card_id);
-                        }}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900"
-                      >
-                        復元
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <TrashSectionBody
+          items={section.items}
+          onRestoreTrashCard={onRestoreTrashCard}
+          openCardModal={openCardModal}
+        />
       );
     }
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50 px-3 py-2">
-          <p className="text-[11px] font-medium text-slate-500">
-            {state.selectedTags.length > 0 ? `${state.selectedTags.length} 件選択中` : "タグで絞り込めます"}
-          </p>
-          <button
-            type="button"
-            onClick={actions.onTagClear}
-            disabled={state.selectedTags.length === 0}
-            className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Clear
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-          {section.tags.length === 0 ? (
-            <div className="px-1 py-2">
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                利用できるタグはまだありません
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                {section.tags.map((tag) => {
-                  const selected = state.selectedTags.includes(tag.name);
-                  return (
-                    <button
-                      key={tag.name}
-                      type="button"
-                      onClick={() => actions.onTagToggle(tag.name)}
-                      data-testid={`desktop-sidebar-tag-${tag.name}`}
-                      className={clsx(
-                        "flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left transition",
-                        selected
-                          ? "border-slate-300 bg-white text-slate-900 shadow-sm"
-                          : "border-transparent bg-white/60 text-slate-700 hover:border-slate-200 hover:bg-white"
-                      )}
-                    >
-                      <span className="min-w-0 truncate text-sm font-medium">#{tag.name}</span>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                        {tag.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {state.selectedTags.length === 0 ? (
-                <div className="px-1 py-1">
-                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                    タグを選ぶと、このパネル内に一致カードを表示します
-                  </p>
-                </div>
-              ) : section.results.length === 0 ? (
-                <div className="px-1 py-1">
-                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                    選択中のタグに一致するカードはありません
-                  </p>
-                </div>
-              ) : (
-                renderSidebarResultRows({
-                  results: section.results,
-                  shortcutSection: "search",
-                  openSource: "tag-sidebar",
-                  testIdPrefix: "tag-card",
-                  onToggleCheck,
-                  onRenameCardTitle: undefined,
-                  openCardModal,
-                  onCardContextMenu,
-                  onCardContextMenuByKeyboard,
-                  contextMenuCardId,
-                  selectedCardIds,
-                  selectionLeadCardId,
-                  onShiftSelect,
-                  onClearSelection,
-                  onActivateCard,
-                  activeCardId,
-                  activeLaneId,
-                })
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <TagsSectionBody
+        tags={section.tags}
+        results={section.results}
+        selectedTags={state.selectedTags}
+        onTagToggle={actions.onTagToggle}
+        onTagClear={actions.onTagClear}
+        openCardModal={openCardModal}
+        onToggleCheck={onToggleCheck}
+        onRenameCardTitle={undefined}
+        onCardContextMenu={onCardContextMenu}
+        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+        contextMenuCardId={contextMenuCardId}
+        selectedCardIds={selectedCardIds}
+        selectionLeadCardId={selectionLeadCardId}
+        onShiftSelect={onShiftSelect}
+        onClearSelection={onClearSelection}
+        onActivateCard={onActivateCard}
+        activeCardId={activeCardId}
+        activeLaneId={activeLaneId}
+      />
     );
   };
 
@@ -1169,26 +763,19 @@ export function DesktopSidebarMenu({
                 className={clsx("min-h-0 min-w-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
                 aria-hidden={!expanded}
               >
-                <div className="relative flex h-8 items-center justify-between border-b border-slate-200/80 px-3">
-                  <div className="flex min-w-0 items-center gap-2 leading-tight">
-                    <h2 className="truncate text-sm font-semibold leading-tight text-slate-800">{section.label}</h2>
-                    <span
-                      className={clsx(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
-                        isDanger ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
-                      )}
-                    >
-                      {section.count}
-                    </span>
-                  </div>
-                  {section.key === "overdue" ? (
+                <SharedPanelHeader
+                  title={section.label}
+                  count={section.count}
+                  tone={isDanger ? "danger" : "neutral"}
+                  accessory={section.key === "overdue" ? (
                     <OverdueSortToggle
                       order={overdueSortOrder}
                       onChange={onOverdueSortOrderChange}
                       testId="desktop-sidebar-overdue-sort-toggle"
                     />
                   ) : null}
-                </div>
+                  className={isDanger ? "bg-rose-50/40" : undefined}
+                />
 
                 {showHeaderSlot ? (
                   <div className="flex h-8 items-center justify-end gap-2 border-b border-slate-200/80 bg-slate-50 px-3">

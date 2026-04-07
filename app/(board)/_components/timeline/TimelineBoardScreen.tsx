@@ -17,6 +17,13 @@ import {
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import {
+  OverdueSectionBody,
+  SearchSectionBody,
+  TagsSectionBody,
+  TrashSectionBody,
+  type SharedPanelSectionKey,
+} from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
@@ -39,10 +46,7 @@ type TimelineBodyProps = ComponentProps<typeof DesktopTimelineView>;
 type ListToolbarProps = ComponentProps<typeof DesktopListToolbar>;
 type ListBodyProps = ComponentProps<typeof DesktopListView>;
 type MobileTimelineProps = ComponentProps<typeof MobileTimelineView>;
-type MobileTimelineBaseProps = Omit<
-  MobileTimelineProps,
-  "overdueSortOrder" | "onOverdueSortOrderChange"
->;
+type MobileTimelineBaseProps = MobileTimelineProps;
 type MobileListProps = ComponentProps<typeof MobileListView>;
 type SidebarMenuProps = ComponentProps<typeof DesktopSidebarMenu>;
 type SidebarMenuBaseProps = Omit<
@@ -87,12 +91,21 @@ export type TimelineBoardScreenProps = {
     viewMode: "timeline" | "list";
     timelineProps: MobileTimelineBaseProps;
     listProps: MobileListProps;
-    contextBar: {
-      label: string;
-      onReset: () => void;
-    } | null;
-    overdueSortOrder: OverdueSortOrder;
-    onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
+    leftPanelProps: SidebarMenuBaseProps;
+    selector: {
+      currentSection: SharedPanelSectionKey;
+      selectorItems: Array<{ key: SharedPanelSectionKey; label: string }>;
+      currentLabel: string;
+      currentCount: number;
+      onSelect: (key: SharedPanelSectionKey) => void;
+      headerAccessory:
+        | {
+            kind: "overdue-sort";
+            order: OverdueSortOrder;
+            onChange: (order: OverdueSortOrder) => void;
+          }
+        | null;
+    };
   };
   dialogsProps: DialogsProps;
   shortcutsProps: ShortcutsModalProps;
@@ -228,6 +241,210 @@ export default function TimelineBoardScreen({
     [desktop.leftPanelProps, desktop.onOverdueSortOrderChange, desktop.overdueSortOrder, desktopSidebarWidth]
   );
   const headerToggleLabel = isHeaderCollapsed ? "メインヘッダーを表示" : "メインヘッダーを隠す";
+  const [showMobileSelector, setShowMobileSelector] = useState(false);
+  const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(false);
+  const mobileSelectorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showMobileSelector) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (mobileSelectorRef.current?.contains(target)) return;
+      setShowMobileSelector(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [showMobileSelector]);
+
+  const currentMobileSection = useMemo(
+    () => mobile.leftPanelProps.sections.find((section) => section.key === mobile.selector.currentSection) ?? null,
+    [mobile.leftPanelProps.sections, mobile.selector.currentSection]
+  );
+
+  const mobileHeaderAccessory = useMemo(() => {
+    if (mobile.selector.headerAccessory?.kind !== "overdue-sort") {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        data-testid="mobile-overdue-sort-toggle"
+        data-order={mobile.selector.headerAccessory.order}
+        onClick={() =>
+          mobile.selector.headerAccessory?.onChange(
+            mobile.selector.headerAccessory.order === "oldest" ? "newest" : "oldest"
+          )
+        }
+        aria-label={`Overdue の並び順を${
+          mobile.selector.headerAccessory.order === "oldest" ? "新しい順" : "古い順"
+        }に切り替え`}
+        className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white px-2 py-1 text-[10px] font-semibold text-rose-700"
+      >
+        <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d={mobile.selector.headerAccessory.order === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"}
+          />
+        </svg>
+        <span>{mobile.selector.headerAccessory.order === "oldest" ? "古い順" : "新しい順"}</span>
+      </button>
+    );
+  }, [mobile.selector.headerAccessory]);
+
+  const renderMobilePanelBody = useCallback(() => {
+    const commonProps = {
+      openCardModal: mobile.leftPanelProps.openCardModal,
+      onToggleCheck: mobile.leftPanelProps.onToggleCheck,
+      onRenameCardTitle: mobile.leftPanelProps.onRenameCardTitle,
+      onCardContextMenu: mobile.leftPanelProps.onCardContextMenu,
+      onCardContextMenuByKeyboard: mobile.leftPanelProps.onCardContextMenuByKeyboard,
+      contextMenuCardId: mobile.leftPanelProps.contextMenuCardId,
+      selectedCardIds: mobile.leftPanelProps.selectedCardIds,
+      selectionLeadCardId: mobile.leftPanelProps.selectionLeadCardId,
+      onShiftSelect: mobile.leftPanelProps.onShiftSelect,
+      onClearSelection: mobile.leftPanelProps.onClearSelection,
+      onActivateCard: mobile.leftPanelProps.onActivateCard,
+      activeCardId: mobile.leftPanelProps.activeCardId,
+      activeLaneId: mobile.leftPanelProps.activeLaneId,
+    };
+
+    if (!currentMobileSection) return null;
+
+    if (currentMobileSection.key === "overdue") {
+      return (
+        <OverdueSectionBody
+          items={currentMobileSection.items}
+          allowDrag={mobile.viewMode === "timeline"}
+          cardClassName="bg-white"
+          emptyClassName="bg-white/90 text-rose-700"
+          {...commonProps}
+        />
+      );
+    }
+    if (currentMobileSection.key === "search") {
+      return (
+        <SearchSectionBody
+          query={mobile.leftPanelProps.state.searchQuery}
+          results={currentMobileSection.results}
+          onQueryChange={mobile.leftPanelProps.actions.onSearchQueryChange}
+          {...commonProps}
+          onRenameCardTitle={undefined}
+        />
+      );
+    }
+    if (currentMobileSection.key === "trash") {
+      return (
+        <TrashSectionBody
+          items={currentMobileSection.items}
+          onRestoreTrashCard={mobile.leftPanelProps.onRestoreTrashCard}
+          openCardModal={mobile.leftPanelProps.openCardModal}
+        />
+      );
+    }
+    if (currentMobileSection.key === "tags") {
+      return (
+        <TagsSectionBody
+          tags={currentMobileSection.tags}
+          results={currentMobileSection.results}
+          selectedTags={mobile.leftPanelProps.state.selectedTags}
+          onTagToggle={mobile.leftPanelProps.actions.onTagToggle}
+          onTagClear={mobile.leftPanelProps.actions.onTagClear}
+          {...commonProps}
+          onRenameCardTitle={undefined}
+        />
+      );
+    }
+    return null;
+  }, [currentMobileSection, mobile.leftPanelProps, mobile.viewMode]);
+
+  const renderMobileTopArea = useCallback(() => (
+    <>
+      <div className="border-b border-slate-200 bg-slate-50/70">
+        <div className="relative flex h-10 items-center justify-between px-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div ref={mobileSelectorRef} className="relative min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowMobileSelector((current) => !current)}
+                className="inline-flex min-w-0 items-center gap-1 text-left text-sm font-semibold leading-tight text-slate-800"
+                aria-haspopup="menu"
+                aria-expanded={showMobileSelector}
+              >
+                <span className="truncate">{mobile.selector.currentLabel}</span>
+                <svg className={clsx("h-3 w-3 shrink-0 transition-transform", showMobileSelector && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 7.5 10 12.5 15 7.5" />
+                </svg>
+              </button>
+              {showMobileSelector ? (
+                <div className="absolute left-0 top-full z-30 mt-1 min-w-[132px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg" role="menu">
+                  {mobile.selector.selectorItems.map((item) => {
+                    const selected = item.key === mobile.selector.currentSection;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => {
+                          setShowMobileSelector(false);
+                          mobile.selector.onSelect(item.key);
+                        }}
+                        className={clsx(
+                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-[12px]",
+                          selected ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"
+                        )}
+                        role="menuitemradio"
+                        aria-checked={selected}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+            <span
+              className={clsx(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
+                mobile.selector.currentSection === "overdue" ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
+              )}
+            >
+              {mobile.selector.currentCount}
+            </span>
+          </div>
+          <div className="ml-2 flex shrink-0 items-center gap-2">
+            {mobileHeaderAccessory}
+            <button
+              type="button"
+              onClick={() => setIsMobilePanelCollapsed((current) => !current)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500"
+              aria-label={isMobilePanelCollapsed ? "left panel を表示" : "left panel を隠す"}
+              aria-expanded={!isMobilePanelCollapsed}
+              aria-controls="mobile-left-panel-body"
+            >
+              <svg className={clsx("h-3.5 w-3.5 transition-transform", isMobilePanelCollapsed && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12.5 10 7.5 15 12.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div
+          id="mobile-left-panel-body"
+          className="overflow-hidden transition-[height,opacity] duration-200 ease-out"
+          style={{ height: isMobilePanelCollapsed ? "0px" : "clamp(168px, 28svh, 240px)", opacity: isMobilePanelCollapsed ? 0 : 1 }}
+        >
+          {renderMobilePanelBody()}
+        </div>
+      </div>
+    </>
+  ), [isMobilePanelCollapsed, mobile.selector, mobileHeaderAccessory, renderMobilePanelBody, showMobileSelector]);
 
   if (!parseResult.ok) {
     return (
@@ -416,42 +633,12 @@ export default function TimelineBoardScreen({
 
         {mobile.viewMode === "timeline" ? (
           <div className="flex-1 overflow-hidden md:hidden">
-            {mobile.contextBar ? (
-              <div className="border-b border-slate-200 bg-white px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-medium text-slate-600">{mobile.contextBar.label}</span>
-                  <button
-                    type="button"
-                    onClick={mobile.contextBar.onReset}
-                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700"
-                  >
-                    List
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            <MobileTimelineView
-              {...mobile.timelineProps}
-              overdueSortOrder={mobile.overdueSortOrder}
-              onOverdueSortOrderChange={mobile.onOverdueSortOrderChange}
-            />
+            {renderMobileTopArea()}
+            <MobileTimelineView {...mobile.timelineProps} />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden md:hidden">
-            {mobile.contextBar ? (
-              <div className="border-b border-slate-200 bg-white px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-medium text-slate-600">{mobile.contextBar.label}</span>
-                  <button
-                    type="button"
-                    onClick={mobile.contextBar.onReset}
-                    className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700"
-                  >
-                    Default
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            {renderMobileTopArea()}
             <MobileListView {...mobile.listProps} />
           </div>
         )}

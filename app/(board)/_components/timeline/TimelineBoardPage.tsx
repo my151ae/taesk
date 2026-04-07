@@ -85,10 +85,16 @@ const canPersistBoardPreferences = (board: Board) => {
 const timelineLaneId = (isoDate: string) => `timeline:${isoDate}`;
 const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
 const OVERDUE_LANE_ID = "overdue";
+const MOBILE_BREAKPOINT_QUERY = "(min-width: 768px)";
 
 const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
   if (mode === "overdue" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
   return null;
+};
+
+const normalizeMobileLeftPanelMode = (mode: LeftPanelMode): LeftPanelMode => {
+  if (mode === "notifications" || mode === "none") return "overdue";
+  return mode;
 };
 
 const sortTrashItems = (items: TrashCardItem[]) =>
@@ -176,10 +182,37 @@ function TimelineBoardPageContent({
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingToolbarFocusSelectorRef = useRef<string | null>(null);
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches;
+  });
+  const isMobileViewport = !isDesktopViewport;
   const activeLeftSectionKey = leftPanelModeToSidebarSection(resolvedState.leftPanelMode);
+  const mobileLeftPanelMode = normalizeMobileLeftPanelMode(resolvedState.leftPanelMode);
   const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
   const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia(MOBILE_BREAKPOINT_QUERY);
+    const syncViewport = () => setIsDesktopViewport(mediaQuery.matches);
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport) return;
+    if (resolvedState.leftPanelMode === mobileLeftPanelMode) return;
+
+    updateBoardUiState({
+      leftPanelMode: mobileLeftPanelMode,
+      method: "replace",
+    });
+  }, [isMobileViewport, mobileLeftPanelMode, resolvedState.leftPanelMode, updateBoardUiState]);
 
   const handleRealtimeTrashChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
     setTrashItems((prev) => {
@@ -947,14 +980,6 @@ function TimelineBoardPageContent({
     [activeLeftSectionKey, expandedSectionKey, resolvedState.tag, searchQuery, selectedTags, updateBoardUiState],
   );
 
-  const handleResetToDefaultList = useCallback(() => {
-    updateBoardUiState({
-      leftPanelMode: "overdue",
-      method: "replace",
-    });
-    setExpandedSectionKey("overdue");
-  }, [updateBoardUiState]);
-
   const handleOpenNotificationsPanel = useCallback(() => {
     updateBoardUiState({
       leftPanelMode: "notifications",
@@ -962,6 +987,41 @@ function TimelineBoardPageContent({
     });
     setExpandedSectionKey("notifications");
   }, [updateBoardUiState]);
+
+  const handleMobileLeftPanelSelect = useCallback((key: Exclude<SidebarSectionKey, "notifications">) => {
+    setExpandedSectionKey(key);
+
+    if (key === "overdue") {
+      updateBoardUiState({
+        leftPanelMode: "overdue",
+        method: "replace",
+      });
+      return;
+    }
+
+    if (key === "search") {
+      updateBoardUiState({
+        leftPanelMode: "search",
+        searchQuery,
+        method: "replace",
+      });
+      return;
+    }
+
+    if (key === "trash") {
+      updateBoardUiState({
+        leftPanelMode: "trash",
+        method: "replace",
+      });
+      return;
+    }
+
+    updateBoardUiState({
+      leftPanelMode: "tags",
+      tag: selectedTags[0] ?? resolvedState.tag ?? null,
+      method: "replace",
+    });
+  }, [resolvedState.tag, searchQuery, selectedTags, updateBoardUiState]);
 
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
@@ -1011,10 +1071,11 @@ function TimelineBoardPageContent({
     onShortcutsClick: () => setShowShortcutsModal(true),
     expandedSectionKey,
     activeLeftPanelMode: resolvedState.leftPanelMode,
+    mobileLeftPanelMode,
     activeLeftSectionKey,
     onExpandedSectionChange: handleExpandedSectionChange,
+    onMobileLeftPanelSelect: handleMobileLeftPanelSelect,
     onOpenNotificationsPanel: handleOpenNotificationsPanel,
-    onResetToDefaultList: handleResetToDefaultList,
     days: data?.days ?? [],
     activeDayIndex,
     effectiveDayRange,
