@@ -17,7 +17,7 @@ type UseTimelineScrollSyncArgs = {
   urlRange: number | null;
   urlTime: number | null;
   data: TimelineResponse | null;
-  activeDayIndex: number;
+  anchorDayIso: string | null;
   dayRange: number;
   indicatorMinutes: number | null;
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
@@ -31,7 +31,7 @@ export const useTimelineScrollSync = ({
   urlRange,
   urlTime,
   data,
-  activeDayIndex,
+  anchorDayIso,
   dayRange,
   indicatorMinutes,
   updateUrlForTimeline,
@@ -43,11 +43,13 @@ export const useTimelineScrollSync = ({
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileTimelineScrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileAnchorTimelineScrollRef = useRef<HTMLDivElement | null>(null);
   const lastScrollRestoreKeyRef = useRef<string | null>(null);
   const scrollRestoreAttemptRef = useRef(0);
   const autoScrollAttemptRef = useRef(0);
   const initialOpenScrollDoneRef = useRef(false);
   const programmaticScrollRef = useRef(false);
+  const lastKnownScrollTopByIsoRef = useRef<Record<string, number>>({});
 
   const useDebounce = <TArgs extends unknown[]>(callback: (...args: TArgs) => void, delay: number) => {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -68,7 +70,7 @@ export const useTimelineScrollSync = ({
   const syncActiveTimelineScrollRef = useCallback(() => {
     if (typeof window === "undefined") return;
     const isDesktop = window.matchMedia("(min-width: 768px)").matches;
-    timelineScrollRef.current = isDesktop ? desktopTimelineScrollRef.current : mobileTimelineScrollRef.current;
+    timelineScrollRef.current = isDesktop ? desktopTimelineScrollRef.current : (mobileAnchorTimelineScrollRef.current ?? mobileTimelineScrollRef.current);
   }, []);
 
   useEffect(() => {
@@ -94,9 +96,15 @@ export const useTimelineScrollSync = ({
 
   useEffect(() => {
     if (shouldPreferNowIndicatorOnOpen) return;
-    if (urlTimeMinutes == null || !timelineScrollRef.current || !isTimelineViewMounted) return;
+    if (!timelineScrollRef.current || !isTimelineViewMounted) return;
 
-    const restoreKey = `${urlDate ?? ""}|${urlRange ?? ""}|${urlTimeMinutes}`;
+    const storedTop = anchorDayIso ? lastKnownScrollTopByIsoRef.current[anchorDayIso] : undefined;
+    const desiredMinutes = typeof storedTop === "number"
+      ? null
+      : urlTimeMinutes;
+    if (typeof storedTop !== "number" && desiredMinutes == null) return;
+
+    const restoreKey = `${anchorDayIso ?? urlDate ?? ""}|${urlRange ?? ""}|${storedTop ?? desiredMinutes ?? ""}`;
     if (lastScrollRestoreKeyRef.current === restoreKey) return;
 
     scrollRestoreAttemptRef.current = 0;
@@ -109,7 +117,9 @@ export const useTimelineScrollSync = ({
       if (!container) return;
 
       const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      const desiredTop = minuteToPixels(urlTimeMinutes, timelineStartHour, hourHeight);
+      const desiredTop = typeof storedTop === "number"
+        ? storedTop
+        : minuteToPixels(desiredMinutes ?? 0, timelineStartHour, hourHeight);
       const clampedTop = Math.max(0, Math.min(desiredTop, maxTop));
 
       if (Math.abs(container.scrollTop - clampedTop) >= 2) {
@@ -118,7 +128,7 @@ export const useTimelineScrollSync = ({
 
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
       const canReachDesired = maxTop + 1 >= desiredTop;
-      const isCloseEnough = Math.abs(container.scrollTop - desiredTop) < 2;
+      const isCloseEnough = Math.abs(container.scrollTop - clampedTop) < 2;
 
       if (canReachDesired && isCloseEnough) {
         lastScrollRestoreKeyRef.current = restoreKey;
@@ -143,7 +153,7 @@ export const useTimelineScrollSync = ({
       cancelled = true;
       programmaticScrollRef.current = false;
     };
-  }, [urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
+  }, [anchorDayIso, urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
   useEffect(() => {
     if (!shouldPreferNowIndicatorOnOpen && urlTime != null) {
@@ -199,10 +209,10 @@ export const useTimelineScrollSync = ({
     };
   }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
-  const stateRef = useRef({ data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode });
-  stateRef.current = { data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode };
+  const stateRef = useRef({ data, anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode });
+  stateRef.current = { data, anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode };
 
-  const handleTimelineScroll = useCallback((arg?: number | React.UIEvent<HTMLDivElement>) => {
+  const handleTimelineScroll = useCallback((arg?: number | React.UIEvent<HTMLDivElement>, dayIso?: string | null) => {
     let scrollTop: number | undefined;
 
     if (typeof arg === "number") {
@@ -216,21 +226,29 @@ export const useTimelineScrollSync = ({
     if (scrollTop == null) return;
     if (programmaticScrollRef.current) return;
 
-    const { data, activeDayIndex, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode } = stateRef.current;
+    const { anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode } = stateRef.current;
     if (viewMode !== "timeline") return;
 
     const minutes = pixelsToMinutes(scrollTop, timelineStartHour, hourHeight);
-    const currentDay = data?.days?.[activeDayIndex];
-
-    if (currentDay) {
-      updateUrlForTimeline({ date: currentDay.isoDate, range: dayRange, time: minutes });
+    const currentDayIso = dayIso ?? anchorDayIso;
+    if (currentDayIso) {
+      lastKnownScrollTopByIsoRef.current[currentDayIso] = scrollTop;
+      updateUrlForTimeline({ date: currentDayIso, range: dayRange, time: minutes });
     }
   }, []);
 
   const debouncedHandleScroll = useDebounce(handleTimelineScroll, 500);
+  const debouncedHandleAnchorScroll = useDebounce((dayIso: string, scrollTop: number) => {
+    handleTimelineScroll(scrollTop, dayIso);
+  }, 500);
 
   const handleTimelineViewMount = useCallback(() => {
     setIsTimelineViewMounted(true);
+    syncActiveTimelineScrollRef();
+  }, [syncActiveTimelineScrollRef]);
+
+  const setMobileAnchorTimelineScrollNode = useCallback((node: HTMLDivElement | null) => {
+    mobileAnchorTimelineScrollRef.current = node;
     syncActiveTimelineScrollRef();
   }, [syncActiveTimelineScrollRef]);
 
@@ -238,7 +256,9 @@ export const useTimelineScrollSync = ({
     timelineScrollRef,
     desktopTimelineScrollRef,
     mobileTimelineScrollRef,
+    setMobileAnchorTimelineScrollNode,
     debouncedHandleScroll,
+    debouncedHandleAnchorScroll,
     handleTimelineViewMount,
   };
 };

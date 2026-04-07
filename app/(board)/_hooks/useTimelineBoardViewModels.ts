@@ -55,12 +55,15 @@ type UseTimelineBoardViewModelsArgs = {
   onOpenNotificationSettings: () => void;
   days: TimelineDay[];
   activeDayIndex: number;
+  anchorDayIso: string;
   intendedDayRange: number;
   effectiveDayRange: number;
   timelineScrollRefDesktop: RefObject<HTMLDivElement>;
   timelineScrollRefMobile: RefObject<HTMLDivElement>;
+  setMobileAnchorTimelineScrollNode: (node: HTMLDivElement | null) => void;
   timelineHeaderRef: RefObject<HTMLDivElement>;
   debouncedHandleScroll: (scrollTop: number) => void;
+  debouncedHandleAnchorScroll: (dayIso: string, scrollTop: number) => void;
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
   handleToggleCardChecked: (cardId: string, checked: boolean) => void;
@@ -76,6 +79,7 @@ type UseTimelineBoardViewModelsArgs = {
   status: string;
   handlePrevDay: () => void;
   handleNextDay: () => void;
+  goToDay: (isoDate: string) => Promise<void>;
   handlePrevDayRange: () => void;
   handleNextDayRange: () => void;
   handleDayRangeChange: (days: number) => void;
@@ -438,6 +442,10 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       timelineScrollRef: args.timelineScrollRefMobile,
       days: args.days,
       activeDayIndex: args.activeDayIndex,
+      anchorDayIso: args.anchorDayIso,
+      setAnchorTimelineScrollNode: args.setMobileAnchorTimelineScrollNode,
+      onAnchorTimelineScroll: args.debouncedHandleAnchorScroll,
+      onAnchorDayChange: args.goToDay,
       onPrevDay: args.handlePrevDay,
       onNextDay: args.handleNextDay,
       onMount: args.handleTimelineViewMount,

@@ -70,11 +70,14 @@ type UseTimelineBoardScreenArgs = {
   onOpenNotificationsPanel: () => void;
   days: TimelineResponse["days"];
   activeDayIndex: number;
+  anchorDayIso: string;
   effectiveDayRange: number;
   timelineScrollRefDesktop: React.RefObject<HTMLDivElement | null>;
   timelineScrollRefMobile: React.RefObject<HTMLDivElement | null>;
+  setMobileAnchorTimelineScrollNode: (node: HTMLDivElement | null) => void;
   timelineHeaderRef: React.RefObject<HTMLDivElement | null>;
   debouncedHandleScroll: (scrollTop: number) => void;
+  debouncedHandleAnchorScroll: (dayIso: string, scrollTop: number) => void;
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
   handleToggleCardChecked: (cardId: string, checked: boolean) => Promise<boolean>;
@@ -91,6 +94,7 @@ type UseTimelineBoardScreenArgs = {
   status: string;
   handlePrevDay: () => void;
   handleNextDay: () => void;
+  goToDay: (isoDate: string) => Promise<void>;
   handlePrevDayRange: () => void;
   handleNextDayRange: () => void;
   eventsByDay: Record<string, TimelineResponse["events"]>;
@@ -232,11 +236,14 @@ export function useTimelineBoardScreen({
   onOpenNotificationsPanel,
   days,
   activeDayIndex,
+  anchorDayIso,
   effectiveDayRange,
   timelineScrollRefDesktop,
   timelineScrollRefMobile,
+  setMobileAnchorTimelineScrollNode,
   timelineHeaderRef,
   debouncedHandleScroll,
+  debouncedHandleAnchorScroll,
   handleTimelineViewMount,
   openCardModal,
   handleToggleCardChecked,
@@ -253,6 +260,7 @@ export function useTimelineBoardScreen({
   status,
   handlePrevDay,
   handleNextDay,
+  goToDay,
   handlePrevDayRange,
   handleNextDayRange,
   eventsByDay,
@@ -377,12 +385,15 @@ export function useTimelineBoardScreen({
     onOpenNotificationSettings: () => setShowNotificationSettings(true),
     days,
     activeDayIndex,
+    anchorDayIso,
     intendedDayRange,
     effectiveDayRange,
     timelineScrollRefDesktop: timelineScrollRefDesktop as React.RefObject<HTMLDivElement>,
     timelineScrollRefMobile: timelineScrollRefMobile as React.RefObject<HTMLDivElement>,
+    setMobileAnchorTimelineScrollNode,
     timelineHeaderRef: timelineHeaderRef as React.RefObject<HTMLDivElement>,
     debouncedHandleScroll,
+    debouncedHandleAnchorScroll,
     handleTimelineViewMount,
     openCardModal,
     handleToggleCardChecked,
@@ -398,6 +409,7 @@ export function useTimelineBoardScreen({
     status,
     handlePrevDay,
     handleNextDay,
+    goToDay,
     handlePrevDayRange,
     handleNextDayRange,
     handleDayRangeChange: onDayRangeChange,

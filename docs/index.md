@@ -8,6 +8,7 @@
 - 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で完結させることをデフォルトとする。
 - board navigation / URL state の canonical contract は strict `lp` / `rp` を使い、`lp` は left section、`rp` は right panel mode のみを表す。
 - desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
+- `date` query は desktop では左端日、mobile では中央 pane の anchor day を表す。mobile の scroll restore は URL ではなく in-memory state を使う。
 - canonical default は `lp=overdue&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
 - `Search` / `Overdue` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
@@ -195,6 +196,7 @@ Canonical type definitions: `lib/api-types/timeline.ts`（クライアント/サ
 
 ### Timeline Planning
 - 🕒 **Timeline (1-7日)**: 24h × 40px のスケールで 1 分単位の予定ブロックを可視化（デフォルトは Today/Tomorrow の2日）
+- 📱 **Mobile Timeline Rail**: モバイルでは 1 日全幅の 3 ペイン横レールで前日/当日/翌日を先読みし、日付ヘッダーより下だけを横スクロールする
 - 🅰️ **A/B Buckets**: `YYYY-MM-DD_a/b` にカードを割り当て、日ごとのタスク整理を行う
 - 🔁 **Drag & Drop**: Timeline ⇄ A/B 間の移動、時間軸上でのリサイズ/再配置を DnD Kit でサポート
 - 📍 **Live Indicator**: JST 基準の Now ラインと「Live」バッジで現在時刻を強調

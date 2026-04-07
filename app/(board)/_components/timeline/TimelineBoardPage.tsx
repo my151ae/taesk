@@ -286,6 +286,8 @@ function TimelineBoardPageContent({
     setShowShortcutsModal,
     activeDayIndex,
     setActiveDayIndex,
+    anchorDayIso,
+    setAnchorDayIso,
     calendarPreset,
     setCalendarPreset,
     timelineStartHour,
@@ -339,7 +341,7 @@ function TimelineBoardPageContent({
     realtimeStatus,
   } = useTimelineData({
     initialBoard,
-    dayRange: intendedDayRange,
+    dayRange: isMobileViewport && viewMode === "timeline" ? Math.max(3, intendedDayRange) : intendedDayRange,
     timelineStartHour,
     dayWindowStartRef,
     setDayWindowStart,
@@ -405,7 +407,9 @@ function TimelineBoardPageContent({
     timelineScrollRef,
     desktopTimelineScrollRef,
     mobileTimelineScrollRef,
+    setMobileAnchorTimelineScrollNode,
     debouncedHandleScroll,
+    debouncedHandleAnchorScroll,
     handleTimelineViewMount,
   } = useTimelineScrollSync({
     viewMode,
@@ -413,7 +417,7 @@ function TimelineBoardPageContent({
     urlRange: resolvedState.view === "timeline" ? resolvedState.timelineRange : null,
     urlTime: resolvedState.view === "timeline" ? resolvedState.time : null,
     data,
-    activeDayIndex,
+    anchorDayIso,
     dayRange: timelineRange,
     indicatorMinutes,
     updateUrlForTimeline,
@@ -553,6 +557,7 @@ function TimelineBoardPageContent({
   const abScrollContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
 
   const {
+    goToDay,
     handlePrevDay,
     handleNextDay,
     handlePrevDayRange,
@@ -565,6 +570,8 @@ function TimelineBoardPageContent({
     dayRange: timelineRange,
     activeDayIndex,
     setActiveDayIndex,
+    anchorDayIso,
+    setAnchorDayIso,
     fetchTimeline,
     updateUrlForTimeline,
     timelineScrollRef,
@@ -576,8 +583,20 @@ function TimelineBoardPageContent({
   const visibleDays = useMemo(() => {
     const days = data?.days ?? [];
     if (!days.length) return [];
-    return days.slice(activeDayIndex, activeDayIndex + effectiveDayRange);
-  }, [activeDayIndex, data?.days, effectiveDayRange]);
+    const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
+    const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
+    return days.slice(startIndex, startIndex + effectiveDayRange);
+  }, [activeDayIndex, anchorDayIso, data?.days, effectiveDayRange, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline") return;
+    const days = data?.days ?? [];
+    if (!days.length) return;
+    const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
+    if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
+      setActiveDayIndex(nextIndex);
+    }
+  }, [activeDayIndex, anchorDayIso, data?.days, setActiveDayIndex, viewMode]);
 
   const {
     calendarEventsByDay,
@@ -848,6 +867,8 @@ function TimelineBoardPageContent({
     dataRange: data?.range,
     activeDayIndex,
     setActiveDayIndex,
+    anchorDayIso,
+    setAnchorDayIso,
     resolvedDate: resolvedState.date,
     dayWindowStartRef,
     setDayWindowStart,
@@ -1078,11 +1099,14 @@ function TimelineBoardPageContent({
     onOpenNotificationsPanel: handleOpenNotificationsPanel,
     days: data?.days ?? [],
     activeDayIndex,
+    anchorDayIso,
     effectiveDayRange,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,
+    setMobileAnchorTimelineScrollNode,
     timelineHeaderRef,
     debouncedHandleScroll,
+    debouncedHandleAnchorScroll,
     handleTimelineViewMount,
     openCardModal,
     handleToggleCardChecked,
@@ -1099,6 +1123,7 @@ function TimelineBoardPageContent({
     status,
     handlePrevDay: handlePrevDayWithFocusRestore,
     handleNextDay: handleNextDayWithFocusRestore,
+    goToDay,
     handlePrevDayRange: handlePrevDayRangeWithFocusRestore,
     handleNextDayRange: handleNextDayRangeWithFocusRestore,
     eventsByDay,

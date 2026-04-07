@@ -188,6 +188,47 @@ async function dragLocatorToPoint(
   await page.mouse.move(target.x, target.y, { steps: 16 });
 }
 
+async function swipeLocatorHorizontally(
+  page: Page,
+  locator: Locator,
+  direction: 'left' | 'right',
+): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Failed to resolve swipe locator bounds');
+  }
+
+  const client = await page.context().newCDPSession(page);
+  const startX = direction === 'left'
+    ? box.x + box.width * 0.78
+    : box.x + box.width * 0.22;
+  const endX = direction === 'left'
+    ? box.x + box.width * 0.22
+    : box.x + box.width * 0.78;
+  const y = box.y + Math.min(72, Math.max(40, box.height * 0.16));
+  const steps = 8;
+
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: startX, y, radiusX: 4, radiusY: 4 }],
+  });
+
+  for (let index = 1; index <= steps; index += 1) {
+    const progress = index / steps;
+    const x = startX + (endX - startX) * progress;
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x, y, radiusX: 4, radiusY: 4 }],
+    });
+    await page.waitForTimeout(16);
+  }
+
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+}
+
 function collectStoragePathsFromContent(content: unknown): string[] {
   const result = new Set<string>();
 
@@ -2464,6 +2505,116 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('swipes mobile timeline between today and tomorrow without extra timeline fetch inside the 3-day window', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const todayIso = isoDateJst();
+    const tomorrowIso = shiftIsoDateJst(1);
+    const todayCardId = crypto.randomUUID();
+    const tomorrowCardId = crypto.randomUUID();
+    const todayTitle = `Mobile swipe today ${Date.now()}`;
+    const tomorrowTitle = `Mobile swipe tomorrow ${Date.now()}`;
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert([
+      {
+        id: todayCardId,
+        title: todayTitle,
+        checklist: { version: 1, lines: [] },
+        excerpt: 'mobile swipe today card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2100,
+        tags: [],
+        due_date: todayIso,
+        due_start: '09:00',
+        due_end: '10:00',
+        due_bucket: 'a',
+        due_bucket_position: 2100,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1100,
+        slug: 'mobile-swipe-today-card',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        id: tomorrowCardId,
+        title: tomorrowTitle,
+        checklist: { version: 1, lines: [] },
+        excerpt: 'mobile swipe tomorrow card',
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 2200,
+        tags: [],
+        due_date: tomorrowIso,
+        due_start: '09:00',
+        due_end: '10:00',
+        due_bucket: 'a',
+        due_bucket_position: 2200,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 1200,
+        slug: 'mobile-swipe-tomorrow-card',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ]);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+
+      const rail = page.getByTestId('mobile-timeline-rail');
+      const todayCard = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: todayTitle }).first();
+      const tomorrowCard = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: tomorrowTitle }).first();
+
+      await expect(todayCard).toBeVisible({ timeout: 20_000 });
+
+      const timelineRequests: string[] = [];
+      const requestListener = (request: Request) => {
+        if (request.method() === 'GET' && request.url().includes(`/api/boards/${boardContext?.boardId}/timeline`)) {
+          timelineRequests.push(request.url());
+        }
+      };
+      page.on('request', requestListener);
+
+      await swipeLocatorHorizontally(page, rail, 'left');
+      await expect(tomorrowCard).toBeVisible({ timeout: 20_000 });
+      await expect(page).toHaveURL(new RegExp(`date=${tomorrowIso}`), { timeout: 20_000 });
+      await page.waitForTimeout(800);
+      expect(timelineRequests).toHaveLength(0);
+
+      await swipeLocatorHorizontally(page, rail, 'right');
+      await expect(todayCard).toBeVisible({ timeout: 20_000 });
+      await expect(page).toHaveURL(new RegExp(`date=${todayIso}`), { timeout: 20_000 });
+      await page.waitForTimeout(800);
+      expect(timelineRequests).toHaveLength(1);
+      expect(timelineRequests[0]).toContain('start=-1');
+      expect(timelineRequests[0]).toContain('range=3');
+
+      page.off('request', requestListener);
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', [todayCardId, tomorrowCardId]);
     }
   });
 

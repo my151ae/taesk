@@ -32,6 +32,8 @@ type UseTimelineBoardModeSyncArgs = {
   dataRange?: number;
   activeDayIndex: number;
   setActiveDayIndex: (index: number) => void;
+  anchorDayIso: string;
+  setAnchorDayIso: (isoDate: string) => void;
   resolvedDate: string | null;
   dayWindowStartRef: React.MutableRefObject<number>;
   setDayWindowStart: (offset: number) => void;
@@ -68,6 +70,8 @@ export function useTimelineBoardModeSync({
   dataRange,
   activeDayIndex,
   setActiveDayIndex,
+  anchorDayIso,
+  setAnchorDayIso,
   resolvedDate,
   dayWindowStartRef,
   setDayWindowStart,
@@ -157,12 +161,13 @@ export function useTimelineBoardModeSync({
 
       const today = getCurrentTimelineIsoDateJst(timelineStartHour);
       const targetDate =
-        dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedDate || today;
+        anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedDate || today;
 
       if (mode === "timeline") {
         const targetOffset = getDayDiff(targetDate, today);
         setDayWindowStart(targetOffset);
         dayWindowStartRef.current = targetOffset;
+        setAnchorDayIso(targetDate);
         pendingTimelineAnchorDateRef.current = targetDate;
         pendingListWindowAutoSyncRef.current = false;
         pendingListWindowAutoSyncAttemptsRef.current = 0;
@@ -183,6 +188,7 @@ export function useTimelineBoardModeSync({
     },
     [
       activeDayIndex,
+      anchorDayIso,
       dataDays,
       dayWindowStartRef,
       handleSetViewMode,
@@ -190,6 +196,7 @@ export function useTimelineBoardModeSync({
       listWindow.before,
       resolvedDate,
       setActiveDayIndex,
+      setAnchorDayIso,
       setDayWindowStart,
       setListAnchorDate,
       setListAnchorOffset,

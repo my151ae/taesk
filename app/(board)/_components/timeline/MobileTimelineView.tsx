@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DndContext, MeasuringStrategy, useDroppable, DragOverlay } from "@dnd-kit/core";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { DndContext, MeasuringStrategy, useDroppable, DragOverlay, type CollisionDetection } from "@dnd-kit/core";
 import {
   getDisplayHours,
   getTimelineHeight,
@@ -426,6 +426,10 @@ type MobileTimelineViewProps = {
   timelineScrollRef: React.RefObject<HTMLDivElement>;
   days: TimelineDay[];
   activeDayIndex: number;
+  anchorDayIso: string;
+  setAnchorTimelineScrollNode?: (node: HTMLDivElement | null) => void;
+  onAnchorTimelineScroll?: (dayIso: string, scrollTop: number) => void;
+  onAnchorDayChange?: (isoDate: string) => Promise<void>;
   onPrevDay: () => void;
   onNextDay: () => void;
   onMount?: () => void;
@@ -465,9 +469,10 @@ type MobileTimelineViewProps = {
 export default function MobileTimelineView({
   timelineScrollRef,
   days,
-  activeDayIndex,
-  onPrevDay,
-  onNextDay,
+  anchorDayIso,
+  setAnchorTimelineScrollNode,
+  onAnchorTimelineScroll,
+  onAnchorDayChange,
   onMount,
   onScroll,
   registerAbScrollContainer,
@@ -490,7 +495,6 @@ export default function MobileTimelineView({
   handleDragEnd,
   handleDragCancel,
   bucketIndicator,
-  isOverABList,
   pointerPreview,
   activeDrag,
   onExternalEventClick,
@@ -501,14 +505,22 @@ export default function MobileTimelineView({
   currentIsoDate,
   currentMinutes,
 }: MobileTimelineViewProps) {
+  const SWIPE_COMMIT_DISTANCE_PX = 18;
+  const SCROLL_SETTLE_DELAY_MS = 80;
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
   }, []);
 
-  const touchStartXRef = useRef<number | null>(null);
-  const touchStartYRef = useRef<number | null>(null);
-  const swipeLockedRef = useRef(false);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const anchorTimelineNodeRef = useRef<HTMLDivElement | null>(null);
+  const programmaticRailScrollRef = useRef(false);
+  const scrollSettleTimerRef = useRef<number | null>(null);
+  const touchGestureRef = useRef<{ startX: number; startY: number; startIndex: number } | null>(null);
+  const pendingAnchorIsoRef = useRef<string | null>(null);
+  const pendingScrollCommitIsoRef = useRef<string | null>(null);
+  const [visiblePaneIds, setVisiblePaneIds] = useState<string[]>(anchorDayIso ? [anchorDayIso] : []);
   const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);
+  const [touchSnapDisabled, setTouchSnapDisabled] = useState(false);
 
   useEffect(() => {
     onMount?.();
@@ -518,22 +530,13 @@ export default function MobileTimelineView({
 
   const activeDragCardId = activeDrag?.cardId ?? null;
   const {
-    activeDay,
-    eventsForDay,
-    calendarTimedEventsForDay,
-    calendarAllDayForDay,
-    abMeta,
-    activeBuckets,
-    indicatorVisible,
-    indicatorPosition,
-    overlayBucketEntry,
-    overlayOverdueCard,
-    overlayCardData,
+    anchorWindowIndex,
+    windowDayStates,
   } = useMemo(
     () =>
       buildMobileTimelineViewState({
         days,
-        activeDayIndex,
+        anchorDayIso,
         eventsByDay,
         calendarEventsByDay,
         calendarAllDayByDay,
@@ -545,8 +548,8 @@ export default function MobileTimelineView({
       }),
     [
       abBuckets,
-      activeDayIndex,
       activeDragCardId,
+      anchorDayIso,
       calendarAllDayByDay,
       calendarEventsByDay,
       days,
@@ -556,10 +559,14 @@ export default function MobileTimelineView({
       overdue,
     ]
   );
+  const anchorDayState = windowDayStates[anchorWindowIndex] ?? windowDayStates[0] ?? null;
+  const overlayBucketEntry = anchorDayState?.overlayBucketEntry ?? null;
+  const overlayOverdueCard = anchorDayState?.overlayOverdueCard ?? null;
+  const overlayCardData = anchorDayState?.overlayCardData ?? null;
 
   useEffect(() => {
     setActiveStackItem(null);
-  }, [activeDay?.isoDate]);
+  }, [anchorDayState?.day.isoDate]);
 
   useEffect(() => {
     if (contextMenuCardId) {
@@ -567,40 +574,170 @@ export default function MobileTimelineView({
     }
   }, [contextMenuCardId]);
 
-  if (!activeDay) return null;
+  useEffect(() => {
+    if (pendingAnchorIsoRef.current === anchorDayIso) {
+      pendingAnchorIsoRef.current = null;
+    }
+  }, [anchorDayIso]);
 
-  const handleSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (activeDrag || event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    if (!touch) return;
-    touchStartXRef.current = touch.clientX;
-    touchStartYRef.current = touch.clientY;
-    swipeLockedRef.current = false;
-  };
+  useLayoutEffect(() => {
+    if (scrollSettleTimerRef.current != null) {
+      window.clearTimeout(scrollSettleTimerRef.current);
+      scrollSettleTimerRef.current = null;
+    }
+    if (!railRef.current || !windowDayStates.length) return;
+    programmaticRailScrollRef.current = true;
+    railRef.current.scrollTo({ left: railRef.current.clientWidth * anchorWindowIndex, behavior: "auto" });
+    window.requestAnimationFrame(() => {
+      programmaticRailScrollRef.current = false;
+    });
+  }, [anchorWindowIndex, windowDayStates.length]);
 
-  const handleSwipeMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (activeDrag || swipeLockedRef.current || event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    const startX = touchStartXRef.current;
-    const startY = touchStartYRef.current;
-    if (!touch || startX == null || startY == null) return;
-    const dx = touch.clientX - startX;
-    const dy = touch.clientY - startY;
-    if (Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      swipeLockedRef.current = true;
-      if (dx > 0) {
-        onPrevDay();
+  const updateVisiblePanes = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const paneWidth = rail.clientWidth;
+    if (!paneWidth) return;
+    const viewportLeft = rail.scrollLeft;
+    const viewportRight = viewportLeft + paneWidth;
+    const nextVisible = windowDayStates
+      .filter((state, index) => {
+        if (state.day.isoDate === anchorDayIso) return true;
+        const paneLeft = index * paneWidth;
+        const paneRight = paneLeft + paneWidth;
+        const overlap = Math.max(0, Math.min(paneRight, viewportRight) - Math.max(paneLeft, viewportLeft));
+        return overlap / paneWidth >= 0.5;
+      })
+      .map((state) => state.day.isoDate);
+    setVisiblePaneIds((current) => {
+      if (
+        current.length === nextVisible.length &&
+        current.every((value, index) => value === nextVisible[index])
+      ) {
+        return current;
+      }
+      return nextVisible;
+    });
+  }, [anchorDayIso, windowDayStates]);
+
+  useEffect(() => {
+    updateVisiblePanes();
+  }, [updateVisiblePanes]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollSettleTimerRef.current != null) {
+        window.clearTimeout(scrollSettleTimerRef.current);
+      }
+    };
+  }, []);
+
+  const setAnchorTimelineNode = useCallback((node: HTMLDivElement | null) => {
+    anchorTimelineNodeRef.current = node;
+    setAnchorTimelineScrollNode?.(node);
+  }, [setAnchorTimelineScrollNode]);
+
+  const commitAnchorDay = useCallback((nextAnchorIso: string | null) => {
+    if (!nextAnchorIso || nextAnchorIso === anchorDayIso || pendingAnchorIsoRef.current === nextAnchorIso) return;
+    pendingAnchorIsoRef.current = nextAnchorIso;
+    void onAnchorDayChange?.(nextAnchorIso);
+  }, [anchorDayIso, onAnchorDayChange]);
+
+  const snapToPaneIndex = useCallback((paneIndex: number, behavior: ScrollBehavior = "smooth", commitAnchor = false) => {
+    const rail = railRef.current;
+    if (!rail || !windowDayStates.length) return;
+    const paneWidth = rail.clientWidth || 1;
+    const nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, paneIndex));
+    const nextAnchorIso = windowDayStates[nextIndex]?.day.isoDate ?? null;
+    if (commitAnchor) {
+      if (behavior === "auto") {
+        pendingScrollCommitIsoRef.current = null;
+        commitAnchorDay(nextAnchorIso);
       } else {
-        onNextDay();
+        pendingScrollCommitIsoRef.current = nextAnchorIso;
       }
     }
-  };
+    rail.scrollTo({ left: nextIndex * paneWidth, behavior });
+  }, [commitAnchorDay, windowDayStates]);
 
-  const handleSwipeEnd = () => {
-    touchStartXRef.current = null;
-    touchStartYRef.current = null;
-    swipeLockedRef.current = false;
-  };
+  const handleRailScroll = useCallback(() => {
+    updateVisiblePanes();
+    if (activeDrag || programmaticRailScrollRef.current || !railRef.current) return;
+    if (scrollSettleTimerRef.current != null) {
+      window.clearTimeout(scrollSettleTimerRef.current);
+    }
+    scrollSettleTimerRef.current = window.setTimeout(() => {
+      const rail = railRef.current;
+      if (!rail || !windowDayStates.length) return;
+      const paneWidth = rail.clientWidth || 1;
+      const paneIndex = Math.max(0, Math.min(windowDayStates.length - 1, Math.round(rail.scrollLeft / paneWidth)));
+      const targetLeft = paneIndex * paneWidth;
+      const aligned = Math.abs(rail.scrollLeft - targetLeft) <= 1;
+      if (!aligned) {
+        snapToPaneIndex(paneIndex, "smooth", false);
+        return;
+      }
+      if (touchSnapDisabled) {
+        setTouchSnapDisabled(false);
+      }
+      const settledIso = pendingScrollCommitIsoRef.current ?? windowDayStates[paneIndex]?.day.isoDate ?? null;
+      pendingScrollCommitIsoRef.current = null;
+      commitAnchorDay(settledIso);
+    }, SCROLL_SETTLE_DELAY_MS);
+  }, [activeDrag, commitAnchorDay, snapToPaneIndex, touchSnapDisabled, updateVisiblePanes, windowDayStates]);
+
+  const scrollToPane = useCallback((delta: number) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const paneWidth = rail.clientWidth || 1;
+    const currentIndex = Math.round(rail.scrollLeft / paneWidth);
+    const nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, currentIndex + delta));
+    snapToPaneIndex(nextIndex, "smooth", true);
+  }, [snapToPaneIndex, windowDayStates.length]);
+
+  const handleRailTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    if (activeDrag || !railRef.current) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    setTouchSnapDisabled(true);
+    const paneWidth = railRef.current.clientWidth || 1;
+    touchGestureRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      startIndex: Math.max(0, Math.min(windowDayStates.length - 1, Math.round(railRef.current.scrollLeft / paneWidth))),
+    };
+  }, [activeDrag, windowDayStates.length]);
+
+  const handleRailTouchEnd = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    const gesture = touchGestureRef.current;
+    touchGestureRef.current = null;
+    if (!gesture || activeDrag || programmaticRailScrollRef.current || !railRef.current || !windowDayStates.length) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - gesture.startX;
+    const deltaY = touch.clientY - gesture.startY;
+    const paneWidth = railRef.current.clientWidth || 1;
+    const currentIndex = Math.max(0, Math.min(windowDayStates.length - 1, Math.round(railRef.current.scrollLeft / paneWidth)));
+    let nextIndex = currentIndex;
+    if (Math.abs(deltaX) >= SWIPE_COMMIT_DISTANCE_PX && Math.abs(deltaX) > Math.abs(deltaY)) {
+      nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, gesture.startIndex + (deltaX < 0 ? 1 : -1)));
+    }
+    snapToPaneIndex(nextIndex, "smooth", true);
+  }, [activeDrag, snapToPaneIndex, windowDayStates.length]);
+
+  const mobileCollisionDetection = useMemo<CollisionDetection>(() => {
+    return (args) => {
+      const filtered = args.droppableContainers.filter((container) => {
+        const node = container.node.current;
+        const pane = node instanceof HTMLElement ? node.closest("[data-mobile-pane-id]") : null;
+        const paneId = pane instanceof HTMLElement ? pane.dataset.mobilePaneId ?? null : null;
+        return !paneId || visiblePaneIds.includes(paneId);
+      });
+      return bucketsFirstCollisionDetection({ ...args, droppableContainers: filtered });
+    };
+  }, [visiblePaneIds]);
+
+  if (!anchorDayState) return null;
 
   return (
     <DndContext
@@ -609,7 +746,7 @@ export default function MobileTimelineView({
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
-      collisionDetection={bucketsFirstCollisionDetection}
+      collisionDetection={mobileCollisionDetection}
       measuring={{
         droppable: { strategy: MeasuringStrategy.Always },
       }}
@@ -619,14 +756,7 @@ export default function MobileTimelineView({
         acceleration: 1,
       }}
     >
-      <div
-        className="relative flex h-full w-full flex-col bg-white overflow-x-hidden overscroll-x-none touch-pan-y"
-        onKeyDownCapture={handleArrowKeyFocus}
-        onTouchStart={handleSwipeStart}
-        onTouchMove={handleSwipeMove}
-        onTouchEnd={handleSwipeEnd}
-        onTouchCancel={handleSwipeEnd}
-      >
+      <div className="relative flex h-full w-full flex-col bg-white" onKeyDownCapture={handleArrowKeyFocus}>
         {(status === "loading" || !days.length) && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
@@ -634,182 +764,201 @@ export default function MobileTimelineView({
         )}
 
         <div className="flex h-full flex-col">
-          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <button
-              type="button"
-              aria-label="前へ 1日"
-              disabled={status === "loading"}
-              onClick={(e) => {
-                e.preventDefault();
-                onPrevDay();
-              }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              {"<1"}
-            </button>
-            <div className="flex items-center gap-2 text-slate-800">
-              {/* Zoom Controls (Left of date) */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    useTimelineZoomStore.getState().setHourHeight(hourHeight - ZOOM_STEP);
-                  }}
-                  disabled={hourHeight <= MIN_HOUR_HEIGHT}
-                  className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
-                >
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    useTimelineZoomStore.getState().setHourHeight(hourHeight + ZOOM_STEP);
-                  }}
-                  disabled={hourHeight >= MAX_HOUR_HEIGHT}
-                  className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
-                >
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Date Info */}
-              <div className="flex flex-col items-center gap-0">
-                <span>{activeDay.label}</span>
-                <span className="text-[10px] text-slate-400 normal-case tracking-normal">
-                  {activeDay.isoDate}
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              aria-label="次へ 1日"
-              disabled={status === "loading"}
-              onClick={(e) => {
-                e.preventDefault();
-                onNextDay();
-              }}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              {'1>'}
-            </button>
-          </div>
-
-          {calendarAllDayForDay.length > 0 && (
-            <div className="border-b border-emerald-100 bg-emerald-50/80 px-3 py-2">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                終日（Google）
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {calendarAllDayForDay.map((item) => {
-                  const meta = formatAllDayMeta({ entry: item, fallbackIsoDate: activeDay?.isoDate ?? null });
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      data-focus-group="timeline"
-                      data-focus-part="card"
-                      disabled={!onExternalEventClick}
-                      onClick={() => onExternalEventClick?.(item)}
-                      className="flex min-w-0 items-start gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
-                      title={item.title || "Google予定"}
-                    >
-                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                        G
-                      </span>
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate max-w-[180px]">{item.title || "Google予定"}</span>
-                        {meta ? (
-                          <span className="truncate text-[10px] font-normal text-emerald-700">
-                            {meta}
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           <div
-            className="grid flex-1 overflow-hidden"
-            style={{ gridTemplateColumns: "1fr 1fr" }}
+            ref={railRef}
+            data-testid="mobile-timeline-rail"
+            className={`flex flex-1 ${(activeDrag || touchSnapDisabled) ? "overflow-x-hidden [scroll-snap-type:none]" : "overflow-x-auto snap-x snap-mandatory"} overflow-y-hidden`}
+            onScroll={handleRailScroll}
+            onTouchStart={handleRailTouchStart}
+            onTouchEnd={handleRailTouchEnd}
+            onTouchCancel={() => {
+              touchGestureRef.current = null;
+              setTouchSnapDisabled(false);
+            }}
+            style={{ touchAction: activeDrag ? "pan-y" : "pan-x" }}
           >
-            <div
-              ref={timelineScrollRef}
-              onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-              className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
-            >
-              <div
-                className="relative grid h-full grid-cols-1"
-                data-testid="timeline-grid"
-                style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}
-              >
-                <MobileTimelineColumn
-                  day={activeDay}
-                  events={eventsForDay}
-                  indicatorVisible={indicatorVisible}
-                  indicatorPosition={indicatorPosition}
-                  openCardModal={openCardModal}
-                  onToggleCheck={onToggleCheck}
-                  pointerPreview={pointerPreview}
-                  activeDragCardId={activeDragCardId}
-                  calendarEvents={calendarTimedEventsForDay}
-                  onExternalEventClick={onExternalEventClick}
-                  timelineStartHour={timelineStartHour}
-                  onCardContextMenu={onCardContextMenu}
-                  onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                  contextMenuCardId={contextMenuCardId}
-                  hourHeight={hourHeight}
-                  activeStackItem={activeStackItem}
-                  setActiveStackItem={setActiveStackItem}
-                  currentIsoDate={currentIsoDate}
-                  currentMinutes={currentMinutes}
-                />
-              </div>
-            </div>
+            {windowDayStates.map((state) => {
+              const isAnchorPane = state.day.isoDate === anchorDayState.day.isoDate;
+              return (
+                <div
+                  key={state.day.isoDate}
+                  data-mobile-pane-id={state.day.isoDate}
+                  className="flex min-h-0 min-w-full snap-start flex-col"
+                >
+                  <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <button
+                      type="button"
+                      aria-label="前へ 1日"
+                      disabled={status === "loading"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        scrollToPane(-1);
+                      }}
+                      className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      {"<1"}
+                    </button>
+                    <div className="flex items-center gap-2 text-slate-800">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            useTimelineZoomStore.getState().setHourHeight(hourHeight - ZOOM_STEP);
+                          }}
+                          disabled={hourHeight <= MIN_HOUR_HEIGHT}
+                          className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
+                        >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            useTimelineZoomStore.getState().setHourHeight(hourHeight + ZOOM_STEP);
+                          }}
+                          disabled={hourHeight >= MAX_HOUR_HEIGHT}
+                          className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 text-slate-600 active:bg-slate-200 disabled:opacity-30"
+                        >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="flex flex-col items-center gap-0">
+                        <span>{state.day.label}</span>
+                        <span className="text-[10px] text-slate-400 normal-case tracking-normal">
+                          {state.day.isoDate}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="次へ 1日"
+                      disabled={status === "loading"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        scrollToPane(1);
+                      }}
+                      className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      {'1>'}
+                    </button>
+                  </div>
+                  {state.calendarAllDay.length > 0 ? (
+                    <div className="border-b border-emerald-100 bg-emerald-50/80 px-3 py-2">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">終日（Google）</div>
+                      <div className="flex flex-wrap gap-2">
+                        {state.calendarAllDay.map((item) => {
+                          const meta = formatAllDayMeta({ entry: item, fallbackIsoDate: state.day.isoDate });
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              data-focus-group="timeline"
+                              data-focus-part="card"
+                              disabled={!onExternalEventClick}
+                              onClick={() => onExternalEventClick?.(item)}
+                              className="flex min-w-0 items-start gap-2 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
+                              title={item.title || "Google予定"}
+                            >
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">G</span>
+                              <span className="flex min-w-0 flex-col gap-0.5">
+                                <span className="truncate max-w-[180px]">{item.title || "Google予定"}</span>
+                                {meta ? <span className="truncate text-[10px] font-normal text-emerald-700">{meta}</span> : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
 
-            <div
-              ref={(el) => registerAbScrollContainer?.(activeDay.isoDate, el)}
-              data-ab-scroll-container="true"
-              data-ab-day={activeDay.isoDate}
-              className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-ab-thin [scrollbar-gutter:stable]"
-            >
-              <div className="space-y-3 px-3 pb-4">
-                {abMeta?.sections.map((section) => {
-                  const items = activeBuckets[section.bucket] ?? [];
-                  return (
-                    <MobileAbBucket
-                      key={section.bucket}
-                      sectionLabel={section.label}
-                      bucketKey={section.bucket}
-                      items={items}
-                      openCardModal={openCardModal}
-                      onRequestCreateBucketCard={onRequestCreateBucketCard}
-                      onCreateBucketCard={onCreateBucketCard}
-                      onToggleCheck={onToggleCheck}
-                      bucketIndicator={bucketIndicator}
-                      onCardContextMenu={onCardContextMenu}
-                      onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                      contextMenuCardId={contextMenuCardId}
-                    />
-                  );
-                })}
-              </div>
-            </div>
+                  <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <div
+                      ref={(node) => {
+                        if (isAnchorPane) {
+                          setAnchorTimelineNode(node);
+                        }
+                      }}
+                      onScroll={(e) => {
+                        if (isAnchorPane) {
+                          onAnchorTimelineScroll?.(state.day.isoDate, e.currentTarget.scrollTop);
+                        } else {
+                          onScroll?.(e.currentTarget.scrollTop);
+                        }
+                      }}
+                      className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
+                      style={{ touchAction: "pan-y" }}
+                    >
+                      <div
+                        className="relative grid h-full grid-cols-1"
+                        data-testid={isAnchorPane ? "timeline-grid" : undefined}
+                        style={{ minHeight: Math.max(timelineViewportHeight, getTimelineHeight(hourHeight)) }}
+                      >
+                        <MobileTimelineColumn
+                          day={state.day}
+                          events={state.events}
+                          indicatorVisible={state.indicatorVisible}
+                          indicatorPosition={state.indicatorPosition}
+                          openCardModal={openCardModal}
+                          onToggleCheck={onToggleCheck}
+                          pointerPreview={pointerPreview}
+                          activeDragCardId={activeDragCardId}
+                          calendarEvents={state.calendarTimed}
+                          onExternalEventClick={onExternalEventClick}
+                          timelineStartHour={timelineStartHour}
+                          onCardContextMenu={onCardContextMenu}
+                          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                          contextMenuCardId={contextMenuCardId}
+                          hourHeight={hourHeight}
+                          activeStackItem={activeStackItem}
+                          setActiveStackItem={setActiveStackItem}
+                          currentIsoDate={currentIsoDate}
+                          currentMinutes={currentMinutes}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      ref={(el) => registerAbScrollContainer?.(state.day.isoDate, visiblePaneIds.includes(state.day.isoDate) ? el : null)}
+                      data-ab-scroll-container="true"
+                      data-ab-day={state.day.isoDate}
+                      className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-ab-thin [scrollbar-gutter:stable]"
+                      style={{ touchAction: "pan-y" }}
+                    >
+                      <div className="space-y-3 px-3 pb-4">
+                        {state.abMeta?.sections.map((section) => {
+                          const items = state.activeBuckets[section.bucket] ?? [];
+                          return (
+                            <MobileAbBucket
+                              key={`${state.day.isoDate}-${section.bucket}`}
+                              sectionLabel={section.label}
+                              bucketKey={section.bucket}
+                              items={items}
+                              openCardModal={openCardModal}
+                              onRequestCreateBucketCard={onRequestCreateBucketCard}
+                              onCreateBucketCard={onCreateBucketCard}
+                              onToggleCheck={onToggleCheck}
+                              bucketIndicator={bucketIndicator}
+                              onCardContextMenu={onCardContextMenu}
+                              onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                              contextMenuCardId={contextMenuCardId}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-
-        {/* Zoom Controls (Bottom Left) */}
-
       </div>
 
       <DragOverlay dropAnimation={null}>

@@ -14,11 +14,12 @@ Timeline ボードの UI 実装で守るべき共通ルールをまとめます�
 ## 2. Timeline の PC / Mobile 分離
 
 - **PC:** `DesktopTimelineView` で dnd-kit によるドラッグ＆リサイズを提供。framer-motion を混在させない。
-- **Mobile:** `MobileTimelineView` はモバイル専用 UI としてレンダリングし、日送りスワイプに加えて `OVERDUE / A-B / timeline` 間の dnd-kit ベース DnD を維持する。PC ではレンダリングしない（`block md:hidden`）。
+- **Mobile:** `MobileTimelineView` はモバイル専用 UI としてレンダリングし、1日全幅の 3 ペイン横レールで `anchor day` を中央 pane に表示する。日付ヘッダーより下だけを横スクロール対象にし、`OVERDUE / A-B / timeline` 間の dnd-kit ベース DnD を維持する。PC ではレンダリングしない（`block md:hidden`）。
 - `TimelineBoardPage` で両ビューを Tailwind で切り替え、データ/ロジックは共通 props を渡すだけにする。
 
-### スワイプ vs ドラッグの競合回避
-- コンポーネントを分離し、DOM を共有しない。PC に framer-motion を入れない。Mobile では既存 DnD とスワイプ閾値の両立を前提に、別の DnD スタックや portal 化したドラッグレイヤーを増やさない。
+### 横レール vs ドラッグの競合回避
+- コンポーネントを分離し、DOM を共有しない。PC に framer-motion を入れない。Mobile では browser 標準の横スクロール + `scroll-snap` を使い、別の DnD スタックや portal 化したドラッグレイヤーを増やさない。
+- Mobile では drag / resize 中に rail の `scroll-snap-type` を一時的に無効化し、off-screen pane を collision 対象から外す。
 - オーバーレイ構造（Timeline 上に A/B を重ねる）でも、PC/Mobile のイベントは別コンポーネントに閉じ込める。
 
 ## 3. レイアウト仕様（PC）
@@ -30,10 +31,10 @@ Timeline ボードの UI 実装で守るべき共通ルールをまとめます�
 
 ## 4. レイアウト仕様（Mobile）
 
-- framer-motion の横スワイプで日送り。スワイプ閾値は距離・速度で判定し、スナップさせる。
-- タイムラインは 1 日単位で表示し、A/B は同日分だけ右側に配置（幅 55/45% など、画面全幅を使う）。
+- モバイルは 1 日単位を全幅表示し、横レール上で前日・当日・翌日の 3 ペインを保持する。スクロール停止後 120ms を目安に anchor day を確定する。
+- 日付ヘッダーより下だけが横スクロールし、各 pane の内部は `all-day` セクション + `timeline / A-B` の 2 カラムで構成する。
 - MobileTimelineView でも同一 `DndContext` 配下で `OVERDUE / A-B / timeline` を扱い、カード投入フローを維持する。
-- 独立スクロールは `OVERDUE` シート、timeline、A/B の 3 系統を基本とし、互いの scroll container を差し替えない。
+- 独立スクロールは `OVERDUE` シート、pane 内 timeline、pane 内 A/B の 3 系統を基本とし、URL と scroll restore は anchor pane の timeline を canonical source にする。
 
 ## 5. 禁止・注意事項
 
@@ -43,7 +44,7 @@ Timeline ボードの UI 実装で守るべき共通ルールをまとめます�
 
 ## 6. 参考プロンプト（Timeline 用）
 > TimelineBoardPage で PC/Mobile のビューを分けています。
-> - モバイル（md 未満）は MobileTimelineView を表示し、横方向スワイプと既存の dnd-kit による `OVERDUE / A-B / timeline` 間 DnD を維持してください。
+> - モバイル（md 未満）は MobileTimelineView を表示し、1日全幅の横レール + `scroll-snap` で anchor day を切り替えてください。
 > - PC（md 以上）は DesktopTimelineView を表示し、既存の dnd-kit によるドラッグ＆リサイズを使います。
 > SSR でのハイドレーションエラーを避けるため、`window.innerWidth` や UA 判定は使わず、Tailwind の `hidden` / `md:block` などで出し分けてください。
 

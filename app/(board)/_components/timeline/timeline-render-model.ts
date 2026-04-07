@@ -31,6 +31,21 @@ export type TimelineAllDaySegment = AllDaySegmentSeed & { row: number };
 const EMPTY_SEGMENTS: TimelineAllDaySegment[] = [];
 const EMPTY_ACTIVE_BUCKETS: Record<string, TimelineBucketItem[]> = {};
 
+export type MobileTimelineDayState = {
+  day: TimelineDay;
+  events: TimelineEvent[];
+  calendarTimed: ExternalCalendarEntry[];
+  calendarAllDay: ExternalCalendarEntry[];
+  abMeta: ReturnType<typeof buildAbMeta>;
+  activeBuckets: Record<string, TimelineBucketItem[]>;
+  indicatorVisible: boolean;
+  indicatorPosition: number;
+  overlayBucketEntry: ReturnType<typeof findOverlayBucketEntry>;
+  overlayOverdueEntry: ReturnType<typeof findOverlayOverdueEntry>;
+  overlayOverdueCard: TimelineOverdueItem | TimelineBucketItem | null;
+  overlayCardData: ReturnType<typeof buildOverlayCardData>;
+};
+
 export const buildStackedTimelineColumnLayout = ({
   events,
   calendarEvents,
@@ -246,7 +261,7 @@ export const buildAllDayLayout = ({
 
 export const buildMobileTimelineViewState = ({
   days,
-  activeDayIndex,
+  anchorDayIso,
   eventsByDay,
   calendarEventsByDay,
   calendarAllDayByDay,
@@ -257,7 +272,7 @@ export const buildMobileTimelineViewState = ({
   activeDragCardId,
 }: {
   days: TimelineDay[];
-  activeDayIndex: number;
+  anchorDayIso: string | null;
   eventsByDay: Record<string, TimelineEvent[]>;
   calendarEventsByDay: Record<string, ExternalCalendarEntry[]>;
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
@@ -267,50 +282,53 @@ export const buildMobileTimelineViewState = ({
   indicatorDayIso: string | null;
   activeDragCardId: string | null;
 }) => {
-  const activeDay = days[activeDayIndex] ?? days[0] ?? null;
+  const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
+  const safeAnchorIndex = anchorIndex >= 0 ? anchorIndex : 0;
+  const windowStart = Math.max(0, Math.min(days.length - 3, safeAnchorIndex - 1));
+  const windowDays = days.slice(windowStart, windowStart + 3);
+  const anchorWindowIndex = Math.max(0, windowDays.findIndex((day) => day.isoDate === anchorDayIso));
 
-  if (!activeDay) {
+  if (!windowDays.length) {
     return {
-      activeDay: null,
-      eventsForDay: [] as TimelineEvent[],
-      calendarTimedEventsForDay: [] as ExternalCalendarEntry[],
-      calendarAllDayForDay: [] as ExternalCalendarEntry[],
-      abMeta: null,
-      activeBuckets: EMPTY_ACTIVE_BUCKETS,
-      indicatorVisible: false,
-      indicatorPosition: indicatorTop ?? 0,
-      overlayBucketEntry: null,
-      overlayOverdueEntry: null,
-      overlayOverdueCard: null,
-      overlayCardData: null,
+      anchorDayIso: null,
+      anchorWindowIndex: 0,
+      windowDayStates: [] as MobileTimelineDayState[],
     };
   }
 
-  const eventsForDay = eventsByDay[activeDay.isoDate] ?? [];
-  const calendarTimedEventsForDay = calendarEventsByDay[activeDay.isoDate] ?? [];
-  const calendarAllDayForDay = calendarAllDayByDay[activeDay.isoDate] ?? [];
-  const activeBuckets = buildActiveBuckets({ activeDay, abBuckets });
-  const { overlayBucketEntry, overlayOverdueEntry, overlayCardData } = buildTimelineOverlayState({
-    abBuckets: activeBuckets,
-    overdue,
-    events: eventsForDay,
-    activeDragCardId,
-    defaultTimelineDuration: 0,
+  const windowDayStates: MobileTimelineDayState[] = windowDays.map((day) => {
+    const events = eventsByDay[day.isoDate] ?? [];
+    const calendarTimed = calendarEventsByDay[day.isoDate] ?? [];
+    const calendarAllDay = calendarAllDayByDay[day.isoDate] ?? [];
+    const activeBuckets = buildActiveBuckets({ activeDay: day, abBuckets });
+    const { overlayBucketEntry, overlayOverdueEntry, overlayCardData } = buildTimelineOverlayState({
+      abBuckets: activeBuckets,
+      overdue,
+      events,
+      activeDragCardId,
+      defaultTimelineDuration: 0,
+    });
+
+    return {
+      day,
+      events,
+      calendarTimed,
+      calendarAllDay,
+      abMeta: buildAbMeta(day),
+      activeBuckets,
+      indicatorVisible: indicatorTop != null && indicatorDayIso === day.isoDate,
+      indicatorPosition: indicatorTop ?? 0,
+      overlayBucketEntry,
+      overlayOverdueEntry,
+      overlayOverdueCard: overlayOverdueEntry?.item ?? null,
+      overlayCardData,
+    };
   });
 
   return {
-    activeDay,
-    eventsForDay,
-    calendarTimedEventsForDay,
-    calendarAllDayForDay,
-    abMeta: buildAbMeta(activeDay),
-    activeBuckets,
-    indicatorVisible: indicatorTop != null && indicatorDayIso === activeDay.isoDate,
-    indicatorPosition: indicatorTop ?? 0,
-    overlayBucketEntry,
-    overlayOverdueEntry,
-    overlayOverdueCard: overlayOverdueEntry?.item ?? null,
-    overlayCardData,
+    anchorDayIso: windowDays[anchorWindowIndex]?.isoDate ?? windowDays[0]?.isoDate ?? null,
+    anchorWindowIndex,
+    windowDayStates,
   };
 };
 

@@ -109,6 +109,7 @@ export function useTimelineBoardController({
   updateUrlForTimeline,
   updateUrlForList,
 }: UseTimelineBoardControllerArgs) {
+  const initialTimelineIsoDate = resolvedState.date ?? getCurrentTimelineIsoDateJst(5);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
@@ -120,6 +121,7 @@ export function useTimelineBoardController({
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const [anchorDayIso, setAnchorDayIso] = useState<string>(initialTimelineIsoDate);
   const [calendarPreset, setCalendarPreset] = useState<"visible" | "this-week" | "next-week">("visible");
   const [timelineStartHour, setTimelineStartHour] = useState(5);
 
@@ -150,6 +152,7 @@ export function useTimelineBoardController({
 
     setViewMode(resolvedState.view);
     setTimelineRange(nextTimelineRange);
+    setAnchorDayIso(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
     setListWindow(nextListWindow);
     setListWindowPresetKey(derivePresetFromWindow(nextListWindow));
     setActiveDayIndex(
@@ -171,6 +174,7 @@ export function useTimelineBoardController({
     resolvedState.listWindow.after,
     resolvedState.date,
     resolvedState.anchorOffset,
+    timelineStartHour,
   ]);
 
   const listRange = useMemo(() => listWindowRange(listWindow), [listWindow]);
@@ -186,7 +190,7 @@ export function useTimelineBoardController({
     (mode: "timeline" | "list") => {
       setViewMode(mode);
       const today = getCurrentTimelineIsoDateJst(timelineStartHour);
-      const currentDayIso = dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedState.date || today;
+      const currentDayIso = anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedState.date || today;
 
       if (mode === "timeline") {
         updateUrlForTimeline({
@@ -209,6 +213,7 @@ export function useTimelineBoardController({
     },
     [
       activeDayIndex,
+      anchorDayIso,
       dataDays,
       listAnchorDate,
       listWindow.after,
@@ -242,6 +247,8 @@ export function useTimelineBoardController({
     setShowShortcutsModal,
     activeDayIndex,
     setActiveDayIndex,
+    anchorDayIso,
+    setAnchorDayIso,
     calendarPreset,
     setCalendarPreset,
     timelineStartHour,

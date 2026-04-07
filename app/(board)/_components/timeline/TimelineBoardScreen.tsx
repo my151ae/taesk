@@ -242,7 +242,7 @@ export default function TimelineBoardScreen({
   );
   const headerToggleLabel = isHeaderCollapsed ? "メインヘッダーを表示" : "メインヘッダーを隠す";
   const [showMobileSelector, setShowMobileSelector] = useState(false);
-  const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(false);
+  const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
   const mobileSelectorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
