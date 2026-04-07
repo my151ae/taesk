@@ -506,6 +506,7 @@ export default function MobileTimelineView({
   currentMinutes,
 }: MobileTimelineViewProps) {
   const SWIPE_COMMIT_DISTANCE_PX = 18;
+  const SWIPE_COMMIT_RATIO = 0.4;
   const SCROLL_SETTLE_DELAY_MS = 80;
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -517,7 +518,9 @@ export default function MobileTimelineView({
   const scrollSettleTimerRef = useRef<number | null>(null);
   const touchGestureRef = useRef<{ startX: number; startY: number; startIndex: number } | null>(null);
   const pendingAnchorIsoRef = useRef<string | null>(null);
-  const pendingScrollCommitIsoRef = useRef<string | null>(null);
+  const pendingSettleTargetIndexRef = useRef<number | null>(null);
+  const pendingSettleTargetIsoRef = useRef<string | null>(null);
+  const isProgrammaticSettleRef = useRef(false);
   const [visiblePaneIds, setVisiblePaneIds] = useState<string[]>(anchorDayIso ? [anchorDayIso] : []);
   const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);
   const [touchSnapDisabled, setTouchSnapDisabled] = useState(false);
@@ -643,22 +646,22 @@ export default function MobileTimelineView({
     void onAnchorDayChange?.(nextAnchorIso);
   }, [anchorDayIso, onAnchorDayChange]);
 
-  const snapToPaneIndex = useCallback((paneIndex: number, behavior: ScrollBehavior = "smooth", commitAnchor = false) => {
+  const snapToPaneIndex = useCallback((paneIndex: number, behavior: ScrollBehavior = "smooth") => {
     const rail = railRef.current;
     if (!rail || !windowDayStates.length) return;
     const paneWidth = rail.clientWidth || 1;
     const nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, paneIndex));
-    const nextAnchorIso = windowDayStates[nextIndex]?.day.isoDate ?? null;
-    if (commitAnchor) {
-      if (behavior === "auto") {
-        pendingScrollCommitIsoRef.current = null;
-        commitAnchorDay(nextAnchorIso);
-      } else {
-        pendingScrollCommitIsoRef.current = nextAnchorIso;
-      }
-    }
     rail.scrollTo({ left: nextIndex * paneWidth, behavior });
-  }, [commitAnchorDay, windowDayStates]);
+  }, [windowDayStates]);
+
+  const requestSettleToPane = useCallback((paneIndex: number) => {
+    if (!windowDayStates.length) return;
+    const nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, paneIndex));
+    pendingSettleTargetIndexRef.current = nextIndex;
+    pendingSettleTargetIsoRef.current = windowDayStates[nextIndex]?.day.isoDate ?? null;
+    isProgrammaticSettleRef.current = true;
+    snapToPaneIndex(nextIndex, "smooth");
+  }, [snapToPaneIndex, windowDayStates]);
 
   const handleRailScroll = useCallback(() => {
     updateVisiblePanes();
@@ -669,22 +672,23 @@ export default function MobileTimelineView({
     scrollSettleTimerRef.current = window.setTimeout(() => {
       const rail = railRef.current;
       if (!rail || !windowDayStates.length) return;
+      if (!isProgrammaticSettleRef.current) return;
+      const targetIndex = pendingSettleTargetIndexRef.current;
+      if (targetIndex == null) return;
       const paneWidth = rail.clientWidth || 1;
-      const paneIndex = Math.max(0, Math.min(windowDayStates.length - 1, Math.round(rail.scrollLeft / paneWidth)));
-      const targetLeft = paneIndex * paneWidth;
-      const aligned = Math.abs(rail.scrollLeft - targetLeft) <= 1;
-      if (!aligned) {
-        snapToPaneIndex(paneIndex, touchSnapDisabled ? "auto" : "smooth", false);
-        return;
-      }
+      const targetLeft = targetIndex * paneWidth;
+      const reachedTarget = Math.abs(rail.scrollLeft - targetLeft) <= 1;
+      if (!reachedTarget) return;
+      isProgrammaticSettleRef.current = false;
+      pendingSettleTargetIndexRef.current = null;
       if (touchSnapDisabled) {
         setTouchSnapDisabled(false);
       }
-      const settledIso = pendingScrollCommitIsoRef.current ?? windowDayStates[paneIndex]?.day.isoDate ?? null;
-      pendingScrollCommitIsoRef.current = null;
+      const settledIso = pendingSettleTargetIsoRef.current;
+      pendingSettleTargetIsoRef.current = null;
       commitAnchorDay(settledIso);
     }, SCROLL_SETTLE_DELAY_MS);
-  }, [activeDrag, commitAnchorDay, snapToPaneIndex, touchSnapDisabled, updateVisiblePanes, windowDayStates]);
+  }, [activeDrag, commitAnchorDay, touchSnapDisabled, updateVisiblePanes, windowDayStates]);
 
   const scrollToPane = useCallback((delta: number) => {
     const rail = railRef.current;
@@ -692,8 +696,8 @@ export default function MobileTimelineView({
     const paneWidth = rail.clientWidth || 1;
     const currentIndex = Math.round(rail.scrollLeft / paneWidth);
     const nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, currentIndex + delta));
-    snapToPaneIndex(nextIndex, "smooth", true);
-  }, [snapToPaneIndex, windowDayStates.length]);
+    requestSettleToPane(nextIndex);
+  }, [requestSettleToPane, windowDayStates.length]);
 
   const handleRailTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
     if (activeDrag || !railRef.current) return;
@@ -717,13 +721,22 @@ export default function MobileTimelineView({
     const deltaX = touch.clientX - gesture.startX;
     const deltaY = touch.clientY - gesture.startY;
     const paneWidth = railRef.current.clientWidth || 1;
-    const currentIndex = Math.max(0, Math.min(windowDayStates.length - 1, Math.round(railRef.current.scrollLeft / paneWidth)));
-    let nextIndex = currentIndex;
-    if (Math.abs(deltaX) >= SWIPE_COMMIT_DISTANCE_PX && Math.abs(deltaX) > Math.abs(deltaY)) {
-      nextIndex = Math.max(0, Math.min(windowDayStates.length - 1, gesture.startIndex + (deltaX < 0 ? 1 : -1)));
+    const horizontalGesture = Math.abs(deltaX) > Math.abs(deltaY);
+    const scrollProgress = (railRef.current.scrollLeft - gesture.startIndex * paneWidth) / paneWidth;
+    const absoluteProgress = Math.abs(scrollProgress);
+    let nextIndex = gesture.startIndex;
+    if (
+      horizontalGesture &&
+      Math.abs(deltaX) >= SWIPE_COMMIT_DISTANCE_PX &&
+      absoluteProgress >= SWIPE_COMMIT_RATIO
+    ) {
+      nextIndex = Math.max(
+        0,
+        Math.min(windowDayStates.length - 1, gesture.startIndex + (scrollProgress > 0 ? 1 : -1))
+      );
     }
-    snapToPaneIndex(nextIndex, "auto", true);
-  }, [activeDrag, snapToPaneIndex, windowDayStates.length]);
+    requestSettleToPane(nextIndex);
+  }, [activeDrag, requestSettleToPane, windowDayStates.length]);
 
   const mobileCollisionDetection = useMemo<CollisionDetection>(() => {
     return (args) => {
@@ -773,6 +786,9 @@ export default function MobileTimelineView({
             onTouchEnd={handleRailTouchEnd}
             onTouchCancel={() => {
               touchGestureRef.current = null;
+              pendingSettleTargetIndexRef.current = null;
+              pendingSettleTargetIsoRef.current = null;
+              isProgrammaticSettleRef.current = false;
               setTouchSnapDisabled(false);
             }}
             style={{ touchAction: activeDrag ? "pan-y" : "pan-x" }}
