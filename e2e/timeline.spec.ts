@@ -2508,7 +2508,33 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('swipes mobile timeline between today and tomorrow without extra timeline fetch inside the 3-day window', async ({ page }) => {
+  test('loads mobile timeline with a 3-day window on first paint', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+
+    const timelineRequests: string[] = [];
+    const requestListener = (request: Request) => {
+      if (request.method() === 'GET' && request.url().includes(`/api/boards/${boardContext?.boardId}/timeline`)) {
+        timelineRequests.push(request.url());
+      }
+    };
+
+    page.on('request', requestListener);
+    try {
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
+      await expect.poll(() => timelineRequests.length, { timeout: 20_000 }).toBeGreaterThan(0);
+      expect(timelineRequests[0]).toContain('range=3');
+    } finally {
+      page.off('request', requestListener);
+    }
+  });
+
+  test('swipes mobile timeline between today and tomorrow and silently prefetches the missing previous day after returning', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');

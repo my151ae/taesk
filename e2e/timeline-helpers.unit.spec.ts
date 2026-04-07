@@ -6,7 +6,8 @@ import {
     getTimelineIsoDateJst,
     NormalizedTimelineLayoutItem,
 } from '../app/(board)/_utils/timeline-helpers';
-import { buildDesktopAllDayState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
+import { buildDesktopAllDayState, buildMobileTimelineViewState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
+import { hasPrefetchedNeighborsForDay, resolveAnchorDayFromPayload } from '../app/(board)/_hooks/useTimelineNavigation';
 import {
     formatShortcutKeyLabel,
     resolveShortcutBarPayload,
@@ -227,6 +228,108 @@ test.describe('timeline-render-model helpers', () => {
         expect(result.allDayLayout.rows).toBe(0);
         expect(result.allDayLayout.segments).toEqual([]);
         expect(result.allDayMinHeight).toBe(48);
+    });
+
+    test('buildMobileTimelineViewState centers a 3-day window around the anchor day', async () => {
+        const days = [
+            { key: '2026-04-06', label: '04/06 (Mon)', isoDate: '2026-04-06' },
+            { key: '2026-04-07', label: 'Today 04/07 (Tue)', isoDate: '2026-04-07' },
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+        ];
+
+        const result = buildMobileTimelineViewState({
+            days,
+            anchorDayIso: '2026-04-08',
+            eventsByDay: {},
+            calendarEventsByDay: {},
+            calendarAllDayByDay: {},
+            abBuckets: {},
+            overdue: [],
+            indicatorTop: null,
+            indicatorDayIso: null,
+            activeDragCardId: null,
+        });
+
+        expect(result.anchorDayIso).toBe('2026-04-08');
+        expect(result.anchorWindowIndex).toBe(1);
+        expect(result.windowDayStates.map((state) => state.day.isoDate)).toEqual([
+            '2026-04-07',
+            '2026-04-08',
+            '2026-04-09',
+        ]);
+    });
+
+    test('buildMobileTimelineViewState right-shifts when the anchor is at the start edge', async () => {
+        const days = [
+            { key: '2026-04-07', label: 'Today 04/07 (Tue)', isoDate: '2026-04-07' },
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+        ];
+
+        const result = buildMobileTimelineViewState({
+            days,
+            anchorDayIso: '2026-04-07',
+            eventsByDay: {},
+            calendarEventsByDay: {},
+            calendarAllDayByDay: {},
+            abBuckets: {},
+            overdue: [],
+            indicatorTop: null,
+            indicatorDayIso: null,
+            activeDragCardId: null,
+        });
+
+        expect(result.anchorWindowIndex).toBe(0);
+        expect(result.windowDayStates.map((state) => state.day.isoDate)).toEqual([
+            '2026-04-07',
+            '2026-04-08',
+            '2026-04-09',
+        ]);
+    });
+});
+
+test.describe('timeline navigation helpers', () => {
+    test('resolveAnchorDayFromPayload snaps to the closest fetched day when the target is missing', async () => {
+        const payloadDays = [
+            { key: '2026-04-07', label: 'Today 04/07 (Tue)', isoDate: '2026-04-07' },
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+        ];
+
+        const result = resolveAnchorDayFromPayload({
+            targetIso: '2026-04-10',
+            payloadDays,
+            currentTimelineIso: '2026-04-07',
+        });
+
+        expect(result.resolvedAnchorDayIso).toBe('2026-04-09');
+        expect(result.anchorIndex).toBe(2);
+        expect(result.windowStartIndex).toBe(2);
+    });
+
+    test('hasPrefetchedNeighborsForDay returns true only when the previous and next day are already loaded', async () => {
+        const completeDays = [
+            { key: '2026-04-06', label: '04/06 (Mon)', isoDate: '2026-04-06' },
+            { key: '2026-04-07', label: 'Today 04/07 (Tue)', isoDate: '2026-04-07' },
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+        ];
+        const incompleteDays = [
+            { key: '2026-04-07', label: 'Today 04/07 (Tue)', isoDate: '2026-04-07' },
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+        ];
+
+        expect(hasPrefetchedNeighborsForDay({
+            targetIso: '2026-04-07',
+            payloadDays: completeDays,
+            currentTimelineIso: '2026-04-07',
+        })).toBe(true);
+
+        expect(hasPrefetchedNeighborsForDay({
+            targetIso: '2026-04-07',
+            payloadDays: incompleteDays,
+            currentTimelineIso: '2026-04-07',
+        })).toBe(false);
     });
 });
 

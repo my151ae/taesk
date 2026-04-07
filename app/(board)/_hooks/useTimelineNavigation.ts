@@ -28,6 +28,61 @@ interface UseTimelineNavigationProps {
     hourHeight?: number;
 }
 
+export const resolveAnchorDayFromPayload = ({
+    targetIso,
+    payloadDays,
+    currentTimelineIso,
+}: {
+    targetIso: string;
+    payloadDays: TimelineResponse["days"] | undefined;
+    currentTimelineIso: string;
+}) => {
+    if (!payloadDays?.length) {
+        return { resolvedAnchorDayIso: targetIso, anchorIndex: 0, windowStartIndex: 0 };
+    }
+
+    const exactIndex = payloadDays.findIndex((day) => day.isoDate === targetIso);
+    if (exactIndex >= 0) {
+        return {
+            resolvedAnchorDayIso: payloadDays[exactIndex]?.isoDate ?? targetIso,
+            anchorIndex: exactIndex,
+            windowStartIndex: exactIndex,
+        };
+    }
+
+    const targetOffset = getDayDiff(targetIso, currentTimelineIso);
+    let closestIndex = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    payloadDays.forEach((day, index) => {
+        const distance = Math.abs(getDayDiff(day.isoDate, currentTimelineIso) - targetOffset);
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = index;
+        }
+    });
+
+    return {
+        resolvedAnchorDayIso: payloadDays[closestIndex]?.isoDate ?? targetIso,
+        anchorIndex: closestIndex,
+        windowStartIndex: closestIndex,
+    };
+};
+
+export const hasPrefetchedNeighborsForDay = ({
+    targetIso,
+    payloadDays,
+    currentTimelineIso,
+}: {
+    targetIso: string;
+    payloadDays: TimelineResponse["days"] | undefined;
+    currentTimelineIso: string;
+}) => {
+    if (!payloadDays?.length) return false;
+    const targetOffset = getDayDiff(targetIso, currentTimelineIso);
+    const offsets = new Set(payloadDays.map((day) => getDayDiff(day.isoDate, currentTimelineIso)));
+    return offsets.has(targetOffset - 1) && offsets.has(targetOffset) && offsets.has(targetOffset + 1);
+};
+
 export function useTimelineNavigation({
     data,
     status,
@@ -48,42 +103,19 @@ export function useTimelineNavigation({
     const currentTimelineIso = getCurrentTimelineIsoDateJst(timelineStartHour);
 
     const resolveAnchorDay = useCallback((targetIso: string, payloadDays: TimelineResponse["days"] | undefined) => {
-        if (!payloadDays?.length) {
-            return { resolvedAnchorDayIso: targetIso, anchorIndex: 0, windowStartIndex: 0 };
-        }
-
-        const exactIndex = payloadDays.findIndex((day) => day.isoDate === targetIso);
-        if (exactIndex >= 0) {
-            return {
-                resolvedAnchorDayIso: payloadDays[exactIndex]?.isoDate ?? targetIso,
-                anchorIndex: exactIndex,
-                windowStartIndex: exactIndex,
-            };
-        }
-
-        const targetOffset = getDayDiff(targetIso, currentTimelineIso);
-        let closestIndex = 0;
-        let closestDistance = Number.POSITIVE_INFINITY;
-        payloadDays.forEach((day, index) => {
-            const distance = Math.abs(getDayDiff(day.isoDate, currentTimelineIso) - targetOffset);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestIndex = index;
-            }
+        return resolveAnchorDayFromPayload({
+            targetIso,
+            payloadDays,
+            currentTimelineIso,
         });
-
-        return {
-            resolvedAnchorDayIso: payloadDays[closestIndex]?.isoDate ?? targetIso,
-            anchorIndex: closestIndex,
-            windowStartIndex: closestIndex,
-        };
     }, [currentTimelineIso]);
 
     const hasPrefetchedNeighbors = useCallback((targetIso: string, payloadDays: TimelineResponse["days"] | undefined) => {
-        if (!payloadDays?.length) return false;
-        const targetOffset = getDayDiff(targetIso, currentTimelineIso);
-        const offsets = new Set(payloadDays.map((day) => getDayDiff(day.isoDate, currentTimelineIso)));
-        return offsets.has(targetOffset - 1) && offsets.has(targetOffset) && offsets.has(targetOffset + 1);
+        return hasPrefetchedNeighborsForDay({
+            targetIso,
+            payloadDays,
+            currentTimelineIso,
+        });
     }, [currentTimelineIso]);
 
     const silentlyPrefetchAroundDay = useCallback(async (targetIso: string, payloadDays?: TimelineResponse["days"]) => {
