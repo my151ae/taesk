@@ -368,7 +368,7 @@ export default function TimelineBoardScreen({
 
   const renderMobileTopArea = useCallback(() => (
     <>
-      <div className="border-b border-slate-200 bg-slate-50/70">
+      <div className="relative z-40 border-b border-slate-200 bg-slate-50/70">
         <div className="relative flex h-10 items-center justify-between px-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div ref={mobileSelectorRef} className="relative min-w-0">
@@ -385,7 +385,7 @@ export default function TimelineBoardScreen({
                 </svg>
               </button>
               {showMobileSelector ? (
-                <div className="absolute left-0 top-full z-30 mt-1 min-w-[132px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg" role="menu">
+                <div className="absolute left-0 top-full z-[70] mt-1 min-w-[132px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg" role="menu">
                   {mobile.selector.selectorItems.map((item) => {
                     const selected = item.key === mobile.selector.currentSection;
                     return (
@@ -440,7 +440,9 @@ export default function TimelineBoardScreen({
           className="overflow-hidden transition-[height,opacity] duration-200 ease-out"
           style={{ height: isMobilePanelCollapsed ? "0px" : "clamp(168px, 28svh, 240px)", opacity: isMobilePanelCollapsed ? 0 : 1 }}
         >
-          {renderMobilePanelBody()}
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            {renderMobilePanelBody()}
+          </div>
         </div>
       </div>
     </>
