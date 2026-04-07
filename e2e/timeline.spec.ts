@@ -7157,7 +7157,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(modal).toBeVisible();
 
       const topTaskList = modal.locator('.ProseMirror > ul[data-type="taskList"]').first();
-      const topTaskItems = topTaskList.locator(':scope > li');
+      const topTaskItems = topTaskList.locator(':scope > li:not([data-hidden-run-marker="true"])');
       await expect(topTaskItems).toHaveCount(10);
 
       const visibleAfterMiddleRun = topTaskItems.filter({ hasText: 'Visible after middle run' }).first();
@@ -7168,21 +7168,123 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(topTaskItems.filter({ hasText: 'Hidden middle 1' }).first().locator(':scope > div > p').first()).toBeHidden();
       await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeHidden();
 
-      const hiddenRunBadges = modal.getByTestId('tiptap-hidden-run-badge');
-      await expect(hiddenRunBadges).toHaveCount(2);
-      await expect(hiddenRunBadges.nth(0)).toHaveText('2');
-      await expect(hiddenRunBadges.nth(1)).toHaveText('6');
+      const hiddenRunButtons = modal.getByTestId('tiptap-hidden-run-marker-button');
+      await expect(hiddenRunButtons).toHaveCount(2);
+      await expect(hiddenRunButtons.nth(0)).toHaveText('2');
+      await expect(hiddenRunButtons.nth(1)).toHaveText('6');
 
-      await hiddenRunBadges.nth(0).click();
+      await hiddenRunButtons.nth(0).click();
       await expect(topTaskItems.filter({ hasText: 'Hidden middle 1' }).first().locator(':scope > div > p').first()).toBeVisible();
       await expect(topTaskItems.filter({ hasText: 'Hidden middle 2' }).first().locator(':scope > div > p').first()).toBeVisible();
       await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeHidden();
-      await expect(hiddenRunBadges).toHaveCount(1);
-      await expect(hiddenRunBadges.first()).toHaveText('6');
+      await expect(hiddenRunButtons).toHaveCount(1);
+      await expect(hiddenRunButtons.first()).toHaveText('6');
 
-      await hiddenRunBadges.first().click();
-      await expect(hiddenRunBadges).toHaveCount(1);
-      await expect(hiddenRunBadges.first()).toHaveText('6');
+      await hiddenRunButtons.first().click();
+      await expect(hiddenRunButtons).toHaveCount(0);
+      await expect(topTaskItems.filter({ hasText: 'Hidden trailing 6' }).first().locator(':scope > div > p').first()).toBeVisible();
+    } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('renders nested hidden-run marker buttons in-flow and expands only the targeted nested run', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+    const initialContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Parent visible task' }] },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: true },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested hidden 1' }] }],
+                    },
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: true },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested hidden 2' }] }],
+                    },
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: false },
+                      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Nested visible after run' }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: 'Nested hidden run markers',
+      checklist: { version: 1, lines: [] },
+      content: initialContent,
+      excerpt: '[ ] Parent visible task\n  [x] Nested hidden 1\n  [x] Nested hidden 2\n  [ ] Nested visible after run',
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1897,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:20:00',
+      due_end: '16:20:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5046,
+      slug: 'nested-hidden-run-markers',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = page.getByRole('dialog');
+      await expect(modal).toBeVisible();
+
+      const nestedTaskList = modal.locator('.ProseMirror > ul[data-type="taskList"] > li > div > ul[data-type="taskList"]').first();
+      const nestedRunButton = nestedTaskList.getByTestId('tiptap-hidden-run-marker-button').first();
+      await expect(nestedRunButton).toBeVisible();
+      await expect(nestedRunButton).toHaveText('2');
+      await expect(nestedTaskList.locator(':scope > li').filter({ hasText: 'Nested hidden 1' }).first().locator(':scope > div > p').first()).toBeHidden();
+
+      await nestedRunButton.click();
+
+      await expect(nestedTaskList.getByTestId('tiptap-hidden-run-marker-button')).toHaveCount(0);
+      await expect(nestedTaskList.locator(':scope > li').filter({ hasText: 'Nested hidden 1' }).first().locator(':scope > div > p').first()).toBeVisible();
+      await expect(nestedTaskList.locator(':scope > li').filter({ hasText: 'Nested hidden 2' }).first().locator(':scope > div > p').first()).toBeVisible();
+      await expect(nestedTaskList.locator(':scope > li').filter({ hasText: 'Nested visible after run' }).first().locator(':scope > div > p').first()).toBeVisible();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -7481,10 +7583,10 @@ test.describe('@feature:timeline Timeline view', () => {
       await showCompletedLines.uncheck();
       await expect(showCompletedLines).not.toBeChecked();
       await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
-      const hiddenRunBadge = modal.getByTestId('tiptap-hidden-run-badge').first();
-      await expect(hiddenRunBadge).toBeVisible();
-      await hiddenRunBadge.click();
-      await expect(modal.getByTestId('tiptap-hidden-run-badge')).toHaveCount(0);
+      const hiddenRunButton = modal.getByTestId('tiptap-hidden-run-marker-button').first();
+      await expect(hiddenRunButton).toBeVisible();
+      await hiddenRunButton.click();
+      await expect(modal.getByTestId('tiptap-hidden-run-marker-button')).toHaveCount(0);
       await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeVisible();
 
       await modal.getByRole('button', { name: '履歴' }).click();
@@ -7514,7 +7616,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(reopenedCompletedLinesPanel).toBeVisible();
       await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).not.toBeChecked();
       await expect(reopenedModal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
-      await expect(reopenedModal.getByTestId('tiptap-hidden-run-badge').first()).toBeVisible();
+      await expect(reopenedModal.getByTestId('tiptap-hidden-run-marker-button').first()).toBeVisible();
     } finally {
       await supabaseAdmin.from('card_content_history').delete().eq('card_id', cardId);
       await supabaseAdmin.from('cards').delete().eq('id', cardId);

@@ -44,12 +44,9 @@ import {
 import {
     clearExpandedHiddenRunsMeta,
     TaskCompletionVisibility,
-    getTaskCompletionCurrentlyHiddenRuns,
     getTaskCompletionState,
     isTopLevelTaskItemHandleVisible,
     setTaskCompletionVisibilityMeta,
-    toggleExpandedHiddenRunMeta,
-    type ToggleableHiddenRunMeta,
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
 
 export type FocusTitleRequest = {
@@ -80,11 +77,6 @@ type RenderableBlockActionTarget = {
     pos: number;
     blockPos: number;
     nodeType: BlockNodeType;
-    rect: DOMRect | null;
-};
-
-type RenderableHiddenRunTarget = {
-    run: ToggleableHiddenRunMeta;
     rect: DOMRect | null;
 };
 
@@ -130,7 +122,6 @@ export default function TiptapEditor({
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
-    const [renderableHiddenRuns, setRenderableHiddenRuns] = useState<RenderableHiddenRunTarget[]>([]);
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
@@ -527,75 +518,6 @@ export default function TiptapEditor({
 
         return cloneDomRect(nodeDom.getBoundingClientRect());
     }, [cloneDomRect]);
-
-    const getHiddenRunAnchorRect = useCallback((view: Editor['view'], run: ToggleableHiddenRunMeta): DOMRect | null => {
-        if (run.anchorKind === 'taskList') {
-            const nodeDom = view.nodeDOM(run.anchorNodePos);
-            if (!(nodeDom instanceof HTMLElement)) {
-                return null;
-            }
-            const taskList = nodeDom.matches('ul[data-type="taskList"]')
-                ? nodeDom
-                : nodeDom.closest('ul[data-type="taskList"]');
-            if (!(taskList instanceof HTMLElement)) {
-                return null;
-            }
-            const rect = taskList.getBoundingClientRect();
-            return new DOMRect(rect.x, rect.bottom, rect.width, 1);
-        }
-
-        const hiddenStartDom = view.nodeDOM(run.runStartPos);
-        const hiddenStartItem = hiddenStartDom instanceof HTMLElement
-            ? (hiddenStartDom.matches('li[data-type="taskItem"]')
-                ? hiddenStartDom
-                : hiddenStartDom.closest('li[data-type="taskItem"]'))
-            : null;
-        const resolvedTarget = resolveBlockTargetAtPos(
-            view.state,
-            Math.max(0, Math.min(run.anchorNodePos + 1, view.state.doc.content.size)),
-        );
-        if (!resolvedTarget || resolvedTarget.nodeType !== 'taskItem') {
-            return null;
-        }
-        const nextRect = getBlockTargetRect(view, resolvedTarget);
-        if (!nextRect) {
-            return null;
-        }
-
-        let previousVisibleRect: DOMRect | null = null;
-        let sibling = hiddenStartItem?.previousElementSibling;
-        while (sibling) {
-            if (
-                sibling instanceof HTMLElement &&
-                sibling.matches('li[data-type="taskItem"]') &&
-                sibling.getAttribute('data-completion-visibility') !== 'hidden'
-            ) {
-                const row = sibling.querySelector(':scope > div');
-                previousVisibleRect = cloneDomRect((row instanceof HTMLElement ? row : sibling).getBoundingClientRect());
-                break;
-            }
-            sibling = sibling.previousElementSibling;
-        }
-
-        let boundaryY = previousVisibleRect
-            ? (previousVisibleRect.bottom + nextRect.top) / 2
-            : nextRect.top - 8;
-
-        if (!previousVisibleRect) {
-            const taskListDom = view.nodeDOM(run.taskListPos);
-            const taskList = taskListDom instanceof HTMLElement
-                ? (taskListDom.matches('ul[data-type="taskList"]')
-                    ? taskListDom
-                    : taskListDom.closest('ul[data-type="taskList"]'))
-                : null;
-            if (taskList instanceof HTMLElement) {
-                const listRect = taskList.getBoundingClientRect();
-                boundaryY = (listRect.top + nextRect.top) / 2;
-            }
-        }
-
-        return new DOMRect(nextRect.x, boundaryY, nextRect.width, 1);
-    }, [cloneDomRect, getBlockTargetRect, resolveBlockTargetAtPos]);
 
     const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): RenderableBlockActionTarget | null => {
         const target = resolveBlockTargetAtPos(state, pos);
@@ -1239,33 +1161,6 @@ export default function TiptapEditor({
         };
     }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
 
-    useLayoutEffect(() => {
-        if (!editor) {
-            setRenderableHiddenRuns([]);
-            return;
-        }
-
-        const frameId = window.requestAnimationFrame(() => {
-            if (suppressBlockUi || showCompletedLines) {
-                setRenderableHiddenRuns([]);
-                return;
-            }
-
-            const nextRuns = getTaskCompletionCurrentlyHiddenRuns(editor.state)
-                .map((run) => ({
-                    run,
-                    rect: getHiddenRunAnchorRect(editor.view, run),
-                }))
-                .filter((run): run is RenderableHiddenRunTarget => run.rect != null);
-
-            setRenderableHiddenRuns(nextRuns);
-        });
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-        };
-    }, [editor, getHiddenRunAnchorRect, layoutVersion, showCompletedLines, suppressBlockUi]);
-
     useEffect(() => {
         if (!editor) return;
 
@@ -1444,49 +1339,6 @@ export default function TiptapEditor({
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
         >
-            {renderableHiddenRuns.map(({ run, rect }) => {
-                if (!rect || !rootRect) return null;
-
-                const top = run.anchorKind === 'taskList'
-                    ? Math.max(rect.top - rootRect.top + 6, 4)
-                    : Math.max(rect.top - rootRect.top - 8, 4);
-                const left = run.anchorKind === 'taskList'
-                    ? 96
-                    : Math.max(rect.left - rootRect.left + 10, 72);
-
-                return (
-                    <button
-                        key={run.runKey}
-                        type="button"
-                        data-testid="tiptap-hidden-run-badge"
-                        data-hidden-run-key={run.runKey}
-                        data-hidden-run-expanded={run.isExpanded ? 'true' : 'false'}
-                        aria-label={run.isExpanded
-                            ? `${run.hiddenRunLength} 件の完了行を再び隠す`
-                            : `${run.hiddenRunLength} 件の完了行を表示`}
-                        aria-pressed={run.isExpanded}
-                        className={`${styles.hiddenRunBadge} ${run.isExpanded ? styles.hiddenRunBadgeExpanded : ''}`}
-                        style={{ top, left }}
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            editor.view.dispatch(toggleExpandedHiddenRunMeta(editor.state.tr, {
-                                taskListPos: run.taskListPos,
-                                runStartPos: run.runStartPos,
-                                runEndPos: run.runEndPos,
-                                hiddenRunLength: run.hiddenRunLength,
-                            }));
-                            invalidateLayout();
-                        }}
-                    >
-                        {run.hiddenRunLength}
-                    </button>
-                );
-            })}
             {renderableBlocks.map((target, index) => {
                 if (!target.rect || !rootRect) return null;
                 return (

@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
 export type TaskItemVisibility = 'visible' | 'hidden';
 
@@ -12,14 +12,12 @@ export type HiddenRunAnchor = {
   hiddenRunLength: number;
 };
 
-export type HiddenRunAnchorKind = 'taskItem' | 'taskList';
+export type HiddenRunPlacement = 'before-visible-item' | 'trailing-list';
 
-export type ToggleableHiddenRunMeta = HiddenRunAnchor & {
+export type HiddenRunMarkerMeta = HiddenRunAnchor & {
   runKey: string;
   anchorPos: number;
-  anchorNodePos: number;
-  anchorKind: HiddenRunAnchorKind;
-  isExpanded: boolean;
+  placement: HiddenRunPlacement;
 };
 
 type CompletedRunMeta = HiddenRunAnchor;
@@ -47,12 +45,13 @@ export type TaskCompletionPluginState = {
   expandedRunAnchors: HiddenRunAnchor[];
   itemMetaByPos: Map<number, TaskItemCompletionMeta>;
   listMetaByPos: Map<number, TaskListCompletionMeta>;
-  toggleableRuns: ToggleableHiddenRunMeta[];
-  currentlyHiddenRuns: ToggleableHiddenRunMeta[];
+  currentlyHiddenRuns: HiddenRunMarkerMeta[];
   decorations: DecorationSet;
 };
 
-export type ToggleExpandedHiddenRunInput = HiddenRunAnchor;
+export type ToggleExpandedHiddenRunInput = {
+  anchorPos: number;
+};
 
 type TaskCompletionMetaUpdate = {
   showCompletedLines?: boolean;
@@ -172,6 +171,52 @@ function resolveExpandedRunAnchor(
   return null;
 }
 
+function createHiddenRunMarkerWidget(view: EditorView, hiddenRun: HiddenRunMarkerMeta): HTMLLIElement {
+  const marker = document.createElement('li');
+  marker.dataset.hiddenRunMarker = 'true';
+  marker.dataset.hiddenRunKey = hiddenRun.runKey;
+  marker.dataset.hiddenRunPlacement = hiddenRun.placement;
+  marker.dataset.hiddenRunLength = String(hiddenRun.hiddenRunLength);
+  marker.setAttribute('contenteditable', 'false');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.hiddenRunToggleButton = 'true';
+  button.dataset.testid = 'tiptap-hidden-run-marker-button';
+  button.setAttribute('contenteditable', 'false');
+  button.setAttribute('aria-label', `${hiddenRun.hiddenRunLength} 件の完了行を表示`);
+  button.textContent = String(hiddenRun.hiddenRunLength);
+
+  const line = document.createElement('span');
+  line.dataset.hiddenRunLine = 'true';
+  line.setAttribute('aria-hidden', 'true');
+  line.setAttribute('contenteditable', 'false');
+
+  const handleMouseDown = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleToggle = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    view.dispatch(toggleExpandedHiddenRunMeta(view.state.tr, {
+      anchorPos: hiddenRun.anchorPos,
+    }));
+  };
+
+  button.addEventListener('mousedown', handleMouseDown);
+  button.addEventListener('click', handleToggle);
+
+  marker.append(button, line);
+  return marker;
+}
+
+function isHiddenRunMarkerEvent(event: Event): boolean {
+  const target = event.target;
+  return target instanceof HTMLElement && target.closest('[data-hidden-run-marker="true"]') != null;
+}
+
 function buildTaskCompletionPluginState(
   doc: ProseMirrorNode,
   showCompletedLines: boolean,
@@ -180,6 +225,7 @@ function buildTaskCompletionPluginState(
   const itemMetaByPos = new Map<number, TaskItemCompletionMeta>();
   const listMetaByPos = new Map<number, TaskListCompletionMeta>();
   const directItemsByTaskListPos = new Map<number, TaskItemCompletionMeta[]>();
+  const taskListsVisited = new Set<number>();
 
   const visitTaskItem = (node: ProseMirrorNode, pos: number, isTopLevel: boolean): TaskItemVisitResult => {
     let allNestedTaskItemsChecked = true;
@@ -210,6 +256,7 @@ function buildTaskCompletionPluginState(
   };
 
   const visitTaskList = (node: ProseMirrorNode, pos: number, directChildrenAreTopLevel: boolean): TaskListVisitResult => {
+    taskListsVisited.add(pos);
     const directChildItems: TaskItemCompletionMeta[] = [];
     let allTaskItemsChecked = true;
 
@@ -236,6 +283,14 @@ function buildTaskCompletionPluginState(
     visitTaskList(child, offset, true);
   });
 
+  doc.descendants((node, pos, parent) => {
+    if (node.type.name !== 'taskList') return true;
+    if (taskListsVisited.has(pos)) return false;
+    if (parent?.type.name === 'taskItem') return false;
+    visitTaskList(node, pos, false);
+    return false;
+  });
+
   const completedRuns = Array.from(directItemsByTaskListPos.entries()).flatMap(([taskListPos, directItems]) =>
     extractCompletedRuns(directItems, taskListPos),
   );
@@ -246,8 +301,7 @@ function buildTaskCompletionPluginState(
     .filter((anchor, index, list) => list.findIndex((candidate) => sameHiddenRunAnchor(candidate, anchor)) === index);
 
   const expandedRunKeys = new Set(resolvedExpandedRunAnchors.map((anchor) => createHiddenRunKey(anchor)));
-  const toggleableRuns: ToggleableHiddenRunMeta[] = [];
-  const currentlyHiddenRuns: ToggleableHiddenRunMeta[] = [];
+  const currentlyHiddenRuns: HiddenRunMarkerMeta[] = [];
 
   for (const [taskListPos, directItems] of directItemsByTaskListPos.entries()) {
     const runs = extractCompletedRuns(directItems, taskListPos);
@@ -269,9 +323,8 @@ function buildTaskCompletionPluginState(
       const runEndIndex = directItems.findIndex((item) => item.pos === run.runEndPos);
       if (runStartIndex === -1 || runEndIndex === -1) continue;
 
-      let anchorPos = run.runStartPos;
-      let anchorNodePos = run.runStartPos;
-      let anchorKind: HiddenRunAnchorKind = 'taskItem';
+      let anchorPos: number | null = null;
+      let placement: HiddenRunPlacement | null = null;
 
       if (!showCompletedLines && !isExpanded) {
         for (let itemIndex = runStartIndex; itemIndex <= runEndIndex; itemIndex += 1) {
@@ -283,28 +336,21 @@ function buildTaskCompletionPluginState(
           nextVisible.hiddenRunStart = true;
           nextVisible.hiddenRunLength = run.hiddenRunLength;
           anchorPos = nextVisible.pos;
-          anchorNodePos = nextVisible.pos;
-          anchorKind = 'taskItem';
+          placement = 'before-visible-item';
         } else if (listMeta) {
           listMeta.trailingHiddenRunLength = run.hiddenRunLength;
-          anchorPos = run.runStartPos;
-          anchorNodePos = taskListPos;
-          anchorKind = 'taskList';
+          anchorPos = taskListPos + listMeta.nodeSize - 1;
+          placement = 'trailing-list';
         }
       }
 
-      const runMeta: ToggleableHiddenRunMeta = {
-        ...run,
-        runKey,
-        anchorPos,
-        anchorNodePos,
-        anchorKind,
-        isExpanded,
-      };
-
-      toggleableRuns.push(runMeta);
-      if (!showCompletedLines && !isExpanded) {
-        currentlyHiddenRuns.push(runMeta);
+      if (!showCompletedLines && !isExpanded && anchorPos != null && placement != null) {
+        currentlyHiddenRuns.push({
+          ...run,
+          runKey,
+          anchorPos,
+          placement,
+        });
       }
     }
   }
@@ -333,6 +379,17 @@ function buildTaskCompletionPluginState(
             'data-hidden-run-length': String(meta.trailingHiddenRunLength),
           }),
         ),
+      ...currentlyHiddenRuns.map((hiddenRun) =>
+        Decoration.widget(
+          hiddenRun.anchorPos,
+          (view) => createHiddenRunMarkerWidget(view, hiddenRun),
+          {
+            side: -1,
+            key: `hidden-run-marker:${hiddenRun.runKey}`,
+            stopEvent: isHiddenRunMarkerEvent,
+          },
+        ),
+      ),
     ],
   );
 
@@ -341,7 +398,6 @@ function buildTaskCompletionPluginState(
     expandedRunAnchors: resolvedExpandedRunAnchors,
     itemMetaByPos,
     listMetaByPos,
-    toggleableRuns,
     currentlyHiddenRuns,
     decorations,
   };
@@ -353,7 +409,7 @@ export const getTaskCompletionState = (state: EditorState): TaskCompletionPlugin
 export const getTaskItemMetaAtPos = (state: EditorState, pos: number): TaskItemCompletionMeta | null =>
   getTaskCompletionState(state)?.itemMetaByPos.get(pos) ?? null;
 
-export const getTaskCompletionCurrentlyHiddenRuns = (state: EditorState): ToggleableHiddenRunMeta[] =>
+export const getTaskCompletionCurrentlyHiddenRuns = (state: EditorState): HiddenRunMarkerMeta[] =>
   getTaskCompletionState(state)?.currentlyHiddenRuns ?? [];
 
 export const isTaskItemHiddenAtPos = (state: EditorState, pos: number): boolean =>
@@ -414,12 +470,21 @@ export const TaskCompletionVisibility = Extension.create<{ showCompletedLines: b
             }
 
             if (meta?.toggleExpandedHiddenRun) {
-              const nextAnchor = meta.toggleExpandedHiddenRun;
-              const existingIndex = nextExpandedAnchors.findIndex((anchor) => sameHiddenRunAnchor(anchor, nextAnchor));
-              if (existingIndex >= 0) {
-                nextExpandedAnchors = nextExpandedAnchors.filter((_, index) => index !== existingIndex);
-              } else {
-                nextExpandedAnchors = [...nextExpandedAnchors, nextAnchor];
+              const toggleInput = meta.toggleExpandedHiddenRun;
+              const nextRun = pluginState.currentlyHiddenRuns.find((hiddenRun) => hiddenRun.anchorPos === toggleInput.anchorPos);
+              if (nextRun) {
+                const nextAnchor: HiddenRunAnchor = {
+                  taskListPos: nextRun.taskListPos,
+                  runStartPos: nextRun.runStartPos,
+                  runEndPos: nextRun.runEndPos,
+                  hiddenRunLength: nextRun.hiddenRunLength,
+                };
+                const existingIndex = nextExpandedAnchors.findIndex((anchor) => sameHiddenRunAnchor(anchor, nextAnchor));
+                if (existingIndex >= 0) {
+                  nextExpandedAnchors = nextExpandedAnchors.filter((_, index) => index !== existingIndex);
+                } else {
+                  nextExpandedAnchors = [...nextExpandedAnchors, nextAnchor];
+                }
               }
             }
 

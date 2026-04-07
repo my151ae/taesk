@@ -154,55 +154,43 @@
     display: none !important;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length]) {
-    position: relative;
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-marker="true"]) {
+    display: grid !important;
+    grid-template-columns: var(--taesk-marker-gutter) minmax(0, 1fr);
+    column-gap: var(--taesk-marker-gap) !important;
+    align-items: center !important;
+    margin: 0 !important;
+    min-height: 0;
+    padding: 0 !important;
+    list-style: none !important;
 }
 
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length])::before {
-    content: "";
-    grid-column: 1 / -1;
-    display: block;
-    height: 1px;
-    margin: 0.45rem 0 0.55rem;
-    background: #cbd5e1;
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-start="true"][data-hidden-run-length])::after {
-    content: none;
-}
-
-.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"][data-hidden-run-start="true"][data-hidden-run-length])::after {
-    display: flex;
-    width: 100%;
-    height: 1.5rem;
-    margin: 0.4rem 0 0.15rem;
-    background: linear-gradient(#cbd5e1, #cbd5e1) center / 100% 1px no-repeat;
-    content: "";
-}
-
-.hiddenRunBadge {
-    position: absolute;
-    z-index: 25;
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-marker="true"] > button[data-hidden-run-toggle-button="true"]) {
+    grid-column: 1;
+    justify-self: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.1rem;
-    height: 1.1rem;
-    padding: 0 0.24rem;
+    width: 1.35rem;
+    min-width: 1.35rem;
+    height: 1.35rem;
     border: 1px solid #cbd5e1;
     border-radius: 9999px;
     background: #f8fafc;
     color: #64748b;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     line-height: 1;
     cursor: pointer;
+    user-select: none;
 }
 
-.hiddenRunBadgeExpanded {
-    border-color: #94a3b8;
-    background: #e2e8f0;
-    color: #334155;
+.editor[data-show-completed-lines="false"] :global(ul[data-type="taskList"] > li[data-hidden-run-marker="true"] > span[data-hidden-run-line="true"]) {
+    grid-column: 2;
+    display: block;
+    width: 100%;
+    height: 1px;
+    background: #cbd5e1;
 }
 
 /* 
