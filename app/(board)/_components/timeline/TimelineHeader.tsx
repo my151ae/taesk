@@ -2,7 +2,6 @@ import { clsx } from 'clsx';
 import Link from 'next/link';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useClickOutside } from '@/app/(board)/_hooks/useClickOutside';
 import { Board, TeamView } from '@/lib/supabase';
 import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
@@ -103,12 +102,15 @@ export default function TimelineHeader({
     const [boardMenuPosition, setBoardMenuPosition] = useState<HeaderMenuPosition | null>(null);
     const [googleMenuPosition, setGoogleMenuPosition] = useState<HeaderMenuPosition | null>(null);
     const [profileMenuPosition, setProfileMenuPosition] = useState<HeaderMenuPosition | null>(null);
+    const [mobileActionsPosition, setMobileActionsPosition] = useState<HeaderMenuPosition | null>(null);
     const boardMenuButtonRef = useRef<HTMLButtonElement>(null);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const profileMenuButtonRef = useRef<HTMLButtonElement>(null);
     const googleMenuRef = useRef<HTMLDivElement>(null);
     const googleMenuButtonRef = useRef<HTMLButtonElement>(null);
     const mobileActionsRef = useRef<HTMLDivElement>(null);
+    const mobileActionsButtonRef = useRef<HTMLButtonElement>(null);
+    const mobileActionsMenuRef = useRef<HTMLDivElement>(null);
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const todayButtonClassName = "shrink-0 rounded-full bg-sky-200 px-2.5 py-1 text-xs font-medium text-sky-800 shadow-sm ring-1 ring-sky-300 hover:bg-sky-300";
@@ -160,8 +162,6 @@ export default function TimelineHeader({
 
         handleBoardNavigate(nextBoard);
     };
-
-    useClickOutside(mobileActionsRef, () => setShowMobileActions(false));
 
     useEffect(() => {
         if (!showBoardMenu) {
@@ -250,6 +250,30 @@ export default function TimelineHeader({
     }, [showProfileMenu]);
 
     useEffect(() => {
+        if (!showMobileActions) return;
+
+        const updateMenuPosition = () => {
+            const rect = mobileActionsButtonRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const minWidth = 256;
+            setMobileActionsPosition({
+                top: rect.bottom + 8,
+                left: Math.max(8, rect.right - minWidth),
+                minWidth,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [showMobileActions]);
+
+    useEffect(() => {
         if (!showBoardMenu) return;
 
         const listener = (event: MouseEvent | TouchEvent) => {
@@ -299,6 +323,23 @@ export default function TimelineHeader({
             document.removeEventListener('touchstart', listener);
         };
     }, [showProfileMenu]);
+
+    useEffect(() => {
+        if (!showMobileActions) return;
+
+        const listener = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as Node;
+            if (mobileActionsButtonRef.current?.contains(target) || mobileActionsMenuRef.current?.contains(target)) return;
+            setShowMobileActions(false);
+        };
+
+        document.addEventListener('mousedown', listener);
+        document.addEventListener('touchstart', listener);
+        return () => {
+            document.removeEventListener('mousedown', listener);
+            document.removeEventListener('touchstart', listener);
+        };
+    }, [showMobileActions]);
 
     const boardsByTeamId = useMemo(() => {
         const groups = new Map<string, Board[]>();
@@ -356,7 +397,7 @@ export default function TimelineHeader({
 
     return (
         <>
-            <header className="flex items-center gap-1.5 px-1.5 py-1 md:gap-2 md:px-3">
+            <header className="relative z-50 flex items-center gap-1.5 px-1.5 py-1 md:gap-2 md:px-3">
                 <div className="flex min-w-0 flex-1 items-center gap-1.5 md:gap-2">
                     {/* Board Switch */}
                     <div ref={boardMenuRef} className="relative shrink-0">
@@ -600,8 +641,9 @@ export default function TimelineHeader({
                     >
                         Today
                     </button>
-                    <div ref={mobileActionsRef} className="relative">
+                    <div ref={mobileActionsRef} className="relative z-[130]">
                     <button
+                        ref={mobileActionsButtonRef}
                         type="button"
                         onClick={() => setShowMobileActions((prev) => !prev)}
                         aria-expanded={showMobileActions}
@@ -612,8 +654,16 @@ export default function TimelineHeader({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                         </svg>
                     </button>
-                    {showMobileActions && (
-                        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-slate-100 bg-white p-2 shadow-lg ring-1 ring-black/5">
+                    {showMobileActions && mobileActionsPosition && typeof document !== 'undefined' && createPortal(
+                        <div
+                            ref={mobileActionsMenuRef}
+                            className="fixed z-[140] w-64 rounded-xl border border-slate-100 bg-white p-2 shadow-lg ring-1 ring-black/5"
+                            style={{
+                                top: mobileActionsPosition.top,
+                                left: mobileActionsPosition.left,
+                                minWidth: mobileActionsPosition.minWidth,
+                            }}
+                        >
                             <div className="space-y-1">
                                 {viewMode === 'timeline' && (
                                     <div className="rounded-lg px-3 py-2 text-sm text-slate-700">
@@ -673,7 +723,8 @@ export default function TimelineHeader({
                                     Sign out
                                 </button>
                             </div>
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
                 </div>
