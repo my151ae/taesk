@@ -16,6 +16,7 @@ import {
 } from "@/app/(board)/_components/timeline/DesktopListView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
+import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import {
   CompletedSectionBody,
@@ -23,7 +24,6 @@ import {
   SearchSectionBody,
   TagsSectionBody,
   TrashSectionBody,
-  type SharedPanelSectionKey,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import {
   NotificationsSectionActions,
@@ -42,6 +42,7 @@ import {
   type ShortcutContextDescriptor,
 } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import { bucketsFirstCollisionDetection } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
+import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 
 type HeaderProps = ComponentProps<typeof TimelineBoardHeader>;
@@ -64,6 +65,13 @@ type CardContextMenuProps = ComponentProps<typeof CardContextMenu>;
 
 type ParseResult = { ok: true } | { ok: false; code: string };
 type TabItem = { key: "timeline" | "list"; label: string };
+type MobileHeaderAccessory =
+  | {
+      kind: "overdue-sort";
+      order: OverdueSortOrder;
+      onChange: (order: OverdueSortOrder) => void;
+    }
+  | null;
 
 export type TimelineBoardScreenProps = {
   parseResult: ParseResult;
@@ -97,19 +105,18 @@ export type TimelineBoardScreenProps = {
     timelineProps: MobileTimelineBaseProps;
     listProps: MobileListProps;
     leftPanelProps: SidebarMenuBaseProps;
-    selector: {
-      currentSection: SharedPanelSectionKey;
-      selectorItems: Array<{ key: SharedPanelSectionKey; label: string }>;
-      currentLabel: string;
-      currentCount: number;
-      onSelect: (key: SharedPanelSectionKey) => void;
-      headerAccessory:
-        | {
-            kind: "overdue-sort";
-            order: OverdueSortOrder;
-            onChange: (order: OverdueSortOrder) => void;
-          }
-        | null;
+    selectorPresentation: {
+      currentSection: SidebarSectionKey;
+      selectorItems: Array<{ key: SidebarSectionKey; label: string }>;
+      triggerLabel: string;
+      onSelect: (key: SidebarSectionKey) => void;
+    };
+    currentSectionChrome: {
+      title: string;
+      count: number;
+      tone: "danger" | "neutral";
+      headerAccessory: MobileHeaderAccessory;
+      secondaryActionsKind: "notifications" | null;
     };
   };
   dialogsProps: DialogsProps;
@@ -249,7 +256,7 @@ export default function TimelineBoardScreen({
   const [showMobileSelector, setShowMobileSelector] = useState(false);
   const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
   const mobileSelectorRef = useRef<HTMLDivElement | null>(null);
-  const previousMobileSectionRef = useRef<SharedPanelSectionKey | null>(null);
+  const previousMobileSectionRef = useRef<SidebarSectionKey | null>(null);
 
   useEffect(() => {
     if (!showMobileSelector) return;
@@ -270,20 +277,20 @@ export default function TimelineBoardScreen({
   }, [showMobileSelector]);
 
   const currentMobileSection = useMemo(
-    () => mobile.leftPanelProps.sections.find((section) => section.key === mobile.selector.currentSection) ?? null,
-    [mobile.leftPanelProps.sections, mobile.selector.currentSection]
+    () => mobile.leftPanelProps.sections.find((section) => section.key === mobile.selectorPresentation.currentSection) ?? null,
+    [mobile.leftPanelProps.sections, mobile.selectorPresentation.currentSection]
   );
 
   useEffect(() => {
     const previousSection = previousMobileSectionRef.current;
-    if (previousSection !== null && previousSection !== mobile.selector.currentSection) {
+    if (previousSection !== null && previousSection !== mobile.selectorPresentation.currentSection) {
       setIsMobilePanelCollapsed(false);
     }
-    previousMobileSectionRef.current = mobile.selector.currentSection;
-  }, [mobile.selector.currentSection]);
+    previousMobileSectionRef.current = mobile.selectorPresentation.currentSection;
+  }, [mobile.selectorPresentation.currentSection]);
 
   const mobileHeaderAccessory = useMemo(() => {
-    if (mobile.selector.headerAccessory?.kind !== "overdue-sort") {
+    if (mobile.currentSectionChrome.headerAccessory?.kind !== "overdue-sort") {
       return null;
     }
 
@@ -291,14 +298,14 @@ export default function TimelineBoardScreen({
       <button
         type="button"
         data-testid="mobile-overdue-sort-toggle"
-        data-order={mobile.selector.headerAccessory.order}
+        data-order={mobile.currentSectionChrome.headerAccessory.order}
         onClick={() =>
-          mobile.selector.headerAccessory?.onChange(
-            mobile.selector.headerAccessory.order === "oldest" ? "newest" : "oldest"
+          mobile.currentSectionChrome.headerAccessory?.onChange(
+            mobile.currentSectionChrome.headerAccessory.order === "oldest" ? "newest" : "oldest"
           )
         }
         aria-label={`Overdue の並び順を${
-          mobile.selector.headerAccessory.order === "oldest" ? "新しい順" : "古い順"
+          mobile.currentSectionChrome.headerAccessory.order === "oldest" ? "新しい順" : "古い順"
         }に切り替え`}
         className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-white px-2 py-1 text-[10px] font-semibold text-rose-700"
       >
@@ -306,13 +313,13 @@ export default function TimelineBoardScreen({
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d={mobile.selector.headerAccessory.order === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"}
+            d={mobile.currentSectionChrome.headerAccessory.order === "oldest" ? "M6 14l4-4 4 4M10 6v8" : "M6 6l4 4 4-4M10 14V6"}
           />
         </svg>
-        <span>{mobile.selector.headerAccessory.order === "oldest" ? "古い順" : "新しい順"}</span>
+        <span>{mobile.currentSectionChrome.headerAccessory.order === "oldest" ? "古い順" : "新しい順"}</span>
       </button>
     );
-  }, [mobile.selector.headerAccessory]);
+  }, [mobile.currentSectionChrome.headerAccessory]);
 
   const renderMobilePanelBody = useCallback(() => {
     const commonProps = {
@@ -360,16 +367,7 @@ export default function TimelineBoardScreen({
     }
     if (currentMobileSection.key === "notifications") {
       return (
-        <>
-          <NotificationsSectionActions
-            unreadCount={mobile.leftPanelProps.notificationUnreadCount}
-            onMarkAllAsRead={mobile.leftPanelProps.onMarkAllNotificationsRead}
-            onOpenSettings={mobile.leftPanelProps.onOpenNotificationSettings}
-            className="border-t border-slate-200/80"
-            markAllButtonTestId="mobile-notifications-mark-all-read"
-            settingsButtonTestId="mobile-notification-settings-button"
-          />
-          <NotificationsSectionBody
+        <NotificationsSectionBody
             notifications={mobile.leftPanelProps.notifications}
             loading={mobile.leftPanelProps.notificationsLoading}
             error={mobile.leftPanelProps.notificationsError}
@@ -377,7 +375,6 @@ export default function TimelineBoardScreen({
             onRetry={mobile.leftPanelProps.onRetryNotifications}
             onOpenNotification={mobile.leftPanelProps.onOpenNotification}
           />
-        </>
       );
     }
     if (currentMobileSection.key === "completed") {
@@ -434,15 +431,15 @@ export default function TimelineBoardScreen({
                 aria-expanded={showMobileSelector}
                 data-testid="mobile-left-panel-selector-trigger"
               >
-                <span className="truncate">{mobile.selector.currentLabel}</span>
+                <span className="truncate">{mobile.selectorPresentation.triggerLabel}</span>
                 <svg className={clsx("h-3 w-3 shrink-0 transition-transform", showMobileSelector && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 7.5 10 12.5 15 7.5" />
                 </svg>
               </button>
               {showMobileSelector ? (
                 <div className="absolute left-0 top-full z-[70] mt-1 min-w-[132px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg" role="menu">
-                  {mobile.selector.selectorItems.map((item) => {
-                    const selected = item.key === mobile.selector.currentSection;
+                  {mobile.selectorPresentation.selectorItems.map((item) => {
+                    const selected = item.key === mobile.selectorPresentation.currentSection;
                     return (
                       <button
                         key={item.key}
@@ -450,7 +447,7 @@ export default function TimelineBoardScreen({
                         onClick={() => {
                           setShowMobileSelector(false);
                           setIsMobilePanelCollapsed(false);
-                          mobile.selector.onSelect(item.key);
+                          mobile.selectorPresentation.onSelect(item.key);
                         }}
                         data-testid={`mobile-left-panel-selector-item-${item.key}`}
                         className={clsx(
@@ -470,11 +467,11 @@ export default function TimelineBoardScreen({
             <span
               className={clsx(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
-                mobile.selector.currentSection === "overdue" ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
+                mobile.currentSectionChrome.tone === "danger" ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
               )}
               data-testid="mobile-left-panel-count-badge"
             >
-              {mobile.selector.currentCount}
+              {mobile.currentSectionChrome.count}
             </span>
           </div>
           <div className="ml-2 flex shrink-0 items-center gap-2">
@@ -499,13 +496,33 @@ export default function TimelineBoardScreen({
           className="overflow-hidden transition-[height,opacity] duration-200 ease-out"
           style={{ height: isMobilePanelCollapsed ? "0px" : "clamp(168px, 28svh, 240px)", opacity: isMobilePanelCollapsed ? 0 : 1 }}
         >
-          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <SidebarSectionShell
+            title={mobile.currentSectionChrome.title}
+            count={mobile.currentSectionChrome.count}
+            tone={mobile.currentSectionChrome.tone}
+            panelId="mobile-left-panel-shell"
+            expanded
+            renderHeader={false}
+            secondaryActions={
+              mobile.currentSectionChrome.secondaryActionsKind === "notifications" ? (
+                <NotificationsSectionActions
+                  unreadCount={mobile.leftPanelProps.notificationUnreadCount}
+                  onMarkAllAsRead={mobile.leftPanelProps.onMarkAllNotificationsRead}
+                  onOpenSettings={mobile.leftPanelProps.onOpenNotificationSettings}
+                  className="border-t border-slate-200/80"
+                  markAllButtonTestId="mobile-notifications-mark-all-read"
+                  settingsButtonTestId="mobile-notification-settings-button"
+                />
+              ) : null
+            }
+            bodyClassName="h-full"
+          >
             {renderMobilePanelBody()}
-          </div>
+          </SidebarSectionShell>
         </div>
       </div>
     </>
-  ), [isMobilePanelCollapsed, mobile.selector, mobileHeaderAccessory, renderMobilePanelBody, showMobileSelector]);
+  ), [isMobilePanelCollapsed, mobile.currentSectionChrome, mobile.leftPanelProps, mobile.selectorPresentation, mobileHeaderAccessory, renderMobilePanelBody, showMobileSelector]);
 
   if (!parseResult.ok) {
     return (

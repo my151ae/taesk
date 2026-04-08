@@ -13,9 +13,10 @@ import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
-import { type SidebarSectionKey, type SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import { type SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
-import { SIDEBAR_INCREMENT_PAGE_SIZE, type IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import { SIDEBAR_INCREMENT_PAGE_SIZE } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
   getCurrentTimelineIsoDateJst,
@@ -262,8 +263,9 @@ function TimelineBoardPageContent({
   }, []);
 
   useEffect(() => {
+    if (isMobileViewport) return;
     setExpandedSectionKey(activeLeftSectionKey);
-  }, [activeLeftSectionKey]);
+  }, [activeLeftSectionKey, isMobileViewport]);
 
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
@@ -1136,12 +1138,12 @@ function TimelineBoardPageContent({
       leftPanelMode: "notifications",
       method: "replace",
     });
-    setExpandedSectionKey("notifications");
+    if (typeof window !== "undefined" && window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+      setExpandedSectionKey("notifications");
+    }
   }, [updateBoardUiState]);
 
   const handleMobileLeftPanelSelect = useCallback((key: SidebarSectionKey) => {
-    setExpandedSectionKey(key);
-
     if (key === "overdue") {
       updateBoardUiState({
         leftPanelMode: "overdue",

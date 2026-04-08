@@ -6,7 +6,6 @@ import { type TimelineBoardScreenProps } from "@/app/(board)/_components/timelin
 import type { ShortcutBarConfig } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { Board, Notification, ProfileSummary, TeamView } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type {
@@ -23,9 +22,8 @@ import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlSta
 import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
-import type { SharedPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
-import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
+import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -69,7 +67,7 @@ type UseTimelineBoardScreenArgs = {
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
-  onMobileLeftPanelSelect: (key: SharedPanelSectionKey) => void;
+  onMobileLeftPanelSelect: (key: SidebarSectionKey) => void;
   sidebarVisibleCounts: SidebarVisibleCountState;
   onSidebarVisibleCountChange: (section: IncrementalPanelSectionKey, nextCount: number) => void;
   onOpenNotificationsPanel: () => void;
@@ -613,7 +611,7 @@ export function useTimelineBoardScreen({
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
       leftPanelProps,
-      selector: {
+      selectorPresentation: {
         currentSection:
           mobileLeftPanelMode === "completed" ||
           mobileLeftPanelMode === "notifications" ||
@@ -626,14 +624,18 @@ export function useTimelineBoardScreen({
           key: section.key,
           label: section.label,
         })),
-        currentLabel:
+        triggerLabel:
           currentMobileSection?.key === "search"
             ? searchQuery.trim() || "Search"
             : currentMobileSection?.key === "tags"
               ? tagsSectionPresentation.triggerLabel
               : currentMobileSection?.label ?? "Overdue",
-        currentCount: currentMobileSection?.count ?? overdue.length,
         onSelect: onMobileLeftPanelSelect,
+      },
+      currentSectionChrome: {
+        title: currentMobileSection?.label ?? "Overdue",
+        count: currentMobileSection?.count ?? overdue.length,
+        tone: currentMobileSection?.tone ?? "danger",
         headerAccessory:
           mobileLeftPanelMode === "overdue"
             ? {
@@ -642,6 +644,7 @@ export function useTimelineBoardScreen({
                 onChange: onOverdueSortOrderChange,
               }
             : null,
+        secondaryActionsKind: mobileLeftPanelMode === "notifications" ? "notifications" : null,
       },
     },
     dialogsProps: {

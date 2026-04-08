@@ -9,13 +9,12 @@ import {
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
 import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 
-export type SharedPanelSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
-export type IncrementalPanelSectionKey = Exclude<SharedPanelSectionKey, "overdue" | "notifications">;
 export const SIDEBAR_INCREMENT_PAGE_SIZE = 20;
 
 type SharedSelectionProps = {

@@ -30,8 +30,8 @@ import type {
   DesktopSidebarMenuActions,
   DesktopSidebarMenuState,
   DesktopSidebarSection,
-  SidebarSectionKey,
 } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 import { featureFlags } from "@/lib/featureFlags";
 import type {

@@ -8,12 +8,11 @@ import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers"
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { Notification } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
+import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import {
   CompletedSectionBody,
-  type IncrementalPanelSectionKey,
   OverdueSectionBody,
   SearchSectionBody,
-  SharedPanelHeader,
   TagsSectionBody,
   TrashSectionBody,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
@@ -21,8 +20,8 @@ import {
   NotificationsSectionActions,
   NotificationsSectionBody,
 } from "@/app/(board)/_components/timeline/TimelineNotificationsShared";
+import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 
-export type SidebarSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
 type SidebarSectionTone = "danger" | "neutral";
 
 export type DesktopSidebarMenuState = {
@@ -41,55 +40,45 @@ export type DesktopSidebarMenuActions = {
 
 export type SidebarVisibleCountState = Record<IncrementalPanelSectionKey, number>;
 
+type DesktopSidebarSectionBase = {
+  key: SidebarSectionKey;
+  tone: SidebarSectionTone;
+  id: string;
+  label: string;
+  count: number;
+};
+
 export type DesktopSidebarSection =
-  | {
+  | (DesktopSidebarSectionBase & {
       key: "overdue";
       tone: "danger";
-      id: string;
-      label: string;
-      count: number;
       items: readonly TimelineOverdueItem[];
-    }
-  | {
+    })
+  | (DesktopSidebarSectionBase & {
       key: "completed";
       tone: "neutral";
-      id: string;
-      label: string;
-      count: number;
       results: readonly TimelineSearchResultItem[];
-    }
-  | {
+    })
+  | (DesktopSidebarSectionBase & {
       key: "notifications";
       tone: "neutral";
-      id: string;
-      label: string;
-      count: number;
-    }
-  | {
+    })
+  | (DesktopSidebarSectionBase & {
       key: "search";
       tone: "neutral";
-      id: string;
-      label: string;
-      count: number;
       results: readonly TimelineSearchResultItem[];
-    }
-  | {
+    })
+  | (DesktopSidebarSectionBase & {
       key: "tags";
       tone: "neutral";
-      id: string;
-      label: string;
-      count: number;
       tags: readonly TimelineTagSummary[];
       results: readonly TimelineSearchResultItem[];
-    }
-  | {
+    })
+  | (DesktopSidebarSectionBase & {
       key: "trash";
       tone: "neutral";
-      id: string;
-      label: string;
-      count: number;
       items: readonly TrashCardItem[];
-    };
+    });
 
 type DesktopSidebarMenuProps = {
   state: DesktopSidebarMenuState;
@@ -528,47 +517,37 @@ export function DesktopSidebarMenu({
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {allSections.map((section) => {
             const expanded = state.expandedSectionKey === section.key;
-            const isDanger = section.tone === "danger";
-            const showNotificationActions = expanded && section.key === "notifications";
 
             return (
-              <section
+              <SidebarSectionShell
                 key={section.key}
-                className={clsx("min-h-0 min-w-0 flex-1 flex-col overflow-hidden", expanded ? "flex" : "hidden")}
-                aria-hidden={!expanded}
-              >
-                <SharedPanelHeader
-                  title={section.label}
-                  count={section.count}
-                  tone={isDanger ? "danger" : "neutral"}
-                  accessory={section.key === "overdue" ? (
+                title={section.label}
+                count={section.count}
+                tone={section.tone}
+                panelId={section.id}
+                expanded={expanded}
+                headerAccessory={
+                  section.key === "overdue" ? (
                     <OverdueSortToggle
                       order={overdueSortOrder}
                       onChange={onOverdueSortOrderChange}
                       testId="desktop-sidebar-overdue-sort-toggle"
                     />
-                  ) : null}
-                  className={isDanger ? "bg-rose-50/40" : undefined}
-                />
-
-                {showNotificationActions ? (
-                  <NotificationsSectionActions
-                    unreadCount={notificationUnreadCount}
-                    onMarkAllAsRead={onMarkAllNotificationsRead}
-                    onOpenSettings={onOpenNotificationSettings}
-                  />
-                ) : null}
-
-                <div
-                  id={section.id}
-                  data-testid={section.id}
-                  aria-hidden={!expanded}
-                  hidden={!expanded}
-                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                >
-                  {renderSectionContent(section)}
-                </div>
-              </section>
+                  ) : null
+                }
+                secondaryActions={
+                  expanded && section.key === "notifications" ? (
+                    <NotificationsSectionActions
+                      unreadCount={notificationUnreadCount}
+                      onMarkAllAsRead={onMarkAllNotificationsRead}
+                      onOpenSettings={onOpenNotificationSettings}
+                    />
+                  ) : null
+                }
+                headerClassName={section.tone === "danger" ? "bg-rose-50/40" : undefined}
+              >
+                {renderSectionContent(section)}
+              </SidebarSectionShell>
             );
           })}
         </div>
