@@ -388,7 +388,8 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await expect(page.getByText('Mobile Notification Card')).toBeVisible();
 
     await page.getByText('Mobile Notification Card').click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByDisplayValue('Mobile Notification Card')).toBeVisible({ timeout: 10000 });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText('Mobile Notification Card')).toBeVisible({ timeout: 10000 });
   });
 });

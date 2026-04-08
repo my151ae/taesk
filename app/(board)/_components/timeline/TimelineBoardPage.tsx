@@ -10,6 +10,8 @@ import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
+import { EMPTY_CHECKLIST } from "@/lib/checklist";
+import { normalizeContent } from "@/lib/tiptap";
 
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
@@ -150,6 +152,50 @@ const mapCardToTrashItem = (card: Partial<Card> & { id: string }): TrashCardItem
     purge_after_at: card.purge_after_at,
   };
 };
+
+const buildNotificationFallbackCard = ({
+  boardId,
+  shortId,
+  title,
+}: {
+  boardId: string;
+  shortId: string;
+  title: string;
+}) =>
+  ({
+    id: `notification:${shortId}`,
+    title,
+    content: normalizeContent(null),
+    excerpt: null,
+    checklist: EMPTY_CHECKLIST,
+    tags: [],
+    checked: false,
+    checked_at: null,
+    short_id: shortId,
+    slug: null,
+    deleted_at: null,
+    purge_after_at: null,
+    due_date: null,
+    due_start: null,
+    due_end: null,
+    start_reminder_enabled: false,
+    start_reminder_minutes: 0,
+    end_reminder_enabled: false,
+    end_reminder_minutes: 0,
+    due_bucket: null,
+    due_bucket_position: null,
+    board_id: boardId,
+    created_at: "",
+    updated_at: "",
+    duration: 60,
+    assignee_id: null,
+    assignee_ids: null,
+    assigned_to: null,
+    list_id: "",
+    position: 0,
+    user_id: null,
+    id_short: null,
+  }) as Card;
 
 function InvalidTimelineUrlState({
   code,
@@ -1194,15 +1240,27 @@ function TimelineBoardPageContent({
 
   const handleOpenNotification = useCallback(async (notification: Notification) => {
     setNotificationFeedback(null);
-    await markAsRead(notification.id);
     const cardShortId =
       typeof notification.payload?.card_short_id === "string" ? notification.payload.card_short_id.trim() : "";
     if (!cardShortId) {
+      await markAsRead(notification.id);
       setNotificationFeedback("この通知は既読にしました。関連カードは開けません。");
       return;
     }
+
+    const cardTitle =
+      typeof notification.payload?.card_title === "string" && notification.payload.card_title.trim().length > 0
+        ? notification.payload.card_title.trim()
+        : "Untitled card";
+
+    setModalCardOverride(buildNotificationFallbackCard({
+      boardId: currentBoard.id,
+      shortId: cardShortId,
+      title: cardTitle,
+    }));
     openCardModal(cardShortId, "notifications");
-  }, [markAsRead, openCardModal]);
+    void markAsRead(notification.id);
+  }, [currentBoard.id, markAsRead, openCardModal, setModalCardOverride]);
 
   const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
     setSidebarVisibleCounts((prev) => {
