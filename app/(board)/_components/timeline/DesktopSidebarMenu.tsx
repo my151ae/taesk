@@ -156,7 +156,7 @@ function OverdueSortToggle({
 
 function OverdueIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v5l3 2" />
       <circle cx="12" cy="12" r="8" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M18 6l1.5-1.5" />
@@ -166,7 +166,7 @@ function OverdueIcon() {
 
 function SearchIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <circle cx="11" cy="11" r="6" />
       <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-4.2-4.2" />
     </svg>
@@ -175,7 +175,7 @@ function SearchIcon() {
 
 function CompletedIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path strokeLinecap="round" strokeLinejoin="round" d="m8.5 12 2.2 2.2 4.8-4.9" />
     </svg>
@@ -184,7 +184,7 @@ function CompletedIcon() {
 
 function TagIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M10 5h7l2 2v7l-8 8-6-6 8-8Z" />
       <circle cx="14.5" cy="9.5" r="1.25" fill="currentColor" stroke="none" />
     </svg>
@@ -193,7 +193,7 @@ function TagIcon() {
 
 function TrashIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 7V5.75A1.75 1.75 0 0 1 10.75 4h2.5A1.75 1.75 0 0 1 15 5.75V7" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 7l.7 11.2A2 2 0 0 0 9.7 20h4.6a2 2 0 0 0 1.99-1.8L17 7" />
@@ -203,7 +203,7 @@ function TrashIcon() {
 
 function NotificationIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h4l-1.1-1.1a2 2 0 0 1-.58-1.42V11a5.3 5.3 0 0 0-3.25-4.88V5a2.07 2.07 0 1 0-4.14 0v1.12A5.3 5.3 0 0 0 6.68 11v3.48c0 .53-.21 1.04-.58 1.42L5 17h4" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 17a2.5 2.5 0 0 0 5 0" />
     </svg>
@@ -382,11 +382,11 @@ function SidebarRailButton({
   const isDanger = tone === "danger";
   const badgeClassName = isDanger
     ? count > 0
-      ? "bg-rose-200 text-rose-800"
-      : "bg-rose-100 text-rose-700"
+      ? "bg-rose-500 text-white"
+      : "bg-rose-300 text-white"
     : count > 0
-      ? "bg-slate-200 text-slate-800"
-      : "bg-slate-200 text-slate-500";
+      ? "bg-slate-700 text-white"
+      : "bg-slate-400 text-white";
 
   return (
     <button
@@ -438,7 +438,7 @@ function SidebarRailButton({
       }}
       data-testid={`${id}-toggle`}
       className={clsx(
-        "group relative flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-150",
+        "group relative z-10 flex h-8 w-8 items-center justify-center overflow-visible rounded-lg border transition-all duration-150",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
         expanded
           ? isDanger
@@ -458,7 +458,7 @@ function SidebarRailButton({
         {children}
         <span
           className={clsx(
-            "absolute -right-1.5 -top-1.5 min-w-[1rem] rounded-full px-[0.28rem] py-[0.18rem] text-center text-[8px] font-semibold leading-none shadow-sm",
+            "absolute -right-[0.68rem] -top-[0.62rem] z-20 inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-[0.22rem] text-center text-[8px] font-semibold leading-none shadow-sm",
             badgeClassName
           )}
           data-testid={`${id}-count`}
@@ -776,7 +776,7 @@ export function DesktopSidebarMenu({
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.94))]">
-      <div className="flex w-[2.5rem] shrink-0 flex-col items-center gap-2 border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.8))] px-0.5 py-2.5">
+      <div className="z-10 flex w-[2.5rem] shrink-0 flex-col items-center gap-2 overflow-visible border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.8))] px-0.5 py-2.5">
         <div className="h-0.5" aria-hidden="true" />
         {allSections.map((section) => (
           <SidebarRailButton

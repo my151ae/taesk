@@ -533,11 +533,11 @@ export function TrashSectionBody({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-          <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2">
+          <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2 pt-2">
             {items.map((item) => (
               <div
                 key={item.card_id}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                className="border border-slate-200 bg-white px-2.5 pb-2 pt-4 shadow-sm"
                 data-testid={`trash-card-${item.card_id}`}
               >
                 <div className="min-w-0">
@@ -560,7 +560,7 @@ export function TrashSectionBody({
                     className="min-h-0 bg-white"
                   />
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="mt-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] text-slate-500">
                     残り {Math.max(0, Math.ceil((new Date(item.purge_after_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} 日
                   </p>
@@ -569,7 +569,7 @@ export function TrashSectionBody({
                     onClick={() => {
                       void onRestoreTrashCard(item.card_id);
                     }}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900"
+                    className="rounded-full border border-slate-200 bg-white px-3 py-0.5 text-[11px] font-semibold text-slate-700 hover:border-slate-300 hover:text-slate-900"
                   >
                     復元
                   </button>
