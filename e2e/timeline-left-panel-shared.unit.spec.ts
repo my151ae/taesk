@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  buildCompletedGroupsResetKey,
   buildCompletedResultsGroups,
   buildCompletedTimeText,
   buildCompletedMonthKeyJst,
@@ -116,10 +117,52 @@ test.describe("TimelineLeftPanelShared helpers", () => {
 
     expect(groups).toHaveLength(3);
     expect(groups[0]?.key).toBe("2026/04");
+    expect(groups[0]?.kind).toBe("month");
     expect(groups[0]?.count).toBe(2);
     expect(groups[1]?.key).toBe("2026/03");
+    expect(groups[1]?.kind).toBe("month");
     expect(groups[1]?.count).toBe(1);
     expect(groups[2]?.key).toBe(COMPLETED_UNDATED_GROUP_KEY);
+    expect(groups[2]?.kind).toBe("undated");
     expect(groups[2]?.count).toBe(1);
+  });
+
+  test("completed reset key は current month と group contents から安定生成する", async () => {
+    const groups = buildCompletedResultsGroups([
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了 4/3",
+        item: {
+          card_id: "card-3",
+          title: "April 3",
+          checked: true,
+          checked_at: "2026-04-03T03:00:00.000Z",
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c3",
+        },
+      },
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了日時なし",
+        item: {
+          card_id: "card-0",
+          title: "Undated",
+          checked: true,
+          checked_at: null,
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c0",
+        },
+      },
+    ]);
+
+    expect(buildCompletedGroupsResetKey("2026/04", groups)).toBe(
+      "2026/04::2026/04:card-3|__undated__:card-0",
+    );
   });
 });

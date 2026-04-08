@@ -112,6 +112,7 @@ type UseTimelineBoardScreenArgs = {
   completedCurrentMonthCount: number;
   completedCurrentMonthKey: string | null;
   completedGroupedResults: CompletedResultsGroup[];
+  completedResetKey: string;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -300,6 +301,7 @@ export function useTimelineBoardScreen({
   completedCurrentMonthCount,
   completedCurrentMonthKey,
   completedGroupedResults,
+  completedResetKey,
   searchQuery,
   setSearchQuery,
   searchResults,
@@ -471,6 +473,7 @@ export function useTimelineBoardScreen({
     completedCurrentMonthCount,
     completedCurrentMonthKey,
     completedGroupedResults,
+    completedResetKey,
     searchQuery,
     setSearchQuery,
     searchResults,

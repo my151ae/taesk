@@ -69,7 +69,7 @@ export type CompletedResultsGroup = {
   label: string;
   count: number;
   results: readonly TimelineSearchResultItem[];
-  isUndated?: boolean;
+  kind: "month" | "undated";
 };
 
 export function buildCompletedMonthKeyJst(checkedAt: string | null) {
@@ -119,11 +119,18 @@ export function buildCompletedResultsGroups(results: readonly TimelineSearchResu
       label,
       count: 1,
       results: [result],
-      isUndated: key === COMPLETED_UNDATED_GROUP_KEY,
+      kind: key === COMPLETED_UNDATED_GROUP_KEY ? "undated" : "month",
     });
   });
 
   return groups;
+}
+
+export function buildCompletedGroupsResetKey(currentMonthKey: string | null, groups: readonly CompletedResultsGroup[]) {
+  const serializedGroups = groups
+    .map((group) => `${group.key}:${group.results.map((result) => result.item.card_id).join(",")}`)
+    .join("|");
+  return `${currentMonthKey ?? ""}::${serializedGroups}`;
 }
 
 export function getIncrementalVisibilityState({
@@ -610,60 +617,74 @@ export function CompletedSectionBody({
   results,
   groupedResults,
   currentMonthKey,
-  visibleCount,
-  onVisibleCountChange,
+  resetKey,
   ...cardActions
 }: {
   results: readonly TimelineSearchResultItem[];
   groupedResults: readonly CompletedResultsGroup[];
   currentMonthKey: string | null;
-} & SharedCardActions & IncrementalVisibilityProps) {
-  const resetKey = useMemo(
-    () => `${currentMonthKey ?? ""}::${results.map((result) => result.item.card_id).join(",")}`,
-    [currentMonthKey, results],
-  );
-  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
-    total: results.length,
-    resetKey,
-    visibleCount,
-    onVisibleCountChange,
-  });
-  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(
-    () => new Set(),
-  );
+  resetKey: string;
+} & SharedCardActions & Partial<IncrementalVisibilityProps>) {
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
+  const [groupVisibleCounts, setGroupVisibleCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setExpandedGroupKeys(new Set());
+    setGroupVisibleCounts({});
   }, [resetKey]);
 
+  const visibleGroups = groupedResults;
+
+  const ensureGroupVisibleCount = (groupKey: string) => {
+    setGroupVisibleCounts((prev) => {
+      if (typeof prev[groupKey] === "number") return prev;
+      return {
+        ...prev,
+        [groupKey]: SIDEBAR_INCREMENT_PAGE_SIZE,
+      };
+    });
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroupKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+    ensureGroupVisibleCount(groupKey);
+  };
+
+  const handleGroupLoadMore = (groupKey: string, nextVisibleCount: number) => {
+    setGroupVisibleCounts((prev) => ({
+      ...prev,
+      [groupKey]: nextVisibleCount,
+    }));
+  };
+
+  const buildSanitizedGroupKey = (groupKey: string) => {
+    if (groupKey === COMPLETED_UNDATED_GROUP_KEY) return "undated";
+    return groupKey.replace("/", "-");
+  };
+
   const exposedGroups = useMemo(() => {
-    let remainingVisibleBudget = sliceEnd;
-    const nextGroups: Array<{
-      group: CompletedResultsGroup;
-      visibleResults: readonly TimelineSearchResultItem[];
-      isFullyVisible: boolean;
-    }> = [];
-
-    groupedResults.forEach((group, index) => {
-      const previousGroup = nextGroups[index - 1];
-      const isExposed = index === 0 || (previousGroup?.isFullyVisible ?? false);
-      if (!isExposed) return;
-
-      const visibleInGroup = Math.min(group.results.length, remainingVisibleBudget);
-      const visibleResults = group.results.slice(0, visibleInGroup);
-      const isFullyVisible = visibleInGroup >= group.results.length;
-
-      nextGroups.push({
-        group,
-        visibleResults,
-        isFullyVisible,
+    return visibleGroups.map((group) => {
+      const visibilityState = getIncrementalVisibilityState({
+        total: group.results.length,
+        visibleCount: groupVisibleCounts[group.key] ?? SIDEBAR_INCREMENT_PAGE_SIZE,
       });
 
-      remainingVisibleBudget = Math.max(0, remainingVisibleBudget - visibleInGroup);
+      return {
+        group,
+        visibleResults: group.results.slice(0, visibilityState.sliceEnd),
+        canLoadMore: visibilityState.canLoadMore,
+        nextVisibleCount: visibilityState.nextVisibleCount,
+      };
     });
-
-    return nextGroups;
-  }, [groupedResults, sliceEnd]);
+  }, [groupVisibleCounts, visibleGroups]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -676,28 +697,17 @@ export function CompletedSectionBody({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
           <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2">
-            {exposedGroups.map(({ group, visibleResults }, index) => {
+            {exposedGroups.map(({ group, visibleResults, canLoadMore, nextVisibleCount }) => {
               const isExpanded = expandedGroupKeys.has(group.key);
-              const sanitizedGroupKey = group.key.replace("/", "-");
-              const isLastExposedGroup = index === exposedGroups.length - 1;
+              const sanitizedGroupKey = buildSanitizedGroupKey(group.key);
 
               return (
                 <div key={group.key} className="space-y-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setExpandedGroupKeys((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(group.key)) {
-                          next.delete(group.key);
-                        } else {
-                          next.add(group.key);
-                        }
-                        return next;
-                      });
-                    }}
+                    onClick={() => toggleGroup(group.key)}
                     aria-expanded={isExpanded}
-                    data-testid={`completed-month-toggle-${sanitizedGroupKey}`}
+                    data-testid={`completed-group-toggle-${sanitizedGroupKey}`}
                     className={clsx(
                       "flex min-h-8 w-full min-w-0 select-none items-center justify-between gap-3 border-b border-slate-200/90 bg-white px-2 py-1 text-left transition-colors duration-150",
                       "cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset",
@@ -707,7 +717,7 @@ export function CompletedSectionBody({
                       <span className="truncate text-[10px] font-semibold text-slate-700">{group.label}</span>
                       <span
                         className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-slate-700"
-                        data-testid={`completed-month-count-${sanitizedGroupKey}`}
+                        data-testid={`completed-group-count-${sanitizedGroupKey}`}
                       >
                         {group.count}
                       </span>
@@ -752,15 +762,12 @@ export function CompletedSectionBody({
                           activeLaneId={cardActions.activeLaneId}
                         />
                       ))}
+                      <LoadMoreFooter
+                        canLoadMore={canLoadMore}
+                        onLoadMore={() => handleGroupLoadMore(group.key, nextVisibleCount)}
+                        testId={`sidebar-completed-load-more-${sanitizedGroupKey}`}
+                      />
                     </div>
-                  ) : null}
-
-                  {isLastExposedGroup ? (
-                    <LoadMoreFooter
-                      canLoadMore={canLoadMore}
-                      onLoadMore={handleLoadMore}
-                      testId="sidebar-completed-load-more"
-                    />
                   ) : null}
                 </div>
               );

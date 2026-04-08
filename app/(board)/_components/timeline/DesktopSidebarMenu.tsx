@@ -60,6 +60,7 @@ export type DesktopSidebarSection =
       tone: "neutral";
       currentMonthCount: number;
       currentMonthKey: string | null;
+      resetKey: string;
       groupedResults: readonly CompletedResultsGroup[];
       results: readonly TimelineSearchResultItem[];
     })
@@ -443,6 +444,7 @@ export function DesktopSidebarMenu({
           results={section.results}
           groupedResults={section.groupedResults}
           currentMonthKey={section.currentMonthKey}
+          resetKey={section.resetKey}
           visibleCount={visibleCounts.completed}
           onVisibleCountChange={(nextCount) => onVisibleCountChange("completed", nextCount)}
           openCardModal={openCardModal}

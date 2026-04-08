@@ -19,6 +19,7 @@ import { type SidebarVisibleCountState } from "@/app/(board)/_components/timelin
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import {
   buildCompletedResultsGroups,
+  buildCompletedGroupsResetKey,
   buildCompletedTimeText,
   buildCurrentCompletedMonthKeyJst,
   COMPLETED_UNDATED_GROUP_KEY,
@@ -609,6 +610,10 @@ function TimelineBoardPageContent({
     () => buildCompletedResultsGroups(completedResults),
     [completedResults],
   );
+  const completedResetKey = useMemo(
+    () => buildCompletedGroupsResetKey(completedCurrentMonthKey, completedGroupedResults),
+    [completedCurrentMonthKey, completedGroupedResults],
+  );
   const completedCurrentMonthCount = useMemo(
     () =>
       completedGroupedResults.find(
@@ -619,12 +624,12 @@ function TimelineBoardPageContent({
 
   const sidebarVisibleResetKeys = useMemo<Record<IncrementalPanelSectionKey, string>>(
     () => ({
-      completed: `${completedCurrentMonthKey ?? ""}::${completedResults.map((result) => result.item.card_id).join(",")}`,
+      completed: completedResetKey,
       search: searchQuery.trim() ? `${searchQuery.trim()}::${searchResults.map((result) => result.item.card_id).join(",")}` : "",
       tags: `${selectedTags.join(",")}::${tagResults.map((result) => result.item.card_id).join(",")}`,
       trash: trashItems.map((item) => item.card_id).join(","),
     }),
-    [completedCurrentMonthKey, completedResults, searchQuery, searchResults, selectedTags, tagResults, trashItems],
+    [completedResetKey, searchQuery, searchResults, selectedTags, tagResults, trashItems],
   );
   const previousSidebarVisibleResetKeysRef = useRef<Record<IncrementalPanelSectionKey, string> | null>(null);
 
@@ -1505,6 +1510,7 @@ function TimelineBoardPageContent({
     completedCurrentMonthCount,
     completedCurrentMonthKey,
     completedGroupedResults,
+    completedResetKey,
     searchQuery,
     setSearchQuery: handleSearchQueryChange,
     searchResults,

@@ -103,6 +103,7 @@ type UseTimelineBoardViewModelsArgs = {
   completedCurrentMonthCount: number;
   completedCurrentMonthKey: string | null;
   completedGroupedResults: CompletedResultsGroup[];
+  completedResetKey: string;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -216,6 +217,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         count: args.completedCurrentMonthCount,
         currentMonthCount: args.completedCurrentMonthCount,
         currentMonthKey: args.completedCurrentMonthKey,
+        resetKey: args.completedResetKey,
         groupedResults: args.completedGroupedResults,
         results: args.completedResults,
       },
@@ -264,6 +266,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
     args.completedCurrentMonthCount,
     args.completedCurrentMonthKey,
     args.completedGroupedResults,
+    args.completedResetKey,
     args.completedResults,
     args.notificationUnreadCount,
     args.overdue,
