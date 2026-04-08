@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
-import type { Board } from "@/lib/supabase";
+import type { Board, Card, Notification } from "@/lib/supabase";
 import { buildBoardUrl } from "@/lib/board-url";
 import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import type { Card } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -49,6 +48,7 @@ import { useTimelineBoardController } from "@/app/(board)/_hooks/useTimelineBoar
 import { useTimelineBoardModeSync } from "@/app/(board)/_hooks/useTimelineBoardModeSync";
 import { useTimelineBoardScreen } from "@/app/(board)/_hooks/useTimelineBoardScreen";
 import { useTimelineCardSelection } from "@/app/(board)/_hooks/useTimelineCardSelection";
+import { useNotificationsStore } from "@/app/(board)/_stores/notifications-store";
 
 type TimelineBoardPageProps = {
   initialBoard: Board;
@@ -101,7 +101,7 @@ const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey |
 };
 
 const normalizeMobileLeftPanelMode = (mode: LeftPanelMode): LeftPanelMode => {
-  if (mode === "notifications" || mode === "none") return "overdue";
+  if (mode === "none") return "overdue";
   return mode;
 };
 
@@ -214,6 +214,16 @@ function TimelineBoardPageContent({
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
   const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
   const [sidebarVisibleCounts, setSidebarVisibleCounts] = useState<SidebarVisibleCountState>(() => createInitialSidebarVisibleCounts());
+  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
+  const {
+    notifications,
+    loading: notificationsLoading,
+    error: notificationsError,
+    unreadCount: notificationUnreadCount,
+    fetchNotifications,
+    markAsRead,
+    markAllAsRead,
+  } = useNotificationsStore();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1129,7 +1139,7 @@ function TimelineBoardPageContent({
     setExpandedSectionKey("notifications");
   }, [updateBoardUiState]);
 
-  const handleMobileLeftPanelSelect = useCallback((key: Exclude<SidebarSectionKey, "notifications">) => {
+  const handleMobileLeftPanelSelect = useCallback((key: SidebarSectionKey) => {
     setExpandedSectionKey(key);
 
     if (key === "overdue") {
@@ -1143,6 +1153,14 @@ function TimelineBoardPageContent({
     if (key === "completed") {
       updateBoardUiState({
         leftPanelMode: "completed",
+        method: "replace",
+      });
+      return;
+    }
+
+    if (key === "notifications") {
+      updateBoardUiState({
+        leftPanelMode: "notifications",
         method: "replace",
       });
       return;
@@ -1171,6 +1189,18 @@ function TimelineBoardPageContent({
       method: "replace",
     });
   }, [resolvedState.tag, searchQuery, selectedTags, updateBoardUiState]);
+
+  const handleOpenNotification = useCallback(async (notification: Notification) => {
+    setNotificationFeedback(null);
+    await markAsRead(notification.id);
+    const cardShortId =
+      typeof notification.payload?.card_short_id === "string" ? notification.payload.card_short_id.trim() : "";
+    if (!cardShortId) {
+      setNotificationFeedback("この通知は既読にしました。関連カードは開けません。");
+      return;
+    }
+    openCardModal(cardShortId, "notifications");
+  }, [markAsRead, openCardModal]);
 
   const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
     setSidebarVisibleCounts((prev) => {
@@ -1279,6 +1309,20 @@ function TimelineBoardPageContent({
     setSelectedTags: handleSelectedTagsChange,
     tagSummaries,
     trashItems,
+    notifications,
+    notificationsLoading,
+    notificationsError,
+    notificationUnreadCount,
+    notificationFeedback,
+    onRetryNotifications: () => {
+      void fetchNotifications();
+    },
+    onMarkAllNotificationsRead: () => {
+      void markAllAsRead();
+    },
+    onOpenNotification: (notification) => {
+      void handleOpenNotification(notification);
+    },
     indicatorTop,
     liveNowIsoDate: currentTimelineIsoDate,
     liveNowMinutes: currentTimelineMinutes,

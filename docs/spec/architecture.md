@@ -132,7 +132,7 @@ app/layout.tsx
 ### useTimelineFiltering
 - `searchQuery`, `sortBy`, `showFilters` を管理し、共通 board 表示向けの `events` / `abBuckets` / `overdue` を返す。
 - 内部で `useBoardFilters` を利用し、`availableTags` / `tagSummaries` / `hasActiveFilters` などの補助情報も返す。
-- 左パネルごとの専用 state はここへ混ぜず、`Tag` の選択状態は右パネル Tag 表示専用として別管理する。
+- 左パネルごとの専用 state はここへ混ぜず、`Tags` の選択状態は右パネル Tags 表示専用として別管理する。
 
 ### useCommentsStore
 - コメントとそのローカルキュー (`comment-queue`) を Zustand で管理。

@@ -14,8 +14,8 @@ import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 
-export type SharedPanelSectionKey = "overdue" | "completed" | "search" | "tags" | "trash";
-export type IncrementalPanelSectionKey = Exclude<SharedPanelSectionKey, "overdue">;
+export type SharedPanelSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
+export type IncrementalPanelSectionKey = Exclude<SharedPanelSectionKey, "overdue" | "notifications">;
 export const SIDEBAR_INCREMENT_PAGE_SIZE = 20;
 
 type SharedSelectionProps = {

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import { type TimelineBoardScreenProps } from "@/app/(board)/_components/timeline/TimelineBoardScreen";
 import type { ShortcutBarConfig } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
-import type { Board, ProfileSummary, TeamView } from "@/lib/supabase";
+import type { Board, Notification, ProfileSummary, TeamView } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
@@ -25,6 +25,7 @@ import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/buc
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 import type { SharedPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -114,6 +115,14 @@ type UseTimelineBoardScreenArgs = {
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
   trashItems: TrashCardItem[];
+  notifications: Notification[];
+  notificationsLoading: boolean;
+  notificationsError: string | null;
+  notificationUnreadCount: number;
+  notificationFeedback: string | null;
+  onRetryNotifications: () => void;
+  onMarkAllNotificationsRead: () => void;
+  onOpenNotification: (notification: Notification) => void;
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   liveNowMinutes: number | null;
@@ -283,6 +292,14 @@ export function useTimelineBoardScreen({
   setSelectedTags,
   tagSummaries,
   trashItems,
+  notifications,
+  notificationsLoading,
+  notificationsError,
+  notificationUnreadCount,
+  notificationFeedback,
+  onRetryNotifications,
+  onMarkAllNotificationsRead,
+  onOpenNotification,
   indicatorTop,
   liveNowIsoDate,
   liveNowMinutes,
@@ -434,6 +451,7 @@ export function useTimelineBoardScreen({
     setSelectedTags,
     tagSummaries,
     trashItems,
+    notificationUnreadCount,
     indicatorTop,
     liveNowIsoDate,
     liveNowMinutes,
@@ -523,6 +541,14 @@ export function useTimelineBoardScreen({
     onVisibleCountChange: onSidebarVisibleCountChange,
     allowOverdueDrag: viewModels.desktop.leftPanel.allowOverdueDrag,
     onOpenNotificationSettings: viewModels.desktop.leftPanel.onOpenNotificationSettings,
+    notifications,
+    notificationsLoading,
+    notificationsError,
+    notificationUnreadCount,
+    notificationFeedback,
+    onRetryNotifications,
+    onMarkAllNotificationsRead,
+    onOpenNotification,
     onRestoreTrashCard: handleRestoreCard,
     openCardModal,
     onToggleCheck: handleToggleCardChecked,
@@ -538,6 +564,16 @@ export function useTimelineBoardScreen({
     activeCardId,
     activeLaneId,
   };
+
+  const currentMobileSection =
+    leftPanelProps.sections.find((section) => section.key === mobileLeftPanelMode) ??
+    leftPanelProps.sections.find((section) => section.key === "overdue");
+
+  const tagsSectionPresentation = getTagsSectionPresentation({
+    selectedTag: selectedTags[0] ?? null,
+    tagSummariesCount: tagSummaries.length,
+    tagResultsCount: tagResults.length,
+  });
 
   return {
     headerProps,
@@ -579,42 +615,24 @@ export function useTimelineBoardScreen({
       leftPanelProps,
       selector: {
         currentSection:
-          mobileLeftPanelMode === "search" || mobileLeftPanelMode === "tags" || mobileLeftPanelMode === "trash" || mobileLeftPanelMode === "completed"
+          mobileLeftPanelMode === "completed" ||
+          mobileLeftPanelMode === "notifications" ||
+          mobileLeftPanelMode === "search" ||
+          mobileLeftPanelMode === "tags" ||
+          mobileLeftPanelMode === "trash"
             ? mobileLeftPanelMode
             : "overdue",
-        selectorItems: [
-          { key: "overdue", label: "Overdue" },
-          { key: "completed", label: "Completed" },
-          { key: "search", label: "Search" },
-          { key: "tags", label: "Tags" },
-          { key: "trash", label: "Trash" },
-        ],
+        selectorItems: leftPanelProps.sections.map((section) => ({
+          key: section.key,
+          label: section.label,
+        })),
         currentLabel:
-          mobileLeftPanelMode === "completed"
-            ? "Completed"
-            : mobileLeftPanelMode === "search"
+          currentMobileSection?.key === "search"
             ? searchQuery.trim() || "Search"
-            : mobileLeftPanelMode === "tags"
-              ? selectedTags[0]
-                ? `#${selectedTags[0]}`
-                : "Tags"
-              : mobileLeftPanelMode === "trash"
-                ? "Trash"
-                : "Overdue",
-        currentCount:
-          mobileLeftPanelMode === "completed"
-            ? completedResults.length
-            : mobileLeftPanelMode === "search"
-            ? searchQuery.trim()
-              ? searchResults.length
-              : 0
-            : mobileLeftPanelMode === "tags"
-              ? selectedTags.length > 0
-                ? tagResults.length
-                : 0
-              : mobileLeftPanelMode === "trash"
-                ? trashItems.length
-                : overdue.length,
+            : currentMobileSection?.key === "tags"
+              ? tagsSectionPresentation.triggerLabel
+              : currentMobileSection?.label ?? "Overdue",
+        currentCount: currentMobileSection?.count ?? overdue.length,
         onSelect: onMobileLeftPanelSelect,
         headerAccessory:
           mobileLeftPanelMode === "overdue"

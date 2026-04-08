@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import clsx from "clsx";
 
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
-import { useNotificationsStore } from "@/app/(board)/_stores/notifications-store";
-import { featureFlags } from "@/lib/featureFlags";
 import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { Notification } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
@@ -19,6 +17,10 @@ import {
   TagsSectionBody,
   TrashSectionBody,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import {
+  NotificationsSectionActions,
+  NotificationsSectionBody,
+} from "@/app/(board)/_components/timeline/TimelineNotificationsShared";
 
 export type SidebarSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
 type SidebarSectionTone = "danger" | "neutral";
@@ -89,23 +91,23 @@ export type DesktopSidebarSection =
       items: readonly TrashCardItem[];
     };
 
-export type DesktopSidebarHeaderSlot =
-  | {
-      sectionKey: SidebarSectionKey;
-      actions: React.ReactNode;
-    }
-  | null;
-
 type DesktopSidebarMenuProps = {
   state: DesktopSidebarMenuState;
   actions: DesktopSidebarMenuActions;
   sections: readonly DesktopSidebarSection[];
   visibleCounts: SidebarVisibleCountState;
   onVisibleCountChange: (section: IncrementalPanelSectionKey, nextCount: number) => void;
-  headerSlot?: DesktopSidebarHeaderSlot;
   overdueSortOrder: OverdueSortOrder;
   onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
   allowOverdueDrag: boolean;
+  notifications: readonly Notification[];
+  notificationsLoading: boolean;
+  notificationsError: string | null;
+  notificationUnreadCount: number;
+  notificationFeedback: string | null;
+  onRetryNotifications: () => void;
+  onMarkAllNotificationsRead: () => void;
+  onOpenNotification: (notification: Notification) => void;
   onOpenNotificationSettings: () => void;
   onRestoreTrashCard: (cardId: string) => Promise<boolean>;
   openCardModal: (shortId: string | null, source: string) => void;
@@ -212,158 +214,6 @@ function NotificationIcon() {
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h4l-1.1-1.1a2 2 0 0 1-.58-1.42V11a5.3 5.3 0 0 0-3.25-4.88V5a2.07 2.07 0 1 0-4.14 0v1.12A5.3 5.3 0 0 0 6.68 11v3.48c0 .53-.21 1.04-.58 1.42L5 17h4" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 17a2.5 2.5 0 0 0 5 0" />
     </svg>
-  );
-}
-
-const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
-
-function formatRelativeDateTime(iso: string) {
-  const target = new Date(iso);
-  const diffMs = target.getTime() - Date.now();
-  const diffMinutes = Math.round(diffMs / 60000);
-  const absolute = new Intl.DateTimeFormat("ja-JP", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(target);
-
-  if (Math.abs(diffMinutes) < 1) {
-    return { relative: `たった今 [ ${absolute} ]`, absolute };
-  }
-  if (Math.abs(diffMinutes) < 60) {
-    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffMinutes, "minute")} [ ${absolute} ]`, absolute };
-  }
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (Math.abs(diffHours) < 24) {
-    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffHours, "hour")} [ ${absolute} ]`, absolute };
-  }
-
-  const diffDays = Math.round(diffHours / 24);
-  if (Math.abs(diffDays) < 7) {
-    return { relative: `${RELATIVE_TIME_FORMATTER.format(diffDays, "day")} [ ${absolute} ]`, absolute };
-  }
-
-  return { relative: absolute, absolute };
-}
-
-function buildNotificationHeadline(notification: Notification) {
-  const changeSummary =
-    typeof notification.payload?.change_summary === "string" && notification.payload.change_summary.trim().length > 0
-      ? notification.payload.change_summary.trim()
-      : null;
-  if (changeSummary) return changeSummary;
-
-  const timeChange = notification.payload?.time_change;
-  if (timeChange && typeof timeChange === "object") {
-    const field = timeChange.field === "end" ? "終了" : "開始";
-    const before = typeof timeChange.before === "string" && timeChange.before.trim().length > 0 ? timeChange.before : "未設定";
-    const after = typeof timeChange.after === "string" && timeChange.after.trim().length > 0 ? timeChange.after : "未設定";
-    return `${field} ${before} → ${after}`;
-  }
-
-  if (notification.type === "assignee_changed") return "担当に追加されました";
-  if (notification.type === "due_soon") return null;
-  if (notification.type === "comment_reply" || notification.type === "comment_replied") return "コメントに返信がありました";
-  if (notification.type === "comment_created") return "新しいコメントがあります";
-  if (notification.type === "mention") return "メンションされました";
-  return null;
-}
-
-function buildNotificationTitle(notification: Notification) {
-  const payloadTitle = typeof notification.payload?.card_title === "string" ? notification.payload.card_title.trim() : "";
-  if (payloadTitle.length > 0) return payloadTitle;
-  const message = typeof notification.payload?.message === "string" ? notification.payload.message.trim() : "";
-  if (message.length > 0) return message;
-  return "Untitled card";
-}
-
-function NotificationActivityRow({
-  notification,
-  onOpen,
-}: {
-  notification: Notification;
-  onOpen: (notification: Notification) => void;
-}) {
-  const { relative, absolute } = formatRelativeDateTime(notification.created_at);
-  const isUnread = !notification.read_at;
-  const commentBody =
-    typeof notification.payload?.comment_body === "string" && notification.payload.comment_body.trim().length > 0
-      ? notification.payload.comment_body.trim()
-      : null;
-  const title = buildNotificationTitle(notification);
-  const headline = buildNotificationHeadline(notification);
-  const canOpen = typeof notification.payload?.card_short_id === "string" && notification.payload.card_short_id.trim().length > 0;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(notification)}
-      className={clsx(
-        "group relative w-full rounded-none border px-2 py-1.5 text-left shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500",
-        isUnread
-          ? "border-sky-200 bg-sky-50/80 hover:border-sky-300 hover:bg-sky-50"
-          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80"
-      )}
-      aria-label={isUnread ? `${title} 未読通知` : `${title} 通知`}
-      title={canOpen ? absolute : `${absolute} / この通知はカードを開けません`}
-    >
-      <span
-        aria-hidden="true"
-        className={clsx(
-          "absolute inset-y-1 left-0 w-1 rounded-r-full",
-          isUnread ? "bg-sky-500" : "bg-transparent"
-        )}
-      />
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1 pt-1">
-          <div className="flex items-start gap-1.5 pr-9">
-            <span
-              className="absolute -top-4 left-0 bg-transparent px-0 text-[10px] font-normal text-slate-500"
-              title={absolute}
-            >
-              {relative}
-            </span>
-            {isUnread ? (
-              <span
-                aria-hidden="true"
-                className="mt-[0.4rem] h-2 w-2 shrink-0 rounded-full bg-sky-600"
-              />
-            ) : null}
-            <p
-              className={clsx(
-                "min-w-0 whitespace-pre-wrap break-words text-[11px] leading-tight text-slate-800",
-                isUnread ? "font-semibold text-slate-900" : "font-semibold text-slate-800"
-              )}
-            >
-              {title}
-            </p>
-          </div>
-          {headline ? (
-            <p className="mt-0.5 text-[10px] leading-tight text-slate-600">{headline}</p>
-          ) : null}
-          {commentBody ? (
-            <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-500">{commentBody}</p>
-          ) : null}
-          {!canOpen ? (
-            <p className="mt-0.5 text-[11px] text-amber-700">この通知は既読になりますが、カードは開けません</p>
-          ) : null}
-        </div>
-        <span
-          aria-hidden="true"
-          className="absolute right-2 top-2 inline-flex h-4 w-4 items-center justify-center rounded-sm border border-slate-200 bg-white text-slate-500 transition group-hover:border-sky-300 group-hover:text-sky-600"
-        >
-          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 5h5v5" />
-            <path d="M10 14 19 5" />
-            <path d="M19 14v4a1 1 0 0 1-1 1h-4" />
-            <path d="M10 5H6a1 1 0 0 0-1 1v4" />
-          </svg>
-        </span>
-      </div>
-    </button>
   );
 }
 
@@ -481,10 +331,17 @@ export function DesktopSidebarMenu({
   sections,
   visibleCounts,
   onVisibleCountChange,
-  headerSlot = null,
   overdueSortOrder,
   onOverdueSortOrderChange,
   allowOverdueDrag,
+  notifications,
+  notificationsLoading,
+  notificationsError,
+  notificationUnreadCount,
+  notificationFeedback,
+  onRetryNotifications,
+  onMarkAllNotificationsRead,
+  onOpenNotification,
   onOpenNotificationSettings,
   onRestoreTrashCard,
   openCardModal,
@@ -501,81 +358,7 @@ export function DesktopSidebarMenu({
   activeCardId,
   activeLaneId,
 }: DesktopSidebarMenuProps) {
-  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
-  const {
-    notifications,
-    loading: notificationsLoading,
-    error: notificationsError,
-    unreadCount,
-    fetchNotifications,
-    markAsRead,
-    markAllAsRead,
-  } = useNotificationsStore();
-
-  const notificationSection = useMemo<DesktopSidebarSection | null>(() => {
-    if (!featureFlags.notifications) return null;
-    return {
-      key: "notifications",
-      tone: "neutral",
-      id: "desktop-sidebar-notifications-panel",
-      label: "Notifications",
-      count: unreadCount,
-    };
-  }, [unreadCount]);
-
-  const sortedNotifications = useMemo(() => {
-    return [...notifications].sort((a, b) => {
-      const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (createdDiff !== 0) return createdDiff;
-      return b.id.localeCompare(a.id);
-    });
-  }, [notifications]);
-
-  const allSections = useMemo(() => {
-    const overdueSection = sections.find((section) => section.key === "overdue");
-    const completedSection = sections.find((section) => section.key === "completed");
-    const searchSection = sections.find((section) => section.key === "search");
-    const tagsSection = sections.find((section) => section.key === "tags");
-    const trashSection = sections.find((section) => section.key === "trash");
-    return [
-      overdueSection,
-      completedSection,
-      notificationSection,
-      searchSection,
-      tagsSection,
-      trashSection,
-    ].filter((section): section is DesktopSidebarSection => Boolean(section));
-  }, [notificationSection, sections]);
-
-  const resolvedHeaderSlot = useMemo<DesktopSidebarHeaderSlot>(() => {
-    if (headerSlot) return headerSlot;
-    if (!featureFlags.notifications) return null;
-    return {
-      sectionKey: "notifications",
-      actions: (
-        <>
-          {unreadCount > 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                void markAllAsRead();
-              }}
-              className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900"
-            >
-              Mark all read
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onOpenNotificationSettings}
-            className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900"
-          >
-            Settings
-          </button>
-        </>
-      ),
-    };
-  }, [headerSlot, markAllAsRead, onOpenNotificationSettings, unreadCount]);
+  const allSections = useMemo(() => sections, [sections]);
 
   const handleToggleSection = (key: SidebarSectionKey) => {
     actions.onExpandedSectionChange(state.expandedSectionKey === key ? null : key);
@@ -598,18 +381,6 @@ export function DesktopSidebarMenu({
       default:
         return null;
     }
-  };
-
-  const handleNotificationOpen = async (notification: Notification) => {
-    setNotificationFeedback(null);
-    await markAsRead(notification.id);
-    const cardShortId =
-      typeof notification.payload?.card_short_id === "string" ? notification.payload.card_short_id.trim() : "";
-    if (!cardShortId) {
-      setNotificationFeedback("この通知は既読にしました。関連カードは開けません。");
-      return;
-    }
-    openCardModal(cardShortId, "notifications");
   };
 
   const renderSectionContent = (section: DesktopSidebarSection) => {
@@ -636,70 +407,15 @@ export function DesktopSidebarMenu({
     }
 
     if (section.key === "notifications") {
-      if (notificationsLoading) {
-        return (
-          <div className="space-y-2 px-3 py-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="animate-pulse rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                <div className="h-3 w-1/3 rounded bg-slate-200" />
-                <div className="mt-2 h-3 w-5/6 rounded bg-slate-200" />
-                <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      if (notificationsError) {
-        return (
-          <div className="px-3 py-4">
-            <div className="rounded-2xl border border-rose-200 bg-rose-50/70 px-3 py-3 text-[11px] text-rose-700/90">
-              <p>{notificationsError}</p>
-              <button
-                type="button"
-                onClick={() => void fetchNotifications()}
-                className="mt-2 rounded-full border border-rose-200 bg-white px-2 py-1 font-semibold text-rose-700"
-              >
-                再試行
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      if (sortedNotifications.length === 0) {
-        return (
-          <div className="px-3 py-4">
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-              通知はありません
-            </p>
-          </div>
-        );
-      }
-
       return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {notificationFeedback ? (
-            <div className="px-3 pt-3">
-              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-                {notificationFeedback}
-              </p>
-            </div>
-          ) : null}
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-            <div className="space-y-4 px-2 py-4">
-              {sortedNotifications.map((notification) => (
-                <NotificationActivityRow
-                  key={notification.id}
-                  notification={notification}
-                  onOpen={(item) => {
-                    void handleNotificationOpen(item);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        <NotificationsSectionBody
+          notifications={notifications}
+          loading={notificationsLoading}
+          error={notificationsError}
+          feedback={notificationFeedback}
+          onRetry={onRetryNotifications}
+          onOpenNotification={onOpenNotification}
+        />
       );
     }
 
@@ -813,7 +529,7 @@ export function DesktopSidebarMenu({
           {allSections.map((section) => {
             const expanded = state.expandedSectionKey === section.key;
             const isDanger = section.tone === "danger";
-            const showHeaderSlot = expanded && resolvedHeaderSlot?.sectionKey === section.key;
+            const showNotificationActions = expanded && section.key === "notifications";
 
             return (
               <section
@@ -835,10 +551,12 @@ export function DesktopSidebarMenu({
                   className={isDanger ? "bg-rose-50/40" : undefined}
                 />
 
-                {showHeaderSlot ? (
-                  <div className="flex h-8 items-center justify-end gap-2 border-b border-slate-200/80 bg-slate-50 px-3">
-                    {resolvedHeaderSlot?.actions}
-                  </div>
+                {showNotificationActions ? (
+                  <NotificationsSectionActions
+                    unreadCount={notificationUnreadCount}
+                    onMarkAllAsRead={onMarkAllNotificationsRead}
+                    onOpenSettings={onOpenNotificationSettings}
+                  />
                 ) : null}
 
                 <div

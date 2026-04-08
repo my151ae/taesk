@@ -25,6 +25,10 @@ import {
   TrashSectionBody,
   type SharedPanelSectionKey,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import {
+  NotificationsSectionActions,
+  NotificationsSectionBody,
+} from "@/app/(board)/_components/timeline/TimelineNotificationsShared";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { ShortcutsModal } from "@/app/(board)/_components/timeline/ShortcutsModal";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
@@ -245,6 +249,7 @@ export default function TimelineBoardScreen({
   const [showMobileSelector, setShowMobileSelector] = useState(false);
   const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
   const mobileSelectorRef = useRef<HTMLDivElement | null>(null);
+  const previousMobileSectionRef = useRef<SharedPanelSectionKey | null>(null);
 
   useEffect(() => {
     if (!showMobileSelector) return;
@@ -268,6 +273,14 @@ export default function TimelineBoardScreen({
     () => mobile.leftPanelProps.sections.find((section) => section.key === mobile.selector.currentSection) ?? null,
     [mobile.leftPanelProps.sections, mobile.selector.currentSection]
   );
+
+  useEffect(() => {
+    const previousSection = previousMobileSectionRef.current;
+    if (previousSection !== null && previousSection !== mobile.selector.currentSection) {
+      setIsMobilePanelCollapsed(false);
+    }
+    previousMobileSectionRef.current = mobile.selector.currentSection;
+  }, [mobile.selector.currentSection]);
 
   const mobileHeaderAccessory = useMemo(() => {
     if (mobile.selector.headerAccessory?.kind !== "overdue-sort") {
@@ -345,6 +358,28 @@ export default function TimelineBoardScreen({
         />
       );
     }
+    if (currentMobileSection.key === "notifications") {
+      return (
+        <>
+          <NotificationsSectionActions
+            unreadCount={mobile.leftPanelProps.notificationUnreadCount}
+            onMarkAllAsRead={mobile.leftPanelProps.onMarkAllNotificationsRead}
+            onOpenSettings={mobile.leftPanelProps.onOpenNotificationSettings}
+            className="border-t border-slate-200/80"
+            markAllButtonTestId="mobile-notifications-mark-all-read"
+            settingsButtonTestId="mobile-notification-settings-button"
+          />
+          <NotificationsSectionBody
+            notifications={mobile.leftPanelProps.notifications}
+            loading={mobile.leftPanelProps.notificationsLoading}
+            error={mobile.leftPanelProps.notificationsError}
+            feedback={mobile.leftPanelProps.notificationFeedback}
+            onRetry={mobile.leftPanelProps.onRetryNotifications}
+            onOpenNotification={mobile.leftPanelProps.onOpenNotification}
+          />
+        </>
+      );
+    }
     if (currentMobileSection.key === "completed") {
       return (
         <CompletedSectionBody
@@ -397,6 +432,7 @@ export default function TimelineBoardScreen({
                 className="inline-flex min-w-0 items-center gap-1 text-left text-sm font-semibold leading-tight text-slate-800"
                 aria-haspopup="menu"
                 aria-expanded={showMobileSelector}
+                data-testid="mobile-left-panel-selector-trigger"
               >
                 <span className="truncate">{mobile.selector.currentLabel}</span>
                 <svg className={clsx("h-3 w-3 shrink-0 transition-transform", showMobileSelector && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -416,6 +452,7 @@ export default function TimelineBoardScreen({
                           setIsMobilePanelCollapsed(false);
                           mobile.selector.onSelect(item.key);
                         }}
+                        data-testid={`mobile-left-panel-selector-item-${item.key}`}
                         className={clsx(
                           "flex w-full items-center rounded-lg px-3 py-2 text-left text-[12px]",
                           selected ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"
@@ -435,6 +472,7 @@ export default function TimelineBoardScreen({
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight",
                 mobile.selector.currentSection === "overdue" ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-700"
               )}
+              data-testid="mobile-left-panel-count-badge"
             >
               {mobile.selector.currentCount}
             </span>
@@ -457,6 +495,7 @@ export default function TimelineBoardScreen({
         </div>
         <div
           id="mobile-left-panel-body"
+          data-testid="mobile-left-panel-body"
           className="overflow-hidden transition-[height,opacity] duration-200 ease-out"
           style={{ height: isMobilePanelCollapsed ? "0px" : "clamp(168px, 28svh, 240px)", opacity: isMobilePanelCollapsed ? 0 : 1 }}
         >

@@ -326,6 +326,69 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await bellButton.click();
 
     // Verify empty state message
-    await expect(page.getByText(/no notifications/i)).toBeVisible();
+    await expect(page.getByText(/(no notifications|通知はありません)/i)).toBeVisible();
+  });
+
+  test('should expose Notifications in the mobile selector and open cards from the panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.route(/\/api\/notifications\/[^/]+$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
+    await page.route(/\/api\/notifications(\?.*)?$/, async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            notifications: [
+              {
+                id: 'notif-mobile-openable',
+                type: 'mention',
+                payload: {
+                  card_title: 'Mobile Notification Card',
+                  card_short_id: '1',
+                  comment_body: 'mobile notification body',
+                },
+                read_at: null,
+                created_at: new Date().toISOString(),
+              },
+            ],
+            unreadCount: 1,
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const bellButton = page.getByRole('button', { name: /notifications/i });
+    await bellButton.click();
+
+    await expect(page.getByTestId('mobile-left-panel-selector-trigger')).toHaveText(/notifications/i);
+    await expect(page.getByTestId('mobile-left-panel-count-badge')).toHaveText('1');
+    await expect(page.getByTestId('mobile-left-panel-body')).toBeVisible();
+    await expect(page.getByText('Mobile Notification Card')).toBeVisible();
+
+    await page.getByTestId('mobile-left-panel-selector-trigger').click();
+    await expect(page.getByTestId('mobile-left-panel-selector-item-notifications')).toBeVisible();
+    await page.getByTestId('mobile-left-panel-selector-item-overdue').click();
+    await expect(page.getByTestId('mobile-left-panel-selector-trigger')).toHaveText(/overdue/i);
+
+    await page.getByTestId('mobile-left-panel-selector-trigger').click();
+    await page.getByTestId('mobile-left-panel-selector-item-notifications').click();
+    await expect(page.getByText('Mobile Notification Card')).toBeVisible();
+
+    await page.getByText('Mobile Notification Card').click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByDisplayValue('Mobile Notification Card')).toBeVisible({ timeout: 10000 });
   });
 });

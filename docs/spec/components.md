@@ -14,7 +14,7 @@ Taesk の UI は `app/(board)/_components/timeline/TimelineBoardPage.tsx` を中
   - `availableBoards`: ボード切り替え用リスト
   - `modalCard`, `cardModalStatus`, `modalProfiles`: CardModal のロード状態
   - `searchQuery`, `sortBy`, `showFilters`, `filteredData`, `hasActiveFilters`, `availableTags`, `tagSummaries`: `useTimelineFiltering`（内部で `useBoardFilters`）で管理
-  - `selectedTags`: 左パネル `Tag` セクション専用 state として `TimelineBoardPage` から右パネルへ渡す。`Timeline` / 通常 `List` には影響させない
+  - `selectedTags`: 左パネル `Tags` セクション専用 state として `TimelineBoardPage` から右パネルへ渡す。`Timeline` / 通常 `List` には影響させない
   - `realtimeStatus`: `useTimelineData` 経由で `useRealtimeBoard` が提供
 
 ### 描画構造（抜粋）
@@ -43,7 +43,7 @@ TimelineBoardPage
 ### Header
 
 - ボード選択: `/api/boards` から取得したリストをフライアウトとして表示。`signOut` ボタンも同じメニュー内に配置。
-- フィルター: `useTimelineFiltering` は検索や補助情報を管理する。左パネル由来の専用 state は各セクションで分離し、`Tag` の選択は Tag 右パネルにのみ反映する。
+- フィルター: `useTimelineFiltering` は検索や補助情報を管理する。左パネル由来の専用 state は各セクションで分離し、`Tags` の選択は Tags 右パネルにのみ反映する。
 - 通知関連: `NotificationsBell` と `NotificationSettings` は `app/(board)/_components/` 配下の共通コンポーネントをそのまま利用。Timeline ヘッダー内にモーダルを開く導線を提供する。
 - Sync インジケーター: 現状は `realtimeStatus` のみを表示。
 
@@ -60,7 +60,7 @@ TimelineBoardPage
 ### A/B Lists
 
 - `buildAbMeta` により表示中の日付ごとに `A/B` セクションを生成し、キーは `${isoDate}_a` / `${isoDate}_b` を使用する。
-- `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタするのは、共通の board 表示に関わる条件のみ。左パネル `Tag` セクションの選択状態はここへ混ぜない。
+- `useTimelineFiltering` が `events` と `abBuckets` をまとめてフィルタするのは、共通の board 表示に関わる条件のみ。左パネル `Tags` セクションの選択状態はここへ混ぜない。
 - ドラッグ対象として `useDroppable` を設定し、 `bucketPosition` を使って降順ソート。
 
 ### CardModal & CommentsPanel

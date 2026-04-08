@@ -32,6 +32,8 @@ import type {
   DesktopSidebarSection,
   SidebarSectionKey,
 } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
+import { featureFlags } from "@/lib/featureFlags";
 import type {
   DesktopTimelineToolbarProps,
   DesktopTimelineViewProps,
@@ -96,6 +98,7 @@ type UseTimelineBoardViewModelsArgs = {
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   tagSummaries: TimelineTagSummary[];
   trashItems: TrashCardItem[];
+  notificationUnreadCount: number;
   indicatorTop: number | null;
   liveNowIsoDate: string | null;
   liveNowMinutes: number | null;
@@ -147,6 +150,15 @@ type UseTimelineBoardViewModelsArgs = {
 export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs) {
   const { onExpandedSectionChange, setSearchQuery, setSelectedTags } = args;
   const activeSidebarSectionKey = args.activeLeftSectionKey;
+  const tagsSectionPresentation = useMemo(
+    () =>
+      getTagsSectionPresentation({
+        selectedTag: args.selectedTags[0] ?? null,
+        tagSummariesCount: args.tagSummaries.length,
+        tagResultsCount: args.tagResults.length,
+      }),
+    [args.selectedTags, args.tagResults, args.tagSummaries]
+  );
 
   const leftPanelState = useMemo<DesktopSidebarMenuState>(
     () => ({
@@ -169,8 +181,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
     [onExpandedSectionChange, setSearchQuery, setSelectedTags]
   );
 
-  const leftPanelSections = useMemo<DesktopSidebarSection[]>(
-    () => [
+  const leftPanelSections = useMemo<DesktopSidebarSection[]>(() => {
+    const sections: DesktopSidebarSection[] = [
       {
         key: "overdue",
         tone: "danger",
@@ -187,6 +199,19 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         count: args.completedResults.length,
         results: args.completedResults,
       },
+    ];
+
+    if (featureFlags.notifications) {
+      sections.push({
+        key: "notifications",
+        tone: "neutral",
+        id: "desktop-sidebar-notifications-panel",
+        label: "Notifications",
+        count: args.notificationUnreadCount,
+      });
+    }
+
+    sections.push(
       {
         key: "search",
         tone: "neutral",
@@ -199,8 +224,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         key: "tags",
         tone: "neutral",
         id: "desktop-sidebar-tags-panel",
-        label: "Tag",
-        count: args.tagSummaries.length,
+        label: tagsSectionPresentation.label,
+        count: tagsSectionPresentation.count,
         tags: args.tagSummaries,
         results: args.tagResults,
       },
@@ -211,10 +236,21 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         label: "Trash",
         count: args.trashItems.length,
         items: args.trashItems,
-      },
-    ],
-    [args.completedResults, args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries, args.trashItems]
-  );
+      }
+    );
+
+    return sections;
+  }, [
+    args.completedResults,
+    args.notificationUnreadCount,
+    args.overdue,
+    args.searchQuery,
+    args.searchResults,
+    args.tagResults,
+    args.tagSummaries,
+    tagsSectionPresentation,
+    args.trashItems,
+  ]);
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(
     () => ["timeline", "list"],
