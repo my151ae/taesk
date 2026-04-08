@@ -135,7 +135,7 @@ export default function MobileListView({
     const displayDays = listReverse ? [...daysWithEvents].reverse() : daysWithEvents;
 
     return (
-        <div className="flex flex-col pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="flex h-full min-h-0 flex-col overflow-y-auto pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur-sm">
                 <div className="flex flex-nowrap items-center gap-1">
                     <button

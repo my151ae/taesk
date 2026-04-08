@@ -769,18 +769,18 @@ export default function MobileTimelineView({
         acceleration: 1,
       }}
     >
-      <div className="relative flex h-full w-full flex-col bg-white" onKeyDownCapture={handleArrowKeyFocus}>
+      <div className="relative flex h-full min-h-0 w-full flex-col bg-white" onKeyDownCapture={handleArrowKeyFocus}>
         {(status === "loading" || !days.length) && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/60 backdrop-blur-sm">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
           </div>
         )}
 
-        <div className="flex h-full flex-col">
+        <div className="flex h-full min-h-0 flex-col">
           <div
             ref={railRef}
             data-testid="mobile-timeline-rail"
-            className={`flex flex-1 ${activeDrag ? "overflow-x-hidden [scroll-snap-type:none]" : touchSnapDisabled ? "overflow-x-auto [scroll-snap-type:none]" : "overflow-x-auto snap-x snap-mandatory"} overflow-y-hidden`}
+            className={`flex min-h-0 flex-1 ${activeDrag ? "overflow-x-hidden [scroll-snap-type:none]" : touchSnapDisabled ? "overflow-x-auto [scroll-snap-type:none]" : "overflow-x-auto snap-x snap-mandatory"} overflow-y-hidden`}
             onScroll={handleRailScroll}
             onTouchStart={handleRailTouchStart}
             onTouchEnd={handleRailTouchEnd}
@@ -894,7 +894,7 @@ export default function MobileTimelineView({
                     </div>
                   ) : null}
 
-                  <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  <div className="grid min-h-0 flex-1 overflow-hidden" style={{ gridTemplateColumns: "1fr 1fr" }}>
                     <div
                       ref={(node) => {
                         if (isAnchorPane) {
@@ -908,7 +908,7 @@ export default function MobileTimelineView({
                           onScroll?.(e.currentTarget.scrollTop);
                         }
                       }}
-                      className="min-w-0 border-r border-slate-100 bg-white overflow-y-auto"
+                      className="min-h-0 min-w-0 overflow-y-auto border-r border-slate-100 bg-white"
                       style={{ touchAction: "pan-y" }}
                     >
                       <div
@@ -944,7 +944,7 @@ export default function MobileTimelineView({
                       ref={(el) => registerAbScrollContainer?.(state.day.isoDate, visiblePaneIds.includes(state.day.isoDate) ? el : null)}
                       data-ab-scroll-container="true"
                       data-ab-day={state.day.isoDate}
-                      className="min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-ab-thin [scrollbar-gutter:stable]"
+                      className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden border-l border-slate-100 scrollbar-ab-thin [scrollbar-gutter:stable]"
                       style={{ touchAction: "pan-y" }}
                     >
                       <div className="space-y-3 px-3 pb-4">

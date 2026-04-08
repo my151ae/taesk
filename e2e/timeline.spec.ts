@@ -229,6 +229,47 @@ async function swipeLocatorHorizontally(
   });
 }
 
+async function swipeLocatorVertically(
+  page: Page,
+  locator: Locator,
+  direction: 'up' | 'down',
+): Promise<void> {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Failed to resolve vertical swipe locator bounds');
+  }
+
+  const client = await page.context().newCDPSession(page);
+  const x = box.x + box.width * 0.5;
+  const startY = direction === 'up'
+    ? box.y + box.height * 0.78
+    : box.y + box.height * 0.22;
+  const endY = direction === 'up'
+    ? box.y + box.height * 0.22
+    : box.y + box.height * 0.78;
+  const steps = 10;
+
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x, y: startY, radiusX: 4, radiusY: 4 }],
+  });
+
+  for (let index = 1; index <= steps; index += 1) {
+    const progress = index / steps;
+    const y = startY + (endY - startY) * progress;
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x, y, radiusX: 4, radiusY: 4 }],
+    });
+    await page.waitForTimeout(16);
+  }
+
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+}
+
 function collectStoragePathsFromContent(content: unknown): string[] {
   const result = new Set<string>();
 
@@ -2960,6 +3001,89 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(overdueCards.nth(1)).toContainText('Mobile overdue newest');
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [olderOverdueCardId, newerOverdueCardId]);
+    }
+  });
+
+  test('scrolls inside the mobile overdue panel when overdue cards exceed the panel height', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const timestamp = new Date().toISOString();
+    const overdueIso = shiftIsoDateJst(-1);
+    const overdueCards = Array.from({ length: 18 }, (_, index) => {
+      const suffix = `${Date.now()}-${index}`;
+      return {
+        id: crypto.randomUUID(),
+        title: `Mobile overdue scroll ${suffix}`,
+        checklist: {
+          version: 1,
+          lines: [
+            { id: `line-${index}-0`, text: `Checklist ${index}-0`, checked: false },
+            { id: `line-${index}-1`, text: `Checklist ${index}-1`, checked: false },
+            { id: `line-${index}-2`, text: `Checklist ${index}-2`, checked: false },
+          ],
+        },
+        excerpt: `mobile overdue scroll regression ${suffix}`,
+        board_id: boardContext.boardId,
+        list_id: boardContext.listId,
+        user_id: testUserId,
+        position: 4000 + index,
+        tags: [],
+        due_date: overdueIso,
+        due_start: null,
+        due_end: null,
+        due_bucket: 'b' as const,
+        due_bucket_position: 4000 + index,
+        checked: false,
+        assigned_to: null,
+        assignee_id: null,
+        assignee_ids: null,
+        short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        id_short: Math.floor(Math.random() * 100000) + 30000 + index,
+        slug: `mobile-overdue-scroll-${suffix}`,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+    });
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert(overdueCards);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.setViewportSize({ width: 430, height: 932 });
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      await expect(page.getByTestId('mobile-left-panel-selector-trigger')).toHaveText(/overdue/i);
+
+      const panelToggle = page.locator('button[aria-controls="mobile-left-panel-body"]').first();
+      await expect(panelToggle).toBeVisible();
+      if ((await panelToggle.getAttribute('aria-expanded')) !== 'true') {
+        await panelToggle.click();
+      }
+      await expect(panelToggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId('mobile-left-panel-body')).toBeVisible();
+
+      const scroller = page.locator('[data-testid="mobile-left-panel-shell"] [class*="overflow-y-auto"]').first();
+      await expect(scroller).toBeVisible();
+
+      const initialMetrics = await getScrollMetrics(scroller);
+      expect(initialMetrics.clientHeight).toBeGreaterThan(0);
+      expect(initialMetrics.scrollHeight).toBeGreaterThan(initialMetrics.clientHeight + 20);
+
+      await swipeLocatorVertically(page, scroller, 'up');
+      await page.waitForTimeout(250);
+
+      await expect.poll(async () => {
+        const metrics = await getScrollMetrics(scroller);
+        return metrics.scrollTop;
+      }, { timeout: 5_000 }).toBeGreaterThan(80);
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', overdueCards.map((card) => card.id));
     }
   });
 

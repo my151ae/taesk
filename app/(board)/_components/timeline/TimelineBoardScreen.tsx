@@ -551,6 +551,7 @@ export default function TimelineBoardScreen({
             panelId="mobile-left-panel-shell"
             expanded
             renderHeader={false}
+            sectionClassName="h-full"
             secondaryActions={
               mobile.currentSectionChrome.secondaryActionsKind === "notifications" ? (
                 <NotificationsSectionActions
@@ -731,7 +732,7 @@ export default function TimelineBoardScreen({
         </div>
 
         {mobile.viewMode === "timeline" ? (
-          <div className="flex-1 overflow-hidden md:hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
             {renderMobileTopArea()}
             {mobile.timelineTransitionPending ? (
               <TimelineLoadingPlaceholder />
@@ -740,12 +741,12 @@ export default function TimelineBoardScreen({
             )}
           </div>
         ) : mobile.viewMode === "list" ? (
-          <div className="flex-1 overflow-hidden md:hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
             {renderMobileTopArea()}
             <MobileListView {...mobile.listProps} />
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden md:hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
             {renderMobileTopArea()}
             <MobileMonthView {...mobile.monthProps} />
           </div>
