@@ -14,7 +14,7 @@ import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 
-export type SharedPanelSectionKey = "overdue" | "search" | "tags" | "trash";
+export type SharedPanelSectionKey = "overdue" | "completed" | "search" | "tags" | "trash";
 
 type SharedSelectionProps = {
   selectedCardIds: ReadonlySet<string>;
@@ -338,11 +338,13 @@ export function SearchSectionBody({
   query,
   results,
   onQueryChange,
+  searchInputTestId = "desktop-sidebar-search-input",
   ...cardActions
 }: {
   query: string;
   results: readonly TimelineSearchResultItem[];
   onQueryChange: (value: string) => void;
+  searchInputTestId?: string;
 } & SharedCardActions) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -354,7 +356,7 @@ export function SearchSectionBody({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search cards..."
             className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-            data-testid="desktop-sidebar-search-input"
+            data-testid={searchInputTestId}
             data-shortcut-scope="board"
             data-shortcut-region="sidebar"
             data-shortcut-section="search"
@@ -387,6 +389,35 @@ export function SearchSectionBody({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+export function CompletedSectionBody({
+  results,
+  ...cardActions
+}: {
+  results: readonly TimelineSearchResultItem[];
+} & SharedCardActions) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {results.length === 0 ? (
+        <div className="px-3 py-4">
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+            完了済みカードはありません
+          </p>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+          {renderSidebarResultRows({
+            results,
+            shortcutSection: "completed",
+            openSource: "completed",
+            testIdPrefix: "completed-sidebar-card",
+            ...cardActions,
+          })}
+        </div>
+      )}
     </div>
   );
 }

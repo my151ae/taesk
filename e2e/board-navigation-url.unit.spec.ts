@@ -125,6 +125,29 @@ test.describe("board navigation canonical url helpers", () => {
     expect(parsed.resolvedState.searchQuery).toBe("");
   });
 
+  test("completed round-trip preserves lp without extra params", async () => {
+    const params = serializeBoardUiStateToSearchParams({
+      state: {
+        leftPanelMode: "completed",
+        rightPanelMode: "timeline",
+        date: "2026-03-31",
+        tag: "Memo",
+        searchQuery: "meeting",
+        showChecked: true,
+        showUnchecked: true,
+      },
+    });
+
+    expect(params.toString()).toBe("lp=completed&rp=timeline&date=2026-03-31");
+
+    const parsed = parseBoardUiStateFromSearchParams(params, defaults);
+    expect(parsed.parseResult).toEqual({ ok: true });
+    expect(parsed.resolvedState.leftPanelMode).toBe("completed");
+    expect(parsed.resolvedState.rightPanelMode).toBe("timeline");
+    expect(parsed.resolvedState.tag).toBeNull();
+    expect(parsed.resolvedState.searchQuery).toBe("");
+  });
+
   test("normalize drops params that do not belong to the current panel mode", async () => {
     const normalized = normalizeBoardUiState(
       {

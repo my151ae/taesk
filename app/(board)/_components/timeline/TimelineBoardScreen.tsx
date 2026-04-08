@@ -18,6 +18,7 @@ import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelin
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import {
+  CompletedSectionBody,
   OverdueSectionBody,
   SearchSectionBody,
   TagsSectionBody,
@@ -336,6 +337,16 @@ export default function TimelineBoardScreen({
           query={mobile.leftPanelProps.state.searchQuery}
           results={currentMobileSection.results}
           onQueryChange={mobile.leftPanelProps.actions.onSearchQueryChange}
+          searchInputTestId="mobile-left-panel-search-input"
+          {...commonProps}
+          onRenameCardTitle={undefined}
+        />
+      );
+    }
+    if (currentMobileSection.key === "completed") {
+      return (
+        <CompletedSectionBody
+          results={currentMobileSection.results}
           {...commonProps}
           onRenameCardTitle={undefined}
         />
@@ -394,6 +405,7 @@ export default function TimelineBoardScreen({
                         type="button"
                         onClick={() => {
                           setShowMobileSelector(false);
+                          setIsMobilePanelCollapsed(false);
                           mobile.selector.onSelect(item.key);
                         }}
                         className={clsx(

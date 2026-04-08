@@ -29,6 +29,7 @@ type TimelineCardRow = {
   due_bucket: 'a' | 'b' | null;
   due_bucket_position: number | null;
   checked: boolean;
+  checked_at: string | null;
   assignee_id: string | null;
   assignee_ids: string[] | null;
   assigned_to: string | null;
@@ -124,7 +125,7 @@ const getHandler = async (
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const cardsSelect =
-    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
+    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, checked_at, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
 
   const { data: cards, error: fetchError } = await supabase
     .from('cards')
@@ -176,6 +177,7 @@ const getHandler = async (
           excerpt: card.excerpt ?? null,
           tags: card.tags ?? [],
           checked: card.checked,
+          checked_at: card.checked_at,
           checklist,
           due_bucket: card.due_bucket ?? null,
           due_bucket_position: card.due_bucket_position ?? null,
@@ -208,6 +210,7 @@ const getHandler = async (
           end_reminder_enabled: card.end_reminder_enabled ?? false,
           end_reminder_minutes: card.end_reminder_minutes ?? 0,
           checked: card.checked,
+          checked_at: card.checked_at,
           checklist,
           tags: card.tags ?? [],
           assignee_id: card.assignee_id,
@@ -236,6 +239,7 @@ const getHandler = async (
         end_reminder_enabled: card.end_reminder_enabled ?? false,
         end_reminder_minutes: card.end_reminder_minutes ?? 0,
         checked: card.checked,
+        checked_at: card.checked_at,
         checklist,
         tags: card.tags ?? [],
         assignee_id: card.assignee_id,

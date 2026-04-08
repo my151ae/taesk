@@ -177,6 +177,7 @@ const postHandler = async (
     due_bucket: parsed.data.due_bucket ?? null,
     due_bucket_position: parsed.data.due_bucket_position ?? null,
     checked: parsed.data.checked ?? false,
+    checked_at: parsed.data.checked ? new Date().toISOString() : null,
     assignee_id: parsed.data.assignee_id ?? null,
     assigned_to: parsed.data.assigned_to ?? null,
     user_id: parsed.data.user_id ?? user.id,

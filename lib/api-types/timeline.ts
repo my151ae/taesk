@@ -32,6 +32,7 @@ export interface TimelineEvent {
   excerpt?: string | null;
   tags: string[];
   checked: boolean;
+  checked_at: string | null;
   checklist?: Checklist | null;
   due_bucket?: DueBucket | null;
   due_bucket_position?: number | null;
@@ -56,6 +57,7 @@ export interface TimelineBucketItem {
   end_reminder_enabled?: boolean;
   end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   checked: boolean;
+  checked_at: string | null;
   checklist?: Checklist | null;
   tags: string[];
   assignee_id?: string | null;
@@ -81,6 +83,7 @@ export interface TimelineOverdueItem {
   end_reminder_enabled?: boolean;
   end_reminder_minutes?: 0 | 5 | 10 | 15 | 30 | 60;
   checked: boolean;
+  checked_at: string | null;
   checklist?: Checklist | null;
   tags: string[];
   assignee_id?: string | null;

@@ -10,7 +10,7 @@
 - desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
 - `date` query は desktop では左端日、mobile では中央 pane の anchor day を表す。mobile の scroll restore は URL ではなく in-memory state を使う。
 - canonical default は `lp=overdue&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
-- `Search` / `Overdue` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
+- `Search` / `Overdue` / `Completed` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
 
 ## 📋 Table of Contents

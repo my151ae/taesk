@@ -140,6 +140,7 @@ function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: strin
     due_bucket_position: sourceEvent?.due_bucket_position ?? sourceOverdueItem?.due_bucket_position ?? sourceBucketItem?.bucketPosition ?? null,
     duration: sourceEvent?.duration ?? sourceBucketItem?.duration ?? sourceOverdueItem?.duration ?? sourceEvent?.durationMinutes ?? 60,
     checked: sourceEvent?.checked ?? sourceBucketItem?.checked ?? sourceOverdueItem?.checked ?? false,
+    checked_at: sourceEvent?.checked_at ?? sourceBucketItem?.checked_at ?? sourceOverdueItem?.checked_at ?? null,
     assigned_to: sourceEvent?.assigned_to ?? sourceBucketItem?.assigned_to ?? sourceOverdueItem?.assigned_to ?? null,
     assignee_id: sourceEvent?.assignee_id ?? sourceBucketItem?.assignee_id ?? sourceOverdueItem?.assignee_id ?? null,
     assignee_ids: sourceEvent?.assignee_ids ?? sourceBucketItem?.assignee_ids ?? sourceOverdueItem?.assignee_ids ?? null,
@@ -318,6 +319,12 @@ export function useTimelineCardActions({
           ...targetCard,
           title: savePayload.title,
           checked: Boolean(savePayload.checked),
+          checked_at:
+            targetCard.checked === Boolean(savePayload.checked)
+              ? targetCard.checked_at ?? null
+              : savePayload.checked
+                ? new Date().toISOString()
+                : null,
           content: normalizedContent,
           excerpt: savePayload.excerpt ?? deriveExcerptFromContent(normalizedContent),
           tags: savePayload.tags ?? targetCard.tags ?? [],
@@ -577,7 +584,11 @@ export function useTimelineCardActions({
     try {
       const baseCard = buildCardFromTimelineMatch(data, cardId);
       if (!baseCard) return false;
-      const updatedCard = { ...baseCard, checked: nextChecked };
+      const updatedCard = {
+        ...baseCard,
+        checked: nextChecked,
+        checked_at: nextChecked ? new Date().toISOString() : null,
+      };
 
       setData((prev) => (prev ? applyCardUpdate(prev, updatedCard, "UPDATE") : prev));
 
@@ -587,6 +598,11 @@ export function useTimelineCardActions({
         body: JSON.stringify({ checked: nextChecked }),
       });
       if (!res.ok) throw new Error();
+      const body = await res.json().catch(() => null) as { card?: Card } | null;
+      if (body?.card) {
+        const persistedCard = body.card;
+        setData((prev) => (prev ? applyCardUpdate(prev, persistedCard, "UPDATE") : prev));
+      }
       restoreCardActionFocus(plannedFocusTarget);
       return true;
     } catch {

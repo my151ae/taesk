@@ -13,7 +13,7 @@ Taesk のデータ層は Supabase (PostgreSQL) 上にあり、Team を上位コ�
 | `board_members` | メンバーと権限 | Timeline API の認可、ShareDialog |
 | `pending_board_access_invites` | Team 招待受諾後に付与する Board access の予約 | Board Settings の外部招待ラッパー |
 | `lists` | 旧 Kanban のリスト（A/B では未使用） | カードの `list_id` 互換のため残存 |
-| `cards` | Timeline/A/B のカード | `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked`, `checklist`, `content`, `excerpt` など |
+| `cards` | Timeline/A/B のカード | `due_start`, `due_end`, `due_bucket`, `due_bucket_position`, `checked`, `checked_at`, `checklist`, `content`, `excerpt` など |
 | `comments` | カードコメント | CardModal / CommentsPanel |
 | `notifications`, `notification_preferences`, `notification_delivery_logs`, `push_subscriptions` | 通知系テーブル | NotificationSettings / Web Push |
 | `activity_logs` | 操作監査 | ボードレベルでの変更追跡 |
@@ -125,6 +125,7 @@ CREATE TABLE public.cards (
     CHECK (due_bucket IS NULL OR due_bucket IN ('a', 'b')),
   due_bucket_position DOUBLE PRECISION NULL,
   checked BOOLEAN NOT NULL DEFAULT FALSE,
+  checked_at TIMESTAMPTZ NULL,
   checklist JSONB NOT NULL DEFAULT jsonb_build_object('version', 1, 'lines', '[]'::jsonb),
   content JSONB NOT NULL DEFAULT '[]'::jsonb,
   excerpt TEXT NOT NULL DEFAULT '',
@@ -159,6 +160,7 @@ CREATE INDEX idx_cards_purge_after_at ON public.cards(purge_after_at) WHERE dele
 - `due_bucket` が未指定の場合は UI 側で `b` をフォールバックとして扱う。  
 - `due_bucket_position` は降順で並ぶ floating number。DnD 時に `Date.now()` を使いユニーク値を割り当てる。
 - `checked` は Timeline の完了チェックボックスや A/B カードにもそのまま反映される。
+- `checked_at` は最後に `checked=false -> true` へ遷移した時刻で、Completed サイドパネルの並び順に使う。
 - `deleted_at` が入ったカードは active Timeline から除外され、Trash にのみ表示される。
 - `purge_after_at` は trash move 時に `deleted_at + 30 days` を記録し、昇順で Trash 一覧を並べる。
 - trash move では card 行を保持し、Google Calendar / 画像 cleanup は走らない。完全削除時のみ destructive cleanup を実行する。

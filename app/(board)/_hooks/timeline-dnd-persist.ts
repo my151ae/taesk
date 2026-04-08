@@ -73,10 +73,17 @@ export function createPersistPlacement({
       const baseOverdueItem = removedOverdueItem ?? meta.sourceOverdueItem ?? null;
 
       const payloadDueDate = (payload.due_date as string | null) ?? null;
+      const previousChecked = baseEvent?.checked ?? baseBucketItem?.checked ?? baseOverdueItem?.checked ?? false;
       const nextChecked =
         typeof payload.checked === 'boolean'
           ? payload.checked
-          : (baseEvent?.checked ?? baseBucketItem?.checked ?? baseOverdueItem?.checked ?? false);
+          : previousChecked;
+      const nextCheckedAt =
+        previousChecked === nextChecked
+          ? (baseEvent?.checked_at ?? baseBucketItem?.checked_at ?? baseOverdueItem?.checked_at ?? null)
+          : nextChecked
+            ? new Date().toISOString()
+            : null;
       const upsertOverdueShortcut = (args: {
         dueDate: string | null;
         dueStart: string | null;
@@ -117,6 +124,7 @@ export function createPersistPlacement({
             baseBucketItem?.end_reminder_minutes ??
             0,
           checked: nextChecked,
+          checked_at: nextCheckedAt,
           checklist: baseOverdueItem?.checklist ?? baseEvent?.checklist ?? baseBucketItem?.checklist ?? null,
           tags: baseOverdueItem?.tags ?? baseEvent?.tags ?? baseBucketItem?.tags ?? [],
           assignee_id: baseOverdueItem?.assignee_id ?? baseEvent?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
@@ -195,7 +203,8 @@ export function createPersistPlacement({
           excerpt: baseEvent?.excerpt ?? baseOverdueItem?.excerpt ?? baseBucketItem?.excerpt ?? null,
           tags: baseEvent?.tags ?? baseOverdueItem?.tags ?? baseBucketItem?.tags ?? [],
           checklist: baseEvent?.checklist ?? baseOverdueItem?.checklist ?? baseBucketItem?.checklist ?? null,
-          checked: baseEvent?.checked ?? baseOverdueItem?.checked ?? baseBucketItem?.checked ?? false,
+          checked: nextChecked,
+          checked_at: nextCheckedAt,
           assignee_id: baseEvent?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseBucketItem?.assignee_id ?? null,
           assignee_ids: baseEvent?.assignee_ids ?? baseOverdueItem?.assignee_ids ?? baseBucketItem?.assignee_ids ?? null,
           assigned_to: baseEvent?.assigned_to ?? baseOverdueItem?.assigned_to ?? baseBucketItem?.assigned_to ?? null,
@@ -242,7 +251,8 @@ export function createPersistPlacement({
           due_date: nextDueDate,
           due_start: (payload.due_start as string | null) ?? null,
           due_end: (payload.due_end as string | null) ?? null,
-          checked: baseBucketItem?.checked ?? baseOverdueItem?.checked ?? baseEvent?.checked ?? false,
+          checked: nextChecked,
+          checked_at: nextCheckedAt,
           checklist: baseBucketItem?.checklist ?? baseOverdueItem?.checklist ?? baseEvent?.checklist ?? null,
           tags: baseBucketItem?.tags ?? baseOverdueItem?.tags ?? baseEvent?.tags ?? [],
           assignee_id: baseBucketItem?.assignee_id ?? baseOverdueItem?.assignee_id ?? baseEvent?.assignee_id ?? null,

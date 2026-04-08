@@ -11,6 +11,7 @@ import type { OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { Notification } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 import {
+  CompletedSectionBody,
   OverdueSectionBody,
   SearchSectionBody,
   SharedPanelHeader,
@@ -18,7 +19,7 @@ import {
   TrashSectionBody,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 
-export type SidebarSectionKey = "overdue" | "notifications" | "search" | "tags" | "trash";
+export type SidebarSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
 type SidebarSectionTone = "danger" | "neutral";
 
 export type DesktopSidebarMenuState = {
@@ -43,6 +44,14 @@ export type DesktopSidebarSection =
       label: string;
       count: number;
       items: readonly TimelineOverdueItem[];
+    }
+  | {
+      key: "completed";
+      tone: "neutral";
+      id: string;
+      label: string;
+      count: number;
+      results: readonly TimelineSearchResultItem[];
     }
   | {
       key: "notifications";
@@ -160,6 +169,15 @@ function SearchIcon() {
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <circle cx="11" cy="11" r="6" />
       <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-4.2-4.2" />
+    </svg>
+  );
+}
+
+function CompletedIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m8.5 12 2.2 2.2 4.8-4.9" />
     </svg>
   );
 }
@@ -508,11 +526,13 @@ export function DesktopSidebarMenu({
 
   const allSections = useMemo(() => {
     const overdueSection = sections.find((section) => section.key === "overdue");
+    const completedSection = sections.find((section) => section.key === "completed");
     const searchSection = sections.find((section) => section.key === "search");
     const tagsSection = sections.find((section) => section.key === "tags");
     const trashSection = sections.find((section) => section.key === "trash");
     return [
       overdueSection,
+      completedSection,
       notificationSection,
       searchSection,
       tagsSection,
@@ -558,6 +578,8 @@ export function DesktopSidebarMenu({
     switch (key) {
       case "overdue":
         return <OverdueIcon />;
+      case "completed":
+        return <CompletedIcon />;
       case "notifications":
         return <NotificationIcon />;
       case "search":
@@ -680,6 +702,27 @@ export function DesktopSidebarMenu({
           query={state.searchQuery}
           results={section.results}
           onQueryChange={actions.onSearchQueryChange}
+          openCardModal={openCardModal}
+          onToggleCheck={onToggleCheck}
+          onRenameCardTitle={undefined}
+          onCardContextMenu={onCardContextMenu}
+          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+          contextMenuCardId={contextMenuCardId}
+          selectedCardIds={selectedCardIds}
+          selectionLeadCardId={selectionLeadCardId}
+          onShiftSelect={onShiftSelect}
+          onClearSelection={onClearSelection}
+          onActivateCard={onActivateCard}
+          activeCardId={activeCardId}
+          activeLaneId={activeLaneId}
+        />
+      );
+    }
+
+    if (section.key === "completed") {
+      return (
+        <CompletedSectionBody
+          results={section.results}
           openCardModal={openCardModal}
           onToggleCheck={onToggleCheck}
           onRenameCardTitle={undefined}

@@ -45,6 +45,7 @@ const createCard = (overrides: Partial<Card> = {}): Card => ({
   due_bucket_position: 100,
   duration: 60,
   checked: false,
+  checked_at: null,
   assigned_to: null,
   assignee_id: null,
   assignee_ids: null,
@@ -60,11 +61,12 @@ test.describe("applyCardUpdate", () => {
   test("期限切れカードを完了にしても検索元の overdue 集合から消さない", async () => {
     const prev = createTimelineResponse();
 
-    const next = applyCardUpdate(prev, createCard({ checked: true }), "UPDATE");
+    const next = applyCardUpdate(prev, createCard({ checked: true, checked_at: "2026-04-02T09:00:00.000Z" }), "UPDATE");
 
     expect(next.overdue).toHaveLength(1);
     expect(next.overdue[0]?.card_id).toBe("card-1");
     expect(next.overdue[0]?.checked).toBe(true);
+    expect(next.overdue[0]?.checked_at).toBe("2026-04-02T09:00:00.000Z");
   });
 
   test("trashed card の realtime UPDATE は active view に再投入しない", async () => {

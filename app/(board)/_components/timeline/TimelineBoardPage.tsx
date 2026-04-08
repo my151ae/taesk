@@ -39,6 +39,7 @@ import { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndD
 import { useTimelineZoomStore } from "@/app/(board)/_stores/timeline-zoom-store";
 import { useTimelineViewport } from "@/app/(board)/_hooks/useTimelineViewport";
 import { useTimelineFiltering } from "@/app/(board)/_hooks/useTimelineFiltering";
+import type { TimelineSearchResultItem } from "@/app/(board)/_hooks/useTimelineFiltering";
 import { useTimelineNavigation } from "@/app/(board)/_hooks/useTimelineNavigation";
 import { useTimelineCardActions } from "@/app/(board)/_hooks/useTimelineCardActions";
 import { useTimelineContextMenu } from "@/app/(board)/_hooks/useTimelineContextMenu";
@@ -88,13 +89,26 @@ const OVERDUE_LANE_ID = "overdue";
 const MOBILE_BREAKPOINT_QUERY = "(min-width: 768px)";
 
 const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
-  if (mode === "overdue" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
+  if (mode === "overdue" || mode === "completed" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
   return null;
 };
 
 const normalizeMobileLeftPanelMode = (mode: LeftPanelMode): LeftPanelMode => {
   if (mode === "notifications" || mode === "none") return "overdue";
   return mode;
+};
+
+const COMPLETED_TIME_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const buildCompletedTimeText = (checkedAt: string | null) => {
+  if (!checkedAt) return "完了日時なし";
+  return `完了 ${COMPLETED_TIME_FORMATTER.format(new Date(checkedAt))}`;
 };
 
 const sortTrashItems = (items: TrashCardItem[]) =>
@@ -451,6 +465,61 @@ function TimelineBoardPageContent({
     () => (sortedFilteredData?.overdue ?? []).filter((item) => !item.checked),
     [sortedFilteredData?.overdue],
   );
+  const completedResults = useMemo<TimelineSearchResultItem[]>(() => {
+    if (!data) return [];
+
+    const byCardId = new Map<string, TimelineSearchResultItem>();
+    const addResult = (entry: TimelineSearchResultItem) => {
+      if (!entry.item.checked) return;
+      const current = byCardId.get(entry.item.card_id);
+      if (!current) {
+        byCardId.set(entry.item.card_id, entry);
+        return;
+      }
+      const currentTime = current.item.checked_at ? new Date(current.item.checked_at).getTime() : 0;
+      const nextTime = entry.item.checked_at ? new Date(entry.item.checked_at).getTime() : 0;
+      if (nextTime >= currentTime) {
+        byCardId.set(entry.item.card_id, entry);
+      }
+    };
+
+    data.overdue.forEach((item) => {
+      addResult({
+        kind: "overdue",
+        item,
+        badgeLabel: item.due_bucket?.toUpperCase() ?? "O",
+        timeText: buildCompletedTimeText(item.checked_at),
+      });
+    });
+
+    data.events.forEach((item) => {
+      addResult({
+        kind: "event",
+        item,
+        badgeLabel: item.due_bucket?.toUpperCase() ?? "T",
+        timeText: buildCompletedTimeText(item.checked_at),
+      });
+    });
+
+    Object.entries(data.abBuckets).forEach(([bucketKey, items]) => {
+      const badgeLabel = bucketKey.endsWith("_a") ? "A" : bucketKey.endsWith("_b") ? "B" : "L";
+      items.forEach((item) => {
+        addResult({
+          kind: "bucket",
+          item,
+          badgeLabel,
+          timeText: buildCompletedTimeText(item.checked_at),
+        });
+      });
+    });
+
+    return Array.from(byCardId.values()).sort((left, right) => {
+      const leftTime = left.item.checked_at ? new Date(left.item.checked_at).getTime() : 0;
+      const rightTime = right.item.checked_at ? new Date(right.item.checked_at).getTime() : 0;
+      if (leftTime !== rightTime) return rightTime - leftTime;
+      return left.item.card_id.localeCompare(right.item.card_id);
+    });
+  }, [data]);
 
   const laneCardOrderMap = useMemo(() => {
     if (!sortedFilteredData) return new Map<string, string[]>();
@@ -967,6 +1036,14 @@ function TimelineBoardPageContent({
         return;
       }
 
+      if (key === "completed") {
+        updateBoardUiState({
+          leftPanelMode: "completed",
+          method: "replace",
+        });
+        return;
+      }
+
       if (key === "search") {
         updateBoardUiState({
           leftPanelMode: "search",
@@ -1015,6 +1092,14 @@ function TimelineBoardPageContent({
     if (key === "overdue") {
       updateBoardUiState({
         leftPanelMode: "overdue",
+        method: "replace",
+      });
+      return;
+    }
+
+    if (key === "completed") {
+      updateBoardUiState({
+        leftPanelMode: "completed",
         method: "replace",
       });
       return;
@@ -1129,6 +1214,7 @@ function TimelineBoardPageContent({
     eventsByDay,
     abBuckets: sortedFilteredData?.abBuckets ?? {},
     overdue: visibleOverdueItems,
+    completedResults,
     searchQuery,
     setSearchQuery: handleSearchQueryChange,
     searchResults,

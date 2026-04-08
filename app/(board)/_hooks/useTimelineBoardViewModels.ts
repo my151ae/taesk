@@ -87,6 +87,7 @@ type UseTimelineBoardViewModelsArgs = {
   eventsByDay: Record<string, TimelineEvent[]>;
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
+  completedResults: TimelineSearchResultItem[];
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -179,6 +180,14 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         items: args.overdue,
       },
       {
+        key: "completed",
+        tone: "neutral",
+        id: "desktop-sidebar-completed-panel",
+        label: "Completed",
+        count: args.completedResults.length,
+        results: args.completedResults,
+      },
+      {
         key: "search",
         tone: "neutral",
         id: "desktop-sidebar-search-panel",
@@ -204,7 +213,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         items: args.trashItems,
       },
     ],
-    [args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries, args.trashItems]
+    [args.completedResults, args.overdue, args.searchQuery, args.searchResults, args.tagResults, args.tagSummaries, args.trashItems]
   );
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(

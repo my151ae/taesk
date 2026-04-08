@@ -100,6 +100,7 @@ type UseTimelineBoardScreenArgs = {
   eventsByDay: Record<string, TimelineResponse["events"]>;
   abBuckets: TimelineResponse["abBuckets"];
   overdue: TimelineResponse["overdue"];
+  completedResults: TimelineSearchResultItem[];
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -266,6 +267,7 @@ export function useTimelineBoardScreen({
   eventsByDay,
   abBuckets,
   overdue,
+  completedResults,
   searchQuery,
   setSearchQuery,
   searchResults,
@@ -417,6 +419,7 @@ export function useTimelineBoardScreen({
     eventsByDay,
     abBuckets,
     overdue,
+    completedResults,
     searchQuery,
     setSearchQuery,
     searchResults,
@@ -568,17 +571,20 @@ export function useTimelineBoardScreen({
       leftPanelProps,
       selector: {
         currentSection:
-          mobileLeftPanelMode === "search" || mobileLeftPanelMode === "tags" || mobileLeftPanelMode === "trash"
+          mobileLeftPanelMode === "search" || mobileLeftPanelMode === "tags" || mobileLeftPanelMode === "trash" || mobileLeftPanelMode === "completed"
             ? mobileLeftPanelMode
             : "overdue",
         selectorItems: [
           { key: "overdue", label: "Overdue" },
+          { key: "completed", label: "Completed" },
           { key: "search", label: "Search" },
           { key: "tags", label: "Tags" },
           { key: "trash", label: "Trash" },
         ],
         currentLabel:
-          mobileLeftPanelMode === "search"
+          mobileLeftPanelMode === "completed"
+            ? "Completed"
+            : mobileLeftPanelMode === "search"
             ? searchQuery.trim() || "Search"
             : mobileLeftPanelMode === "tags"
               ? selectedTags[0]
@@ -588,7 +594,9 @@ export function useTimelineBoardScreen({
                 ? "Trash"
                 : "Overdue",
         currentCount:
-          mobileLeftPanelMode === "search"
+          mobileLeftPanelMode === "completed"
+            ? completedResults.length
+            : mobileLeftPanelMode === "search"
             ? searchQuery.trim()
               ? searchResults.length
               : 0

@@ -101,6 +101,7 @@ export interface Card {
   due_bucket_position: number | null;
   duration: number;
   checked: boolean;
+  checked_at: string | null;
   /** @deprecated legacy text-based assignee field */
   assigned_to: string | null;
   assignee_id: string | null;

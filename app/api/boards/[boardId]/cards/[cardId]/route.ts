@@ -18,6 +18,7 @@ import {
   syncPatchedCardToCalendar,
 } from '@/lib/server/card-side-effects';
 import { mapCardRowToTrashItem } from '@/lib/server/trash';
+import { resolveCheckedAtMutation } from '@/lib/server/card-checked-at';
 
 const UpdateCardSchema = z.object({
   title: z.string().max(255).optional(),
@@ -101,6 +102,29 @@ const patchHandler = async (
   );
 
   const normalizedPayload: Record<string, unknown> = stripUndefinedValues({ ...parsed.data });
+  if (typeof parsed.data.checked === 'boolean') {
+    const { data: currentCard, error: currentCardError } = await supabase
+      .from('cards')
+      .select('checked')
+      .eq('id', cardId)
+      .eq('board_id', boardId)
+      .maybeSingle();
+
+    if (currentCardError || !currentCard) {
+      return NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Card not found' } },
+        { status: 404 }
+      );
+    }
+
+    const nextCheckedAt = resolveCheckedAtMutation({
+      currentChecked: Boolean(currentCard.checked),
+      nextChecked: parsed.data.checked,
+    });
+    if (nextCheckedAt !== undefined) {
+      normalizedPayload.checked_at = nextCheckedAt;
+    }
+  }
   if (
     normalizedPayload.due_bucket_position != null &&
     typeof normalizedPayload.due_bucket_position !== 'number'
@@ -197,7 +221,7 @@ const deleteHandler = async (
 
   const { data: card } = await supabase
     .from('cards')
-    .select('id, title, content, excerpt, due_date, due_start, due_end, checked, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at')
+    .select('id, title, content, excerpt, due_date, due_start, due_end, checked, checked_at, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at')
     .eq('id', cardId)
     .eq('board_id', boardId)
     .maybeSingle();

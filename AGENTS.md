@@ -32,7 +32,7 @@
 - 左パネルのセクション追加は、**別ページを新設せず** `/b/...` の既存レイアウト内で完結させることをデフォルトとする。
 - board navigation の canonical URL は `lp` / `rp` を使い、旧 `view` / `before` / `after` / `range` / `time` 契約は救済しない。契約外 URL は invalid URL として扱う。
 - board navigation は no-exception contract を採用し、`lp` は left section、`rp` は right panel mode のみを表す。`lp` が `rp` を暗黙変更してはいけない。
-- canonical default は `lp=none&rp=timeline` とする。invalid URL からの reset 先も同一 canonical URL とする。
+- canonical default は `lp=overdue&rp=timeline` とする。invalid URL からの reset 先も同一 canonical URL とする。
 - `Search` / `Overdue` / `Tags` は left self-contained とし、入力・選択・結果表示は左パネル内で完結させる。
 - 右パネル上部は今後も 2 段構成をデフォルトとし、1段目はレイアウト種別（例: `Timeline` / `List`）、2段目はその左パネル項目に対応する専用メニューを配置する。行高・余白は既存 Timeline / List ヘッダーに合わせて統一する。
 
@@ -60,6 +60,9 @@ cat test-results/playwright-report.json | jq '.stats'
 - 認証が切れた場合は `codex mcp login supabase` を実行し、ブラウザで OAuth を完了する。
 - 接続確認は `mcp__supabase__list_projects`（MCP ツール呼び出し）を最初に実行する。
 - `list_mcp_resources(server=\"supabase\")` は Supabase 側で未実装のため `Method not found` でも異常とは限らない。
+- **DB スキーマを変える修正では、コード変更だけで終えず必ず migration を作成・適用すること。** `supabase/migrations/` に migration を追加しただけでは完了扱いにしない。
+- schema 追加/削除/カラム変更を含む修正では、作業完了前に「対象環境へ migration が適用済みであること」を確認すること。未適用のまま fetch / select が壊れる変更は完了扱いにしてはいけない。
+- API や UI が新カラムを参照する変更では、migration 適用後に該当 fetch / mutation まで確認し、migration 未適用起因のエラーを残したまま終了しないこと。
 
 ## Commit & Pull Request Guidelines
 短い命令形のコミットメッセージを推奨。ユーザーの承認なしで push しない。破壊的な git コマンドはユーザー指示がある場合のみ実行すること。

@@ -7014,19 +7014,19 @@ test.describe('@feature:timeline Timeline view', () => {
       }
       await expect(completedLinesPanel).toBeVisible();
       const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
-      await expect(showCompletedLines).not.toBeChecked();
+      await expect(showCompletedLines).toBeChecked();
 
       const savedBeforeToggle = await fetchSavedCard(cardId);
       expect(Date.parse(savedBeforeToggle?.updatedAt ?? '')).toBe(Date.parse(timestamp));
 
-      await expect(checkedTaskLine).toBeHidden();
-      await expect(uncheckedTaskLine).toBeVisible();
-      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(1);
-
-      await showCompletedLines.check();
-      await expect(showCompletedLines).toBeChecked();
       await expect(checkedTaskLine).toBeVisible();
+      await expect(uncheckedTaskLine).toBeVisible();
       expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(2);
+
+      await showCompletedLines.uncheck();
+      await expect(showCompletedLines).not.toBeChecked();
+      await expect(checkedTaskLine).toBeHidden();
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(1);
 
       const checkedLineStyles = await checkedTaskLine.evaluate((element) => {
         const style = window.getComputedStyle(element);
@@ -7195,7 +7195,7 @@ test.describe('@feature:timeline Timeline view', () => {
       }
       await expect(completedLinesPanel).toBeVisible();
       const showCompletedLines = modal.getByTestId('card-modal-show-completed-lines');
-      await expect(showCompletedLines).not.toBeChecked();
+      await expect(showCompletedLines).toBeChecked();
 
       const topTaskItems = modal.locator('.ProseMirror > ul[data-type="taskList"] > li');
       const parentOnlyDone = topTaskItems.filter({ hasText: 'Parent only done' }).first();
@@ -7213,13 +7213,13 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(parentOnlyDone).toHaveAttribute('data-completion-visibility', 'visible');
       await expect(parentOnlyDone).toHaveAttribute('data-subtree-complete', 'false');
       await expect(parentActive).toHaveAttribute('data-completion-visibility', 'visible');
-      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'hidden');
-      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeHidden();
-      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeHidden();
+      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'visible');
+      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeVisible();
+      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeVisible();
       await expect(parentAndChildDone).toHaveAttribute('data-completion-visibility', 'visible');
       await expect(parentOnlyDoneLine).toBeVisible();
       await expect(childStaysVisibleLine).toBeVisible();
-      await expect(childDoneOnlyLine).toBeHidden();
+      await expect(childDoneOnlyLine).toBeVisible();
       await expect(parentAndChildDoneLine).toBeVisible();
       await expect(childAndGrandchildBranchLine).toBeVisible();
       await expect(grandchildKeepsBranchVisibleLine).toBeVisible();
@@ -7238,15 +7238,15 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(lineDecorations[3]).toContain('line-through');
       expect(lineDecorations[4]).not.toContain('line-through');
 
-      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(3);
-
-      await showCompletedLines.check();
-      await expect(showCompletedLines).toBeChecked();
-      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'visible');
-      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeVisible();
-      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeVisible();
-      await expect(childDoneOnlyLine).toBeVisible();
       expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(4);
+
+      await showCompletedLines.uncheck();
+      await expect(showCompletedLines).not.toBeChecked();
+      await expect(parentSubtreeDone).toHaveAttribute('data-completion-visibility', 'hidden');
+      await expect(parentSubtreeDone.locator(':scope > div > p').first()).toBeHidden();
+      await expect(parentSubtreeDone.locator(':scope > div > ul[data-type="taskList"] > li > div > p').first()).toBeHidden();
+      await expect(childDoneOnlyLine).toBeHidden();
+      expect(await countVisibleTopLevelTaskItemHandles(modal)).toBe(3);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -7791,9 +7791,9 @@ test.describe('@feature:timeline Timeline view', () => {
         await reopenedModal.getByTitle('Show details').click();
       }
       await expect(reopenedCompletedLinesPanel).toBeVisible();
-      await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).not.toBeChecked();
-      await expect(reopenedModal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeHidden();
-      await expect(reopenedModal.getByTestId('tiptap-hidden-run-marker-button').first()).toBeVisible();
+      await expect(reopenedModal.getByTestId('card-modal-show-completed-lines')).toBeChecked();
+      await expect(reopenedModal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toBeVisible();
+      await expect(reopenedModal.getByTestId('tiptap-hidden-run-marker-button')).toHaveCount(0);
     } finally {
       await supabaseAdmin.from('card_content_history').delete().eq('card_id', cardId);
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
