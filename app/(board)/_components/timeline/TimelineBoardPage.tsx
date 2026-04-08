@@ -1380,6 +1380,20 @@ function TimelineBoardPageContent({
     setNotificationFeedback(null);
     const cardShortId =
       typeof notification.payload?.card_short_id === "string" ? notification.payload.card_short_id.trim() : "";
+    const boardShortId =
+      typeof notification.payload?.board_short_id === "string" ? notification.payload.board_short_id.trim() : "";
+    const boardSlugTail =
+      typeof notification.payload?.board_slug === "string" ? notification.payload.board_slug.trim() : "";
+
+    if (notification.type === "daily_digest" && boardShortId) {
+      const boardUrl = boardSlugTail.length > 0
+        ? `/b/${boardShortId}/${boardSlugTail}?lp=overdue&rp=timeline`
+        : `/b/${boardShortId}?lp=overdue&rp=timeline`;
+      await markAsRead(notification.id);
+      router.push(boardUrl);
+      return;
+    }
+
     if (!cardShortId) {
       await markAsRead(notification.id);
       setNotificationFeedback("この通知は既読にしました。関連カードは開けません。");
@@ -1398,7 +1412,7 @@ function TimelineBoardPageContent({
     }));
     openCardModal(cardShortId, "notifications");
     void markAsRead(notification.id);
-  }, [currentBoard.id, markAsRead, openCardModal, setModalCardOverride]);
+  }, [currentBoard.id, markAsRead, openCardModal, router, setModalCardOverride]);
 
   const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
     setSidebarVisibleCounts((prev) => {

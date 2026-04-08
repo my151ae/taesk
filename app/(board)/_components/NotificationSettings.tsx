@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuth } from '@/app/contexts/AuthContext';
 import {
@@ -15,7 +15,11 @@ import {
   showTestNotification,
 } from '@/lib/push-notifications';
 import { unlockAudio, playNotificationSound, isAudioUnlocked } from '@/lib/notification-audio';
-import type { NotificationPreferences, QuietHoursPreference } from '@/lib/supabase';
+import type {
+  DailyDigestPreferences,
+  NotificationPreferences,
+  QuietHoursPreference,
+} from '@/lib/supabase';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -29,7 +33,15 @@ const supportedTimezones: string[] =
     ? (Intl as unknown as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone')
     : [defaultTimezone];
 
-export default function NotificationSettings() {
+type NotificationSettingsProps = {
+  boardId?: string | null;
+  boardName?: string | null;
+};
+
+export default function NotificationSettings({
+  boardId = null,
+  boardName = null,
+}: NotificationSettingsProps) {
   const { user } = useAuth();
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -39,13 +51,17 @@ export default function NotificationSettings() {
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [testSending, setTestSending] = useState(false);
+  const [loadingDailyDigest, setLoadingDailyDigest] = useState(false);
+  const [savingDailyDigest, setSavingDailyDigest] = useState(false);
 
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [inAppEnabled, setInAppEnabled] = useState(true);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietHoursStart, setQuietHoursStart] = useState('22:00');
   const [quietHoursEnd, setQuietHoursEnd] = useState('07:00');
   const [quietHoursTimezone, setQuietHoursTimezone] = useState(defaultTimezone);
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(false);
+  const [dailyDigestDeliveryTime, setDailyDigestDeliveryTime] = useState('09:00');
+  const [dailyDigestTimezone, setDailyDigestTimezone] = useState(defaultTimezone);
 
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -59,6 +75,12 @@ export default function NotificationSettings() {
       setQuietHoursEnd(prefs.quiet_hours.end);
       setQuietHoursTimezone(prefs.quiet_hours.timezone);
     }
+  };
+
+  const applyDailyDigestPreferencesToForm = (prefs: DailyDigestPreferences) => {
+    setDailyDigestEnabled(prefs.enabled);
+    setDailyDigestDeliveryTime(prefs.delivery_time);
+    setDailyDigestTimezone(prefs.timezone);
   };
 
   const fetchPreferences = useCallback(async () => {
@@ -79,7 +101,6 @@ export default function NotificationSettings() {
       }
 
       const data: NotificationPreferences = await response.json();
-      setPreferences(data);
       applyPreferencesToForm(data);
     } catch (err) {
       console.error('Failed to load notification preferences:', err);
@@ -92,6 +113,38 @@ export default function NotificationSettings() {
   useEffect(() => {
     fetchPreferences();
   }, [fetchPreferences]);
+
+  const fetchDailyDigestPreferences = useCallback(async () => {
+    if (!user || !boardId) {
+      setDailyDigestEnabled(false);
+      setDailyDigestDeliveryTime('09:00');
+      setDailyDigestTimezone(defaultTimezone);
+      return;
+    }
+
+    try {
+      setLoadingDailyDigest(true);
+      setError(null);
+
+      const response = await fetch(`/api/boards/${boardId}/notifications/daily-digest-preferences`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to load daily digest preferences');
+      }
+
+      const data: DailyDigestPreferences = await response.json();
+      applyDailyDigestPreferencesToForm(data);
+    } catch (err) {
+      console.error('Failed to load daily digest preferences:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load daily digest preferences');
+    } finally {
+      setLoadingDailyDigest(false);
+    }
+  }, [boardId, user]);
+
+  useEffect(() => {
+    void fetchDailyDigestPreferences();
+  }, [fetchDailyDigestPreferences]);
 
   useEffect(() => {
     if (!user) {
@@ -142,7 +195,6 @@ export default function NotificationSettings() {
       }
 
       const data: NotificationPreferences = await response.json();
-      setPreferences(data);
       applyPreferencesToForm(data);
       if (successMessage) {
         setStatusMessage(successMessage);
@@ -298,6 +350,65 @@ export default function NotificationSettings() {
     } finally {
       setTestSending(false);
     }
+  };
+
+  const updateDailyDigestPreferences = async (
+    updates: Partial<DailyDigestPreferences>,
+    successMessage?: string
+  ): Promise<boolean> => {
+    if (!boardId) {
+      return false;
+    }
+
+    try {
+      setSavingDailyDigest(true);
+      setError(null);
+      setStatusMessage(null);
+
+      const response = await fetch(`/api/boards/${boardId}/notifications/daily-digest-preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to update daily digest preferences');
+      }
+
+      const data: DailyDigestPreferences = await response.json();
+      applyDailyDigestPreferencesToForm(data);
+      if (successMessage) {
+        setStatusMessage(successMessage);
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to update daily digest preferences:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update daily digest preferences');
+      return false;
+    } finally {
+      setSavingDailyDigest(false);
+    }
+  };
+
+  const handleSaveDailyDigest = async () => {
+    if (!boardId) {
+      return;
+    }
+
+    if (!TIME_PATTERN.test(dailyDigestDeliveryTime)) {
+      setError('Daily digest time must be in HH:MM format');
+      return;
+    }
+
+    await updateDailyDigestPreferences(
+      {
+        enabled: dailyDigestEnabled,
+        delivery_time: dailyDigestDeliveryTime,
+        timezone: dailyDigestTimezone,
+      },
+      'Daily digest preferences updated'
+    );
   };
 
   const handleUnlockAudio = async () => {
@@ -510,6 +621,75 @@ export default function NotificationSettings() {
           </button>
         </div>
       </section>
+
+      {boardId ? (
+        <section className="space-y-2">
+          <h3 className="text-lg font-semibold">Daily通知</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {boardName ? `${boardName} の今日タスク要約を毎日通知します。` : '現在のボードの今日タスク要約を毎日通知します。'}
+          </p>
+
+          <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+            {loadingDailyDigest ? (
+              <p className="text-sm text-gray-600 dark:text-gray-400">Loading daily digest settings...</p>
+            ) : (
+              <>
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={dailyDigestEnabled}
+                    onChange={(event) => setDailyDigestEnabled(event.target.checked)}
+                    disabled={savingDailyDigest}
+                    data-testid="daily-digest-toggle"
+                  />
+                  <span className="text-sm font-medium">このボードのDaily通知を有効化</span>
+                </label>
+
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <label className="space-y-1">
+                    <span className="font-medium text-gray-700 dark:text-gray-200">通知時刻</span>
+                    <input
+                      type="time"
+                      value={dailyDigestDeliveryTime}
+                      onChange={(event) => setDailyDigestDeliveryTime(event.target.value)}
+                      disabled={savingDailyDigest}
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-700"
+                      data-testid="daily-digest-time"
+                    />
+                  </label>
+
+                  <label className="space-y-1">
+                    <span className="font-medium text-gray-700 dark:text-gray-200">Timezone</span>
+                    <select
+                      value={dailyDigestTimezone}
+                      onChange={(event) => setDailyDigestTimezone(event.target.value)}
+                      disabled={savingDailyDigest}
+                      className="w-full rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-700"
+                      data-testid="daily-digest-timezone"
+                    >
+                      {supportedTimezones.map((zone) => (
+                        <option key={zone} value={zone}>
+                          {zone}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <button
+                  onClick={handleSaveDailyDigest}
+                  disabled={savingDailyDigest}
+                  className="rounded bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
+                  data-testid="save-daily-digest-button"
+                >
+                  {savingDailyDigest ? 'Saving…' : 'Save Daily Digest'}
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <h3 className="text-lg font-semibold">通知音設定</h3>

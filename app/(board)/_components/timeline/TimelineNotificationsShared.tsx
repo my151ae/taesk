@@ -40,6 +40,12 @@ function formatRelativeDateTime(iso: string) {
 }
 
 function buildNotificationHeadline(notification: Notification) {
+  if (notification.type === "daily_digest") {
+    const todayCount = typeof notification.payload?.today_count === "number" ? notification.payload.today_count : 0;
+    const overdueCount = typeof notification.payload?.overdue_count === "number" ? notification.payload.overdue_count : 0;
+    return `今日 ${todayCount}件 / overdue ${overdueCount}件`;
+  }
+
   const changeSummary =
     typeof notification.payload?.change_summary === "string" && notification.payload.change_summary.trim().length > 0
       ? notification.payload.change_summary.trim()
@@ -63,6 +69,13 @@ function buildNotificationHeadline(notification: Notification) {
 }
 
 function buildNotificationTitle(notification: Notification) {
+  if (notification.type === "daily_digest") {
+    const boardName = typeof notification.payload?.board_name === "string" ? notification.payload.board_name.trim() : "";
+    if (boardName.length > 0) {
+      return `${boardName} のDaily通知`;
+    }
+  }
+
   const payloadTitle = typeof notification.payload?.card_title === "string" ? notification.payload.card_title.trim() : "";
   if (payloadTitle.length > 0) return payloadTitle;
   const message = typeof notification.payload?.message === "string" ? notification.payload.message.trim() : "";
@@ -85,7 +98,10 @@ function NotificationActivityRow({
       : null;
   const title = buildNotificationTitle(notification);
   const headline = buildNotificationHeadline(notification);
-  const canOpen = typeof notification.payload?.card_short_id === "string" && notification.payload.card_short_id.trim().length > 0;
+  const hasCardTarget = typeof notification.payload?.card_short_id === "string" && notification.payload.card_short_id.trim().length > 0;
+  const hasBoardTarget =
+    typeof notification.payload?.board_short_id === "string" && notification.payload.board_short_id.trim().length > 0;
+  const canOpen = hasCardTarget || hasBoardTarget;
 
   return (
     <button
@@ -138,7 +154,7 @@ function NotificationActivityRow({
             <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-500">{commentBody}</p>
           ) : null}
           {!canOpen ? (
-            <p className="mt-0.5 text-[11px] text-amber-700">この通知は既読になりますが、カードは開けません</p>
+            <p className="mt-0.5 text-[11px] text-amber-700">この通知は既読になりますが、関連画面は開けません</p>
           ) : null}
         </div>
         <span

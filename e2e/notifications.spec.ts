@@ -5,7 +5,7 @@ import { mockServiceWorkerAndPush } from './utils/push';
 type QuietHours = { start: string; end: string; timezone: string };
 
 async function openNotificationSettings(page: import('@playwright/test').Page) {
-  await page.getByRole('button', { name: /notifications/i }).click();
+  await page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i }).click();
   await page.getByTestId('notification-settings-button').click();
   await expect(page.getByRole('heading', { name: 'Notification Settings' })).toBeVisible({
     timeout: 10000,
@@ -19,6 +19,11 @@ test.describe('Web Push Notifications @feature:notifications', () => {
     web_push_enabled: boolean;
     quiet_hours: QuietHours | null;
   };
+  let dailyDigestState: {
+    enabled: boolean;
+    delivery_time: string;
+    timezone: string;
+  };
   let testNotificationCount: number;
   let pushSubscriptionCreates: number;
   let pushSubscriptionDeletes: number;
@@ -28,6 +33,11 @@ test.describe('Web Push Notifications @feature:notifications', () => {
       in_app_enabled: true,
       web_push_enabled: false,
       quiet_hours: null,
+    };
+    dailyDigestState = {
+      enabled: false,
+      delivery_time: '09:00',
+      timezone: 'Asia/Tokyo',
     };
     testNotificationCount = 0;
     pushSubscriptionCreates = 0;
@@ -69,6 +79,64 @@ test.describe('Web Push Notifications @feature:notifications', () => {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             ...preferencesState,
+          }),
+        });
+        return;
+      }
+
+      await route.fallback();
+    });
+
+    await page.route('**/api/boards/*/notifications/daily-digest-preferences', async (route) => {
+      const request = route.request();
+      if (request.method() === 'GET') {
+        const url = new URL(request.url());
+        const segments = url.pathname.split('/');
+        const boardId = segments[segments.indexOf('boards') + 1] || 'mock-board';
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            profile_id: 'mock-user',
+            board_id: boardId,
+            include_overdue: true,
+            notify_when_empty: true,
+            last_sent_local_date: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...dailyDigestState,
+          }),
+        });
+        return;
+      }
+
+      if (request.method() === 'PUT') {
+        const payload = JSON.parse(request.postData() || '{}');
+        if (payload.enabled !== undefined) {
+          dailyDigestState.enabled = payload.enabled;
+        }
+        if (payload.delivery_time !== undefined) {
+          dailyDigestState.delivery_time = payload.delivery_time;
+        }
+        if (payload.timezone !== undefined) {
+          dailyDigestState.timezone = payload.timezone;
+        }
+
+        const url = new URL(request.url());
+        const segments = url.pathname.split('/');
+        const boardId = segments[segments.indexOf('boards') + 1] || 'mock-board';
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            profile_id: 'mock-user',
+            board_id: boardId,
+            include_overdue: true,
+            notify_when_empty: true,
+            last_sent_local_date: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...dailyDigestState,
           }),
         });
         return;
@@ -148,6 +216,24 @@ test.describe('Web Push Notifications @feature:notifications', () => {
       .toBeNull();
   });
 
+  test('configures daily digest preferences', async ({ page }) => {
+    await openNotificationSettings(page);
+
+    await page.getByTestId('daily-digest-toggle').check();
+    await page.getByTestId('daily-digest-time').fill('08:15');
+    const timezoneValue = await page
+      .getByTestId('daily-digest-timezone')
+      .evaluate((select) => (select as HTMLSelectElement).options[1]?.value || 'Asia/Tokyo');
+    await page.getByTestId('daily-digest-timezone').selectOption(timezoneValue);
+    await page.getByTestId('save-daily-digest-button').click();
+
+    await expect.poll(() => dailyDigestState).toEqual({
+      enabled: true,
+      delivery_time: '08:15',
+      timezone: timezoneValue,
+    });
+  });
+
   test('sends a test notification', async ({ page }) => {
     await openNotificationSettings(page);
     const beforeCount = testNotificationCount;
@@ -217,7 +303,7 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await page.waitForLoadState('networkidle');
 
     // Verify bell icon shows unread badge
-    const bellButton = page.getByRole('button', { name: /notifications/i });
+    const bellButton = page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i });
     await expect(bellButton).toBeVisible({ timeout: 10000 });
 
     // Badge should show "2"
@@ -278,7 +364,7 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await page.waitForLoadState('networkidle');
 
     // Open notifications panel
-    const bellButton = page.getByRole('button', { name: /notifications/i });
+    const bellButton = page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i });
     await bellButton.click();
 
     // Verify notification is visible
@@ -322,7 +408,7 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await expect(badge).toHaveCount(0);
 
     // Open notifications panel
-    const bellButton = page.getByRole('button', { name: /notifications/i });
+    const bellButton = page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i });
     await bellButton.click();
 
     // Verify empty state message
@@ -370,7 +456,7 @@ test.describe('In-app Notifications @feature:notifications', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const bellButton = page.getByRole('button', { name: /notifications/i });
+    const bellButton = page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i });
     await bellButton.click();
 
     await expect(page.getByTestId('mobile-left-panel-selector-trigger')).toHaveText(/notifications/i);

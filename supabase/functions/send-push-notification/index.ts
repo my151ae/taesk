@@ -33,6 +33,7 @@ interface NotificationPayload {
     board_id?: string;
     board_short_id?: string;
     board_slug?: string;
+    board_name?: string;
   };
 }
 
@@ -237,7 +238,12 @@ Deno.serve(async (req) => {
 
     // Prepare push notification payload
     const pushPayload = JSON.stringify({
-      title: 'Taesk Notification',
+      title:
+        notificationData.type === 'daily_digest' &&
+        typeof notificationData.payload.board_name === 'string' &&
+        notificationData.payload.board_name.trim().length > 0
+          ? `Taesk: ${notificationData.payload.board_name.trim()}`
+          : 'Taesk Notification',
       body: notificationData.payload.message,
       icon: '/icon?size=192',
       badge: '/icon?size=192',

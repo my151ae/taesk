@@ -331,7 +331,19 @@ export type NotificationType =
   | 'comment_reply'
   | 'comment_created'
   | 'comment_replied'
+  | 'daily_digest'
   | 'test';
+
+export interface DailyDigestTopItem {
+  card_id: string;
+  card_short_id: string | null;
+  card_slug: string | null;
+  title: string;
+  due_date: string | null;
+  due_start: string | null;
+  due_end: string | null;
+  kind: 'today' | 'overdue';
+}
 
 export interface Notification {
   id: string;
@@ -345,6 +357,15 @@ export interface Notification {
     comment_body?: string | null;
     card_short_id?: string | null;
     card_slug?: string | null;
+    board_id?: string;
+    board_name?: string | null;
+    board_short_id?: string | null;
+    board_slug?: string | null;
+    summary_date?: string | null;
+    today_count?: number;
+    overdue_count?: number;
+    total_count?: number;
+    top_items?: DailyDigestTopItem[];
     change_summary?: string | null;
     time_change?: {
       field?: 'start' | 'end' | string;
@@ -379,6 +400,19 @@ export interface NotificationPreferences {
   in_app_enabled: boolean;
   web_push_enabled: boolean;
   quiet_hours: QuietHoursPreference | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyDigestPreferences {
+  profile_id: string;
+  board_id: string;
+  enabled: boolean;
+  delivery_time: string;
+  timezone: string;
+  include_overdue: boolean;
+  notify_when_empty: boolean;
+  last_sent_local_date: string | null;
   created_at: string;
   updated_at: string;
 }

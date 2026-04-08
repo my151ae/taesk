@@ -4,7 +4,7 @@
  */
 
 // Service Worker version - increment to force update
-const SW_VERSION = '1.3.3';
+const SW_VERSION = '1.3.4';
 const CACHE_NAME = `taesk-cache-${SW_VERSION}`;
 
 // Install event - cache critical resources
@@ -245,7 +245,9 @@ self.addEventListener('notificationclick', (event) => {
     url = `/c/${data.card_short_id}/${data.card_slug || ''}`;
   } else if (data.board_id && data.board_short_id) {
     // Navigate to board
-    url = `/b/${data.board_short_id}/${data.board_slug || ''}`;
+    url = data.board_slug
+      ? `/b/${data.board_short_id}/${data.board_slug}?lp=overdue&rp=timeline`
+      : `/b/${data.board_short_id}?lp=overdue&rp=timeline`;
   }
 
   // Focus or open window

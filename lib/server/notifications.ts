@@ -11,6 +11,7 @@ export type NotificationType =
   | 'mention'
   | 'assignee_changed'
   | 'due_soon'
+  | 'daily_digest'
   | 'test';
 
 export interface CommentNotificationEvent {
@@ -215,6 +216,8 @@ export function generateNotificationMessage(
       return `You were assigned to card: ${asString(payload.card_title, 'Untitled')}`;
     case 'due_soon':
       return `Card due soon: ${asString(payload.card_title, 'Untitled')}`;
+    case 'daily_digest':
+      return asString(payload.message, 'Daily digest');
     case 'test':
       return asString(payload.message, 'Test notification');
     default:

@@ -75,7 +75,7 @@ export default function TimelineBoardDialogs({
               </button>
             </div>
             <div className="overflow-y-auto pr-1">
-              <NotificationSettings />
+              <NotificationSettings boardId={initialBoard.id} boardName={initialBoard.name} />
             </div>
           </div>
         </div>
