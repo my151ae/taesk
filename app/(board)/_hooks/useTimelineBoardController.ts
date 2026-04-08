@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
+import {
+  getMonthGridSpec,
+} from "@/app/(board)/_components/timeline/month-view-helpers";
 import type {
   ListWindow,
   ListWindowPresetKey,
   ResolvedTimelineUrlState,
+  TimelineViewMode,
   UrlUpdateMethod,
 } from "@/app/(board)/_hooks/useTimelineUrlState";
 export type { ListWindow };
@@ -33,6 +37,7 @@ type UseTimelineBoardControllerArgs = {
   dataDays?: Array<{ isoDate: string }>;
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   updateUrlForList: (args: ListUrlUpdateArgs) => void;
+  updateUrlForMonth: (args: { date?: string | null; method?: UrlUpdateMethod; card?: string | null }) => void;
 };
 
 const clampTimelineRange = (range: number) => Math.max(1, Math.min(7, Math.round(range)));
@@ -108,6 +113,7 @@ export function useTimelineBoardController({
   dataDays,
   updateUrlForTimeline,
   updateUrlForList,
+  updateUrlForMonth,
 }: UseTimelineBoardControllerArgs) {
   const initialTimelineIsoDate = resolvedState.date ?? getCurrentTimelineIsoDateJst(5);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
@@ -126,7 +132,7 @@ export function useTimelineBoardController({
   const [timelineStartHour, setTimelineStartHour] = useState(5);
 
   const initialWindow = normalizeListWindow(resolvedState.listWindow);
-  const [viewMode, setViewMode] = useState<"timeline" | "list">(resolvedState.view);
+  const [viewMode, setViewMode] = useState<TimelineViewMode>(resolvedState.view);
   const [timelineRange, setTimelineRange] = useState(
     clampTimelineRange(resolvedState.timelineRange || initialTimelineRange || 2)
   );
@@ -138,6 +144,11 @@ export function useTimelineBoardController({
     resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)
   );
   const [listAnchorOffset, setListAnchorOffset] = useState<number>(resolvedState.anchorOffset);
+  const [monthAnchorDate, setMonthAnchorDate] = useState<string>(
+    resolvedState.view === "month"
+      ? resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)
+      : getCurrentTimelineIsoDateJst(timelineStartHour)
+  );
 
   useEffect(() => {
     const nextTimelineRange = clampTimelineRange(
@@ -153,6 +164,9 @@ export function useTimelineBoardController({
     setViewMode(resolvedState.view);
     setTimelineRange(nextTimelineRange);
     setAnchorDayIso(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
+    if (resolvedState.view === "month") {
+      setMonthAnchorDate(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
+    }
     setListWindow(nextListWindow);
     setListWindowPresetKey(derivePresetFromWindow(nextListWindow));
     setActiveDayIndex(
@@ -178,25 +192,36 @@ export function useTimelineBoardController({
   ]);
 
   const listRange = useMemo(() => listWindowRange(listWindow), [listWindow]);
+  const monthGrid = useMemo(() => getMonthGridSpec(monthAnchorDate), [monthAnchorDate]);
 
   const intendedDayRange = useMemo(
-    () => (viewMode === "timeline" ? timelineRange : listRange),
-    [listRange, timelineRange, viewMode]
+    () => (viewMode === "timeline" ? timelineRange : viewMode === "list" ? listRange : monthGrid.range),
+    [listRange, monthGrid.range, timelineRange, viewMode]
   );
 
   const effectiveDayRange = viewMode === "timeline" ? Math.min(intendedDayRange, 7) : intendedDayRange;
 
   const handleSetViewMode = useCallback(
-    (mode: "timeline" | "list") => {
+    (mode: TimelineViewMode) => {
       setViewMode(mode);
       const today = getCurrentTimelineIsoDateJst(timelineStartHour);
-      const currentDayIso = anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || listAnchorDate || resolvedState.date || today;
+      const currentDayIso =
+        anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || monthAnchorDate || listAnchorDate || resolvedState.date || today;
 
       if (mode === "timeline") {
         updateUrlForTimeline({
           date: currentDayIso,
           range: timelineRange,
           time: null,
+        });
+        return;
+      }
+
+      if (mode === "month") {
+        setMonthAnchorDate(currentDayIso);
+        updateUrlForMonth({
+          date: currentDayIso,
+          method: "replace",
         });
         return;
       }
@@ -219,12 +244,45 @@ export function useTimelineBoardController({
       listWindow.after,
       listWindow.before,
       resolvedState.date,
+      monthAnchorDate,
       timelineRange,
       timelineStartHour,
       updateUrlForList,
+      updateUrlForMonth,
       updateUrlForTimeline,
     ]
   );
+
+  const shiftMonth = useCallback(
+    (delta: number) => {
+      const base = monthAnchorDate || getCurrentTimelineIsoDateJst(timelineStartHour);
+      const date = new Date(`${base}T00:00:00Z`);
+      const next = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1))
+        .toISOString()
+        .slice(0, 10);
+      setMonthAnchorDate(next);
+      if (viewMode === "month") {
+        updateUrlForMonth({ date: next, method: "push" });
+      }
+    },
+    [monthAnchorDate, timelineStartHour, updateUrlForMonth, viewMode],
+  );
+
+  const handleMonthPrev = useCallback(() => {
+    shiftMonth(-1);
+  }, [shiftMonth]);
+
+  const handleMonthNext = useCallback(() => {
+    shiftMonth(1);
+  }, [shiftMonth]);
+
+  const handleMonthToday = useCallback(() => {
+    const today = getCurrentTimelineIsoDateJst(timelineStartHour);
+    setMonthAnchorDate(today);
+    if (viewMode === "month") {
+      updateUrlForMonth({ date: today, method: "push" });
+    }
+  }, [timelineStartHour, updateUrlForMonth, viewMode]);
 
   return {
     showBoardMenu,
@@ -265,9 +323,15 @@ export function useTimelineBoardController({
     setListAnchorDate,
     listAnchorOffset,
     setListAnchorOffset,
+    monthAnchorDate,
+    setMonthAnchorDate,
+    monthGrid,
     listRange,
     intendedDayRange,
     effectiveDayRange,
     handleSetViewMode,
+    handleMonthPrev,
+    handleMonthNext,
+    handleMonthToday,
   };
 }

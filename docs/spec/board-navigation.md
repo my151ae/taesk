@@ -6,6 +6,7 @@
 - `lp` は `rp` を変更しない。left/right の state model は完全に分離する。
 - canonical default は `lp=overdue&rp=timeline`。
 - `Search` / `Overdue` / `Completed` / `Tags` / `Trash` は left self-contained とし、right-panel dedicated view は持たせない。
+- desktop / mobile は同じ `BoardUiState` を共有し、viewport を理由に `rp` を別 mode へ書き換えない。
 
 ## Panel Ownership
 
@@ -19,11 +20,12 @@
 - Right panel:
   - `timeline`
   - `list`
+  - `month`
 
 ## Strict Canonical Contract
 
 - canonical URL は常に `lp` と `rp` を持つ。
-- `date` は `rp=timeline` のときだけ有効。
+- `date` は `rp=timeline` / `rp=month` のとき有効。
 - `q` は `lp=search` のときだけ有効。
 - `tag` は `lp=tags` のときだけ有効。
 - serialize は strict に不要パラメータを落とす。
@@ -63,18 +65,23 @@
 - Phase 1 では mobile に left-panel 専用 sheet/panel は追加しない。
 - mobile では context bar のラベルで current `lp` を示す。
 - right panel は current `rp` の内容をそのまま表示する。
+- `rp=month` も mobile でそのまま描画する。
 - Phase 2 で mobile に desktop 相当の self-contained left UI を追加する。
 
 ## Test Matrix
 
 - `lp=search&rp=timeline&q=...` が valid。
 - `lp=search&rp=list&q=...` が valid。
+- `lp=search&rp=month&q=...` が valid。
 - `lp=tags&rp=timeline&tag=...` が valid。
 - `lp=tags&rp=list&tag=...` が valid。
+- `lp=tags&rp=month&tag=...` が valid。
 - `lp=trash&rp=timeline` が valid。
 - `lp=trash&rp=list` が valid。
+- `lp=trash&rp=month` が valid。
 - `lp=completed&rp=timeline` が valid。
 - `lp=completed&rp=list` が valid。
+- `lp=completed&rp=month` が valid。
 - `lp` / `rp` 欠落 URL は invalid。
 - Search は right panel mode を変えない。
 - Search results は left sidebar にのみ出る。

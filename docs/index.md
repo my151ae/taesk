@@ -4,13 +4,13 @@
 
 ## UI Scope
 
-現在の運用 UI は **Timeline + A/B リスト** のみ。`/b/...` ルートでは Kanban 画面は使用しない。
+現在の運用 UI は **Timeline / List / Month + A/B リスト** を正とする。`/b/...` ルートでは Kanban 画面は使用しない。
 - 左パネル機能は別ページへ逃がさず、既存の `/b/...` 画面内で完結させることをデフォルトとする。
 - board navigation / URL state の canonical contract は strict `lp` / `rp` を使い、`lp` は left section、`rp` は right panel mode のみを表す。
 - desktop / mobile は visible UI が違っていても、board navigation の state/URL model は同じ `BoardUiState` を共有する。
-- `date` query は desktop では左端日、mobile では中央 pane の anchor day を表す。mobile の scroll restore は URL ではなく in-memory state を使う。
+- `date` query は `rp=timeline` / `rp=month` の anchor date を表す。`rp=list` は URL に `date` を持たず、local state の `listAnchorDate` を使う。
 - canonical default は `lp=overdue&rp=timeline` とし、invalid URL の reset 先も同一 canonical URL とする。
-- `Search` / `Overdue` / `Completed` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` は left context から独立して切り替える。
+- `Search` / `Overdue` / `Completed` / `Tags` は left self-contained とし、右パネルの `Timeline` / `List` / `Month` は left context から独立して切り替える。
 - 右パネル上部は「1段目=レイアウト種別」「2段目=その機能専用メニュー」の 2 段を共通パターンとする。
 
 ## 📋 Table of Contents

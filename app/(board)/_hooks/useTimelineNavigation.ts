@@ -162,23 +162,15 @@ export function useTimelineNavigation({
 
     const goToDay = useCallback(async (targetIso: string) => {
         if (status === 'loading' || !targetIso) return;
-        const localResolved = resolveAnchorDay(targetIso, data?.days);
-        const localExactDay = data?.days?.find((day) => day.isoDate === targetIso) ?? null;
-        if (localExactDay) {
-            setAnchorDayIso(localResolved.resolvedAnchorDayIso);
-            setActiveDayIndex(localResolved.windowStartIndex);
-            updateUrlForTimeline({ date: localResolved.resolvedAnchorDayIso, range: dayRange, time: getCurrentTime() });
-            void silentlyPrefetchAroundDay(localResolved.resolvedAnchorDayIso, data?.days);
-            return;
-        }
         const targetOffset = getDayDiff(targetIso, currentTimelineIso);
-        const targetPayload = await fetchTimeline(targetOffset - 1, { range: fetchRange });
+        const targetPayload = await fetchTimeline(targetOffset, { range: fetchRange });
         const resolved = resolveAnchorDay(targetIso, targetPayload?.days);
-        setAnchorDayIso(resolved.resolvedAnchorDayIso);
-        setActiveDayIndex(resolved.windowStartIndex);
-        updateUrlForTimeline({ date: resolved.resolvedAnchorDayIso, range: dayRange, time: getCurrentTime() });
-        void silentlyPrefetchAroundDay(resolved.resolvedAnchorDayIso, targetPayload?.days);
-    }, [currentTimelineIso, data?.days, dayRange, fetchRange, fetchTimeline, getCurrentTime, resolveAnchorDay, setActiveDayIndex, setAnchorDayIso, silentlyPrefetchAroundDay, status, updateUrlForTimeline]);
+        const nextAnchorIso = targetPayload?.days?.[0]?.isoDate ?? resolved.resolvedAnchorDayIso;
+        setAnchorDayIso(nextAnchorIso);
+        setActiveDayIndex(0);
+        updateUrlForTimeline({ date: nextAnchorIso, range: dayRange, time: getCurrentTime() });
+        void silentlyPrefetchAroundDay(nextAnchorIso, targetPayload?.days);
+    }, [currentTimelineIso, dayRange, fetchRange, fetchTimeline, getCurrentTime, resolveAnchorDay, setActiveDayIndex, setAnchorDayIso, silentlyPrefetchAroundDay, status, updateUrlForTimeline]);
 
     const handlePrevDay = useCallback(async () => {
         await navigateByDays(-1);

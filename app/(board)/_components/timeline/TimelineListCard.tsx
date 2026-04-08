@@ -12,6 +12,7 @@ type TimelineListCardProps = {
   kind: "event" | "bucket" | "overdue";
   variant: "desktop" | "mobile";
   openSource: string;
+  shortcutView?: "timeline" | "list" | "month";
   bucketLabel?: string | null;
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
@@ -24,6 +25,7 @@ export function TimelineListCard({
   kind,
   variant,
   openSource,
+  shortcutView = "list",
   bucketLabel,
   openCardModal,
   onToggleCheck,
@@ -76,7 +78,7 @@ export function TimelineListCard({
         shortcutContext={{
           scope: "board",
           region: "main-panel",
-          view: "list",
+          view: shortcutView,
           part: "card",
         }}
         focusGroup="bucket"

@@ -14,8 +14,13 @@ import {
   DesktopListToolbar,
   DesktopListView,
 } from "@/app/(board)/_components/timeline/DesktopListView";
+import {
+  DesktopMonthToolbar,
+  DesktopMonthView,
+} from "@/app/(board)/_components/timeline/DesktopMonthView";
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
+import MobileMonthView from "@/app/(board)/_components/timeline/MobileMonthView";
 import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import {
@@ -51,9 +56,12 @@ type TimelineToolbarProps = ComponentProps<typeof DesktopTimelineToolbar>;
 type TimelineBodyProps = ComponentProps<typeof DesktopTimelineView>;
 type ListToolbarProps = ComponentProps<typeof DesktopListToolbar>;
 type ListBodyProps = ComponentProps<typeof DesktopListView>;
+type MonthToolbarProps = ComponentProps<typeof DesktopMonthToolbar>;
+type MonthBodyProps = ComponentProps<typeof DesktopMonthView>;
 type MobileTimelineProps = ComponentProps<typeof MobileTimelineView>;
 type MobileTimelineBaseProps = MobileTimelineProps;
 type MobileListProps = ComponentProps<typeof MobileListView>;
+type MobileMonthProps = ComponentProps<typeof MobileMonthView>;
 type SidebarMenuProps = ComponentProps<typeof DesktopSidebarMenu>;
 type SidebarMenuBaseProps = Omit<
   SidebarMenuProps,
@@ -64,7 +72,7 @@ type CardModalProps = ComponentProps<typeof CardModal>;
 type CardContextMenuProps = ComponentProps<typeof CardContextMenu>;
 
 type ParseResult = { ok: true } | { ok: false; code: string };
-type TabItem = { key: "timeline" | "list"; label: string };
+type TabItem = { key: "timeline" | "list" | "month"; label: string };
 type MobileHeaderAccessory =
   | {
       kind: "overdue-sort";
@@ -79,9 +87,10 @@ export type TimelineBoardScreenProps = {
   onMoveToCanonicalUrl: () => void;
   headerProps: HeaderProps;
   desktop: {
-    activeView: "timeline" | "list";
+    activeView: "timeline" | "list" | "month";
+    timelineTransitionPending: boolean;
     tabItems: TabItem[];
-    onTabChange: (key: "timeline" | "list") => void;
+    onTabChange: (key: "timeline" | "list" | "month") => void;
     leftPanelProps: SidebarMenuBaseProps;
     overdueSortOrder: OverdueSortOrder;
     onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
@@ -89,6 +98,8 @@ export type TimelineBoardScreenProps = {
     timelineViewProps: TimelineBodyProps;
     listToolbarProps: ListToolbarProps;
     listViewProps: ListBodyProps;
+    monthToolbarProps: MonthToolbarProps;
+    monthViewProps: MonthBodyProps;
     dndProps: Pick<
       TimelineBodyProps,
       "sensors" | "handleDragStart" | "handleDragMove" | "handleDragEnd" | "handleDragCancel"
@@ -101,9 +112,11 @@ export type TimelineBoardScreenProps = {
     };
   };
   mobile: {
-    viewMode: "timeline" | "list";
+    viewMode: "timeline" | "list" | "month";
+    timelineTransitionPending: boolean;
     timelineProps: MobileTimelineBaseProps;
     listProps: MobileListProps;
+    monthProps: MobileMonthProps;
     leftPanelProps: SidebarMenuBaseProps;
     selectorPresentation: {
       currentSection: SidebarSectionKey;
@@ -149,6 +162,16 @@ export type TimelineBoardScreenProps = {
         open: false;
       };
 };
+
+function TimelineLoadingPlaceholder() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50/40">
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-500 shadow-sm">
+        Timeline を読み込み中...
+      </div>
+    </div>
+  );
+}
 
 export default function TimelineBoardScreen({
   parseResult,
@@ -257,6 +280,28 @@ export default function TimelineBoardScreen({
   const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
   const mobileSelectorRef = useRef<HTMLDivElement | null>(null);
   const previousMobileSectionRef = useRef<SidebarSectionKey | null>(null);
+  const renderDesktopTabs = () => (
+    <div className="border-b border-slate-100 bg-white px-3">
+      <div className="flex h-8 items-center gap-2 overflow-x-auto">
+        {desktop.tabItems.map((item) => {
+          const isActive = item.key === desktop.activeView;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => desktop.onTabChange(item.key)}
+              data-focus-group="toolbar"
+              data-focus-part="control"
+              className={isActive ? activeTabClassName : inactiveTabClassName}
+              aria-current={isActive ? "page" : undefined}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!showMobileSelector) return;
@@ -641,29 +686,13 @@ export default function TimelineBoardScreen({
               >
                 {renderDesktopShell(
                   <>
-                    <div className="border-b border-slate-100 bg-white px-3">
-                      <div className="flex h-8 items-center gap-2 overflow-x-auto">
-                        {desktop.tabItems.map((item) => {
-                          const isActive = item.key === desktop.activeView;
-                          return (
-                            <button
-                              key={item.key}
-                              type="button"
-                              onClick={() => desktop.onTabChange(item.key)}
-                              data-focus-group="toolbar"
-                              data-focus-part="control"
-                              className={isActive ? activeTabClassName : inactiveTabClassName}
-                              aria-current={isActive ? "page" : undefined}
-                            >
-                              {item.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
+                    {renderDesktopTabs()}
                     <DesktopTimelineToolbar {...desktop.timelineToolbarProps} />
-                    <DesktopTimelineView {...desktop.timelineViewProps} />
+                    {desktop.timelineTransitionPending ? (
+                      <TimelineLoadingPlaceholder />
+                    ) : (
+                      <DesktopTimelineView {...desktop.timelineViewProps} />
+                    )}
                   </>
                 )}
 
@@ -682,29 +711,18 @@ export default function TimelineBoardScreen({
             <>
               {renderDesktopShell(
                 <>
-                  <div className="border-b border-slate-100 bg-white px-3">
-                    <div className="flex h-8 items-center gap-2 overflow-x-auto">
-                      {desktop.tabItems.map((item) => {
-                        const isActive = item.key === desktop.activeView;
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => desktop.onTabChange(item.key)}
-                            data-focus-group="toolbar"
-                            data-focus-part="control"
-                            className={isActive ? activeTabClassName : inactiveTabClassName}
-                            aria-current={isActive ? "page" : undefined}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <DesktopListToolbar {...desktop.listToolbarProps} />
-                  <DesktopListView {...desktop.listViewProps} />
+                  {renderDesktopTabs()}
+                  {desktop.activeView === "list" ? (
+                    <>
+                      <DesktopListToolbar {...desktop.listToolbarProps} />
+                      <DesktopListView {...desktop.listViewProps} />
+                    </>
+                  ) : (
+                    <>
+                      <DesktopMonthToolbar {...desktop.monthToolbarProps} />
+                      <DesktopMonthView {...desktop.monthViewProps} />
+                    </>
+                  )}
                 </>
               )}
             </>
@@ -714,12 +732,21 @@ export default function TimelineBoardScreen({
         {mobile.viewMode === "timeline" ? (
           <div className="flex-1 overflow-hidden md:hidden">
             {renderMobileTopArea()}
-            <MobileTimelineView {...mobile.timelineProps} />
+            {mobile.timelineTransitionPending ? (
+              <TimelineLoadingPlaceholder />
+            ) : (
+              <MobileTimelineView {...mobile.timelineProps} />
+            )}
+          </div>
+        ) : mobile.viewMode === "list" ? (
+          <div className="flex-1 overflow-hidden md:hidden">
+            {renderMobileTopArea()}
+            <MobileListView {...mobile.listProps} />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden md:hidden">
             {renderMobileTopArea()}
-            <MobileListView {...mobile.listProps} />
+            <MobileMonthView {...mobile.monthProps} />
           </div>
         )}
 

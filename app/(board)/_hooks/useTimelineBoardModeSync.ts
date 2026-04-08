@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
+import { getMonthGridSpec } from "@/app/(board)/_components/timeline/month-view-helpers";
 import {
   LIST_WINDOW_PRESETS,
   listWindowRange,
@@ -25,8 +26,8 @@ type ListUrlUpdateArgs = {
 };
 
 type UseTimelineBoardModeSyncArgs = {
-  viewMode: "timeline" | "list";
-  handleSetViewMode: (mode: "timeline" | "list") => void;
+  viewMode: "timeline" | "list" | "month";
+  handleSetViewMode: (mode: "timeline" | "list" | "month") => void;
   dataDays: TimelineResponse["days"] | undefined;
   dataStartOffset?: number;
   dataRange?: number;
@@ -52,8 +53,13 @@ type UseTimelineBoardModeSyncArgs = {
   listWindow: ListWindow;
   setListWindow: (window: ListWindow) => void;
   setListWindowPresetKey: (preset: ListWindowPresetKey) => void;
+  monthAnchorDate: string;
+  setMonthAnchorDate: (isoDate: string) => void;
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   updateUrlForList: (args: ListUrlUpdateArgs) => void;
+  updateUrlForMonth: (args: { date?: string | null; method?: "replace" | "push" }) => void;
+  timelineRange: number;
+  suppressMonthUrlSyncRef: React.MutableRefObject<boolean>;
 };
 
 const addDaysToIsoDate = (baseIsoDate: string, delta: number) => {
@@ -87,11 +93,17 @@ export function useTimelineBoardModeSync({
   listWindow,
   setListWindow,
   setListWindowPresetKey,
+  monthAnchorDate,
+  setMonthAnchorDate,
   updateUrlForTimeline,
   updateUrlForList,
+  updateUrlForMonth,
+  timelineRange,
+  suppressMonthUrlSyncRef,
 }: UseTimelineBoardModeSyncArgs) {
   const hasAppliedInitialListWindowRef = useRef(false);
-  const previousViewModeRef = useRef<"timeline" | "list">(viewMode);
+  const hasAppliedInitialMonthWindowRef = useRef(false);
+  const previousViewModeRef = useRef<"timeline" | "list" | "month">(viewMode);
   const pendingTimelineAnchorDateRef = useRef<string | null>(null);
   const pendingListWindowAutoSyncRef = useRef(false);
   const pendingListWindowAutoSyncAttemptsRef = useRef(0);
@@ -156,7 +168,7 @@ export function useTimelineBoardModeSync({
   );
 
   const handleViewModeChange = useCallback(
-    (mode: "timeline" | "list") => {
+    (mode: "timeline" | "list" | "month") => {
       if (mode === viewMode) return;
 
       const today = getCurrentTimelineIsoDateJst(timelineStartHour);
@@ -169,6 +181,16 @@ export function useTimelineBoardModeSync({
         dayWindowStartRef.current = targetOffset;
         setAnchorDayIso(targetDate);
         pendingTimelineAnchorDateRef.current = targetDate;
+        pendingListWindowAutoSyncRef.current = false;
+        pendingListWindowAutoSyncAttemptsRef.current = 0;
+      } else if (mode === "month") {
+        const nextMonthAnchor = targetDate;
+        const monthGrid = getMonthGridSpec(nextMonthAnchor);
+        const startOffset = getDayDiff(monthGrid.gridStartIso, today);
+        setDayWindowStart(startOffset);
+        dayWindowStartRef.current = startOffset;
+        setMonthAnchorDate(nextMonthAnchor);
+        pendingTimelineAnchorDateRef.current = null;
         pendingListWindowAutoSyncRef.current = false;
         pendingListWindowAutoSyncAttemptsRef.current = 0;
       } else {
@@ -200,6 +222,7 @@ export function useTimelineBoardModeSync({
       setDayWindowStart,
       setListAnchorDate,
       setListAnchorOffset,
+      setMonthAnchorDate,
       viewMode,
       timelineStartHour,
     ],
@@ -274,6 +297,83 @@ export function useTimelineBoardModeSync({
   useEffect(() => {
     if (viewMode !== "timeline") return;
 
+    const today = getCurrentTimelineIsoDateJst(timelineStartHour);
+    const targetAnchorDate = anchorDayIso || resolvedDate || today;
+    const startOffset = getDayDiff(targetAnchorDate, today);
+
+    if (status === "loading") return;
+
+    if (dataStartOffset === startOffset && dataRange === timelineRange) {
+      previousViewModeRef.current = "timeline";
+      return;
+    }
+
+    setDayWindowStart(startOffset);
+    dayWindowStartRef.current = startOffset;
+    pendingTimelineAnchorDateRef.current = targetAnchorDate;
+    void fetchTimeline(startOffset, { range: timelineRange });
+    previousViewModeRef.current = "timeline";
+  }, [
+    anchorDayIso,
+    dataRange,
+    dataStartOffset,
+    dayWindowStartRef,
+    fetchTimeline,
+    resolvedDate,
+    setDayWindowStart,
+    status,
+    timelineRange,
+    timelineStartHour,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "month") {
+      suppressMonthUrlSyncRef.current = false;
+      hasAppliedInitialMonthWindowRef.current = false;
+      return;
+    }
+
+    const today = getCurrentTimelineIsoDateJst(timelineStartHour);
+    const monthGrid = getMonthGridSpec(monthAnchorDate || today);
+    const startOffset = getDayDiff(monthGrid.gridStartIso, today);
+
+    if (status === "loading") return;
+
+    if (dataStartOffset === startOffset && dataRange === monthGrid.range) {
+      hasAppliedInitialMonthWindowRef.current = true;
+      previousViewModeRef.current = "month";
+      if (!suppressMonthUrlSyncRef.current) {
+        updateUrlForMonth({
+          date: monthAnchorDate || today,
+          method: "replace",
+        });
+      }
+      return;
+    }
+
+    hasAppliedInitialMonthWindowRef.current = true;
+    setDayWindowStart(startOffset);
+    dayWindowStartRef.current = startOffset;
+    void fetchTimeline(startOffset, { range: monthGrid.range });
+    previousViewModeRef.current = "month";
+  }, [
+    dataRange,
+    dataStartOffset,
+    dayWindowStartRef,
+    fetchTimeline,
+    monthAnchorDate,
+    setDayWindowStart,
+    status,
+    suppressMonthUrlSyncRef,
+    timelineStartHour,
+    updateUrlForMonth,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline") return;
+
     const pendingAnchorDate = pendingTimelineAnchorDateRef.current;
     if (!pendingAnchorDate) return;
     if (dataDays?.[0]?.isoDate !== pendingAnchorDate) return;
@@ -284,7 +384,9 @@ export function useTimelineBoardModeSync({
 
   useEffect(() => {
     if (viewMode !== "list") {
-      previousViewModeRef.current = "timeline";
+      if (viewMode === "timeline" || viewMode === "month") {
+        previousViewModeRef.current = viewMode;
+      }
       return;
     }
 

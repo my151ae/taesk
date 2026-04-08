@@ -61,7 +61,8 @@ type UseTimelineBoardScreenArgs = {
   setCalendarPreset: (preset: "visible" | "this-week" | "next-week") => void;
   refreshGoogleCalendar: () => void;
   handleGoogleConnect: () => void;
-  viewMode: "timeline" | "list";
+  viewMode: "timeline" | "list" | "month";
+  timelineTransitionPending: boolean;
   onShortcutsClick: () => void;
   activeLeftPanelMode: LeftPanelMode;
   mobileLeftPanelMode: LeftPanelMode;
@@ -101,6 +102,7 @@ type UseTimelineBoardScreenArgs = {
   handlePrevDay: () => void;
   handleNextDay: () => void;
   goToDay: (isoDate: string) => Promise<void>;
+  openTimelineDay: (isoDate: string) => void;
   handlePrevDayRange: () => void;
   handleNextDayRange: () => void;
   eventsByDay: Record<string, TimelineResponse["events"]>;
@@ -178,7 +180,11 @@ type UseTimelineBoardScreenArgs = {
   handleListPrevWeek: () => void;
   handleListNextWeek: () => void;
   handleListToday: () => void;
-  handleViewModeChange: (mode: "timeline" | "list") => void;
+  monthAnchorDate: string;
+  handleMonthPrev: () => void;
+  handleMonthNext: () => void;
+  handleMonthToday: () => void;
+  handleViewModeChange: (mode: "timeline" | "list" | "month") => void;
   showShareDialog: boolean;
   setShowShareDialog: (show: boolean) => void;
   showNotificationSettings: boolean;
@@ -244,6 +250,7 @@ export function useTimelineBoardScreen({
   refreshGoogleCalendar,
   handleGoogleConnect,
   viewMode,
+  timelineTransitionPending,
   onShortcutsClick,
   activeLeftPanelMode,
   mobileLeftPanelMode,
@@ -283,6 +290,7 @@ export function useTimelineBoardScreen({
   handlePrevDay,
   handleNextDay,
   goToDay,
+  openTimelineDay,
   handlePrevDayRange,
   handleNextDayRange,
   eventsByDay,
@@ -349,6 +357,10 @@ export function useTimelineBoardScreen({
   handleListPrevWeek,
   handleListNextWeek,
   handleListToday,
+  monthAnchorDate,
+  handleMonthPrev,
+  handleMonthNext,
+  handleMonthToday,
   handleViewModeChange,
   showShareDialog,
   setShowShareDialog,
@@ -433,6 +445,7 @@ export function useTimelineBoardScreen({
     handleTimelineViewMount,
     openCardModal,
     handleToggleCardChecked,
+    handleRenameCardTitle,
     activeResize,
     handleResizeStart,
     handleResizeMove,
@@ -446,6 +459,7 @@ export function useTimelineBoardScreen({
     handlePrevDay,
     handleNextDay,
     goToDay,
+    openTimelineDay,
     handlePrevDayRange,
     handleNextDayRange,
     handleDayRangeChange: onDayRangeChange,
@@ -506,6 +520,10 @@ export function useTimelineBoardScreen({
     handleListPrevWeek,
     handleListNextWeek,
     handleListToday,
+    monthAnchorDate,
+    handleMonthPrev,
+    handleMonthNext,
+    handleMonthToday,
     handleViewModeChange,
   });
 
@@ -593,6 +611,7 @@ export function useTimelineBoardScreen({
     headerProps,
     desktop: {
       activeView: desktopActiveView,
+      timelineTransitionPending,
       tabItems: desktopTabItems,
       onTabChange: viewModels.desktop.mainPanel.tabs.onChange,
       leftPanelProps,
@@ -606,6 +625,11 @@ export function useTimelineBoardScreen({
       listToolbarProps: viewModels.desktop.mainPanel.views.list.toolbar,
       listViewProps: {
         ...viewModels.desktop.mainPanel.views.list.body,
+        onRenameCardTitle: handleRenameCardTitle,
+      },
+      monthToolbarProps: viewModels.desktop.mainPanel.views.month.toolbar,
+      monthViewProps: {
+        ...viewModels.desktop.mainPanel.views.month.body,
         onRenameCardTitle: handleRenameCardTitle,
       },
       dndProps: {
@@ -624,8 +648,10 @@ export function useTimelineBoardScreen({
     },
     mobile: {
       viewMode,
+      timelineTransitionPending,
       timelineProps: viewModels.mobile.timeline,
       listProps: viewModels.mobile.list,
+      monthProps: viewModels.mobile.month,
       leftPanelProps,
       selectorPresentation: {
         currentSection:

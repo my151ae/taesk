@@ -48,7 +48,7 @@ type TimelineHeaderProps = {
     handleGoogleConnect: () => void;
     isGoogleLoading: boolean;
     realtimeStatus: 'connected' | 'connecting' | 'disconnected';
-    viewMode: 'timeline' | 'list';
+    viewMode: 'timeline' | 'list' | 'month';
     onShortcutsClick: () => void;
     onOpenTeamSettings: (teamId: string | null | undefined) => void;
     collapsed?: boolean;

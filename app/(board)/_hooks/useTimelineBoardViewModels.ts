@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   KeyboardEvent,
   MouseEvent,
@@ -43,11 +43,16 @@ import type {
   DesktopListToolbarProps,
   DesktopListViewProps,
 } from "@/app/(board)/_components/timeline/DesktopListView";
+import type {
+  DesktopMonthToolbarProps,
+  DesktopMonthViewProps,
+} from "@/app/(board)/_components/timeline/DesktopMonthView";
+import type { MobileMonthViewProps } from "@/app/(board)/_components/timeline/MobileMonthView";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import { useDesktopListState } from "@/app/(board)/_hooks/useDesktopListState";
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
-export type DesktopMainPanelViewMode = "timeline" | "list";
+export type DesktopMainPanelViewMode = "timeline" | "list" | "month";
 
 type UseTimelineBoardViewModelsArgs = {
   viewMode: DesktopMainPanelViewMode;
@@ -72,6 +77,7 @@ type UseTimelineBoardViewModelsArgs = {
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
   handleToggleCardChecked: (cardId: string, checked: boolean) => void;
+  handleRenameCardTitle: (cardId: string, nextTitle: string) => Promise<boolean>;
   activeResize: ActiveResizeState | null;
   handleResizeStart: (e: PointerEvent, cardId: string, startMinutes: number, duration: number, edge: "top" | "bottom") => void;
   handleResizeMove: (e: PointerEvent) => void;
@@ -85,6 +91,7 @@ type UseTimelineBoardViewModelsArgs = {
   handlePrevDay: () => void;
   handleNextDay: () => void;
   goToDay: (isoDate: string) => Promise<void>;
+  openTimelineDay: (isoDate: string) => void;
   handlePrevDayRange: () => void;
   handleNextDayRange: () => void;
   handleDayRangeChange: (days: number) => void;
@@ -150,6 +157,10 @@ type UseTimelineBoardViewModelsArgs = {
   handleListPrevWeek: () => void;
   handleListNextWeek: () => void;
   handleListToday: () => void;
+  monthAnchorDate: string;
+  handleMonthPrev: () => void;
+  handleMonthNext: () => void;
+  handleMonthToday: () => void;
   handleViewModeChange: (mode: DesktopMainPanelViewMode) => void;
 };
 
@@ -265,7 +276,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   ]);
 
   const availableKeys = useMemo<DesktopMainPanelViewMode[]>(
-    () => ["timeline", "list"],
+    () => ["timeline", "list", "month"],
     []
   );
   const fallbackKey: DesktopMainPanelViewMode = args.viewMode;
@@ -278,6 +289,13 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
 
   const timelineEventsByDay = useMemo(() => args.eventsByDay, [args.eventsByDay]);
   const timelineBuckets = useMemo(() => args.abBuckets, [args.abBuckets]);
+  const openTimelineDay = args.openTimelineDay;
+  const openMonthDayTimeline = useCallback(
+    (isoDate: string) => {
+      openTimelineDay(isoDate);
+    },
+    [openTimelineDay],
+  );
 
   const timelineToolbar = useMemo<DesktopTimelineToolbarProps>(
     () => ({
@@ -475,11 +493,46 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
     ]
   );
 
+  const monthToolbar: DesktopMonthToolbarProps = {
+    monthAnchorDate: args.monthAnchorDate,
+    onPrevMonth: args.handleMonthPrev,
+    onNextMonth: args.handleMonthNext,
+    onToday: args.handleMonthToday,
+  };
+
+  const monthBody = useMemo<DesktopMonthViewProps>(
+    () => ({
+      days: args.days,
+      eventsByDay: args.eventsByDay,
+      abBuckets: args.abBuckets,
+      monthAnchorDate: args.monthAnchorDate,
+      openCardModal: args.openCardModal,
+      onToggleCheck: args.handleToggleCardChecked,
+      onRenameCardTitle: args.handleRenameCardTitle,
+      onCardContextMenu: args.handleCardContextMenu,
+      onOpenDayTimeline: openMonthDayTimeline,
+      status: args.status,
+    }),
+    [
+      args.days,
+      args.eventsByDay,
+      args.abBuckets,
+      args.monthAnchorDate,
+      args.openCardModal,
+      args.handleToggleCardChecked,
+      args.handleRenameCardTitle,
+      args.handleCardContextMenu,
+      openMonthDayTimeline,
+      args.status,
+    ],
+  );
+
   const mainPanel = {
     tabs: {
       items: [
         { key: "timeline" as const, label: "Timeline" },
         { key: "list" as const, label: "List" },
+        { key: "month" as const, label: "Month" },
       ],
       activeKey,
       availableKeys,
@@ -494,6 +547,10 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       list: {
         toolbar: listToolbar,
         body: listBody,
+      },
+      month: {
+        toolbar: monthToolbar,
+        body: monthBody,
       },
     },
   };
@@ -566,6 +623,20 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       showChecked: listState.showChecked,
       showUnchecked: listState.showUnchecked,
       showGoogle: listState.showGoogle,
+    },
+    month: {
+      days: args.days,
+      eventsByDay: args.eventsByDay,
+      abBuckets: args.abBuckets,
+      monthAnchorDate: args.monthAnchorDate,
+      openCardModal: args.openCardModal,
+      onToggleCheck: args.handleToggleCardChecked,
+      onCardContextMenu: args.handleCardContextMenu,
+      onOpenDayTimeline: openMonthDayTimeline,
+      onPrevMonth: args.handleMonthPrev,
+      onNextMonth: args.handleMonthNext,
+      onToday: args.handleMonthToday,
+      status: args.status,
     },
   };
 

@@ -12,7 +12,7 @@ type TimelineUrlUpdateArgs = {
 };
 
 type UseTimelineScrollSyncArgs = {
-  viewMode: "timeline" | "list";
+  viewMode: "timeline" | "list" | "month";
   urlDate: string | null;
   urlRange: number | null;
   urlTime: number | null;

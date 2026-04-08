@@ -11,9 +11,9 @@ type UseTimelineUrlStateArgs = {
   defaultListAfter?: number | null;
 };
 
-export type TimelineViewMode = "timeline" | "list";
+export type TimelineViewMode = "timeline" | "list" | "month";
 export type LeftPanelMode = "none" | "overdue" | "completed" | "notifications" | "tags" | "search" | "trash";
-export type RightPanelMode = "timeline" | "list";
+export type RightPanelMode = "timeline" | "list" | "month";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
 export type ListWindowPresetKey =
@@ -89,6 +89,12 @@ type ListUrlUpdateArgs = {
   before: number;
   after: number;
   time?: number | null;
+  method?: UrlUpdateMethod;
+  card?: string | null;
+};
+
+type MonthUrlUpdateArgs = {
+  date?: string | null;
   method?: UrlUpdateMethod;
   card?: string | null;
 };
@@ -172,7 +178,7 @@ const isLeftPanelMode = (value: string | null): value is LeftPanelMode =>
   value === "none" || value === "overdue" || value === "completed" || value === "notifications" || value === "tags" || value === "search" || value === "trash";
 
 const isRightPanelMode = (value: string | null): value is RightPanelMode =>
-  value === "timeline" || value === "list";
+  value === "timeline" || value === "list" || value === "month";
 
 const buildDefaultResolvedState = (
   defaults: ParseDefaults,
@@ -227,7 +233,7 @@ export function normalizeBoardUiState(
   let showChecked = input.showChecked ?? true;
   let showUnchecked = input.showUnchecked ?? true;
 
-  if (rightPanelMode !== "timeline") {
+  if (rightPanelMode === "list") {
     date = null;
   }
   if (leftPanelMode !== "tags") {
@@ -293,7 +299,7 @@ export function serializeBoardUiStateToSearchParams(args: {
   params.set("lp", normalized.leftPanelMode);
   params.set("rp", normalized.rightPanelMode);
 
-  if (normalized.rightPanelMode === "timeline" && normalized.date) {
+  if ((normalized.rightPanelMode === "timeline" || normalized.rightPanelMode === "month") && normalized.date) {
     params.set("date", normalized.date);
   }
   if (normalized.leftPanelMode === "tags" && normalized.tag) {
@@ -528,6 +534,19 @@ export const useTimelineUrlState = ({
     [resolvedState.leftPanelMode, updateBoardUiState],
   );
 
+  const updateUrlForMonth = useCallback(
+    ({ date, method, card }: MonthUrlUpdateArgs) => {
+      updateBoardUiState({
+        leftPanelMode: resolvedState.leftPanelMode,
+        rightPanelMode: "month",
+        date: date ?? resolvedState.date ?? todayJstIso(),
+        card,
+        method,
+      });
+    },
+    [resolvedState.date, resolvedState.leftPanelMode, updateBoardUiState],
+  );
+
   const setCard = useCallback(
     (card: string | null, options?: { method?: UrlUpdateMethod }) => {
       const method = options?.method ?? "replace";
@@ -575,6 +594,7 @@ export const useTimelineUrlState = ({
     updateBoardUiState,
     updateUrlForTimeline,
     updateUrlForList,
+    updateUrlForMonth,
     setCard,
   };
 };

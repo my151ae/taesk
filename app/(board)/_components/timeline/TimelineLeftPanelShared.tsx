@@ -618,14 +618,6 @@ export function CompletedSectionBody({
   groupedResults: readonly CompletedResultsGroup[];
   currentMonthKey: string | null;
 } & SharedCardActions & IncrementalVisibilityProps) {
-  const getInitialExpandedGroupKeys = useMemo(() => {
-    if (groupedResults.length === 0) return [];
-    const currentMonthGroup = currentMonthKey
-      ? groupedResults.find((group) => group.key === currentMonthKey && !group.isUndated)
-      : null;
-    if (currentMonthGroup) return [currentMonthGroup.key];
-    return [groupedResults[0].key];
-  }, [currentMonthKey, groupedResults]);
   const resetKey = useMemo(
     () => `${currentMonthKey ?? ""}::${results.map((result) => result.item.card_id).join(",")}`,
     [currentMonthKey, results],
@@ -637,12 +629,12 @@ export function CompletedSectionBody({
     onVisibleCountChange,
   });
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(
-    () => new Set(getInitialExpandedGroupKeys),
+    () => new Set(),
   );
 
   useEffect(() => {
-    setExpandedGroupKeys(new Set(getInitialExpandedGroupKeys));
-  }, [getInitialExpandedGroupKeys, resetKey]);
+    setExpandedGroupKeys(new Set());
+  }, [resetKey]);
 
   const exposedGroups = useMemo(() => {
     let remainingVisibleBudget = sliceEnd;
@@ -728,7 +720,7 @@ export function CompletedSectionBody({
                           : "border-slate-200 bg-white text-slate-500",
                       )}
                     >
-                      {isExpanded ? "開いている" : "閉じている"}
+                      {isExpanded ? "Opening" : "Closed"}
                     </span>
                   </button>
 

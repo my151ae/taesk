@@ -3,7 +3,7 @@
 export type ShortcutScope = "board" | "modal" | "context-menu";
 export type ShortcutRegion = "sidebar" | "main-panel" | "modal-title" | "modal-body" | "shortcuts-modal";
 export type ShortcutSection = "overdue" | "search" | "a" | "b" | "completed";
-export type ShortcutView = "timeline" | "list";
+export type ShortcutView = "timeline" | "list" | "month";
 export type ShortcutPart = "card" | "checkbox" | "title" | "editor" | "add-button" | "section-button";
 export type ShortcutState = "active" | "editing" | "readonly" | "dragging" | "menu-open";
 export type LegacyShortcutContext = "timeline-card" | "cardmodal-title" | "cardmodal-editor";
@@ -97,6 +97,7 @@ const SECTION_ORDER: Record<ShortcutSection, number> = {
 const VIEW_ORDER: Record<ShortcutView, number> = {
   timeline: 1,
   list: 2,
+  month: 3,
 };
 
 const PART_ORDER: Record<ShortcutPart, number> = {
@@ -133,6 +134,7 @@ const SECTION_LABELS: Record<ShortcutSection, string> = {
 const VIEW_LABELS: Record<ShortcutView, string> = {
   timeline: "Timeline",
   list: "List",
+  month: "Month",
 };
 
 const PART_LABELS: Record<ShortcutPart, string> = {

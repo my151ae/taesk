@@ -29,6 +29,7 @@ import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
   getCurrentTimelineIsoDateJst,
+  getDayDiff,
   type TimelineEvent,
   getNowMinutesJst,
   getTimelineIsoDateJst,
@@ -74,6 +75,7 @@ type TimelineBoardPageContentProps = {
   setDayWindowStart: ReturnType<typeof useTimelineUrlState>["setDayWindowStart"];
   updateUrlForTimeline: ReturnType<typeof useTimelineUrlState>["updateUrlForTimeline"];
   updateUrlForList: ReturnType<typeof useTimelineUrlState>["updateUrlForList"];
+  updateUrlForMonth: ReturnType<typeof useTimelineUrlState>["updateUrlForMonth"];
   updateBoardUiState: ReturnType<typeof useTimelineUrlState>["updateBoardUiState"];
   setCard: ReturnType<typeof useTimelineUrlState>["setCard"];
 };
@@ -237,12 +239,14 @@ function TimelineBoardPageContent({
   setDayWindowStart,
   updateUrlForTimeline,
   updateUrlForList,
+  updateUrlForMonth,
   updateBoardUiState,
   setCard,
 }: TimelineBoardPageContentProps) {
   const router = useRouter();
   const boardMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingToolbarFocusSelectorRef = useRef<string | null>(null);
+  const suppressMonthUrlSyncRef = useRef(false);
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
   const [isDesktopViewport, setIsDesktopViewport] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -378,14 +382,20 @@ function TimelineBoardPageContent({
     setListAnchorDate,
     listAnchorOffset,
     setListAnchorOffset,
+    monthAnchorDate,
+    setMonthAnchorDate,
     intendedDayRange,
     effectiveDayRange,
     handleSetViewMode,
+    handleMonthPrev,
+    handleMonthNext,
+    handleMonthToday,
   } = useTimelineBoardController({
     initialTimelineRange: initialBoard.day_range,
     resolvedState,
     updateUrlForTimeline,
     updateUrlForList,
+    updateUrlForMonth,
   });
 
   const desktopTimelineFetchRange = useMemo(() => {
@@ -416,7 +426,7 @@ function TimelineBoardPageContent({
   useEffect(() => {
     if (hiddenDesktopDayIsos.length === 0) return;
     setHiddenDesktopDayIsos([]);
-  }, [currentBoard.id, isDesktopViewport, viewMode]);
+  }, [currentBoard.id, hiddenDesktopDayIsos.length, isDesktopViewport, viewMode]);
 
   const {
     data,
@@ -771,9 +781,32 @@ function TimelineBoardPageContent({
     requestedFetchRange: desktopTimelineFetchRange,
   });
 
+  const openTimelineDay = useCallback((isoDate: string) => {
+    if (!isoDate) return;
+    suppressMonthUrlSyncRef.current = true;
+    setHiddenDesktopDayIsos([]);
+    setAnchorDayIso(isoDate);
+    setActiveDayIndex(0);
+    updateUrlForTimeline({
+      date: isoDate,
+      range: timelineRange,
+      time: null,
+      method: "push",
+    });
+  }, [setActiveDayIndex, setAnchorDayIso, timelineRange, updateUrlForTimeline]);
+
   const visibleDays = useMemo(() => {
     const days = data?.days ?? [];
     if (!days.length) return [];
+    if (viewMode === "timeline") {
+      const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
+      if (data?.startOffset !== expectedStartOffset || data?.range !== timelineRange) {
+        return [];
+      }
+    }
+    if (viewMode === "month") {
+      return days;
+    }
     if (viewMode === "timeline" && isDesktopViewport) {
       return buildDesktopTimelineColumns({
         candidateDays: days,
@@ -784,17 +817,30 @@ function TimelineBoardPageContent({
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, data?.days, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, timelineRange, timelineStartHour, viewMode]);
+
+  const timelineDataReady = useMemo(() => {
+    if (viewMode !== "timeline") return true;
+    const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
+    return data?.startOffset === expectedStartOffset && data?.range === timelineRange;
+  }, [anchorDayIso, data?.range, data?.startOffset, timelineRange, timelineStartHour, viewMode]);
+
+  const renderDays = useMemo(() => {
+    if (!timelineDataReady) return [];
+    return data?.days ?? [];
+  }, [data?.days, timelineDataReady]);
 
   useEffect(() => {
     if (viewMode !== "timeline") return;
     const days = data?.days ?? [];
     if (!days.length) return;
+    const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
+    if (data?.startOffset !== expectedStartOffset || data?.range !== timelineRange) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, setActiveDayIndex, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, setActiveDayIndex, timelineRange, timelineStartHour, viewMode]);
 
   const {
     calendarEventsByDay,
@@ -805,11 +851,14 @@ function TimelineBoardPageContent({
     refreshGoogleCalendar,
   } = useTimelineCalendar({
     calendarPreset,
-    calendarRangeStart: visibleDays[0] ? new Date(visibleDays[0].isoDate) : null,
-    calendarRangeEnd: visibleDays[visibleDays.length - 1]
-      ? new Date(visibleDays[visibleDays.length - 1].isoDate)
-      : null,
-    days: data?.days ?? [],
+    calendarRangeStart: viewMode === "month" ? null : visibleDays[0] ? new Date(visibleDays[0].isoDate) : null,
+    calendarRangeEnd:
+      viewMode === "month"
+        ? null
+        : visibleDays[visibleDays.length - 1]
+          ? new Date(visibleDays[visibleDays.length - 1].isoDate)
+          : null,
+    days: renderDays,
   });
 
   const googleCalendarLabel = useMemo(() => {
@@ -1100,8 +1149,13 @@ function TimelineBoardPageContent({
     listWindow,
     setListWindow,
     setListWindowPresetKey,
+    monthAnchorDate,
+    setMonthAnchorDate,
     updateUrlForTimeline,
     updateUrlForList,
+    updateUrlForMonth,
+    timelineRange,
+    suppressMonthUrlSyncRef,
   });
 
   const handleListTodayWithFocusRestore = useCallback(() => {
@@ -1151,6 +1205,21 @@ function TimelineBoardPageContent({
     scheduleToolbarFocusRestore();
     modeSync.handleListNextWeek();
   }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+
+  const handleMonthPrevWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleMonthPrev();
+  }, [handleMonthPrev, scheduleToolbarFocusRestore]);
+
+  const handleMonthNextWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleMonthNext();
+  }, [handleMonthNext, scheduleToolbarFocusRestore]);
+
+  const handleMonthTodayWithFocusRestore = useCallback(() => {
+    scheduleToolbarFocusRestore();
+    handleMonthToday();
+  }, [handleMonthToday, scheduleToolbarFocusRestore]);
 
   const handleSearchQueryChange = useCallback(
     (value: string) => {
@@ -1370,7 +1439,12 @@ function TimelineBoardPageContent({
     signOut,
     intendedDayRange,
     onDayRangeChange: handleDayRangeUpdate,
-    onTodayClick: viewMode === "list" ? handleListTodayWithFocusRestore : handleTodayClickWithFocusRestore,
+    onTodayClick:
+      viewMode === "list"
+        ? handleListTodayWithFocusRestore
+        : viewMode === "month"
+          ? handleMonthTodayWithFocusRestore
+          : handleTodayClickWithFocusRestore,
     realtimeStatus,
     googleToast,
     googleStatusText,
@@ -1381,6 +1455,7 @@ function TimelineBoardPageContent({
     refreshGoogleCalendar,
     handleGoogleConnect,
     viewMode,
+    timelineTransitionPending: !timelineDataReady,
     onShortcutsClick: () => setShowShortcutsModal(true),
     expandedSectionKey,
     activeLeftPanelMode: resolvedState.leftPanelMode,
@@ -1420,6 +1495,7 @@ function TimelineBoardPageContent({
     handlePrevDay: handlePrevDayWithFocusRestore,
     handleNextDay: handleNextDayWithFocusRestore,
     goToDay,
+    openTimelineDay,
     handlePrevDayRange: handlePrevDayRangeWithFocusRestore,
     handleNextDayRange: handleNextDayRangeWithFocusRestore,
     eventsByDay,
@@ -1492,6 +1568,10 @@ function TimelineBoardPageContent({
     handleListPrevWeek: handleListPrevWeekWithFocusRestore,
     handleListNextWeek: handleListNextWeekWithFocusRestore,
     handleListToday: handleListTodayWithFocusRestore,
+    monthAnchorDate,
+    handleMonthPrev: handleMonthPrevWithFocusRestore,
+    handleMonthNext: handleMonthNextWithFocusRestore,
+    handleMonthToday: handleMonthTodayWithFocusRestore,
     handleViewModeChange: modeSync.handleViewModeChange,
     showShareDialog,
     setShowShareDialog,
@@ -1611,6 +1691,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
     updateBoardUiState,
     updateUrlForTimeline,
     updateUrlForList,
+    updateUrlForMonth,
     setCard,
   } = useTimelineUrlState({
     basePath,
@@ -1676,6 +1757,7 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
       updateBoardUiState={updateBoardUiState}
       updateUrlForTimeline={updateUrlForTimeline}
       updateUrlForList={updateUrlForList}
+      updateUrlForMonth={updateUrlForMonth}
       setCard={setCard}
     />
   );

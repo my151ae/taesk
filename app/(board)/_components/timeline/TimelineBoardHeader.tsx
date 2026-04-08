@@ -35,7 +35,7 @@ type TimelineBoardHeaderProps = {
   isGoogleLoading: boolean;
   realtimeStatus: "connected" | "connecting" | "disconnected";
   googleToast: string | null;
-  viewMode: 'timeline' | 'list';
+  viewMode: 'timeline' | 'list' | 'month';
   onShortcutsClick: () => void;
   collapsed?: boolean;
 };
