@@ -28,7 +28,9 @@ import {
 } from "@/app/(board)/_stores/timeline-zoom-store";
 import {
   buildDesktopAllDayState,
-  buildVisibleDays,
+  buildDesktopTimelineColumns,
+  buildDesktopTimelineHiddenDaysForHide,
+  buildDesktopTimelineHiddenDaysForReveal,
   formatAllDayRange,
   formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
@@ -101,6 +103,8 @@ export type DesktopTimelineViewProps = {
   onPendingTitleEditConsumed: () => void;
   currentIsoDate: string | null;
   currentMinutes: number | null;
+  hiddenDayIsos: string[];
+  onHiddenDayIsosChange: (nextHiddenDayIsos: string[]) => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -249,20 +253,28 @@ export function DesktopTimelineView({
   onPendingTitleEditConsumed,
   currentIsoDate,
   currentMinutes,
+  hiddenDayIsos,
+  onHiddenDayIsosChange,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
   }, []);
 
-  // Calculate how many days to show based on dayRange setting
-  const { visibleDays, gridTemplateColumns: desktopGridTemplateColumns } = useMemo(
-    () =>
-      buildVisibleDays({
-        days,
-        activeDayIndex,
-        dayRange,
-      }),
-    [activeDayIndex, dayRange, days]
+  const {
+    visibleDays,
+    columns: renderColumns,
+    normalizedHiddenDayIsos,
+  } = useMemo(
+    () => buildDesktopTimelineColumns({ candidateDays: days, hiddenDayIsos, targetVisibleCount: dayRange }),
+    [dayRange, days, hiddenDayIsos]
+  );
+  const desktopGridTemplateColumns = useMemo(
+    () => `repeat(${visibleDays.length}, minmax(0, 1fr))`,
+    [visibleDays.length]
+  );
+  const visibleDayColumns = useMemo(
+    () => visibleDays.map((day) => ({ kind: "day" as const, key: day.key, day })),
+    [visibleDays]
   );
   const [abViewportHeight, setAbViewportHeight] = useState(0);
 
@@ -331,7 +343,7 @@ export function DesktopTimelineView({
 
   useEffect(() => {
     setActiveStackItem(null);
-  }, [activeDayIndex, dayRange, days.length]);
+  }, [activeDayIndex, dayRange, days.length, normalizedHiddenDayIsos]);
 
   useEffect(() => {
     if (contextMenuCardId) {
@@ -377,14 +389,102 @@ export function DesktopTimelineView({
   const { hasAllDayEvents, allDayLayout, allDayMinHeight } = useMemo(
     () =>
       buildDesktopAllDayState({
-        visibleDays,
+        renderColumns: visibleDayColumns,
         calendarAllDayByDay,
         rowHeight: ALL_DAY_ROW_HEIGHT,
         rowGap: 4,
         minHeight: 34,
       }),
-    [calendarAllDayByDay, visibleDays]
+    [calendarAllDayByDay, visibleDayColumns]
   );
+
+  const dayBoundaryControls = useMemo(() => {
+    const controls = new Map<string, { leftHiddenIsos: string[]; rightHiddenIsos: string[] }>();
+    visibleDays.forEach((day) => {
+      controls.set(day.isoDate, { leftHiddenIsos: [], rightHiddenIsos: [] });
+    });
+
+    renderColumns.forEach((column, index) => {
+      if (column.kind !== "gap") return;
+      const previousColumn = renderColumns[index - 1];
+      const nextColumn = renderColumns[index + 1];
+      if (previousColumn?.kind === "day") {
+        controls.set(previousColumn.day.isoDate, {
+          leftHiddenIsos: controls.get(previousColumn.day.isoDate)?.leftHiddenIsos ?? [],
+          rightHiddenIsos: column.hiddenIsos,
+        });
+      }
+      if (nextColumn?.kind === "day") {
+        controls.set(nextColumn.day.isoDate, {
+          leftHiddenIsos: column.hiddenIsos,
+          rightHiddenIsos: controls.get(nextColumn.day.isoDate)?.rightHiddenIsos ?? [],
+        });
+      }
+    });
+
+    return controls;
+  }, [renderColumns, visibleDays]);
+
+  const focusDayHeader = useCallback((targetIso: string | null, fallbackElement?: HTMLElement | null) => {
+    requestAnimationFrame(() => {
+      if (targetIso) {
+        const nextTarget = document.querySelector<HTMLElement>(`[data-timeline-day-hide-button="${targetIso}"]`);
+        if (nextTarget && !nextTarget.matches("[disabled]")) {
+          nextTarget.focus();
+          return;
+        }
+      }
+
+      if (fallbackElement && fallbackElement.isConnected) {
+        fallbackElement.focus();
+        return;
+      }
+
+      const nearbyTarget = document.querySelector<HTMLElement>("[data-timeline-day-hide-button]");
+      nearbyTarget?.focus();
+    });
+  }, []);
+
+  const handleHideDay = useCallback((dayIso: string, fallbackElement?: HTMLElement | null) => {
+    const currentDayIndex = visibleDays.findIndex((day) => day.isoDate === dayIso);
+    if (currentDayIndex < 0) {
+      fallbackElement?.focus();
+      return;
+    }
+
+    const nextHiddenDayIsos = buildDesktopTimelineHiddenDaysForHide({
+      candidateDays: days,
+      hiddenDayIsos: normalizedHiddenDayIsos,
+      targetIso: dayIso,
+    });
+    const nextModel = buildDesktopTimelineColumns({
+      candidateDays: days,
+      hiddenDayIsos: nextHiddenDayIsos,
+      targetVisibleCount: dayRange,
+    });
+    const nextFocusIso =
+      nextModel.visibleDays[Math.min(currentDayIndex, Math.max(0, nextModel.visibleDays.length - 1))]?.isoDate ?? null;
+
+    onHiddenDayIsosChange(nextHiddenDayIsos);
+    focusDayHeader(nextFocusIso, fallbackElement);
+  }, [dayRange, days, focusDayHeader, normalizedHiddenDayIsos, onHiddenDayIsosChange, visibleDays]);
+
+  const handleRevealHiddenIso = useCallback((revealIso: string | null, fallbackElement?: HTMLElement | null) => {
+    if (!revealIso) {
+      fallbackElement?.focus();
+      return;
+    }
+
+    const nextHiddenDayIsos = buildDesktopTimelineHiddenDaysForReveal({
+      candidateDays: days,
+      hiddenDayIsos: normalizedHiddenDayIsos,
+      revealIso,
+      pushHiddenIso: null,
+    });
+
+    onHiddenDayIsosChange(nextHiddenDayIsos);
+    focusDayHeader(revealIso, fallbackElement);
+  }, [days, focusDayHeader, normalizedHiddenDayIsos, onHiddenDayIsosChange]);
 
   useEffect(() => {
     onMount?.();
@@ -406,16 +506,43 @@ export function DesktopTimelineView({
                 {visibleDays.map((day, index) => {
                   const isToday = day.label.startsWith("Today ");
                   const headerLabel = isToday ? day.label.replace(/^Today\s+/, "") : day.label;
+                  const boundary = dayBoundaryControls.get(day.isoDate) ?? { leftHiddenIsos: [], rightHiddenIsos: [] };
+                  const revealLeftIso = boundary.leftHiddenIsos[0] ?? null;
+                  const revealRightIso = boundary.leftHiddenIsos[boundary.leftHiddenIsos.length - 1] ?? null;
 
                   return (
                     <div
                       key={day.key}
                       className={clsx(
-                        "relative flex h-full items-center justify-between px-3 text-center",
+                        "relative flex h-full items-center justify-center px-3 text-center",
                         index > 0 ? "border-l border-slate-100" : ""
                       )}
                     >
-                      <div className="flex w-full items-center justify-center leading-tight">
+                      {boundary.leftHiddenIsos.length > 0 ? (
+                        <div className="absolute left-0 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-slate-200 bg-white shadow-sm">
+                          <button
+                            type="button"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-l-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                            aria-label={revealLeftIso ? `${revealLeftIso} を再表示` : "日付を再表示"}
+                            data-testid={revealLeftIso ? `timeline-reveal-left-${day.isoDate}-${revealLeftIso}` : undefined}
+                            onClick={(event) => handleRevealHiddenIso(revealLeftIso, event.currentTarget)}
+                          >
+                            ◀
+                          </button>
+                          <span className="pointer-events-none text-[10px] text-slate-300">|</span>
+                          <button
+                            type="button"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-r-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                            aria-label={revealRightIso ? `${revealRightIso} を再表示` : "日付を再表示"}
+                            data-testid={revealRightIso ? `timeline-reveal-right-${day.isoDate}-${revealRightIso}` : undefined}
+                            onClick={(event) => handleRevealHiddenIso(revealRightIso, event.currentTarget)}
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      ) : null}
+
+                      <div className="flex min-w-0 items-center justify-center gap-1.5 leading-tight">
                         <span
                           className={clsx(
                             "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5 text-xs font-semibold",
@@ -427,6 +554,16 @@ export function DesktopTimelineView({
                           {headerLabel}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        className="inline-flex h-5 shrink-0 items-center rounded border border-slate-200 px-1.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50"
+                        aria-label={`${day.isoDate} を非表示`}
+                        data-timeline-day-hide-button={day.isoDate}
+                        data-testid={`timeline-hide-day-${day.isoDate}`}
+                        onClick={(event) => handleHideDay(day.isoDate, event.currentTarget)}
+                      >
+                        非表示
+                      </button>
                     </div>
                   );
                 })}
@@ -440,17 +577,16 @@ export function DesktopTimelineView({
                   }}
                 >
                   <div
-                    className="relative px-2 py-1.5"
+                    className="grid px-2 py-1.5"
                     style={{
-                      gridColumn: `1 / span ${visibleDays.length}`,
+                      gridColumn: "1 / -1",
+                      gridTemplateColumns: desktopGridTemplateColumns,
+                      gridTemplateRows: `repeat(${Math.max(allDayLayout.rows, 1)}, ${ALL_DAY_ROW_HEIGHT}px)`,
+                      rowGap: "4px",
                       minHeight: allDayMinHeight,
                     }}
                   >
                     {allDayLayout.segments.map((item) => {
-                      const span = item.end - item.start + 1;
-                      const dayWidth = 100 / visibleDays.length;
-                      const left = dayWidth * item.start;
-                      const width = dayWidth * span;
                       const rangeLabel = formatAllDayRange({ segment: item, visibleDays });
                       const inlineLabel = formatAllDayInlineLabel({
                         title: item.title,
@@ -464,11 +600,10 @@ export function DesktopTimelineView({
                           data-focus-part="card"
                           disabled={!onExternalEventClick}
                           onClick={() => onExternalEventClick?.(item.entry)}
-                          className="absolute flex h-6 items-center gap-2 overflow-hidden rounded-md border border-emerald-200 bg-white/90 px-2.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
+                          className="flex h-6 min-w-0 items-center gap-2 overflow-hidden rounded-md border border-emerald-200 bg-white/90 px-2.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
                           style={{
-                            top: 5 + item.row * (ALL_DAY_ROW_HEIGHT + 4),
-                            left: `calc(${left}% + 2px)`,
-                            width: `calc(${width}% - 4px)`,
+                            gridColumn: `${item.startColumn + 1} / span ${item.endColumn - item.startColumn + 1}`,
+                            gridRow: `${item.row + 1}`,
                           }}
                           title={inlineLabel}
                         >
@@ -503,59 +638,61 @@ export function DesktopTimelineView({
                   gridTemplateColumns: desktopGridTemplateColumns,
                 }}
               >
-                {visibleDays.map((day, index) => (
-                  <DaySection
-                    key={day.isoDate}
-                    day={day}
-                    index={index}
-                    events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
-                    indicatorTop={indicatorTop}
-                    indicatorDayIso={indicatorDayIso}
-                    timelineViewportHeight={timelineViewportHeight}
-                    activeDragCardId={activeDrag?.cardId ?? null}
-                    pointerPreview={pointerPreview}
-                    activeResize={activeResize}
-                    selectedSlot={selectedSlot}
-                    handleEventKeyDown={handleEventKeyDown}
-                    handleColumnClick={handleColumnClick}
-                    handleResizeStart={handleResizeStart}
-                    handleResizeMove={handleResizeMove}
-                    handleResizeEnd={handleResizeEnd}
-                    setSelectedSlot={setSelectedSlot}
-                    calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
-                    onExternalEventClick={onExternalEventClick}
-                    timelineStartHour={timelineStartHour}
-                    bucketsA={abBuckets[`${day.key}_a`] ?? EMPTY_BUCKET}
-                    bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
-                    bucketIndicator={bucketIndicator}
-                    onCreateBucketCard={onCreateBucketCard}
-                    onRequestCreateBucketCard={onRequestCreateBucketCard}
-                    viewportHeight={abViewportHeight}
-                    registerAbScrollContainer={registerAbScrollContainer}
-                    floatingLayerTop={floatingLayerTop}
-                    status={status}
-                    openCardModal={openCardModal}
-                    onToggleCheck={onToggleCheck}
-                    onRenameCardTitle={onRenameCardTitle}
-                    onCardContextMenu={onCardContextMenu}
-                    onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-                    contextMenuCardId={contextMenuCardId}
-                    hourHeight={hourHeight}
-                    activeStackItem={activeStackItem}
-                    setActiveStackItem={setActiveStackItem}
-                    selectedCardIds={selectedCardIds}
-                    selectionLeadCardId={selectionLeadCardId}
-                    onShiftSelect={onShiftSelect}
-                    onClearSelection={onClearSelection}
-                        onActivateCard={onActivateCard}
-                        activeCardId={activeCardId}
-                        activeLaneId={activeLaneId}
-                        pendingTitleEditCardId={pendingTitleEditCardId}
-                        onPendingTitleEditConsumed={onPendingTitleEditConsumed}
-                        currentIsoDate={currentIsoDate}
-                        currentMinutes={currentMinutes}
-                      />
-                ))}
+                {visibleDays.map((day, dayIndex) => {
+                  return (
+                    <DaySection
+                      key={day.isoDate}
+                      day={day}
+                      index={dayIndex}
+                      events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
+                      indicatorTop={indicatorTop}
+                      indicatorDayIso={indicatorDayIso}
+                      timelineViewportHeight={timelineViewportHeight}
+                      activeDragCardId={activeDrag?.cardId ?? null}
+                      pointerPreview={pointerPreview}
+                      activeResize={activeResize}
+                      selectedSlot={selectedSlot}
+                      handleEventKeyDown={handleEventKeyDown}
+                      handleColumnClick={handleColumnClick}
+                      handleResizeStart={handleResizeStart}
+                      handleResizeMove={handleResizeMove}
+                      handleResizeEnd={handleResizeEnd}
+                      setSelectedSlot={setSelectedSlot}
+                      calendarEvents={calendarEventsByDay?.[day.isoDate] ?? []}
+                      onExternalEventClick={onExternalEventClick}
+                      timelineStartHour={timelineStartHour}
+                      bucketsA={abBuckets[`${day.key}_a`] ?? EMPTY_BUCKET}
+                      bucketsB={abBuckets[`${day.key}_b`] ?? EMPTY_BUCKET}
+                      bucketIndicator={bucketIndicator}
+                      onCreateBucketCard={onCreateBucketCard}
+                      onRequestCreateBucketCard={onRequestCreateBucketCard}
+                      viewportHeight={abViewportHeight}
+                      registerAbScrollContainer={registerAbScrollContainer}
+                      floatingLayerTop={floatingLayerTop}
+                      status={status}
+                      openCardModal={openCardModal}
+                      onToggleCheck={onToggleCheck}
+                      onRenameCardTitle={onRenameCardTitle}
+                      onCardContextMenu={onCardContextMenu}
+                      onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+                      contextMenuCardId={contextMenuCardId}
+                      hourHeight={hourHeight}
+                      activeStackItem={activeStackItem}
+                      setActiveStackItem={setActiveStackItem}
+                      selectedCardIds={selectedCardIds}
+                      selectionLeadCardId={selectionLeadCardId}
+                      onShiftSelect={onShiftSelect}
+                      onClearSelection={onClearSelection}
+                      onActivateCard={onActivateCard}
+                      activeCardId={activeCardId}
+                      activeLaneId={activeLaneId}
+                      pendingTitleEditCardId={pendingTitleEditCardId}
+                      onPendingTitleEditConsumed={onPendingTitleEditConsumed}
+                      currentIsoDate={currentIsoDate}
+                      currentMinutes={currentMinutes}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>

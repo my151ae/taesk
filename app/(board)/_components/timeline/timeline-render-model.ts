@@ -14,6 +14,25 @@ import { buildOverlayCardData, findOverlayBucketEntry, findOverlayOverdueEntry }
 
 type StackedLayoutDevice = "desktop" | "mobile";
 
+export type DesktopTimelineGapKind = "leading" | "between" | "trailing";
+
+export type DesktopTimelineDayColumn = {
+  kind: "day";
+  key: string;
+  day: TimelineDay;
+};
+
+export type DesktopTimelineGapColumn = {
+  kind: "gap";
+  key: string;
+  gapKind: DesktopTimelineGapKind;
+  hiddenIsos: string[];
+};
+
+export type DesktopTimelineRenderColumn =
+  | DesktopTimelineDayColumn
+  | DesktopTimelineGapColumn;
+
 type AllDaySegmentSeed = {
   id: string;
   title: string;
@@ -26,10 +45,18 @@ type AllDaySegmentSeed = {
   calendarId?: string | null;
 };
 
-export type TimelineAllDaySegment = AllDaySegmentSeed & { row: number };
+export type TimelineAllDaySegment = AllDaySegmentSeed & {
+  row: number;
+  startColumn: number;
+  endColumn: number;
+  startDayIndex: number;
+  endDayIndex: number;
+};
 
 const EMPTY_SEGMENTS: TimelineAllDaySegment[] = [];
 const EMPTY_ACTIVE_BUCKETS: Record<string, TimelineBucketItem[]> = {};
+const DAY_COLUMN_TEMPLATE = "minmax(0, 1fr)";
+const GAP_COLUMN_TEMPLATE = "1.75rem";
 
 export type MobileTimelineDayState = {
   day: TimelineDay;
@@ -82,6 +109,152 @@ export const buildVisibleDays = ({
     dayCount,
     visibleDays,
     gridTemplateColumns: `repeat(${visibleDays.length}, minmax(0, 1fr))`,
+  };
+};
+
+const uniqueSortedHiddenDayIsos = ({
+  candidateDays,
+  hiddenDayIsos,
+}: {
+  candidateDays: TimelineDay[];
+  hiddenDayIsos: readonly string[];
+}) => {
+  const candidateSet = new Set(candidateDays.map((day) => day.isoDate));
+  return Array.from(new Set(hiddenDayIsos))
+    .filter((isoDate) => candidateSet.has(isoDate))
+    .sort((left, right) => left.localeCompare(right));
+};
+
+export const buildDesktopTimelineHiddenDaysForHide = ({
+  candidateDays,
+  hiddenDayIsos,
+  targetIso,
+}: {
+  candidateDays: TimelineDay[];
+  hiddenDayIsos: readonly string[];
+  targetIso: string;
+}) => {
+  const normalized = uniqueSortedHiddenDayIsos({ candidateDays, hiddenDayIsos });
+  const visibleSet = new Set(candidateDays.map((day) => day.isoDate));
+  if (!visibleSet.has(targetIso) || normalized.includes(targetIso)) {
+    return normalized;
+  }
+  return [...normalized, targetIso].sort((left, right) => left.localeCompare(right));
+};
+
+export const buildDesktopTimelineHiddenDaysForReveal = ({
+  candidateDays,
+  hiddenDayIsos,
+  revealIso,
+  pushHiddenIso,
+}: {
+  candidateDays: TimelineDay[];
+  hiddenDayIsos: readonly string[];
+  revealIso: string;
+  pushHiddenIso: string | null;
+}) => {
+  const normalized = uniqueSortedHiddenDayIsos({ candidateDays, hiddenDayIsos });
+  if (!normalized.includes(revealIso)) {
+    return normalized;
+  }
+
+  const next = normalized.filter((isoDate) => isoDate !== revealIso);
+  if (pushHiddenIso && candidateDays.some((day) => day.isoDate === pushHiddenIso) && pushHiddenIso !== revealIso && !next.includes(pushHiddenIso)) {
+    next.push(pushHiddenIso);
+  }
+
+  return next.sort((left, right) => left.localeCompare(right));
+};
+
+export const buildDesktopTimelineColumns = ({
+  candidateDays,
+  hiddenDayIsos,
+  targetVisibleCount,
+}: {
+  candidateDays: TimelineDay[];
+  hiddenDayIsos: readonly string[];
+  targetVisibleCount: number;
+}) => {
+  const normalizedHiddenDayIsos = uniqueSortedHiddenDayIsos({ candidateDays, hiddenDayIsos });
+  const hiddenSet = new Set(normalizedHiddenDayIsos);
+  const clampedVisibleCount = Math.max(0, Math.round(targetVisibleCount));
+
+  const visibleDays: TimelineDay[] = [];
+  let lastVisibleIndex = -1;
+  for (let index = 0; index < candidateDays.length; index += 1) {
+    const day = candidateDays[index];
+    if (hiddenSet.has(day.isoDate)) continue;
+    visibleDays.push(day);
+    lastVisibleIndex = index;
+    if (visibleDays.length >= clampedVisibleCount) break;
+  }
+
+  let scanEndIndex = lastVisibleIndex;
+  if (lastVisibleIndex >= 0) {
+    for (let index = lastVisibleIndex + 1; index < candidateDays.length; index += 1) {
+      const day = candidateDays[index];
+      if (!hiddenSet.has(day.isoDate)) break;
+      scanEndIndex = index;
+    }
+  }
+
+  const scannedDays = scanEndIndex >= 0 ? candidateDays.slice(0, scanEndIndex + 1) : [];
+  const columns: DesktopTimelineRenderColumn[] = [];
+  let hiddenRun: string[] = [];
+
+  const flushHiddenRun = () => {
+    if (!hiddenRun.length) return;
+    const previousColumn = columns[columns.length - 1] ?? null;
+    const gapKind: DesktopTimelineGapKind =
+      previousColumn?.kind === "day"
+        ? "between"
+        : columns.length === 0
+          ? "leading"
+          : "trailing";
+
+    columns.push({
+      kind: "gap",
+      key: `gap:${hiddenRun[0]}:${hiddenRun[hiddenRun.length - 1]}`,
+      gapKind,
+      hiddenIsos: hiddenRun,
+    });
+    hiddenRun = [];
+  };
+
+  scannedDays.forEach((day) => {
+    if (hiddenSet.has(day.isoDate)) {
+      hiddenRun.push(day.isoDate);
+      return;
+    }
+
+    flushHiddenRun();
+    columns.push({
+      kind: "day",
+      key: day.key,
+      day,
+    });
+  });
+
+  flushHiddenRun();
+
+  if (columns.length >= 2) {
+    columns.forEach((column, index) => {
+      if (column.kind !== "gap" || column.gapKind !== "between") return;
+      if (index === columns.length - 1) {
+        columns[index] = { ...column, gapKind: "trailing" };
+      }
+    });
+  }
+
+  const gridTemplateColumns = columns
+    .map((column) => (column.kind === "day" ? DAY_COLUMN_TEMPLATE : GAP_COLUMN_TEMPLATE))
+    .join(" ");
+
+  return {
+    visibleDays,
+    columns,
+    gridTemplateColumns,
+    normalizedHiddenDayIsos,
   };
 };
 
@@ -150,21 +323,22 @@ export const buildActiveBuckets = ({
 };
 
 export const buildDesktopAllDayState = ({
-  visibleDays,
+  renderColumns,
   calendarAllDayByDay,
   rowHeight,
   rowGap = 6,
   minHeight = 48,
 }: {
-  visibleDays: TimelineDay[];
+  renderColumns: DesktopTimelineRenderColumn[];
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
   rowHeight: number;
   rowGap?: number;
   minHeight?: number;
 }) => {
+  const visibleDays = renderColumns.flatMap((column) => (column.kind === "day" ? [column.day] : []));
   const hasAllDayEvents = visibleDays.some((day) => (calendarAllDayByDay[day.isoDate]?.length ?? 0) > 0);
   const allDayLayout = hasAllDayEvents
-    ? buildAllDayLayout({ visibleDays, calendarAllDayByDay })
+    ? buildAllDayLayout({ renderColumns, calendarAllDayByDay })
     : { segments: EMPTY_SEGMENTS, rows: 0 };
 
   return {
@@ -175,20 +349,40 @@ export const buildDesktopAllDayState = ({
 };
 
 export const buildAllDayLayout = ({
-  visibleDays,
+  renderColumns,
   calendarAllDayByDay,
 }: {
-  visibleDays: TimelineDay[];
+  renderColumns: DesktopTimelineRenderColumn[];
   calendarAllDayByDay: Record<string, ExternalCalendarEntry[]>;
 }) => {
-  if (!visibleDays.length) {
+  if (!renderColumns.length) {
     return { segments: [] as TimelineAllDaySegment[], rows: 0 };
   }
 
-  const segments: AllDaySegmentSeed[] = [];
-  const ongoing = new Map<string, AllDaySegmentSeed>();
+  type TimelineAllDaySeed = AllDaySegmentSeed & {
+    startColumn: number;
+    endColumn: number;
+    startDayIndex: number;
+    endDayIndex: number;
+  };
 
-  visibleDays.forEach((day, idx) => {
+  const segments: TimelineAllDaySeed[] = [];
+  const ongoing = new Map<string, TimelineAllDaySeed>();
+  let visibleDayIndex = -1;
+
+  const flushOngoing = () => {
+    ongoing.forEach((segment) => segments.push(segment));
+    ongoing.clear();
+  };
+
+  renderColumns.forEach((column, columnIndex) => {
+    if (column.kind === "gap") {
+      flushOngoing();
+      return;
+    }
+
+    const day = column.day;
+    visibleDayIndex += 1;
     const items = calendarAllDayByDay[day.isoDate] ?? [];
     const present = new Set<string>();
 
@@ -197,15 +391,20 @@ export const buildAllDayLayout = ({
       present.add(key);
       const existing = ongoing.get(key);
       if (existing) {
-        if (idx === existing.end + 1) {
-          existing.end = idx;
+        if (columnIndex === existing.endColumn + 1) {
+          existing.endColumn = columnIndex;
+          existing.endDayIndex = visibleDayIndex;
         } else {
           segments.push(existing);
           ongoing.set(key, {
             id: key,
             title: item.title || "Google予定",
-            start: idx,
-            end: idx,
+            start: visibleDayIndex,
+            end: visibleDayIndex,
+            startColumn: columnIndex,
+            endColumn: columnIndex,
+            startDayIndex: visibleDayIndex,
+            endDayIndex: visibleDayIndex,
             entry: item,
             startDate: item.startDate ?? item.dayIso ?? null,
             endDate: item.endDate ?? null,
@@ -217,8 +416,12 @@ export const buildAllDayLayout = ({
         ongoing.set(key, {
           id: key,
           title: item.title || "Google予定",
-          start: idx,
-          end: idx,
+          start: visibleDayIndex,
+          end: visibleDayIndex,
+          startColumn: columnIndex,
+          endColumn: columnIndex,
+          startDayIndex: visibleDayIndex,
+          endDayIndex: visibleDayIndex,
           entry: item,
           startDate: item.startDate ?? item.dayIso ?? null,
           endDate: item.endDate ?? null,
@@ -238,17 +441,17 @@ export const buildAllDayLayout = ({
     toClose.forEach((key) => ongoing.delete(key));
   });
 
-  ongoing.forEach((segment) => segments.push(segment));
+  flushOngoing();
 
   segments.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
   const rowEnds: number[] = [];
   const placed = segments.map((segment) => {
-    let row = rowEnds.findIndex((end) => segment.start > end);
+    let row = rowEnds.findIndex((end) => segment.startColumn > end);
     if (row === -1) {
       row = rowEnds.length;
-      rowEnds.push(segment.end);
+      rowEnds.push(segment.endColumn);
     } else {
-      rowEnds[row] = segment.end;
+      rowEnds[row] = segment.endColumn;
     }
     return { ...segment, row };
   });

@@ -60,6 +60,8 @@ type UseTimelineBoardViewModelsArgs = {
   anchorDayIso: string;
   intendedDayRange: number;
   effectiveDayRange: number;
+  hiddenDesktopDayIsos: string[];
+  onHiddenDesktopDayIsosChange: React.Dispatch<React.SetStateAction<string[]>>;
   timelineScrollRefDesktop: RefObject<HTMLDivElement>;
   timelineScrollRefMobile: RefObject<HTMLDivElement>;
   setMobileAnchorTimelineScrollNode: (node: HTMLDivElement | null) => void;
@@ -343,6 +345,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onPendingTitleEditConsumed: args.onPendingTitleEditConsumed,
       currentIsoDate: args.liveNowIsoDate,
       currentMinutes: args.liveNowMinutes,
+      hiddenDayIsos: args.hiddenDesktopDayIsos,
+      onHiddenDayIsosChange: args.onHiddenDesktopDayIsosChange,
     }),
     [
       args.days,
@@ -395,6 +399,8 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.pendingTitleEditCardId,
       args.onPendingTitleEditConsumed,
       args.liveNowMinutes,
+      args.hiddenDesktopDayIsos,
+      args.onHiddenDesktopDayIsosChange,
     ]
   );
 

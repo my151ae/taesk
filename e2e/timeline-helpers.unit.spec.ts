@@ -6,7 +6,14 @@ import {
     getTimelineIsoDateJst,
     NormalizedTimelineLayoutItem,
 } from '../app/(board)/_utils/timeline-helpers';
-import { buildDesktopAllDayState, buildMobileTimelineViewState, buildVisibleDays } from '../app/(board)/_components/timeline/timeline-render-model';
+import {
+    buildDesktopAllDayState,
+    buildDesktopTimelineColumns,
+    buildDesktopTimelineHiddenDaysForHide,
+    buildDesktopTimelineHiddenDaysForReveal,
+    buildMobileTimelineViewState,
+    buildVisibleDays,
+} from '../app/(board)/_components/timeline/timeline-render-model';
 import { hasPrefetchedNeighborsForDay, resolveAnchorDayFromPayload } from '../app/(board)/_hooks/useTimelineNavigation';
 import {
     formatShortcutKeyLabel,
@@ -219,7 +226,7 @@ test.describe('timeline-render-model helpers', () => {
         ];
 
         const result = buildDesktopAllDayState({
-            visibleDays,
+            renderColumns: visibleDays.map((day) => ({ kind: 'day' as const, key: day.key, day })),
             calendarAllDayByDay: {},
             rowHeight: 36,
         });
@@ -228,6 +235,69 @@ test.describe('timeline-render-model helpers', () => {
         expect(result.allDayLayout.rows).toBe(0);
         expect(result.allDayLayout.segments).toEqual([]);
         expect(result.allDayMinHeight).toBe(48);
+    });
+
+    test('buildDesktopTimelineColumns keeps visible days sorted and inserts a between gap', async () => {
+        const candidateDays = [
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+            { key: '2026-04-10', label: '04/10 (Fri)', isoDate: '2026-04-10' },
+            { key: '2026-04-11', label: '04/11 (Sat)', isoDate: '2026-04-11' },
+        ];
+
+        const result = buildDesktopTimelineColumns({
+            candidateDays,
+            hiddenDayIsos: ['2026-04-09'],
+            targetVisibleCount: 3,
+        });
+
+        expect(result.visibleDays.map((day) => day.isoDate)).toEqual(['2026-04-08', '2026-04-10', '2026-04-11']);
+        expect(result.columns.map((column) => column.kind === 'day' ? column.day.isoDate : column.hiddenIsos.join(','))).toEqual([
+            '2026-04-08',
+            '2026-04-09',
+            '2026-04-10',
+            '2026-04-11',
+        ]);
+        expect(result.columns[1]).toMatchObject({
+            kind: 'gap',
+            gapKind: 'between',
+            hiddenIsos: ['2026-04-09'],
+        });
+    });
+
+    test('buildDesktopTimelineHiddenDaysForHide deduplicates hidden days', async () => {
+        const candidateDays = [
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+            { key: '2026-04-10', label: '04/10 (Fri)', isoDate: '2026-04-10' },
+        ];
+
+        const result = buildDesktopTimelineHiddenDaysForHide({
+            candidateDays,
+            hiddenDayIsos: ['2026-04-09'],
+            targetIso: '2026-04-09',
+        });
+
+        expect(result).toEqual(['2026-04-09']);
+    });
+
+    test('buildDesktopTimelineHiddenDaysForReveal restores one day and pushes the visible edge', async () => {
+        const candidateDays = [
+            { key: '2026-04-08', label: '04/08 (Wed)', isoDate: '2026-04-08' },
+            { key: '2026-04-09', label: '04/09 (Thu)', isoDate: '2026-04-09' },
+            { key: '2026-04-10', label: '04/10 (Fri)', isoDate: '2026-04-10' },
+            { key: '2026-04-11', label: '04/11 (Sat)', isoDate: '2026-04-11' },
+            { key: '2026-04-12', label: '04/12 (Sun)', isoDate: '2026-04-12' },
+        ];
+
+        const result = buildDesktopTimelineHiddenDaysForReveal({
+            candidateDays,
+            hiddenDayIsos: ['2026-04-09', '2026-04-11'],
+            revealIso: '2026-04-09',
+            pushHiddenIso: '2026-04-12',
+        });
+
+        expect(result).toEqual(['2026-04-11', '2026-04-12']);
     });
 
     test('buildMobileTimelineViewState centers a 3-day window around the anchor day', async () => {

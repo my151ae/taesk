@@ -26,6 +26,7 @@ interface UseTimelineNavigationProps {
     dayWindowStartRef: React.MutableRefObject<number>;
     timelineStartHour?: number;
     hourHeight?: number;
+    requestedFetchRange?: number;
 }
 
 export const resolveAnchorDayFromPayload = ({
@@ -97,9 +98,10 @@ export function useTimelineNavigation({
     dayWindowStartRef,
     timelineStartHour = 0,
     hourHeight = 40,
+    requestedFetchRange,
 }: UseTimelineNavigationProps) {
     const navStep = Math.max(1, dayRange - 1);
-    const fetchRange = Math.max(dayRange, 3);
+    const fetchRange = Math.max(requestedFetchRange ?? dayRange, 3);
     const currentTimelineIso = getCurrentTimelineIsoDateJst(timelineStartHour);
 
     const resolveAnchorDay = useCallback((targetIso: string, payloadDays: TimelineResponse["days"] | undefined) => {

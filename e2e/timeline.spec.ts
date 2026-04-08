@@ -563,6 +563,69 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('desktop timeline hides a middle day and backfills the next visible day', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const baseIsoDay = isoDateJst();
+    const days = [
+      baseIsoDay,
+      shiftIsoDateJst(1),
+      shiftIsoDateJst(2),
+      shiftIsoDateJst(3),
+    ];
+    const timestamp = new Date().toISOString();
+    const cards = days.map((isoDay, index) => ({
+      id: crypto.randomUUID(),
+      title: `Hidden day card ${index + 1}`,
+      checklist: { version: 1, lines: [] },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1700 + index * 10,
+      tags: [],
+      due_date: isoDay,
+      due_start: '09:00:00',
+      due_end: '10:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      id_short: 601 + index,
+      slug: `hidden-day-card-${index + 1}`,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }));
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert(cards);
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(boardContext.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      await page.getByTestId('timeline-toolbar-range-plus').click();
+
+      await expect(page.getByTestId(`timeline-hide-day-${days[0]}`)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toBeVisible({ timeout: 20_000 });
+
+      await page.getByTestId(`timeline-hide-day-${days[1]}`).click();
+
+      await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toHaveCount(0);
+      await expect(page.getByTestId(`timeline-hide-day-${days[3]}`)).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId(`timeline-reveal-left-${days[2]}-${days[1]}`)).toBeVisible();
+    } finally {
+      await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
+    }
+  });
+
   test('supports shift-click multi select within the same timeline lane and switches between bulk and single menus', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {

@@ -75,6 +75,8 @@ type UseTimelineBoardScreenArgs = {
   activeDayIndex: number;
   anchorDayIso: string;
   effectiveDayRange: number;
+  hiddenDesktopDayIsos: string[];
+  onHiddenDesktopDayIsosChange: React.Dispatch<React.SetStateAction<string[]>>;
   timelineScrollRefDesktop: React.RefObject<HTMLDivElement | null>;
   timelineScrollRefMobile: React.RefObject<HTMLDivElement | null>;
   setMobileAnchorTimelineScrollNode: (node: HTMLDivElement | null) => void;
@@ -252,6 +254,8 @@ export function useTimelineBoardScreen({
   activeDayIndex,
   anchorDayIso,
   effectiveDayRange,
+  hiddenDesktopDayIsos,
+  onHiddenDesktopDayIsosChange,
   timelineScrollRefDesktop,
   timelineScrollRefMobile,
   setMobileAnchorTimelineScrollNode,
@@ -411,6 +415,8 @@ export function useTimelineBoardScreen({
     anchorDayIso,
     intendedDayRange,
     effectiveDayRange,
+    hiddenDesktopDayIsos,
+    onHiddenDesktopDayIsosChange,
     timelineScrollRefDesktop: timelineScrollRefDesktop as React.RefObject<HTMLDivElement>,
     timelineScrollRefMobile: timelineScrollRefMobile as React.RefObject<HTMLDivElement>,
     setMobileAnchorTimelineScrollNode,

@@ -18,6 +18,7 @@ import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoar
 import { type SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import { SIDEBAR_INCREMENT_PAGE_SIZE } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import { buildDesktopTimelineColumns } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
@@ -338,6 +339,7 @@ function TimelineBoardPageContent({
     handleShiftSelect,
   } = useTimelineCardSelection();
   const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
+  const [hiddenDesktopDayIsos, setHiddenDesktopDayIsos] = useState<string[]>([]);
 
   const {
     contextMenu,
@@ -393,6 +395,13 @@ function TimelineBoardPageContent({
     updateUrlForList,
   });
 
+  const desktopTimelineFetchRange = useMemo(() => {
+    if (viewMode !== "timeline" || isMobileViewport) {
+      return intendedDayRange;
+    }
+    return timelineRange + hiddenDesktopDayIsos.length + 1;
+  }, [hiddenDesktopDayIsos.length, intendedDayRange, isMobileViewport, timelineRange, viewMode]);
+
   const {
     profile,
     availableBoards,
@@ -411,6 +420,11 @@ function TimelineBoardPageContent({
     onTimelineStartHour: setTimelineStartHour,
   });
 
+  useEffect(() => {
+    if (hiddenDesktopDayIsos.length === 0) return;
+    setHiddenDesktopDayIsos([]);
+  }, [currentBoard.id, isDesktopViewport, viewMode]);
+
   const {
     data,
     setData,
@@ -421,7 +435,7 @@ function TimelineBoardPageContent({
     realtimeStatus,
   } = useTimelineData({
     initialBoard,
-    dayRange: isMobileViewport && viewMode === "timeline" ? Math.max(3, intendedDayRange) : intendedDayRange,
+    dayRange: isMobileViewport && viewMode === "timeline" ? Math.max(3, intendedDayRange) : desktopTimelineFetchRange,
     timelineStartHour,
     dayWindowStartRef,
     setDayWindowStart,
@@ -748,15 +762,23 @@ function TimelineBoardPageContent({
     dayWindowStartRef,
     timelineStartHour,
     hourHeight,
+    requestedFetchRange: desktopTimelineFetchRange,
   });
 
   const visibleDays = useMemo(() => {
     const days = data?.days ?? [];
     if (!days.length) return [];
+    if (viewMode === "timeline" && isDesktopViewport) {
+      return buildDesktopTimelineColumns({
+        candidateDays: days,
+        hiddenDayIsos: hiddenDesktopDayIsos,
+        targetVisibleCount: effectiveDayRange,
+      }).visibleDays;
+    }
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, data?.days, effectiveDayRange, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "timeline") return;
@@ -973,6 +995,9 @@ function TimelineBoardPageContent({
   const handleDayRangeUpdate = useCallback(
     (newRange: number) => {
       if (viewMode !== "timeline") return;
+      if (hiddenDesktopDayIsos.length > 0) {
+        setHiddenDesktopDayIsos([]);
+      }
       scheduleToolbarFocusRestore();
       handleDayRangeChange(newRange);
       setTimelineRange(newRange);
@@ -980,33 +1005,48 @@ function TimelineBoardPageContent({
         void handleUpdateBoard({ day_range: newRange });
       }
     },
-    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
+    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
   );
 
   const handlePrevDayWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     handlePrevDay();
-  }, [handlePrevDay, scheduleToolbarFocusRestore]);
+  }, [handlePrevDay, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
 
   const handleNextDayWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     handleNextDay();
-  }, [handleNextDay, scheduleToolbarFocusRestore]);
+  }, [handleNextDay, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
 
   const handlePrevDayRangeWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     handlePrevDayRange();
-  }, [handlePrevDayRange, scheduleToolbarFocusRestore]);
+  }, [handlePrevDayRange, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
 
   const handleNextDayRangeWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     handleNextDayRange();
-  }, [handleNextDayRange, scheduleToolbarFocusRestore]);
+  }, [handleNextDayRange, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
 
   const handleTodayClickWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     handleTodayClick();
-  }, [handleTodayClick, scheduleToolbarFocusRestore]);
+  }, [handleTodayClick, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
 
   useEffect(() => {
     const selector = pendingToolbarFocusSelectorRef.current;
@@ -1059,34 +1099,52 @@ function TimelineBoardPageContent({
   });
 
   const handleListTodayWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListToday();
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleListWindowPresetChangeWithFocusRestore = useCallback((nextPreset: ListWindowPresetKey) => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListWindowPresetChange(nextPreset);
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleListPrevDayWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevDay();
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleListNextDayWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextDay();
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleListPrevWeekWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevWeek();
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleListNextWeekWithFocusRestore = useCallback(() => {
+    if (hiddenDesktopDayIsos.length > 0) {
+      setHiddenDesktopDayIsos([]);
+    }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextWeek();
-  }, [modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
 
   const handleSearchQueryChange = useCallback(
     (value: string) => {
@@ -1331,6 +1389,8 @@ function TimelineBoardPageContent({
     activeDayIndex,
     anchorDayIso,
     effectiveDayRange,
+    hiddenDesktopDayIsos,
+    onHiddenDesktopDayIsosChange: setHiddenDesktopDayIsos,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,
     setMobileAnchorTimelineScrollNode,
