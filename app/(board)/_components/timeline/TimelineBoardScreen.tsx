@@ -470,20 +470,26 @@ export default function TimelineBoardScreen({
       <div className="relative z-40 border-b border-slate-200 bg-slate-50/70">
         <div className="relative flex h-10 items-center justify-between px-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div ref={mobileSelectorRef} className="relative min-w-0">
+            <div ref={mobileSelectorRef} className="relative flex min-w-0 items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setShowMobileSelector((current) => !current)}
-                className="inline-flex min-w-0 items-center gap-1 text-left text-sm font-semibold leading-tight text-slate-800"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
                 aria-haspopup="menu"
                 aria-expanded={showMobileSelector}
+                aria-label="メニューを切り替え"
                 data-testid="mobile-left-panel-selector-trigger"
               >
-                <span className="truncate">{mobile.selectorPresentation.triggerLabel}</span>
-                <svg className={clsx("h-3 w-3 shrink-0 transition-transform", showMobileSelector && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 7.5 10 12.5 15 7.5" />
+                <svg className={clsx("h-3.5 w-3.5 transition-transform", showMobileSelector && "rotate-180")} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <rect x="3.5" y="3.5" width="5" height="5" rx="1" />
+                  <rect x="11.5" y="3.5" width="5" height="5" rx="1" />
+                  <rect x="3.5" y="11.5" width="5" height="5" rx="1" />
+                  <rect x="11.5" y="11.5" width="5" height="5" rx="1" />
                 </svg>
               </button>
+              <span className="truncate text-sm font-semibold leading-tight text-slate-800">
+                {mobile.selectorPresentation.triggerLabel}
+              </span>
               {showMobileSelector ? (
                 <div className="absolute left-0 top-full z-[70] mt-1 min-w-[132px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg" role="menu">
                   {mobile.selectorPresentation.selectorItems.map((item) => {
@@ -521,9 +527,6 @@ export default function TimelineBoardScreen({
             >
               {mobile.currentSectionChrome.count}
             </span>
-          </div>
-          <div className="ml-2 flex shrink-0 items-center gap-2">
-            {mobileHeaderAccessory}
             <button
               type="button"
               onClick={() => setIsMobilePanelCollapsed((current) => !current)}
@@ -536,6 +539,9 @@ export default function TimelineBoardScreen({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 12.5 10 7.5 15 12.5" />
               </svg>
             </button>
+          </div>
+          <div className="ml-2 flex shrink-0 items-center gap-2">
+            {mobileHeaderAccessory}
           </div>
         </div>
         <div
