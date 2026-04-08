@@ -785,7 +785,7 @@ export function DesktopSidebarMenu({
             label={section.label}
             count={section.count}
             tone={section.tone}
-            expanded={state.activeSectionKey === section.key}
+            expanded={state.expandedSectionKey === section.key}
             onToggle={() => handleToggleSection(section.key)}
           >
             {getSectionIcon(section.key)}
