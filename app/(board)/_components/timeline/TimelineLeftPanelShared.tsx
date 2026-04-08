@@ -187,14 +187,18 @@ function useIncrementalVisibleCount({
   };
 }
 
-function LoadMoreFooter({
+export function LoadMoreFooter({
   canLoadMore,
   onLoadMore,
   testId,
+  disabled = false,
+  label = "さらに表示",
 }: {
   canLoadMore: boolean;
   onLoadMore: () => void;
   testId: string;
+  disabled?: boolean;
+  label?: string;
 }) {
   if (!canLoadMore) return null;
 
@@ -204,9 +208,10 @@ function LoadMoreFooter({
         type="button"
         data-testid={testId}
         onClick={onLoadMore}
+        disabled={disabled}
         className="flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
       >
-        さらに表示
+        {label}
       </button>
     </div>
   );

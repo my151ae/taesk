@@ -4,6 +4,25 @@ import { mockServiceWorkerAndPush } from './utils/push';
 
 type QuietHours = { start: string; end: string; timezone: string };
 
+function buildNotificationsResponse({
+  notifications,
+  unreadCount,
+  hasMore = false,
+  nextCursor = null,
+}: {
+  notifications: unknown[];
+  unreadCount: number;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+}) {
+  return JSON.stringify({
+    notifications,
+    unreadCount,
+    hasMore,
+    nextCursor,
+  });
+}
+
 async function openNotificationSettings(page: import('@playwright/test').Page) {
   await page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i }).click();
   await page.getByTestId('notification-settings-button').click();
@@ -267,29 +286,31 @@ test.describe('In-app Notifications @feature:notifications', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            notifications: [
-              {
-                id: crypto.randomUUID(),
-                type: 'comment',
-                payload: {
-                  message: 'New comment',
-                  body: 'Someone commented on your card',
+            ...JSON.parse(buildNotificationsResponse({
+              notifications: [
+                {
+                  id: crypto.randomUUID(),
+                  type: 'comment',
+                  payload: {
+                    message: 'New comment',
+                    body: 'Someone commented on your card',
+                  },
+                  read_at: null,
+                  created_at: new Date().toISOString(),
                 },
-                read_at: null,
-                created_at: new Date().toISOString(),
-              },
-              {
-                id: crypto.randomUUID(),
-                type: 'mention',
-                payload: {
-                  message: 'You were mentioned',
-                  body: 'Someone mentioned you in a comment',
+                {
+                  id: crypto.randomUUID(),
+                  type: 'mention',
+                  payload: {
+                    message: 'You were mentioned',
+                    body: 'Someone mentioned you in a comment',
+                  },
+                  read_at: null,
+                  created_at: new Date().toISOString(),
                 },
-                read_at: null,
-                created_at: new Date().toISOString(),
-              },
-            ],
-            unreadCount: 2,
+              ],
+              unreadCount: 2,
+            })),
           }),
         });
         return;
@@ -333,19 +354,21 @@ test.describe('In-app Notifications @feature:notifications', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            notifications: [
-              {
-                id: 'notif-1',
-                type: 'comment',
-                payload: {
-                  message: 'New comment',
-                  body: 'Test notification',
+            ...JSON.parse(buildNotificationsResponse({
+              notifications: [
+                {
+                  id: 'notif-1',
+                  type: 'comment',
+                  payload: {
+                    message: 'New comment',
+                    body: 'Test notification',
+                  },
+                  read_at: markAsReadCalled > 0 ? new Date().toISOString() : null,
+                  created_at: new Date().toISOString(),
                 },
-                read_at: markAsReadCalled > 0 ? new Date().toISOString() : null,
-                created_at: new Date().toISOString(),
-              },
-            ],
-            unreadCount: markAsReadCalled > 0 ? 0 : 1,
+              ],
+              unreadCount: markAsReadCalled > 0 ? 0 : 1,
+            })),
           }),
         });
         return;
@@ -392,8 +415,10 @@ test.describe('In-app Notifications @feature:notifications', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            notifications: [],
-            unreadCount: 0,
+            ...JSON.parse(buildNotificationsResponse({
+              notifications: [],
+              unreadCount: 0,
+            })),
           }),
         });
         return;
@@ -432,20 +457,22 @@ test.describe('In-app Notifications @feature:notifications', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            notifications: [
-              {
-                id: 'notif-mobile-openable',
-                type: 'mention',
-                payload: {
-                  card_title: 'Mobile Notification Card',
-                  card_short_id: '1',
-                  comment_body: 'mobile notification body',
+            ...JSON.parse(buildNotificationsResponse({
+              notifications: [
+                {
+                  id: 'notif-mobile-openable',
+                  type: 'mention',
+                  payload: {
+                    card_title: 'Mobile Notification Card',
+                    card_short_id: '1',
+                    comment_body: 'mobile notification body',
+                  },
+                  read_at: null,
+                  created_at: new Date().toISOString(),
                 },
-                read_at: null,
-                created_at: new Date().toISOString(),
-              },
-            ],
-            unreadCount: 1,
+              ],
+              unreadCount: 1,
+            })),
           }),
         });
         return;
@@ -477,5 +504,107 @@ test.describe('In-app Notifications @feature:notifications', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 10000 });
     await expect(dialog.getByText('Mobile Notification Card')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should load more notifications without dropping the current page', async ({ page }) => {
+    const pageOneCursor = 'page-1-cursor';
+    let firstPageRequests = 0;
+
+    await page.route(/\/api\/notifications(\?.*)?$/, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fallback();
+        return;
+      }
+
+      const url = new URL(route.request().url());
+      const before = url.searchParams.get('before');
+
+      if (before === pageOneCursor) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: buildNotificationsResponse({
+            notifications: [
+              {
+                id: 'notif-older-1',
+                type: 'comment',
+                payload: {
+                  card_title: 'Older Notification 1',
+                  comment_body: 'older body 1',
+                },
+                read_at: null,
+                created_at: '2026-04-08T09:00:00.000Z',
+              },
+              {
+                id: 'notif-older-2',
+                type: 'comment',
+                payload: {
+                  card_title: 'Older Notification 2',
+                  comment_body: 'older body 2',
+                },
+                read_at: '2026-04-08T09:05:00.000Z',
+                created_at: '2026-04-08T08:00:00.000Z',
+              },
+            ],
+            unreadCount: 3,
+            hasMore: false,
+            nextCursor: null,
+          }),
+        });
+        return;
+      }
+
+      firstPageRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: buildNotificationsResponse({
+          notifications: [
+            {
+              id: 'notif-head-1',
+              type: 'mention',
+              payload: {
+                card_title: 'Head Notification 1',
+                comment_body: 'head body 1',
+              },
+              read_at: null,
+              created_at: '2026-04-09T12:00:00.000Z',
+            },
+            {
+              id: 'notif-head-2',
+              type: 'comment',
+              payload: {
+                card_title: 'Head Notification 2',
+                comment_body: 'head body 2',
+              },
+              read_at: null,
+              created_at: '2026-04-09T11:00:00.000Z',
+            },
+          ],
+          unreadCount: 3,
+          hasMore: true,
+          nextCursor: pageOneCursor,
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByTestId('board-main-header').getByRole('button', { name: /notifications/i }).click();
+    const desktopNotificationsPanel = page.getByTestId('desktop-sidebar-notifications-panel');
+
+    await expect(desktopNotificationsPanel.getByText('Head Notification 1')).toBeVisible();
+    await expect(desktopNotificationsPanel.getByText('Head Notification 2')).toBeVisible();
+
+    const loadMoreButton = desktopNotificationsPanel.getByTestId('notifications-load-more');
+    await expect(loadMoreButton).toBeVisible();
+    await loadMoreButton.click();
+
+    await expect(desktopNotificationsPanel.getByText('Older Notification 1')).toBeVisible();
+    await expect(desktopNotificationsPanel.getByText('Older Notification 2')).toBeVisible();
+    await expect(desktopNotificationsPanel.getByText('Head Notification 1')).toBeVisible();
+    await expect(loadMoreButton).toHaveCount(0);
+    await expect.poll(() => firstPageRequests, { timeout: 10_000 }).toBeGreaterThan(0);
   });
 });

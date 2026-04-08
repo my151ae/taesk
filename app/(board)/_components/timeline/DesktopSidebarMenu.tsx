@@ -96,10 +96,13 @@ type DesktopSidebarMenuProps = {
   allowOverdueDrag: boolean;
   notifications: readonly Notification[];
   notificationsLoading: boolean;
+  notificationsLoadingMore: boolean;
   notificationsError: string | null;
   notificationUnreadCount: number;
+  notificationsHasMore: boolean;
   notificationFeedback: string | null;
   onRetryNotifications: () => void;
+  onLoadMoreNotifications: () => void;
   onMarkAllNotificationsRead: () => void;
   onOpenNotification: (notification: Notification) => void;
   onOpenNotificationSettings: () => void;
@@ -330,10 +333,13 @@ export function DesktopSidebarMenu({
   allowOverdueDrag,
   notifications,
   notificationsLoading,
+  notificationsLoadingMore,
   notificationsError,
   notificationUnreadCount,
+  notificationsHasMore,
   notificationFeedback,
   onRetryNotifications,
+  onLoadMoreNotifications,
   onMarkAllNotificationsRead,
   onOpenNotification,
   onOpenNotificationSettings,
@@ -405,9 +411,12 @@ export function DesktopSidebarMenu({
         <NotificationsSectionBody
           notifications={notifications}
           loading={notificationsLoading}
+          loadingMore={notificationsLoadingMore}
           error={notificationsError}
+          hasMore={notificationsHasMore}
           feedback={notificationFeedback}
           onRetry={onRetryNotifications}
+          onLoadMore={onLoadMoreNotifications}
           onOpenNotification={onOpenNotification}
         />
       );

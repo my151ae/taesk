@@ -264,9 +264,12 @@ function TimelineBoardPageContent({
   const {
     notifications,
     loading: notificationsLoading,
+    loadingMore: notificationsLoadingMore,
     error: notificationsError,
     unreadCount: notificationUnreadCount,
+    hasMore: notificationsHasMore,
     fetchNotifications,
+    fetchMoreNotifications,
     markAsRead,
     markAllAsRead,
   } = useNotificationsStore();
@@ -1536,11 +1539,16 @@ function TimelineBoardPageContent({
     trashItems,
     notifications,
     notificationsLoading,
+    notificationsLoadingMore,
     notificationsError,
     notificationUnreadCount,
+    notificationsHasMore,
     notificationFeedback,
     onRetryNotifications: () => {
       void fetchNotifications();
+    },
+    onLoadMoreNotifications: () => {
+      void fetchMoreNotifications();
     },
     onMarkAllNotificationsRead: () => {
       void markAllAsRead();

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
 import clsx from "clsx";
 
 import type { Notification } from "@/lib/supabase";
+import { LoadMoreFooter } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 
 const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
 
@@ -215,28 +215,24 @@ export function NotificationsSectionActions({
 export function NotificationsSectionBody({
   notifications,
   loading,
+  loadingMore,
   error,
+  hasMore,
   feedback,
   onRetry,
+  onLoadMore,
   onOpenNotification,
 }: {
   notifications: readonly Notification[];
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
+  hasMore: boolean;
   feedback: string | null;
   onRetry: () => void;
+  onLoadMore: () => void;
   onOpenNotification: (notification: Notification) => void;
 }) {
-  const sortedNotifications = useMemo(
-    () =>
-      [...notifications].sort((a, b) => {
-        const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        if (createdDiff !== 0) return createdDiff;
-        return b.id.localeCompare(a.id);
-      }),
-    [notifications]
-  );
-
   if (loading) {
     return (
       <div className="space-y-2 px-3 py-3">
@@ -268,7 +264,7 @@ export function NotificationsSectionBody({
     );
   }
 
-  if (sortedNotifications.length === 0) {
+  if (notifications.length === 0) {
     return (
       <div className="px-3 py-4">
         <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
@@ -289,7 +285,7 @@ export function NotificationsSectionBody({
       ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
         <div className="space-y-4 px-2 py-4">
-          {sortedNotifications.map((notification) => (
+          {notifications.map((notification) => (
             <NotificationActivityRow
               key={notification.id}
               notification={notification}
@@ -297,6 +293,13 @@ export function NotificationsSectionBody({
             />
           ))}
         </div>
+        <LoadMoreFooter
+          canLoadMore={hasMore}
+          onLoadMore={onLoadMore}
+          disabled={loadingMore}
+          label={loadingMore ? "読み込み中..." : "さらに表示"}
+          testId="notifications-load-more"
+        />
       </div>
     </div>
   );

@@ -124,10 +124,13 @@ type UseTimelineBoardScreenArgs = {
   trashItems: TrashCardItem[];
   notifications: Notification[];
   notificationsLoading: boolean;
+  notificationsLoadingMore: boolean;
   notificationsError: string | null;
   notificationUnreadCount: number;
+  notificationsHasMore: boolean;
   notificationFeedback: string | null;
   onRetryNotifications: () => void;
+  onLoadMoreNotifications: () => void;
   onMarkAllNotificationsRead: () => void;
   onOpenNotification: (notification: Notification) => void;
   indicatorTop: number | null;
@@ -313,10 +316,13 @@ export function useTimelineBoardScreen({
   trashItems,
   notifications,
   notificationsLoading,
+  notificationsLoadingMore,
   notificationsError,
   notificationUnreadCount,
+  notificationsHasMore,
   notificationFeedback,
   onRetryNotifications,
+  onLoadMoreNotifications,
   onMarkAllNotificationsRead,
   onOpenNotification,
   indicatorTop,
@@ -578,10 +584,13 @@ export function useTimelineBoardScreen({
     onOpenNotificationSettings: viewModels.desktop.leftPanel.onOpenNotificationSettings,
     notifications,
     notificationsLoading,
+    notificationsLoadingMore,
     notificationsError,
     notificationUnreadCount,
+    notificationsHasMore,
     notificationFeedback,
     onRetryNotifications,
+    onLoadMoreNotifications,
     onMarkAllNotificationsRead,
     onOpenNotification,
     onRestoreTrashCard: handleRestoreCard,

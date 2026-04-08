@@ -415,9 +415,12 @@ export default function TimelineBoardScreen({
         <NotificationsSectionBody
             notifications={mobile.leftPanelProps.notifications}
             loading={mobile.leftPanelProps.notificationsLoading}
+            loadingMore={mobile.leftPanelProps.notificationsLoadingMore}
             error={mobile.leftPanelProps.notificationsError}
+            hasMore={mobile.leftPanelProps.notificationsHasMore}
             feedback={mobile.leftPanelProps.notificationFeedback}
             onRetry={mobile.leftPanelProps.onRetryNotifications}
+            onLoadMore={mobile.leftPanelProps.onLoadMoreNotifications}
             onOpenNotification={mobile.leftPanelProps.onOpenNotification}
           />
       );

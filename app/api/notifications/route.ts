@@ -3,6 +3,48 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Notification } from '@/lib/supabase';
 import { withErrorHandling } from '@/lib/server/with-error-handling';
 
+const DEFAULT_NOTIFICATIONS_PAGE_SIZE = 20;
+const MAX_NOTIFICATIONS_PAGE_SIZE = 100;
+
+type NotificationsCursor = {
+  created_at: string;
+  id: string;
+};
+
+function parseLimit(searchParams: URLSearchParams) {
+  const rawLimit = searchParams.get('limit');
+  if (!rawLimit) return DEFAULT_NOTIFICATIONS_PAGE_SIZE;
+
+  const parsedLimit = Number.parseInt(rawLimit, 10);
+  if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+    return null;
+  }
+
+  return Math.min(parsedLimit, MAX_NOTIFICATIONS_PAGE_SIZE);
+}
+
+function encodeCursor(notification: Pick<Notification, 'created_at' | 'id'>) {
+  return Buffer.from(
+    JSON.stringify({ created_at: notification.created_at, id: notification.id }),
+    'utf-8'
+  ).toString('base64url');
+}
+
+function decodeCursor(cursor: string): NotificationsCursor | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8')) as Partial<NotificationsCursor>;
+    if (typeof parsed.created_at !== 'string' || typeof parsed.id !== 'string') {
+      return null;
+    }
+    return {
+      created_at: parsed.created_at,
+      id: parsed.id,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/notifications - List notifications for current user
 const getHandler = async (request: NextRequest) => {
   const supabase = await createServerSupabaseClient();
@@ -11,20 +53,66 @@ const getHandler = async (request: NextRequest) => {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-    // Fetch notifications
-    const { data: notifications, error } = await supabase
+  const limit = parseLimit(request.nextUrl.searchParams);
+  if (limit === null) {
+    return NextResponse.json({ error: 'Invalid limit' }, { status: 400 });
+  }
+
+  const before = request.nextUrl.searchParams.get('before');
+  const cursor = before ? decodeCursor(before) : null;
+  if (before && !cursor) {
+    return NextResponse.json({ error: 'Invalid before cursor' }, { status: 400 });
+  }
+
+  let notificationsQuery = supabase
+    .from('notifications')
+    .select('*')
+    .eq('recipient_id', user.id)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit + 1);
+
+  if (cursor) {
+    notificationsQuery = notificationsQuery.or(
+      `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+    );
+  }
+
+  const [
+    { data: notificationsResult, error: notificationsError },
+    { count: unreadCount, error: unreadCountError },
+  ] = await Promise.all([
+    notificationsQuery,
+    supabase
       .from('notifications')
-      .select('*')
+      .select('*', { count: 'exact', head: true })
       .eq('recipient_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(2);
+      .is('read_at', null),
+  ]);
 
-    if (error) {
-      console.error('Error fetching notifications:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  if (notificationsError) {
+    console.error('Error fetching notifications:', notificationsError);
+    return NextResponse.json({ error: notificationsError.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ notifications: notifications || [] });
+  if (unreadCountError) {
+    console.error('Error fetching unread notifications count:', unreadCountError);
+    return NextResponse.json({ error: unreadCountError.message }, { status: 500 });
+  }
+
+  const notifications = notificationsResult ?? [];
+  const hasMore = notifications.length > limit;
+  const pageNotifications = hasMore ? notifications.slice(0, limit) : notifications;
+  const nextCursor = hasMore && pageNotifications.length > 0
+    ? encodeCursor(pageNotifications[pageNotifications.length - 1])
+    : null;
+
+  return NextResponse.json({
+    notifications: pageNotifications,
+    unreadCount: unreadCount ?? 0,
+    hasMore,
+    nextCursor,
+  });
 };
 
 // POST /api/notifications - Create a notification
