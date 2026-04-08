@@ -31,6 +31,7 @@ import type {
   DesktopSidebarMenuState,
   DesktopSidebarSection,
 } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 import { featureFlags } from "@/lib/featureFlags";
@@ -92,6 +93,9 @@ type UseTimelineBoardViewModelsArgs = {
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
   completedResults: TimelineSearchResultItem[];
+  completedCurrentMonthCount: number;
+  completedCurrentMonthKey: string | null;
+  completedGroupedResults: CompletedResultsGroup[];
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -198,7 +202,10 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
         tone: "neutral",
         id: "desktop-sidebar-completed-panel",
         label: "Completed",
-        count: args.completedResults.length,
+        count: args.completedCurrentMonthCount,
+        currentMonthCount: args.completedCurrentMonthCount,
+        currentMonthKey: args.completedCurrentMonthKey,
+        groupedResults: args.completedGroupedResults,
         results: args.completedResults,
       },
     ];
@@ -243,6 +250,9 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
 
     return sections;
   }, [
+    args.completedCurrentMonthCount,
+    args.completedCurrentMonthKey,
+    args.completedGroupedResults,
     args.completedResults,
     args.notificationUnreadCount,
     args.overdue,

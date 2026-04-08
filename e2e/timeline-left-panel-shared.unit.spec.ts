@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  buildCompletedResultsGroups,
+  buildCompletedTimeText,
   buildCompletedMonthKeyJst,
+  COMPLETED_UNDATED_GROUP_KEY,
   getIncrementalVisibilityState,
   SIDEBAR_INCREMENT_PAGE_SIZE,
 } from "../app/(board)/_components/timeline/TimelineLeftPanelShared";
@@ -41,5 +44,82 @@ test.describe("TimelineLeftPanelShared helpers", () => {
 
   test("checked_at が null のとき month key は null", async () => {
     expect(buildCompletedMonthKeyJst(null)).toBeNull();
+  });
+
+  test("completed time text は JST 基準で表示する", async () => {
+    expect(buildCompletedTimeText("2026-03-31T15:30:00.000Z")).toBe("完了 4/1(水) 00:30");
+  });
+
+  test("completed results は月別と完了日時なしにグループ化する", async () => {
+    const groups = buildCompletedResultsGroups([
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了 4/3",
+        item: {
+          card_id: "card-3",
+          title: "April 3",
+          checked: true,
+          checked_at: "2026-04-03T03:00:00.000Z",
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c3",
+        },
+      },
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了 4/1",
+        item: {
+          card_id: "card-2",
+          title: "April 1",
+          checked: true,
+          checked_at: "2026-03-31T15:30:00.000Z",
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c2",
+        },
+      },
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了 3/10",
+        item: {
+          card_id: "card-1",
+          title: "March",
+          checked: true,
+          checked_at: "2026-03-10T03:00:00.000Z",
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c1",
+        },
+      },
+      {
+        kind: "event",
+        badgeLabel: "T",
+        timeText: "完了日時なし",
+        item: {
+          card_id: "card-0",
+          title: "Undated",
+          checked: true,
+          checked_at: null,
+          checklist: null,
+          content: null,
+          excerpt: null,
+          short_id: "c0",
+        },
+      },
+    ]);
+
+    expect(groups).toHaveLength(3);
+    expect(groups[0]?.key).toBe("2026/04");
+    expect(groups[0]?.count).toBe(2);
+    expect(groups[1]?.key).toBe("2026/03");
+    expect(groups[1]?.count).toBe(1);
+    expect(groups[2]?.key).toBe(COMPLETED_UNDATED_GROUP_KEY);
+    expect(groups[2]?.count).toBe(1);
   });
 });

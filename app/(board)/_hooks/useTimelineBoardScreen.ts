@@ -24,6 +24,7 @@ import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/buc
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
+import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -106,6 +107,9 @@ type UseTimelineBoardScreenArgs = {
   abBuckets: TimelineResponse["abBuckets"];
   overdue: TimelineResponse["overdue"];
   completedResults: TimelineSearchResultItem[];
+  completedCurrentMonthCount: number;
+  completedCurrentMonthKey: string | null;
+  completedGroupedResults: CompletedResultsGroup[];
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   searchResults: TimelineSearchResultItem[];
@@ -285,6 +289,9 @@ export function useTimelineBoardScreen({
   abBuckets,
   overdue,
   completedResults,
+  completedCurrentMonthCount,
+  completedCurrentMonthKey,
+  completedGroupedResults,
   searchQuery,
   setSearchQuery,
   searchResults,
@@ -447,6 +454,9 @@ export function useTimelineBoardScreen({
     abBuckets,
     overdue,
     completedResults,
+    completedCurrentMonthCount,
+    completedCurrentMonthKey,
+    completedGroupedResults,
     searchQuery,
     setSearchQuery,
     searchResults,

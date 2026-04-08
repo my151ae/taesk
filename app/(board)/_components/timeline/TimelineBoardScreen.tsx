@@ -381,6 +381,8 @@ export default function TimelineBoardScreen({
       return (
         <CompletedSectionBody
           results={currentMobileSection.results}
+          groupedResults={currentMobileSection.groupedResults}
+          currentMonthKey={currentMobileSection.currentMonthKey}
           visibleCount={mobile.leftPanelProps.visibleCounts.completed}
           onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("completed", nextCount)}
           {...commonProps}

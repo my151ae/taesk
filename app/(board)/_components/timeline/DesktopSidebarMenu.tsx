@@ -11,6 +11,7 @@ import type { TrashCardItem } from "@/lib/api-types/timeline";
 import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import {
   CompletedSectionBody,
+  type CompletedResultsGroup,
   OverdueSectionBody,
   SearchSectionBody,
   TagsSectionBody,
@@ -57,6 +58,9 @@ export type DesktopSidebarSection =
   | (DesktopSidebarSectionBase & {
       key: "completed";
       tone: "neutral";
+      currentMonthCount: number;
+      currentMonthKey: string | null;
+      groupedResults: readonly CompletedResultsGroup[];
       results: readonly TimelineSearchResultItem[];
     })
   | (DesktopSidebarSectionBase & {
@@ -437,6 +441,8 @@ export function DesktopSidebarMenu({
       return (
         <CompletedSectionBody
           results={section.results}
+          groupedResults={section.groupedResults}
+          currentMonthKey={section.currentMonthKey}
           visibleCount={visibleCounts.completed}
           onVisibleCountChange={(nextCount) => onVisibleCountChange("completed", nextCount)}
           openCardModal={openCardModal}

@@ -52,6 +52,26 @@ const COMPLETED_MONTH_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
   month: "2-digit",
 });
 
+const COMPLETED_TIME_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export const COMPLETED_UNDATED_GROUP_KEY = "__undated__";
+export const COMPLETED_UNDATED_GROUP_LABEL = "完了日時なし";
+
+export type CompletedResultsGroup = {
+  key: string;
+  label: string;
+  count: number;
+  results: readonly TimelineSearchResultItem[];
+  isUndated?: boolean;
+};
+
 export function buildCompletedMonthKeyJst(checkedAt: string | null) {
   if (!checkedAt) return null;
   const parts = COMPLETED_MONTH_FORMATTER.formatToParts(new Date(checkedAt));
@@ -59,6 +79,51 @@ export function buildCompletedMonthKeyJst(checkedAt: string | null) {
   const month = parts.find((part) => part.type === "month")?.value;
   if (!year || !month) return null;
   return `${year}/${month}`;
+}
+
+export function buildCurrentCompletedMonthKeyJst(referenceDate: Date | string = new Date()) {
+  const date = typeof referenceDate === "string" ? new Date(referenceDate) : referenceDate;
+  const parts = COMPLETED_MONTH_FORMATTER.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  if (!year || !month) return null;
+  return `${year}/${month}`;
+}
+
+export function buildCompletedTimeText(checkedAt: string | null) {
+  if (!checkedAt) return COMPLETED_UNDATED_GROUP_LABEL;
+  return `完了 ${COMPLETED_TIME_FORMATTER.format(new Date(checkedAt))}`;
+}
+
+export function buildCompletedResultsGroups(results: readonly TimelineSearchResultItem[]): CompletedResultsGroup[] {
+  const groups: CompletedResultsGroup[] = [];
+
+  results.forEach((result) => {
+    const monthKey = buildCompletedMonthKeyJst(result.item.checked_at);
+    const key = monthKey ?? COMPLETED_UNDATED_GROUP_KEY;
+    const label = monthKey ?? COMPLETED_UNDATED_GROUP_LABEL;
+    const currentGroup = groups[groups.length - 1];
+
+    if (currentGroup?.key === key) {
+      const nextResults = [...currentGroup.results, result];
+      groups[groups.length - 1] = {
+        ...currentGroup,
+        count: nextResults.length,
+        results: nextResults,
+      };
+      return;
+    }
+
+    groups.push({
+      key,
+      label,
+      count: 1,
+      results: [result],
+      isUndated: key === COMPLETED_UNDATED_GROUP_KEY,
+    });
+  });
+
+  return groups;
 }
 
 export function getIncrementalVisibilityState({
@@ -543,15 +608,27 @@ export function SearchSectionBody({
 
 export function CompletedSectionBody({
   results,
+  groupedResults,
+  currentMonthKey,
   visibleCount,
   onVisibleCountChange,
   ...cardActions
 }: {
   results: readonly TimelineSearchResultItem[];
+  groupedResults: readonly CompletedResultsGroup[];
+  currentMonthKey: string | null;
 } & SharedCardActions & IncrementalVisibilityProps) {
+  const getInitialExpandedGroupKeys = useMemo(() => {
+    if (groupedResults.length === 0) return [];
+    const currentMonthGroup = currentMonthKey
+      ? groupedResults.find((group) => group.key === currentMonthKey && !group.isUndated)
+      : null;
+    if (currentMonthGroup) return [currentMonthGroup.key];
+    return [groupedResults[0].key];
+  }, [currentMonthKey, groupedResults]);
   const resetKey = useMemo(
-    () => results.map((result) => result.item.card_id).join(","),
-    [results],
+    () => `${currentMonthKey ?? ""}::${results.map((result) => result.item.card_id).join(",")}`,
+    [currentMonthKey, results],
   );
   const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
     total: results.length,
@@ -559,7 +636,42 @@ export function CompletedSectionBody({
     visibleCount,
     onVisibleCountChange,
   });
-  const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(
+    () => new Set(getInitialExpandedGroupKeys),
+  );
+
+  useEffect(() => {
+    setExpandedGroupKeys(new Set(getInitialExpandedGroupKeys));
+  }, [getInitialExpandedGroupKeys, resetKey]);
+
+  const exposedGroups = useMemo(() => {
+    let remainingVisibleBudget = sliceEnd;
+    const nextGroups: Array<{
+      group: CompletedResultsGroup;
+      visibleResults: readonly TimelineSearchResultItem[];
+      isFullyVisible: boolean;
+    }> = [];
+
+    groupedResults.forEach((group, index) => {
+      const previousGroup = nextGroups[index - 1];
+      const isExposed = index === 0 || (previousGroup?.isFullyVisible ?? false);
+      if (!isExposed) return;
+
+      const visibleInGroup = Math.min(group.results.length, remainingVisibleBudget);
+      const visibleResults = group.results.slice(0, visibleInGroup);
+      const isFullyVisible = visibleInGroup >= group.results.length;
+
+      nextGroups.push({
+        group,
+        visibleResults,
+        isFullyVisible,
+      });
+
+      remainingVisibleBudget = Math.max(0, remainingVisibleBudget - visibleInGroup);
+    });
+
+    return nextGroups;
+  }, [groupedResults, sliceEnd]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -571,21 +683,97 @@ export function CompletedSectionBody({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-          {renderSidebarResultRows({
-            results: visibleResults,
-            shortcutSection: "completed",
-            openSource: "completed",
-            testIdPrefix: "completed-sidebar-card",
-            showCompletedMonthHeadings: true,
-            footer: (
-              <LoadMoreFooter
-                canLoadMore={canLoadMore}
-                onLoadMore={handleLoadMore}
-                testId="sidebar-completed-load-more"
-              />
-            ),
-            ...cardActions,
-          })}
+          <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2">
+            {exposedGroups.map(({ group, visibleResults }, index) => {
+              const isExpanded = expandedGroupKeys.has(group.key);
+              const sanitizedGroupKey = group.key.replace("/", "-");
+              const isLastExposedGroup = index === exposedGroups.length - 1;
+
+              return (
+                <div key={group.key} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedGroupKeys((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(group.key)) {
+                          next.delete(group.key);
+                        } else {
+                          next.add(group.key);
+                        }
+                        return next;
+                      });
+                    }}
+                    aria-expanded={isExpanded}
+                    data-testid={`completed-month-toggle-${sanitizedGroupKey}`}
+                    className={clsx(
+                      "flex min-h-8 w-full min-w-0 select-none items-center justify-between gap-3 border-b border-slate-200/90 bg-white px-2 py-1 text-left transition-colors duration-150",
+                      "cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-inset",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-[10px] font-semibold text-slate-700">{group.label}</span>
+                      <span
+                        className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold leading-none text-slate-700"
+                        data-testid={`completed-month-count-${sanitizedGroupKey}`}
+                      >
+                        {group.count}
+                      </span>
+                    </span>
+                    <span
+                      className={clsx(
+                        "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none transition-colors duration-150",
+                        isExpanded
+                          ? "border-sky-200 bg-sky-50 text-sky-700"
+                          : "border-slate-200 bg-white text-slate-500",
+                      )}
+                    >
+                      {isExpanded ? "開いている" : "閉じている"}
+                    </span>
+                  </button>
+
+                  {isExpanded ? (
+                    <div className="space-y-1 pb-1">
+                      {visibleResults.map((result) => (
+                        <SidebarCardRow
+                          key={`${result.kind}:${result.item.card_id}`}
+                          item={result.item}
+                          badgeLabel={result.badgeLabel}
+                          timeText={result.timeText}
+                          openSource="completed"
+                          shortcutSection="completed"
+                          testId={`completed-sidebar-card-${result.kind}-${result.item.card_id}`}
+                          className="bg-white"
+                          onToggleCheck={cardActions.onToggleCheck}
+                          onRenameCardTitle={cardActions.onRenameCardTitle}
+                          openCardModal={cardActions.openCardModal}
+                          onCardContextMenu={cardActions.onCardContextMenu}
+                          onCardContextMenuByKeyboard={cardActions.onCardContextMenuByKeyboard}
+                          isContextMenuOpen={cardActions.contextMenuCardId === result.item.card_id}
+                          isActive={cardActions.selectionLeadCardId === result.item.card_id || cardActions.activeCardId === result.item.card_id}
+                          isSelected={cardActions.selectedCardIds.has(result.item.card_id)}
+                          selectionLane="completed"
+                          onShiftSelect={cardActions.onShiftSelect}
+                          onClearSelection={cardActions.onClearSelection}
+                          onActivateCard={cardActions.onActivateCard}
+                          activeCardId={cardActions.activeCardId}
+                          activeLaneId={cardActions.activeLaneId}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {isLastExposedGroup ? (
+                    <LoadMoreFooter
+                      canLoadMore={canLoadMore}
+                      onLoadMore={handleLoadMore}
+                      testId="sidebar-completed-load-more"
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

@@ -17,7 +17,13 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
 import { type SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
-import { SIDEBAR_INCREMENT_PAGE_SIZE } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import {
+  buildCompletedResultsGroups,
+  buildCompletedTimeText,
+  buildCurrentCompletedMonthKeyJst,
+  COMPLETED_UNDATED_GROUP_KEY,
+  SIDEBAR_INCREMENT_PAGE_SIZE,
+} from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import { buildDesktopTimelineColumns } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import {
@@ -107,19 +113,6 @@ const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey |
 const normalizeMobileLeftPanelMode = (mode: LeftPanelMode): LeftPanelMode => {
   if (mode === "none") return "overdue";
   return mode;
-};
-
-const COMPLETED_TIME_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
-  month: "numeric",
-  day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const buildCompletedTimeText = (checkedAt: string | null) => {
-  if (!checkedAt) return "完了日時なし";
-  return `完了 ${COMPLETED_TIME_FORMATTER.format(new Date(checkedAt))}`;
 };
 
 const sortTrashItems = (items: TrashCardItem[]) =>
@@ -601,14 +594,27 @@ function TimelineBoardPageContent({
     });
   }, [data]);
 
+  const completedCurrentMonthKey = buildCurrentCompletedMonthKeyJst();
+  const completedGroupedResults = useMemo(
+    () => buildCompletedResultsGroups(completedResults),
+    [completedResults],
+  );
+  const completedCurrentMonthCount = useMemo(
+    () =>
+      completedGroupedResults.find(
+        (group) => group.key === completedCurrentMonthKey && group.key !== COMPLETED_UNDATED_GROUP_KEY,
+      )?.count ?? 0,
+    [completedCurrentMonthKey, completedGroupedResults],
+  );
+
   const sidebarVisibleResetKeys = useMemo<Record<IncrementalPanelSectionKey, string>>(
     () => ({
-      completed: completedResults.map((result) => result.item.card_id).join(","),
+      completed: `${completedCurrentMonthKey ?? ""}::${completedResults.map((result) => result.item.card_id).join(",")}`,
       search: searchQuery.trim() ? `${searchQuery.trim()}::${searchResults.map((result) => result.item.card_id).join(",")}` : "",
       tags: `${selectedTags.join(",")}::${tagResults.map((result) => result.item.card_id).join(",")}`,
       trash: trashItems.map((item) => item.card_id).join(","),
     }),
-    [completedResults, searchQuery, searchResults, selectedTags, tagResults, trashItems],
+    [completedCurrentMonthKey, completedResults, searchQuery, searchResults, selectedTags, tagResults, trashItems],
   );
   const previousSidebarVisibleResetKeysRef = useRef<Record<IncrementalPanelSectionKey, string> | null>(null);
 
@@ -1420,6 +1426,9 @@ function TimelineBoardPageContent({
     abBuckets: sortedFilteredData?.abBuckets ?? {},
     overdue: visibleOverdueItems,
     completedResults,
+    completedCurrentMonthCount,
+    completedCurrentMonthKey,
+    completedGroupedResults,
     searchQuery,
     setSearchQuery: handleSearchQueryChange,
     searchResults,
