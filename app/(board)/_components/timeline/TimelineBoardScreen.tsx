@@ -217,7 +217,7 @@ export default function TimelineBoardScreen({
   const inactiveTabClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 hover:bg-slate-50";
   const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
-  const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "3.5rem";
+  const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "2.5rem";
 
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
