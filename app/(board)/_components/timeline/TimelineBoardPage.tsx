@@ -14,8 +14,9 @@ import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 import { useAuth } from "@/app/contexts/AuthContext";
 import TimelineBoardScreen from "@/app/(board)/_components/timeline/TimelineBoardScreen";
-import { type SidebarSectionKey } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
+import { type SidebarSectionKey, type SidebarVisibleCountState } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
+import { SIDEBAR_INCREMENT_PAGE_SIZE, type IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
   getCurrentTimelineIsoDateJst,
@@ -69,6 +70,12 @@ type TimelineBoardPageContentProps = {
 
 const DAY_WINDOW_RANGE = DEFAULT_TIMELINE_DAY_RANGE;
 const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
+const createInitialSidebarVisibleCounts = (): SidebarVisibleCountState => ({
+  completed: SIDEBAR_INCREMENT_PAGE_SIZE,
+  search: SIDEBAR_INCREMENT_PAGE_SIZE,
+  tags: SIDEBAR_INCREMENT_PAGE_SIZE,
+  trash: SIDEBAR_INCREMENT_PAGE_SIZE,
+});
 
 const deriveListWindowFromRange = (range?: number | null): ListWindow => {
   const normalized = typeof range === "number" ? Math.max(1, Math.round(range)) : 30;
@@ -206,6 +213,7 @@ function TimelineBoardPageContent({
   const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
   const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
+  const [sidebarVisibleCounts, setSidebarVisibleCounts] = useState<SidebarVisibleCountState>(() => createInitialSidebarVisibleCounts());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -520,6 +528,41 @@ function TimelineBoardPageContent({
       return left.item.card_id.localeCompare(right.item.card_id);
     });
   }, [data]);
+
+  const sidebarVisibleResetKeys = useMemo<Record<IncrementalPanelSectionKey, string>>(
+    () => ({
+      completed: completedResults.map((result) => result.item.card_id).join(","),
+      search: searchQuery.trim() ? `${searchQuery.trim()}::${searchResults.map((result) => result.item.card_id).join(",")}` : "",
+      tags: `${selectedTags.join(",")}::${tagResults.map((result) => result.item.card_id).join(",")}`,
+      trash: trashItems.map((item) => item.card_id).join(","),
+    }),
+    [completedResults, searchQuery, searchResults, selectedTags, tagResults, trashItems],
+  );
+  const previousSidebarVisibleResetKeysRef = useRef<Record<IncrementalPanelSectionKey, string> | null>(null);
+
+  useEffect(() => {
+    if (!previousSidebarVisibleResetKeysRef.current) {
+      previousSidebarVisibleResetKeysRef.current = sidebarVisibleResetKeys;
+      return;
+    }
+
+    const previousKeys = previousSidebarVisibleResetKeysRef.current;
+    previousSidebarVisibleResetKeysRef.current = sidebarVisibleResetKeys;
+
+    setSidebarVisibleCounts((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      (Object.keys(sidebarVisibleResetKeys) as IncrementalPanelSectionKey[]).forEach((section) => {
+        if (previousKeys[section] === sidebarVisibleResetKeys[section]) return;
+        if (next[section] === SIDEBAR_INCREMENT_PAGE_SIZE) return;
+        next[section] = SIDEBAR_INCREMENT_PAGE_SIZE;
+        changed = true;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [sidebarVisibleResetKeys]);
 
   const laneCardOrderMap = useMemo(() => {
     if (!sortedFilteredData) return new Map<string, string[]>();
@@ -1129,6 +1172,16 @@ function TimelineBoardPageContent({
     });
   }, [resolvedState.tag, searchQuery, selectedTags, updateBoardUiState]);
 
+  const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
+    setSidebarVisibleCounts((prev) => {
+      if (prev[section] === nextCount) return prev;
+      return {
+        ...prev,
+        [section]: nextCount,
+      };
+    });
+  }, []);
+
   const eventsByDay = useMemo(() => {
     const result: Record<string, TimelineEvent[]> = {};
     sortedFilteredData?.events?.forEach((event) => {
@@ -1181,6 +1234,8 @@ function TimelineBoardPageContent({
     activeLeftSectionKey,
     onExpandedSectionChange: handleExpandedSectionChange,
     onMobileLeftPanelSelect: handleMobileLeftPanelSelect,
+    sidebarVisibleCounts,
+    onSidebarVisibleCountChange: handleSidebarVisibleCountChange,
     onOpenNotificationsPanel: handleOpenNotificationsPanel,
     days: data?.days ?? [],
     activeDayIndex,

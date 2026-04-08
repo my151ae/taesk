@@ -12,6 +12,7 @@ import type { Notification } from "@/lib/supabase";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 import {
   CompletedSectionBody,
+  type IncrementalPanelSectionKey,
   OverdueSectionBody,
   SearchSectionBody,
   SharedPanelHeader,
@@ -35,6 +36,8 @@ export type DesktopSidebarMenuActions = {
   onTagToggle: (value: string) => void;
   onTagClear: () => void;
 };
+
+export type SidebarVisibleCountState = Record<IncrementalPanelSectionKey, number>;
 
 export type DesktopSidebarSection =
   | {
@@ -97,6 +100,8 @@ type DesktopSidebarMenuProps = {
   state: DesktopSidebarMenuState;
   actions: DesktopSidebarMenuActions;
   sections: readonly DesktopSidebarSection[];
+  visibleCounts: SidebarVisibleCountState;
+  onVisibleCountChange: (section: IncrementalPanelSectionKey, nextCount: number) => void;
   headerSlot?: DesktopSidebarHeaderSlot;
   overdueSortOrder: OverdueSortOrder;
   onOverdueSortOrderChange: (order: OverdueSortOrder) => void;
@@ -474,6 +479,8 @@ export function DesktopSidebarMenu({
   state,
   actions,
   sections,
+  visibleCounts,
+  onVisibleCountChange,
   headerSlot = null,
   overdueSortOrder,
   onOverdueSortOrderChange,
@@ -702,6 +709,8 @@ export function DesktopSidebarMenu({
           query={state.searchQuery}
           results={section.results}
           onQueryChange={actions.onSearchQueryChange}
+          visibleCount={visibleCounts.search}
+          onVisibleCountChange={(nextCount) => onVisibleCountChange("search", nextCount)}
           openCardModal={openCardModal}
           onToggleCheck={onToggleCheck}
           onRenameCardTitle={undefined}
@@ -723,6 +732,8 @@ export function DesktopSidebarMenu({
       return (
         <CompletedSectionBody
           results={section.results}
+          visibleCount={visibleCounts.completed}
+          onVisibleCountChange={(nextCount) => onVisibleCountChange("completed", nextCount)}
           openCardModal={openCardModal}
           onToggleCheck={onToggleCheck}
           onRenameCardTitle={undefined}
@@ -744,6 +755,8 @@ export function DesktopSidebarMenu({
       return (
         <TrashSectionBody
           items={section.items}
+          visibleCount={visibleCounts.trash}
+          onVisibleCountChange={(nextCount) => onVisibleCountChange("trash", nextCount)}
           onRestoreTrashCard={onRestoreTrashCard}
           openCardModal={openCardModal}
         />
@@ -757,6 +770,8 @@ export function DesktopSidebarMenu({
         selectedTags={state.selectedTags}
         onTagToggle={actions.onTagToggle}
         onTagClear={actions.onTagClear}
+        visibleCount={visibleCounts.tags}
+        onVisibleCountChange={(nextCount) => onVisibleCountChange("tags", nextCount)}
         openCardModal={openCardModal}
         onToggleCheck={onToggleCheck}
         onRenameCardTitle={undefined}

@@ -338,6 +338,8 @@ export default function TimelineBoardScreen({
           results={currentMobileSection.results}
           onQueryChange={mobile.leftPanelProps.actions.onSearchQueryChange}
           searchInputTestId="mobile-left-panel-search-input"
+          visibleCount={mobile.leftPanelProps.visibleCounts.search}
+          onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("search", nextCount)}
           {...commonProps}
           onRenameCardTitle={undefined}
         />
@@ -347,6 +349,8 @@ export default function TimelineBoardScreen({
       return (
         <CompletedSectionBody
           results={currentMobileSection.results}
+          visibleCount={mobile.leftPanelProps.visibleCounts.completed}
+          onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("completed", nextCount)}
           {...commonProps}
           onRenameCardTitle={undefined}
         />
@@ -356,6 +360,8 @@ export default function TimelineBoardScreen({
       return (
         <TrashSectionBody
           items={currentMobileSection.items}
+          visibleCount={mobile.leftPanelProps.visibleCounts.trash}
+          onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("trash", nextCount)}
           onRestoreTrashCard={mobile.leftPanelProps.onRestoreTrashCard}
           openCardModal={mobile.leftPanelProps.openCardModal}
         />
@@ -369,6 +375,8 @@ export default function TimelineBoardScreen({
           selectedTags={mobile.leftPanelProps.state.selectedTags}
           onTagToggle={mobile.leftPanelProps.actions.onTagToggle}
           onTagClear={mobile.leftPanelProps.actions.onTagClear}
+          visibleCount={mobile.leftPanelProps.visibleCounts.tags}
+          onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("tags", nextCount)}
           {...commonProps}
           onRenameCardTitle={undefined}
         />

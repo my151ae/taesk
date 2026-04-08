@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 
 import { DraggableCard } from "@/app/(board)/_components/timeline/TimelineDraggableCard";
@@ -15,6 +15,8 @@ import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers"
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 
 export type SharedPanelSectionKey = "overdue" | "completed" | "search" | "tags" | "trash";
+export type IncrementalPanelSectionKey = Exclude<SharedPanelSectionKey, "overdue">;
+export const SIDEBAR_INCREMENT_PAGE_SIZE = 20;
 
 type SharedSelectionProps = {
   selectedCardIds: ReadonlySet<string>;
@@ -39,6 +41,105 @@ type SharedCardActions = SharedSelectionProps & {
   contextMenuCardId: string | null;
   onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
 };
+
+type IncrementalVisibilityProps = {
+  visibleCount: number;
+  onVisibleCountChange: (nextCount: number) => void;
+};
+
+const COMPLETED_MONTH_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "2-digit",
+});
+
+export function buildCompletedMonthKeyJst(checkedAt: string | null) {
+  if (!checkedAt) return null;
+  const parts = COMPLETED_MONTH_FORMATTER.formatToParts(new Date(checkedAt));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  if (!year || !month) return null;
+  return `${year}/${month}`;
+}
+
+export function getIncrementalVisibilityState({
+  total,
+  visibleCount,
+  pageSize = SIDEBAR_INCREMENT_PAGE_SIZE,
+}: {
+  total: number;
+  visibleCount: number;
+  pageSize?: number;
+}) {
+  const normalizedVisibleCount = Math.max(pageSize, visibleCount);
+  return {
+    normalizedVisibleCount,
+    nextVisibleCount: normalizedVisibleCount + pageSize,
+    sliceEnd: Math.min(total, normalizedVisibleCount),
+    canLoadMore: total > normalizedVisibleCount,
+  };
+}
+
+function useIncrementalVisibleCount({
+  total,
+  resetKey,
+  visibleCount,
+  onVisibleCountChange,
+  pageSize = SIDEBAR_INCREMENT_PAGE_SIZE,
+}: {
+  total: number;
+  resetKey: string;
+  visibleCount: number;
+  onVisibleCountChange: (nextCount: number) => void;
+  pageSize?: number;
+}) {
+  const previousResetKeyRef = useRef(resetKey);
+
+  useEffect(() => {
+    if (previousResetKeyRef.current === resetKey) return;
+    previousResetKeyRef.current = resetKey;
+    if (visibleCount !== pageSize) {
+      onVisibleCountChange(pageSize);
+    }
+  }, [onVisibleCountChange, pageSize, resetKey, visibleCount]);
+
+  const state = useMemo(
+    () => getIncrementalVisibilityState({ total, visibleCount, pageSize }),
+    [pageSize, total, visibleCount],
+  );
+
+  return {
+    visibleCount: state.normalizedVisibleCount,
+    sliceEnd: state.sliceEnd,
+    canLoadMore: state.canLoadMore,
+    handleLoadMore: () => onVisibleCountChange(state.nextVisibleCount),
+  };
+}
+
+function LoadMoreFooter({
+  canLoadMore,
+  onLoadMore,
+  testId,
+}: {
+  canLoadMore: boolean;
+  onLoadMore: () => void;
+  testId: string;
+}) {
+  if (!canLoadMore) return null;
+
+  return (
+    <div className="px-2 pb-4 pt-2">
+      <button
+        type="button"
+        data-testid={testId}
+        onClick={onLoadMore}
+        className="flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+      >
+        さらに表示
+      </button>
+    </div>
+  );
+}
 
 export function SharedPanelHeader({
   title,
@@ -219,6 +320,8 @@ function renderSidebarResultRows({
   shortcutSection,
   openSource,
   testIdPrefix,
+  showCompletedMonthHeadings = false,
+  footer,
   onToggleCheck,
   onRenameCardTitle,
   openCardModal,
@@ -237,35 +340,61 @@ function renderSidebarResultRows({
   shortcutSection: ShortcutSection;
   openSource: string;
   testIdPrefix: string;
+  showCompletedMonthHeadings?: boolean;
+  footer?: React.ReactNode;
 } & SharedCardActions) {
+  const content: React.ReactNode[] = [];
+  let previousMonthKey: string | null = null;
+
+  results.forEach((result) => {
+    const monthKey = showCompletedMonthHeadings ? buildCompletedMonthKeyJst(result.item.checked_at) : null;
+    if (monthKey && monthKey !== previousMonthKey) {
+      content.push(
+        <div
+          key={`month-heading:${monthKey}`}
+          data-testid={`completed-month-heading-${monthKey.replace("/", "-")}`}
+          className="mt-3 border-t border-slate-200/80 pt-3 first:mt-0 first:border-t-0 first:pt-0"
+        >
+          <p className="text-[10px] font-semibold tracking-[0.08em] text-slate-400">{monthKey}</p>
+        </div>,
+      );
+      previousMonthKey = monthKey;
+    } else if (!monthKey) {
+      previousMonthKey = null;
+    }
+
+    content.push(
+      <SidebarCardRow
+        key={`${result.kind}:${result.item.card_id}`}
+        item={result.item}
+        badgeLabel={result.badgeLabel}
+        timeText={result.timeText}
+        openSource={openSource}
+        shortcutSection={shortcutSection}
+        testId={`${testIdPrefix}-${result.kind}-${result.item.card_id}`}
+        className="bg-white"
+        onToggleCheck={onToggleCheck}
+        onRenameCardTitle={onRenameCardTitle}
+        openCardModal={openCardModal}
+        onCardContextMenu={onCardContextMenu}
+        onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+        isContextMenuOpen={contextMenuCardId === result.item.card_id}
+        isActive={selectionLeadCardId === result.item.card_id || activeCardId === result.item.card_id}
+        isSelected={selectedCardIds.has(result.item.card_id)}
+        selectionLane={shortcutSection}
+        onShiftSelect={onShiftSelect}
+        onClearSelection={onClearSelection}
+        onActivateCard={onActivateCard}
+        activeCardId={activeCardId}
+        activeLaneId={activeLaneId}
+      />,
+    );
+  });
+
   return (
     <div className="min-h-full space-y-1 p-[1px] pb-4 pl-2 pr-2">
-      {results.map((result) => (
-        <SidebarCardRow
-          key={`${result.kind}:${result.item.card_id}`}
-          item={result.item}
-          badgeLabel={result.badgeLabel}
-          timeText={result.timeText}
-          openSource={openSource}
-          shortcutSection={shortcutSection}
-          testId={`${testIdPrefix}-${result.kind}-${result.item.card_id}`}
-          className="bg-white"
-          onToggleCheck={onToggleCheck}
-          onRenameCardTitle={onRenameCardTitle}
-          openCardModal={openCardModal}
-          onCardContextMenu={onCardContextMenu}
-          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
-          isContextMenuOpen={contextMenuCardId === result.item.card_id}
-          isActive={selectionLeadCardId === result.item.card_id || activeCardId === result.item.card_id}
-          isSelected={selectedCardIds.has(result.item.card_id)}
-          selectionLane={shortcutSection}
-          onShiftSelect={onShiftSelect}
-          onClearSelection={onClearSelection}
-          onActivateCard={onActivateCard}
-          activeCardId={activeCardId}
-          activeLaneId={activeLaneId}
-        />
-      ))}
+      {content}
+      {footer}
     </div>
   );
 }
@@ -339,13 +468,28 @@ export function SearchSectionBody({
   results,
   onQueryChange,
   searchInputTestId = "desktop-sidebar-search-input",
+  visibleCount,
+  onVisibleCountChange,
   ...cardActions
 }: {
   query: string;
   results: readonly TimelineSearchResultItem[];
   onQueryChange: (value: string) => void;
   searchInputTestId?: string;
-} & SharedCardActions) {
+} & SharedCardActions & IncrementalVisibilityProps) {
+  const resetKey = useMemo(() => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return "";
+    return `${trimmedQuery}::${results.map((result) => result.item.card_id).join(",")}`;
+  }, [query, results]);
+  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
+    total: results.length,
+    resetKey,
+    visibleCount,
+    onVisibleCountChange,
+  });
+  const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="border-b border-slate-200/80 bg-slate-50 px-2 py-2">
@@ -378,15 +522,20 @@ export function SearchSectionBody({
             </p>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
-            {renderSidebarResultRows({
-              results,
-              shortcutSection: "search",
-              openSource: "search",
-              testIdPrefix: "search-card",
-              ...cardActions,
-            })}
-          </div>
+          renderSidebarResultRows({
+            results: visibleResults,
+            shortcutSection: "search",
+            openSource: "search",
+            testIdPrefix: "search-card",
+            footer: (
+              <LoadMoreFooter
+                canLoadMore={canLoadMore}
+                onLoadMore={handleLoadMore}
+                testId="sidebar-search-load-more"
+              />
+            ),
+            ...cardActions,
+          })
         )}
       </div>
     </div>
@@ -395,10 +544,24 @@ export function SearchSectionBody({
 
 export function CompletedSectionBody({
   results,
+  visibleCount,
+  onVisibleCountChange,
   ...cardActions
 }: {
   results: readonly TimelineSearchResultItem[];
-} & SharedCardActions) {
+} & SharedCardActions & IncrementalVisibilityProps) {
+  const resetKey = useMemo(
+    () => results.map((result) => result.item.card_id).join(","),
+    [results],
+  );
+  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
+    total: results.length,
+    resetKey,
+    visibleCount,
+    onVisibleCountChange,
+  });
+  const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {results.length === 0 ? (
@@ -410,10 +573,18 @@ export function CompletedSectionBody({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
           {renderSidebarResultRows({
-            results,
+            results: visibleResults,
             shortcutSection: "completed",
             openSource: "completed",
             testIdPrefix: "completed-sidebar-card",
+            showCompletedMonthHeadings: true,
+            footer: (
+              <LoadMoreFooter
+                canLoadMore={canLoadMore}
+                onLoadMore={handleLoadMore}
+                testId="sidebar-completed-load-more"
+              />
+            ),
             ...cardActions,
           })}
         </div>
@@ -428,6 +599,8 @@ export function TagsSectionBody({
   selectedTags,
   onTagToggle,
   onTagClear,
+  visibleCount,
+  onVisibleCountChange,
   ...cardActions
 }: {
   tags: readonly TimelineTagSummary[];
@@ -435,7 +608,19 @@ export function TagsSectionBody({
   selectedTags: readonly string[];
   onTagToggle: (value: string) => void;
   onTagClear: () => void;
-} & SharedCardActions) {
+} & SharedCardActions & IncrementalVisibilityProps) {
+  const resetKey = useMemo(
+    () => `${selectedTags.join(",")}::${results.map((result) => result.item.card_id).join(",")}`,
+    [results, selectedTags],
+  );
+  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
+    total: results.length,
+    resetKey,
+    visibleCount,
+    onVisibleCountChange,
+  });
+  const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50 px-3 py-2">
@@ -500,10 +685,17 @@ export function TagsSectionBody({
               </div>
             ) : (
               renderSidebarResultRows({
-                results,
+                results: visibleResults,
                 shortcutSection: "search",
                 openSource: "tag-sidebar",
                 testIdPrefix: "tag-card",
+                footer: (
+                  <LoadMoreFooter
+                    canLoadMore={canLoadMore}
+                    onLoadMore={handleLoadMore}
+                    testId="sidebar-tags-load-more"
+                  />
+                ),
                 ...cardActions,
               })
             )}
@@ -518,11 +710,25 @@ export function TrashSectionBody({
   items,
   onRestoreTrashCard,
   openCardModal,
+  visibleCount,
+  onVisibleCountChange,
 }: {
   items: readonly TrashCardItem[];
   onRestoreTrashCard: (cardId: string) => Promise<boolean>;
   openCardModal: (shortId: string | null, source: string) => void;
-}) {
+} & IncrementalVisibilityProps) {
+  const resetKey = useMemo(
+    () => items.map((item) => item.card_id).join(","),
+    [items],
+  );
+  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
+    total: items.length,
+    resetKey,
+    visibleCount,
+    onVisibleCountChange,
+  });
+  const visibleItems = useMemo(() => items.slice(0, sliceEnd), [items, sliceEnd]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {items.length === 0 ? (
@@ -534,7 +740,7 @@ export function TrashSectionBody({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
           <div className="min-h-full space-y-2 p-[1px] pb-4 pl-2 pr-2 pt-2">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div
                 key={item.card_id}
                 className="border border-slate-200 bg-white px-2.5 pb-2 pt-4 shadow-sm"
@@ -576,6 +782,11 @@ export function TrashSectionBody({
                 </div>
               </div>
             ))}
+            <LoadMoreFooter
+              canLoadMore={canLoadMore}
+              onLoadMore={handleLoadMore}
+              testId="sidebar-trash-load-more"
+            />
           </div>
         </div>
       )}
