@@ -40,10 +40,36 @@ API routes:
 - `GET /api/notifications/preferences` – returns the current preferences (defaults when no row exists).
 - `PUT /api/notifications/preferences` – accepts partial updates (`in_app_enabled`, `web_push_enabled`, `quiet_hours`).
 - `POST /api/notifications/test` – enqueues a test notification for the authenticated user.
+- `POST /api/boards/[boardId]/notifications/daily-digest-test` – creates a manual daily digest preview for the authenticated board member.
 
 Clients should treat the API as the source of truth instead of talking to Supabase directly.
 
 ## Web Push Behaviour
+
+### Push Copy Safety Limits
+
+- `title`: target `24`, hard max `30`
+- `body`: target `36`, hard max `40`
+- `daily_digest` board name: target `18`, hard max `20`
+- grapheme 単位で長さを評価し、短縮時は末尾に `…` を付ける
+- これらの safety limits は **push title/body** にのみ適用し、in-app 一覧の表示文面には直接適用しない
+
+### Daily Digest Push Format
+
+- title: `Taesk: {board_name}`
+- body: `今日 {today}件 / overdue {overdue}件 - {taskTitleShort}`
+- item がない場合の body は `今日 0件 / overdue 0件`
+- preview API の `title/body/titleLength/bodyLength`、本番 digest payload、push payload は同じ shared helper で生成する
+
+### Daily Digest Manual Test
+
+- `NotificationSettings` の board context でのみ `Send Daily Digest Test` を表示する
+- manual test は `type='daily_digest'` の notification row を即時作成し、現在の board 状態から preview 用 digest を組み立てる
+- manual test は見た目確認用なので `enabled`, `delivery_time`, `last_sent_local_date`, `in_app_enabled`, `quiet_hours` を送信可否条件に使わない
+- `last_sent_local_date` は更新しない
+- `manual_test: true` を payload に含め、push 配信時は **daily digest manual test のみ** quiet hours を bypass する
+- `web_push_enabled=false` は bypass しない。push 不可でも in-app row は作成する
+- `pushReason='enabled'` は「push を試行可能」を意味し、送達成功そのものは保証しない
 
 The Edge Function uses the [`web-push`](https://www.npmjs.com/package/web-push) library inside Deno. Environment variables required at deployment time:
 

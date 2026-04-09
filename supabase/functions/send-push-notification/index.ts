@@ -15,6 +15,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webPush from 'npm:web-push@3.6.7';
+import { formatPushNotificationCopy } from '../../../lib/shared/notification-push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,10 @@ interface NotificationPayload {
     board_short_id?: string;
     board_slug?: string;
     board_name?: string;
+    today_count?: number;
+    overdue_count?: number;
+    top_items?: Array<{ title?: string }>;
+    manual_test?: boolean;
   };
 }
 
@@ -204,7 +209,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (recipientPrefs.quiet_hours && isWithinQuietHours(recipientPrefs.quiet_hours as QuietHoursPreference)) {
+    if (
+      recipientPrefs.quiet_hours &&
+      notificationData.payload.manual_test !== true &&
+      isWithinQuietHours(recipientPrefs.quiet_hours as QuietHoursPreference)
+    ) {
       console.log('Quiet hours active for user:', notificationData.recipient_id);
       return new Response(
         JSON.stringify({ success: true, message: 'Quiet hours active' }),
@@ -237,14 +246,10 @@ Deno.serve(async (req) => {
     }
 
     // Prepare push notification payload
+    const pushCopy = formatPushNotificationCopy(notificationData.type, notificationData.payload);
     const pushPayload = JSON.stringify({
-      title:
-        notificationData.type === 'daily_digest' &&
-        typeof notificationData.payload.board_name === 'string' &&
-        notificationData.payload.board_name.trim().length > 0
-          ? `Taesk: ${notificationData.payload.board_name.trim()}`
-          : 'Taesk Notification',
-      body: notificationData.payload.message,
+      title: pushCopy.title,
+      body: pushCopy.body,
       icon: '/icon?size=192',
       badge: '/icon?size=192',
       tag: `notification-${notificationData.notification_id}`,

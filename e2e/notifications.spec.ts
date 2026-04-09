@@ -44,6 +44,7 @@ test.describe('Web Push Notifications @feature:notifications', () => {
     timezone: string;
   };
   let testNotificationCount: number;
+  let dailyDigestTestCount: number;
   let pushSubscriptionCreates: number;
   let pushSubscriptionDeletes: number;
 
@@ -59,6 +60,7 @@ test.describe('Web Push Notifications @feature:notifications', () => {
       timezone: 'Asia/Tokyo',
     };
     testNotificationCount = 0;
+    dailyDigestTestCount = 0;
     pushSubscriptionCreates = 0;
     pushSubscriptionDeletes = 0;
 
@@ -178,6 +180,29 @@ test.describe('Web Push Notifications @feature:notifications', () => {
       await route.fallback();
     });
 
+    await page.route('**/api/boards/*/notifications/daily-digest-test', async (route) => {
+      if (route.request().method() === 'POST') {
+        dailyDigestTestCount += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            notificationId: crypto.randomUUID(),
+            title: 'Taesk: Timeline Board',
+            body: '今日 2件 / overdue 1件 - 企画書レビュー…',
+            titleLength: 20,
+            bodyLength: 29,
+            pushEligible: false,
+            pushReason: 'disabled',
+          }),
+        });
+        return;
+      }
+
+      await route.fallback();
+    });
+
     await page.route('**/api/push-subscriptions', async (route) => {
       const method = route.request().method();
       if (method === 'POST' || method === 'DELETE') {
@@ -272,6 +297,31 @@ test.describe('Web Push Notifications @feature:notifications', () => {
     await expect
       .poll(() => testNotificationCount, { timeout: 5_000 })
       .toBeGreaterThan(beforeCount);
+  });
+
+  test('sends a daily digest test and shows preview', async ({ page }) => {
+    await openNotificationSettings(page);
+    const beforeCount = dailyDigestTestCount;
+
+    const digestResponsePromise = page.waitForResponse((res) => {
+      return (
+        res.request().method() === 'POST' &&
+        res.url().includes('/notifications/daily-digest-test') &&
+        res.ok()
+      );
+    }, { timeout: 10_000 });
+
+    await page.getByTestId('send-daily-digest-test-button').click();
+    await digestResponsePromise;
+
+    await expect
+      .poll(() => dailyDigestTestCount, { timeout: 5_000 })
+      .toBeGreaterThan(beforeCount);
+
+    await expect(page.getByTestId('daily-digest-test-preview')).toBeVisible();
+    await expect(page.getByTestId('daily-digest-test-title')).toHaveText('Taesk: Timeline Board');
+    await expect(page.getByTestId('daily-digest-test-body')).toHaveText('今日 2件 / overdue 1件 - 企画書レビュー…');
+    await expect(page.getByText('Push is disabled; created in-app digest only.')).toBeVisible();
   });
 });
 

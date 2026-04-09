@@ -38,6 +38,17 @@ type NotificationSettingsProps = {
   boardName?: string | null;
 };
 
+type DailyDigestTestResponse = {
+  success: true;
+  notificationId: string;
+  title: string;
+  body: string;
+  titleLength: number;
+  bodyLength: number;
+  pushEligible: boolean;
+  pushReason: 'enabled' | 'disabled' | 'no_subscription';
+};
+
 export default function NotificationSettings({
   boardId = null,
   boardName = null,
@@ -51,6 +62,7 @@ export default function NotificationSettings({
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [testSending, setTestSending] = useState(false);
+  const [dailyDigestTestSending, setDailyDigestTestSending] = useState(false);
   const [loadingDailyDigest, setLoadingDailyDigest] = useState(false);
   const [savingDailyDigest, setSavingDailyDigest] = useState(false);
 
@@ -65,6 +77,7 @@ export default function NotificationSettings({
 
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [dailyDigestPreview, setDailyDigestPreview] = useState<DailyDigestTestResponse | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const applyPreferencesToForm = (prefs: NotificationPreferences) => {
@@ -93,6 +106,7 @@ export default function NotificationSettings({
       setLoadingPreferences(true);
       setError(null);
       setStatusMessage(null);
+      setDailyDigestPreview(null);
 
       const response = await fetch('/api/notifications/preferences');
       if (!response.ok) {
@@ -318,6 +332,7 @@ export default function NotificationSettings({
     setTestSending(true);
     setError(null);
     setStatusMessage(null);
+    setDailyDigestPreview(null);
 
     try {
       const automated = typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { webdriver?: boolean }).webdriver);
@@ -349,6 +364,43 @@ export default function NotificationSettings({
       setError(err instanceof Error ? err.message : 'Failed to send test notification');
     } finally {
       setTestSending(false);
+    }
+  };
+
+  const handleSendDailyDigestTest = async () => {
+    if (!boardId) {
+      return;
+    }
+
+    setDailyDigestTestSending(true);
+    setError(null);
+    setStatusMessage(null);
+    setDailyDigestPreview(null);
+
+    try {
+      const response = await fetch(`/api/boards/${boardId}/notifications/daily-digest-test`, {
+        method: 'POST',
+      });
+
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to send daily digest test');
+      }
+
+      const data = body as DailyDigestTestResponse;
+      setDailyDigestPreview(data);
+      if (data.pushReason === 'disabled') {
+        setStatusMessage('Push is disabled; created in-app digest only.');
+      } else if (data.pushReason === 'no_subscription') {
+        setStatusMessage('No push subscription found; created in-app digest only.');
+      } else {
+        setStatusMessage('Daily digest test created. Push is eligible for delivery attempt.');
+      }
+    } catch (err) {
+      console.error('Failed to send daily digest test:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send daily digest test');
+    } finally {
+      setDailyDigestTestSending(false);
     }
   };
 
@@ -685,6 +737,48 @@ export default function NotificationSettings({
                 >
                   {savingDailyDigest ? 'Saving…' : 'Save Daily Digest'}
                 </button>
+
+                <div className="space-y-2 rounded border border-dashed border-slate-300 bg-white/70 p-3 dark:border-slate-600 dark:bg-slate-900/20">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Sends an immediate test digest for this board. Delivery schedule and quiet hours are ignored for this preview.
+                  </p>
+                  <button
+                    onClick={handleSendDailyDigestTest}
+                    disabled={dailyDigestTestSending}
+                    className="rounded bg-slate-700 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
+                    data-testid="send-daily-digest-test-button"
+                  >
+                    {dailyDigestTestSending ? 'Sending…' : 'Send Daily Digest Test'}
+                  </button>
+
+                  {dailyDigestPreview ? (
+                    <div
+                      className="space-y-2 rounded border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/40"
+                      data-testid="daily-digest-test-preview"
+                    >
+                      <div>
+                        <div className="font-medium text-slate-700 dark:text-slate-200">Preview title</div>
+                        <div className="break-words text-slate-900 dark:text-slate-100" data-testid="daily-digest-test-title">
+                          {dailyDigestPreview.title}
+                        </div>
+                        <div className="text-xs text-slate-500">Length: {dailyDigestPreview.titleLength}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-700 dark:text-slate-200">Preview body</div>
+                        <div className="break-words text-slate-900 dark:text-slate-100" data-testid="daily-digest-test-body">
+                          {dailyDigestPreview.body}
+                        </div>
+                        <div className="text-xs text-slate-500">Length: {dailyDigestPreview.bodyLength}</div>
+                      </div>
+                      <div className="text-xs text-slate-500" data-testid="daily-digest-test-push-status">
+                        Push status: {dailyDigestPreview.pushReason}
+                        {dailyDigestPreview.pushEligible
+                          ? ' (push attempt eligible; delivery success not guaranteed)'
+                          : ' (in-app only)'}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </>
             )}
           </div>
