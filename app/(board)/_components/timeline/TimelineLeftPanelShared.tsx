@@ -8,7 +8,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
@@ -251,7 +251,7 @@ export function SharedPanelHeader({
 function SidebarCardRow({
   item,
   badgeLabel,
-  timeText,
+  timeText: _timeText,
   openSource,
   shortcutSection,
   testId,
@@ -280,6 +280,14 @@ function SidebarCardRow({
     checklist?: TimelineOverdueItem["checklist"];
     content?: TimelineOverdueItem["content"];
     excerpt?: string | null;
+    tags?: string[];
+    due_date?: string | null;
+    due_start?: string | null;
+    due_end?: string | null;
+    due_bucket?: string | null;
+    duration?: number | null;
+    start_reminder_enabled?: boolean;
+    end_reminder_enabled?: boolean;
     short_id: string | null;
   };
   badgeLabel: string;
@@ -320,12 +328,18 @@ function SidebarCardRow({
         content={item.content ?? null}
         onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
         cardId={item.card_id}
-        badgeLabel={badgeLabel}
-        timeText={timeText}
-        timePlacement="out-top"
+        statusItems={buildTimelineCardStatusItems(item, {
+          includeTags: true,
+          includeDate: true,
+          includeTime: true,
+          includeDuration: true,
+          bucketLabel: badgeLabel,
+        })}
+        timeText={null}
+        timePlacement="inline"
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-        notePreviewLines={3}
+        notePreviewLines={2}
         onOpen={() => openCardModal(item.short_id, openSource)}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
         showOpenButton
@@ -944,11 +958,22 @@ export function TrashSectionBody({
                     content={item.content ?? null}
                     note={item.excerpt ?? undefined}
                     noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-                    notePreviewLines={3}
+                    notePreviewLines={2}
                     cardId={item.card_id}
-                    badgeLabel="TR"
-                    timeText={buildTrashTimeText(item)}
-                    timePlacement="out-top"
+                    statusItems={[
+                      {
+                        key: "trash",
+                        kind: "bucket",
+                        label: "TR",
+                      },
+                      {
+                        key: "trash-time",
+                        kind: "time",
+                        label: buildTrashTimeText(item),
+                      },
+                    ]}
+                    timeText={null}
+                    timePlacement="inline"
                     onOpen={() => openCardModal(item.short_id, "trash")}
                     openButtonTestId={`cardOpenButton-trash-${item.card_id}`}
                     showOpenButton

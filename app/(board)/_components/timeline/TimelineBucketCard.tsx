@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { useState } from 'react';
 import clsx from 'clsx';
 import { TimelineBucketItem } from '@/app/(board)/_utils/timeline-helpers';
-import { buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
+import { buildTimelineCardStatusItems } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import { bucketKeyToDueBucket } from '@/lib/bucket-normalization';
 import { DraggableCard } from './TimelineDraggableCard';
 import {
@@ -108,16 +108,18 @@ export const TimelineBucketCard = ({
                     content={item.content ?? null}
                     onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                     cardId={item.card_id}
-                    badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-                    timeText={buildTimelineCardTimeText(item, {
+                    statusItems={buildTimelineCardStatusItems(item, {
+                        includeTags: true,
                         includeDate: true,
                         includeTime: false,
                         includeDuration: true,
+                        bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
                     })}
-                    timePlacement="out-top"
+                    timeText={null}
+                    timePlacement="inline"
                     note={item.excerpt ?? undefined}
                     noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-                    notePreviewLines={3}
+                    notePreviewLines={2}
                     rightMeta={null}
                     onOpen={() => {
                         openCardModal(item.short_id);

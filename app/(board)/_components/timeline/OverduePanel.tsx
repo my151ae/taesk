@@ -5,7 +5,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type OverduePanelProps = {
@@ -22,13 +22,6 @@ type OverduePanelProps = {
   compactEmptyState?: boolean;
   emptyStateMessage?: string;
 };
-
-function buildTimeText(item: TimelineOverdueItem) {
-  return buildTimelineCardTimeText(item, {
-    includeDate: true,
-    includeDuration: true,
-  });
-}
 
 function OverdueCardRow({
   item,
@@ -63,12 +56,18 @@ function OverdueCardRow({
           content={item.content ?? null}
           onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
           cardId={item.card_id}
-          badgeLabel={item.due_bucket?.toUpperCase() ?? "O"}
-          timeText={buildTimeText(item)}
-          timePlacement="out-top"
+          statusItems={buildTimelineCardStatusItems(item, {
+            includeTags: true,
+            includeDate: true,
+            includeTime: true,
+            includeDuration: true,
+            bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
+          })}
+          timeText={null}
+          timePlacement="inline"
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-          notePreviewLines={3}
+          notePreviewLines={2}
           onOpen={() => openCardModal(item.short_id, "overdue")}
           openButtonTestId={`cardOpenButton-overdue-${item.card_id}`}
           showOpenButton

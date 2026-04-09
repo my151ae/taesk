@@ -8,7 +8,7 @@ import {
     TimelineCard,
     TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from './TimelineCard';
-import { buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
+import { buildTimelineCardStatusItems } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import {
     TimelineDay,
     TimelineBucketItem,
@@ -362,11 +362,9 @@ function StaticTimelineRow({
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     dataTestId,
-    badgeTestId,
     openButtonTestId,
     notePreviewLines = 3,
     cardClassName,
-    timeText,
     openSource = 'bucket-list',
     checkedVisualTone = 'default',
     isSelected = false,
@@ -387,11 +385,9 @@ function StaticTimelineRow({
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     dataTestId?: string;
-    badgeTestId?: string;
     openButtonTestId?: string;
     notePreviewLines?: number;
     cardClassName?: string;
-    timeText?: ReactNode;
     openSource?: string;
     checkedVisualTone?: 'default' | 'timeline-dim';
     isSelected?: boolean;
@@ -415,14 +411,6 @@ function StaticTimelineRow({
             data-testid={dataTestId}
             onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
         >
-            {badgeLabel ? (
-                <span
-                    className="pointer-events-none absolute right-[8px] top-[8px] z-20 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-500 shadow-sm"
-                    data-testid={badgeTestId}
-                >
-                    {badgeLabel}
-                </span>
-            ) : null}
             <TimelineCard
                 title={item.title || ''}
                 checked={item.checked}
@@ -430,11 +418,18 @@ function StaticTimelineRow({
                 content={item.content ?? null}
                 onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
                 cardId={item.card_id}
-                timeText={timeText}
-                timePlacement="out-top"
+                statusItems={buildTimelineCardStatusItems(item, {
+                    includeTags: true,
+                    includeDate: true,
+                    includeTime: true,
+                    includeDuration: true,
+                    bucketLabel: badgeLabel,
+                })}
+                timeText={null}
+                timePlacement="inline"
                 note={item.excerpt ?? undefined}
                 noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-                notePreviewLines={notePreviewLines}
+                notePreviewLines={Math.min(notePreviewLines, 2)}
                 rightMeta={null}
                 onOpen={() => openCardModal(item.short_id, openSource)}
                 openButtonTestId={openButtonTestId}
@@ -1108,9 +1103,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                     onCardContextMenu={onCardContextMenu}
                     onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                     dataTestId={`completed-card-${entry.item.card_id}`}
-                    badgeTestId={`completed-badge-${entry.item.card_id}`}
                     openButtonTestId={`cardOpenButton-timeline-${entry.item.card_id}`}
-                    timeText={buildTimelineCardTimeText(entry.item, { includeDuration: true })}
                     openSource="timeline"
                     checkedVisualTone="timeline-dim"
                     isSelected={selectedCardIds.has(entry.item.card_id)}
@@ -1136,13 +1129,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 onCardContextMenu={onCardContextMenu}
                 onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                 dataTestId={`completed-card-${entry.item.card_id}`}
-                badgeTestId={`completed-badge-${entry.item.card_id}`}
                 openButtonTestId={`cardOpenButton-bucket-list-${entry.item.card_id}`}
-                timeText={buildTimelineCardTimeText(entry.item, {
-                    includeDate: true,
-                    includeTime: false,
-                    includeDuration: true,
-                })}
                 openSource="bucket-list"
                 checkedVisualTone="timeline-dim"
                 isSelected={selectedCardIds.has(entry.item.card_id)}

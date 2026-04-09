@@ -12,11 +12,11 @@ import {
     getMinutesFromTime,
     type StackedTimelineItemKind,
     timeLabel,
-    ExternalCalendarEntry,
-    detailedTimeLabel
+    ExternalCalendarEntry
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
 import { TimelineCard } from './TimelineCard';
+import { buildTimelineCardStatusItems } from './timeline-card-meta';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import {
     buildStackedTimelineColumnLayout,
@@ -296,13 +296,22 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             title={calendarEvent.title || "Google予定"}
                                             checked={false}
                                             onToggleCheck={() => {}}
-                                            badgeLabel="G"
-                                            timeText={
-                                                layout?.isTimeOverlapped && !isActive
-                                                    ? null
-                                                    : detailedTimeLabel(minutesToTime(calendarEvent.startMinutes), minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes), calendarEvent.durationMinutes)
-                                            }
-                                            timePlacement="out-top"
+                                            statusItems={buildTimelineCardStatusItems({
+                                                due_start: minutesToTime(calendarEvent.startMinutes),
+                                                due_end: minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes),
+                                                durationMinutes: calendarEvent.durationMinutes,
+                                            }, {
+                                                includeTags: false,
+                                                includeDate: false,
+                                                includeTime: true,
+                                                includeDuration: true,
+                                                includeBucket: true,
+                                                includeProgress: false,
+                                                includeReminder: false,
+                                                bucketLabel: "G",
+                                            })}
+                                            timeText={null}
+                                            timePlacement="inline"
                                             onOpen={() => {
                                                 if (!interactionLocked) {
                                                     setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });

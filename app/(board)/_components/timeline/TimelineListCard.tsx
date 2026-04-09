@@ -4,7 +4,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type TimelineListCardProps = {
@@ -34,21 +34,10 @@ export function TimelineListCard({
 }: TimelineListCardProps) {
   const isEvent = kind === "event";
   const isOverdue = kind === "overdue";
-  const timeText = isEvent
-    ? buildTimelineCardTimeText(item, { includeDuration: true })
-    : isOverdue
-      ? buildTimelineCardTimeText(item, { includeDate: true, includeDuration: true })
-    : buildTimelineCardTimeText(item, {
-        includeDate: true,
-        includeTime: false,
-        includeDuration: true,
-      });
-
   return (
     <div
       className={clsx(
         "min-w-0",
-        timeText ? "pt-4" : "",
         variant === "mobile" ? "active:scale-[0.98] transition-transform" : ""
       )}
       onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
@@ -60,12 +49,19 @@ export function TimelineListCard({
         content={item.content ?? null}
         onToggleCheck={(next) => onToggleCheck(item.card_id, next)}
         cardId={item.card_id}
-        badgeLabel={bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null)}
-        timeText={timeText}
-        timePlacement={timeText ? "out-top" : "inline"}
+        statusItems={buildTimelineCardStatusItems(item, {
+          includeTags: true,
+          includeDate: isOverdue || !isEvent,
+          includeTime: isEvent || isOverdue,
+          includeDuration: true,
+          bucketLabel: bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null),
+          includeReminder: true,
+        })}
+        timeText={null}
+        timePlacement="inline"
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-        notePreviewLines={3}
+        notePreviewLines={2}
         rightMeta={null}
         onOpen={() => openCardModal(item.short_id, openSource)}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}

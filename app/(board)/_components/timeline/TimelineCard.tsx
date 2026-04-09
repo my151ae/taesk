@@ -13,22 +13,20 @@ import {
 } from 'react';
 import type { JSONContent } from '@tiptap/react';
 import type { Checklist } from '@/lib/checklist';
-import { countCheckedLines, countNonEmptyLines } from '@/lib/checklist';
 import { getTiptapPlainText, normalizeContent } from '@/lib/tiptap';
+import type { TimelineCardStatusItem } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import {
     buildShortcutDataAttributes,
     type ShortcutContextDescriptor,
 } from '@/app/(board)/_components/timeline/shortcut-bar-registry';
 
-export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-3';
+export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-2';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
 const NOTE_PREVIEW_ROW_GAP_EM = 0.125;
-const CARD_LEFT_COLUMN_WIDTH = '1.2rem';
-const CARD_LEFT_CELL_X_PADDING = '1px';
-const CARD_RIGHT_CELL_X_PADDING = '4px';
-const CARD_TOP_CELL_Y_PADDING = '1px';
-const CARD_BODY_TOP_PADDING = '4px';
-const CARD_TOP_ROW_MIN_HEIGHT = '1.2rem';
+const CARD_LEFT_COLUMN_WIDTH = '1.9rem';
+const CARD_LEFT_CELL_X_PADDING = '4px';
+const CARD_RIGHT_CELL_X_PADDING = '8px';
+const CARD_ROW_Y_PADDING = '6px';
 
 type TimelineCardProps = {
     title: string;
@@ -72,6 +70,10 @@ type TimelineCardProps = {
     titleBackgroundClassName?: string;
     /** 左側のチェックボックス列を非表示にするか */
     hideLeftColumn?: boolean;
+    statusItems?: TimelineCardStatusItem[];
+    showDragHandle?: boolean;
+    densityMode?: 'default' | 'compact' | 'minimal';
+    reminderEnabled?: boolean;
     shortcutContext?: ShortcutContextDescriptor | null;
     checkedVisualTone?: 'default' | 'timeline-dim';
     isSelected?: boolean;
@@ -97,10 +99,10 @@ type TimelineCardProps = {
 export function TimelineCard({
     title,
     checked,
-    checklist,
+    checklist: _checklist,
     content,
     onToggleCheck,
-    badgeLabel,
+    badgeLabel: _badgeLabel,
     timeText,
     rightMeta,
     timePlacement = 'top',
@@ -120,7 +122,7 @@ export function TimelineCard({
     onBlur,
     childrenPosition = 'bottom',
     note,
-    noteClampClass,
+    noteClampClass: _noteClampClass,
     notePreviewLines = 2,
     backgroundClass = 'bg-white',
     borderClassName,
@@ -128,6 +130,10 @@ export function TimelineCard({
     titleClassName,
     titleBackgroundClassName,
     hideLeftColumn = false,
+    statusItems,
+    showDragHandle = !hideLeftColumn,
+    densityMode = 'default',
+    reminderEnabled = false,
     shortcutContext,
     checkedVisualTone = 'default',
     isSelected = false,
@@ -149,13 +155,11 @@ export function TimelineCard({
     const titleInputRef = useRef<HTMLInputElement | null>(null);
     const isComposingRef = useRef(false);
     const isSubmittingTitleRef = useRef(false);
-    const resolvedNoteClampClass =
-        noteClampClass ?? (notePreviewLines >= 3 ? TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS : 'line-clamp-2');
     const notePreviewMaxHeightEm = notePreviewLines > 0
         ? (notePreviewLines * NOTE_PREVIEW_LINE_HEIGHT_EM) + ((notePreviewLines - 1) * NOTE_PREVIEW_ROW_GAP_EM)
         : 0;
     const plainTextFromContent = content ? getTiptapPlainText(normalizeContent(content)) : '';
-    const contentChecklistProgress = plainTextFromContent
+    const fallbackContentProgress = plainTextFromContent
         .split(/\r?\n/)
         .reduce(
             (acc, line) => {
@@ -169,16 +173,32 @@ export function TimelineCard({
             },
             { checked: 0, total: 0 }
         );
-    const checklistTotalCount = countNonEmptyLines(checklist) || contentChecklistProgress.total;
-    const checklistCheckedCount = countCheckedLines(checklist) || contentChecklistProgress.checked;
-    const checklistProgressLabel = checklistTotalCount > 0 ? `${checklistCheckedCount}/${checklistTotalCount}` : null;
-    const hasBodySection = Boolean(note || checklistProgressLabel);
+    const canShowBodySection = densityMode === 'default' && Boolean(note);
     const isTimelineDimChecked = checked && checkedVisualTone === 'timeline-dim';
-    const inlineBadgeLabel = badgeLabel && !['A', 'B'].includes(badgeLabel.toUpperCase()) ? badgeLabel : null;
     const resolvedBackgroundClass = isTimelineDimChecked ? 'bg-slate-100' : backgroundClass;
     const resolvedBorderClassName = borderClassName ?? (isTimelineDimChecked ? 'border-slate-200 shadow-none' : 'border-slate-200');
     const checkedTextClassName = isTimelineDimChecked ? 'text-slate-400 line-through decoration-slate-400 decoration-1' : '';
     const checkedMetaTextClassName = isTimelineDimChecked ? 'text-slate-400' : '';
+    const fallbackProgressItem = fallbackContentProgress.total > 0
+        ? {
+            key: 'progress:fallback',
+            kind: 'progress' as const,
+            label: `${fallbackContentProgress.checked}/${fallbackContentProgress.total}`,
+        }
+        : null;
+    const resolvedStatusItems = (statusItems ?? []).filter((item) => {
+        if (!item) return false;
+        if (item.kind === 'reminder') {
+            return reminderEnabled || item.label !== undefined || item.icon !== undefined;
+        }
+        return Boolean(item.label);
+    });
+    const mergedStatusItems = fallbackProgressItem && !resolvedStatusItems.some((item) => item.kind === 'progress')
+        ? [...resolvedStatusItems, fallbackProgressItem]
+        : resolvedStatusItems;
+    const hasStatusBar = mergedStatusItems.length > 0;
+    const shouldRenderBodyRow = canShowBodySection;
+    const titleClampClassName = densityMode === 'minimal' ? 'line-clamp-1' : 'line-clamp-2';
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [draftTitle, setDraftTitle] = useState(title);
 
@@ -355,6 +375,48 @@ export function TimelineCard({
             </span>
         );
     }, [rightMeta]);
+    const renderStatusIcon = useCallback((item: TimelineCardStatusItem) => {
+        if (item.icon) return item.icon;
+
+        if (item.kind === 'progress') {
+            return (
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    <rect x="2.5" y="3" width="11" height="10.5" rx="2" />
+                    <path d="M5 6.5h6M5 9h4" />
+                </svg>
+            );
+        }
+
+        if (item.kind === 'reminder') {
+            return (
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    <path d="M8 2.25a3 3 0 0 0-3 3v1.1c0 .55-.16 1.08-.46 1.54L3.5 9.5v.75h9V9.5l-1.04-1.61A2.95 2.95 0 0 1 11 7.35v-1.1a3 3 0 0 0-3-3Z" />
+                    <path d="M6.5 11.5a1.5 1.5 0 0 0 3 0" />
+                </svg>
+            );
+        }
+
+        return null;
+    }, []);
+    const renderStatusItem = useCallback((item: TimelineCardStatusItem) => {
+        const icon = renderStatusIcon(item);
+        const baseClassName = clsx(
+            'inline-flex min-w-0 items-center gap-1 rounded-full border px-1.5 py-[1px] text-[10px] font-medium leading-none',
+            isTimelineDimChecked
+                ? 'border-slate-200 bg-white/80 text-slate-400'
+                : 'border-slate-200 bg-white text-slate-600'
+        );
+        const labelClassName = item.kind === 'reminder' && !item.label
+            ? 'sr-only'
+            : 'min-w-0 truncate';
+
+        return (
+            <span key={item.key} className={baseClassName} title={item.label}>
+                {icon ? <span className="shrink-0">{icon}</span> : null}
+                {item.label ? <span className={labelClassName}>{item.label}</span> : null}
+            </span>
+        );
+    }, [isTimelineDimChecked, renderStatusIcon]);
     const handleOpenButtonClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
@@ -436,38 +498,31 @@ export function TimelineCard({
                 onKeyDown?.(event);
             }}
         >
-            <div className="relative flex flex-1 flex-col min-w-0">
-                <div className={clsx(
-                    "flex flex-1 flex-col gap-2 min-w-0 overflow-hidden min-h-0",
-                    // 時間がカード内に表示される場合は上部パディングを設けて重なりを防止
-                    (timePlacement === 'top' && timeText) ? "pt-4 pb-0.5" : (paddingClass === 'py-3' ? "pt-0.5 pb-1" : "py-0.5")
-                )}>
+            <div className="relative flex flex-1 min-w-0 flex-col">
+                <div
+                    className={clsx(
+                        "flex min-h-0 flex-1 flex-col overflow-hidden",
+                        (timePlacement === 'top' && timeText) ? 'pt-4 pb-0.5' : 'py-0.5'
+                    )}
+                >
                     {childrenPosition === 'top' && children}
 
-                    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-                        <div
-                            className="pointer-events-none absolute inset-y-0 w-px"
-                            aria-hidden="true"
-                            style={{
-                                left: CARD_LEFT_COLUMN_WIDTH,
-                                backgroundImage: isTimelineDimChecked
-                                    ? "repeating-linear-gradient(to bottom, rgb(226 232 240) 0 8px, transparent 8px 12px)"
-                                    : "repeating-linear-gradient(to bottom, rgb(203 213 225) 0 8px, transparent 8px 12px)",
-                            }}
-                        />
-                        <div
-                            className="grid min-w-0"
-                            style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
-                        >
-                            {!hideLeftColumn && (
+                    <div
+                        className="grid min-h-0 min-w-0 flex-1 overflow-hidden"
+                        style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                    >
+                        {!hideLeftColumn ? (
+                            <div className="flex min-h-0 flex-col border-r border-slate-200/80">
                                 <div
-                                    className="flex items-center justify-center"
+                                    className={clsx(
+                                        'flex items-start justify-center',
+                                        (shouldRenderBodyRow || hasStatusBar) && 'border-b border-slate-200/80'
+                                    )}
                                     style={{
-                                        minHeight: CARD_TOP_ROW_MIN_HEIGHT,
                                         paddingLeft: CARD_LEFT_CELL_X_PADDING,
                                         paddingRight: CARD_LEFT_CELL_X_PADDING,
-                                        paddingTop: CARD_TOP_CELL_Y_PADDING,
-                                        paddingBottom: CARD_TOP_CELL_Y_PADDING,
+                                        paddingTop: CARD_ROW_Y_PADDING,
+                                        paddingBottom: CARD_ROW_Y_PADDING,
                                     }}
                                 >
                                     <div
@@ -485,7 +540,7 @@ export function TimelineCard({
                                         onPointerDown={(e) => e.stopPropagation()}
                                         data-checkbox-tone={isTimelineDimChecked ? 'success' : 'default'}
                                         className={clsx(
-                                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
+                                            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all cursor-pointer",
                                             checked
                                                 ? isTimelineDimChecked
                                                     ? 'border-emerald-500 bg-emerald-500'
@@ -493,257 +548,277 @@ export function TimelineCard({
                                                 : "border-slate-300 bg-white hover:border-sky-400"
                                         )}
                                     >
-                                        {checked && (
+                                        {checked ? (
                                             <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                             </svg>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div
-                                className="flex min-w-0 items-center"
-                                style={{
-                                    minHeight: CARD_TOP_ROW_MIN_HEIGHT,
-                                    paddingLeft: CARD_RIGHT_CELL_X_PADDING,
-                                    paddingRight: CARD_RIGHT_CELL_X_PADDING,
-                                    paddingTop: CARD_TOP_CELL_Y_PADDING,
-                                    paddingBottom: CARD_TOP_CELL_Y_PADDING,
-                                }}
-                            >
-                                <div className={clsx(
-                                    'flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] font-semibold',
-                                    'text-slate-800',
-                                    checkedTextClassName
-                                )}>
-                                    <div className="flex min-w-0 items-start gap-1">
-                                        <span
-                                            className="min-w-0 flex-1"
-                                            data-focus-group={focusGroup}
-                                            data-focus-part={focusGroup ? 'title' : undefined}
-                                            tabIndex={-1}
-                                        >
-                                            {isEditingTitle ? (
-                                                <input
-                                                    ref={titleInputRef}
-                                                    type="text"
-                                                    value={draftTitle}
-                                                    maxLength={255}
-                                                    data-testid="timeline-card-title-input"
-                                                    className={clsx(
-                                                        'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
-                                                        titleBackgroundClassName,
-                                                        titleClassName
-                                                    )}
-                                                    onPointerDown={(event) => {
-                                                        event.stopPropagation();
-                                                    }}
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                    }}
-                                                    onChange={(event) => {
-                                                        setDraftTitle(event.target.value);
-                                                    }}
-                                                    onCompositionStart={() => {
-                                                        isComposingRef.current = true;
-                                                    }}
-                                                    onCompositionEnd={() => {
-                                                        isComposingRef.current = false;
-                                                    }}
-                                                    onKeyDown={(event) => {
-                                                        event.stopPropagation();
-                                                        if (event.key === 'Enter') {
-                                                            if (isComposingRef.current) return;
-                                                            event.preventDefault();
-                                                            void commitTitleChange();
-                                                            return;
-                                                        }
-                                                        if (event.key === 'Escape') {
-                                                            event.preventDefault();
-                                                            cancelTitleEditing();
-                                                        }
-                                                    }}
-                                                    onBlur={() => {
-                                                        if (isComposingRef.current) return;
-                                                        void commitTitleChange();
-                                                    }}
-                                                />
-                                            ) : (
-                                                <span
-                                                    className={clsx(
-                                                        "line-clamp-2 break-words leading-tight",
-                                                        inlineTitleEdit && onRenameTitle && (titleBackgroundClassName ? "cursor-text" : "cursor-text rounded px-0.5 hover:bg-sky-50"),
-                                                        !title && "text-slate-400",
-                                                        titleBackgroundClassName,
-                                                        titleClassName
-                                                    )}
-                                                    data-testid="timeline-card-title-display"
-                                                    onPointerDown={handleTitleDisplayPointerDown}
-                                                    onClick={handleTitleDisplayClick}
-                                                >
-                                                    {title || "Untitled card"}
-                                                </span>
-                                            )}
-                                        </span>
-                                        {showOpenButton ? (
-                                            <div className="flex shrink-0 items-center gap-1 pl-1">
-                                                {inlineBadgeLabel ? (
-                                                    <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-500 shadow-sm">
-                                                        {inlineBadgeLabel}
-                                                    </span>
-                                                ) : null}
-                                                <span
-                                                    aria-hidden="true"
-                                                    className={clsx(
-                                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
-                                                        isTimelineDimChecked
-                                                            ? "border-slate-200 bg-white/80 text-slate-300"
-                                                            : "border-slate-200 bg-white text-slate-400"
-                                                    )}
-                                                >
-                                                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                                                        <circle cx="9" cy="7" r="1.25" />
-                                                        <circle cx="15" cy="7" r="1.25" />
-                                                        <circle cx="9" cy="12" r="1.25" />
-                                                        <circle cx="15" cy="12" r="1.25" />
-                                                        <circle cx="9" cy="17" r="1.25" />
-                                                        <circle cx="15" cy="17" r="1.25" />
-                                                    </svg>
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    aria-label="カードを開く"
-                                                    data-testid={openButtonTestId}
-                                                    className={clsx(
-                                                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
-                                                        isTimelineDimChecked
-                                                            ? "border-slate-200 bg-white/80 text-slate-400 hover:border-slate-300 hover:text-slate-500"
-                                                            : "border-slate-200 bg-white text-slate-500 hover:border-sky-300 hover:text-sky-600"
-                                                    )}
-                                                    onClick={handleOpenButtonClick}
-                                                    onPointerDown={(event) => {
-                                                        event.preventDefault();
-                                                        event.stopPropagation();
-                                                    }}
-                                                    tabIndex={-1}
-                                                >
-                                                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                                        <path d="M14 5h5v5" />
-                                                        <path d="M10 14 19 5" />
-                                                        <path d="M19 14v4a1 1 0 0 1-1 1h-4" />
-                                                        <path d="M10 5H6a1 1 0 0 0-1 1v4" />
-                                                    </svg>
-                                                </button>
-                                            </div>
                                         ) : null}
                                     </div>
-                                    {timePlacement === 'inline' && timeText ? (
-                                        <span className={clsx("text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>
-                                    ) : null}
                                 </div>
-                            </div>
-                        </div>
-
-                        {hasBodySection ? (
-                            <div
-                                className={clsx(
-                                    'grid min-h-0 min-w-0 flex-1 border-t',
-                                    isTimelineDimChecked ? 'border-slate-100' : 'border-slate-200'
-                                )}
-                                style={{ gridTemplateColumns: hideLeftColumn ? "minmax(0, 1fr)" : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
-                            >
-                                {!hideLeftColumn && (
+                                {shouldRenderBodyRow ? (
                                     <div
-                                        className="flex min-h-0 items-start justify-center"
+                                        className={clsx(
+                                            'flex-1 border-b border-slate-200/80',
+                                            densityMode !== 'default' && 'hidden'
+                                        )}
+                                        aria-hidden="true"
+                                    />
+                                ) : null}
+                                {hasStatusBar ? (
+                                    <div
+                                        className="flex items-center justify-center"
                                         style={{
                                             paddingLeft: CARD_LEFT_CELL_X_PADDING,
                                             paddingRight: CARD_LEFT_CELL_X_PADDING,
-                                            paddingTop: CARD_BODY_TOP_PADDING,
+                                            paddingTop: CARD_ROW_Y_PADDING,
+                                            paddingBottom: CARD_ROW_Y_PADDING,
                                         }}
                                     >
-                                        {checklistProgressLabel ? (
-                                            <div
+                                        {showDragHandle ? (
+                                            <span
+                                                aria-hidden="true"
                                                 className={clsx(
-                                                    'flex min-h-[3rem] flex-col items-center justify-start text-[11px] font-semibold leading-none tabular-nums',
-                                                    'text-slate-500',
-                                                    checkedMetaTextClassName
+                                                    'pointer-events-none inline-flex h-4 w-4 items-center justify-center rounded text-slate-400',
+                                                    isTimelineDimChecked && 'text-slate-300'
                                                 )}
-                                                aria-label={`チェックリスト ${checklistProgressLabel}`}
                                             >
-                                                <span>{checklistCheckedCount}</span>
-                                                <span className={clsx('my-1 h-px w-3', isTimelineDimChecked ? 'bg-slate-200' : 'bg-slate-300')} aria-hidden="true" />
-                                                <span>{checklistTotalCount}</span>
-                                            </div>
+                                                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                                                    <circle cx="5" cy="4" r="1" />
+                                                    <circle cx="11" cy="4" r="1" />
+                                                    <circle cx="5" cy="8" r="1" />
+                                                    <circle cx="11" cy="8" r="1" />
+                                                    <circle cx="5" cy="12" r="1" />
+                                                    <circle cx="11" cy="12" r="1" />
+                                                </svg>
+                                            </span>
                                         ) : null}
                                     </div>
-                                )}
-
-                                <div
-                                    className={clsx(
-                                        'flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 pt-1 text-[10px] leading-tight',
-                                        'text-slate-600',
-                                        checkedTextClassName
-                                    )}
-                                    style={{
-                                        ...(note ? { maxHeight: `${notePreviewMaxHeightEm}em` } : {}),
-                                        paddingLeft: CARD_RIGHT_CELL_X_PADDING,
-                                        paddingRight: CARD_RIGHT_CELL_X_PADDING,
-                                        paddingTop: CARD_BODY_TOP_PADDING,
-                                    }}
-                                >
-                                    {note ? (() => {
-                                        const lines = note
-                                            .split(/\r?\n/)
-                                            .map((line) => line)
-                                            .filter((line) => {
-                                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                                if (taskMatch) return true;
-                                                return Boolean(line.trim());
-                                            });
-                                        return lines.map((line, idx) => {
-                                            const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                            const isTask = Boolean(taskMatch);
-                                            const indentRaw = taskMatch?.[1] ?? '';
-                                            const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
-                                            const checked = taskMatch?.[2]?.toLowerCase() === 'x';
-                                            const text = isTask ? (taskMatch?.[3] ?? '') : line;
-
-                                            return (
-                                                <div
-                                                    key={`line-${idx}`}
-                                                    className="flex w-full min-w-0 items-start gap-1"
-                                                    style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
-                                                >
-                                                    {isTask ? (
-                                                        <span
-                                                            className={clsx(
-                                                                "mt-[1px] flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
-                                                                checked ? "border-slate-500 bg-slate-500" : "border-slate-400"
-                                                            )}
-                                                            aria-hidden="true"
-                                                        >
-                                                            {checked ? (
-                                                                <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                    <path d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            ) : null}
-                                                        </span>
-                                                    ) : null}
-                                                    <span
-                                                        className={clsx('block min-w-0 w-0 flex-1 truncate')}
-                                                    >
-                                                        {text || '\u00A0'}
-                                                    </span>
-                                                </div>
-                                            );
-                                        });
-                                    })() : (
-                                        <div className="min-h-[3rem]" />
-                                    )}
-                                </div>
+                                ) : null}
                             </div>
                         ) : null}
+
+                        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+                            <div
+                                className={clsx(
+                                    'flex min-w-0 items-start justify-between gap-2',
+                                    (shouldRenderBodyRow || hasStatusBar) && 'border-b border-slate-200/80'
+                                )}
+                                style={{
+                                    paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingTop: CARD_ROW_Y_PADDING,
+                                    paddingBottom: CARD_ROW_Y_PADDING,
+                                }}
+                            >
+                                <span
+                                    className="min-w-0 flex-1"
+                                    data-focus-group={focusGroup}
+                                    data-focus-part={focusGroup ? 'title' : undefined}
+                                    tabIndex={-1}
+                                >
+                                    {isEditingTitle ? (
+                                        <input
+                                            ref={titleInputRef}
+                                            type="text"
+                                            value={draftTitle}
+                                            maxLength={255}
+                                            data-testid="timeline-card-title-input"
+                                            className={clsx(
+                                                'w-full min-w-0 rounded border border-sky-300 bg-white px-1 py-0.5 text-[11px] font-semibold leading-tight text-slate-900 shadow-sm outline-none ring-2 ring-sky-200',
+                                                titleBackgroundClassName,
+                                                titleClassName
+                                            )}
+                                            onPointerDown={(event) => {
+                                                event.stopPropagation();
+                                            }}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                            }}
+                                            onChange={(event) => {
+                                                setDraftTitle(event.target.value);
+                                            }}
+                                            onCompositionStart={() => {
+                                                isComposingRef.current = true;
+                                            }}
+                                            onCompositionEnd={() => {
+                                                isComposingRef.current = false;
+                                            }}
+                                            onKeyDown={(event) => {
+                                                event.stopPropagation();
+                                                if (event.key === 'Enter') {
+                                                    if (isComposingRef.current) return;
+                                                    event.preventDefault();
+                                                    void commitTitleChange();
+                                                    return;
+                                                }
+                                                if (event.key === 'Escape') {
+                                                    event.preventDefault();
+                                                    cancelTitleEditing();
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                if (isComposingRef.current) return;
+                                                void commitTitleChange();
+                                            }}
+                                        />
+                                    ) : (
+                                        <span
+                                            className={clsx(
+                                                titleClampClassName,
+                                                "block break-words text-[11px] font-semibold leading-tight",
+                                                inlineTitleEdit && onRenameTitle && (titleBackgroundClassName ? "cursor-text" : "cursor-text rounded px-0.5 hover:bg-sky-50"),
+                                                !title && "text-slate-400",
+                                                checkedTextClassName,
+                                                titleBackgroundClassName,
+                                                titleClassName
+                                            )}
+                                            data-testid="timeline-card-title-display"
+                                            onPointerDown={handleTitleDisplayPointerDown}
+                                            onClick={handleTitleDisplayClick}
+                                        >
+                                            {title || "Untitled card"}
+                                        </span>
+                                    )}
+                                </span>
+                                {showOpenButton ? (
+                                    <div className="flex shrink-0 items-start gap-1 pl-1">
+                                        <span
+                                            aria-hidden="true"
+                                            className={clsx(
+                                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
+                                                isTimelineDimChecked
+                                                    ? "border-slate-200 bg-white/80 text-slate-300"
+                                                    : "border-slate-200 bg-white text-slate-400"
+                                            )}
+                                        >
+                                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                                                <circle cx="9" cy="7" r="1.25" />
+                                                <circle cx="15" cy="7" r="1.25" />
+                                                <circle cx="9" cy="12" r="1.25" />
+                                                <circle cx="15" cy="12" r="1.25" />
+                                                <circle cx="9" cy="17" r="1.25" />
+                                                <circle cx="15" cy="17" r="1.25" />
+                                            </svg>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            aria-label="カードを開く"
+                                            data-testid={openButtonTestId}
+                                            className={clsx(
+                                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                                                isTimelineDimChecked
+                                                    ? "border-slate-200 bg-white/80 text-slate-400 hover:border-slate-300 hover:text-slate-500"
+                                                    : "border-slate-200 bg-white text-slate-500 hover:border-sky-300 hover:text-sky-600"
+                                            )}
+                                            onClick={handleOpenButtonClick}
+                                            onPointerDown={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                            }}
+                                            tabIndex={-1}
+                                        >
+                                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                                <path d="M14 5h5v5" />
+                                                <path d="M10 14 19 5" />
+                                                <path d="M19 14v4a1 1 0 0 1-1 1h-4" />
+                                                <path d="M10 5H6a1 1 0 0 0-1 1v4" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {shouldRenderBodyRow ? (
+                                <div
+                                    className="min-h-0 min-w-0 border-b border-slate-200/80"
+                                    style={{
+                                        paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingTop: CARD_ROW_Y_PADDING,
+                                        paddingBottom: CARD_ROW_Y_PADDING,
+                                    }}
+                                >
+                                    <div
+                                        className={clsx(
+                                            'min-h-0 min-w-0 text-[10px] leading-tight text-slate-600',
+                                            checkedTextClassName
+                                        )}
+                                        style={{ maxHeight: `${notePreviewMaxHeightEm}em` }}
+                                    >
+                                        {(() => {
+                                            const lines = note
+                                                ? note
+                                                    .split(/\r?\n/)
+                                                    .map((line) => line)
+                                                    .filter((line) => {
+                                                        const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                                        if (taskMatch) return true;
+                                                        return Boolean(line.trim());
+                                                    })
+                                                : [];
+                                            return lines.map((line, idx) => {
+                                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                                const isTask = Boolean(taskMatch);
+                                                const indentRaw = taskMatch?.[1] ?? '';
+                                                const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
+                                                const taskChecked = taskMatch?.[2]?.toLowerCase() === 'x';
+                                                const text = isTask ? (taskMatch?.[3] ?? '') : line;
+
+                                                return (
+                                                    <div
+                                                        key={`line-${idx}`}
+                                                        className={clsx(
+                                                            'flex min-w-0 items-start gap-1',
+                                                            idx >= notePreviewLines && 'hidden'
+                                                        )}
+                                                        style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                                    >
+                                                        {isTask ? (
+                                                            <span
+                                                                className={clsx(
+                                                                    "mt-[1px] flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
+                                                                    taskChecked ? "border-slate-500 bg-slate-500" : "border-slate-400"
+                                                                )}
+                                                                aria-hidden="true"
+                                                            >
+                                                                {taskChecked ? (
+                                                                    <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                ) : null}
+                                                            </span>
+                                                        ) : null}
+                                                        <span className="block min-w-0 flex-1 truncate">{text || '\u00A0'}</span>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {hasStatusBar ? (
+                                <div
+                                    className={clsx(
+                                        'flex min-w-0 items-center',
+                                        densityMode === 'minimal' ? 'min-h-[24px]' : 'min-h-[28px]'
+                                    )}
+                                    style={{
+                                        paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                        paddingTop: CARD_ROW_Y_PADDING,
+                                        paddingBottom: CARD_ROW_Y_PADDING,
+                                    }}
+                                >
+                                    <div className={clsx('flex min-w-0 flex-1 items-center gap-1 overflow-hidden', checkedMetaTextClassName)}>
+                                        {mergedStatusItems.map(renderStatusItem)}
+                                    </div>
+                                    {timePlacement === 'inline' && timeText ? (
+                                        <span className={clsx("ml-2 shrink-0 text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
                     </div>
 
                     {childrenPosition === 'bottom' && children}

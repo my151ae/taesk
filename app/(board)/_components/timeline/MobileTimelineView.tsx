@@ -25,7 +25,7 @@ import {
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
 import { resolveTimelineEventTone } from "@/app/(board)/_components/timeline/timeline-event-tone";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
@@ -254,6 +254,25 @@ function MobileTimelineColumn({
                 }}
                 onContextMenu={(e) => onCardContextMenu(e, event.card_id)}
               >
+                {(() => {
+                  const densityMode = height >= 76 ? "default" : height >= 44 ? "compact" : "minimal";
+                  const statusItems = buildTimelineCardStatusItems(event, densityMode === "default"
+                    ? {
+                        includeTags: true,
+                        includeDate: false,
+                        includeTime: true,
+                        includeDuration: true,
+                        bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
+                      }
+                    : {
+                        includeTags: false,
+                        includeDate: false,
+                        includeTime: true,
+                        includeDuration: true,
+                        includeProgress: false,
+                        bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
+                      });
+                  return (
                 <TimelineCard
                   title={event.title || ""}
                   checked={event.checked}
@@ -261,14 +280,11 @@ function MobileTimelineColumn({
                   content={event.content ?? null}
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   cardId={event.card_id}
-                  badgeLabel={(event.due_bucket ?? "a").toUpperCase()}
-                  timeText={
-                    layout?.isTimeOverlapped && !(activeStackItem?.kind === "card" && activeStackItem.id === event.card_id)
-                      ? null
-                      : detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60)
-                  }
+                  statusItems={statusItems}
+                  timeText={null}
                   rightMeta={undefined}
-                  timePlacement="out-top"
+                  timePlacement="inline"
+                  densityMode={densityMode}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   openButtonTestId={`cardOpenButton-mobile-timeline-${event.card_id}`}
                   showOpenButton
@@ -295,6 +311,8 @@ function MobileTimelineColumn({
                     });
                   }}
                 />
+                  );
+                })()}
               </div>
             </DraggableCard>
           );
@@ -1037,20 +1055,22 @@ function MobileBucketCard({
           content={item.content ?? null}
           onToggleCheck={(checked) => onToggleCheck(item.card_id, checked)}
           cardId={item.card_id}
-          badgeLabel={bucketKeyToDueBucket(bucketKey).toUpperCase()}
-          timeText={buildTimelineCardTimeText(item, {
+          statusItems={buildTimelineCardStatusItems(item, {
+            includeTags: true,
             includeDate: true,
             includeTime: false,
             includeDuration: true,
+            bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
           })}
+          timeText={null}
           rightMeta={null}
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-          notePreviewLines={3}
+          notePreviewLines={2}
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           openButtonTestId={`cardOpenButton-mobile-ab-${item.card_id}`}
           showOpenButton
-          timePlacement="out-top"
+          timePlacement="inline"
           paddingClass="py-1"
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}

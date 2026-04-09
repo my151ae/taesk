@@ -2,13 +2,12 @@ import { FocusEvent, KeyboardEvent, PointerEvent, memo, useState } from 'react';
 import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
+import { buildTimelineCardStatusItems } from './timeline-card-meta';
 import { resolveTimelineEventTone } from './timeline-event-tone';
 import {
     TimelineEvent,
     minuteToPixels,
     getMinutesFromTime,
-    detailedTimeLabel,
-    minutesToTime,
     StackedEventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -89,18 +88,30 @@ export const TimelineEventItem = memo(function TimelineEventItem({
     const tone = resolveTimelineEventTone(event, currentIsoDate, currentMinutes);
     let start = getMinutesFromTime(event.due_start ?? null) ?? 0;
     let duration = event.durationMinutes ?? 60;
-    let displayStart = event.due_start;
-    let displayEnd = event.due_end;
-
     if (activeResize && activeResize.cardId === event.card_id) {
         start = activeResize.startMinutes;
         duration = activeResize.duration;
-        displayStart = minutesToTime(start);
-        displayEnd = minutesToTime(start + duration);
     }
 
     const top = minuteToPixels(start, timelineStartHour, hourHeight);
     const height = Math.max(minuteToPixels(start + duration, timelineStartHour, hourHeight) - minuteToPixels(start, timelineStartHour, hourHeight), 20);
+    const densityMode = height >= 76 ? 'default' : height >= 44 ? 'compact' : 'minimal';
+    const statusItems = buildTimelineCardStatusItems(event, densityMode === 'default'
+        ? {
+            includeTags: true,
+            includeDate: false,
+            includeTime: true,
+            includeDuration: true,
+            bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
+        }
+        : {
+            includeTags: false,
+            includeDate: false,
+            includeTime: true,
+            includeDuration: true,
+            includeProgress: false,
+            bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
+        });
 
     return (
         <DraggableCard
@@ -133,15 +144,12 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     content={event.content ?? null}
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     cardId={event.card_id}
-                    badgeLabel={(event.due_bucket ?? 'a').toUpperCase()}
-                    timeText={
-                        layout?.isTimeOverlapped && !isActive && !activeResize
-                            ? null
-                            : detailedTimeLabel(displayStart, displayEnd, duration)
-                    }
+                    statusItems={statusItems}
+                    timeText={null}
                     rightMeta={undefined}
-                    timePlacement="out-top"
+                    timePlacement="inline"
                     note={event.excerpt ?? undefined}
+                    densityMode={densityMode}
                     onOpen={() => {
                         openCardModal(event.short_id, 'timeline');
                     }}

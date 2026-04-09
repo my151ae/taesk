@@ -6,9 +6,9 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
-import { formatDuration, minuteToPixels, timeLabel } from "@/app/(board)/_utils/timeline-helpers";
+import { minuteToPixels } from "@/app/(board)/_utils/timeline-helpers";
 import type { OverlayCardData } from "@/app/(board)/_utils/timeline-overlay";
 
 type TimelineDragOverlayCardProps = {
@@ -33,33 +33,38 @@ export function TimelineDragOverlayCard({
   const overlayKind = isOverdueListOverlay ? "overdue" : isListOverlay ? "bucket" : "timeline";
 
   if (variant === "mobile" && !isListOverlay) {
+    const eventStatusItems = overlayTimelineEvent
+      ? buildTimelineCardStatusItems(overlayTimelineEvent, {
+          includeTags: false,
+          includeDate: false,
+          includeTime: true,
+          includeDuration: true,
+          includeProgress: false,
+          bucketLabel: overlayCardData.badge.toUpperCase(),
+        })
+      : [];
     return (
       <div
-        className="pointer-events-none w-[220px] max-w-[260px] rounded-lg border border-slate-200 bg-white p-3 shadow-lg"
+        className="pointer-events-none w-[220px] max-w-[260px] rounded-lg bg-transparent shadow-lg"
         data-testid={`timeline-drag-overlay-${variant}`}
         data-overlay-kind={overlayKind}
       >
-        <div className="flex items-start gap-2">
-          <span className="rounded-full border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 shadow-sm">
-            {overlayCardData.badge.toUpperCase()}
-          </span>
-          <div
-            className={clsx(
-              "min-w-0 flex-1 text-[12px] font-semibold leading-tight line-clamp-2 break-words",
-              !overlayCardData.title ? "text-slate-400" : "text-slate-800"
-            )}
-          >
-            {overlayCardData.title || "Untitled card"}
-          </div>
-        </div>
-        {overlayCardData.note ? (
-          <div className="mt-1 text-[10px] text-slate-600 leading-tight line-clamp-2 whitespace-pre-wrap break-words">
-            {overlayCardData.note}
-          </div>
-        ) : null}
-        {overlayCardData.timeText ? (
-          <div className="mt-1 text-[11px] text-slate-600">{overlayCardData.timeText}</div>
-        ) : null}
+        <TimelineCard
+          title={overlayCardData.title}
+          statusItems={eventStatusItems}
+          note={overlayCardData.note ?? undefined}
+          noteClampClass="line-clamp-2"
+          notePreviewLines={2}
+          checked={overlayTimelineEvent?.checked ?? false}
+          checklist={overlayTimelineEvent?.checklist ?? null}
+          content={overlayTimelineEvent?.content ?? null}
+          onToggleCheck={() => {}}
+          onOpen={() => {}}
+          timeText={null}
+          timePlacement="inline"
+          densityMode={overlayTimelineEvent ? "compact" : "minimal"}
+          className="w-full border-none shadow-none"
+        />
       </div>
     );
   }
@@ -76,28 +81,24 @@ export function TimelineDragOverlayCard({
       >
         <TimelineCard
           title={overlayCardData.title}
-          badgeLabel={overlayCardData.badge?.toUpperCase()}
-          timeText={
-            isOverdueListOverlay
-              ? overlayCardData.timeText
-              : listOverlayCard
-                ? buildTimelineCardTimeText(listOverlayCard, {
-                    includeDate: true,
-                    includeTime: false,
-                    includeDuration: true,
-                  })
-                : overlayCardData.timeText
-          }
+          statusItems={listOverlayCard ? buildTimelineCardStatusItems(listOverlayCard, {
+            includeTags: true,
+            includeDate: true,
+            includeTime: isOverdueListOverlay,
+            includeDuration: true,
+            bucketLabel: overlayCardData.badge?.toUpperCase(),
+          }) : []}
+          timeText={null}
           note={overlayCardData.note ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
-          notePreviewLines={3}
+          notePreviewLines={2}
           rightMeta={undefined}
           checked={listOverlayCard?.checked ?? false}
           checklist={listOverlayCard?.checklist ?? null}
           content={listOverlayCard?.content ?? null}
           onToggleCheck={() => {}}
           onOpen={() => {}}
-          timePlacement="out-top"
+          timePlacement="inline"
           className="w-full border-none shadow-none"
           paddingClass="py-1"
         />
@@ -119,26 +120,26 @@ export function TimelineDragOverlayCard({
     >
       <TimelineCard
         title={overlayCardData.title}
-        badgeLabel={overlayCardData.badge?.toUpperCase()}
-        timeText={
-          overlayTimelineEvent
-            ? timeLabel(overlayTimelineEvent.due_start, overlayTimelineEvent.due_end)
-            : overlayCardData.timeText
-        }
+        statusItems={overlayTimelineEvent ? buildTimelineCardStatusItems(overlayTimelineEvent, {
+          includeTags: false,
+          includeDate: false,
+          includeTime: true,
+          includeDuration: true,
+          includeProgress: false,
+          bucketLabel: overlayCardData.badge?.toUpperCase(),
+        }) : []}
+        timeText={null}
         note={overlayCardData.note ?? undefined}
         noteClampClass="line-clamp-2"
         notePreviewLines={2}
-        rightMeta={
-          overlayTimelineEvent
-            ? formatDuration(overlayTimelineEvent.durationMinutes ?? 60)
-            : undefined
-        }
+        rightMeta={undefined}
         checked={overlayTimelineEvent?.checked ?? overlayBucketCard?.checked ?? overlayOverdueCard?.checked ?? false}
         checklist={overlayTimelineEvent?.checklist ?? overlayBucketCard?.checklist ?? overlayOverdueCard?.checklist ?? null}
         content={overlayTimelineEvent?.content ?? overlayBucketCard?.content ?? overlayOverdueCard?.content ?? null}
         onToggleCheck={() => {}}
         onOpen={() => {}}
-        timePlacement="out-top"
+        timePlacement="inline"
+        densityMode={overlayTimelineEvent ? "compact" : "default"}
         className="w-full h-full border-none shadow-none"
         paddingClass="py-2"
       />
