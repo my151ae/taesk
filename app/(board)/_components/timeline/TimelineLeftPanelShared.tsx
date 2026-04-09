@@ -8,7 +8,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
@@ -388,8 +388,7 @@ function SidebarCardRow({
 }
 
 function buildOverdueTimeText(item: TimelineOverdueItem) {
-  return buildTimelineCardFloatingLabel(item, {
-    bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
+  return buildTimelineCardTimeText(item, {
     includeDate: true,
     includeDuration: true,
   });
