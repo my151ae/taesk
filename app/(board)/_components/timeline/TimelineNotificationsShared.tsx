@@ -4,6 +4,7 @@ import clsx from "clsx";
 
 import type { Notification } from "@/lib/supabase";
 import { LoadMoreFooter } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import { formatPushNotificationCopy } from "@/lib/shared/notification-push";
 
 const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
 
@@ -41,9 +42,7 @@ function formatRelativeDateTime(iso: string) {
 
 function buildNotificationHeadline(notification: Notification) {
   if (notification.type === "daily_digest") {
-    const todayCount = typeof notification.payload?.today_count === "number" ? notification.payload.today_count : 0;
-    const overdueCount = typeof notification.payload?.overdue_count === "number" ? notification.payload.overdue_count : 0;
-    return `今日 ${todayCount}件 / overdue ${overdueCount}件`;
+    return formatPushNotificationCopy(notification.type, notification.payload).body;
   }
 
   const changeSummary =
@@ -70,10 +69,7 @@ function buildNotificationHeadline(notification: Notification) {
 
 function buildNotificationTitle(notification: Notification) {
   if (notification.type === "daily_digest") {
-    const boardName = typeof notification.payload?.board_name === "string" ? notification.payload.board_name.trim() : "";
-    if (boardName.length > 0) {
-      return `${boardName} のDaily通知`;
-    }
+    return formatPushNotificationCopy(notification.type, notification.payload).title;
   }
 
   const payloadTitle = typeof notification.payload?.card_title === "string" ? notification.payload.card_title.trim() : "";
@@ -148,13 +144,13 @@ function NotificationActivityRow({
             </p>
           </div>
           {headline ? (
-            <p className="mt-0.5 text-[10px] leading-tight text-slate-600">{headline}</p>
+            <p className="mt-0.5 whitespace-pre-wrap break-words text-[10px] leading-tight text-slate-600">{headline}</p>
           ) : null}
           {commentBody ? (
             <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-slate-500">{commentBody}</p>
           ) : null}
           {!canOpen ? (
-            <p className="mt-0.5 text-[11px] text-amber-700">この通知は既読になりますが、関連画面は開けません</p>
+            <p className="mt-0.5 text-[11px] text-amber-700">関連画面なし</p>
           ) : null}
         </div>
         <span
