@@ -10,7 +10,13 @@ type PushPayload = {
   board_name?: unknown;
   today_count?: unknown;
   overdue_count?: unknown;
+  timed_count?: unknown;
+  a_count?: unknown;
+  b_count?: unknown;
   top_items?: unknown;
+  timed_items?: unknown;
+  a_items?: unknown;
+  b_items?: unknown;
 };
 
 export type PushCopy = {
@@ -71,20 +77,65 @@ function getTopItemTitle(value: unknown): string {
   return asString((firstItem as { title?: unknown }).title);
 }
 
+type DigestPreviewItem = {
+  title: string;
+  due_start?: string | null;
+};
+
+function getDigestItems(value: unknown): DigestPreviewItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      title: asString((item as { title?: unknown }).title),
+      due_start: typeof (item as { due_start?: unknown }).due_start === 'string'
+        ? (item as { due_start?: string }).due_start ?? null
+        : null,
+    }))
+    .filter((item) => item.title.length > 0);
+}
+
+function normalizeTimeLabel(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  return trimmed.length >= 5 ? trimmed.slice(0, 5) : trimmed;
+}
+
+function formatDigestLine(prefix: 'T' | 'A' | 'B', items: DigestPreviewItem[]): string | null {
+  if (items.length === 0) return null;
+  const content = items
+    .slice(0, 2)
+    .map((item) => {
+      if (prefix === 'T') {
+        const timeLabel = normalizeTimeLabel(item.due_start);
+        return timeLabel ? `${timeLabel} ${item.title}` : item.title;
+      }
+      return item.title;
+    })
+    .join(',');
+
+  return `${prefix}:${content}`;
+}
+
 export function formatDailyDigestPushCopy(input: {
   boardName: string;
   todayCount: number;
   overdueCount: number;
+  timedCount?: number;
+  aCount?: number;
+  bCount?: number;
+  timedItems?: DigestPreviewItem[];
+  aItems?: DigestPreviewItem[];
+  bItems?: DigestPreviewItem[];
   topItemTitle?: string | null;
 }): PushCopy {
-  const boardName = truncateGraphemes(input.boardName, DIGEST_BOARD_NAME_HARD_MAX);
-  const title = truncateGraphemes(`Taesk: ${boardName}`, PUSH_TITLE_HARD_MAX);
-  const summary = `今日 ${input.todayCount}件 / overdue ${input.overdueCount}件`;
-  const topItemTitle = asString(input.topItemTitle ?? '');
-
-  const body = topItemTitle
-    ? truncateGraphemes(`${summary} - ${topItemTitle}`, PUSH_BODY_HARD_MAX)
-    : summary;
+  const title = `TaeDigest:Time=${input.timedCount ?? 0} A=${input.aCount ?? 0} B=${input.bCount ?? 0} Overdue=${input.overdueCount}`;
+  const lines = [
+    formatDigestLine('T', input.timedItems ?? []),
+    formatDigestLine('A', input.aItems ?? []),
+    formatDigestLine('B', input.bItems ?? []),
+  ].filter((line): line is string => Boolean(line));
+  const body = lines.length > 0 ? lines.join('\n') : asString(input.topItemTitle ?? '') || `Today=${input.todayCount}`;
 
   return {
     title,
@@ -100,6 +151,12 @@ export function formatPushNotificationCopy(type: string, payload: PushPayload): 
       boardName: asString(payload.board_name),
       todayCount: asNumber(payload.today_count),
       overdueCount: asNumber(payload.overdue_count),
+      timedCount: asNumber(payload.timed_count),
+      aCount: asNumber(payload.a_count),
+      bCount: asNumber(payload.b_count),
+      timedItems: getDigestItems(payload.timed_items),
+      aItems: getDigestItems(payload.a_items),
+      bItems: getDigestItems(payload.b_items),
       topItemTitle: getTopItemTitle(payload.top_items),
     });
   }

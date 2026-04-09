@@ -4,6 +4,7 @@ export type DailyDigestSourceCard = {
   due_date: string | null;
   due_start: string | null;
   due_end: string | null;
+  due_bucket?: 'a' | 'b' | null;
   short_id: string | null;
   slug: string | null;
 };
@@ -24,6 +25,7 @@ export type DailyDigestItem = {
   due_date: string | null;
   due_start: string | null;
   due_end: string | null;
+  due_bucket?: 'a' | 'b' | null;
   kind: 'today' | 'overdue';
 };
 
@@ -106,6 +108,7 @@ export function buildDigestItems(params: {
         due_date: dueDateJst,
         due_start: card.due_start,
         due_end: card.due_end,
+        due_bucket: card.due_bucket ?? null,
         kind: dueDateJst === params.summaryDate ? 'today' : 'overdue',
       };
     })

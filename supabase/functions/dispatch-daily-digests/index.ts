@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
 
       const { data: cards, error: cardsError } = await supabase
         .from('cards')
-        .select('id, title, due_date, due_start, due_end, updated_at, short_id, slug')
+        .select('id, title, due_date, due_start, due_end, due_bucket, updated_at, short_id, slug')
         .eq('board_id', preference.board_id)
         .is('deleted_at', null)
         .eq('checked', false)
@@ -262,11 +262,20 @@ Deno.serve(async (req) => {
       const todayCount = digestItems.filter((item) => item.kind === 'today').length;
       const overdueCount = digestItems.filter((item) => item.kind === 'overdue').length;
       const totalCount = digestItems.length;
+      const timedItems = digestItems.filter((item) => item.kind === 'today' && !!item.due_start);
+      const aItems = digestItems.filter((item) => item.kind === 'today' && !item.due_start && item.due_bucket === 'a');
+      const bItems = digestItems.filter((item) => item.kind === 'today' && !item.due_start && item.due_bucket !== 'a');
       const boardInfo = board as BoardRow;
       const pushCopy = formatDailyDigestPushCopy({
         boardName: boardInfo.name,
         todayCount,
         overdueCount,
+        timedCount: timedItems.length,
+        aCount: aItems.length,
+        bCount: bItems.length,
+        timedItems,
+        aItems,
+        bItems,
         topItemTitle: digestItems[0]?.title ?? '',
       });
 
@@ -285,8 +294,14 @@ Deno.serve(async (req) => {
         summary_date: summaryDate,
         today_count: todayCount,
         overdue_count: overdueCount,
+        timed_count: timedItems.length,
+        a_count: aItems.length,
+        b_count: bItems.length,
         total_count: totalCount,
         top_items: digestItems.slice(0, 3),
+        timed_items: timedItems.slice(0, 2),
+        a_items: aItems.slice(0, 2),
+        b_items: bItems.slice(0, 2),
       };
 
       const dedupeKey = `daily_digest:${preference.profile_id}:${preference.board_id}:${summaryDate}`;

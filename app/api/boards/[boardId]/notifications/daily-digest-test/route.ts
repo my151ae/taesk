@@ -48,7 +48,7 @@ const postHandler = async (
       .maybeSingle(),
     admin
       .from('cards')
-      .select('id, title, due_date, due_start, due_end, short_id, slug')
+      .select('id, title, due_date, due_start, due_end, due_bucket, short_id, slug')
       .eq('board_id', boardId)
       .is('deleted_at', null)
       .eq('checked', false)
@@ -74,11 +74,20 @@ const postHandler = async (
   const todayCount = digestItems.filter((item) => item.kind === 'today').length;
   const overdueCount = digestItems.filter((item) => item.kind === 'overdue').length;
   const totalCount = digestItems.length;
+  const timedItems = digestItems.filter((item) => item.kind === 'today' && !!item.due_start);
+  const aItems = digestItems.filter((item) => item.kind === 'today' && !item.due_start && item.due_bucket === 'a');
+  const bItems = digestItems.filter((item) => item.kind === 'today' && !item.due_start && item.due_bucket !== 'a');
   const boardInfo = board as DailyDigestBoard;
   const pushCopy = formatDailyDigestPushCopy({
     boardName: boardInfo.name,
     todayCount,
     overdueCount,
+    timedCount: timedItems.length,
+    aCount: aItems.length,
+    bCount: bItems.length,
+    timedItems,
+    aItems,
+    bItems,
     topItemTitle: digestItems[0]?.title ?? '',
   });
   const payload = {
@@ -90,8 +99,14 @@ const postHandler = async (
     summary_date: summaryDate,
     today_count: todayCount,
     overdue_count: overdueCount,
+    timed_count: timedItems.length,
+    a_count: aItems.length,
+    b_count: bItems.length,
     total_count: totalCount,
     top_items: digestItems.slice(0, 3),
+    timed_items: timedItems.slice(0, 2),
+    a_items: aItems.slice(0, 2),
+    b_items: bItems.slice(0, 2),
     manual_test: true,
   };
 
