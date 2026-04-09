@@ -30,6 +30,10 @@ type BuildCardTimeTextOptions = {
   showAnytime?: boolean;
 };
 
+type BuildFloatingLabelOptions = BuildCardTimeTextOptions & {
+  bucketLabel?: string | null;
+};
+
 type BuildTimelineCardStatusItemsOptions = BuildCardTimeTextOptions & {
   includeTags?: boolean;
   includeBucket?: boolean;
@@ -48,6 +52,24 @@ export function formatTimelineCardDateLabel(value: string | null | undefined) {
 
 export function resolveTimelineCardDuration(source: CardMetaSource) {
   return source.duration ?? source.durationMinutes ?? null;
+}
+
+export function formatTimelineCardBucketMarker(bucketLabel: string | null | undefined) {
+  if (!bucketLabel) return null;
+
+  const normalized = bucketLabel.trim().toUpperCase();
+  switch (normalized) {
+    case "A":
+      return "Ⓐ";
+    case "B":
+      return "Ⓑ";
+    case "O":
+      return "Ⓞ";
+    case "G":
+      return "Ⓖ";
+    default:
+      return normalized;
+  }
 }
 
 export function buildTimelineCardTimeText(
@@ -84,6 +106,19 @@ export function buildTimelineCardTimeText(
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+export function buildTimelineCardFloatingLabel(
+  source: CardMetaSource,
+  options: BuildFloatingLabelOptions = {}
+) {
+  const { bucketLabel, ...timeOptions } = options;
+  const marker = formatTimelineCardBucketMarker(bucketLabel ?? source.due_bucket ?? null);
+  const timeText = buildTimelineCardTimeText(source, timeOptions);
+
+  if (marker && timeText) return `${marker} ${timeText}`;
+  if (marker) return marker;
+  return timeText;
+}
+
 export function buildTimelineCardStatusItems(
   source: CardMetaSource,
   options: BuildTimelineCardStatusItemsOptions = {}
@@ -103,6 +138,17 @@ export function buildTimelineCardStatusItems(
 
   const items: TimelineCardStatusItem[] = [];
 
+  if (includeProgress) {
+    const total = countNonEmptyLines(source.checklist);
+    if (total > 0) {
+      items.push({
+        key: "progress",
+        kind: "progress",
+        label: `${countCheckedLines(source.checklist)}/${total}`,
+      });
+    }
+  }
+
   if (includeTags) {
     const tags = (source.tags ?? []).filter(Boolean).slice(0, Math.max(0, maxTags));
     for (const tag of tags) {
@@ -110,6 +156,17 @@ export function buildTimelineCardStatusItems(
         key: `tag:${tag}`,
         kind: "tag",
         label: `#${tag}`,
+      });
+    }
+  }
+
+  if (includeBucket) {
+    const resolvedBucket = bucketLabel ?? source.due_bucket?.toUpperCase() ?? null;
+    if (resolvedBucket) {
+      items.push({
+        key: `bucket:${resolvedBucket}`,
+        kind: "bucket",
+        label: resolvedBucket,
       });
     }
   }
@@ -126,28 +183,6 @@ export function buildTimelineCardStatusItems(
       kind: "time",
       label: timeLabelText,
     });
-  }
-
-  if (includeBucket) {
-    const resolvedBucket = bucketLabel ?? source.due_bucket?.toUpperCase() ?? null;
-    if (resolvedBucket) {
-      items.push({
-        key: `bucket:${resolvedBucket}`,
-        kind: "bucket",
-        label: resolvedBucket,
-      });
-    }
-  }
-
-  if (includeProgress) {
-    const total = countNonEmptyLines(source.checklist);
-    if (total > 0) {
-      items.push({
-        key: "progress",
-        kind: "progress",
-        label: `${countCheckedLines(source.checklist)}/${total}`,
-      });
-    }
   }
 
   if (includeReminder && (source.start_reminder_enabled || source.end_reminder_enabled)) {

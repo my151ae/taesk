@@ -4,7 +4,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type TimelineListCardProps = {
@@ -53,13 +53,13 @@ export function TimelineListCard({
         cardId={item.card_id}
         statusItems={buildTimelineCardStatusItems(item, {
           includeTags: true,
-          includeDate: isOverdue || !isEvent,
           includeTime: false,
-          includeDuration: true,
-          bucketLabel: bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null),
+          includeDuration: false,
+          includeBucket: false,
           includeReminder: true,
         })}
-        timeText={buildTimelineCardTimeText(item, {
+        timeText={buildTimelineCardFloatingLabel(item, {
+          bucketLabel: bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null),
           includeDate: isOverdue || !isEvent,
           includeTime: isEvent || isOverdue,
           includeDuration: true,

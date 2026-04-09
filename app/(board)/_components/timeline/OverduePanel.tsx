@@ -5,7 +5,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type OverduePanelProps = {
@@ -61,9 +61,10 @@ function OverdueCardRow({
             includeDate: false,
             includeTime: false,
             includeDuration: false,
-            bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
+            includeBucket: false,
           })}
-          timeText={buildTimelineCardTimeText(item, {
+          timeText={buildTimelineCardFloatingLabel(item, {
+            bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
             includeDate: true,
             includeTime: true,
             includeDuration: true,

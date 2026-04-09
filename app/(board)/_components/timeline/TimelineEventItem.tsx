@@ -2,13 +2,12 @@ import { FocusEvent, KeyboardEvent, PointerEvent, memo, useState } from 'react';
 import clsx from 'clsx';
 import { DraggableCard } from './TimelineDraggableCard';
 import { TimelineCard } from './TimelineCard';
-import { buildTimelineCardStatusItems } from './timeline-card-meta';
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from './timeline-card-meta';
 import { resolveTimelineEventTone } from './timeline-event-tone';
 import {
     TimelineEvent,
     minuteToPixels,
     getMinutesFromTime,
-    detailedTimeLabel,
     StackedEventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -103,7 +102,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             includeDate: false,
             includeTime: false,
             includeDuration: false,
-            bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
+            includeBucket: false,
         }
         : {
             includeTags: false,
@@ -111,11 +110,24 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             includeTime: false,
             includeDuration: false,
             includeProgress: false,
-            bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
+            includeBucket: false,
         });
     const floatingTimeText = layout?.isTimeOverlapped && !isActive && !activeResize
         ? null
-        : detailedTimeLabel(event.due_start, event.due_end, duration);
+        : buildTimelineCardFloatingLabel(
+            {
+                due_bucket: event.due_bucket,
+                due_start: event.due_start,
+                due_end: event.due_end,
+                durationMinutes: duration,
+            },
+            {
+                bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
+                includeDate: false,
+                includeTime: true,
+                includeDuration: true,
+            }
+        );
 
     return (
         <DraggableCard

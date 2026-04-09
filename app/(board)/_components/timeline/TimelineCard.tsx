@@ -194,7 +194,7 @@ export function TimelineCard({
         return Boolean(item.label);
     });
     const mergedStatusItems = fallbackProgressItem && !resolvedStatusItems.some((item) => item.kind === 'progress')
-        ? [...resolvedStatusItems, fallbackProgressItem]
+        ? [fallbackProgressItem, ...resolvedStatusItems]
         : resolvedStatusItems;
     const hasStatusBar = mergedStatusItems.length > 0;
     const shouldRenderBodyRow = canShowBodySection;
@@ -376,48 +376,17 @@ export function TimelineCard({
             </span>
         );
     }, [rightMeta]);
-    const renderStatusIcon = useCallback((item: TimelineCardStatusItem) => {
-        if (item.icon) return item.icon;
-
-        if (item.kind === 'progress') {
-            return (
-                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                    <rect x="2.5" y="3" width="11" height="10.5" rx="2" />
-                    <path d="M5 6.5h6M5 9h4" />
-                </svg>
-            );
-        }
-
-        if (item.kind === 'reminder') {
-            return (
-                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                    <path d="M8 2.25a3 3 0 0 0-3 3v1.1c0 .55-.16 1.08-.46 1.54L3.5 9.5v.75h9V9.5l-1.04-1.61A2.95 2.95 0 0 1 11 7.35v-1.1a3 3 0 0 0-3-3Z" />
-                    <path d="M6.5 11.5a1.5 1.5 0 0 0 3 0" />
-                </svg>
-            );
-        }
-
-        return null;
-    }, []);
     const renderStatusItem = useCallback((item: TimelineCardStatusItem) => {
-        const icon = renderStatusIcon(item);
-        const baseClassName = clsx(
-            'inline-flex min-w-0 items-center gap-1 rounded-full border px-1.5 py-[1px] text-[10px] font-medium leading-none',
-            isTimelineDimChecked
-                ? 'border-slate-200 bg-white/80 text-slate-400'
-                : 'border-slate-200 bg-white text-slate-600'
-        );
         const labelClassName = item.kind === 'reminder' && !item.label
             ? 'sr-only'
             : 'min-w-0 truncate';
 
         return (
-            <span key={item.key} className={baseClassName} title={item.label}>
-                {icon ? <span className="shrink-0">{icon}</span> : null}
+            <span key={item.key} className="min-w-0 truncate text-[10px] font-medium leading-none" title={item.label}>
                 {item.label ? <span className={labelClassName}>{item.label}</span> : null}
             </span>
         );
-    }, [isTimelineDimChecked, renderStatusIcon]);
+    }, []);
     const handleOpenButtonClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
@@ -799,8 +768,15 @@ export function TimelineCard({
                                     paddingBottom: CARD_ROW_Y_PADDING,
                                 }}
                             >
-                                <div className={clsx('flex min-w-0 flex-1 items-center gap-1 overflow-hidden', checkedMetaTextClassName)}>
-                                    {mergedStatusItems.map(renderStatusItem)}
+                                <div className={clsx('flex min-w-0 flex-1 items-center gap-0 overflow-hidden', checkedMetaTextClassName)}>
+                                    {mergedStatusItems.map((item, index) => (
+                                        <div key={item.key} className="flex min-w-0 items-center">
+                                            {index > 0 ? (
+                                                <span className="px-1 text-[10px] leading-none text-slate-300" aria-hidden="true">|</span>
+                                            ) : null}
+                                            {renderStatusItem(item)}
+                                        </div>
+                                    ))}
                                 </div>
                                 {timePlacement === 'inline' && timeText ? (
                                     <span className={clsx("ml-2 shrink-0 text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>

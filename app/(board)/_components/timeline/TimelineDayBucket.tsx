@@ -8,7 +8,7 @@ import {
     TimelineCard,
     TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from './TimelineCard';
-import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import {
     TimelineDay,
     TimelineBucketItem,
@@ -423,9 +423,10 @@ function StaticTimelineRow({
                     includeDate: false,
                     includeTime: false,
                     includeDuration: false,
-                    bucketLabel: badgeLabel,
+                    includeBucket: false,
                 })}
-                timeText={buildTimelineCardTimeText(item, {
+                timeText={buildTimelineCardFloatingLabel(item, {
+                    bucketLabel: badgeLabel,
                     includeDate: true,
                     includeTime: true,
                     includeDuration: true,

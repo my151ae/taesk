@@ -7,7 +7,6 @@ import {
   getTimelineHeight,
   minuteToPixels,
   timeLabel,
-  detailedTimeLabel,
   minutesToTime,
   TimelineBucketItem,
   TimelineDay,
@@ -25,7 +24,7 @@ import {
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
 import { resolveTimelineEventTone } from "@/app/(board)/_components/timeline/timeline-event-tone";
-import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import { TimelineDragOverlayCard } from "@/app/(board)/_components/timeline/TimelineDragOverlayCard";
 import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
@@ -262,7 +261,7 @@ function MobileTimelineColumn({
                         includeDate: false,
                         includeTime: false,
                         includeDuration: false,
-                        bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
+                        includeBucket: false,
                       }
                     : {
                         includeTags: false,
@@ -270,12 +269,25 @@ function MobileTimelineColumn({
                         includeTime: false,
                         includeDuration: false,
                         includeProgress: false,
-                        bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
+                        includeBucket: false,
                       });
                   const floatingTimeText =
                     layout?.isTimeOverlapped && !(activeStackItem?.kind === "card" && activeStackItem.id === event.card_id)
                       ? null
-                      : detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60);
+                      : buildTimelineCardFloatingLabel(
+                          {
+                            due_bucket: event.due_bucket,
+                            due_start: event.due_start,
+                            due_end: event.due_end,
+                            durationMinutes: event.durationMinutes ?? 60,
+                          },
+                          {
+                            bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
+                            includeDate: false,
+                            includeTime: true,
+                            includeDuration: true,
+                          }
+                        );
                   return (
                 <TimelineCard
                   title={event.title || ""}
@@ -1063,9 +1075,10 @@ function MobileBucketCard({
             includeTags: true,
             includeTime: false,
             includeDuration: false,
-            bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
+            includeBucket: false,
           })}
-          timeText={buildTimelineCardTimeText(item, {
+          timeText={buildTimelineCardFloatingLabel(item, {
+            bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
             includeDate: true,
             includeTime: false,
             includeDuration: true,

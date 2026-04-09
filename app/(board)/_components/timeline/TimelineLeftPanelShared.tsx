@@ -8,7 +8,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { IncrementalPanelSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { ShortcutSection } from "@/app/(board)/_components/timeline/shortcut-bar-registry";
 import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)/_hooks/useTimelineFiltering";
@@ -314,6 +314,13 @@ function SidebarCardRow({
   onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const bucketPrefix = buildTimelineCardFloatingLabel(item, {
+    bucketLabel: badgeLabel,
+    includeDate: false,
+    includeTime: false,
+    includeDuration: false,
+  });
+  const floatingLabel = [bucketPrefix, _timeText].filter(Boolean).join(" ") || null;
 
   const card = (
     <div
@@ -333,9 +340,9 @@ function SidebarCardRow({
           includeDate: false,
           includeTime: false,
           includeDuration: false,
-          bucketLabel: badgeLabel,
+          includeBucket: false,
         })}
-        timeText={_timeText}
+        timeText={floatingLabel}
         timePlacement="out-top"
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
@@ -381,7 +388,8 @@ function SidebarCardRow({
 }
 
 function buildOverdueTimeText(item: TimelineOverdueItem) {
-  return buildTimelineCardTimeText(item, {
+  return buildTimelineCardFloatingLabel(item, {
+    bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
     includeDate: true,
     includeDuration: true,
   });
