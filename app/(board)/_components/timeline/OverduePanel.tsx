@@ -5,7 +5,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type OverduePanelProps = {
@@ -45,7 +45,7 @@ function OverdueCardRow({
       disabled={isContextMenuOpen}
     >
       <div
-        className="min-w-0"
+        className="min-w-0 pt-4"
         data-testid={`overdue-card-${item.card_id}`}
         onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
       >
@@ -58,13 +58,17 @@ function OverdueCardRow({
           cardId={item.card_id}
           statusItems={buildTimelineCardStatusItems(item, {
             includeTags: true,
+            includeDate: false,
+            includeTime: false,
+            includeDuration: false,
+            bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
+          })}
+          timeText={buildTimelineCardTimeText(item, {
             includeDate: true,
             includeTime: true,
             includeDuration: true,
-            bucketLabel: item.due_bucket?.toUpperCase() ?? "O",
           })}
-          timeText={null}
-          timePlacement="inline"
+          timePlacement="out-top"
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
           notePreviewLines={2}

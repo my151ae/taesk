@@ -4,7 +4,7 @@ import {
   TimelineCard,
   TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from "@/app/(board)/_components/timeline/TimelineCard";
-import { buildTimelineCardStatusItems } from "@/app/(board)/_components/timeline/timeline-card-meta";
+import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { TimelineBucketItem, TimelineEvent, TimelineOverdueItem } from "@/app/(board)/_utils/timeline-helpers";
 
 type TimelineListCardProps = {
@@ -34,10 +34,12 @@ export function TimelineListCard({
 }: TimelineListCardProps) {
   const isEvent = kind === "event";
   const isOverdue = kind === "overdue";
+  const shouldShowTimeAboveCard = true;
   return (
     <div
       className={clsx(
         "min-w-0",
+        shouldShowTimeAboveCard ? "pt-4" : "",
         variant === "mobile" ? "active:scale-[0.98] transition-transform" : ""
       )}
       onContextMenu={(e) => onCardContextMenu?.(e, item.card_id)}
@@ -52,13 +54,17 @@ export function TimelineListCard({
         statusItems={buildTimelineCardStatusItems(item, {
           includeTags: true,
           includeDate: isOverdue || !isEvent,
-          includeTime: isEvent || isOverdue,
+          includeTime: false,
           includeDuration: true,
           bucketLabel: bucketLabel ?? item.due_bucket?.toUpperCase() ?? (isEvent ? "A" : isOverdue ? "O" : null),
           includeReminder: true,
         })}
-        timeText={null}
-        timePlacement="inline"
+        timeText={buildTimelineCardTimeText(item, {
+          includeDate: isOverdue || !isEvent,
+          includeTime: isEvent || isOverdue,
+          includeDuration: true,
+        })}
+        timePlacement="out-top"
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
         notePreviewLines={2}

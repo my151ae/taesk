@@ -23,10 +23,10 @@ import {
 export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-2';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
 const NOTE_PREVIEW_ROW_GAP_EM = 0.125;
-const CARD_LEFT_COLUMN_WIDTH = '1.9rem';
-const CARD_LEFT_CELL_X_PADDING = '4px';
-const CARD_RIGHT_CELL_X_PADDING = '8px';
-const CARD_ROW_Y_PADDING = '6px';
+const CARD_LEFT_COLUMN_WIDTH = '1.6rem';
+const CARD_LEFT_CELL_X_PADDING = '3px';
+const CARD_RIGHT_CELL_X_PADDING = '6px';
+const CARD_ROW_Y_PADDING = '4px';
 
 type TimelineCardProps = {
     title: string;
@@ -198,6 +198,7 @@ export function TimelineCard({
         : resolvedStatusItems;
     const hasStatusBar = mergedStatusItems.length > 0;
     const shouldRenderBodyRow = canShowBodySection;
+    const shouldRenderMiddleRow = !hideLeftColumn && (showDragHandle || shouldRenderBodyRow);
     const titleClampClassName = densityMode === 'minimal' ? 'line-clamp-1' : 'line-clamp-2';
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [draftTitle, setDraftTitle] = useState(title);
@@ -507,16 +508,16 @@ export function TimelineCard({
                 >
                     {childrenPosition === 'top' && children}
 
-                    <div
-                        className="grid min-h-0 min-w-0 flex-1 overflow-hidden"
-                        style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
-                    >
-                        {!hideLeftColumn ? (
-                            <div className="flex min-h-0 flex-col border-r border-slate-200/80">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                        <div
+                            className="grid min-w-0 overflow-hidden"
+                            style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                        >
+                            {!hideLeftColumn ? (
                                 <div
                                     className={clsx(
-                                        'flex items-start justify-center',
-                                        (shouldRenderBodyRow || hasStatusBar) && 'border-b border-slate-200/80'
+                                        'flex items-start justify-center border-r border-slate-200/80',
+                                        (shouldRenderMiddleRow || hasStatusBar) && 'border-b border-slate-200/80'
                                     )}
                                     style={{
                                         paddingLeft: CARD_LEFT_CELL_X_PADDING,
@@ -555,53 +556,12 @@ export function TimelineCard({
                                         ) : null}
                                     </div>
                                 </div>
-                                {shouldRenderBodyRow ? (
-                                    <div
-                                        className={clsx(
-                                            'flex-1 border-b border-slate-200/80',
-                                            densityMode !== 'default' && 'hidden'
-                                        )}
-                                        aria-hidden="true"
-                                    />
-                                ) : null}
-                                {hasStatusBar ? (
-                                    <div
-                                        className="flex items-center justify-center"
-                                        style={{
-                                            paddingLeft: CARD_LEFT_CELL_X_PADDING,
-                                            paddingRight: CARD_LEFT_CELL_X_PADDING,
-                                            paddingTop: CARD_ROW_Y_PADDING,
-                                            paddingBottom: CARD_ROW_Y_PADDING,
-                                        }}
-                                    >
-                                        {showDragHandle ? (
-                                            <span
-                                                aria-hidden="true"
-                                                className={clsx(
-                                                    'pointer-events-none inline-flex h-4 w-4 items-center justify-center rounded text-slate-400',
-                                                    isTimelineDimChecked && 'text-slate-300'
-                                                )}
-                                            >
-                                                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-                                                    <circle cx="5" cy="4" r="1" />
-                                                    <circle cx="11" cy="4" r="1" />
-                                                    <circle cx="5" cy="8" r="1" />
-                                                    <circle cx="11" cy="8" r="1" />
-                                                    <circle cx="5" cy="12" r="1" />
-                                                    <circle cx="11" cy="12" r="1" />
-                                                </svg>
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </div>
-                        ) : null}
+                            ) : null}
 
-                        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
                             <div
                                 className={clsx(
                                     'flex min-w-0 items-start justify-between gap-2',
-                                    (shouldRenderBodyRow || hasStatusBar) && 'border-b border-slate-200/80'
+                                    (shouldRenderMiddleRow || hasStatusBar) && 'border-b border-slate-200/80'
                                 )}
                                 style={{
                                     paddingLeft: CARD_RIGHT_CELL_X_PADDING,
@@ -682,24 +642,6 @@ export function TimelineCard({
                                 </span>
                                 {showOpenButton ? (
                                     <div className="flex shrink-0 items-start gap-1 pl-1">
-                                        <span
-                                            aria-hidden="true"
-                                            className={clsx(
-                                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
-                                                isTimelineDimChecked
-                                                    ? "border-slate-200 bg-white/80 text-slate-300"
-                                                    : "border-slate-200 bg-white text-slate-400"
-                                            )}
-                                        >
-                                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                                                <circle cx="9" cy="7" r="1.25" />
-                                                <circle cx="15" cy="7" r="1.25" />
-                                                <circle cx="9" cy="12" r="1.25" />
-                                                <circle cx="15" cy="12" r="1.25" />
-                                                <circle cx="9" cy="17" r="1.25" />
-                                                <circle cx="15" cy="17" r="1.25" />
-                                            </svg>
-                                        </span>
                                         <button
                                             type="button"
                                             aria-label="カードを開く"
@@ -727,81 +669,51 @@ export function TimelineCard({
                                     </div>
                                 ) : null}
                             </div>
+                        </div>
 
-                            {shouldRenderBodyRow ? (
-                                <div
-                                    className="min-h-0 min-w-0 border-b border-slate-200/80"
-                                    style={{
-                                        paddingLeft: CARD_RIGHT_CELL_X_PADDING,
-                                        paddingRight: CARD_RIGHT_CELL_X_PADDING,
-                                        paddingTop: CARD_ROW_Y_PADDING,
-                                        paddingBottom: CARD_ROW_Y_PADDING,
-                                    }}
-                                >
+                        {shouldRenderMiddleRow ? (
+                            <div
+                                className="grid min-h-0 min-w-0 flex-1 overflow-hidden"
+                                style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
+                            >
+                                {!hideLeftColumn ? (
                                     <div
                                         className={clsx(
-                                            'min-h-0 min-w-0 text-[10px] leading-tight text-slate-600',
-                                            checkedTextClassName
+                                            'flex min-h-0 items-center justify-center border-r border-slate-200/80',
+                                            hasStatusBar && 'border-b border-slate-200/80'
                                         )}
-                                        style={{ maxHeight: `${notePreviewMaxHeightEm}em` }}
+                                        style={{
+                                            paddingLeft: CARD_LEFT_CELL_X_PADDING,
+                                            paddingRight: CARD_LEFT_CELL_X_PADDING,
+                                            paddingTop: CARD_ROW_Y_PADDING,
+                                            paddingBottom: CARD_ROW_Y_PADDING,
+                                        }}
                                     >
-                                        {(() => {
-                                            const lines = note
-                                                ? note
-                                                    .split(/\r?\n/)
-                                                    .map((line) => line)
-                                                    .filter((line) => {
-                                                        const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                                        if (taskMatch) return true;
-                                                        return Boolean(line.trim());
-                                                    })
-                                                : [];
-                                            return lines.map((line, idx) => {
-                                                const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
-                                                const isTask = Boolean(taskMatch);
-                                                const indentRaw = taskMatch?.[1] ?? '';
-                                                const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
-                                                const taskChecked = taskMatch?.[2]?.toLowerCase() === 'x';
-                                                const text = isTask ? (taskMatch?.[3] ?? '') : line;
-
-                                                return (
-                                                    <div
-                                                        key={`line-${idx}`}
-                                                        className={clsx(
-                                                            'flex min-w-0 items-start gap-1',
-                                                            idx >= notePreviewLines && 'hidden'
-                                                        )}
-                                                        style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
-                                                    >
-                                                        {isTask ? (
-                                                            <span
-                                                                className={clsx(
-                                                                    "mt-[1px] flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
-                                                                    taskChecked ? "border-slate-500 bg-slate-500" : "border-slate-400"
-                                                                )}
-                                                                aria-hidden="true"
-                                                            >
-                                                                {taskChecked ? (
-                                                                    <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                                        <path d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                ) : null}
-                                                            </span>
-                                                        ) : null}
-                                                        <span className="block min-w-0 flex-1 truncate">{text || '\u00A0'}</span>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
+                                        {showDragHandle ? (
+                                            <span
+                                                aria-hidden="true"
+                                                className={clsx(
+                                                    'pointer-events-none inline-flex h-4 w-4 items-center justify-center rounded text-slate-400',
+                                                    isTimelineDimChecked && 'text-slate-300'
+                                                )}
+                                            >
+                                                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                                                    <circle cx="5" cy="4" r="1" />
+                                                    <circle cx="11" cy="4" r="1" />
+                                                    <circle cx="5" cy="8" r="1" />
+                                                    <circle cx="11" cy="8" r="1" />
+                                                    <circle cx="5" cy="12" r="1" />
+                                                    <circle cx="11" cy="12" r="1" />
+                                                </svg>
+                                            </span>
+                                        ) : null}
                                     </div>
-                                </div>
-                            ) : null}
+                                ) : null}
 
-                            {hasStatusBar ? (
                                 <div
                                     className={clsx(
-                                        'flex min-w-0 items-center',
-                                        densityMode === 'minimal' ? 'min-h-[24px]' : 'min-h-[28px]'
+                                        'min-h-0 min-w-0',
+                                        hasStatusBar && 'border-b border-slate-200/80'
                                     )}
                                     style={{
                                         paddingLeft: CARD_RIGHT_CELL_X_PADDING,
@@ -810,15 +722,91 @@ export function TimelineCard({
                                         paddingBottom: CARD_ROW_Y_PADDING,
                                     }}
                                 >
-                                    <div className={clsx('flex min-w-0 flex-1 items-center gap-1 overflow-hidden', checkedMetaTextClassName)}>
-                                        {mergedStatusItems.map(renderStatusItem)}
-                                    </div>
-                                    {timePlacement === 'inline' && timeText ? (
-                                        <span className={clsx("ml-2 shrink-0 text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>
-                                    ) : null}
+                                    {shouldRenderBodyRow ? (
+                                        <div
+                                            className={clsx(
+                                                'min-h-0 min-w-0 text-[10px] leading-tight text-slate-600',
+                                                checkedTextClassName
+                                            )}
+                                            style={{ maxHeight: `${notePreviewMaxHeightEm}em` }}
+                                        >
+                                            {(() => {
+                                                const lines = note
+                                                    ? note
+                                                        .split(/\r?\n/)
+                                                        .map((line) => line)
+                                                        .filter((line) => {
+                                                            const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                                            if (taskMatch) return true;
+                                                            return Boolean(line.trim());
+                                                        })
+                                                    : [];
+                                                return lines.map((line, idx) => {
+                                                    const taskMatch = line.match(/^([\s\u00A0]*)\[([ xX])\]\s?(.*)$/);
+                                                    const isTask = Boolean(taskMatch);
+                                                    const indentRaw = taskMatch?.[1] ?? '';
+                                                    const indentLevel = indentRaw.split('').reduce((acc, char) => acc + (char === '\t' ? 2 : 1), 0);
+                                                    const taskChecked = taskMatch?.[2]?.toLowerCase() === 'x';
+                                                    const text = isTask ? (taskMatch?.[3] ?? '') : line;
+
+                                                    return (
+                                                        <div
+                                                            key={`line-${idx}`}
+                                                            className={clsx(
+                                                                'flex min-w-0 items-start gap-1',
+                                                                idx >= notePreviewLines && 'hidden'
+                                                            )}
+                                                            style={isTask && indentLevel > 0 ? { paddingLeft: `${indentLevel * 6}px` } : undefined}
+                                                        >
+                                                            {isTask ? (
+                                                                <span
+                                                                    className={clsx(
+                                                                        "mt-[1px] flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border",
+                                                                        taskChecked ? "border-slate-500 bg-slate-500" : "border-slate-400"
+                                                                    )}
+                                                                    aria-hidden="true"
+                                                                >
+                                                                    {taskChecked ? (
+                                                                        <svg className="h-2 w-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                    ) : null}
+                                                                </span>
+                                                            ) : null}
+                                                            <span className="block min-w-0 flex-1 truncate">{text || '\u00A0'}</span>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <div className="min-h-[14px]" aria-hidden="true" />
+                                    )}
                                 </div>
-                            ) : null}
-                        </div>
+                            </div>
+                        ) : null}
+
+                        {hasStatusBar ? (
+                            <div
+                                className={clsx(
+                                    'flex min-w-0 items-center',
+                                    densityMode === 'minimal' ? 'min-h-[20px]' : 'min-h-[24px]'
+                                )}
+                                style={{
+                                    paddingLeft: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingRight: CARD_RIGHT_CELL_X_PADDING,
+                                    paddingTop: CARD_ROW_Y_PADDING,
+                                    paddingBottom: CARD_ROW_Y_PADDING,
+                                }}
+                            >
+                                <div className={clsx('flex min-w-0 flex-1 items-center gap-1 overflow-hidden', checkedMetaTextClassName)}>
+                                    {mergedStatusItems.map(renderStatusItem)}
+                                </div>
+                                {timePlacement === 'inline' && timeText ? (
+                                    <span className={clsx("ml-2 shrink-0 text-[10px] font-normal text-slate-500", checkedMetaTextClassName)}>{timeText}</span>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </div>
 
                     {childrenPosition === 'bottom' && children}

@@ -12,7 +12,8 @@ import {
     getMinutesFromTime,
     type StackedTimelineItemKind,
     timeLabel,
-    ExternalCalendarEntry
+    ExternalCalendarEntry,
+    detailedTimeLabel
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
 import { TimelineCard } from './TimelineCard';
@@ -303,15 +304,19 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             }, {
                                                 includeTags: false,
                                                 includeDate: false,
-                                                includeTime: true,
-                                                includeDuration: true,
+                                                includeTime: false,
+                                                includeDuration: false,
                                                 includeBucket: true,
                                                 includeProgress: false,
                                                 includeReminder: false,
                                                 bucketLabel: "G",
                                             })}
-                                            timeText={null}
-                                            timePlacement="inline"
+                                            timeText={
+                                                layout?.isTimeOverlapped && !isActive
+                                                    ? null
+                                                    : detailedTimeLabel(minutesToTime(calendarEvent.startMinutes), minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes), calendarEvent.durationMinutes)
+                                            }
+                                            timePlacement="out-top"
                                             onOpen={() => {
                                                 if (!interactionLocked) {
                                                     setActiveStackItem({ kind: 'calendar', id: calendarEvent.id });

@@ -260,18 +260,22 @@ function MobileTimelineColumn({
                     ? {
                         includeTags: true,
                         includeDate: false,
-                        includeTime: true,
-                        includeDuration: true,
+                        includeTime: false,
+                        includeDuration: false,
                         bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
                       }
                     : {
                         includeTags: false,
                         includeDate: false,
-                        includeTime: true,
-                        includeDuration: true,
+                        includeTime: false,
+                        includeDuration: false,
                         includeProgress: false,
                         bucketLabel: (event.due_bucket ?? "a").toUpperCase(),
                       });
+                  const floatingTimeText =
+                    layout?.isTimeOverlapped && !(activeStackItem?.kind === "card" && activeStackItem.id === event.card_id)
+                      ? null
+                      : detailedTimeLabel(event.due_start, event.due_end, event.durationMinutes ?? 60);
                   return (
                 <TimelineCard
                   title={event.title || ""}
@@ -281,9 +285,9 @@ function MobileTimelineColumn({
                   onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                   cardId={event.card_id}
                   statusItems={statusItems}
-                  timeText={null}
+                  timeText={floatingTimeText}
                   rightMeta={undefined}
-                  timePlacement="inline"
+                  timePlacement="out-top"
                   densityMode={densityMode}
                   onOpen={() => openCardModal(event.short_id, "mobile-timeline")}
                   openButtonTestId={`cardOpenButton-mobile-timeline-${event.card_id}`}
@@ -1057,12 +1061,15 @@ function MobileBucketCard({
           cardId={item.card_id}
           statusItems={buildTimelineCardStatusItems(item, {
             includeTags: true,
+            includeTime: false,
+            includeDuration: false,
+            bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
+          })}
+          timeText={buildTimelineCardTimeText(item, {
             includeDate: true,
             includeTime: false,
             includeDuration: true,
-            bucketLabel: bucketKeyToDueBucket(bucketKey).toUpperCase(),
           })}
-          timeText={null}
           rightMeta={null}
           note={item.excerpt ?? undefined}
           noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
@@ -1070,7 +1077,7 @@ function MobileBucketCard({
           onOpen={() => openCardModal(item.short_id, "mobile-ab")}
           openButtonTestId={`cardOpenButton-mobile-ab-${item.card_id}`}
           showOpenButton
-          timePlacement="inline"
+          timePlacement="out-top"
           paddingClass="py-1"
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}

@@ -330,13 +330,13 @@ function SidebarCardRow({
         cardId={item.card_id}
         statusItems={buildTimelineCardStatusItems(item, {
           includeTags: true,
-          includeDate: true,
-          includeTime: true,
-          includeDuration: true,
+          includeDate: false,
+          includeTime: false,
+          includeDuration: false,
           bucketLabel: badgeLabel,
         })}
-        timeText={null}
-        timePlacement="inline"
+        timeText={_timeText}
+        timePlacement="out-top"
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
         notePreviewLines={2}
@@ -966,14 +966,9 @@ export function TrashSectionBody({
                         kind: "bucket",
                         label: "TR",
                       },
-                      {
-                        key: "trash-time",
-                        kind: "time",
-                        label: buildTrashTimeText(item),
-                      },
                     ]}
-                    timeText={null}
-                    timePlacement="inline"
+                    timeText={buildTrashTimeText(item)}
+                    timePlacement="out-top"
                     onOpen={() => openCardModal(item.short_id, "trash")}
                     openButtonTestId={`cardOpenButton-trash-${item.card_id}`}
                     showOpenButton

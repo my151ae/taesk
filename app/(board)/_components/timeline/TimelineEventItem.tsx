@@ -8,6 +8,7 @@ import {
     TimelineEvent,
     minuteToPixels,
     getMinutesFromTime,
+    detailedTimeLabel,
     StackedEventLayout
 } from '@/app/(board)/_utils/timeline-helpers';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
@@ -100,18 +101,21 @@ export const TimelineEventItem = memo(function TimelineEventItem({
         ? {
             includeTags: true,
             includeDate: false,
-            includeTime: true,
-            includeDuration: true,
+            includeTime: false,
+            includeDuration: false,
             bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
         }
         : {
             includeTags: false,
             includeDate: false,
-            includeTime: true,
-            includeDuration: true,
+            includeTime: false,
+            includeDuration: false,
             includeProgress: false,
             bucketLabel: (event.due_bucket ?? 'a').toUpperCase(),
         });
+    const floatingTimeText = layout?.isTimeOverlapped && !isActive && !activeResize
+        ? null
+        : detailedTimeLabel(event.due_start, event.due_end, duration);
 
     return (
         <DraggableCard
@@ -145,9 +149,9 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     onToggleCheck={(next) => onToggleCheck(event.card_id, next)}
                     cardId={event.card_id}
                     statusItems={statusItems}
-                    timeText={null}
+                    timeText={floatingTimeText}
                     rightMeta={undefined}
-                    timePlacement="inline"
+                    timePlacement="out-top"
                     note={event.excerpt ?? undefined}
                     densityMode={densityMode}
                     onOpen={() => {

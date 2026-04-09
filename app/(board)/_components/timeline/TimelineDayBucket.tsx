@@ -8,7 +8,7 @@ import {
     TimelineCard,
     TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS,
 } from './TimelineCard';
-import { buildTimelineCardStatusItems } from '@/app/(board)/_components/timeline/timeline-card-meta';
+import { buildTimelineCardStatusItems, buildTimelineCardTimeText } from '@/app/(board)/_components/timeline/timeline-card-meta';
 import {
     TimelineDay,
     TimelineBucketItem,
@@ -420,13 +420,17 @@ function StaticTimelineRow({
                 cardId={item.card_id}
                 statusItems={buildTimelineCardStatusItems(item, {
                     includeTags: true,
+                    includeDate: false,
+                    includeTime: false,
+                    includeDuration: false,
+                    bucketLabel: badgeLabel,
+                })}
+                timeText={buildTimelineCardTimeText(item, {
                     includeDate: true,
                     includeTime: true,
                     includeDuration: true,
-                    bucketLabel: badgeLabel,
                 })}
-                timeText={null}
-                timePlacement="inline"
+                timePlacement="out-top"
                 note={item.excerpt ?? undefined}
                 noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
                 notePreviewLines={Math.min(notePreviewLines, 2)}
