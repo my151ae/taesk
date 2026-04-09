@@ -129,13 +129,13 @@ export function formatDailyDigestPushCopy(input: {
   bItems?: DigestPreviewItem[];
   topItemTitle?: string | null;
 }): PushCopy {
-  const title = `TaeDigest:Time=${input.timedCount ?? 0} A=${input.aCount ?? 0} B=${input.bCount ?? 0} Overdue=${input.overdueCount}`;
+  const title = `TaeDigest:Time=${input.timedCount ?? 0},A=${input.aCount ?? 0},B=${input.bCount ?? 0},Over=${input.overdueCount}`;
   const lines = [
     formatDigestLine('T', input.timedItems ?? []),
     formatDigestLine('A', input.aItems ?? []),
     formatDigestLine('B', input.bItems ?? []),
   ].filter((line): line is string => Boolean(line));
-  const body = lines.length > 0 ? lines.join('\n') : asString(input.topItemTitle ?? '') || `Today=${input.todayCount}`;
+  const body = lines.length > 0 ? lines.join(',') : asString(input.topItemTitle ?? '') || `Today=${input.todayCount}`;
 
   return {
     title,

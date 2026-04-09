@@ -41,42 +41,13 @@ function formatRelativeDateTime(iso: string) {
 }
 
 function buildNotificationHeadline(notification: Notification) {
-  if (notification.type === "daily_digest") {
-    return formatPushNotificationCopy(notification.type, notification.payload).body;
-  }
-
-  const changeSummary =
-    typeof notification.payload?.change_summary === "string" && notification.payload.change_summary.trim().length > 0
-      ? notification.payload.change_summary.trim()
-      : null;
-  if (changeSummary) return changeSummary;
-
-  const timeChange = notification.payload?.time_change;
-  if (timeChange && typeof timeChange === "object") {
-    const field = timeChange.field === "end" ? "終了" : "開始";
-    const before = typeof timeChange.before === "string" && timeChange.before.trim().length > 0 ? timeChange.before : "未設定";
-    const after = typeof timeChange.after === "string" && timeChange.after.trim().length > 0 ? timeChange.after : "未設定";
-    return `${field} ${before} → ${after}`;
-  }
-
-  if (notification.type === "assignee_changed") return "担当に追加されました";
-  if (notification.type === "due_soon") return null;
-  if (notification.type === "comment_reply" || notification.type === "comment_replied") return "コメントに返信がありました";
-  if (notification.type === "comment_created") return "新しいコメントがあります";
-  if (notification.type === "mention") return "メンションされました";
-  return null;
+  const pushCopy = formatPushNotificationCopy(notification.type, notification.payload);
+  return pushCopy.body.trim().length > 0 ? pushCopy.body : null;
 }
 
 function buildNotificationTitle(notification: Notification) {
-  if (notification.type === "daily_digest") {
-    return formatPushNotificationCopy(notification.type, notification.payload).title;
-  }
-
-  const payloadTitle = typeof notification.payload?.card_title === "string" ? notification.payload.card_title.trim() : "";
-  if (payloadTitle.length > 0) return payloadTitle;
-  const message = typeof notification.payload?.message === "string" ? notification.payload.message.trim() : "";
-  if (message.length > 0) return message;
-  return "Untitled card";
+  const pushCopy = formatPushNotificationCopy(notification.type, notification.payload);
+  return pushCopy.title.trim().length > 0 ? pushCopy.title : "Taesk Notification";
 }
 
 function NotificationActivityRow({
