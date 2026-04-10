@@ -31,6 +31,13 @@ import {
   formatAllDayRange,
   formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
+import {
+  ANCHOR_SWITCH_THRESHOLD,
+  type DesktopTimelineWindowState,
+  resolveDesktopTimelineAnchorIso,
+  resolveDesktopTimelineWindowMetrics,
+  resolveDesktopTimelineWindowState,
+} from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
 import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
@@ -102,6 +109,7 @@ export type DesktopTimelineViewProps = {
   currentIsoDate: string | null;
   currentMinutes: number | null;
   onAnchorDayChange?: (isoDate: string) => void;
+  onWindowStateChange?: (state: DesktopTimelineWindowState) => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -252,13 +260,20 @@ export function DesktopTimelineView({
   currentIsoDate,
   currentMinutes,
   onAnchorDayChange,
+  onWindowStateChange,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
   }, []);
   const horizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollSyncSourceRef = useRef<"external" | "user" | null>(null);
   const programmaticHorizontalScrollRef = useRef(false);
-  const hasUserHorizontalInteractionRef = useRef(false);
+  const lastEmittedAnchorRef = useRef<string | null>(null);
+  const pendingAnchorSyncRafRef = useRef<number | null>(null);
+  const pendingExternalSettleRafRef = useRef<number | null>(null);
+  const isSettlingScrollRef = useRef(false);
+  const lastProgrammaticTargetLeftRef = useRef<number | null>(null);
+  const lastWindowStateSignatureRef = useRef<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
@@ -266,18 +281,22 @@ export function DesktopTimelineView({
   // Zoom State
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
   const setHourHeight = useTimelineZoomStore((state) => state.setHourHeight);
-  const overscanDays = activeDrag || activeResize ? 5 : 3;
   const safeViewportWidth = viewportWidth > 0 ? viewportWidth : 1200;
   const columnWidth = safeViewportWidth / Math.max(1, dayRange);
-  const renderStartIndex = Math.max(0, Math.floor(scrollLeft / columnWidth) - overscanDays);
-  const renderEndIndex = Math.min(
-    days.length,
-    Math.ceil((scrollLeft + safeViewportWidth) / columnWidth) + overscanDays,
+  const windowMetrics = useMemo(
+    () =>
+      resolveDesktopTimelineWindowMetrics({
+        scrollLeft,
+        viewportWidth,
+        columnWidth,
+        loadedDayCount: days.length,
+        dayRange,
+        isInteractionActive: Boolean(activeDrag || activeResize),
+      }),
+    [activeDrag, activeResize, columnWidth, dayRange, days.length, scrollLeft, viewportWidth],
   );
+  const { renderStartIndex, renderEndIndex, leftSpacerWidth, rightSpacerWidth, totalStripWidth } = windowMetrics;
   const renderDays = useMemo(() => days.slice(renderStartIndex, renderEndIndex), [days, renderEndIndex, renderStartIndex]);
-  const leftSpacerWidth = renderStartIndex * columnWidth;
-  const rightSpacerWidth = Math.max(0, (days.length - renderEndIndex) * columnWidth);
-  const totalStripWidth = Math.max(columnWidth * Math.max(days.length, dayRange), safeViewportWidth);
   const desktopGridTemplateColumns = useMemo(
     () => `repeat(${renderDays.length}, minmax(${columnWidth}px, ${columnWidth}px))`,
     [columnWidth, renderDays.length],
@@ -348,7 +367,7 @@ export function DesktopTimelineView({
 
   useEffect(() => {
     setActiveStackItem(null);
-  }, [activeDayIndex, dayRange, days.length]);
+  }, [anchorDayIso, dayRange, days.length]);
 
   useEffect(() => {
     if (contextMenuCardId) {
@@ -420,33 +439,112 @@ export function DesktopTimelineView({
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(update);
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      if (pendingAnchorSyncRafRef.current != null) {
+        window.cancelAnimationFrame(pendingAnchorSyncRafRef.current);
+      }
+      if (pendingExternalSettleRafRef.current != null) {
+        window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
+      }
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
     const container = horizontalScrollRef.current;
     if (!container || columnWidth <= 0) return;
-    const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
+    const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
+    if (anchorIndex < 0) return;
     const targetLeft = anchorIndex * columnWidth;
     if (Math.abs(container.scrollLeft - targetLeft) < 1) return;
+    if (lastProgrammaticTargetLeftRef.current === targetLeft) return;
+    lastProgrammaticTargetLeftRef.current = targetLeft;
+    lastEmittedAnchorRef.current = anchorDayIso;
+    scrollSyncSourceRef.current = "external";
+    isSettlingScrollRef.current = true;
     programmaticHorizontalScrollRef.current = true;
     container.scrollTo({ left: targetLeft, behavior: "auto" });
-    const timeoutId = window.setTimeout(() => {
+    if (pendingExternalSettleRafRef.current != null) {
+      window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
+    }
+    pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
+      pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
+        setScrollLeft(container.scrollLeft);
+        scrollSyncSourceRef.current = null;
+        isSettlingScrollRef.current = false;
+        programmaticHorizontalScrollRef.current = false;
+        pendingExternalSettleRafRef.current = null;
+      });
+    });
+    return () => {
+      if (pendingExternalSettleRafRef.current != null) {
+        window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
+      }
       programmaticHorizontalScrollRef.current = false;
-    }, 250);
-    return () => window.clearTimeout(timeoutId);
+      isSettlingScrollRef.current = false;
+      scrollSyncSourceRef.current = null;
+    };
   }, [anchorDayIso, columnWidth, days]);
 
   useEffect(() => {
-    if (!days.length || columnWidth <= 0) return;
-    if (programmaticHorizontalScrollRef.current) return;
-    if (!hasUserHorizontalInteractionRef.current) return;
-    const anchorIndex = Math.max(0, Math.min(days.length - 1, Math.round(scrollLeft / columnWidth)));
-    const nextAnchor = days[anchorIndex]?.isoDate ?? null;
-    if (nextAnchor && nextAnchor !== anchorDayIso) {
-      onAnchorDayChange?.(nextAnchor);
+    const nextWindowState = resolveDesktopTimelineWindowState({
+      anchorDayIso,
+      loadedDays: days,
+    });
+    const signature = JSON.stringify(nextWindowState);
+    if (signature === lastWindowStateSignatureRef.current) return;
+    lastWindowStateSignatureRef.current = signature;
+    onWindowStateChange?.(nextWindowState);
+  }, [anchorDayIso, days, onWindowStateChange]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingAnchorSyncRafRef.current != null) {
+        window.cancelAnimationFrame(pendingAnchorSyncRafRef.current);
+      }
+      if (pendingExternalSettleRafRef.current != null) {
+        window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleAnchorEmit = useCallback(
+    (nextScrollLeft: number) => {
+      if (pendingAnchorSyncRafRef.current != null) {
+        window.cancelAnimationFrame(pendingAnchorSyncRafRef.current);
+      }
+      pendingAnchorSyncRafRef.current = window.requestAnimationFrame(() => {
+        pendingAnchorSyncRafRef.current = null;
+        if (scrollSyncSourceRef.current !== "user") return;
+        if (isSettlingScrollRef.current) return;
+        const nextAnchor = resolveDesktopTimelineAnchorIso({
+          scrollLeft: nextScrollLeft,
+          columnWidth,
+          loadedDays: days,
+          threshold: ANCHOR_SWITCH_THRESHOLD,
+        });
+        if (!nextAnchor) return;
+        if (nextAnchor === anchorDayIso) return;
+        if (lastEmittedAnchorRef.current === nextAnchor) return;
+        lastEmittedAnchorRef.current = nextAnchor;
+        onAnchorDayChange?.(nextAnchor);
+        onWindowStateChange?.(
+          resolveDesktopTimelineWindowState({
+            anchorDayIso: nextAnchor,
+            loadedDays: days,
+          }),
+        );
+      });
+    },
+    [anchorDayIso, columnWidth, days, onAnchorDayChange, onWindowStateChange],
+  );
+
+  useEffect(() => {
+    if (!days.length) return;
+    if (lastEmittedAnchorRef.current !== anchorDayIso) {
+      lastEmittedAnchorRef.current = anchorDayIso;
     }
-  }, [anchorDayIso, columnWidth, days, onAnchorDayChange, scrollLeft]);
+  }, [anchorDayIso, days.length]);
 
   return (
     <div
@@ -457,10 +555,15 @@ export function DesktopTimelineView({
         ref={horizontalScrollRef}
         className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
         onScroll={(event) => {
+          const nextScrollLeft = event.currentTarget.scrollLeft;
           if (!programmaticHorizontalScrollRef.current) {
-            hasUserHorizontalInteractionRef.current = true;
+            scrollSyncSourceRef.current = "user";
+            lastProgrammaticTargetLeftRef.current = null;
           }
-          setScrollLeft(event.currentTarget.scrollLeft);
+          setScrollLeft(nextScrollLeft);
+          if (scrollSyncSourceRef.current === "user") {
+            scheduleAnchorEmit(nextScrollLeft);
+          }
         }}
       >
           <div ref={timelineHeaderRef} className="z-30" style={{ width: totalStripWidth }}>

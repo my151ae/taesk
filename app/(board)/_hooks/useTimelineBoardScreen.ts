@@ -25,6 +25,7 @@ import type { TrashCardItem } from "@/lib/api-types/timeline";
 import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import type { DesktopTimelineWindowState } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -175,6 +176,7 @@ type UseTimelineBoardScreenArgs = {
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
   onTimelineAnchorChange: (isoDate: string) => void;
+  onTimelineWindowStateChange: (state: DesktopTimelineWindowState) => void;
   listAnchorDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -357,6 +359,7 @@ export function useTimelineBoardScreen({
   pendingTitleEditCardId,
   onPendingTitleEditConsumed,
   onTimelineAnchorChange,
+  onTimelineWindowStateChange,
   listAnchorDate,
   listWindowPresetKey,
   handleListWindowPresetChange,
@@ -522,6 +525,7 @@ export function useTimelineBoardScreen({
     pendingTitleEditCardId,
     onPendingTitleEditConsumed,
     onTimelineAnchorChange,
+    onTimelineWindowStateChange,
     listBaseDate: listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange,

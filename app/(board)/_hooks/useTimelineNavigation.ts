@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { getDayDiff, getCurrentTimelineIsoDateJst } from "@/app/(board)/_utils/timeline-helpers";
 import type { TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
 import type { UrlUpdateMethod } from "@/app/(board)/_hooks/useTimelineUrlState";
@@ -24,11 +24,18 @@ interface UseTimelineNavigationProps {
   updateUrlForTimeline: (args: TimelineUrlUpdateArgs) => void;
   timelineStartHour?: number;
   requestedFetchRange?: number;
+  syncActiveDayIndex?: boolean;
 }
 
 const clampIndex = (index: number, length: number) => {
   if (length <= 0) return 0;
   return Math.max(0, Math.min(index, length - 1));
+};
+
+const addDaysToIso = (isoDate: string, delta: number) => {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
 };
 
 export function useTimelineNavigation({
@@ -42,22 +49,24 @@ export function useTimelineNavigation({
   updateUrlForTimeline,
   timelineStartHour = 0,
   requestedFetchRange,
+  syncActiveDayIndex = true,
 }: UseTimelineNavigationProps) {
   const navStep = Math.max(1, dayRange);
   const fetchRange = Math.max(requestedFetchRange ?? dayRange, dayRange, 7);
   const currentTimelineIso = getCurrentTimelineIsoDateJst(timelineStartHour);
+  const lastVisibleAnchorRef = useRef<string | null>(null);
 
   const syncAnchor = useCallback(
     (nextIsoDate: string, method: UrlUpdateMethod = "replace") => {
       if (!nextIsoDate) return;
       setAnchorDayIso(nextIsoDate);
       const nextIndex = data?.days?.findIndex((day) => day.isoDate === nextIsoDate) ?? -1;
-      if (nextIndex >= 0) {
+      if (syncActiveDayIndex && nextIndex >= 0) {
         setActiveDayIndex(nextIndex);
       }
       updateUrlForTimeline({ date: nextIsoDate, method });
     },
-    [data?.days, setActiveDayIndex, setAnchorDayIso, updateUrlForTimeline],
+    [data?.days, setActiveDayIndex, setAnchorDayIso, syncActiveDayIndex, updateUrlForTimeline],
   );
 
   const navigateByDays = useCallback(
@@ -65,21 +74,20 @@ export function useTimelineNavigation({
       if (!delta) return;
 
       const days = data?.days ?? [];
-      const currentIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
-      const nextIndex = currentIndex >= 0 ? currentIndex + delta : activeDayIndex + delta;
-      const cachedTarget = days[clampIndex(nextIndex, days.length)]?.isoDate ?? null;
+      const targetIso = addDaysToIso(anchorDayIso, delta);
+      const cachedTarget = days.find((day) => day.isoDate === targetIso)?.isoDate ?? null;
 
-      if (cachedTarget && nextIndex >= 0 && nextIndex < days.length) {
+      if (cachedTarget) {
         syncAnchor(cachedTarget, method);
         return;
       }
 
-      const targetOffset = getDayDiff(anchorDayIso, currentTimelineIso) + delta;
+      const targetOffset = getDayDiff(targetIso, currentTimelineIso);
       const targetPayload = await fetchTimeline(targetOffset, { range: fetchRange, silent: true });
       const nextDays = targetPayload?.days ?? [];
       const nextIso =
-        nextDays.find((day) => getDayDiff(day.isoDate, anchorDayIso) === delta)?.isoDate ??
-        nextDays[clampIndex(Math.abs(delta), nextDays.length)]?.isoDate ??
+        nextDays.find((day) => day.isoDate === targetIso)?.isoDate ??
+        nextDays[clampIndex(nextDays.findIndex((day) => getDayDiff(day.isoDate, targetIso) >= 0), nextDays.length)]?.isoDate ??
         nextDays[0]?.isoDate;
 
       if (nextIso) {
@@ -87,7 +95,6 @@ export function useTimelineNavigation({
       }
     },
     [
-      activeDayIndex,
       anchorDayIso,
       currentTimelineIso,
       data?.days,
@@ -107,10 +114,12 @@ export function useTimelineNavigation({
       }
 
       const targetOffset = getDayDiff(targetIso, currentTimelineIso);
-      await fetchTimeline(targetOffset, { range: fetchRange, silent: true });
-      syncAnchor(targetIso, method);
+      const targetPayload = await fetchTimeline(targetOffset, { range: fetchRange, silent: true });
+      const resolvedTargetIso =
+        targetPayload?.days?.find((day) => day.isoDate === targetIso)?.isoDate ?? targetIso;
+      syncAnchor(resolvedTargetIso, method);
     },
-    [currentTimelineIso, data?.days, fetchRange, fetchTimeline, syncAnchor],
+    [currentTimelineIso, fetchRange, fetchTimeline, syncAnchor],
   );
 
   const handlePrevDay = useCallback(async () => {
@@ -135,19 +144,20 @@ export function useTimelineNavigation({
 
   const handleDayRangeChange = useCallback(
     (newRange: number) => {
-      const currentDay = data?.days?.[activeDayIndex] ?? data?.days?.find((day) => day.isoDate === anchorDayIso);
-      if (currentDay) {
-        updateUrlForTimeline({ date: currentDay.isoDate });
-      } else if (newRange > 0) {
+      if (newRange > 0) {
         updateUrlForTimeline({ date: anchorDayIso });
       }
     },
-    [activeDayIndex, anchorDayIso, data?.days, updateUrlForTimeline],
+    [anchorDayIso, updateUrlForTimeline],
   );
 
   const handleVisibleAnchorChange = useCallback(
     (nextIsoDate: string) => {
       if (!nextIsoDate || nextIsoDate === anchorDayIso) return;
+      if (lastVisibleAnchorRef.current === nextIsoDate) {
+        return;
+      }
+      lastVisibleAnchorRef.current = nextIsoDate;
       syncAnchor(nextIsoDate, "replace");
     },
     [anchorDayIso, syncAnchor],

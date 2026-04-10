@@ -38,6 +38,7 @@ import {
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
+import type { DesktopTimelineWindowState } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
@@ -818,19 +819,18 @@ function TimelineBoardPageContent({
     updateUrlForTimeline,
     timelineStartHour,
     requestedFetchRange: desktopTimelineFetchRange,
+    syncActiveDayIndex: !(viewMode === "timeline" && isDesktopViewport),
   });
 
   const openTimelineDay = useCallback((isoDate: string) => {
     if (!isoDate) return;
     suppressMonthUrlSyncRef.current = true;
-    resetDesktopTimelineProjection();
     setAnchorDayIso(isoDate);
-    setActiveDayIndex(0);
     updateUrlForTimeline({
       date: isoDate,
       method: "push",
     });
-  }, [resetDesktopTimelineProjection, setActiveDayIndex, setAnchorDayIso, updateUrlForTimeline]);
+  }, [setAnchorDayIso, updateUrlForTimeline]);
 
   const timelineCandidateDays = useMemo(() => data?.days ?? [], [data?.days]);
 
@@ -857,35 +857,24 @@ function TimelineBoardPageContent({
 
   useEffect(() => {
     if (viewMode !== "timeline") return;
+    if (isDesktopViewport) return;
     const days = timelineCandidateDays;
     if (!days.length) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, setActiveDayIndex, timelineCandidateDays, viewMode]);
+  }, [activeDayIndex, anchorDayIso, isDesktopViewport, setActiveDayIndex, timelineCandidateDays, viewMode]);
 
-  useEffect(() => {
+  const handleTimelineWindowStateChange = useCallback((state: DesktopTimelineWindowState) => {
     if (viewMode !== "timeline" || !isDesktopViewport) return;
-    const days = timelineCandidateDays;
-    if (!days.length) return;
-    const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
-    if (anchorIndex < 0) return;
-
-    const nearLeftEdge = anchorIndex < 3;
-    const nearRightEdge = days.length - anchorIndex - 1 < 3;
-    if (!nearLeftEdge && !nearRightEdge) return;
-    const firstIso = days[0]?.isoDate;
-    const lastIso = days[days.length - 1]?.isoDate;
-    if (!firstIso || !lastIso) return;
-
-    if (nearLeftEdge) {
-      void ensureTimelineRange(addDaysToIso(firstIso, -7), addDaysToIso(firstIso, -1), { silent: true });
+    if (state.nearLeftEdge && state.firstLoadedIso) {
+      void ensureTimelineRange(addDaysToIso(state.firstLoadedIso, -7), addDaysToIso(state.firstLoadedIso, -1), { silent: true });
     }
-    if (nearRightEdge) {
-      void ensureTimelineRange(addDaysToIso(lastIso, 1), addDaysToIso(lastIso, 7), { silent: true });
+    if (state.nearRightEdge && state.lastLoadedIso) {
+      void ensureTimelineRange(addDaysToIso(state.lastLoadedIso, 1), addDaysToIso(state.lastLoadedIso, 7), { silent: true });
     }
-  }, [anchorDayIso, ensureTimelineRange, isDesktopViewport, timelineCandidateDays, timelineRange, viewMode]);
+  }, [ensureTimelineRange, isDesktopViewport, viewMode]);
 
   const {
     calendarEventsByDay,
@@ -1097,9 +1086,6 @@ function TimelineBoardPageContent({
   const handleDayRangeUpdate = useCallback(
     (newRange: number) => {
       if (viewMode !== "timeline") return;
-      if (hiddenDesktopDayIsos.length > 0) {
-        resetDesktopTimelineProjection();
-      }
       scheduleToolbarFocusRestore();
       handleDayRangeChange(newRange);
       setTimelineRange(newRange);
@@ -1107,48 +1093,33 @@ function TimelineBoardPageContent({
         void handleUpdateBoard({ day_range: newRange });
       }
     },
-    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
+    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
   );
 
   const handlePrevDayWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     handlePrevDay();
-  }, [handlePrevDay, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [handlePrevDay, scheduleToolbarFocusRestore]);
 
   const handleNextDayWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     handleNextDay();
-  }, [handleNextDay, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [handleNextDay, scheduleToolbarFocusRestore]);
 
   const handlePrevDayRangeWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     handlePrevDayRange();
-  }, [handlePrevDayRange, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [handlePrevDayRange, scheduleToolbarFocusRestore]);
 
   const handleNextDayRangeWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     handleNextDayRange();
-  }, [handleNextDayRange, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [handleNextDayRange, scheduleToolbarFocusRestore]);
 
   const handleTodayClickWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     handleTodayClick();
-  }, [handleTodayClick, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [handleTodayClick, scheduleToolbarFocusRestore]);
 
   useEffect(() => {
     const selector = pendingToolbarFocusSelectorRef.current;
@@ -1626,6 +1597,7 @@ function TimelineBoardPageContent({
     pendingTitleEditCardId,
     onPendingTitleEditConsumed: () => setPendingTitleEditCardId(null),
     onTimelineAnchorChange: handleVisibleAnchorChange,
+    onTimelineWindowStateChange: handleTimelineWindowStateChange,
     listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange: handleListWindowPresetChangeWithFocusRestore,

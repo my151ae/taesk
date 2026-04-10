@@ -39,6 +39,7 @@ import type {
   DesktopTimelineToolbarProps,
   DesktopTimelineViewProps,
 } from "@/app/(board)/_components/timeline/DesktopTimelineView";
+import type { DesktopTimelineWindowState } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
 import type {
   DesktopListToolbarProps,
   DesktopListViewProps,
@@ -149,6 +150,7 @@ type UseTimelineBoardViewModelsArgs = {
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
   onTimelineAnchorChange: (isoDate: string) => void;
+  onTimelineWindowStateChange: (state: DesktopTimelineWindowState) => void;
   listBaseDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -379,6 +381,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       currentIsoDate: args.liveNowIsoDate,
       currentMinutes: args.liveNowMinutes,
       onAnchorDayChange: args.onTimelineAnchorChange,
+      onWindowStateChange: args.onTimelineWindowStateChange,
     }),
     [
       args.days,
@@ -433,6 +436,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.onPendingTitleEditConsumed,
       args.liveNowMinutes,
       args.onTimelineAnchorChange,
+      args.onTimelineWindowStateChange,
     ]
   );
 
