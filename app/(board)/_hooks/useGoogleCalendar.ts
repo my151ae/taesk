@@ -5,11 +5,8 @@ import type { GoogleCalendarEvent, GoogleCalendarEventsResponse } from "@/lib/ap
 
 type GoogleCalendarStatus = "idle" | "loading" | "success" | "error" | "disconnected";
 
-type CacheEntry = {
-  events: GoogleCalendarEvent[];
-  canWrite: boolean; // Added
-  status: GoogleCalendarStatus;
-  error: string | null;
+type WeekBlock = {
+  events: Map<string, GoogleCalendarEvent>;
 };
 
 const toErrorMessage = (value: unknown): string | null => {
@@ -30,70 +27,101 @@ const toErrorMessage = (value: unknown): string | null => {
   return String(value);
 };
 
-export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null) {
-  const startIso = useMemo(() => {
-    if (!startDate) return null;
-    return startDate.toISOString();
-  }, [startDate]);
+const startOfWeekJst = (base: Date) => {
+  const jstMs = base.getTime() + 9 * 60 * 60 * 1000;
+  const jst = new Date(jstMs);
+  const day = jst.getUTCDay();
+  const diff = (day + 6) % 7;
+  const mondayUtc = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() - diff, 0, 0, 0);
+  return new Date(mondayUtc - 9 * 60 * 60 * 1000);
+};
 
-  const endIso = useMemo(() => {
-    if (!endDate) return null;
-    return endDate.toISOString();
-  }, [endDate]);
+const endOfWeekExclusiveJst = (weekStart: Date) => {
+  const next = new Date(weekStart);
+  next.setUTCDate(next.getUTCDate() + 7);
+  return next;
+};
+
+const formatWeekKey = (weekStart: Date) => weekStart.toISOString().slice(0, 10);
+
+const buildRequiredWeekKeys = (startDate?: Date | null, endDate?: Date | null) => {
+  if (!startDate || !endDate) return [];
+
+  const start = startOfWeekJst(startDate);
+  const keys: string[] = [];
+  let cursor = new Date(start);
+  while (cursor.getTime() < endDate.getTime()) {
+    keys.push(formatWeekKey(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 7);
+  }
+  return keys;
+};
+
+const dedupeEventKey = (event: GoogleCalendarEvent) => {
+  if (event.isAllDay) {
+    return `${event.id}:${event.startDate ?? event.start}:${event.endDate ?? event.end}`;
+  }
+  return `${event.id}:${event.start}:${event.end}`;
+};
+
+export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null) {
+  const startDateKey = startDate ? startDate.toISOString().slice(0, 10) : null;
+  const endDateKey = endDate ? endDate.toISOString().slice(0, 10) : null;
+  const requiredWeekKeys = useMemo(() => buildRequiredWeekKeys(startDate, endDate), [endDateKey, startDateKey]);
+  const requiredWeekKeysSignature = useMemo(() => requiredWeekKeys.join("|"), [requiredWeekKeys]);
 
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
   const [canWrite, setCanWrite] = useState<boolean>(false);
   const [status, setStatus] = useState<GoogleCalendarStatus>("idle");
+  const [backgroundStatus, setBackgroundStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
-  const abortRef = useRef<AbortController | null>(null);
+  const blocksRef = useRef<Map<string, WeekBlock>>(new Map());
+  const inflightWeekKeysRef = useRef<Set<string>>(new Set());
+  const permissionCheckedRef = useRef(false);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
-  const cacheKey = startIso && endIso ? `${startIso}_${endIso}` : "permission_check";
+  const rebuildVisibleEvents = useCallback(() => {
+    const merged = new Map<string, GoogleCalendarEvent>();
+    requiredWeekKeys.forEach((weekKey) => {
+      const block = blocksRef.current.get(weekKey);
+      if (!block) return;
+      block.events.forEach((event, key) => merged.set(key, event));
+    });
 
-  const load = useCallback(async (force = false) => {
-    // If no dates, we still fetch to check permissions, unless it's strictly required to have dates.
-    // The API now supports missing dates for permission check.
-    if (!cacheKey) {
-      // Should not happen with new logic, but safe guard
-      return;
-    }
+    setEvents(
+      [...merged.values()].sort((left, right) => {
+        const leftValue = left.startDate ?? left.start;
+        const rightValue = right.startDate ?? right.start;
+        return leftValue.localeCompare(rightValue);
+      }),
+    );
+  }, [requiredWeekKeysSignature, requiredWeekKeys]);
 
-    if (!force && cacheRef.current.has(cacheKey)) {
-      const cached = cacheRef.current.get(cacheKey)!;
-      setEvents(cached.events);
-      setCanWrite(cached.canWrite); // Restore canWrite
-      setStatus(cached.status);
-      setError(cached.error);
-      return;
-    }
+  const fetchWeek = useCallback(async (weekKey: string) => {
+    if (inflightWeekKeysRef.current.has(weekKey)) return;
 
-    setStatus("loading");
-    setError(null);
-
-    abortRef.current?.abort();
+    inflightWeekKeysRef.current.add(weekKey);
     const controller = new AbortController();
-    abortRef.current = controller;
+    abortControllersRef.current.set(weekKey, controller);
 
     try {
-      const params = new URLSearchParams();
-      if (startIso && endIso) {
-        params.append('start', startIso);
-        params.append('end', endIso);
-      }
+      const start = new Date(`${weekKey}T00:00:00.000Z`);
+      const end = endOfWeekExclusiveJst(start);
+      const params = new URLSearchParams({
+        start: start.toISOString(),
+        end: end.toISOString(),
+      });
 
-      const queryString = params.toString();
-      const url = queryString ? `/api/calendar/events?${queryString}` : '/api/calendar/events';
-
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(`/api/calendar/events?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const body = (await response.json().catch(() => null)) as GoogleCalendarEventsResponse | null;
 
       if (controller.signal.aborted) return;
 
       if (body?.connected === false) {
-        const normalizedError = toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ?? null;
-        const entry: CacheEntry = { events: [], canWrite: false, status: "disconnected", error: normalizedError };
-        cacheRef.current.set(cacheKey, entry);
+        const normalizedError = toErrorMessage((body as { error?: unknown } | null)?.error) ?? null;
         setEvents([]);
         setCanWrite(false);
         setStatus("disconnected");
@@ -103,65 +131,142 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
       if (!response.ok) {
         const message =
-          toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ??
+          toErrorMessage((body as { error?: unknown } | null)?.error) ??
           "Failed to fetch Google Calendar events";
-        const entry: CacheEntry = { events: [], canWrite: false, status: "error", error: message };
-        cacheRef.current.set(cacheKey, entry);
-        setEvents([]);
-        setCanWrite(false);
         setStatus("error");
         setError(message);
+        setBackgroundStatus("error");
         return;
       }
 
-      const nextEvents = Array.isArray(body?.events) ? body!.events : [];
-      const nextCanWrite = body?.canWrite ?? false;
+      const nextEvents = Array.isArray(body?.events) ? body.events : [];
+      const blockEvents = new Map<string, GoogleCalendarEvent>();
+      nextEvents.forEach((event) => {
+        blockEvents.set(dedupeEventKey(event), event);
+      });
 
-      const normalizedError = toErrorMessage((body as unknown as { error?: unknown } | null)?.error) ?? null;
-      const entry: CacheEntry = { events: nextEvents, canWrite: nextCanWrite, status: "success", error: normalizedError };
-      cacheRef.current.set(cacheKey, entry);
-
-      setEvents(nextEvents);
-      setCanWrite(nextCanWrite);
+      blocksRef.current.set(weekKey, { events: blockEvents });
+      permissionCheckedRef.current = true;
+      setCanWrite(body?.canWrite ?? false);
       setStatus("success");
-      setError(normalizedError);
+      setError(toErrorMessage((body as { error?: unknown } | null)?.error) ?? null);
+      rebuildVisibleEvents();
     } catch (err) {
       if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Failed to fetch Google Calendar events";
-      const entry: CacheEntry = { events: [], canWrite: false, status: "error", error: message }; // Default false on error
-      cacheRef.current.set(cacheKey, entry);
-      setEvents([]);
-      setCanWrite(false);
-      setStatus("error");
+      if (!permissionCheckedRef.current) {
+        setStatus("error");
+      }
       setError(message);
+      setBackgroundStatus("error");
+    } finally {
+      inflightWeekKeysRef.current.delete(weekKey);
+      abortControllersRef.current.delete(weekKey);
     }
-  }, [cacheKey, endIso, startIso]);
+  }, [rebuildVisibleEvents]);
 
   useEffect(() => {
-    load();
-    return () => {
-      abortRef.current?.abort();
+    let cancelled = false;
+
+    const load = async () => {
+      if (!startDate || !endDate) {
+        if (permissionCheckedRef.current) {
+          rebuildVisibleEvents();
+          return;
+        }
+
+        setStatus("loading");
+        try {
+          const response = await fetch("/api/calendar/events");
+          const body = (await response.json().catch(() => null)) as GoogleCalendarEventsResponse | null;
+          if (cancelled) return;
+
+          if (body?.connected === false) {
+            setCanWrite(false);
+            setStatus("disconnected");
+            setError(toErrorMessage((body as { error?: unknown } | null)?.error) ?? null);
+            return;
+          }
+
+          if (!response.ok) {
+            const message =
+              toErrorMessage((body as { error?: unknown } | null)?.error) ??
+              "Failed to fetch Google Calendar events";
+            setStatus("error");
+            setError(message);
+            return;
+          }
+
+          permissionCheckedRef.current = true;
+          setCanWrite(body?.canWrite ?? false);
+          setStatus("success");
+          setError(null);
+        } catch (err) {
+          if (cancelled) return;
+          setStatus("error");
+          setError(err instanceof Error ? err.message : "Failed to fetch Google Calendar events");
+        }
+        return;
+      }
+
+      rebuildVisibleEvents();
+      const missingWeekKeys = requiredWeekKeys.filter((weekKey) => !blocksRef.current.has(weekKey));
+      if (missingWeekKeys.length === 0) {
+        if (permissionCheckedRef.current) {
+          setStatus("success");
+        }
+        return;
+      }
+
+      if (blocksRef.current.size === 0 && !permissionCheckedRef.current) {
+        setStatus("loading");
+      } else {
+        setBackgroundStatus("loading");
+      }
+
+      await Promise.all(missingWeekKeys.map((weekKey) => fetchWeek(weekKey)));
+      if (cancelled) return;
+
+      rebuildVisibleEvents();
+      setBackgroundStatus("idle");
+      if (permissionCheckedRef.current) {
+        setStatus("success");
+      }
     };
-  }, [load]);
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [endDateKey, fetchWeek, rebuildVisibleEvents, requiredWeekKeysSignature, startDateKey, requiredWeekKeys]);
+
+  useEffect(() => {
+    return () => {
+      abortControllersRef.current.forEach((controller) => controller.abort());
+      abortControllersRef.current.clear();
+    };
+  }, []);
 
   const refresh = useCallback(() => {
-    if (cacheKey) {
-      cacheRef.current.delete(cacheKey);
+    requiredWeekKeys.forEach((weekKey) => {
+      blocksRef.current.delete(weekKey);
+    });
+    rebuildVisibleEvents();
+    setBackgroundStatus("idle");
+    if (requiredWeekKeys.length > 0) {
+      setStatus("loading");
     }
-    void load(true);
-  }, [cacheKey, load]);
+  }, [rebuildVisibleEvents, requiredWeekKeysSignature, requiredWeekKeys]);
 
   return {
     events,
     canWrite,
     status,
+    backgroundStatus,
     error,
-    connected: status !== "disconnected" && status !== "error" && status !== "idle", // 'idle' means not loaded yet
-    // Actually connected logic in v1 was `status !== "disconnected"`. Let's keep it consistent but safer.
-    // Wait, original was `connected: status !== "disconnected"`.
-    // If error occurs (e.g. rate limit), we are still connected?
-    // Let's stick to original behavior as much as possible but expose canWrite.
-    isConnected: status === "success" || (status !== "disconnected" && status !== "error"), // ambiguous
+    connected: status !== "disconnected" && status !== "error" && status !== "idle",
+    isConnected: status === "success" || (status !== "disconnected" && status !== "error"),
     refresh,
   };
 }

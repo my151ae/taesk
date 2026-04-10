@@ -25,7 +25,6 @@ import {
   COMPLETED_UNDATED_GROUP_KEY,
   SIDEBAR_INCREMENT_PAGE_SIZE,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
-import { buildDesktopTimelineColumns } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
@@ -96,6 +95,12 @@ const deriveListWindowFromRange = (range?: number | null): ListWindow => {
   if (normalized >= 90) return { before: 0, after: 89 };
   if (normalized >= 60) return { before: 0, after: 59 };
   return { before: 0, after: 29 };
+};
+
+const addDaysToIso = (isoDate: string, delta: number) => {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
 };
 
 const canPersistBoardPreferences = (board: Board) => {
@@ -411,18 +416,14 @@ function TimelineBoardPageContent({
     if (viewMode !== "timeline" || isMobileViewport) {
       return intendedDayRange;
     }
-    return timelineRange + hiddenDesktopDayIsos.length + 1;
-  }, [hiddenDesktopDayIsos.length, intendedDayRange, isMobileViewport, timelineRange, viewMode]);
+    return Math.max(timelineRange + 14, 21);
+  }, [intendedDayRange, isMobileViewport, timelineRange, viewMode]);
 
   const requiredTimelineSourceRange = useMemo(() => {
-    if (viewMode !== "timeline") {
-      return effectiveDayRange;
-    }
-    if (!isDesktopViewport) {
-      return effectiveDayRange;
-    }
-    return timelineRange + hiddenDesktopDayIsos.length;
-  }, [effectiveDayRange, hiddenDesktopDayIsos.length, isDesktopViewport, timelineRange, viewMode]);
+    if (viewMode !== "timeline") return effectiveDayRange;
+    if (!isDesktopViewport) return effectiveDayRange;
+    return desktopTimelineFetchRange;
+  }, [desktopTimelineFetchRange, effectiveDayRange, isDesktopViewport, viewMode]);
   const {
     profile,
     availableBoards,
@@ -467,6 +468,8 @@ function TimelineBoardPageContent({
     data,
     setData,
     status,
+    backgroundRangeStatus,
+    ensureTimelineRange,
     setErrorMessage,
     dataMode,
     fetchTimeline,
@@ -480,44 +483,6 @@ function TimelineBoardPageContent({
     buildMockTimelineResponse,
     onRealtimeCardChange: handleRealtimeTrashChange,
   });
-
-  const backfillRequestKeyRef = useRef<string | null>(null);
-  const renderedHiddenDesktopDayCount = lastReadyDesktopTimelineProjection?.hiddenDayIsos.length ?? 0;
-  useEffect(() => {
-    if (viewMode !== "timeline" || isMobileViewport) return;
-    if (hiddenDesktopDayIsos.length === 0) return;
-    if (hiddenDesktopDayIsos.length <= renderedHiddenDesktopDayCount) {
-      backfillRequestKeyRef.current = null;
-      return;
-    }
-    if ((data?.days?.length ?? 0) >= desktopTimelineFetchRange) {
-      backfillRequestKeyRef.current = null;
-      return;
-    }
-
-    const requestKey = `${dayWindowStartRef.current}:${desktopTimelineFetchRange}:${hiddenDesktopDayIsos.join(",")}`;
-    if (backfillRequestKeyRef.current === requestKey) return;
-    backfillRequestKeyRef.current = requestKey;
-
-    void fetchTimeline(dayWindowStartRef.current, {
-      silent: true,
-      range: desktopTimelineFetchRange,
-    }).finally(() => {
-      if (backfillRequestKeyRef.current === requestKey) {
-        backfillRequestKeyRef.current = null;
-      }
-    });
-  }, [
-    data?.days?.length,
-    dayWindowStartRef,
-    desktopTimelineFetchRange,
-    fetchTimeline,
-    hiddenDesktopDayIsos,
-    hiddenDesktopDayIsos.length,
-    isMobileViewport,
-    renderedHiddenDesktopDayCount,
-    viewMode,
-  ]);
 
   const fetchTrash = useCallback(async () => {
     const response = await fetch(`/api/boards/${currentBoard.id}/trash`, { cache: "no-store" });
@@ -841,9 +806,9 @@ function TimelineBoardPageContent({
     handleNextDayRange,
     handleTodayClick,
     handleDayRangeChange,
+    handleVisibleAnchorChange,
   } = useTimelineNavigation({
     data,
-    status,
     dayRange: timelineRange,
     activeDayIndex,
     setActiveDayIndex,
@@ -851,10 +816,7 @@ function TimelineBoardPageContent({
     setAnchorDayIso,
     fetchTimeline,
     updateUrlForTimeline,
-    timelineScrollRef,
-    dayWindowStartRef,
     timelineStartHour,
-    hourHeight,
     requestedFetchRange: desktopTimelineFetchRange,
   });
 
@@ -866,128 +828,27 @@ function TimelineBoardPageContent({
     setActiveDayIndex(0);
     updateUrlForTimeline({
       date: isoDate,
-      range: timelineRange,
-      time: null,
       method: "push",
     });
-  }, [resetDesktopTimelineProjection, setActiveDayIndex, setAnchorDayIso, timelineRange, updateUrlForTimeline]);
+  }, [resetDesktopTimelineProjection, setActiveDayIndex, setAnchorDayIso, updateUrlForTimeline]);
 
-  const expectedTimelineStartOffset = useMemo(
-    () => (viewMode === "timeline" ? getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour)) : null),
-    [anchorDayIso, timelineStartHour, viewMode],
-  );
-  const desiredTimelineDataReady = useMemo(() => {
-    if (viewMode !== "timeline") return true;
-    if (expectedTimelineStartOffset == null) return false;
-    return data?.startOffset === expectedTimelineStartOffset && (data?.days?.length ?? 0) >= requiredTimelineSourceRange;
-  }, [data?.days?.length, data?.startOffset, expectedTimelineStartOffset, requiredTimelineSourceRange, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "timeline" || !isDesktopViewport) {
-      if (lastReadyDesktopTimelineProjection !== null) {
-        setLastReadyDesktopTimelineProjection(null);
-      }
-      return;
-    }
-    if (!desiredTimelineDataReady) return;
-    const nextDays = data?.days ?? [];
-    if (!nextDays.length) return;
-    setLastReadyDesktopTimelineProjection((current) => {
-      if (
-        current &&
-        current.hiddenDayIsos.length === hiddenDesktopDayIsos.length &&
-        current.hiddenDayIsos.every((isoDate, index) => isoDate === hiddenDesktopDayIsos[index]) &&
-        current.days.length === nextDays.length &&
-        current.days.every((day, index) => day.isoDate === nextDays[index]?.isoDate)
-      ) {
-        return current;
-      }
-
-      return {
-        days: nextDays,
-        hiddenDayIsos: hiddenDesktopDayIsos,
-      };
-    });
-  }, [
-    data?.days,
-    desiredTimelineDataReady,
-    hiddenDesktopDayIsos,
-    isDesktopViewport,
-    lastReadyDesktopTimelineProjection,
-    viewMode,
-  ]);
-
-  const renderDesktopProjection = useMemo(() => {
-    if (viewMode !== "timeline" || !isDesktopViewport) return null;
-    if (desiredTimelineDataReady) {
-      return {
-        days: data?.days ?? [],
-        hiddenDayIsos: hiddenDesktopDayIsos,
-      };
-    }
-    if (!lastReadyDesktopTimelineProjection) {
-      return null;
-    }
-
-    const canRenderCurrentHiddenStateFromSnapshot =
-      hiddenDesktopDayIsos.length <= lastReadyDesktopTimelineProjection.hiddenDayIsos.length &&
-      lastReadyDesktopTimelineProjection.days.length >= timelineRange + hiddenDesktopDayIsos.length;
-
-    if (canRenderCurrentHiddenStateFromSnapshot) {
-      return {
-        days: lastReadyDesktopTimelineProjection.days,
-        hiddenDayIsos: hiddenDesktopDayIsos,
-      };
-    }
-
-    return lastReadyDesktopTimelineProjection;
-  }, [
-    data?.days,
-    desiredTimelineDataReady,
-    hiddenDesktopDayIsos,
-    isDesktopViewport,
-    lastReadyDesktopTimelineProjection,
-    timelineRange,
-    viewMode,
-  ]);
-  const renderHiddenDesktopDayIsos = renderDesktopProjection?.hiddenDayIsos ?? hiddenDesktopDayIsos;
-  const timelineCandidateDays = useMemo(() => {
-    if (viewMode !== "timeline" || !isDesktopViewport) {
-      return data?.days ?? [];
-    }
-    return renderDesktopProjection?.days ?? [];
-  }, [data?.days, isDesktopViewport, renderDesktopProjection, viewMode]);
+  const timelineCandidateDays = useMemo(() => data?.days ?? [], [data?.days]);
 
   const visibleDays = useMemo(() => {
     const days = timelineCandidateDays;
     if (!days.length) return [];
-    if (viewMode === "timeline") {
-      if (!desiredTimelineDataReady) {
-        if (!(isDesktopViewport && renderDesktopProjection)) {
-          return [];
-        }
-      }
-    }
     if (viewMode === "month") {
       return days;
-    }
-    if (viewMode === "timeline" && isDesktopViewport) {
-      return buildDesktopTimelineColumns({
-        candidateDays: days,
-        hiddenDayIsos: renderHiddenDesktopDayIsos,
-        targetVisibleCount: effectiveDayRange,
-      }).visibleDays;
     }
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, desiredTimelineDataReady, effectiveDayRange, isDesktopViewport, renderDesktopProjection, renderHiddenDesktopDayIsos, timelineCandidateDays, viewMode]);
+  }, [activeDayIndex, anchorDayIso, effectiveDayRange, timelineCandidateDays, viewMode]);
 
   const timelineDataReady = useMemo(() => {
     if (viewMode !== "timeline") return true;
-    if (isDesktopViewport) return renderDesktopProjection !== null;
-    return desiredTimelineDataReady;
-  }, [desiredTimelineDataReady, isDesktopViewport, renderDesktopProjection, viewMode]);
+    return (timelineCandidateDays.length ?? 0) > 0;
+  }, [timelineCandidateDays.length, viewMode]);
 
   const renderDays = useMemo(() => {
     if (!timelineDataReady) return [];
@@ -996,20 +857,42 @@ function TimelineBoardPageContent({
 
   useEffect(() => {
     if (viewMode !== "timeline") return;
-    const days = data?.days ?? [];
+    const days = timelineCandidateDays;
     if (!days.length) return;
-    if (!desiredTimelineDataReady) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, desiredTimelineDataReady, setActiveDayIndex, viewMode]);
+  }, [activeDayIndex, anchorDayIso, setActiveDayIndex, timelineCandidateDays, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline" || !isDesktopViewport) return;
+    const days = timelineCandidateDays;
+    if (!days.length) return;
+    const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
+    if (anchorIndex < 0) return;
+
+    const nearLeftEdge = anchorIndex < 3;
+    const nearRightEdge = days.length - anchorIndex - 1 < 3;
+    if (!nearLeftEdge && !nearRightEdge) return;
+    const firstIso = days[0]?.isoDate;
+    const lastIso = days[days.length - 1]?.isoDate;
+    if (!firstIso || !lastIso) return;
+
+    if (nearLeftEdge) {
+      void ensureTimelineRange(addDaysToIso(firstIso, -7), addDaysToIso(firstIso, -1), { silent: true });
+    }
+    if (nearRightEdge) {
+      void ensureTimelineRange(addDaysToIso(lastIso, 1), addDaysToIso(lastIso, 7), { silent: true });
+    }
+  }, [anchorDayIso, ensureTimelineRange, isDesktopViewport, timelineCandidateDays, timelineRange, viewMode]);
 
   const {
     calendarEventsByDay,
     calendarAllDayEventsByDay,
     googleCalendarEvents,
     googleCalendarStatus,
+    googleCalendarBackgroundStatus,
     googleCalendarError,
     refreshGoogleCalendar,
   } = useTimelineCalendar({
@@ -1035,11 +918,12 @@ function TimelineBoardPageContent({
 
   const googleStatusText = useMemo(() => {
     if (googleCalendarStatus === "loading") return "Google予定同期中...";
+    if (googleCalendarBackgroundStatus === "loading") return `Google予定を更新中 (${googleCalendarLabel})`;
     if (googleCalendarStatus === "success") return `Google予定表示中 (${googleCalendarLabel})`;
     if (googleCalendarStatus === "disconnected") return "Google未接続";
     if (googleCalendarStatus === "error") return "Google予定の取得エラー";
     return "Google予定の状態確認中...";
-  }, [googleCalendarLabel, googleCalendarStatus]);
+  }, [googleCalendarBackgroundStatus, googleCalendarLabel, googleCalendarStatus]);
 
   const bucketDayMap = useMemo(() => {
     const result: Record<string, string | null> = {};
@@ -1647,7 +1531,7 @@ function TimelineBoardPageContent({
     activeDayIndex,
     anchorDayIso,
     effectiveDayRange,
-    hiddenDesktopDayIsos: renderHiddenDesktopDayIsos,
+    hiddenDesktopDayIsos: [],
     onHiddenDesktopDayIsosChange: setHiddenDesktopDayIsos,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,
@@ -1741,6 +1625,7 @@ function TimelineBoardPageContent({
     activeLaneId,
     pendingTitleEditCardId,
     onPendingTitleEditConsumed: () => setPendingTitleEditCardId(null),
+    onTimelineAnchorChange: handleVisibleAnchorChange,
     listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange: handleListWindowPresetChangeWithFocusRestore,

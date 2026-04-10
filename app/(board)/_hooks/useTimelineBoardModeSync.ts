@@ -14,15 +14,9 @@ import type { TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
 
 type TimelineUrlUpdateArgs = {
   date?: string | null;
-  range: number;
-  time?: number | null;
 };
 
 type ListUrlUpdateArgs = {
-  date?: string | null;
-  before: number;
-  after: number;
-  time?: number | null;
 };
 
 type UseTimelineBoardModeSyncArgs = {
@@ -141,12 +135,7 @@ export function useTimelineBoardModeSync({
       if (anchorDay) {
         setListAnchorDate(anchorDay.isoDate);
         setListAnchorOffset(anchorOffset);
-        updateUrlForList({
-          before: window.before,
-          after: window.after,
-          date: anchorDay.isoDate,
-          time: null,
-        });
+        updateUrlForList({});
       }
 
       setActiveDayIndex(anchorDayIndex);
@@ -422,12 +411,7 @@ export function useTimelineBoardModeSync({
       if (anchorDay) {
         setListAnchorDate(anchorDay.isoDate);
         setListAnchorOffset(getDayDiff(anchorDay.isoDate, getCurrentTimelineIsoDateJst(timelineStartHour)));
-        updateUrlForList({
-          before: listWindow.before,
-          after: listWindow.after,
-          date: anchorDay.isoDate,
-          time: null,
-        });
+        updateUrlForList({});
       }
       setActiveDayIndex(nextAnchorIndex);
       hasAppliedInitialListWindowRef.current = true;

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DaySection } from "@/app/(board)/_components/timeline/DaySection";
 import { handleTimelineCardArrowFocus } from "@/app/(board)/_components/timeline/timeline-focus-navigation";
 import type {
@@ -28,9 +28,6 @@ import {
 } from "@/app/(board)/_stores/timeline-zoom-store";
 import {
   buildDesktopAllDayState,
-  buildDesktopTimelineColumns,
-  buildDesktopTimelineHiddenDaysForHide,
-  buildDesktopTimelineHiddenDaysForReveal,
   formatAllDayRange,
   formatAllDayInlineLabel,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
@@ -50,6 +47,7 @@ export type DesktopTimelineViewProps = {
   timelineScrollRef: React.RefObject<HTMLDivElement>;
   registerAbScrollContainer?: (dayIso: string, el: HTMLDivElement | null, bucket?: 'a' | 'b') => void;
   days: TimelineDay[];
+  anchorDayIso: string;
   activeDayIndex: number;
   dayRange: number;
   status: string;
@@ -103,8 +101,7 @@ export type DesktopTimelineViewProps = {
   onPendingTitleEditConsumed: () => void;
   currentIsoDate: string | null;
   currentMinutes: number | null;
-  hiddenDayIsos: string[];
-  onHiddenDayIsosChange: (nextHiddenDayIsos: string[]) => void;
+  onAnchorDayChange?: (isoDate: string) => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -206,6 +203,7 @@ export function DesktopTimelineView({
   timelineScrollRef,
   registerAbScrollContainer,
   days,
+  anchorDayIso,
   activeDayIndex,
   dayRange,
   status,
@@ -253,34 +251,41 @@ export function DesktopTimelineView({
   onPendingTitleEditConsumed,
   currentIsoDate,
   currentMinutes,
-  hiddenDayIsos,
-  onHiddenDayIsosChange,
+  onAnchorDayChange,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
   }, []);
-
-  const {
-    visibleDays,
-    columns: renderColumns,
-    normalizedHiddenDayIsos,
-  } = useMemo(
-    () => buildDesktopTimelineColumns({ candidateDays: days, hiddenDayIsos, targetVisibleCount: dayRange }),
-    [dayRange, days, hiddenDayIsos]
-  );
-  const desktopGridTemplateColumns = useMemo(
-    () => `repeat(${visibleDays.length}, minmax(0, 1fr))`,
-    [visibleDays.length]
-  );
-  const visibleDayColumns = useMemo(
-    () => visibleDays.map((day) => ({ kind: "day" as const, key: day.key, day })),
-    [visibleDays]
-  );
+  const horizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const programmaticHorizontalScrollRef = useRef(false);
+  const hasUserHorizontalInteractionRef = useRef(false);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
 
   // Zoom State
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
   const setHourHeight = useTimelineZoomStore((state) => state.setHourHeight);
+  const overscanDays = activeDrag || activeResize ? 5 : 3;
+  const safeViewportWidth = viewportWidth > 0 ? viewportWidth : 1200;
+  const columnWidth = safeViewportWidth / Math.max(1, dayRange);
+  const renderStartIndex = Math.max(0, Math.floor(scrollLeft / columnWidth) - overscanDays);
+  const renderEndIndex = Math.min(
+    days.length,
+    Math.ceil((scrollLeft + safeViewportWidth) / columnWidth) + overscanDays,
+  );
+  const renderDays = useMemo(() => days.slice(renderStartIndex, renderEndIndex), [days, renderEndIndex, renderStartIndex]);
+  const leftSpacerWidth = renderStartIndex * columnWidth;
+  const rightSpacerWidth = Math.max(0, (days.length - renderEndIndex) * columnWidth);
+  const totalStripWidth = Math.max(columnWidth * Math.max(days.length, dayRange), safeViewportWidth);
+  const desktopGridTemplateColumns = useMemo(
+    () => `repeat(${renderDays.length}, minmax(${columnWidth}px, ${columnWidth}px))`,
+    [columnWidth, renderDays.length],
+  );
+  const visibleDayColumns = useMemo(
+    () => renderDays.map((day) => ({ kind: "day" as const, key: day.key, day })),
+    [renderDays],
+  );
 
   // Zoom Interaction: Ctrl + Wheel
   useEffect(() => {
@@ -343,7 +348,7 @@ export function DesktopTimelineView({
 
   useEffect(() => {
     setActiveStackItem(null);
-  }, [activeDayIndex, dayRange, days.length, normalizedHiddenDayIsos]);
+  }, [activeDayIndex, dayRange, days.length]);
 
   useEffect(() => {
     if (contextMenuCardId) {
@@ -398,145 +403,91 @@ export function DesktopTimelineView({
     [calendarAllDayByDay, visibleDayColumns]
   );
 
-  const gapBeforeDayIsos = useMemo(() => {
-    const controls = new Map<string, string[]>();
-
-    renderColumns.forEach((column, index) => {
-      if (column.kind !== "day") return;
-      const previousColumn = renderColumns[index - 1];
-      controls.set(
-        column.day.isoDate,
-        previousColumn?.kind === "gap" ? previousColumn.hiddenIsos : [],
-      );
-    });
-
-    return controls;
-  }, [renderColumns]);
-
-  const focusDayHeader = useCallback((targetIso: string | null, fallbackElement?: HTMLElement | null) => {
-    requestAnimationFrame(() => {
-      if (targetIso) {
-        const nextTarget = document.querySelector<HTMLElement>(`[data-timeline-day-hide-button="${targetIso}"]`);
-        if (nextTarget && !nextTarget.matches("[disabled]")) {
-          nextTarget.focus();
-          return;
-        }
-      }
-
-      if (fallbackElement && fallbackElement.isConnected) {
-        fallbackElement.focus();
-        return;
-      }
-
-      const nearbyTarget = document.querySelector<HTMLElement>("[data-timeline-day-hide-button]");
-      nearbyTarget?.focus();
-    });
-  }, []);
-
-  const handleHideDay = useCallback((dayIso: string, fallbackElement?: HTMLElement | null) => {
-    const currentDayIndex = visibleDays.findIndex((day) => day.isoDate === dayIso);
-    if (currentDayIndex < 0) {
-      fallbackElement?.focus();
-      return;
-    }
-
-    const nextHiddenDayIsos = buildDesktopTimelineHiddenDaysForHide({
-      candidateDays: days,
-      hiddenDayIsos: normalizedHiddenDayIsos,
-      targetIso: dayIso,
-    });
-    const nextModel = buildDesktopTimelineColumns({
-      candidateDays: days,
-      hiddenDayIsos: nextHiddenDayIsos,
-      targetVisibleCount: dayRange,
-    });
-    const nextFocusIso =
-      nextModel.visibleDays[Math.min(currentDayIndex, Math.max(0, nextModel.visibleDays.length - 1))]?.isoDate ?? null;
-
-    onHiddenDayIsosChange(nextHiddenDayIsos);
-    focusDayHeader(nextFocusIso, fallbackElement);
-  }, [dayRange, days, focusDayHeader, normalizedHiddenDayIsos, onHiddenDayIsosChange, visibleDays]);
-
-  const handleRevealHiddenIso = useCallback((
-    revealIso: string | null,
-    pushHiddenIso: string | null,
-    fallbackElement?: HTMLElement | null,
-  ) => {
-    if (!revealIso) {
-      fallbackElement?.focus();
-      return;
-    }
-
-    const nextHiddenDayIsos = buildDesktopTimelineHiddenDaysForReveal({
-      candidateDays: days,
-      hiddenDayIsos: normalizedHiddenDayIsos,
-      revealIso,
-      pushHiddenIso,
-    });
-
-    onHiddenDayIsosChange(nextHiddenDayIsos);
-    focusDayHeader(revealIso, fallbackElement);
-  }, [days, focusDayHeader, normalizedHiddenDayIsos, onHiddenDayIsosChange]);
-
   useEffect(() => {
     onMount?.();
   }, [onMount]);
+
+  useEffect(() => {
+    const container = horizontalScrollRef.current;
+    if (!container) return;
+
+    const update = () => {
+      setViewportWidth(container.clientWidth);
+      setScrollLeft(container.scrollLeft);
+    };
+
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const container = horizontalScrollRef.current;
+    if (!container || columnWidth <= 0) return;
+    const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
+    const targetLeft = anchorIndex * columnWidth;
+    if (Math.abs(container.scrollLeft - targetLeft) < 1) return;
+    programmaticHorizontalScrollRef.current = true;
+    container.scrollTo({ left: targetLeft, behavior: "auto" });
+    const timeoutId = window.setTimeout(() => {
+      programmaticHorizontalScrollRef.current = false;
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [anchorDayIso, columnWidth, days]);
+
+  useEffect(() => {
+    if (!days.length || columnWidth <= 0) return;
+    if (programmaticHorizontalScrollRef.current) return;
+    if (!hasUserHorizontalInteractionRef.current) return;
+    const anchorIndex = Math.max(0, Math.min(days.length - 1, Math.round(scrollLeft / columnWidth)));
+    const nextAnchor = days[anchorIndex]?.isoDate ?? null;
+    if (nextAnchor && nextAnchor !== anchorDayIso) {
+      onAnchorDayChange?.(nextAnchor);
+    }
+  }, [anchorDayIso, columnWidth, days, onAnchorDayChange, scrollLeft]);
 
   return (
     <div
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
       onKeyDownCapture={handleArrowKeyFocus}
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div ref={timelineHeaderRef} className="z-30">
+      <div
+        ref={horizontalScrollRef}
+        className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+        onScroll={(event) => {
+          if (!programmaticHorizontalScrollRef.current) {
+            hasUserHorizontalInteractionRef.current = true;
+          }
+          setScrollLeft(event.currentTarget.scrollLeft);
+        }}
+      >
+          <div ref={timelineHeaderRef} className="z-30" style={{ width: totalStripWidth }}>
               <div
-                className="grid h-8 border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
-                style={{
-                  gridTemplateColumns: desktopGridTemplateColumns,
-                }}
+                className="flex h-8 border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
+                style={{ width: totalStripWidth }}
               >
-                {visibleDays.map((day, index) => {
+                <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
+                <div
+                  className="grid"
+                  style={{
+                    gridTemplateColumns: desktopGridTemplateColumns,
+                  }}
+                >
+                {renderDays.map((day, index) => {
                   const isToday = day.label.startsWith("Today ");
-                  const headerLabel = isToday ? day.label.replace(/^Today\s+/, "") : day.label;
-                  const gapHiddenIsos = gapBeforeDayIsos.get(day.isoDate) ?? [];
-                  const hasRevealControls = gapHiddenIsos.length > 0;
-                  const revealLeftIso = gapHiddenIsos[0] ?? null;
-                  const revealRightIso = gapHiddenIsos[gapHiddenIsos.length - 1] ?? null;
-                  const pushLeftRevealIso = visibleDays[visibleDays.length - 1]?.isoDate ?? null;
-                  const pushRightRevealIso = visibleDays[0]?.isoDate ?? null;
+                  const headerLabel = day.label;
 
                   return (
                     <div
                       key={day.key}
                       className={clsx(
-                        "relative flex h-full items-center justify-center px-3 text-center",
+                        "relative flex h-full min-w-0 items-center justify-center px-3 text-center",
                         index > 0 ? "border-l border-slate-100" : ""
                       )}
+                      style={{ width: columnWidth }}
                     >
-                      {hasRevealControls ? (
-                        <div className="absolute left-0 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-slate-200 bg-white shadow-sm">
-                          <button
-                            type="button"
-                            className="inline-flex h-5 w-5 items-center justify-center rounded-l-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                            aria-label={revealLeftIso ? `${revealLeftIso} を再表示` : "日付を再表示"}
-                            data-testid={revealLeftIso ? `timeline-reveal-left-${day.isoDate}-${revealLeftIso}` : undefined}
-                            onClick={(event) => handleRevealHiddenIso(revealLeftIso, pushLeftRevealIso, event.currentTarget)}
-                          >
-                            ◀
-                          </button>
-                          <span className="pointer-events-none text-[10px] text-slate-300">|</span>
-                          <button
-                            type="button"
-                            className="inline-flex h-5 w-5 items-center justify-center rounded-r-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                            aria-label={revealRightIso ? `${revealRightIso} を再表示` : "日付を再表示"}
-                            data-testid={revealRightIso ? `timeline-reveal-right-${day.isoDate}-${revealRightIso}` : undefined}
-                            onClick={(event) => handleRevealHiddenIso(revealRightIso, pushRightRevealIso, event.currentTarget)}
-                          >
-                            ▶
-                          </button>
-                        </div>
-                      ) : null}
-
                       <div className="flex min-w-0 items-center justify-center gap-1.5 leading-tight">
                         <span
                           className={clsx(
@@ -549,32 +500,24 @@ export function DesktopTimelineView({
                           {headerLabel}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        className="inline-flex h-5 shrink-0 items-center rounded border border-slate-200 px-1.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50"
-                        aria-label={`${day.isoDate} を非表示`}
-                        data-timeline-day-hide-button={day.isoDate}
-                        data-testid={`timeline-hide-day-${day.isoDate}`}
-                        onClick={(event) => handleHideDay(day.isoDate, event.currentTarget)}
-                      >
-                        非表示
-                      </button>
                     </div>
                   );
                 })}
+                </div>
+                <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
               </div>
 
               {hasAllDayEvents && (
                 <div
-                  className="grid border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
+                  className="flex border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
                   style={{
-                    gridTemplateColumns: desktopGridTemplateColumns,
+                    width: totalStripWidth,
                   }}
                 >
+                  <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
                   <div
                     className="grid px-2 py-1.5"
                     style={{
-                      gridColumn: "1 / -1",
                       gridTemplateColumns: desktopGridTemplateColumns,
                       gridTemplateRows: `repeat(${Math.max(allDayLayout.rows, 1)}, ${ALL_DAY_ROW_HEIGHT}px)`,
                       rowGap: "4px",
@@ -582,7 +525,7 @@ export function DesktopTimelineView({
                     }}
                   >
                     {allDayLayout.segments.map((item) => {
-                      const rangeLabel = formatAllDayRange({ segment: item, visibleDays });
+                      const rangeLabel = formatAllDayRange({ segment: item, visibleDays: renderDays });
                       const inlineLabel = formatAllDayInlineLabel({
                         title: item.title,
                         rangeLabel,
@@ -610,6 +553,7 @@ export function DesktopTimelineView({
                       );
                     })}
                   </div>
+                  <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
                 </div>
               )}
           </div>
@@ -617,28 +561,30 @@ export function DesktopTimelineView({
           <div
             ref={timelineScrollRef}
             onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+            style={{ width: totalStripWidth }}
           >
-            <div className="relative" style={{ minHeight: timelineViewportHeight }}>
-              {(status === "loading" || !days.length) && (
+            <div className="relative" style={{ minHeight: timelineViewportHeight, width: totalStripWidth }}>
+              {!days.length && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
                 </div>
               )}
 
-              <div
-                className="grid timeline-container"
-                data-testid="timeline-grid"
-                style={{
-                  gridTemplateColumns: desktopGridTemplateColumns,
-                }}
-              >
-                {visibleDays.map((day, dayIndex) => {
+              <div className="flex timeline-container" data-testid="timeline-grid" style={{ width: totalStripWidth }}>
+                <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
+                <div
+                  className="grid"
+                  style={{
+                    gridTemplateColumns: desktopGridTemplateColumns,
+                  }}
+                >
+                {renderDays.map((day, dayIndex) => {
                   return (
                     <DaySection
                       key={day.isoDate}
                       day={day}
-                      index={dayIndex}
+                      index={renderStartIndex + dayIndex}
                       events={eventsByDay[day.isoDate] ?? EMPTY_EVENTS}
                       indicatorTop={indicatorTop}
                       indicatorDayIso={indicatorDayIso}
@@ -688,6 +634,8 @@ export function DesktopTimelineView({
                     />
                   );
                 })}
+                </div>
+                <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
               </div>
             </div>
           </div>

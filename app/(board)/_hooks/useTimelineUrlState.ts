@@ -78,17 +78,11 @@ export type ResolvedTimelineUrlState = {
 
 type TimelineUrlUpdateArgs = {
   date?: string | null;
-  range: number;
-  time?: number | null;
   method?: UrlUpdateMethod;
   card?: string | null;
 };
 
 type ListUrlUpdateArgs = {
-  date?: string | null;
-  before: number;
-  after: number;
-  time?: number | null;
   method?: UrlUpdateMethod;
   card?: string | null;
 };

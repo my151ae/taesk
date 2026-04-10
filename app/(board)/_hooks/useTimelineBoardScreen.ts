@@ -174,6 +174,7 @@ type UseTimelineBoardScreenArgs = {
   activeLaneId: string | null;
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
+  onTimelineAnchorChange: (isoDate: string) => void;
   listAnchorDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -355,6 +356,7 @@ export function useTimelineBoardScreen({
   activeLaneId,
   pendingTitleEditCardId,
   onPendingTitleEditConsumed,
+  onTimelineAnchorChange,
   listAnchorDate,
   listWindowPresetKey,
   handleListWindowPresetChange,
@@ -519,6 +521,7 @@ export function useTimelineBoardScreen({
     activeLaneId,
     pendingTitleEditCardId,
     onPendingTitleEditConsumed,
+    onTimelineAnchorChange,
     listBaseDate: listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange,

@@ -6,8 +6,6 @@ import type { UrlUpdateMethod } from "@/app/(board)/_hooks/useTimelineUrlState";
 
 type TimelineUrlUpdateArgs = {
   date?: string | null;
-  range: number;
-  time?: number | null;
   method?: UrlUpdateMethod;
 };
 
@@ -226,14 +224,13 @@ export const useTimelineScrollSync = ({
     if (scrollTop == null) return;
     if (programmaticScrollRef.current) return;
 
-    const { anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode } = stateRef.current;
+    const { anchorDayIso, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode } = stateRef.current;
     if (viewMode !== "timeline") return;
 
-    const minutes = pixelsToMinutes(scrollTop, timelineStartHour, hourHeight);
     const currentDayIso = dayIso ?? anchorDayIso;
     if (currentDayIso) {
       lastKnownScrollTopByIsoRef.current[currentDayIso] = scrollTop;
-      updateUrlForTimeline({ date: currentDayIso, range: dayRange, time: minutes });
+      updateUrlForTimeline({ date: currentDayIso });
     }
   }, []);
 

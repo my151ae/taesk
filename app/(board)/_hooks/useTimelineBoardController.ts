@@ -16,17 +16,11 @@ export type { ListWindow };
 
 type TimelineUrlUpdateArgs = {
   date?: string | null;
-  range: number;
-  time?: number | null;
   method?: UrlUpdateMethod;
   card?: string | null;
 };
 
 type ListUrlUpdateArgs = {
-  date?: string | null;
-  before: number;
-  after: number;
-  time?: number | null;
   method?: UrlUpdateMethod;
   card?: string | null;
 };
@@ -219,8 +213,6 @@ export function useTimelineBoardController({
       if (mode === "timeline") {
         updateUrlForTimeline({
           date: currentDayIso,
-          range: timelineRange,
-          time: null,
         });
         return;
       }
@@ -237,12 +229,7 @@ export function useTimelineBoardController({
       const nextAnchorOffset = getDayDiff(currentDayIso, today);
       setListAnchorOffset(nextAnchorOffset);
       setListAnchorDate(currentDayIso);
-      updateUrlForList({
-        date: currentDayIso,
-        before: listWindow.before,
-        after: listWindow.after,
-        time: null,
-      });
+      updateUrlForList({});
     },
     [
       activeDayIndex,

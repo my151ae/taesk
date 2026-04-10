@@ -148,6 +148,7 @@ type UseTimelineBoardViewModelsArgs = {
   activeLaneId: string | null;
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
+  onTimelineAnchorChange: (isoDate: string) => void;
   listBaseDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -326,6 +327,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
   const timelineBody = useMemo<DesktopTimelineViewProps>(
     () => ({
       days: args.days,
+      anchorDayIso: args.anchorDayIso,
       activeDayIndex: args.activeDayIndex,
       dayRange: args.effectiveDayRange,
       timelineScrollRef: args.timelineScrollRefDesktop,
@@ -376,11 +378,11 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       onPendingTitleEditConsumed: args.onPendingTitleEditConsumed,
       currentIsoDate: args.liveNowIsoDate,
       currentMinutes: args.liveNowMinutes,
-      hiddenDayIsos: args.hiddenDesktopDayIsos,
-      onHiddenDayIsosChange: args.onHiddenDesktopDayIsosChange,
+      onAnchorDayChange: args.onTimelineAnchorChange,
     }),
     [
       args.days,
+      args.anchorDayIso,
       args.activeDayIndex,
       args.effectiveDayRange,
       args.timelineScrollRefDesktop,
@@ -430,8 +432,7 @@ export function useTimelineBoardViewModels(args: UseTimelineBoardViewModelsArgs)
       args.pendingTitleEditCardId,
       args.onPendingTitleEditConsumed,
       args.liveNowMinutes,
-      args.hiddenDesktopDayIsos,
-      args.onHiddenDesktopDayIsosChange,
+      args.onTimelineAnchorChange,
     ]
   );
 

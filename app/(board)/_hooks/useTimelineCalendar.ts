@@ -22,6 +22,9 @@ export const useTimelineCalendar = ({
   calendarRangeEnd,
   days,
 }: UseTimelineCalendarArgs) => {
+  const calendarRangeStartKey = calendarRangeStart ? calendarRangeStart.toISOString().slice(0, 10) : null;
+  const calendarRangeEndKey = calendarRangeEnd ? calendarRangeEnd.toISOString().slice(0, 10) : null;
+
   const expandRangeWithBuffer = useCallback((start: Date | null, end: Date | null) => {
     if (!start || !end) return { start, end };
 
@@ -65,11 +68,12 @@ export const useTimelineCalendar = ({
       return { start, end };
     }
     return expandRangeWithBuffer(calendarRangeStart, calendarRangeEnd);
-  }, [calendarPreset, calendarRangeEnd, calendarRangeStart, expandRangeWithBuffer, startOfWeekJst]);
+  }, [calendarPreset, calendarRangeEndKey, calendarRangeStartKey, expandRangeWithBuffer, startOfWeekJst]);
 
   const {
     events: googleCalendarEvents,
     status: googleCalendarStatus,
+    backgroundStatus: googleCalendarBackgroundStatus,
     error: googleCalendarError,
     refresh: refreshGoogleCalendar,
   } = useGoogleCalendar(presetRange.start, presetRange.end);
@@ -84,6 +88,7 @@ export const useTimelineCalendar = ({
     calendarAllDayEventsByDay,
     googleCalendarEvents,
     googleCalendarStatus,
+    googleCalendarBackgroundStatus,
     googleCalendarError,
     refreshGoogleCalendar,
   };

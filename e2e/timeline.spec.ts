@@ -652,22 +652,16 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(boardContext.canonicalPath);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
       await page.getByTestId('timeline-toolbar-range-plus').click();
-
-      await expect(page.getByTestId(`timeline-hide-day-${days[0]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toBeVisible({ timeout: 20_000 });
-
-      await page.getByTestId(`timeline-hide-day-${days[1]}`).click();
-
+      await expect(page.getByTestId(`timeline-hide-day-${days[0]}`)).toHaveCount(0);
       await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toHaveCount(0);
-      await expect(page.getByTestId(`timeline-hide-day-${days[3]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-reveal-left-${days[2]}-${days[1]}`)).toBeVisible();
+      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toHaveCount(0);
+      await expect(page.getByTestId(`timeline-reveal-left-${days[2]}-${days[1]}`)).toHaveCount(0);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
     }
   });
 
-  test('desktop timeline reveals the rightmost hidden day from a multi-hidden gap', async ({ page }) => {
+  test('desktop timeline no longer renders hidden-day reveal controls', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -716,27 +710,26 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(boardContext.canonicalPath);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
       await page.getByTestId('timeline-toolbar-range-plus').click();
-
-      await expect(page.getByTestId(`timeline-hide-day-${days[0]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toBeVisible({ timeout: 20_000 });
-
-      await page.getByTestId(`timeline-hide-day-${days[1]}`).click();
-      await expect(page.getByTestId(`timeline-hide-day-${days[3]}`)).toBeVisible({ timeout: 20_000 });
-
-      await page.getByTestId(`timeline-hide-day-${days[2]}`).click();
-      await expect(page.getByTestId(`timeline-hide-day-${days[4]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-reveal-right-${days[3]}-${days[2]}`)).toBeVisible();
-
-      await page.getByTestId(`timeline-reveal-right-${days[3]}-${days[2]}`).click();
-
-      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[3]}`)).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId(`timeline-hide-day-${days[4]}`)).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId(`timeline-hide-day-${days[0]}`)).toHaveCount(0);
+      await expect(page.getByTestId(`timeline-hide-day-${days[1]}`)).toHaveCount(0);
+      await expect(page.getByTestId(`timeline-hide-day-${days[2]}`)).toHaveCount(0);
+      await expect(page.getByTestId(`timeline-reveal-right-${days[3]}-${days[2]}`)).toHaveCount(0);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
     }
+  });
+
+  test('desktop timeline opens with the Today header visible and stays anchored near today', async ({ page }) => {
+    test.skip(!boardContext, 'Missing board context for timeline spec');
+
+    await page.goto(boardContext!.canonicalPath);
+    await expect(page.getByRole('heading', { name: boardContext!.boardName })).toBeVisible();
+
+    const todayHeader = page.locator('text=/Today\\s+\\d{2}\\/\\d{2}/').first();
+    await expect(todayHeader).toBeVisible({ timeout: 20_000 });
+
+    await page.waitForTimeout(500);
+    await expect(todayHeader).toBeVisible();
   });
 
   test('supports shift-click multi select within the same timeline lane and switches between bulk and single menus', async ({ page }) => {
