@@ -341,8 +341,10 @@ function TimelineBoardPageContent({
   } = useTimelineCardSelection();
   const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
   const [hiddenDesktopDayIsos, setHiddenDesktopDayIsos] = useState<string[]>([]);
-  const [appliedHiddenDesktopDayIsos, setAppliedHiddenDesktopDayIsos] = useState<string[]>([]);
-  const [lastReadyDesktopTimelineDays, setLastReadyDesktopTimelineDays] = useState<TimelineResponse["days"]>([]);
+  const [lastReadyDesktopTimelineProjection, setLastReadyDesktopTimelineProjection] = useState<{
+    days: TimelineResponse["days"];
+    hiddenDayIsos: string[];
+  } | null>(null);
 
   const {
     contextMenu,
@@ -421,16 +423,6 @@ function TimelineBoardPageContent({
     }
     return timelineRange + hiddenDesktopDayIsos.length;
   }, [effectiveDayRange, hiddenDesktopDayIsos.length, isDesktopViewport, timelineRange, viewMode]);
-  const appliedTimelineSourceRange = useMemo(() => {
-    if (viewMode !== "timeline") {
-      return effectiveDayRange;
-    }
-    if (!isDesktopViewport) {
-      return effectiveDayRange;
-    }
-    return timelineRange + appliedHiddenDesktopDayIsos.length;
-  }, [appliedHiddenDesktopDayIsos.length, effectiveDayRange, isDesktopViewport, timelineRange, viewMode]);
-
   const {
     profile,
     availableBoards,
@@ -452,6 +444,10 @@ function TimelineBoardPageContent({
   const previousBoardIdRef = useRef(currentBoard.id);
   const previousIsDesktopViewportRef = useRef(isDesktopViewport);
   const previousViewModeRef = useRef(viewMode);
+  const resetDesktopTimelineProjection = useCallback(() => {
+    setHiddenDesktopDayIsos([]);
+    setLastReadyDesktopTimelineProjection(null);
+  }, []);
   useEffect(() => {
     const boardChanged = previousBoardIdRef.current !== currentBoard.id;
     const viewportModeChanged = previousIsDesktopViewportRef.current !== isDesktopViewport;
@@ -464,11 +460,8 @@ function TimelineBoardPageContent({
     if (!boardChanged && !viewportModeChanged && !viewModeChanged) {
       return;
     }
-    if (hiddenDesktopDayIsos.length === 0) return;
-    setHiddenDesktopDayIsos([]);
-    setAppliedHiddenDesktopDayIsos([]);
-    setLastReadyDesktopTimelineDays([]);
-  }, [currentBoard.id, hiddenDesktopDayIsos.length, isDesktopViewport, viewMode]);
+    resetDesktopTimelineProjection();
+  }, [currentBoard.id, isDesktopViewport, resetDesktopTimelineProjection, viewMode]);
 
   const {
     data,
@@ -489,10 +482,11 @@ function TimelineBoardPageContent({
   });
 
   const backfillRequestKeyRef = useRef<string | null>(null);
+  const renderedHiddenDesktopDayCount = lastReadyDesktopTimelineProjection?.hiddenDayIsos.length ?? 0;
   useEffect(() => {
     if (viewMode !== "timeline" || isMobileViewport) return;
     if (hiddenDesktopDayIsos.length === 0) return;
-    if (hiddenDesktopDayIsos.length <= appliedHiddenDesktopDayIsos.length) {
+    if (hiddenDesktopDayIsos.length <= renderedHiddenDesktopDayCount) {
       backfillRequestKeyRef.current = null;
       return;
     }
@@ -514,7 +508,6 @@ function TimelineBoardPageContent({
       }
     });
   }, [
-    appliedHiddenDesktopDayIsos.length,
     data?.days?.length,
     dayWindowStartRef,
     desktopTimelineFetchRange,
@@ -522,6 +515,7 @@ function TimelineBoardPageContent({
     hiddenDesktopDayIsos,
     hiddenDesktopDayIsos.length,
     isMobileViewport,
+    renderedHiddenDesktopDayCount,
     viewMode,
   ]);
 
@@ -867,8 +861,7 @@ function TimelineBoardPageContent({
   const openTimelineDay = useCallback((isoDate: string) => {
     if (!isoDate) return;
     suppressMonthUrlSyncRef.current = true;
-    setHiddenDesktopDayIsos([]);
-    setAppliedHiddenDesktopDayIsos([]);
+    resetDesktopTimelineProjection();
     setAnchorDayIso(isoDate);
     setActiveDayIndex(0);
     updateUrlForTimeline({
@@ -877,10 +870,8 @@ function TimelineBoardPageContent({
       time: null,
       method: "push",
     });
-  }, [setActiveDayIndex, setAnchorDayIso, timelineRange, updateUrlForTimeline]);
+  }, [resetDesktopTimelineProjection, setActiveDayIndex, setAnchorDayIso, timelineRange, updateUrlForTimeline]);
 
-  const hiddenDesktopDayIsosKey = useMemo(() => hiddenDesktopDayIsos.join(","), [hiddenDesktopDayIsos]);
-  const appliedHiddenDesktopDayIsosKey = useMemo(() => appliedHiddenDesktopDayIsos.join(","), [appliedHiddenDesktopDayIsos]);
   const expectedTimelineStartOffset = useMemo(
     () => (viewMode === "timeline" ? getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour)) : null),
     [anchorDayIso, timelineStartHour, viewMode],
@@ -890,75 +881,89 @@ function TimelineBoardPageContent({
     if (expectedTimelineStartOffset == null) return false;
     return data?.startOffset === expectedTimelineStartOffset && (data?.days?.length ?? 0) >= requiredTimelineSourceRange;
   }, [data?.days?.length, data?.startOffset, expectedTimelineStartOffset, requiredTimelineSourceRange, viewMode]);
-  const renderHiddenDesktopDayIsos = useMemo(
-    () =>
-      viewMode === "timeline" && isDesktopViewport && !desiredTimelineDataReady
-        ? appliedHiddenDesktopDayIsos
-        : hiddenDesktopDayIsos,
-    [appliedHiddenDesktopDayIsos, desiredTimelineDataReady, hiddenDesktopDayIsos, isDesktopViewport, viewMode],
-  );
-  const renderTimelineDataReady = useMemo(() => {
-    if (viewMode !== "timeline") return true;
-    if (expectedTimelineStartOffset == null) return false;
-    return data?.startOffset === expectedTimelineStartOffset && (data?.days?.length ?? 0) >= appliedTimelineSourceRange;
-  }, [appliedTimelineSourceRange, data?.days?.length, data?.startOffset, expectedTimelineStartOffset, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "timeline" || !isDesktopViewport) {
-      if (appliedHiddenDesktopDayIsos.length > 0) {
-        setAppliedHiddenDesktopDayIsos([]);
-      }
-      if (lastReadyDesktopTimelineDays.length > 0) {
-        setLastReadyDesktopTimelineDays([]);
+      if (lastReadyDesktopTimelineProjection !== null) {
+        setLastReadyDesktopTimelineProjection(null);
       }
       return;
     }
     if (!desiredTimelineDataReady) return;
-    if (hiddenDesktopDayIsosKey === appliedHiddenDesktopDayIsosKey) return;
-    setAppliedHiddenDesktopDayIsos(hiddenDesktopDayIsos);
-  }, [
-    appliedHiddenDesktopDayIsos,
-    appliedHiddenDesktopDayIsosKey,
-    desiredTimelineDataReady,
-    hiddenDesktopDayIsos,
-    hiddenDesktopDayIsosKey,
-    isDesktopViewport,
-    lastReadyDesktopTimelineDays.length,
-    viewMode,
-  ]);
-
-  useEffect(() => {
-    if (viewMode !== "timeline" || !isDesktopViewport) return;
-    if (!renderTimelineDataReady) return;
     const nextDays = data?.days ?? [];
     if (!nextDays.length) return;
-    setLastReadyDesktopTimelineDays((current) => {
+    setLastReadyDesktopTimelineProjection((current) => {
       if (
-        current.length === nextDays.length &&
-        current.every((day, index) => day.isoDate === nextDays[index]?.isoDate)
+        current &&
+        current.hiddenDayIsos.length === hiddenDesktopDayIsos.length &&
+        current.hiddenDayIsos.every((isoDate, index) => isoDate === hiddenDesktopDayIsos[index]) &&
+        current.days.length === nextDays.length &&
+        current.days.every((day, index) => day.isoDate === nextDays[index]?.isoDate)
       ) {
         return current;
       }
-      return nextDays;
-    });
-  }, [data?.days, isDesktopViewport, renderTimelineDataReady, viewMode]);
 
+      return {
+        days: nextDays,
+        hiddenDayIsos: hiddenDesktopDayIsos,
+      };
+    });
+  }, [
+    data?.days,
+    desiredTimelineDataReady,
+    hiddenDesktopDayIsos,
+    isDesktopViewport,
+    lastReadyDesktopTimelineProjection,
+    viewMode,
+  ]);
+
+  const renderDesktopProjection = useMemo(() => {
+    if (viewMode !== "timeline" || !isDesktopViewport) return null;
+    if (desiredTimelineDataReady) {
+      return {
+        days: data?.days ?? [],
+        hiddenDayIsos: hiddenDesktopDayIsos,
+      };
+    }
+    if (!lastReadyDesktopTimelineProjection) {
+      return null;
+    }
+
+    const canRenderCurrentHiddenStateFromSnapshot =
+      hiddenDesktopDayIsos.length <= lastReadyDesktopTimelineProjection.hiddenDayIsos.length &&
+      lastReadyDesktopTimelineProjection.days.length >= timelineRange + hiddenDesktopDayIsos.length;
+
+    if (canRenderCurrentHiddenStateFromSnapshot) {
+      return {
+        days: lastReadyDesktopTimelineProjection.days,
+        hiddenDayIsos: hiddenDesktopDayIsos,
+      };
+    }
+
+    return lastReadyDesktopTimelineProjection;
+  }, [
+    data?.days,
+    desiredTimelineDataReady,
+    hiddenDesktopDayIsos,
+    isDesktopViewport,
+    lastReadyDesktopTimelineProjection,
+    timelineRange,
+    viewMode,
+  ]);
+  const renderHiddenDesktopDayIsos = renderDesktopProjection?.hiddenDayIsos ?? hiddenDesktopDayIsos;
   const timelineCandidateDays = useMemo(() => {
     if (viewMode !== "timeline" || !isDesktopViewport) {
       return data?.days ?? [];
     }
-    if (renderTimelineDataReady || lastReadyDesktopTimelineDays.length === 0) {
-      return data?.days ?? [];
-    }
-    return lastReadyDesktopTimelineDays;
-  }, [data?.days, isDesktopViewport, lastReadyDesktopTimelineDays, renderTimelineDataReady, viewMode]);
+    return renderDesktopProjection?.days ?? [];
+  }, [data?.days, isDesktopViewport, renderDesktopProjection, viewMode]);
 
   const visibleDays = useMemo(() => {
     const days = timelineCandidateDays;
     if (!days.length) return [];
     if (viewMode === "timeline") {
-      if (!renderTimelineDataReady) {
-        if (!(isDesktopViewport && lastReadyDesktopTimelineDays.length > 0)) {
+      if (!desiredTimelineDataReady) {
+        if (!(isDesktopViewport && renderDesktopProjection)) {
           return [];
         }
       }
@@ -976,12 +981,13 @@ function TimelineBoardPageContent({
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, effectiveDayRange, isDesktopViewport, lastReadyDesktopTimelineDays.length, renderHiddenDesktopDayIsos, renderTimelineDataReady, timelineCandidateDays, viewMode]);
+  }, [activeDayIndex, anchorDayIso, desiredTimelineDataReady, effectiveDayRange, isDesktopViewport, renderDesktopProjection, renderHiddenDesktopDayIsos, timelineCandidateDays, viewMode]);
 
   const timelineDataReady = useMemo(() => {
-    if (renderTimelineDataReady) return true;
-    return viewMode === "timeline" && isDesktopViewport && lastReadyDesktopTimelineDays.length > 0;
-  }, [isDesktopViewport, lastReadyDesktopTimelineDays.length, renderTimelineDataReady, viewMode]);
+    if (viewMode !== "timeline") return true;
+    if (isDesktopViewport) return renderDesktopProjection !== null;
+    return desiredTimelineDataReady;
+  }, [desiredTimelineDataReady, isDesktopViewport, renderDesktopProjection, viewMode]);
 
   const renderDays = useMemo(() => {
     if (!timelineDataReady) return [];
@@ -992,12 +998,12 @@ function TimelineBoardPageContent({
     if (viewMode !== "timeline") return;
     const days = data?.days ?? [];
     if (!days.length) return;
-    if (!renderTimelineDataReady) return;
+    if (!desiredTimelineDataReady) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, renderTimelineDataReady, setActiveDayIndex, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, desiredTimelineDataReady, setActiveDayIndex, viewMode]);
 
   const {
     calendarEventsByDay,
@@ -1208,7 +1214,7 @@ function TimelineBoardPageContent({
     (newRange: number) => {
       if (viewMode !== "timeline") return;
       if (hiddenDesktopDayIsos.length > 0) {
-        setHiddenDesktopDayIsos([]);
+        resetDesktopTimelineProjection();
       }
       scheduleToolbarFocusRestore();
       handleDayRangeChange(newRange);
@@ -1217,48 +1223,48 @@ function TimelineBoardPageContent({
         void handleUpdateBoard({ day_range: newRange });
       }
     },
-    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
+    [canPersistPreferences, handleDayRangeChange, handleUpdateBoard, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore, setTimelineRange, viewMode],
   );
 
   const handlePrevDayWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     handlePrevDay();
-  }, [handlePrevDay, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
+  }, [handlePrevDay, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleNextDayWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     handleNextDay();
-  }, [handleNextDay, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
+  }, [handleNextDay, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handlePrevDayRangeWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     handlePrevDayRange();
-  }, [handlePrevDayRange, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
+  }, [handlePrevDayRange, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleNextDayRangeWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     handleNextDayRange();
-  }, [handleNextDayRange, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
+  }, [handleNextDayRange, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleTodayClickWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     handleTodayClick();
-  }, [handleTodayClick, hiddenDesktopDayIsos.length, scheduleToolbarFocusRestore]);
+  }, [handleTodayClick, hiddenDesktopDayIsos.length, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   useEffect(() => {
     const selector = pendingToolbarFocusSelectorRef.current;
@@ -1317,51 +1323,51 @@ function TimelineBoardPageContent({
 
   const handleListTodayWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListToday();
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleListWindowPresetChangeWithFocusRestore = useCallback((nextPreset: ListWindowPresetKey) => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListWindowPresetChange(nextPreset);
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleListPrevDayWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevDay();
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleListNextDayWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextDay();
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleListPrevWeekWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevWeek();
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleListNextWeekWithFocusRestore = useCallback(() => {
     if (hiddenDesktopDayIsos.length > 0) {
-      setHiddenDesktopDayIsos([]);
+      resetDesktopTimelineProjection();
     }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextWeek();
-  }, [hiddenDesktopDayIsos.length, modeSync, scheduleToolbarFocusRestore]);
+  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
 
   const handleMonthPrevWithFocusRestore = useCallback(() => {
     scheduleToolbarFocusRestore();

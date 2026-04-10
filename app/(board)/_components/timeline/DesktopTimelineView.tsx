@@ -398,32 +398,20 @@ export function DesktopTimelineView({
     [calendarAllDayByDay, visibleDayColumns]
   );
 
-  const dayBoundaryControls = useMemo(() => {
-    const controls = new Map<string, { leftHiddenIsos: string[]; rightHiddenIsos: string[] }>();
-    visibleDays.forEach((day) => {
-      controls.set(day.isoDate, { leftHiddenIsos: [], rightHiddenIsos: [] });
-    });
+  const gapBeforeDayIsos = useMemo(() => {
+    const controls = new Map<string, string[]>();
 
     renderColumns.forEach((column, index) => {
-      if (column.kind !== "gap") return;
+      if (column.kind !== "day") return;
       const previousColumn = renderColumns[index - 1];
-      const nextColumn = renderColumns[index + 1];
-      if (previousColumn?.kind === "day") {
-        controls.set(previousColumn.day.isoDate, {
-          leftHiddenIsos: controls.get(previousColumn.day.isoDate)?.leftHiddenIsos ?? [],
-          rightHiddenIsos: column.hiddenIsos,
-        });
-      }
-      if (nextColumn?.kind === "day") {
-        controls.set(nextColumn.day.isoDate, {
-          leftHiddenIsos: column.hiddenIsos,
-          rightHiddenIsos: controls.get(nextColumn.day.isoDate)?.rightHiddenIsos ?? [],
-        });
-      }
+      controls.set(
+        column.day.isoDate,
+        previousColumn?.kind === "gap" ? previousColumn.hiddenIsos : [],
+      );
     });
 
     return controls;
-  }, [renderColumns, visibleDays]);
+  }, [renderColumns]);
 
   const focusDayHeader = useCallback((targetIso: string | null, fallbackElement?: HTMLElement | null) => {
     requestAnimationFrame(() => {
@@ -469,7 +457,11 @@ export function DesktopTimelineView({
     focusDayHeader(nextFocusIso, fallbackElement);
   }, [dayRange, days, focusDayHeader, normalizedHiddenDayIsos, onHiddenDayIsosChange, visibleDays]);
 
-  const handleRevealHiddenIso = useCallback((revealIso: string | null, fallbackElement?: HTMLElement | null) => {
+  const handleRevealHiddenIso = useCallback((
+    revealIso: string | null,
+    pushHiddenIso: string | null,
+    fallbackElement?: HTMLElement | null,
+  ) => {
     if (!revealIso) {
       fallbackElement?.focus();
       return;
@@ -479,7 +471,7 @@ export function DesktopTimelineView({
       candidateDays: days,
       hiddenDayIsos: normalizedHiddenDayIsos,
       revealIso,
-      pushHiddenIso: null,
+      pushHiddenIso,
     });
 
     onHiddenDayIsosChange(nextHiddenDayIsos);
@@ -506,14 +498,12 @@ export function DesktopTimelineView({
                 {visibleDays.map((day, index) => {
                   const isToday = day.label.startsWith("Today ");
                   const headerLabel = isToday ? day.label.replace(/^Today\s+/, "") : day.label;
-                  const boundary = dayBoundaryControls.get(day.isoDate) ?? { leftHiddenIsos: [], rightHiddenIsos: [] };
-                  const hasRevealControls = boundary.leftHiddenIsos.length > 0 || boundary.rightHiddenIsos.length > 0;
-                  const revealLeftIso = boundary.leftHiddenIsos[0]
-                    ?? boundary.rightHiddenIsos[0]
-                    ?? null;
-                  const revealRightIso = boundary.rightHiddenIsos[boundary.rightHiddenIsos.length - 1]
-                    ?? boundary.leftHiddenIsos[boundary.leftHiddenIsos.length - 1]
-                    ?? null;
+                  const gapHiddenIsos = gapBeforeDayIsos.get(day.isoDate) ?? [];
+                  const hasRevealControls = gapHiddenIsos.length > 0;
+                  const revealLeftIso = gapHiddenIsos[0] ?? null;
+                  const revealRightIso = gapHiddenIsos[gapHiddenIsos.length - 1] ?? null;
+                  const pushLeftRevealIso = visibleDays[visibleDays.length - 1]?.isoDate ?? null;
+                  const pushRightRevealIso = visibleDays[0]?.isoDate ?? null;
 
                   return (
                     <div
@@ -530,7 +520,7 @@ export function DesktopTimelineView({
                             className="inline-flex h-5 w-5 items-center justify-center rounded-l-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                             aria-label={revealLeftIso ? `${revealLeftIso} を再表示` : "日付を再表示"}
                             data-testid={revealLeftIso ? `timeline-reveal-left-${day.isoDate}-${revealLeftIso}` : undefined}
-                            onClick={(event) => handleRevealHiddenIso(revealLeftIso, event.currentTarget)}
+                            onClick={(event) => handleRevealHiddenIso(revealLeftIso, pushLeftRevealIso, event.currentTarget)}
                           >
                             ◀
                           </button>
@@ -540,7 +530,7 @@ export function DesktopTimelineView({
                             className="inline-flex h-5 w-5 items-center justify-center rounded-r-full text-[11px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                             aria-label={revealRightIso ? `${revealRightIso} を再表示` : "日付を再表示"}
                             data-testid={revealRightIso ? `timeline-reveal-right-${day.isoDate}-${revealRightIso}` : undefined}
-                            onClick={(event) => handleRevealHiddenIso(revealRightIso, event.currentTarget)}
+                            onClick={(event) => handleRevealHiddenIso(revealRightIso, pushRightRevealIso, event.currentTarget)}
                           >
                             ▶
                           </button>
