@@ -35,6 +35,11 @@ function attachConsoleErrorCollector(page: Page) {
   };
 }
 
+function formatHeaderDateLabel(isoDate: string): string {
+  const [, month, day] = isoDate.split('-');
+  return `${month}/${day}`;
+}
+
 async function dispatchCopyEvent(page: Page): Promise<{ plainText: string; htmlText: string; defaultPrevented: boolean }> {
   return page.evaluate(() => {
     const target = document.querySelector('.ProseMirror[data-autofocus="true"]');
@@ -752,6 +757,32 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.waitForTimeout(500);
       await expect(todayHeader).toBeVisible();
+      consoleErrors.assertClean();
+    } finally {
+      consoleErrors.dispose();
+    }
+  });
+
+  test('desktop timeline toolbar keeps URL date and header label in sync', async ({ page }) => {
+    test.skip(!boardContext, 'Missing board context for timeline spec');
+    const consoleErrors = attachConsoleErrorCollector(page);
+    const todayIso = isoDateJst();
+    const tomorrowIso = shiftIsoDateJst(1);
+
+    try {
+      await page.goto(boardContext!.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext!.boardName })).toBeVisible();
+
+      await page.getByTestId('timeline-toolbar-next-day').click();
+      await expect(page).toHaveURL(new RegExp(`date=${tomorrowIso}`), { timeout: 20_000 });
+      await expect(page.locator(`text=${formatHeaderDateLabel(tomorrowIso)}`).first()).toBeVisible({ timeout: 20_000 });
+
+      await page.getByTestId('timeline-toolbar-prev-day').click();
+      await expect(page).toHaveURL(new RegExp(`date=${todayIso}`), { timeout: 20_000 });
+      await expect(page.locator(`text=/Today\\s+${formatHeaderDateLabel(todayIso).replace('/', '\\/')}/`).first()).toBeVisible({
+        timeout: 20_000,
+      });
+
       consoleErrors.assertClean();
     } finally {
       consoleErrors.dispose();
