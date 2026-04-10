@@ -17,7 +17,6 @@ import {
 } from '@/app/(board)/_utils/timeline-helpers';
 import { TimelineEventItem } from './TimelineEventItem';
 import { TimelineCard } from './TimelineCard';
-import { buildTimelineCardStatusItems } from './timeline-card-meta';
 import { ActiveResizeState } from '@/app/(board)/_hooks/useTimelineDragAndDrop';
 import {
     buildStackedTimelineColumnLayout,
@@ -277,6 +276,12 @@ export const TimelineColumn = memo(function TimelineColumn({
                                 const calendarEvent = item.entry as ExternalCalendarEntry;
                                 const layout = stackedLayout[item.key];
                                 const isActive = activeStackItem?.kind === 'calendar' && activeStackItem.id === calendarEvent.id;
+                                const height = Math.max(
+                                    minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, currentHourHeight) -
+                                    minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight),
+                                    20
+                                );
+                                const densityMode = height >= 76 ? 'default' : height >= 44 ? 'compact' : 'minimal';
                                 return (
                                     <div
                                         key={`calendar-${calendarEvent.id}`}
@@ -287,7 +292,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                         data-slot-index={layout?.slotIndex ?? 0}
                                         style={{
                                             top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight),
-                                            height: Math.max(minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, currentHourHeight) - minuteToPixels(calendarEvent.startMinutes, timelineStartHour, currentHourHeight), 20),
+                                            height,
                                             left: layout?.left ?? '0%',
                                             width: layout?.width ?? '100%',
                                             zIndex: isActive ? 30 : (layout?.baseZIndex ?? 10),
@@ -297,20 +302,7 @@ export const TimelineColumn = memo(function TimelineColumn({
                                             title={calendarEvent.title || "Google予定"}
                                             checked={false}
                                             onToggleCheck={() => {}}
-                                            statusItems={buildTimelineCardStatusItems({
-                                                due_start: minutesToTime(calendarEvent.startMinutes),
-                                                due_end: minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes),
-                                                durationMinutes: calendarEvent.durationMinutes,
-                                            }, {
-                                                includeTags: false,
-                                                includeDate: false,
-                                                includeTime: false,
-                                                includeDuration: false,
-                                                includeBucket: true,
-                                                includeProgress: false,
-                                                includeReminder: false,
-                                                bucketLabel: "G",
-                                            })}
+                                            densityMode={densityMode}
                                             timeText={
                                                 layout?.isTimeOverlapped && !isActive
                                                     ? null

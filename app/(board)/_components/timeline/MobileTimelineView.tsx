@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
 import { DndContext, MeasuringStrategy, useDroppable, DragOverlay, type CollisionDetection } from "@dnd-kit/core";
 import {
   getDisplayHours,
@@ -158,6 +159,12 @@ function MobileTimelineColumn({
             const calendarEvent = item.entry as ExternalCalendarEntry;
             const layout = stackedLayout[item.key];
             const isActive = activeStackItem?.kind === "calendar" && activeStackItem.id === calendarEvent.id;
+            const height = Math.max(
+              minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, hourHeight) -
+              minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
+              18
+            );
+            const densityMode = height >= 76 ? "default" : height >= 44 ? "compact" : "minimal";
             return (
               <button
                 key={`calendar-${calendarEvent.id}`}
@@ -190,32 +197,29 @@ function MobileTimelineColumn({
                 className="absolute z-0 rounded-md border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[10px] text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)] text-left hover:bg-emerald-100"
                 style={{
                   top: minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
-                  height: Math.max(
-                    minuteToPixels(calendarEvent.startMinutes + calendarEvent.durationMinutes, timelineStartHour, hourHeight) -
-                    minuteToPixels(calendarEvent.startMinutes, timelineStartHour, hourHeight),
-                    18
-                  ),
+                  height,
                   left: layout?.left ?? "0px",
                   width: layout?.width ?? "100%",
                   zIndex: isActive ? 30 : (layout?.baseZIndex ?? 10),
                 }}
               >
                 <div className="flex items-center gap-1">
-                  <span className="truncate font-semibold">{calendarEvent.title || "Google予定"}</span>
-                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                    G
+                  <span className={clsx("font-semibold", densityMode === "minimal" ? "truncate" : "line-clamp-2 break-words")}>
+                    {calendarEvent.title || "Google予定"}
                   </span>
                 </div>
-                <p className="text-[9px] text-emerald-600">
-                  {layout?.isTimeOverlapped && !isActive
-                    ? null
-                    : calendarEvent.isAllDay
-                      ? "終日"
-                      : timeLabel(
-                        minutesToTime(calendarEvent.startMinutes),
-                        minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
-                      )}
-                </p>
+                {densityMode !== "minimal" ? (
+                  <p className="text-[9px] text-emerald-600">
+                    {layout?.isTimeOverlapped && !isActive
+                      ? null
+                      : calendarEvent.isAllDay
+                        ? "終日"
+                        : timeLabel(
+                          minutesToTime(calendarEvent.startMinutes),
+                          minutesToTime(calendarEvent.startMinutes + calendarEvent.durationMinutes)
+                        )}
+                  </p>
+                ) : null}
               </button>
             );
           }
