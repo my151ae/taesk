@@ -346,11 +346,6 @@ function TimelineBoardPageContent({
     handleShiftSelect,
   } = useTimelineCardSelection();
   const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
-  const [hiddenDesktopDayIsos, setHiddenDesktopDayIsos] = useState<string[]>([]);
-  const [lastReadyDesktopTimelineProjection, setLastReadyDesktopTimelineProjection] = useState<{
-    days: TimelineResponse["days"];
-    hiddenDayIsos: string[];
-  } | null>(null);
 
   const {
     contextMenu,
@@ -442,29 +437,6 @@ function TimelineBoardPageContent({
     router,
     onTimelineStartHour: setTimelineStartHour,
   });
-
-  const previousBoardIdRef = useRef(currentBoard.id);
-  const previousIsDesktopViewportRef = useRef(isDesktopViewport);
-  const previousViewModeRef = useRef(viewMode);
-  const resetDesktopTimelineProjection = useCallback(() => {
-    setHiddenDesktopDayIsos([]);
-    setLastReadyDesktopTimelineProjection(null);
-  }, []);
-  useEffect(() => {
-    const boardChanged = previousBoardIdRef.current !== currentBoard.id;
-    const viewportModeChanged = previousIsDesktopViewportRef.current !== isDesktopViewport;
-    const viewModeChanged = previousViewModeRef.current !== viewMode;
-
-    previousBoardIdRef.current = currentBoard.id;
-    previousIsDesktopViewportRef.current = isDesktopViewport;
-    previousViewModeRef.current = viewMode;
-
-    if (!boardChanged && !viewportModeChanged && !viewModeChanged) {
-      return;
-    }
-    resetDesktopTimelineProjection();
-  }, [currentBoard.id, isDesktopViewport, resetDesktopTimelineProjection, viewMode]);
-
   const {
     data,
     setData,
@@ -550,8 +522,6 @@ function TimelineBoardPageContent({
   } = useTimelineScrollSync({
     viewMode,
     urlDate: resolvedState.view === "timeline" ? resolvedState.date : null,
-    urlRange: resolvedState.view === "timeline" ? resolvedState.timelineRange : null,
-    urlTime: resolvedState.view === "timeline" ? resolvedState.time : null,
     data,
     anchorDayIso,
     dayRange: timelineRange,
@@ -866,15 +836,39 @@ function TimelineBoardPageContent({
     }
   }, [activeDayIndex, anchorDayIso, isDesktopViewport, setActiveDayIndex, timelineCandidateDays, viewMode]);
 
+  const lastRequestedPrefetchRef = useRef<{ left: string | null; right: string | null }>({
+    left: null,
+    right: null,
+  });
+
   const handleTimelineWindowStateChange = useCallback((state: DesktopTimelineWindowState) => {
     if (viewMode !== "timeline" || !isDesktopViewport) return;
     if (state.nearLeftEdge && state.firstLoadedIso) {
-      void ensureTimelineRange(addDaysToIso(state.firstLoadedIso, -7), addDaysToIso(state.firstLoadedIso, -1), { silent: true });
+      const startIso = addDaysToIso(state.firstLoadedIso, -7);
+      const endIso = addDaysToIso(state.firstLoadedIso, -1);
+      const signature = `${startIso}:${endIso}`;
+      if (lastRequestedPrefetchRef.current.left !== signature) {
+        lastRequestedPrefetchRef.current.left = signature;
+        void ensureTimelineRange(startIso, endIso, { silent: true });
+      }
     }
     if (state.nearRightEdge && state.lastLoadedIso) {
-      void ensureTimelineRange(addDaysToIso(state.lastLoadedIso, 1), addDaysToIso(state.lastLoadedIso, 7), { silent: true });
+      const startIso = addDaysToIso(state.lastLoadedIso, 1);
+      const endIso = addDaysToIso(state.lastLoadedIso, 7);
+      const signature = `${startIso}:${endIso}`;
+      if (lastRequestedPrefetchRef.current.right !== signature) {
+        lastRequestedPrefetchRef.current.right = signature;
+        void ensureTimelineRange(startIso, endIso, { silent: true });
+      }
     }
   }, [ensureTimelineRange, isDesktopViewport, viewMode]);
+
+  const calendarWindowDays = useMemo(() => {
+    if (viewMode === "timeline" && isDesktopViewport) {
+      return visibleDays;
+    }
+    return visibleDays;
+  }, [isDesktopViewport, viewMode, visibleDays]);
 
   const {
     calendarEventsByDay,
@@ -886,14 +880,15 @@ function TimelineBoardPageContent({
     refreshGoogleCalendar,
   } = useTimelineCalendar({
     calendarPreset,
-    calendarRangeStart: viewMode === "month" ? null : visibleDays[0] ? new Date(visibleDays[0].isoDate) : null,
+    calendarRangeStart: viewMode === "month" ? null : calendarWindowDays[0] ? new Date(calendarWindowDays[0].isoDate) : null,
     calendarRangeEnd:
       viewMode === "month"
         ? null
-        : visibleDays[visibleDays.length - 1]
-          ? new Date(visibleDays[visibleDays.length - 1].isoDate)
+        : calendarWindowDays[calendarWindowDays.length - 1]
+          ? new Date(calendarWindowDays[calendarWindowDays.length - 1].isoDate)
           : null,
     days: renderDays,
+    windowDays: calendarWindowDays,
   });
 
   const googleCalendarLabel = useMemo(() => {
@@ -1177,52 +1172,34 @@ function TimelineBoardPageContent({
   });
 
   const handleListTodayWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListToday();
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleListWindowPresetChangeWithFocusRestore = useCallback((nextPreset: ListWindowPresetKey) => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListWindowPresetChange(nextPreset);
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleListPrevDayWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevDay();
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleListNextDayWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextDay();
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleListPrevWeekWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListPrevWeek();
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleListNextWeekWithFocusRestore = useCallback(() => {
-    if (hiddenDesktopDayIsos.length > 0) {
-      resetDesktopTimelineProjection();
-    }
     scheduleToolbarFocusRestore();
     modeSync.handleListNextWeek();
-  }, [hiddenDesktopDayIsos.length, modeSync, resetDesktopTimelineProjection, scheduleToolbarFocusRestore]);
+  }, [modeSync, scheduleToolbarFocusRestore]);
 
   const handleMonthPrevWithFocusRestore = useCallback(() => {
     scheduleToolbarFocusRestore();
@@ -1502,8 +1479,6 @@ function TimelineBoardPageContent({
     activeDayIndex,
     anchorDayIso,
     effectiveDayRange,
-    hiddenDesktopDayIsos: [],
-    onHiddenDesktopDayIsosChange: setHiddenDesktopDayIsos,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,
     setMobileAnchorTimelineScrollNode,

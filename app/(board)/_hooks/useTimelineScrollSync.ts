@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { minuteToPixels, pixelsToMinutes, type TimelineResponse } from "@/app/(board)/_utils/timeline-helpers";
 import type { UrlUpdateMethod } from "@/app/(board)/_hooks/useTimelineUrlState";
 
@@ -12,8 +12,6 @@ type TimelineUrlUpdateArgs = {
 type UseTimelineScrollSyncArgs = {
   viewMode: "timeline" | "list" | "month";
   urlDate: string | null;
-  urlRange: number | null;
-  urlTime: number | null;
   data: TimelineResponse | null;
   anchorDayIso: string | null;
   dayRange: number;
@@ -26,8 +24,6 @@ type UseTimelineScrollSyncArgs = {
 export const useTimelineScrollSync = ({
   viewMode,
   urlDate,
-  urlRange,
-  urlTime,
   data,
   anchorDayIso,
   dayRange,
@@ -80,13 +76,6 @@ export const useTimelineScrollSync = ({
     return () => mql.removeEventListener("change", sync);
   }, [syncActiveTimelineScrollRef]);
 
-  const urlTimeMinutes = useMemo(() => {
-    if (typeof urlTime !== "number") return null;
-    const timeMinutes = Math.round(urlTime);
-    if (isNaN(timeMinutes) || timeMinutes < 0 || timeMinutes >= 24 * 60) return null;
-    return timeMinutes;
-  }, [urlTime]);
-
   const shouldPreferNowIndicatorOnOpen =
     !initialOpenScrollDoneRef.current &&
     isTimelineViewMounted &&
@@ -97,12 +86,9 @@ export const useTimelineScrollSync = ({
     if (!timelineScrollRef.current || !isTimelineViewMounted) return;
 
     const storedTop = anchorDayIso ? lastKnownScrollTopByIsoRef.current[anchorDayIso] : undefined;
-    const desiredMinutes = typeof storedTop === "number"
-      ? null
-      : urlTimeMinutes;
-    if (typeof storedTop !== "number" && desiredMinutes == null) return;
+    if (typeof storedTop !== "number") return;
 
-    const restoreKey = `${anchorDayIso ?? urlDate ?? ""}|${urlRange ?? ""}|${storedTop ?? desiredMinutes ?? ""}`;
+    const restoreKey = `${anchorDayIso ?? urlDate ?? ""}|${storedTop}`;
     if (lastScrollRestoreKeyRef.current === restoreKey) return;
 
     scrollRestoreAttemptRef.current = 0;
@@ -115,9 +101,7 @@ export const useTimelineScrollSync = ({
       if (!container) return;
 
       const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      const desiredTop = typeof storedTop === "number"
-        ? storedTop
-        : minuteToPixels(desiredMinutes ?? 0, timelineStartHour, hourHeight);
+      const desiredTop = storedTop;
       const clampedTop = Math.max(0, Math.min(desiredTop, maxTop));
 
       if (Math.abs(container.scrollTop - clampedTop) >= 2) {
@@ -151,14 +135,9 @@ export const useTimelineScrollSync = ({
       cancelled = true;
       programmaticScrollRef.current = false;
     };
-  }, [anchorDayIso, urlDate, urlRange, urlTimeMinutes, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
+  }, [anchorDayIso, urlDate, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
   useEffect(() => {
-    if (!shouldPreferNowIndicatorOnOpen && urlTime != null) {
-      if (!hasAutoScrolled) setHasAutoScrolled(true);
-      return;
-    }
-
     if (!isTimelineViewMounted || !timelineScrollRef.current || indicatorMinutes == null || hasAutoScrolled) return;
 
     autoScrollAttemptRef.current = 0;
@@ -205,7 +184,7 @@ export const useTimelineScrollSync = ({
       cancelled = true;
       programmaticScrollRef.current = false;
     };
-  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, urlTime, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
+  }, [timelineScrollRef, indicatorMinutes, hasAutoScrolled, isTimelineViewMounted, shouldPreferNowIndicatorOnOpen, timelineStartHour, hourHeight]);
 
   const stateRef = useRef({ data, anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode });
   stateRef.current = { data, anchorDayIso, dayRange, updateUrlForTimeline, timelineStartHour, hourHeight, viewMode };

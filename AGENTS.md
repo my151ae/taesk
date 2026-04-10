@@ -53,6 +53,8 @@ cat test-results/playwright-report.json | jq '.stats'
 - `npm run dev` や Playwright 実行前に `lsof -i :3000` で Next.js サーバーが残っていないか確認すること。
 - 既存サーバーを使い回さない場合は、先に停止してから起動すること。`3001` 以降への自動退避を許容しない。
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
+- Playwright が pass しても完了扱いにせず、**必ず browser console の runtime error / hydration error / React error (`Maximum update depth exceeded` など) を確認すること。** console error が残っている場合は、原因特定と解消、または未解消理由の明記まで行う。
+- Timeline / List / Month の UI 変更では、focused E2E 実行後に browser console を確認し、エラー 0 件を確認するまで終了しないこと。
 - CardModal 本文の Tiptap / ProseMirror block action を検証するときは `docs/spec/tiptap-block-action-testing.md` を参照し、見た目 DOM 件数より handle metadata と保存 JSON を優先すること。
 - 一時的な実行結果や日時付きのテスト状況は `AGENTS.md` ではなく `docs/tickets/<date>/` に残すこと。`AGENTS.md` には恒久ルールだけを書く。
 

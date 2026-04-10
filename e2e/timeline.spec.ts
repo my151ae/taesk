@@ -18,6 +18,23 @@ import {
   pastePlainText,
 } from './helpers/timeline-editor';
 
+function attachConsoleErrorCollector(page: Page) {
+  const messages: string[] = [];
+  const handler = (message: { type(): string; text(): string }) => {
+    if (message.type() !== 'error') return;
+    messages.push(message.text());
+  };
+  page.on('console', handler);
+  return {
+    assertClean() {
+      expect(messages, `browser console errors:\n${messages.join('\n')}`).toEqual([]);
+    },
+    dispose() {
+      page.off('console', handler);
+    },
+  };
+}
+
 async function dispatchCopyEvent(page: Page): Promise<{ plainText: string; htmlText: string; defaultPrevented: boolean }> {
   return page.evaluate(() => {
     const target = document.querySelector('.ProseMirror[data-autofocus="true"]');
@@ -563,6 +580,7 @@ test.describe('@feature:timeline Timeline view', () => {
     if (!testUserId) {
       throw new Error('Missing authenticated test user id for timeline spec');
     }
+    const consoleErrors = attachConsoleErrorCollector(page);
     const cardId = crypto.randomUUID();
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
@@ -601,6 +619,8 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(focusEvent).toBeVisible({ timeout: 20_000 });
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
+      consoleErrors.assertClean();
+      consoleErrors.dispose();
     }
   });
 
@@ -721,15 +741,21 @@ test.describe('@feature:timeline Timeline view', () => {
 
   test('desktop timeline opens with the Today header visible and stays anchored near today', async ({ page }) => {
     test.skip(!boardContext, 'Missing board context for timeline spec');
+    const consoleErrors = attachConsoleErrorCollector(page);
 
-    await page.goto(boardContext!.canonicalPath);
-    await expect(page.getByRole('heading', { name: boardContext!.boardName })).toBeVisible();
+    try {
+      await page.goto(boardContext!.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext!.boardName })).toBeVisible();
 
-    const todayHeader = page.locator('text=/Today\\s+\\d{2}\\/\\d{2}/').first();
-    await expect(todayHeader).toBeVisible({ timeout: 20_000 });
+      const todayHeader = page.locator('text=/Today\\s+\\d{2}\\/\\d{2}/').first();
+      await expect(todayHeader).toBeVisible({ timeout: 20_000 });
 
-    await page.waitForTimeout(500);
-    await expect(todayHeader).toBeVisible();
+      await page.waitForTimeout(500);
+      await expect(todayHeader).toBeVisible();
+      consoleErrors.assertClean();
+    } finally {
+      consoleErrors.dispose();
+    }
   });
 
   test('supports shift-click multi select within the same timeline lane and switches between bulk and single menus', async ({ page }) => {

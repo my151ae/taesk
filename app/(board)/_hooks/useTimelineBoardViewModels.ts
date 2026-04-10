@@ -67,8 +67,6 @@ type UseTimelineBoardViewModelsArgs = {
   anchorDayIso: string;
   intendedDayRange: number;
   effectiveDayRange: number;
-  hiddenDesktopDayIsos: string[];
-  onHiddenDesktopDayIsosChange: React.Dispatch<React.SetStateAction<string[]>>;
   timelineScrollRefDesktop: RefObject<HTMLDivElement>;
   timelineScrollRefMobile: RefObject<HTMLDivElement>;
   setMobileAnchorTimelineScrollNode: (node: HTMLDivElement | null) => void;

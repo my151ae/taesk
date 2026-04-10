@@ -64,7 +64,6 @@ export type ResolvedTimelineUrlState = {
   rightPanelMode: RightPanelMode;
   boardUiState: BoardUiState;
   date: string | null;
-  time: number | null;
   tag: string | null;
   searchQuery: string;
   showChecked: boolean;
@@ -189,7 +188,6 @@ const buildDefaultResolvedState = (
     rightPanel: { mode: "timeline", state: {} },
   },
   date: null,
-  time: null,
   tag: null,
   searchQuery: "",
   showChecked: true,
@@ -259,7 +257,6 @@ export function normalizeBoardUiState(
       rightPanel: { mode: rightPanelMode, state: {} },
     },
     date,
-    time: null,
     tag,
     searchQuery,
     showChecked,

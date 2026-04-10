@@ -38,6 +38,17 @@ const addDaysToIso = (isoDate: string, delta: number) => {
   return date.toISOString().slice(0, 10);
 };
 
+const resolveClosestLoadedIso = (days: TimelineResponse["days"], targetIso: string) => {
+  if (!days.length) return null;
+  const exact = days.find((day) => day.isoDate === targetIso)?.isoDate;
+  if (exact) return exact;
+  const firstAfterIndex = days.findIndex((day) => getDayDiff(day.isoDate, targetIso) >= 0);
+  if (firstAfterIndex >= 0) {
+    return days[clampIndex(firstAfterIndex, days.length)]?.isoDate ?? null;
+  }
+  return days[days.length - 1]?.isoDate ?? null;
+};
+
 export function useTimelineNavigation({
   data,
   dayRange,
@@ -85,10 +96,7 @@ export function useTimelineNavigation({
       const targetOffset = getDayDiff(targetIso, currentTimelineIso);
       const targetPayload = await fetchTimeline(targetOffset, { range: fetchRange, silent: true });
       const nextDays = targetPayload?.days ?? [];
-      const nextIso =
-        nextDays.find((day) => day.isoDate === targetIso)?.isoDate ??
-        nextDays[clampIndex(nextDays.findIndex((day) => getDayDiff(day.isoDate, targetIso) >= 0), nextDays.length)]?.isoDate ??
-        nextDays[0]?.isoDate;
+      const nextIso = resolveClosestLoadedIso(nextDays, targetIso);
 
       if (nextIso) {
         syncAnchor(nextIso, method);
@@ -115,11 +123,10 @@ export function useTimelineNavigation({
 
       const targetOffset = getDayDiff(targetIso, currentTimelineIso);
       const targetPayload = await fetchTimeline(targetOffset, { range: fetchRange, silent: true });
-      const resolvedTargetIso =
-        targetPayload?.days?.find((day) => day.isoDate === targetIso)?.isoDate ?? targetIso;
+      const resolvedTargetIso = resolveClosestLoadedIso(targetPayload?.days ?? [], targetIso) ?? targetIso;
       syncAnchor(resolvedTargetIso, method);
     },
-    [currentTimelineIso, fetchRange, fetchTimeline, syncAnchor],
+    [currentTimelineIso, data?.days, fetchRange, fetchTimeline, syncAnchor],
   );
 
   const handlePrevDay = useCallback(async () => {

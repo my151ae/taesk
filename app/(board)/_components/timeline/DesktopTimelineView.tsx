@@ -528,15 +528,9 @@ export function DesktopTimelineView({
         if (lastEmittedAnchorRef.current === nextAnchor) return;
         lastEmittedAnchorRef.current = nextAnchor;
         onAnchorDayChange?.(nextAnchor);
-        onWindowStateChange?.(
-          resolveDesktopTimelineWindowState({
-            anchorDayIso: nextAnchor,
-            loadedDays: days,
-          }),
-        );
       });
     },
-    [anchorDayIso, columnWidth, days, onAnchorDayChange, onWindowStateChange],
+    [anchorDayIso, columnWidth, days, onAnchorDayChange],
   );
 
   useEffect(() => {

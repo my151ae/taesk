@@ -64,10 +64,16 @@ const dedupeEventKey = (event: GoogleCalendarEvent) => {
   return `${event.id}:${event.start}:${event.end}`;
 };
 
+const parseIsoDateKey = (value: string | null) => (value ? new Date(`${value}T00:00:00.000Z`) : null);
+
 export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null) {
   const startDateKey = startDate ? startDate.toISOString().slice(0, 10) : null;
   const endDateKey = endDate ? endDate.toISOString().slice(0, 10) : null;
-  const requiredWeekKeys = useMemo(() => buildRequiredWeekKeys(startDate, endDate), [endDateKey, startDateKey]);
+  const hasExplicitRange = startDateKey != null && endDateKey != null;
+  const requiredWeekKeys = useMemo(
+    () => buildRequiredWeekKeys(parseIsoDateKey(startDateKey), parseIsoDateKey(endDateKey)),
+    [endDateKey, startDateKey],
+  );
   const requiredWeekKeysSignature = useMemo(() => requiredWeekKeys.join("|"), [requiredWeekKeys]);
 
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
@@ -75,11 +81,13 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
   const [status, setStatus] = useState<GoogleCalendarStatus>("idle");
   const [backgroundStatus, setBackgroundStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   const blocksRef = useRef<Map<string, WeekBlock>>(new Map());
   const inflightWeekKeysRef = useRef<Set<string>>(new Set());
   const permissionCheckedRef = useRef(false);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const lastVisibleEventsSignatureRef = useRef<string>("");
 
   const rebuildVisibleEvents = useCallback(() => {
     const merged = new Map<string, GoogleCalendarEvent>();
@@ -89,14 +97,20 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       block.events.forEach((event, key) => merged.set(key, event));
     });
 
-    setEvents(
-      [...merged.values()].sort((left, right) => {
+    const nextEvents = [...merged.values()].sort((left, right) => {
         const leftValue = left.startDate ?? left.start;
         const rightValue = right.startDate ?? right.start;
         return leftValue.localeCompare(rightValue);
-      }),
-    );
-  }, [requiredWeekKeysSignature, requiredWeekKeys]);
+      });
+    const nextSignature = nextEvents
+      .map((event) => dedupeEventKey(event))
+      .join("|");
+    if (nextSignature === lastVisibleEventsSignatureRef.current) {
+      return;
+    }
+    lastVisibleEventsSignatureRef.current = nextSignature;
+    setEvents(nextEvents);
+  }, [requiredWeekKeys]);
 
   const fetchWeek = useCallback(async (weekKey: string) => {
     if (inflightWeekKeysRef.current.has(weekKey)) return;
@@ -122,10 +136,10 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
       if (body?.connected === false) {
         const normalizedError = toErrorMessage((body as { error?: unknown } | null)?.error) ?? null;
-        setEvents([]);
         setCanWrite(false);
         setStatus("disconnected");
         setError(normalizedError);
+        setBackgroundStatus("idle");
         return;
       }
 
@@ -169,7 +183,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     let cancelled = false;
 
     const load = async () => {
-      if (!startDate || !endDate) {
+      if (!hasExplicitRange) {
         if (permissionCheckedRef.current) {
           rebuildVisibleEvents();
           return;
@@ -215,10 +229,11 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
         if (permissionCheckedRef.current) {
           setStatus("success");
         }
+        setBackgroundStatus("idle");
         return;
       }
 
-      if (blocksRef.current.size === 0 && !permissionCheckedRef.current) {
+      if (events.length === 0 && blocksRef.current.size === 0 && !permissionCheckedRef.current) {
         setStatus("loading");
       } else {
         setBackgroundStatus("loading");
@@ -239,12 +254,13 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     return () => {
       cancelled = true;
     };
-  }, [endDateKey, fetchWeek, rebuildVisibleEvents, requiredWeekKeysSignature, startDateKey, requiredWeekKeys]);
+  }, [endDateKey, events.length, fetchWeek, hasExplicitRange, rebuildVisibleEvents, refreshVersion, requiredWeekKeys, startDateKey]);
 
   useEffect(() => {
+    const controllers = abortControllersRef.current;
     return () => {
-      abortControllersRef.current.forEach((controller) => controller.abort());
-      abortControllersRef.current.clear();
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
     };
   }, []);
 
@@ -252,12 +268,16 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     requiredWeekKeys.forEach((weekKey) => {
       blocksRef.current.delete(weekKey);
     });
-    rebuildVisibleEvents();
-    setBackgroundStatus("idle");
-    if (requiredWeekKeys.length > 0) {
+    if (requiredWeekKeys.length === 0) {
+      permissionCheckedRef.current = false;
+    }
+    if (events.length > 0 || permissionCheckedRef.current) {
+      setBackgroundStatus("loading");
+    } else if (requiredWeekKeys.length > 0) {
       setStatus("loading");
     }
-  }, [rebuildVisibleEvents, requiredWeekKeysSignature, requiredWeekKeys]);
+    setRefreshVersion((current) => current + 1);
+  }, [events.length, requiredWeekKeys]);
 
   return {
     events,
