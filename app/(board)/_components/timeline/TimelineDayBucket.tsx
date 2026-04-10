@@ -93,6 +93,7 @@ const FALLBACK_BUCKET_VIEWPORT_HEIGHT_PX = 480;
 const CONTENT_CHROME_ALLOWANCE_PX = 8;
 const BUCKET_CARD_STACK_CHROME_ALLOWANCE_PX = 16;
 const PRIORITY_FIT_TOLERANCE_PX = 2;
+const BUCKET_LAYOUT_HYSTERESIS_PX = 12;
 
 const DEFAULT_MEASUREMENTS: Record<ActiveBucketSection, SectionMeasurements> = {
     completed: {
@@ -245,6 +246,7 @@ function resolveBucketBodyLayout({
     availableBodyHeight,
     isPriority,
     allowCompactEmpty = true,
+    previousEmptyStateVariant = 'hidden',
 }: {
     count: number;
     naturalBodyHeight: number;
@@ -254,6 +256,7 @@ function resolveBucketBodyLayout({
     availableBodyHeight: number;
     isPriority: boolean;
     allowCompactEmpty?: boolean;
+    previousEmptyStateVariant?: BucketEmptyStateVariant;
 }): Pick<SectionLayout, 'bodyHeight' | 'emptyStateVariant'> {
     if (availableBodyHeight <= 0) {
         return { bodyHeight: 0, emptyStateVariant: 'hidden' };
@@ -281,7 +284,14 @@ function resolveBucketBodyLayout({
         };
     }
 
-    if (!isPriority && availableBodyHeight <= peekMinBodyHeight) {
+    const shouldStayCompact = previousEmptyStateVariant === 'compact'
+        && availableBodyHeight < peekMinBodyHeight + BUCKET_LAYOUT_HYSTERESIS_PX;
+    const shouldEnterCompact = availableBodyHeight <= Math.max(
+        compactEmptyBodyMinHeight,
+        peekMinBodyHeight - BUCKET_LAYOUT_HYSTERESIS_PX
+    );
+
+    if (!isPriority && (shouldStayCompact || shouldEnterCompact)) {
         if (availableBodyHeight >= compactEmptyBodyMinHeight) {
             return {
                 bodyHeight: compactEmptyBodyMinHeight,
@@ -524,6 +534,10 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     const [completedPriority, setCompletedPriority] = useState(() => completedCount > 0 && activeA.length === 0 && activeB.length === 0);
     const [measurements, setMeasurements] = useState<Record<ActiveBucketSection, SectionMeasurements>>(DEFAULT_MEASUREMENTS);
     const previousCountsRef = useRef(sectionCounts);
+    const previousEmptyStateVariantsRef = useRef<Record<PrimaryBucketSection, BucketEmptyStateVariant>>({
+        a: 'hidden',
+        b: 'hidden',
+    });
 
     const headerRefs = useRef<Record<ActiveBucketSection, HTMLButtonElement | null>>({
         completed: null,
@@ -651,6 +665,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             compactEmptyBodyMinHeight: measurements[abPrioritySection].compactEmptyBodyMinHeight,
             availableBodyHeight: Math.max(0, availableAbBodyHeight - secondaryCompactReserve),
             isPriority: true,
+            previousEmptyStateVariant: previousEmptyStateVariantsRef.current[abPrioritySection],
         });
         const secondaryLayout = resolveBucketBodyLayout({
             count: sectionCounts[secondarySection],
@@ -661,6 +676,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             availableBodyHeight: Math.max(0, availableAbBodyHeight - priorityLayout.bodyHeight),
             isPriority: false,
             allowCompactEmpty: sectionCounts[abPrioritySection] > 0 || !hasAnyAbCards,
+            previousEmptyStateVariant: previousEmptyStateVariantsRef.current[secondarySection],
         });
 
         const bodyHeightMap: Record<ActiveBucketSection, number> = {
@@ -711,6 +727,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         completedPriority,
         sectionCounts,
     ]);
+
+    useEffect(() => {
+        previousEmptyStateVariantsRef.current = {
+            a: sectionLayout.a.emptyStateVariant ?? 'hidden',
+            b: sectionLayout.b.emptyStateVariant ?? 'hidden',
+        };
+    }, [sectionLayout]);
 
     const setHeaderRef = useCallback((section: ActiveBucketSection, node: HTMLButtonElement | null) => {
         headerRefs.current[section] = node;
