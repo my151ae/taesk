@@ -395,6 +395,7 @@ function TimelineBoardPageContent({
     handleMonthNext,
     handleMonthToday,
   } = useTimelineBoardController({
+    boardId: initialBoard.id,
     initialTimelineRange: initialBoard.day_range,
     resolvedState,
     updateUrlForTimeline,
@@ -406,8 +407,18 @@ function TimelineBoardPageContent({
     if (viewMode !== "timeline" || isMobileViewport) {
       return intendedDayRange;
     }
-    return timelineRange + hiddenDesktopDayIsos.length;
+    return timelineRange + hiddenDesktopDayIsos.length + 1;
   }, [hiddenDesktopDayIsos.length, intendedDayRange, isMobileViewport, timelineRange, viewMode]);
+
+  const requiredTimelineSourceRange = useMemo(() => {
+    if (viewMode !== "timeline") {
+      return effectiveDayRange;
+    }
+    if (!isDesktopViewport) {
+      return effectiveDayRange;
+    }
+    return timelineRange + hiddenDesktopDayIsos.length;
+  }, [effectiveDayRange, hiddenDesktopDayIsos.length, isDesktopViewport, timelineRange, viewMode]);
 
   const {
     profile,
@@ -456,7 +467,7 @@ function TimelineBoardPageContent({
     realtimeStatus,
   } = useTimelineData({
     initialBoard,
-    dayRange: isMobileViewport && viewMode === "timeline" ? Math.max(3, intendedDayRange) : desktopTimelineFetchRange,
+    dayRange: isMobileViewport && viewMode === "timeline" ? Math.max(3, intendedDayRange) : intendedDayRange,
     timelineStartHour,
     dayWindowStartRef,
     setDayWindowStart,
@@ -467,14 +478,14 @@ function TimelineBoardPageContent({
   useEffect(() => {
     if (viewMode !== "timeline" || isMobileViewport) return;
     if (hiddenDesktopDayIsos.length === 0) return;
-    if ((data?.range ?? 0) >= desktopTimelineFetchRange) return;
+    if ((data?.days?.length ?? 0) >= desktopTimelineFetchRange) return;
 
     void fetchTimeline(dayWindowStartRef.current, {
       silent: true,
       range: desktopTimelineFetchRange,
     });
   }, [
-    data?.range,
+    data?.days?.length,
     dayWindowStartRef,
     desktopTimelineFetchRange,
     fetchTimeline,
@@ -841,7 +852,7 @@ function TimelineBoardPageContent({
     if (!days.length) return [];
     if (viewMode === "timeline") {
       const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-      if (data?.startOffset !== expectedStartOffset || (data?.range ?? 0) < effectiveDayRange) {
+      if (data?.startOffset !== expectedStartOffset || days.length < requiredTimelineSourceRange) {
         return [];
       }
     }
@@ -858,13 +869,13 @@ function TimelineBoardPageContent({
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, requiredTimelineSourceRange, timelineStartHour, viewMode]);
 
   const timelineDataReady = useMemo(() => {
     if (viewMode !== "timeline") return true;
     const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    return data?.startOffset === expectedStartOffset && (data?.range ?? 0) >= effectiveDayRange;
-  }, [anchorDayIso, data?.range, data?.startOffset, effectiveDayRange, timelineStartHour, viewMode]);
+    return data?.startOffset === expectedStartOffset && (data?.days?.length ?? 0) >= requiredTimelineSourceRange;
+  }, [anchorDayIso, data?.days?.length, data?.startOffset, requiredTimelineSourceRange, timelineStartHour, viewMode]);
 
   const renderDays = useMemo(() => {
     if (!timelineDataReady) return [];
@@ -876,12 +887,12 @@ function TimelineBoardPageContent({
     const days = data?.days ?? [];
     if (!days.length) return;
     const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    if (data?.startOffset !== expectedStartOffset || (data?.range ?? 0) < effectiveDayRange) return;
+    if (data?.startOffset !== expectedStartOffset || days.length < requiredTimelineSourceRange) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, setActiveDayIndex, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.startOffset, requiredTimelineSourceRange, setActiveDayIndex, timelineStartHour, viewMode]);
 
   const {
     calendarEventsByDay,

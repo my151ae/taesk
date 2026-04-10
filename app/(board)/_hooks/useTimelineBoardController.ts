@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
 import {
   getMonthGridSpec,
@@ -32,6 +32,7 @@ type ListUrlUpdateArgs = {
 };
 
 type UseTimelineBoardControllerArgs = {
+  boardId?: string | null;
   initialTimelineRange?: number | null;
   resolvedState: ResolvedTimelineUrlState;
   dataDays?: Array<{ isoDate: string }>;
@@ -108,6 +109,7 @@ export const derivePresetFromWindow = (window: ListWindow): ListWindowPresetKey 
 };
 
 export function useTimelineBoardController({
+  boardId,
   initialTimelineRange,
   resolvedState,
   dataDays,
@@ -149,6 +151,7 @@ export function useTimelineBoardController({
       ? resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)
       : getCurrentTimelineIsoDateJst(timelineStartHour)
   );
+  const previousBoardIdRef = useRef(boardId ?? null);
 
   useEffect(() => {
     const nextTimelineRange = clampTimelineRange(
@@ -160,9 +163,11 @@ export function useTimelineBoardController({
       before: resolvedState.listWindow.before,
       after: resolvedState.listWindow.after,
     });
+    const boardChanged = previousBoardIdRef.current !== (boardId ?? null);
+    previousBoardIdRef.current = boardId ?? null;
 
     setViewMode(resolvedState.view);
-    if (!resolvedState.hasExplicitBoardState) {
+    if (boardChanged) {
       setTimelineRange(nextTimelineRange);
     }
     setAnchorDayIso(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
@@ -183,6 +188,7 @@ export function useTimelineBoardController({
       setListAnchorOffset(resolvedState.anchorOffset);
     }
   }, [
+    boardId,
     initialTimelineRange,
     resolvedState.view,
     resolvedState.timelineRange,
