@@ -507,8 +507,13 @@ export function DesktopTimelineView({
                   const isToday = day.label.startsWith("Today ");
                   const headerLabel = isToday ? day.label.replace(/^Today\s+/, "") : day.label;
                   const boundary = dayBoundaryControls.get(day.isoDate) ?? { leftHiddenIsos: [], rightHiddenIsos: [] };
-                  const revealLeftIso = boundary.leftHiddenIsos[0] ?? null;
-                  const revealRightIso = boundary.leftHiddenIsos[boundary.leftHiddenIsos.length - 1] ?? null;
+                  const hasRevealControls = boundary.leftHiddenIsos.length > 0 || boundary.rightHiddenIsos.length > 0;
+                  const revealLeftIso = boundary.leftHiddenIsos[0]
+                    ?? boundary.rightHiddenIsos[0]
+                    ?? null;
+                  const revealRightIso = boundary.rightHiddenIsos[boundary.rightHiddenIsos.length - 1]
+                    ?? boundary.leftHiddenIsos[boundary.leftHiddenIsos.length - 1]
+                    ?? null;
 
                   return (
                     <div
@@ -518,7 +523,7 @@ export function DesktopTimelineView({
                         index > 0 ? "border-l border-slate-100" : ""
                       )}
                     >
-                      {boundary.leftHiddenIsos.length > 0 ? (
+                      {hasRevealControls ? (
                         <div className="absolute left-0 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-slate-200 bg-white shadow-sm">
                           <button
                             type="button"

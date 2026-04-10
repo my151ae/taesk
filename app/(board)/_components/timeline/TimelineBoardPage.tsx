@@ -9,7 +9,7 @@ import { buildBoardUrl } from "@/lib/board-url";
 import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import type { TrashCardItem } from "@/lib/api-types/timeline";
+import type { TimelineResponse, TrashCardItem } from "@/lib/api-types/timeline";
 import { EMPTY_CHECKLIST } from "@/lib/checklist";
 import { normalizeContent } from "@/lib/tiptap";
 
@@ -341,6 +341,8 @@ function TimelineBoardPageContent({
   } = useTimelineCardSelection();
   const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
   const [hiddenDesktopDayIsos, setHiddenDesktopDayIsos] = useState<string[]>([]);
+  const [appliedHiddenDesktopDayIsos, setAppliedHiddenDesktopDayIsos] = useState<string[]>([]);
+  const [lastReadyDesktopTimelineDays, setLastReadyDesktopTimelineDays] = useState<TimelineResponse["days"]>([]);
 
   const {
     contextMenu,
@@ -419,6 +421,15 @@ function TimelineBoardPageContent({
     }
     return timelineRange + hiddenDesktopDayIsos.length;
   }, [effectiveDayRange, hiddenDesktopDayIsos.length, isDesktopViewport, timelineRange, viewMode]);
+  const appliedTimelineSourceRange = useMemo(() => {
+    if (viewMode !== "timeline") {
+      return effectiveDayRange;
+    }
+    if (!isDesktopViewport) {
+      return effectiveDayRange;
+    }
+    return timelineRange + appliedHiddenDesktopDayIsos.length;
+  }, [appliedHiddenDesktopDayIsos.length, effectiveDayRange, isDesktopViewport, timelineRange, viewMode]);
 
   const {
     profile,
@@ -455,6 +466,8 @@ function TimelineBoardPageContent({
     }
     if (hiddenDesktopDayIsos.length === 0) return;
     setHiddenDesktopDayIsos([]);
+    setAppliedHiddenDesktopDayIsos([]);
+    setLastReadyDesktopTimelineDays([]);
   }, [currentBoard.id, hiddenDesktopDayIsos.length, isDesktopViewport, viewMode]);
 
   const {
@@ -475,20 +488,38 @@ function TimelineBoardPageContent({
     onRealtimeCardChange: handleRealtimeTrashChange,
   });
 
+  const backfillRequestKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (viewMode !== "timeline" || isMobileViewport) return;
     if (hiddenDesktopDayIsos.length === 0) return;
-    if ((data?.days?.length ?? 0) >= desktopTimelineFetchRange) return;
+    if (hiddenDesktopDayIsos.length <= appliedHiddenDesktopDayIsos.length) {
+      backfillRequestKeyRef.current = null;
+      return;
+    }
+    if ((data?.days?.length ?? 0) >= desktopTimelineFetchRange) {
+      backfillRequestKeyRef.current = null;
+      return;
+    }
+
+    const requestKey = `${dayWindowStartRef.current}:${desktopTimelineFetchRange}:${hiddenDesktopDayIsos.join(",")}`;
+    if (backfillRequestKeyRef.current === requestKey) return;
+    backfillRequestKeyRef.current = requestKey;
 
     void fetchTimeline(dayWindowStartRef.current, {
       silent: true,
       range: desktopTimelineFetchRange,
+    }).finally(() => {
+      if (backfillRequestKeyRef.current === requestKey) {
+        backfillRequestKeyRef.current = null;
+      }
     });
   }, [
+    appliedHiddenDesktopDayIsos.length,
     data?.days?.length,
     dayWindowStartRef,
     desktopTimelineFetchRange,
     fetchTimeline,
+    hiddenDesktopDayIsos,
     hiddenDesktopDayIsos.length,
     isMobileViewport,
     viewMode,
@@ -837,6 +868,7 @@ function TimelineBoardPageContent({
     if (!isoDate) return;
     suppressMonthUrlSyncRef.current = true;
     setHiddenDesktopDayIsos([]);
+    setAppliedHiddenDesktopDayIsos([]);
     setAnchorDayIso(isoDate);
     setActiveDayIndex(0);
     updateUrlForTimeline({
@@ -847,13 +879,88 @@ function TimelineBoardPageContent({
     });
   }, [setActiveDayIndex, setAnchorDayIso, timelineRange, updateUrlForTimeline]);
 
+  const hiddenDesktopDayIsosKey = useMemo(() => hiddenDesktopDayIsos.join(","), [hiddenDesktopDayIsos]);
+  const appliedHiddenDesktopDayIsosKey = useMemo(() => appliedHiddenDesktopDayIsos.join(","), [appliedHiddenDesktopDayIsos]);
+  const expectedTimelineStartOffset = useMemo(
+    () => (viewMode === "timeline" ? getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour)) : null),
+    [anchorDayIso, timelineStartHour, viewMode],
+  );
+  const desiredTimelineDataReady = useMemo(() => {
+    if (viewMode !== "timeline") return true;
+    if (expectedTimelineStartOffset == null) return false;
+    return data?.startOffset === expectedTimelineStartOffset && (data?.days?.length ?? 0) >= requiredTimelineSourceRange;
+  }, [data?.days?.length, data?.startOffset, expectedTimelineStartOffset, requiredTimelineSourceRange, viewMode]);
+  const renderHiddenDesktopDayIsos = useMemo(
+    () =>
+      viewMode === "timeline" && isDesktopViewport && !desiredTimelineDataReady
+        ? appliedHiddenDesktopDayIsos
+        : hiddenDesktopDayIsos,
+    [appliedHiddenDesktopDayIsos, desiredTimelineDataReady, hiddenDesktopDayIsos, isDesktopViewport, viewMode],
+  );
+  const renderTimelineDataReady = useMemo(() => {
+    if (viewMode !== "timeline") return true;
+    if (expectedTimelineStartOffset == null) return false;
+    return data?.startOffset === expectedTimelineStartOffset && (data?.days?.length ?? 0) >= appliedTimelineSourceRange;
+  }, [appliedTimelineSourceRange, data?.days?.length, data?.startOffset, expectedTimelineStartOffset, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline" || !isDesktopViewport) {
+      if (appliedHiddenDesktopDayIsos.length > 0) {
+        setAppliedHiddenDesktopDayIsos([]);
+      }
+      if (lastReadyDesktopTimelineDays.length > 0) {
+        setLastReadyDesktopTimelineDays([]);
+      }
+      return;
+    }
+    if (!desiredTimelineDataReady) return;
+    if (hiddenDesktopDayIsosKey === appliedHiddenDesktopDayIsosKey) return;
+    setAppliedHiddenDesktopDayIsos(hiddenDesktopDayIsos);
+  }, [
+    appliedHiddenDesktopDayIsos,
+    appliedHiddenDesktopDayIsosKey,
+    desiredTimelineDataReady,
+    hiddenDesktopDayIsos,
+    hiddenDesktopDayIsosKey,
+    isDesktopViewport,
+    lastReadyDesktopTimelineDays.length,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline" || !isDesktopViewport) return;
+    if (!renderTimelineDataReady) return;
+    const nextDays = data?.days ?? [];
+    if (!nextDays.length) return;
+    setLastReadyDesktopTimelineDays((current) => {
+      if (
+        current.length === nextDays.length &&
+        current.every((day, index) => day.isoDate === nextDays[index]?.isoDate)
+      ) {
+        return current;
+      }
+      return nextDays;
+    });
+  }, [data?.days, isDesktopViewport, renderTimelineDataReady, viewMode]);
+
+  const timelineCandidateDays = useMemo(() => {
+    if (viewMode !== "timeline" || !isDesktopViewport) {
+      return data?.days ?? [];
+    }
+    if (renderTimelineDataReady || lastReadyDesktopTimelineDays.length === 0) {
+      return data?.days ?? [];
+    }
+    return lastReadyDesktopTimelineDays;
+  }, [data?.days, isDesktopViewport, lastReadyDesktopTimelineDays, renderTimelineDataReady, viewMode]);
+
   const visibleDays = useMemo(() => {
-    const days = data?.days ?? [];
+    const days = timelineCandidateDays;
     if (!days.length) return [];
     if (viewMode === "timeline") {
-      const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-      if (data?.startOffset !== expectedStartOffset || days.length < requiredTimelineSourceRange) {
-        return [];
+      if (!renderTimelineDataReady) {
+        if (!(isDesktopViewport && lastReadyDesktopTimelineDays.length > 0)) {
+          return [];
+        }
       }
     }
     if (viewMode === "month") {
@@ -862,37 +969,35 @@ function TimelineBoardPageContent({
     if (viewMode === "timeline" && isDesktopViewport) {
       return buildDesktopTimelineColumns({
         candidateDays: days,
-        hiddenDayIsos: hiddenDesktopDayIsos,
+        hiddenDayIsos: renderHiddenDesktopDayIsos,
         targetVisibleCount: effectiveDayRange,
       }).visibleDays;
     }
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, requiredTimelineSourceRange, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, effectiveDayRange, isDesktopViewport, lastReadyDesktopTimelineDays.length, renderHiddenDesktopDayIsos, renderTimelineDataReady, timelineCandidateDays, viewMode]);
 
   const timelineDataReady = useMemo(() => {
-    if (viewMode !== "timeline") return true;
-    const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    return data?.startOffset === expectedStartOffset && (data?.days?.length ?? 0) >= requiredTimelineSourceRange;
-  }, [anchorDayIso, data?.days?.length, data?.startOffset, requiredTimelineSourceRange, timelineStartHour, viewMode]);
+    if (renderTimelineDataReady) return true;
+    return viewMode === "timeline" && isDesktopViewport && lastReadyDesktopTimelineDays.length > 0;
+  }, [isDesktopViewport, lastReadyDesktopTimelineDays.length, renderTimelineDataReady, viewMode]);
 
   const renderDays = useMemo(() => {
     if (!timelineDataReady) return [];
-    return data?.days ?? [];
-  }, [data?.days, timelineDataReady]);
+    return timelineCandidateDays;
+  }, [timelineCandidateDays, timelineDataReady]);
 
   useEffect(() => {
     if (viewMode !== "timeline") return;
     const days = data?.days ?? [];
     if (!days.length) return;
-    const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    if (data?.startOffset !== expectedStartOffset || days.length < requiredTimelineSourceRange) return;
+    if (!renderTimelineDataReady) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.startOffset, requiredTimelineSourceRange, setActiveDayIndex, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, renderTimelineDataReady, setActiveDayIndex, viewMode]);
 
   const {
     calendarEventsByDay,
@@ -1532,11 +1637,11 @@ function TimelineBoardPageContent({
     sidebarVisibleCounts,
     onSidebarVisibleCountChange: handleSidebarVisibleCountChange,
     onOpenNotificationsPanel: handleOpenNotificationsPanel,
-    days: data?.days ?? [],
+    days: timelineCandidateDays,
     activeDayIndex,
     anchorDayIso,
     effectiveDayRange,
-    hiddenDesktopDayIsos,
+    hiddenDesktopDayIsos: renderHiddenDesktopDayIsos,
     onHiddenDesktopDayIsosChange: setHiddenDesktopDayIsos,
     timelineScrollRefDesktop: desktopTimelineScrollRef,
     timelineScrollRefMobile: mobileTimelineScrollRef,

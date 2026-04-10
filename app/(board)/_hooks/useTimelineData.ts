@@ -42,6 +42,7 @@ export const useTimelineData = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dataMode, setDataMode] = useState<DataMode>("api");
   const traceRef = useRef<ClientTrace | null>(null);
+  const latestRequestIdRef = useRef(0);
 
   useEffect(() => {
     traceRef.current = createClientTrace("timeline");
@@ -52,6 +53,8 @@ export const useTimelineData = ({
       if (!initialBoard?.id) return null;
       const effectiveStart = typeof start === "number" ? start : dayWindowStartRef.current;
       const effectiveRange = options?.range ?? dayRange;
+      const requestId = latestRequestIdRef.current + 1;
+      latestRequestIdRef.current = requestId;
 
       if (!options?.silent) {
         setStatus("loading");
@@ -71,6 +74,9 @@ export const useTimelineData = ({
           throw new Error(body?.error?.message || "Failed to load timeline");
         }
         const payload = (await response.json()) as TimelineResponse;
+        if (latestRequestIdRef.current !== requestId) {
+          return payload;
+        }
         const startOffset = payload.startOffset ?? effectiveStart;
         setData(payload);
         setDataMode("api");
@@ -92,6 +98,9 @@ export const useTimelineData = ({
         traceRef.current = createClientTrace("timeline");
         return payload;
       } catch (error) {
+        if (latestRequestIdRef.current !== requestId) {
+          return null;
+        }
         console.warn("[timeline] fetch failed, rendering mock data", error);
         setErrorMessage("Showing sample schedule until sync succeeds");
         const fallback = buildMockTimelineResponse();
@@ -100,7 +109,7 @@ export const useTimelineData = ({
         setStatus("idle");
         return fallback;
       } finally {
-        if (!options?.silent) {
+        if (!options?.silent && latestRequestIdRef.current === requestId) {
           setStatus("idle");
         }
       }
