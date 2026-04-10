@@ -180,6 +180,10 @@ function resolveCompletedCountBadgeTone(done: number, total: number): 'neutral' 
     return 'warning';
 }
 
+function resolveAbCountBadgeTone(count: number): 'neutral' | 'danger' {
+    return count === 0 ? 'neutral' : 'danger';
+}
+
 function resolveMeasuredPeekHeight(contentNode: HTMLDivElement | null, section: ActiveBucketSection) {
     if (!contentNode) {
         return section === 'completed' ? FALLBACK_COMPLETED_BODY_HEIGHT_PX : FALLBACK_PEEK_BODY_HEIGHT_PX;
@@ -1091,6 +1095,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                                 section,
                                 count: items.length,
                                 countTestId: `bucket-count-${section}-${day.isoDate}`,
+                                countBadgeTone: resolveAbCountBadgeTone(items.length),
                             })}
                             <div
                                 ref={(node) => {

@@ -162,7 +162,9 @@ export function useTimelineBoardController({
     });
 
     setViewMode(resolvedState.view);
-    setTimelineRange(nextTimelineRange);
+    if (!resolvedState.hasExplicitBoardState) {
+      setTimelineRange(nextTimelineRange);
+    }
     setAnchorDayIso(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
     if (resolvedState.view === "month") {
       setMonthAnchorDate(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));

@@ -406,7 +406,7 @@ function TimelineBoardPageContent({
     if (viewMode !== "timeline" || isMobileViewport) {
       return intendedDayRange;
     }
-    return timelineRange + hiddenDesktopDayIsos.length + 1;
+    return timelineRange + hiddenDesktopDayIsos.length;
   }, [hiddenDesktopDayIsos.length, intendedDayRange, isMobileViewport, timelineRange, viewMode]);
 
   const {
@@ -427,7 +427,21 @@ function TimelineBoardPageContent({
     onTimelineStartHour: setTimelineStartHour,
   });
 
+  const previousBoardIdRef = useRef(currentBoard.id);
+  const previousIsDesktopViewportRef = useRef(isDesktopViewport);
+  const previousViewModeRef = useRef(viewMode);
   useEffect(() => {
+    const boardChanged = previousBoardIdRef.current !== currentBoard.id;
+    const viewportModeChanged = previousIsDesktopViewportRef.current !== isDesktopViewport;
+    const viewModeChanged = previousViewModeRef.current !== viewMode;
+
+    previousBoardIdRef.current = currentBoard.id;
+    previousIsDesktopViewportRef.current = isDesktopViewport;
+    previousViewModeRef.current = viewMode;
+
+    if (!boardChanged && !viewportModeChanged && !viewModeChanged) {
+      return;
+    }
     if (hiddenDesktopDayIsos.length === 0) return;
     setHiddenDesktopDayIsos([]);
   }, [currentBoard.id, hiddenDesktopDayIsos.length, isDesktopViewport, viewMode]);
@@ -449,6 +463,25 @@ function TimelineBoardPageContent({
     buildMockTimelineResponse,
     onRealtimeCardChange: handleRealtimeTrashChange,
   });
+
+  useEffect(() => {
+    if (viewMode !== "timeline" || isMobileViewport) return;
+    if (hiddenDesktopDayIsos.length === 0) return;
+    if ((data?.range ?? 0) >= desktopTimelineFetchRange) return;
+
+    void fetchTimeline(dayWindowStartRef.current, {
+      silent: true,
+      range: desktopTimelineFetchRange,
+    });
+  }, [
+    data?.range,
+    dayWindowStartRef,
+    desktopTimelineFetchRange,
+    fetchTimeline,
+    hiddenDesktopDayIsos.length,
+    isMobileViewport,
+    viewMode,
+  ]);
 
   const fetchTrash = useCallback(async () => {
     const response = await fetch(`/api/boards/${currentBoard.id}/trash`, { cache: "no-store" });
@@ -808,7 +841,7 @@ function TimelineBoardPageContent({
     if (!days.length) return [];
     if (viewMode === "timeline") {
       const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-      if (data?.startOffset !== expectedStartOffset || data?.range !== timelineRange) {
+      if (data?.startOffset !== expectedStartOffset || (data?.range ?? 0) < effectiveDayRange) {
         return [];
       }
     }
@@ -825,13 +858,13 @@ function TimelineBoardPageContent({
     const anchorIndex = Math.max(0, days.findIndex((day) => day.isoDate === anchorDayIso));
     const startIndex = viewMode === "timeline" ? anchorIndex : activeDayIndex;
     return days.slice(startIndex, startIndex + effectiveDayRange);
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, timelineRange, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, hiddenDesktopDayIsos, isDesktopViewport, timelineStartHour, viewMode]);
 
   const timelineDataReady = useMemo(() => {
     if (viewMode !== "timeline") return true;
     const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    return data?.startOffset === expectedStartOffset && data?.range === timelineRange;
-  }, [anchorDayIso, data?.range, data?.startOffset, timelineRange, timelineStartHour, viewMode]);
+    return data?.startOffset === expectedStartOffset && (data?.range ?? 0) >= effectiveDayRange;
+  }, [anchorDayIso, data?.range, data?.startOffset, effectiveDayRange, timelineStartHour, viewMode]);
 
   const renderDays = useMemo(() => {
     if (!timelineDataReady) return [];
@@ -843,12 +876,12 @@ function TimelineBoardPageContent({
     const days = data?.days ?? [];
     if (!days.length) return;
     const expectedStartOffset = getDayDiff(anchorDayIso, getCurrentTimelineIsoDateJst(timelineStartHour));
-    if (data?.startOffset !== expectedStartOffset || data?.range !== timelineRange) return;
+    if (data?.startOffset !== expectedStartOffset || (data?.range ?? 0) < effectiveDayRange) return;
     const nextIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (nextIndex >= 0 && nextIndex !== activeDayIndex) {
       setActiveDayIndex(nextIndex);
     }
-  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, setActiveDayIndex, timelineRange, timelineStartHour, viewMode]);
+  }, [activeDayIndex, anchorDayIso, data?.days, data?.range, data?.startOffset, effectiveDayRange, setActiveDayIndex, timelineStartHour, viewMode]);
 
   const {
     calendarEventsByDay,
