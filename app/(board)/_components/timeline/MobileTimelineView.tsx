@@ -844,9 +844,9 @@ export default function MobileTimelineView({
                       type="button"
                       aria-label="前へ 1日"
                       disabled={status === "loading"}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.preventDefault();
-                        scrollToPane(-1);
+                        await onPrevDay?.();
                       }}
                       className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
                     >
@@ -894,9 +894,9 @@ export default function MobileTimelineView({
                       type="button"
                       aria-label="次へ 1日"
                       disabled={status === "loading"}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.preventDefault();
-                        scrollToPane(1);
+                        await onNextDay?.();
                       }}
                       className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
                     >
