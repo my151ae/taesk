@@ -2,66 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimelineDay } from "@/app/(board)/_utils/timeline-helpers";
-import { PREFETCH_CHUNK_DAYS } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
 import {
-  deriveLoadedRangeFromDays,
   deriveTimelineViewportStateFromAnchor,
   EMPTY_TIMELINE_VIEWPORT_STATE,
   type TimelineViewportState,
 } from "@/app/(board)/_components/timeline/timelineViewportState";
-
-const addDaysToIso = (isoDate: string, delta: number) => {
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + delta);
-  return date.toISOString().slice(0, 10);
-};
-
-export type TimelinePrefetchSpan = {
-  direction: "leading" | "trailing";
-  startIso: string;
-  endIso: string;
-};
-
-export const buildDesktopTimelinePrefetchSpans = ({
-  viewportState,
-  loadedDays,
-  chunkDays = PREFETCH_CHUNK_DAYS,
-}: {
-  viewportState: TimelineViewportState;
-  loadedDays: TimelineDay[];
-  chunkDays?: number;
-}): TimelinePrefetchSpan[] => {
-  const { firstLoadedIso, lastLoadedIso } = deriveLoadedRangeFromDays(loadedDays);
-  const spans: TimelinePrefetchSpan[] = [];
-
-  if (viewportState.nearLeadingEdge && firstLoadedIso) {
-    spans.push({
-      direction: "leading",
-      startIso: addDaysToIso(firstLoadedIso, -chunkDays),
-      endIso: addDaysToIso(firstLoadedIso, -1),
-    });
-  }
-
-  if (viewportState.nearTrailingEdge && lastLoadedIso) {
-    spans.push({
-      direction: "trailing",
-      startIso: addDaysToIso(lastLoadedIso, 1),
-      endIso: addDaysToIso(lastLoadedIso, chunkDays),
-    });
-  }
-
-  return spans;
-};
-
-export const buildTimelinePrefetchSignature = (span: TimelinePrefetchSpan) =>
-  `${span.direction}:${span.startIso}:${span.endIso}`;
-
-export const buildCalendarWindowRangeFromViewportState = (
-  viewportState: TimelineViewportState,
-) => ({
-  windowStartIso: viewportState.windowStartIso,
-  windowEndIso: viewportState.windowEndIso,
-});
+import {
+  buildCalendarWindowRangeFromViewportState,
+  buildTimelinePrefetchSignature,
+  buildTimelinePrefetchSpans,
+} from "@/app/(board)/_components/timeline/timelineViewportHelpers";
 
 export function useDesktopTimelineCoordinator({
   loadedDays,
@@ -126,7 +76,7 @@ export function useDesktopTimelineCoordinator({
 
   useEffect(() => {
     if (!enabled) return;
-    const spans = buildDesktopTimelinePrefetchSpans({
+    const spans = buildTimelinePrefetchSpans({
       viewportState,
       loadedDays,
     });

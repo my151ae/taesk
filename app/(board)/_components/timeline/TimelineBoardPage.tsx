@@ -40,7 +40,7 @@ import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useDesktopTimelineCoordinator } from "@/app/(board)/_hooks/useDesktopTimelineCoordinator";
 import { EMPTY_TIMELINE_VIEWPORT_STATE } from "@/app/(board)/_components/timeline/timelineViewportState";
-import { useMobileTimelineViewportState } from "@/app/(board)/_hooks/useMobileTimelineViewportState";
+import { useMobileTimelineCoordinator } from "@/app/(board)/_hooks/useMobileTimelineCoordinator";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
@@ -849,9 +849,9 @@ function TimelineBoardPageContent({
     ensureTimelineRange,
   });
 
-  const mobileViewportState = useMobileTimelineViewportState({
+  const mobileTimelineCoordinator = useMobileTimelineCoordinator({
     enabled: viewMode === "timeline" && !isDesktopViewport,
-    days: timelineCandidateDays,
+    loadedDays: timelineCandidateDays,
     anchorDayIso,
     dayRange: effectiveDayRange,
     eventsByDay: timelineEventsByDayForViewport,
@@ -859,6 +859,7 @@ function TimelineBoardPageContent({
     overdue: data?.overdue ?? [],
     indicatorTop,
     indicatorDayIso: liveNowIsoDate,
+    ensureTimelineRange,
   });
 
   const activeViewportState = useMemo(() => {
@@ -868,11 +869,29 @@ function TimelineBoardPageContent({
     if (isDesktopViewport) {
       return desktopTimelineCoordinator.viewportState;
     }
-    return mobileViewportState;
+    return mobileTimelineCoordinator.viewportState;
   }, [
     desktopTimelineCoordinator.viewportState,
     isDesktopViewport,
-    mobileViewportState,
+    mobileTimelineCoordinator.viewportState,
+    viewMode,
+  ]);
+
+  const activeCalendarWindowRange = useMemo(() => {
+    if (viewMode === "month") {
+      return {
+        windowStartIso: null,
+        windowEndIso: null,
+      };
+    }
+    if (isDesktopViewport) {
+      return desktopTimelineCoordinator.calendarWindowRange;
+    }
+    return mobileTimelineCoordinator.calendarWindowRange;
+  }, [
+    desktopTimelineCoordinator.calendarWindowRange,
+    isDesktopViewport,
+    mobileTimelineCoordinator.calendarWindowRange,
     viewMode,
   ]);
 
@@ -886,8 +905,8 @@ function TimelineBoardPageContent({
     refreshGoogleCalendar,
   } = useTimelineCalendar({
     calendarPreset,
-    windowStartIso: viewMode === "month" ? null : activeViewportState.windowStartIso,
-    windowEndIso: viewMode === "month" ? null : activeViewportState.windowEndIso,
+    windowStartIso: activeCalendarWindowRange.windowStartIso,
+    windowEndIso: activeCalendarWindowRange.windowEndIso,
     days: renderDays,
   });
 

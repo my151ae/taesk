@@ -11,9 +11,9 @@ import {
 } from "../app/(board)/_components/timeline/timelineViewportState";
 import {
   buildCalendarWindowRangeFromViewportState,
-  buildDesktopTimelinePrefetchSpans,
   buildTimelinePrefetchSignature,
-} from "../app/(board)/_hooks/useDesktopTimelineCoordinator";
+  buildTimelinePrefetchSpans,
+} from "../app/(board)/_components/timeline/timelineViewportHelpers";
 import { resolveMobileTimelineViewportState } from "../app/(board)/_hooks/useMobileTimelineViewportState";
 
 const buildDays = (count: number, startDay = 1) =>
@@ -116,7 +116,7 @@ test.describe("timeline viewport helpers", () => {
       dayRange: 3,
     });
 
-    const spans = buildDesktopTimelinePrefetchSpans({
+    const spans = buildTimelinePrefetchSpans({
       viewportState,
       loadedDays: days,
     });

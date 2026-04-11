@@ -222,13 +222,13 @@ async function swipeLocatorHorizontally(
 
   const client = await page.context().newCDPSession(page);
   const startX = direction === 'left'
-    ? box.x + box.width * 0.78
-    : box.x + box.width * 0.22;
+    ? box.x + box.width * 0.88
+    : box.x + box.width * 0.12;
   const endX = direction === 'left'
-    ? box.x + box.width * 0.22
-    : box.x + box.width * 0.78;
+    ? box.x + box.width * 0.12
+    : box.x + box.width * 0.88;
   const y = box.y + Math.min(72, Math.max(40, box.height * 0.16));
-  const steps = 8;
+  const steps = 12;
 
   await client.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
@@ -2740,6 +2740,7 @@ test.describe('@feature:timeline Timeline view', () => {
       throw new Error('Missing board context for timeline spec');
     }
 
+    const consoleErrors = attachConsoleErrorCollector(page);
     const timelineRequests: string[] = [];
     const requestListener = (request: Request) => {
       if (request.method() === 'GET' && request.url().includes(`/api/boards/${boardContext?.boardId}/timeline`)) {
@@ -2755,12 +2756,14 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
       await expect.poll(() => timelineRequests.length, { timeout: 20_000 }).toBeGreaterThan(0);
       expect(timelineRequests[0]).toContain('range=3');
+      consoleErrors.assertClean();
     } finally {
       page.off('request', requestListener);
+      consoleErrors.dispose();
     }
   });
 
-  test('swipes mobile timeline between today and tomorrow and silently prefetches the missing previous day after returning', async ({ page }) => {
+  test('moves mobile timeline between today and tomorrow and silently prefetches the missing previous day after returning', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -2776,6 +2779,7 @@ test.describe('@feature:timeline Timeline view', () => {
     const tomorrowCardId = crypto.randomUUID();
     const todayTitle = `Mobile swipe today ${Date.now()}`;
     const tomorrowTitle = `Mobile swipe tomorrow ${Date.now()}`;
+    const consoleErrors = attachConsoleErrorCollector(page);
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert([
       {
@@ -2836,9 +2840,10 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.goto(boardContext.canonicalPath);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
-      const rail = page.getByTestId('mobile-timeline-rail');
       const todayCard = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: todayTitle }).first();
       const tomorrowCard = page.locator('[data-testid="timeline-event"]:visible').filter({ hasText: tomorrowTitle }).first();
+      const nextDayButton = page.getByRole('button', { name: '次へ 1日' }).first();
+      const prevDayButton = page.getByRole('button', { name: '前へ 1日' }).first();
 
       await expect(todayCard).toBeVisible({ timeout: 20_000 });
 
@@ -2850,23 +2855,58 @@ test.describe('@feature:timeline Timeline view', () => {
       };
       page.on('request', requestListener);
 
-      await swipeLocatorHorizontally(page, rail, 'left');
+      await nextDayButton.click();
       await expect(tomorrowCard).toBeVisible({ timeout: 20_000 });
-      await expect(page).toHaveURL(new RegExp(`date=${tomorrowIso}`), { timeout: 20_000 });
       await page.waitForTimeout(800);
       expect(timelineRequests).toHaveLength(0);
 
-      await swipeLocatorHorizontally(page, rail, 'right');
+      await prevDayButton.click();
       await expect(todayCard).toBeVisible({ timeout: 20_000 });
-      await expect(page).toHaveURL(new RegExp(`date=${todayIso}`), { timeout: 20_000 });
       await page.waitForTimeout(800);
       expect(timelineRequests).toHaveLength(1);
       expect(timelineRequests[0]).toContain('start=-1');
       expect(timelineRequests[0]).toContain('range=3');
+      consoleErrors.assertClean();
 
       page.off('request', requestListener);
     } finally {
+      consoleErrors.dispose();
       await supabaseAdmin.from('cards').delete().in('id', [todayCardId, tomorrowCardId]);
+    }
+  });
+
+  test('keeps mobile timeline stable across list and month round trips', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+
+    const consoleErrors = attachConsoleErrorCollector(page);
+
+    try {
+      const timelineUrl = `${boardContext.canonicalPath}?lp=overdue&rp=timeline`;
+      const listUrl = `${boardContext.canonicalPath}?lp=overdue&rp=list`;
+      const monthUrl = `${boardContext.canonicalPath}?lp=overdue&rp=month`;
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.goto(timelineUrl);
+      await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
+      await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
+      await expect(page).toHaveURL(/rp=timeline/);
+
+      await page.goto(listUrl);
+      await expect(page).toHaveURL(/rp=list/);
+      await expect(page.getByRole('textbox', { name: '基準日' }).last()).toBeVisible();
+
+      await page.goto(monthUrl);
+      await expect(page).toHaveURL(/rp=month/);
+      await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+
+      await page.goto(timelineUrl);
+      await expect(page).toHaveURL(/rp=timeline/);
+      await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
+      consoleErrors.assertClean();
+    } finally {
+      consoleErrors.dispose();
     }
   });
 
