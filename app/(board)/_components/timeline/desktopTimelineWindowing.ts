@@ -18,6 +18,8 @@ export type DesktopTimelineWindowMetrics = {
 
 export type DesktopTimelineWindowState = {
   anchorIso: string | null;
+  windowStartIso: string | null;
+  windowEndIso: string | null;
   nearLeftEdge: boolean;
   nearRightEdge: boolean;
   firstLoadedIso: string | null;
@@ -85,15 +87,23 @@ export const resolveDesktopTimelineAnchorIso = ({
 export const resolveDesktopTimelineWindowState = ({
   anchorDayIso,
   loadedDays,
+  scrollLeft,
+  columnWidth,
+  dayRange,
   prefetchEdgeDays = PREFETCH_EDGE_DAYS,
 }: {
   anchorDayIso: string;
   loadedDays: TimelineDay[];
+  scrollLeft: number;
+  columnWidth: number;
+  dayRange: number;
   prefetchEdgeDays?: number;
 }): DesktopTimelineWindowState => {
   if (!loadedDays.length) {
     return {
       anchorIso: null,
+      windowStartIso: null,
+      windowEndIso: null,
       nearLeftEdge: false,
       nearRightEdge: false,
       firstLoadedIso: null,
@@ -103,11 +113,22 @@ export const resolveDesktopTimelineWindowState = ({
 
   const anchorIndex = loadedDays.findIndex((day) => day.isoDate === anchorDayIso);
   const safeAnchorIndex = anchorIndex >= 0 ? anchorIndex : 0;
+  const safeColumnWidth = columnWidth > 0 ? columnWidth : 1;
+  const visibleStartIndex = Math.max(
+    0,
+    Math.min(loadedDays.length - 1, Math.floor(scrollLeft / safeColumnWidth)),
+  );
+  const visibleEndIndex = Math.max(
+    visibleStartIndex,
+    Math.min(loadedDays.length - 1, visibleStartIndex + Math.max(1, dayRange) - 1),
+  );
 
   return {
     anchorIso: loadedDays[safeAnchorIndex]?.isoDate ?? null,
-    nearLeftEdge: safeAnchorIndex < prefetchEdgeDays,
-    nearRightEdge: loadedDays.length - safeAnchorIndex - 1 < prefetchEdgeDays,
+    windowStartIso: loadedDays[visibleStartIndex]?.isoDate ?? null,
+    windowEndIso: loadedDays[visibleEndIndex]?.isoDate ?? null,
+    nearLeftEdge: visibleStartIndex < prefetchEdgeDays,
+    nearRightEdge: loadedDays.length - visibleEndIndex - 1 < prefetchEdgeDays,
     firstLoadedIso: loadedDays[0]?.isoDate ?? null,
     lastLoadedIso: loadedDays[loadedDays.length - 1]?.isoDate ?? null,
   };

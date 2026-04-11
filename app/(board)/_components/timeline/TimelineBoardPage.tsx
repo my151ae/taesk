@@ -38,7 +38,12 @@ import {
 import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
-import type { DesktopTimelineWindowState } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
+import { useDesktopTimelineCoordinator } from "@/app/(board)/_hooks/useDesktopTimelineCoordinator";
+import {
+  adaptMobileTimelineViewStateToViewportState,
+  deriveTimelineViewportStateFromAnchor,
+  EMPTY_TIMELINE_VIEWPORT_STATE,
+} from "@/app/(board)/_components/timeline/timelineViewportState";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
@@ -96,12 +101,6 @@ const deriveListWindowFromRange = (range?: number | null): ListWindow => {
   if (normalized >= 90) return { before: 0, after: 89 };
   if (normalized >= 60) return { before: 0, after: 59 };
   return { before: 0, after: 29 };
-};
-
-const addDaysToIso = (isoDate: string, delta: number) => {
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + delta);
-  return date.toISOString().slice(0, 10);
 };
 
 const canPersistBoardPreferences = (board: Board) => {
@@ -825,6 +824,15 @@ function TimelineBoardPageContent({
     return timelineCandidateDays;
   }, [timelineCandidateDays, timelineDataReady]);
 
+  const timelineEventsByDayForViewport = useMemo(() => {
+    const result: Record<string, TimelineEvent[]> = {};
+    data?.events?.forEach((event) => {
+      if (!result[event.due_date]) result[event.due_date] = [];
+      result[event.due_date].push(event);
+    });
+    return result;
+  }, [data?.events]);
+
   useEffect(() => {
     if (viewMode !== "timeline") return;
     if (isDesktopViewport) return;
@@ -836,39 +844,66 @@ function TimelineBoardPageContent({
     }
   }, [activeDayIndex, anchorDayIso, isDesktopViewport, setActiveDayIndex, timelineCandidateDays, viewMode]);
 
-  const lastRequestedPrefetchRef = useRef<{ left: string | null; right: string | null }>({
-    left: null,
-    right: null,
+  const desktopTimelineCoordinator = useDesktopTimelineCoordinator({
+    loadedDays: timelineCandidateDays,
+    anchorDayIso,
+    dayRange: effectiveDayRange,
+    enabled: viewMode === "timeline" && isDesktopViewport,
+    ensureTimelineRange,
   });
 
-  const handleTimelineWindowStateChange = useCallback((state: DesktopTimelineWindowState) => {
-    if (viewMode !== "timeline" || !isDesktopViewport) return;
-    if (state.nearLeftEdge && state.firstLoadedIso) {
-      const startIso = addDaysToIso(state.firstLoadedIso, -7);
-      const endIso = addDaysToIso(state.firstLoadedIso, -1);
-      const signature = `${startIso}:${endIso}`;
-      if (lastRequestedPrefetchRef.current.left !== signature) {
-        lastRequestedPrefetchRef.current.left = signature;
-        void ensureTimelineRange(startIso, endIso, { silent: true });
-      }
+  const mobileViewportState = useMemo(() => {
+    if (viewMode !== "timeline" || isDesktopViewport) {
+      return EMPTY_TIMELINE_VIEWPORT_STATE;
     }
-    if (state.nearRightEdge && state.lastLoadedIso) {
-      const startIso = addDaysToIso(state.lastLoadedIso, 1);
-      const endIso = addDaysToIso(state.lastLoadedIso, 7);
-      const signature = `${startIso}:${endIso}`;
-      if (lastRequestedPrefetchRef.current.right !== signature) {
-        lastRequestedPrefetchRef.current.right = signature;
-        void ensureTimelineRange(startIso, endIso, { silent: true });
-      }
-    }
-  }, [ensureTimelineRange, isDesktopViewport, viewMode]);
+    return adaptMobileTimelineViewStateToViewportState({
+      days: timelineCandidateDays,
+      anchorDayIso,
+      eventsByDay: timelineEventsByDayForViewport,
+      calendarEventsByDay: {},
+      calendarAllDayByDay: {},
+      abBuckets: data?.abBuckets ?? {},
+      overdue: data?.overdue ?? [],
+      indicatorTop,
+      indicatorDayIso: liveNowIsoDate,
+      activeDragCardId: null,
+    });
+  }, [
+    anchorDayIso,
+    data?.abBuckets,
+    data?.overdue,
+    indicatorTop,
+    isDesktopViewport,
+    liveNowIsoDate,
+    timelineEventsByDayForViewport,
+    timelineCandidateDays,
+    viewMode,
+  ]);
 
-  const calendarWindowDays = useMemo(() => {
-    if (viewMode === "timeline" && isDesktopViewport) {
-      return visibleDays;
+  const activeViewportState = useMemo(() => {
+    if (viewMode === "month") {
+      return EMPTY_TIMELINE_VIEWPORT_STATE;
     }
-    return visibleDays;
-  }, [isDesktopViewport, viewMode, visibleDays]);
+    if (isDesktopViewport) {
+      return desktopTimelineCoordinator.viewportState;
+    }
+    if (mobileViewportState.windowStartIso && mobileViewportState.windowEndIso) {
+      return mobileViewportState;
+    }
+    return deriveTimelineViewportStateFromAnchor({
+      days: timelineCandidateDays,
+      anchorDayIso,
+      dayRange: effectiveDayRange,
+    });
+  }, [
+    anchorDayIso,
+    desktopTimelineCoordinator.viewportState,
+    effectiveDayRange,
+    isDesktopViewport,
+    mobileViewportState,
+    timelineCandidateDays,
+    viewMode,
+  ]);
 
   const {
     calendarEventsByDay,
@@ -880,15 +915,9 @@ function TimelineBoardPageContent({
     refreshGoogleCalendar,
   } = useTimelineCalendar({
     calendarPreset,
-    calendarRangeStart: viewMode === "month" ? null : calendarWindowDays[0] ? new Date(calendarWindowDays[0].isoDate) : null,
-    calendarRangeEnd:
-      viewMode === "month"
-        ? null
-        : calendarWindowDays[calendarWindowDays.length - 1]
-          ? new Date(calendarWindowDays[calendarWindowDays.length - 1].isoDate)
-          : null,
+    windowStartIso: viewMode === "month" ? null : activeViewportState.windowStartIso,
+    windowEndIso: viewMode === "month" ? null : activeViewportState.windowEndIso,
     days: renderDays,
-    windowDays: calendarWindowDays,
   });
 
   const googleCalendarLabel = useMemo(() => {
@@ -1572,7 +1601,7 @@ function TimelineBoardPageContent({
     pendingTitleEditCardId,
     onPendingTitleEditConsumed: () => setPendingTitleEditCardId(null),
     onTimelineAnchorChange: handleVisibleAnchorChange,
-    onTimelineWindowStateChange: handleTimelineWindowStateChange,
+    onTimelineWindowStateChange: desktopTimelineCoordinator.handleViewportStateChange,
     listAnchorDate,
     listWindowPresetKey,
     handleListWindowPresetChange: handleListWindowPresetChangeWithFocusRestore,

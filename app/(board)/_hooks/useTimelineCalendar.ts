@@ -11,20 +11,17 @@ const MAX_CALENDAR_RANGE_DAYS = 130;
 
 type UseTimelineCalendarArgs = {
   calendarPreset: CalendarPreset;
-  calendarRangeStart: Date | null;
-  calendarRangeEnd: Date | null;
+  windowStartIso: string | null;
+  windowEndIso: string | null;
   days: TimelineDay[];
-  windowDays?: TimelineDay[];
 };
 
 export const useTimelineCalendar = ({
   calendarPreset,
-  calendarRangeStart,
-  calendarRangeEnd,
+  windowStartIso,
+  windowEndIso,
   days,
-  windowDays,
 }: UseTimelineCalendarArgs) => {
-  const visibleWindowDays = windowDays && windowDays.length > 0 ? windowDays : days;
   const expandRangeWithBuffer = useCallback((start: Date | null, end: Date | null) => {
     if (!start || !end) return { start, end };
 
@@ -67,15 +64,10 @@ export const useTimelineCalendar = ({
       end.setUTCDate(end.getUTCDate() + 7);
       return { start, end };
     }
-    const visibleRangeStart =
-      calendarRangeStart ?? (visibleWindowDays[0] ? new Date(visibleWindowDays[0].isoDate) : null);
-    const visibleRangeEnd =
-      calendarRangeEnd ??
-      (visibleWindowDays[visibleWindowDays.length - 1]
-        ? new Date(visibleWindowDays[visibleWindowDays.length - 1].isoDate)
-        : null);
+    const visibleRangeStart = windowStartIso ? new Date(`${windowStartIso}T00:00:00.000Z`) : null;
+    const visibleRangeEnd = windowEndIso ? new Date(`${windowEndIso}T00:00:00.000Z`) : null;
     return expandRangeWithBuffer(visibleRangeStart, visibleRangeEnd);
-  }, [calendarPreset, calendarRangeEnd, calendarRangeStart, expandRangeWithBuffer, startOfWeekJst, visibleWindowDays]);
+  }, [calendarPreset, expandRangeWithBuffer, startOfWeekJst, windowEndIso, windowStartIso]);
 
   const {
     events: googleCalendarEvents,

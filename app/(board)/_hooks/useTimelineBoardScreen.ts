@@ -17,15 +17,16 @@ import type { TimelineSearchResultItem, TimelineTagSummary } from "@/app/(board)
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import { useTimelineBoardViewModels } from "@/app/(board)/_hooks/useTimelineBoardViewModels";
 import { useTimelineCardContextMenuItems } from "@/app/(board)/_hooks/useTimelineCardContextMenuItems";
+import { useDesktopTimelineScreen } from "@/app/(board)/_hooks/useDesktopTimelineScreen";
+import { useMobileTimelineScreen } from "@/app/(board)/_hooks/useMobileTimelineScreen";
 import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
-import { getTagsSectionPresentation } from "@/app/(board)/_components/timeline/tags-section-presentation";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
-import type { DesktopTimelineWindowState } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
+import type { TimelineViewportState } from "@/app/(board)/_components/timeline/timelineViewportState";
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
@@ -35,7 +36,7 @@ export type TimelineBoardScreenContentProps = Omit<
   "parseResult" | "onResetInvalidUrl" | "onMoveToCanonicalUrl" | "bucketCreateMenu"
 >;
 
-type UseTimelineBoardScreenArgs = {
+export type UseTimelineBoardScreenArgs = {
   currentBoard: Board;
   availableBoards: Board[];
   availableTeams: TeamView[];
@@ -174,7 +175,7 @@ type UseTimelineBoardScreenArgs = {
   pendingTitleEditCardId: string | null;
   onPendingTitleEditConsumed: () => void;
   onTimelineAnchorChange: (isoDate: string) => void;
-  onTimelineWindowStateChange: (state: DesktopTimelineWindowState) => void;
+  onTimelineWindowStateChange: (state: TimelineViewportState) => void;
   listAnchorDate: string;
   listWindowPresetKey: ListWindowPresetKey;
   handleListWindowPresetChange: (nextPreset: ListWindowPresetKey) => void;
@@ -537,11 +538,6 @@ export function useTimelineBoardScreen({
     handleViewModeChange,
   });
 
-  const desktopActiveView = viewModels.desktop.mainPanel.tabs.activeKey;
-  const desktopTabItems = viewModels.desktop.mainPanel.tabs.items.filter((item) =>
-    viewModels.desktop.mainPanel.tabs.availableKeys.includes(item.key),
-  );
-
   const headerProps: TimelineBoardScreenContentProps["headerProps"] = {
     board: currentBoard,
     modalBoards: availableBoards,
@@ -610,98 +606,44 @@ export function useTimelineBoardScreen({
     activeLaneId,
   };
 
-  const currentMobileSection =
-    leftPanelProps.sections.find((section) => section.key === mobileLeftPanelMode) ??
-    leftPanelProps.sections.find((section) => section.key === "overdue");
+  const desktop = useDesktopTimelineScreen({
+    viewModels,
+    timelineTransitionPending,
+    overdueSortOrder,
+    onOverdueSortOrderChange,
+    handleRenameCardTitle,
+    sensors,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+    handleDragCancel,
+    overlayCardData,
+    overlayTimelineEvent,
+    overlayBucketEntryItem: overlayBucketEntry?.item ?? null,
+    overlayOverdueEntryItem: overlayOverdueEntry?.item ?? null,
+    leftPanelProps,
+  });
 
-  const tagsSectionPresentation = getTagsSectionPresentation({
-    selectedTag: selectedTags[0] ?? null,
-    tagSummariesCount: tagSummaries.length,
-    tagResultsCount: tagResults.length,
+  const mobile = useMobileTimelineScreen({
+    viewModels,
+    viewMode,
+    timelineTransitionPending,
+    leftPanelProps,
+    mobileLeftPanelMode,
+    selectedTags,
+    tagSummaries,
+    tagResults,
+    searchQuery,
+    overdueCount: overdue.length,
+    onMobileLeftPanelSelect,
+    overdueSortOrder,
+    onOverdueSortOrderChange,
   });
 
   return {
     headerProps,
-    desktop: {
-      activeView: desktopActiveView,
-      timelineTransitionPending,
-      tabItems: desktopTabItems,
-      onTabChange: viewModels.desktop.mainPanel.tabs.onChange,
-      leftPanelProps,
-      overdueSortOrder,
-      onOverdueSortOrderChange,
-      timelineToolbarProps: viewModels.desktop.mainPanel.views.timeline.toolbar,
-      timelineViewProps: {
-        ...viewModels.desktop.mainPanel.views.timeline.body,
-        onRenameCardTitle: handleRenameCardTitle,
-      },
-      listToolbarProps: viewModels.desktop.mainPanel.views.list.toolbar,
-      listViewProps: {
-        ...viewModels.desktop.mainPanel.views.list.body,
-        onRenameCardTitle: handleRenameCardTitle,
-      },
-      monthToolbarProps: viewModels.desktop.mainPanel.views.month.toolbar,
-      monthViewProps: {
-        ...viewModels.desktop.mainPanel.views.month.body,
-        onRenameCardTitle: handleRenameCardTitle,
-      },
-      dndProps: {
-        sensors,
-        handleDragStart,
-        handleDragMove,
-        handleDragEnd,
-        handleDragCancel,
-      },
-      overlayProps: {
-        overlayCardData,
-        overlayTimelineEvent,
-        overlayBucketCard: overlayBucketEntry?.item ?? null,
-        overlayOverdueCard: overlayOverdueEntry?.item ?? null,
-      },
-    },
-    mobile: {
-      viewMode,
-      timelineTransitionPending,
-      timelineProps: viewModels.mobile.timeline,
-      listProps: viewModels.mobile.list,
-      monthProps: viewModels.mobile.month,
-      leftPanelProps,
-      selectorPresentation: {
-        currentSection:
-          mobileLeftPanelMode === "completed" ||
-          mobileLeftPanelMode === "notifications" ||
-          mobileLeftPanelMode === "search" ||
-          mobileLeftPanelMode === "tags" ||
-          mobileLeftPanelMode === "trash"
-            ? mobileLeftPanelMode
-            : "overdue",
-        selectorItems: leftPanelProps.sections.map((section) => ({
-          key: section.key,
-          label: section.label,
-        })),
-        triggerLabel:
-          currentMobileSection?.key === "search"
-            ? searchQuery.trim() || "Search"
-            : currentMobileSection?.key === "tags"
-              ? tagsSectionPresentation.triggerLabel
-              : currentMobileSection?.label ?? "Overdue",
-        onSelect: onMobileLeftPanelSelect,
-      },
-      currentSectionChrome: {
-        title: currentMobileSection?.label ?? "Overdue",
-        count: currentMobileSection?.count ?? overdue.length,
-        tone: currentMobileSection?.tone ?? "danger",
-        headerAccessory:
-          mobileLeftPanelMode === "overdue"
-            ? {
-                kind: "overdue-sort",
-                order: overdueSortOrder,
-                onChange: onOverdueSortOrderChange,
-              }
-            : null,
-        secondaryActionsKind: mobileLeftPanelMode === "notifications" ? "notifications" : null,
-      },
-    },
+    desktop,
+    mobile,
     dialogsProps: {
       showShareDialog,
       setShowShareDialog,

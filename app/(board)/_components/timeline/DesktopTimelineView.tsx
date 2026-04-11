@@ -33,11 +33,14 @@ import {
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 import {
   ANCHOR_SWITCH_THRESHOLD,
-  type DesktopTimelineWindowState,
   resolveDesktopTimelineAnchorIso,
   resolveDesktopTimelineWindowMetrics,
   resolveDesktopTimelineWindowState,
 } from "@/app/(board)/_components/timeline/desktopTimelineWindowing";
+import {
+  adaptDesktopWindowStateToViewportState,
+  type TimelineViewportState,
+} from "@/app/(board)/_components/timeline/timelineViewportState";
 import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
@@ -109,7 +112,7 @@ export type DesktopTimelineViewProps = {
   currentIsoDate: string | null;
   currentMinutes: number | null;
   onAnchorDayChange?: (isoDate: string) => void;
-  onWindowStateChange?: (state: DesktopTimelineWindowState) => void;
+  onWindowStateChange?: (state: TimelineViewportState) => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -487,15 +490,20 @@ export function DesktopTimelineView({
   }, [anchorDayIso, columnWidth, days]);
 
   useEffect(() => {
-    const nextWindowState = resolveDesktopTimelineWindowState({
+    const nextWindowState = adaptDesktopWindowStateToViewportState(
+      resolveDesktopTimelineWindowState({
       anchorDayIso,
       loadedDays: days,
-    });
+      scrollLeft,
+      columnWidth,
+      dayRange,
+    }),
+    );
     const signature = JSON.stringify(nextWindowState);
     if (signature === lastWindowStateSignatureRef.current) return;
     lastWindowStateSignatureRef.current = signature;
     onWindowStateChange?.(nextWindowState);
-  }, [anchorDayIso, days, onWindowStateChange]);
+  }, [anchorDayIso, columnWidth, dayRange, days, onWindowStateChange, scrollLeft]);
 
   useEffect(() => {
     return () => {
