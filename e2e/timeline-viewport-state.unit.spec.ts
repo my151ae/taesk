@@ -14,6 +14,7 @@ import {
   buildDesktopTimelinePrefetchSpans,
   buildTimelinePrefetchSignature,
 } from "../app/(board)/_hooks/useDesktopTimelineCoordinator";
+import { resolveMobileTimelineViewportState } from "../app/(board)/_hooks/useMobileTimelineViewportState";
 
 const buildDays = (count: number, startDay = 1) =>
   Array.from({ length: count }, (_, index) => {
@@ -131,6 +132,50 @@ test.describe("timeline viewport helpers", () => {
     expect(buildCalendarWindowRangeFromViewportState(viewportState)).toEqual({
       windowStartIso: "2026-04-02",
       windowEndIso: "2026-04-04",
+    });
+  });
+
+  test("mobile viewport resolver falls back to anchor-derived range and respects disabled state", async () => {
+    const days = buildDays(6);
+
+    expect(
+      resolveMobileTimelineViewportState({
+        enabled: false,
+        days,
+        anchorDayIso: "2026-04-03",
+        dayRange: 3,
+        eventsByDay: {},
+        abBuckets: {},
+        overdue: [],
+        indicatorTop: null,
+        indicatorDayIso: null,
+      }),
+    ).toEqual({
+      anchorDayIso: null,
+      windowStartIso: null,
+      windowEndIso: null,
+      nearLeadingEdge: false,
+      nearTrailingEdge: false,
+    });
+
+    expect(
+      resolveMobileTimelineViewportState({
+        enabled: true,
+        days,
+        anchorDayIso: "2026-04-05",
+        dayRange: 3,
+        eventsByDay: {},
+        abBuckets: {},
+        overdue: [],
+        indicatorTop: null,
+        indicatorDayIso: null,
+      }),
+    ).toEqual({
+      anchorDayIso: "2026-04-05",
+      windowStartIso: "2026-04-04",
+      windowEndIso: "2026-04-06",
+      nearLeadingEdge: false,
+      nearTrailingEdge: true,
     });
   });
 });

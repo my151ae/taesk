@@ -39,11 +39,8 @@ import { buildMockTimeline } from "@/app/(board)/_utils/timeline-board-helpers";
 import { applyCardUpdate } from "@/app/(board)/_utils/card-updates";
 import { useTimelineCalendar } from "@/app/(board)/_hooks/useTimelineCalendar";
 import { useDesktopTimelineCoordinator } from "@/app/(board)/_hooks/useDesktopTimelineCoordinator";
-import {
-  adaptMobileTimelineViewStateToViewportState,
-  deriveTimelineViewportStateFromAnchor,
-  EMPTY_TIMELINE_VIEWPORT_STATE,
-} from "@/app/(board)/_components/timeline/timelineViewportState";
+import { EMPTY_TIMELINE_VIEWPORT_STATE } from "@/app/(board)/_components/timeline/timelineViewportState";
+import { useMobileTimelineViewportState } from "@/app/(board)/_hooks/useMobileTimelineViewportState";
 import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
@@ -852,33 +849,17 @@ function TimelineBoardPageContent({
     ensureTimelineRange,
   });
 
-  const mobileViewportState = useMemo(() => {
-    if (viewMode !== "timeline" || isDesktopViewport) {
-      return EMPTY_TIMELINE_VIEWPORT_STATE;
-    }
-    return adaptMobileTimelineViewStateToViewportState({
-      days: timelineCandidateDays,
-      anchorDayIso,
-      eventsByDay: timelineEventsByDayForViewport,
-      calendarEventsByDay: {},
-      calendarAllDayByDay: {},
-      abBuckets: data?.abBuckets ?? {},
-      overdue: data?.overdue ?? [],
-      indicatorTop,
-      indicatorDayIso: liveNowIsoDate,
-      activeDragCardId: null,
-    });
-  }, [
+  const mobileViewportState = useMobileTimelineViewportState({
+    enabled: viewMode === "timeline" && !isDesktopViewport,
+    days: timelineCandidateDays,
     anchorDayIso,
-    data?.abBuckets,
-    data?.overdue,
+    dayRange: effectiveDayRange,
+    eventsByDay: timelineEventsByDayForViewport,
+    abBuckets: data?.abBuckets ?? {},
+    overdue: data?.overdue ?? [],
     indicatorTop,
-    isDesktopViewport,
-    liveNowIsoDate,
-    timelineEventsByDayForViewport,
-    timelineCandidateDays,
-    viewMode,
-  ]);
+    indicatorDayIso: liveNowIsoDate,
+  });
 
   const activeViewportState = useMemo(() => {
     if (viewMode === "month") {
@@ -887,21 +868,11 @@ function TimelineBoardPageContent({
     if (isDesktopViewport) {
       return desktopTimelineCoordinator.viewportState;
     }
-    if (mobileViewportState.windowStartIso && mobileViewportState.windowEndIso) {
-      return mobileViewportState;
-    }
-    return deriveTimelineViewportStateFromAnchor({
-      days: timelineCandidateDays,
-      anchorDayIso,
-      dayRange: effectiveDayRange,
-    });
+    return mobileViewportState;
   }, [
-    anchorDayIso,
     desktopTimelineCoordinator.viewportState,
-    effectiveDayRange,
     isDesktopViewport,
     mobileViewportState,
-    timelineCandidateDays,
     viewMode,
   ]);
 
