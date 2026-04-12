@@ -55,7 +55,7 @@ const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 export type HorizontalStepRequest =
-  | { id: number; direction: "prev" | "next" }
+  | { id: number; direction: "prev" | "next" | "today" | "prevRange" | "nextRange" }
   | null;
 
 export type DesktopTimelineViewProps = {
@@ -166,7 +166,7 @@ export function DesktopTimelineToolbar({
     <div className="border-b border-slate-100 bg-white px-3">
       <div className="flex h-8 items-center gap-2 overflow-x-auto">
         <button type="button" onClick={onPrevDayRange} disabled={status === "loading"} data-testid="timeline-toolbar-prev-range" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
-          {"<<"}
+          {`<${dayRange}`}
         </button>
         <button type="button" onClick={onPrevDay} disabled={status === "loading"} data-testid="timeline-toolbar-prev-day" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"<1"}
@@ -178,7 +178,7 @@ export function DesktopTimelineToolbar({
           {"1>"}
         </button>
         <button type="button" onClick={onNextDayRange} disabled={status === "loading"} data-testid="timeline-toolbar-next-range" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
-          {">>"}
+          {`${dayRange}>`}
         </button>
         <div className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-[11px] text-slate-700">
           <button
@@ -602,9 +602,20 @@ export function DesktopTimelineView({
       consumeRequest();
       return;
     }
-    const targetIndex = request.direction === "next"
-      ? Math.min(currentDays.length - 1, currentIndex + 1)
-      : Math.max(0, currentIndex - 1);
+    let targetIndex: number;
+    if (request.direction === "today") {
+      const todayIso = getCurrentTimelineIsoDateJst(timelineStartHour);
+      targetIndex = currentDays.findIndex((day) => day.isoDate === todayIso);
+      if (targetIndex < 0) targetIndex = 0; // 見つからない場合は先頭
+    } else if (request.direction === "nextRange") {
+      targetIndex = Math.min(currentDays.length - 1, currentIndex + dayRange);
+    } else if (request.direction === "prevRange") {
+      targetIndex = Math.max(0, currentIndex - dayRange);
+    } else {
+      targetIndex = request.direction === "next"
+        ? Math.min(currentDays.length - 1, currentIndex + 1)
+        : Math.max(0, currentIndex - 1);
+    }
     const targetLeft = targetIndex * currentColumnWidth;
 
     if (targetIndex === currentIndex || Math.abs(liveScrollLeft - targetLeft) < 1) {

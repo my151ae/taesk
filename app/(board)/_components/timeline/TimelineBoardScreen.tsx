@@ -339,6 +339,15 @@ export default function TimelineBoardScreen({
       onNextDay: () => {
         setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "next" });
       },
+      onToday: () => {
+        setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "today" });
+      },
+      onPrevDayRange: () => {
+        setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "prevRange" });
+      },
+      onNextDayRange: () => {
+        setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "nextRange" });
+      },
     };
   }, [desktop.activeView, desktop.timelineToolbarProps]);
 
