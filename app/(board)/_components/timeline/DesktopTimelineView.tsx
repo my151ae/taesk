@@ -19,6 +19,8 @@ import {
   minuteToPixels,
   pixelsToMinutes,
   getTimelineHeight,
+  getCurrentTimelineIsoDateJst,
+  formatDayLabel,
 } from "@/app/(board)/_utils/timeline-helpers";
 import {
   useTimelineZoomStore,
@@ -130,6 +132,7 @@ export type DesktopTimelineToolbarProps = {
   onPrevDayRange: () => void;
   onNextDayRange: () => void;
   onToday: () => void;
+  timelineStartHour?: number;
 };
 
 export function DesktopTimelineToolbar({
@@ -141,7 +144,11 @@ export function DesktopTimelineToolbar({
   onPrevDayRange,
   onNextDayRange,
   onToday,
+  timelineStartHour = 5,
 }: DesktopTimelineToolbarProps) {
+  const todayIso = useMemo(() => getCurrentTimelineIsoDateJst(timelineStartHour), [timelineStartHour]);
+  const todayLabel = useMemo(() => formatDayLabel(todayIso, todayIso), [todayIso]);
+
   const dayRangeOptions = useMemo(
     () =>
       [1, 2, 3, 4, 5, 6, 7].map((days) => ({
@@ -165,7 +172,7 @@ export function DesktopTimelineToolbar({
           {"<1"}
         </button>
         <button type="button" onClick={onToday} disabled={status === "loading"} data-testid="timeline-toolbar-today" data-focus-group="toolbar" data-focus-part="control" className={todayButtonClassName}>
-          Today
+          {todayLabel}
         </button>
         <button type="button" onClick={onNextDay} disabled={status === "loading"} data-testid="timeline-toolbar-next-day" data-focus-group="toolbar" data-focus-part="control" className={buttonClassName}>
           {"1>"}
@@ -527,12 +534,18 @@ export function DesktopTimelineView({
     beginProgrammaticHorizontalMotion("external");
     container.scrollTo({ left: targetLeft, behavior: "auto" });
 
+    // behavior: "auto" は即時移動のため、その後の windowMetrics 計算に備えて
+    // scrollLeft state を即座に同期させる。これを行わないと、RAF までの数ミリ秒間
+    // 古い scrollLeft に基づいて leftSpacerWidth が計算され、コンテンツが
+    // 画面外に飛ばされて「枠が空」に見えるバグが発生する。
+    setScrollLeft(targetLeft);
+
     if (pendingExternalSettleRafRef.current != null) {
       window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
     }
+    // 少し遅延させてフラグをリセットし、ブラウザのスクロールイベント収束を待つ
     pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
       pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
-        setScrollLeft(container.scrollLeft);
         resetHorizontalMotionFlags();
         pendingExternalSettleRafRef.current = null;
       });

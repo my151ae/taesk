@@ -725,7 +725,10 @@ export default function TimelineBoardScreen({
                 {renderDesktopShell(
                   <>
                     {renderDesktopTabs()}
-                    <DesktopTimelineToolbar {...desktopTimelineToolbarProps} />
+                    <DesktopTimelineToolbar
+                      {...desktopTimelineToolbarProps}
+                      timelineStartHour={desktop.timelineViewProps.timelineStartHour}
+                    />
                     {desktop.timelineTransitionPending ? (
                       <TimelineLoadingPlaceholder />
                     ) : (
