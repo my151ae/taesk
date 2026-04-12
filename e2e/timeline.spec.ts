@@ -768,6 +768,20 @@ test.describe('@feature:timeline Timeline view', () => {
     const consoleErrors = attachConsoleErrorCollector(page);
     const todayIso = isoDateJst();
     const tomorrowIso = shiftIsoDateJst(1);
+    const readHorizontalAlignment = async () =>
+      page.getByTestId('desktop-timeline-horizontal-scroll').evaluate((element) => {
+        if (!(element instanceof HTMLDivElement)) {
+          throw new Error('desktop timeline horizontal scroller not found');
+        }
+        const firstDayHeader = element.querySelector('[class*="grid"] > div');
+        if (!(firstDayHeader instanceof HTMLElement)) {
+          throw new Error('desktop timeline day header not found');
+        }
+        return {
+          scrollLeft: element.scrollLeft,
+          columnWidth: firstDayHeader.offsetWidth,
+        };
+      });
 
     try {
       await page.goto(boardContext!.canonicalPath);
@@ -776,12 +790,24 @@ test.describe('@feature:timeline Timeline view', () => {
       await page.getByTestId('timeline-toolbar-next-day').click();
       await expect(page).toHaveURL(new RegExp(`date=${tomorrowIso}`), { timeout: 20_000 });
       await expect(page.locator(`text=${formatHeaderDateLabel(tomorrowIso)}`).first()).toBeVisible({ timeout: 20_000 });
+      await expect
+        .poll(async () => {
+          const { scrollLeft, columnWidth } = await readHorizontalAlignment();
+          return Math.abs(scrollLeft / columnWidth - Math.round(scrollLeft / columnWidth));
+        })
+        .toBeLessThan(0.01);
 
       await page.getByTestId('timeline-toolbar-prev-day').click();
       await expect(page).toHaveURL(new RegExp(`date=${todayIso}`), { timeout: 20_000 });
       await expect(page.locator(`text=/Today\\s+${formatHeaderDateLabel(todayIso).replace('/', '\\/')}/`).first()).toBeVisible({
         timeout: 20_000,
       });
+      await expect
+        .poll(async () => {
+          const { scrollLeft, columnWidth } = await readHorizontalAlignment();
+          return Math.abs(scrollLeft / columnWidth - Math.round(scrollLeft / columnWidth));
+        })
+        .toBeLessThan(0.01);
 
       consoleErrors.assertClean();
     } finally {

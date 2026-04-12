@@ -41,6 +41,7 @@ import {
   adaptDesktopWindowStateToViewportState,
   type TimelineViewportState,
 } from "@/app/(board)/_components/timeline/timelineViewportState";
+import { useDesktopTimelineHorizontalMotion } from "@/app/(board)/_hooks/useDesktopTimelineHorizontalMotion";
 import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMenuSelect";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
@@ -51,6 +52,9 @@ const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
 const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
+export type HorizontalStepRequest =
+  | { id: number; direction: "prev" | "next" }
+  | null;
 
 export type DesktopTimelineViewProps = {
   timelineHeaderRef: React.RefObject<HTMLDivElement>;
@@ -113,6 +117,8 @@ export type DesktopTimelineViewProps = {
   currentMinutes: number | null;
   onAnchorDayChange?: (isoDate: string) => void;
   onWindowStateChange?: (state: TimelineViewportState) => void;
+  horizontalStepRequest?: HorizontalStepRequest;
+  onHorizontalStepRequestConsumed?: (requestId: number) => void;
 };
 
 export type DesktopTimelineToolbarProps = {
@@ -264,6 +270,8 @@ export function DesktopTimelineView({
   currentMinutes,
   onAnchorDayChange,
   onWindowStateChange,
+  horizontalStepRequest,
+  onHorizontalStepRequestConsumed,
 }: DesktopTimelineViewProps) {
   const handleArrowKeyFocus = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     handleTimelineCardArrowFocus(event);
@@ -280,6 +288,7 @@ export function DesktopTimelineView({
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
+  const { animateTo, cancel: cancelHorizontalMotion, isAnimatingRef } = useDesktopTimelineHorizontalMotion();
 
   // Zoom State
   const hourHeight = useTimelineZoomStore((state) => state.hourHeight);
@@ -429,6 +438,18 @@ export function DesktopTimelineView({
     onMount?.();
   }, [onMount]);
 
+  const beginProgrammaticHorizontalMotion = useCallback((source: "external" | null = "external") => {
+    programmaticHorizontalScrollRef.current = true;
+    isSettlingScrollRef.current = true;
+    scrollSyncSourceRef.current = source;
+  }, []);
+
+  const resetHorizontalMotionFlags = useCallback(() => {
+    programmaticHorizontalScrollRef.current = false;
+    isSettlingScrollRef.current = false;
+    scrollSyncSourceRef.current = null;
+  }, []);
+
   useEffect(() => {
     const container = horizontalScrollRef.current;
     if (!container) return;
@@ -449,13 +470,17 @@ export function DesktopTimelineView({
       if (pendingExternalSettleRafRef.current != null) {
         window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
       }
+      cancelHorizontalMotion();
+      resetHorizontalMotionFlags();
       observer.disconnect();
     };
-  }, []);
+  }, [cancelHorizontalMotion, resetHorizontalMotionFlags]);
 
   useEffect(() => {
     const container = horizontalScrollRef.current;
-    if (!container || columnWidth <= 0) return;
+    if (!container) return;
+    if (columnWidth <= 0) return;
+    cancelHorizontalMotion();
     const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (anchorIndex < 0) return;
     const targetLeft = anchorIndex * columnWidth;
@@ -463,9 +488,7 @@ export function DesktopTimelineView({
     if (lastProgrammaticTargetLeftRef.current === targetLeft) return;
     lastProgrammaticTargetLeftRef.current = targetLeft;
     lastEmittedAnchorRef.current = anchorDayIso;
-    scrollSyncSourceRef.current = "external";
-    isSettlingScrollRef.current = true;
-    programmaticHorizontalScrollRef.current = true;
+    beginProgrammaticHorizontalMotion("external");
     container.scrollTo({ left: targetLeft, behavior: "auto" });
     if (pendingExternalSettleRafRef.current != null) {
       window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
@@ -473,9 +496,7 @@ export function DesktopTimelineView({
     pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
       pendingExternalSettleRafRef.current = window.requestAnimationFrame(() => {
         setScrollLeft(container.scrollLeft);
-        scrollSyncSourceRef.current = null;
-        isSettlingScrollRef.current = false;
-        programmaticHorizontalScrollRef.current = false;
+        resetHorizontalMotionFlags();
         pendingExternalSettleRafRef.current = null;
       });
     });
@@ -483,11 +504,111 @@ export function DesktopTimelineView({
       if (pendingExternalSettleRafRef.current != null) {
         window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
       }
-      programmaticHorizontalScrollRef.current = false;
-      isSettlingScrollRef.current = false;
-      scrollSyncSourceRef.current = null;
+      resetHorizontalMotionFlags();
     };
-  }, [anchorDayIso, columnWidth, days]);
+  }, [anchorDayIso, beginProgrammaticHorizontalMotion, cancelHorizontalMotion, columnWidth, dayRange, days, resetHorizontalMotionFlags]);
+
+  useEffect(() => {
+    const request = horizontalStepRequest;
+    if (!request) return;
+
+    const consumeRequest = () => {
+      onHorizontalStepRequestConsumed?.(request.id);
+    };
+
+    const container = horizontalScrollRef.current;
+    if (!container || days.length === 0) {
+      resetHorizontalMotionFlags();
+      consumeRequest();
+      return;
+    }
+    if (columnWidth <= 0) {
+      resetHorizontalMotionFlags();
+      consumeRequest();
+      return;
+    }
+
+    if (pendingExternalSettleRafRef.current != null) {
+      window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
+      pendingExternalSettleRafRef.current = null;
+    }
+
+    cancelHorizontalMotion();
+
+    let baseLeft = container.scrollLeft;
+    if (isAnimatingRef.current && lastProgrammaticTargetLeftRef.current != null) {
+      baseLeft = lastProgrammaticTargetLeftRef.current;
+    }
+
+    const currentIndex = Math.round(baseLeft / columnWidth);
+    const rawTargetIndex = request.direction === "next" ? currentIndex + 1 : currentIndex - 1;
+    
+    // allow prefetching logic to engage by nudging anchor even if index hits limits
+    const clampedIndex = Math.max(0, Math.min(days.length - 1, rawTargetIndex));
+    const finalTargetIso = days[clampedIndex]?.isoDate;
+    
+    const targetIndex = clampedIndex;
+    const targetLeft = targetIndex * columnWidth;
+
+    if (targetIndex === currentIndex && Math.abs(container.scrollLeft - targetLeft) < 1) {
+      if (rawTargetIndex !== currentIndex && finalTargetIso) {
+        // We hit the boundary. Emit the anchor day change to trigger data fetching
+        onAnchorDayChange?.(finalTargetIso);
+      }
+      container.scrollLeft = targetLeft;
+      setScrollLeft(targetLeft);
+      lastProgrammaticTargetLeftRef.current = targetLeft;
+      resetHorizontalMotionFlags();
+      consumeRequest();
+      return;
+    }
+
+    const targetIso = days[targetIndex]?.isoDate;
+    if (!targetIso) {
+      resetHorizontalMotionFlags();
+      consumeRequest();
+      return;
+    }
+
+    lastProgrammaticTargetLeftRef.current = targetLeft;
+    beginProgrammaticHorizontalMotion(null);
+
+    animateTo({
+      container,
+      targetLeft,
+      durationMs: 240,
+      onUpdate: (nextLeft) => {
+        setScrollLeft(nextLeft);
+      },
+      onComplete: () => {
+        container.scrollLeft = targetLeft;
+        setScrollLeft(targetLeft);
+        lastProgrammaticTargetLeftRef.current = targetLeft;
+        lastEmittedAnchorRef.current = targetIso;
+        resetHorizontalMotionFlags();
+        onAnchorDayChange?.(targetIso);
+        consumeRequest();
+      },
+    });
+
+    return () => {
+      cancelHorizontalMotion();
+      resetHorizontalMotionFlags();
+      consumeRequest();
+    };
+  }, [
+    anchorDayIso,
+    animateTo,
+    beginProgrammaticHorizontalMotion,
+    cancelHorizontalMotion,
+    columnWidth,
+    dayRange,
+    days,
+    horizontalStepRequest,
+    onAnchorDayChange,
+    onHorizontalStepRequestConsumed,
+    resetHorizontalMotionFlags,
+  ]);
 
   useEffect(() => {
     const nextWindowState = adaptDesktopWindowStateToViewportState(
@@ -513,8 +634,10 @@ export function DesktopTimelineView({
       if (pendingExternalSettleRafRef.current != null) {
         window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
       }
+      cancelHorizontalMotion();
+      resetHorizontalMotionFlags();
     };
-  }, []);
+  }, [cancelHorizontalMotion, resetHorizontalMotionFlags]);
 
   const scheduleAnchorEmit = useCallback(
     (nextScrollLeft: number) => {
@@ -555,10 +678,11 @@ export function DesktopTimelineView({
     >
       <div
         ref={horizontalScrollRef}
+        data-testid="desktop-timeline-horizontal-scroll"
         className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
         onScroll={(event) => {
           const nextScrollLeft = event.currentTarget.scrollLeft;
-          if (!programmaticHorizontalScrollRef.current) {
+          if (!programmaticHorizontalScrollRef.current && !isAnimatingRef.current) {
             scrollSyncSourceRef.current = "user";
             lastProgrammaticTargetLeftRef.current = null;
           }

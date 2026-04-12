@@ -511,6 +511,8 @@ export default function MobileTimelineView({
   setAnchorTimelineScrollNode,
   onAnchorTimelineScroll,
   onAnchorDayChange,
+  onPrevDay,
+  onNextDay,
   onMount,
   onScroll,
   registerAbScrollContainer,

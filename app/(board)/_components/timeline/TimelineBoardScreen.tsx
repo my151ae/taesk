@@ -9,6 +9,7 @@ import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoa
 import {
   DesktopTimelineToolbar,
   DesktopTimelineView,
+  type HorizontalStepRequest,
 } from "@/app/(board)/_components/timeline/DesktopTimelineView";
 import {
   DesktopListToolbar,
@@ -189,7 +190,9 @@ export default function TimelineBoardScreen({
   bucketCreateMenu,
 }: TimelineBoardScreenProps) {
   const desktopScopeRef = useRef<HTMLDivElement | null>(null);
+  const requestIdRef = useRef(0);
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
+  const [desktopHorizontalStepRequest, setDesktopHorizontalStepRequest] = useState<HorizontalStepRequest>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   const setBoardShortcutContextFromTarget = useCallback((target: EventTarget | null) => {
@@ -324,6 +327,30 @@ export default function TimelineBoardScreen({
   const currentMobileSection = useMemo(
     () => mobile.leftPanelProps.sections.find((section) => section.key === mobile.selectorPresentation.currentSection) ?? null,
     [mobile.leftPanelProps.sections, mobile.selectorPresentation.currentSection]
+  );
+
+  const desktopTimelineToolbarProps = useMemo(() => {
+    if (desktop.activeView !== "timeline") return desktop.timelineToolbarProps;
+    return {
+      ...desktop.timelineToolbarProps,
+      onPrevDay: () => {
+        setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "prev" });
+      },
+      onNextDay: () => {
+        setDesktopHorizontalStepRequest({ id: ++requestIdRef.current, direction: "next" });
+      },
+    };
+  }, [desktop.activeView, desktop.timelineToolbarProps]);
+
+  const desktopTimelineViewProps = useMemo(
+    () => ({
+      ...desktop.timelineViewProps,
+      horizontalStepRequest: desktopHorizontalStepRequest,
+      onHorizontalStepRequestConsumed: (requestId: number) => {
+        setDesktopHorizontalStepRequest((current) => (current?.id === requestId ? null : current));
+      },
+    }),
+    [desktop.timelineViewProps, desktopHorizontalStepRequest],
   );
 
   useEffect(() => {
@@ -698,11 +725,11 @@ export default function TimelineBoardScreen({
                 {renderDesktopShell(
                   <>
                     {renderDesktopTabs()}
-                    <DesktopTimelineToolbar {...desktop.timelineToolbarProps} />
+                    <DesktopTimelineToolbar {...desktopTimelineToolbarProps} />
                     {desktop.timelineTransitionPending ? (
                       <TimelineLoadingPlaceholder />
                     ) : (
-                      <DesktopTimelineView {...desktop.timelineViewProps} />
+                      <DesktopTimelineView {...desktopTimelineViewProps} />
                     )}
                   </>
                 )}
