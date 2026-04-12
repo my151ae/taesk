@@ -6,6 +6,7 @@ export type MotionIntent = "step";
 
 export type AnimateToArgs = {
   container: HTMLDivElement;
+  startLeft?: number;
   targetLeft: number;
   durationMs: number;
   onUpdate?: (nextLeft: number) => void;
@@ -35,11 +36,11 @@ export function useDesktopTimelineHorizontalMotion(): DesktopTimelineHorizontalM
   }, []);
 
   const animateTo = useCallback(
-    ({ container, targetLeft, durationMs, onUpdate, onComplete }: AnimateToArgs) => {
+    ({ container, startLeft, targetLeft, durationMs, onUpdate, onComplete }: AnimateToArgs) => {
       cancel();
 
-      const startLeft = container.scrollLeft;
-      if (Math.abs(startLeft - targetLeft) < 1) {
+      const initialLeft = typeof startLeft === "number" ? startLeft : container.scrollLeft;
+      if (Math.abs(initialLeft - targetLeft) < 1) {
         container.scrollLeft = targetLeft;
         onUpdate?.(targetLeft);
         onComplete?.();
@@ -54,7 +55,7 @@ export function useDesktopTimelineHorizontalMotion(): DesktopTimelineHorizontalM
         const elapsed = timestamp - startTime;
         const progress = durationMs <= 0 ? 1 : Math.min(1, elapsed / durationMs);
         const eased = easeOutCubic(progress);
-        const nextLeft = startLeft + (targetLeft - startLeft) * eased;
+        const nextLeft = initialLeft + (targetLeft - initialLeft) * eased;
         container.scrollLeft = nextLeft;
         onUpdate?.(nextLeft);
 

@@ -285,6 +285,11 @@ export function DesktopTimelineView({
   const isSettlingScrollRef = useRef(false);
   const lastProgrammaticTargetLeftRef = useRef<number | null>(null);
   const lastWindowStateSignatureRef = useRef<string | null>(null);
+  const latestDaysRef = useRef(days);
+  const latestAnchorDayIsoRef = useRef(anchorDayIso);
+  const latestColumnWidthRef = useRef(0);
+  const onAnchorDayChangeRef = useRef(onAnchorDayChange);
+  const onHorizontalStepRequestConsumedRef = useRef(onHorizontalStepRequestConsumed);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
@@ -317,6 +322,26 @@ export function DesktopTimelineView({
     () => renderDays.map((day) => ({ kind: "day" as const, key: day.key, day })),
     [renderDays],
   );
+
+  useEffect(() => {
+    latestDaysRef.current = days;
+  }, [days]);
+
+  useEffect(() => {
+    latestAnchorDayIsoRef.current = anchorDayIso;
+  }, [anchorDayIso]);
+
+  useEffect(() => {
+    latestColumnWidthRef.current = columnWidth;
+  }, [columnWidth]);
+
+  useEffect(() => {
+    onAnchorDayChangeRef.current = onAnchorDayChange;
+  }, [onAnchorDayChange]);
+
+  useEffect(() => {
+    onHorizontalStepRequestConsumedRef.current = onHorizontalStepRequestConsumed;
+  }, [onHorizontalStepRequestConsumed]);
 
   // Zoom Interaction: Ctrl + Wheel
   useEffect(() => {
@@ -484,12 +509,15 @@ export function DesktopTimelineView({
     const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (anchorIndex < 0) return;
     const targetLeft = anchorIndex * columnWidth;
-    if (Math.abs(container.scrollLeft - targetLeft) < 1) return;
+    if (Math.abs(container.scrollLeft - targetLeft) < 1) {
+      return;
+    }
     if (lastProgrammaticTargetLeftRef.current === targetLeft) return;
     lastProgrammaticTargetLeftRef.current = targetLeft;
     lastEmittedAnchorRef.current = anchorDayIso;
     beginProgrammaticHorizontalMotion("external");
     container.scrollTo({ left: targetLeft, behavior: "auto" });
+
     if (pendingExternalSettleRafRef.current != null) {
       window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
     }
@@ -500,29 +528,34 @@ export function DesktopTimelineView({
         pendingExternalSettleRafRef.current = null;
       });
     });
+
     return () => {
       if (pendingExternalSettleRafRef.current != null) {
         window.cancelAnimationFrame(pendingExternalSettleRafRef.current);
       }
       resetHorizontalMotionFlags();
     };
-  }, [anchorDayIso, beginProgrammaticHorizontalMotion, cancelHorizontalMotion, columnWidth, dayRange, days, resetHorizontalMotionFlags]);
+  }, [
+    anchorDayIso,
+    beginProgrammaticHorizontalMotion,
+    cancelHorizontalMotion,
+    columnWidth,
+    days,
+    resetHorizontalMotionFlags,
+  ]);
 
   useEffect(() => {
     const request = horizontalStepRequest;
     if (!request) return;
 
     const consumeRequest = () => {
-      onHorizontalStepRequestConsumed?.(request.id);
+      onHorizontalStepRequestConsumedRef.current?.(request.id);
     };
 
+    const currentDays = latestDaysRef.current;
+    const currentColumnWidth = latestColumnWidthRef.current;
     const container = horizontalScrollRef.current;
-    if (!container || days.length === 0) {
-      resetHorizontalMotionFlags();
-      consumeRequest();
-      return;
-    }
-    if (columnWidth <= 0) {
+    if (!container || currentColumnWidth <= 0 || currentDays.length === 0) {
       resetHorizontalMotionFlags();
       consumeRequest();
       return;
@@ -535,26 +568,22 @@ export function DesktopTimelineView({
 
     cancelHorizontalMotion();
 
-    let baseLeft = container.scrollLeft;
-    if (isAnimatingRef.current && lastProgrammaticTargetLeftRef.current != null) {
-      baseLeft = lastProgrammaticTargetLeftRef.current;
+    const liveScrollLeft = container.scrollLeft;
+    const currentIndex = Math.max(
+      0,
+      Math.min(currentDays.length - 1, Math.round(liveScrollLeft / currentColumnWidth)),
+    );
+    if (currentIndex < 0 || currentIndex >= currentDays.length) {
+      resetHorizontalMotionFlags();
+      consumeRequest();
+      return;
     }
+    const targetIndex = request.direction === "next"
+      ? Math.min(currentDays.length - 1, currentIndex + 1)
+      : Math.max(0, currentIndex - 1);
+    const targetLeft = targetIndex * currentColumnWidth;
 
-    const currentIndex = Math.round(baseLeft / columnWidth);
-    const rawTargetIndex = request.direction === "next" ? currentIndex + 1 : currentIndex - 1;
-    
-    // allow prefetching logic to engage by nudging anchor even if index hits limits
-    const clampedIndex = Math.max(0, Math.min(days.length - 1, rawTargetIndex));
-    const finalTargetIso = days[clampedIndex]?.isoDate;
-    
-    const targetIndex = clampedIndex;
-    const targetLeft = targetIndex * columnWidth;
-
-    if (targetIndex === currentIndex && Math.abs(container.scrollLeft - targetLeft) < 1) {
-      if (rawTargetIndex !== currentIndex && finalTargetIso) {
-        // We hit the boundary. Emit the anchor day change to trigger data fetching
-        onAnchorDayChange?.(finalTargetIso);
-      }
+    if (targetIndex === currentIndex || Math.abs(liveScrollLeft - targetLeft) < 1) {
       container.scrollLeft = targetLeft;
       setScrollLeft(targetLeft);
       lastProgrammaticTargetLeftRef.current = targetLeft;
@@ -563,7 +592,7 @@ export function DesktopTimelineView({
       return;
     }
 
-    const targetIso = days[targetIndex]?.isoDate;
+    const targetIso = currentDays[targetIndex]?.isoDate;
     if (!targetIso) {
       resetHorizontalMotionFlags();
       consumeRequest();
@@ -575,6 +604,7 @@ export function DesktopTimelineView({
 
     animateTo({
       container,
+      startLeft: liveScrollLeft,
       targetLeft,
       durationMs: 240,
       onUpdate: (nextLeft) => {
@@ -586,7 +616,7 @@ export function DesktopTimelineView({
         lastProgrammaticTargetLeftRef.current = targetLeft;
         lastEmittedAnchorRef.current = targetIso;
         resetHorizontalMotionFlags();
-        onAnchorDayChange?.(targetIso);
+        onAnchorDayChangeRef.current?.(targetIso);
         consumeRequest();
       },
     });
@@ -597,16 +627,10 @@ export function DesktopTimelineView({
       consumeRequest();
     };
   }, [
-    anchorDayIso,
     animateTo,
     beginProgrammaticHorizontalMotion,
     cancelHorizontalMotion,
-    columnWidth,
-    dayRange,
-    days,
     horizontalStepRequest,
-    onAnchorDayChange,
-    onHorizontalStepRequestConsumed,
     resetHorizontalMotionFlags,
   ]);
 
@@ -679,13 +703,15 @@ export function DesktopTimelineView({
       <div
         ref={horizontalScrollRef}
         data-testid="desktop-timeline-horizontal-scroll"
-        className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
+        className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-hidden [overflow-anchor:none] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200"
         onScroll={(event) => {
           const nextScrollLeft = event.currentTarget.scrollLeft;
-          if (!programmaticHorizontalScrollRef.current && !isAnimatingRef.current) {
-            scrollSyncSourceRef.current = "user";
-            lastProgrammaticTargetLeftRef.current = null;
+          if (programmaticHorizontalScrollRef.current || isAnimatingRef.current) {
+            setScrollLeft(nextScrollLeft);
+            return;
           }
+          scrollSyncSourceRef.current = "user";
+          lastProgrammaticTargetLeftRef.current = null;
           setScrollLeft(nextScrollLeft);
           if (scrollSyncSourceRef.current === "user") {
             scheduleAnchorEmit(nextScrollLeft);
