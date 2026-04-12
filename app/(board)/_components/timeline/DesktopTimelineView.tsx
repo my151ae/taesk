@@ -290,6 +290,11 @@ export function DesktopTimelineView({
   const latestColumnWidthRef = useRef(0);
   const onAnchorDayChangeRef = useRef(onAnchorDayChange);
   const onHorizontalStepRequestConsumedRef = useRef(onHorizontalStepRequestConsumed);
+  // horizontalStepRequest の最新値を ref で追跡（anchorDayIso Effect の依存配列に含めずに参照するため）
+  const horizontalStepRequestRef = useRef(horizontalStepRequest);
+  useEffect(() => {
+    horizontalStepRequestRef.current = horizontalStepRequest;
+  }, [horizontalStepRequest]);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [abViewportHeight, setAbViewportHeight] = useState(0);
@@ -505,6 +510,10 @@ export function DesktopTimelineView({
     const container = horizontalScrollRef.current;
     if (!container) return;
     if (columnWidth <= 0) return;
+    // horizontalStepRequest がある場合はアニメーション側の Effect に処理を委ねる。
+    // ref で参照することで、horizontalStepRequest の変化では本 Effect が再実行されない。
+    // これにより consumeRequest() 後の誤った戻りジャンプを防ぐ。
+    if (horizontalStepRequestRef.current) return;
     cancelHorizontalMotion();
     const anchorIndex = days.findIndex((day) => day.isoDate === anchorDayIso);
     if (anchorIndex < 0) return;
@@ -537,6 +546,8 @@ export function DesktopTimelineView({
     };
   }, [
     anchorDayIso,
+    // horizontalStepRequest は依存配列に含めない（ref で参照）
+    // 含めると consumeRequest() 後の Effect 再実行で誤った戻りジャンプが発生する
     beginProgrammaticHorizontalMotion,
     cancelHorizontalMotion,
     columnWidth,
@@ -606,9 +617,12 @@ export function DesktopTimelineView({
       container,
       startLeft: liveScrollLeft,
       targetLeft,
-      durationMs: 240,
-      onUpdate: (nextLeft) => {
-        setScrollLeft(nextLeft);
+      durationMs: 1000,
+      onUpdate: (_nextLeft) => {
+        // アニメーション中は setScrollLeft を呼ばない。
+        // 呼ぶと windowMetrics（leftSpacerWidth）が急変して DOM レイアウトが乱れ
+        // 「グシャ」（前日が一瞬見える）現象が発生するため。
+        // 350ms の短いアニメーションなので仮想スクロール更新なしで問題ない。
       },
       onComplete: () => {
         container.scrollLeft = targetLeft;
@@ -637,12 +651,12 @@ export function DesktopTimelineView({
   useEffect(() => {
     const nextWindowState = adaptDesktopWindowStateToViewportState(
       resolveDesktopTimelineWindowState({
-      anchorDayIso,
-      loadedDays: days,
-      scrollLeft,
-      columnWidth,
-      dayRange,
-    }),
+        anchorDayIso,
+        loadedDays: days,
+        scrollLeft,
+        columnWidth,
+        dayRange,
+      }),
     );
     const signature = JSON.stringify(nextWindowState);
     if (signature === lastWindowStateSignatureRef.current) return;
@@ -707,7 +721,8 @@ export function DesktopTimelineView({
         onScroll={(event) => {
           const nextScrollLeft = event.currentTarget.scrollLeft;
           if (programmaticHorizontalScrollRef.current || isAnimatingRef.current) {
-            setScrollLeft(nextScrollLeft);
+            // アニメーション中は setScrollLeft を呼ばない（windowMetrics 変化で「グシャ」になるため）
+            // onComplete でのみ setScrollLeft(targetLeft) を呼んで最終位置を確定する
             return;
           }
           scrollSyncSourceRef.current = "user";
@@ -718,122 +733,122 @@ export function DesktopTimelineView({
           }
         }}
       >
-          <div ref={timelineHeaderRef} className="z-30" style={{ width: totalStripWidth }}>
-              <div
-                className="flex h-8 border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
-                style={{ width: totalStripWidth }}
-              >
-                <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
-                <div
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: desktopGridTemplateColumns,
-                  }}
-                >
-                {renderDays.map((day, index) => {
-                  const isToday = day.label.startsWith("Today ");
-                  const headerLabel = day.label;
-
-                  return (
-                    <div
-                      key={day.key}
-                      className={clsx(
-                        "relative flex h-full min-w-0 items-center justify-center px-3 text-center",
-                        index > 0 ? "border-l border-slate-100" : ""
-                      )}
-                      style={{ width: columnWidth }}
-                    >
-                      <div className="flex min-w-0 items-center justify-center gap-1.5 leading-tight">
-                        <span
-                          className={clsx(
-                            "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5 text-xs font-semibold",
-                            isToday
-                              ? "bg-sky-200 text-sky-800 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.7)]"
-                              : "text-slate-800"
-                          )}
-                        >
-                          {headerLabel}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-                </div>
-                <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
-              </div>
-
-              {hasAllDayEvents && (
-                <div
-                  className="flex border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
-                  style={{
-                    width: totalStripWidth,
-                  }}
-                >
-                  <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
-                  <div
-                    className="grid px-2 py-1.5"
-                    style={{
-                      gridTemplateColumns: desktopGridTemplateColumns,
-                      gridTemplateRows: `repeat(${Math.max(allDayLayout.rows, 1)}, ${ALL_DAY_ROW_HEIGHT}px)`,
-                      rowGap: "4px",
-                      minHeight: allDayMinHeight,
-                    }}
-                  >
-                    {allDayLayout.segments.map((item) => {
-                      const rangeLabel = formatAllDayRange({ segment: item, visibleDays: renderDays });
-                      const inlineLabel = formatAllDayInlineLabel({
-                        title: item.title,
-                        rangeLabel,
-                      });
-                      return (
-                        <button
-                          key={`${item.id}-${item.start}-${item.end}`}
-                          type="button"
-                          data-focus-group="timeline"
-                          data-focus-part="card"
-                          disabled={!onExternalEventClick}
-                          onClick={() => onExternalEventClick?.(item.entry)}
-                          className="flex h-6 min-w-0 items-center gap-2 overflow-hidden rounded-md border border-emerald-200 bg-white/90 px-2.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
-                          style={{
-                            gridColumn: `${item.startColumn + 1} / span ${item.endColumn - item.startColumn + 1}`,
-                            gridRow: `${item.row + 1}`,
-                          }}
-                          title={inlineLabel}
-                        >
-                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                            G
-                          </span>
-                          <span className="min-w-0 truncate">{inlineLabel}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
-                </div>
-              )}
-          </div>
-
+        <div ref={timelineHeaderRef} className="z-30" style={{ width: totalStripWidth }}>
           <div
-            ref={timelineScrollRef}
-            onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
-            className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+            className="flex h-8 border-b border-slate-100 bg-white text-xs font-semibold tracking-wide text-slate-500 pr-[14px]"
             style={{ width: totalStripWidth }}
           >
-            <div className="relative" style={{ minHeight: timelineViewportHeight, width: totalStripWidth }}>
-              {!days.length && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
-                </div>
-              )}
+            <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: desktopGridTemplateColumns,
+              }}
+            >
+              {renderDays.map((day, index) => {
+                const isToday = day.label.startsWith("Today ");
+                const headerLabel = day.label;
 
-              <div className="flex timeline-container" data-testid="timeline-grid" style={{ width: totalStripWidth }}>
-                <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
-                <div
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: desktopGridTemplateColumns,
-                  }}
-                >
+                return (
+                  <div
+                    key={day.key}
+                    className={clsx(
+                      "relative flex h-full min-w-0 items-center justify-center px-3 text-center",
+                      index > 0 ? "border-l border-slate-100" : ""
+                    )}
+                    style={{ width: columnWidth }}
+                  >
+                    <div className="flex min-w-0 items-center justify-center gap-1.5 leading-tight">
+                      <span
+                        className={clsx(
+                          "inline-flex max-w-full items-center justify-center truncate rounded-full px-2 py-0.5 text-xs font-semibold",
+                          isToday
+                            ? "bg-sky-200 text-sky-800 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.7)]"
+                            : "text-slate-800"
+                        )}
+                      >
+                        {headerLabel}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
+          </div>
+
+          {hasAllDayEvents && (
+            <div
+              className="flex border-b border-emerald-100/70 bg-emerald-50/60 text-[11px] font-semibold text-emerald-800 pr-[14px]"
+              style={{
+                width: totalStripWidth,
+              }}
+            >
+              <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
+              <div
+                className="grid px-2 py-1.5"
+                style={{
+                  gridTemplateColumns: desktopGridTemplateColumns,
+                  gridTemplateRows: `repeat(${Math.max(allDayLayout.rows, 1)}, ${ALL_DAY_ROW_HEIGHT}px)`,
+                  rowGap: "4px",
+                  minHeight: allDayMinHeight,
+                }}
+              >
+                {allDayLayout.segments.map((item) => {
+                  const rangeLabel = formatAllDayRange({ segment: item, visibleDays: renderDays });
+                  const inlineLabel = formatAllDayInlineLabel({
+                    title: item.title,
+                    rangeLabel,
+                  });
+                  return (
+                    <button
+                      key={`${item.id}-${item.start}-${item.end}`}
+                      type="button"
+                      data-focus-group="timeline"
+                      data-focus-part="card"
+                      disabled={!onExternalEventClick}
+                      onClick={() => onExternalEventClick?.(item.entry)}
+                      className="flex h-6 min-w-0 items-center gap-2 overflow-hidden rounded-md border border-emerald-200 bg-white/90 px-2.5 text-left text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-default disabled:opacity-80"
+                      style={{
+                        gridColumn: `${item.startColumn + 1} / span ${item.endColumn - item.startColumn + 1}`,
+                        gridRow: `${item.row + 1}`,
+                      }}
+                      title={inlineLabel}
+                    >
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                        G
+                      </span>
+                      <span className="min-w-0 truncate">{inlineLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
+            </div>
+          )}
+        </div>
+
+        <div
+          ref={timelineScrollRef}
+          onScroll={(e) => onScroll?.(e.currentTarget.scrollTop)}
+          className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]"
+          style={{ width: totalStripWidth }}
+        >
+          <div className="relative" style={{ minHeight: timelineViewportHeight, width: totalStripWidth }}>
+            {!days.length && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500" />
+              </div>
+            )}
+
+            <div className="flex timeline-container" data-testid="timeline-grid" style={{ width: totalStripWidth }}>
+              <div style={{ width: leftSpacerWidth, flexShrink: 0 }} />
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns: desktopGridTemplateColumns,
+                }}
+              >
                 {renderDays.map((day, dayIndex) => {
                   return (
                     <DaySection
@@ -889,11 +904,11 @@ export function DesktopTimelineView({
                     />
                   );
                 })}
-                </div>
-                <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
               </div>
+              <div style={{ width: rightSpacerWidth, flexShrink: 0 }} />
             </div>
           </div>
+        </div>
       </div>
     </div>
   );
