@@ -617,7 +617,7 @@ export function DesktopTimelineView({
       container,
       startLeft: liveScrollLeft,
       targetLeft,
-      durationMs: 1000,
+      durationMs: 450,
       onUpdate: (_nextLeft) => {
         // アニメーション中は setScrollLeft を呼ばない。
         // 呼ぶと windowMetrics（leftSpacerWidth）が急変して DOM レイアウトが乱れ

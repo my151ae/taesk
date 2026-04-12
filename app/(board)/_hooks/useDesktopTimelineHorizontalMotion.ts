@@ -19,7 +19,11 @@ export type DesktopTimelineHorizontalMotion = {
   cancel: () => void;
 };
 
-const easeOutCubic = (value: number) => 1 - (1 - value) ** 3;
+// ゆっくり始まる → 加速 → わずかに行き過ぎ → スッと収まる（スマホのスワイプページングに近い動き）
+// ゆっくり動き出し → 加速 → 滑らかに減速してピタッと止まる（反動なし）
+const easeInOutQuart = (x: number): number => {
+  return x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2;
+};
 
 export function useDesktopTimelineHorizontalMotion(): DesktopTimelineHorizontalMotion {
   const isAnimatingRef = useRef(false);
@@ -54,7 +58,7 @@ export function useDesktopTimelineHorizontalMotion(): DesktopTimelineHorizontalM
       const step = (timestamp: number) => {
         const elapsed = timestamp - startTime;
         const progress = durationMs <= 0 ? 1 : Math.min(1, elapsed / durationMs);
-        const eased = easeOutCubic(progress);
+        const eased = easeInOutQuart(progress);
         const nextLeft = initialLeft + (targetLeft - initialLeft) * eased;
         container.scrollLeft = nextLeft;
         onUpdate?.(nextLeft);
