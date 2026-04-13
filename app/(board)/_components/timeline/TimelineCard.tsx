@@ -477,7 +477,7 @@ export function TimelineCard({
                 >
                     {childrenPosition === 'top' && children}
 
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                    <div className="min-h-0 min-w-0 overflow-hidden">
                         <div
                             className="grid min-w-0 overflow-hidden"
                             style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
@@ -642,7 +642,7 @@ export function TimelineCard({
 
                         {shouldRenderMiddleRow ? (
                             <div
-                                className="grid min-h-0 min-w-0 flex-1 overflow-hidden"
+                                className="grid min-h-0 min-w-0 overflow-hidden"
                                 style={{ gridTemplateColumns: hideLeftColumn ? 'minmax(0, 1fr)' : `${CARD_LEFT_COLUMN_WIDTH} minmax(0, 1fr)` }}
                             >
                                 {!hideLeftColumn ? (
@@ -757,10 +757,7 @@ export function TimelineCard({
 
                         {hasStatusBar ? (
                             <div
-                                className={clsx(
-                                    'flex min-w-0 items-center',
-                                    densityMode === 'minimal' ? 'min-h-[20px]' : 'min-h-[24px]'
-                                )}
+                                className="flex min-w-0 items-center"
                                 style={{
                                     paddingLeft: CARD_RIGHT_CELL_X_PADDING,
                                     paddingRight: CARD_RIGHT_CELL_X_PADDING,
