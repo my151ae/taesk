@@ -54,8 +54,12 @@ export function getDateTimeParts(value: Date | string, timeZone: string) {
   };
 }
 
+export function getLocalDate(value: string | Date, timeZone: string): string {
+  return getDateTimeParts(value instanceof Date ? value : new Date(value), timeZone).date;
+}
+
 export function getJstDate(value: string | Date): string {
-  return getDateTimeParts(value instanceof Date ? value : new Date(value), 'Asia/Tokyo').date;
+  return getLocalDate(value, 'Asia/Tokyo');
 }
 
 export function buildBoardTail(board: DailyDigestBoard): string {
@@ -86,17 +90,18 @@ export function compareDigestItems(a: DailyDigestItem, b: DailyDigestItem): numb
 export function buildDigestItems(params: {
   cards: DailyDigestSourceCard[];
   summaryDate: string;
+  timeZone: string;
   includeOverdue: boolean;
 }): DailyDigestItem[] {
   return params.cards
     .map((card): DailyDigestItem | null => {
       if (!card.due_date) return null;
-      const dueDateJst = getJstDate(card.due_date);
-      if (dueDateJst !== params.summaryDate && (!params.includeOverdue || dueDateJst >= params.summaryDate)) {
+      const dueDateLocal = getLocalDate(card.due_date, params.timeZone);
+      if (dueDateLocal !== params.summaryDate && (!params.includeOverdue || dueDateLocal >= params.summaryDate)) {
         return null;
       }
 
-      if (dueDateJst > params.summaryDate) {
+      if (dueDateLocal > params.summaryDate) {
         return null;
       }
 
@@ -105,11 +110,11 @@ export function buildDigestItems(params: {
         card_short_id: card.short_id,
         card_slug: card.slug,
         title: card.title,
-        due_date: dueDateJst,
+        due_date: dueDateLocal,
         due_start: card.due_start,
         due_end: card.due_end,
         due_bucket: card.due_bucket ?? null,
-        kind: dueDateJst === params.summaryDate ? 'today' : 'overdue',
+        kind: dueDateLocal === params.summaryDate ? 'today' : 'overdue',
       };
     })
     .filter((item): item is DailyDigestItem => item !== null)

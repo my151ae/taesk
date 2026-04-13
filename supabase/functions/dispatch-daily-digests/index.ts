@@ -3,7 +3,6 @@ import {
   buildBoardTail,
   buildDigestItems,
   getDateTimeParts,
-  getJstDate,
   type DailyDigestBoard,
   type DailyDigestSourceCard,
 } from '../../../lib/shared/daily-digest.ts';
@@ -155,7 +154,6 @@ Deno.serve(async (req) => {
 
     const now = new Date();
     const windowMinutes = parseIntEnv('DAILY_DIGEST_WINDOW_MINUTES', 5);
-    const summaryDate = getJstDate(now);
 
     const { data: preferences, error: preferencesError } = await supabase
       .from('daily_digest_preferences')
@@ -183,6 +181,7 @@ Deno.serve(async (req) => {
       if (!dispatchWindow.matches) {
         continue;
       }
+      const summaryDate = dispatchWindow.localDate;
 
       if (preference.last_sent_local_date === dispatchWindow.localDate) {
         counters.skipped += 1;
@@ -257,6 +256,7 @@ Deno.serve(async (req) => {
       const digestItems = buildDigestItems({
         cards: (cards ?? []) as CardRow[],
         summaryDate,
+        timeZone: preference.timezone,
         includeOverdue: preference.include_overdue,
       });
       const todayCount = digestItems.filter((item) => item.kind === 'today').length;
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, summaryDate, ...counters }), {
+    return new Response(JSON.stringify({ success: true, evaluatedAt: now.toISOString(), ...counters }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {

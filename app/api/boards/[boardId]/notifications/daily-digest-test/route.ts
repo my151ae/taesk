@@ -11,7 +11,7 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 import {
   buildBoardTail,
   buildDigestItems,
-  getJstDate,
+  getLocalDate,
   type DailyDigestBoard,
   type DailyDigestSourceCard,
 } from '@/lib/shared/daily-digest';
@@ -40,7 +40,7 @@ const postHandler = async (
 
   const admin = createServiceRoleSupabaseClient();
 
-  const [{ data: board, error: boardError }, { data: cards, error: cardsError }] = await Promise.all([
+  const [{ data: board, error: boardError }, { data: cards, error: cardsError }, { data: digestPreferences, error: digestPreferencesError }] = await Promise.all([
     admin
       .from('boards')
       .select('id, name, short_id, id_short, slug')
@@ -53,6 +53,12 @@ const postHandler = async (
       .is('deleted_at', null)
       .eq('checked', false)
       .not('due_date', 'is', null),
+    admin
+      .from('daily_digest_preferences')
+      .select('timezone')
+      .eq('profile_id', user.id)
+      .eq('board_id', boardId)
+      .maybeSingle(),
   ]);
 
   if (boardError || !board) {
@@ -65,10 +71,17 @@ const postHandler = async (
     return NextResponse.json({ error: 'Failed to load cards' }, { status: 500 });
   }
 
-  const summaryDate = getJstDate(new Date());
+  if (digestPreferencesError) {
+    console.error('Failed to load daily digest preferences for test:', digestPreferencesError);
+    return NextResponse.json({ error: 'Failed to load daily digest preferences' }, { status: 500 });
+  }
+
+  const digestTimezone = digestPreferences?.timezone || 'Asia/Tokyo';
+  const summaryDate = getLocalDate(new Date(), digestTimezone);
   const digestItems = buildDigestItems({
     cards: (cards ?? []) as DailyDigestSourceCard[],
     summaryDate,
+    timeZone: digestTimezone,
     includeOverdue: true,
   });
   const todayCount = digestItems.filter((item) => item.kind === 'today').length;
@@ -97,6 +110,7 @@ const postHandler = async (
     board_short_id: boardInfo.short_id,
     board_slug: buildBoardTail(boardInfo),
     summary_date: summaryDate,
+    summary_timezone: digestTimezone,
     today_count: todayCount,
     overdue_count: overdueCount,
     timed_count: timedItems.length,

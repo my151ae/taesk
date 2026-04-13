@@ -1385,7 +1385,11 @@ export default function TiptapEditor({
                         className={styles.blockActionHandle}
                         style={{
                             top: Math.max(
-                                target.rect.top - rootRect.top + Math.max((target.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0),
+                                target.rect.top -
+                                    rootRect.top +
+                                    (target.nodeType === 'heading'
+                                        ? Math.max((target.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0)
+                                        : 0),
                                 4,
                             ),
                             left: 12,
