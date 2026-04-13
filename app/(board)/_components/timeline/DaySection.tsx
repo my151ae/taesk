@@ -131,16 +131,28 @@ export const DaySection = memo(function DaySection({
     currentIsoDate,
     currentMinutes,
 }: DaySectionProps) {
+    const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
+    const indicatorPosition = indicatorTop ?? 0;
+
     return (
-        <div className="day-section grid grid-cols-2 h-full min-w-0">
+        <div className="day-section relative grid h-full min-w-0 grid-cols-2">
+            {indicatorVisibleInDay ? (
+                <div
+                    className="pointer-events-none absolute left-0 right-0 z-30"
+                    data-testid="timeline-now-indicator"
+                    style={{ top: indicatorPosition }}
+                >
+                    <div className="relative h-px bg-red-400/80">
+                        <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
+                    </div>
+                </div>
+            ) : null}
             {/* Timeline部分（左半分） */}
             <div className="timeline-col h-full min-w-0 overflow-hidden">
                 <TimelineColumn
                     day={day}
                     events={events}
                     index={index}
-                    indicatorTop={indicatorTop}
-                    indicatorDayIso={indicatorDayIso}
                     timelineViewportHeight={timelineViewportHeight}
                     activeDragCardId={activeDragCardId}
                     pointerPreview={pointerPreview}

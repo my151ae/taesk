@@ -119,7 +119,8 @@ function MobileTimelineColumn({
 
       {indicatorVisible && (
         <div
-          className="pointer-events-none absolute z-10"
+          className="pointer-events-none absolute z-40"
+          data-testid="timeline-now-indicator"
           style={{ top: indicatorPosition, left: 0, right: 0 }}
         >
           <div className="relative h-px bg-red-400/80">

@@ -34,8 +34,6 @@ type TimelineColumnProps = {
     day: TimelineDay;
     events: ReadonlyArray<TimelineEvent>;
     index: number;
-    indicatorTop: number | null;
-    indicatorDayIso: string | null;
     timelineViewportHeight: number;
     activeDragCardId: string | null;
     pointerPreview: PointerPreviewState;
@@ -96,8 +94,6 @@ export const TimelineColumn = memo(function TimelineColumn({
     day,
     events,
     index,
-    indicatorTop,
-    indicatorDayIso,
     timelineViewportHeight,
     activeDragCardId,
     pointerPreview,
@@ -136,8 +132,6 @@ export const TimelineColumn = memo(function TimelineColumn({
 }: TimelineColumnProps) {
     // Use default if undefined
     const currentHourHeight = hourHeight ?? HOUR_HEIGHT;
-    const indicatorVisibleInDay = indicatorTop != null && indicatorDayIso === day.isoDate;
-    const indicatorPosition = indicatorTop ?? 0;
     const isFirstColumn = index === 0;
     const { combinedItems, stackedLayout } = buildStackedTimelineColumnLayout({
         events,
@@ -238,17 +232,6 @@ export const TimelineColumn = memo(function TimelineColumn({
                             </div>
                         ))}
                     </div>
-
-                    {indicatorVisibleInDay && (
-                        <div
-                            className="pointer-events-none absolute z-10"
-                            style={{ top: indicatorPosition, left: 0, right: 0 }}
-                        >
-                            <div className="relative h-px bg-red-400/80">
-                                <div className="absolute top-1/2 left-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500" />
-                            </div>
-                        </div>
-                    )}
 
                     {activeDragCardId && pointerPreview.visible && pointerPreview.dayIso === day.isoDate && (
                         <div
