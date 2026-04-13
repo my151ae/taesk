@@ -6,8 +6,11 @@ import {
   buildCompletedTimeText,
   buildCompletedMonthKeyJst,
   COMPLETED_UNDATED_GROUP_KEY,
+  getTagsSectionViewState,
   getIncrementalVisibilityState,
   SIDEBAR_INCREMENT_PAGE_SIZE,
+  TAGS_EMPTY_MESSAGE,
+  TAGS_NO_RESULTS_MESSAGE,
 } from "../app/(board)/_components/timeline/TimelineLeftPanelShared";
 
 test.describe("TimelineLeftPanelShared helpers", () => {
@@ -36,6 +39,34 @@ test.describe("TimelineLeftPanelShared helpers", () => {
     });
     expect(state.sliceEnd).toBe(12);
     expect(state.canLoadMore).toBe(false);
+  });
+
+  test("tags section は未選択時にタグ一覧を主表示する", async () => {
+    expect(
+      getTagsSectionViewState({
+        selectedTags: [],
+        resultCount: 5,
+      }),
+    ).toEqual({
+      hasSelection: false,
+      showTagList: true,
+      headerText: "タグで絞り込めます",
+      helperMessage: TAGS_EMPTY_MESSAGE,
+    });
+  });
+
+  test("tags section は選択時に結果表示へ切り替える", async () => {
+    expect(
+      getTagsSectionViewState({
+        selectedTags: ["urgent"],
+        resultCount: 0,
+      }),
+    ).toEqual({
+      hasSelection: true,
+      showTagList: false,
+      headerText: "1 件選択中",
+      helperMessage: TAGS_NO_RESULTS_MESSAGE,
+    });
   });
 
   test("completed month key は JST 基準で YYYY/MM を返す", async () => {

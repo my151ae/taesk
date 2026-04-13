@@ -63,6 +63,8 @@ const COMPLETED_TIME_FORMATTER = new Intl.DateTimeFormat("ja-JP", {
 
 export const COMPLETED_UNDATED_GROUP_KEY = "__undated__";
 export const COMPLETED_UNDATED_GROUP_LABEL = "完了日時なし";
+export const TAGS_EMPTY_MESSAGE = "タグを選ぶと、このパネル内に一致カードを表示します";
+export const TAGS_NO_RESULTS_MESSAGE = "選択中のタグに一致するカードはありません";
 
 export type CompletedResultsGroup = {
   key: string;
@@ -71,6 +73,27 @@ export type CompletedResultsGroup = {
   results: readonly TimelineSearchResultItem[];
   kind: "month" | "undated";
 };
+
+export function getTagsSectionViewState({
+  selectedTags,
+  resultCount,
+}: {
+  selectedTags: readonly string[];
+  resultCount: number;
+}) {
+  const hasSelection = selectedTags.length > 0;
+
+  return {
+    hasSelection,
+    showTagList: !hasSelection,
+    headerText: hasSelection ? `${selectedTags.length} 件選択中` : "タグで絞り込めます",
+    helperMessage: hasSelection
+      ? resultCount === 0
+        ? TAGS_NO_RESULTS_MESSAGE
+        : null
+      : TAGS_EMPTY_MESSAGE,
+  };
+}
 
 export function buildCompletedMonthKeyJst(checkedAt: string | null) {
   if (!checkedAt) return null;
@@ -832,17 +855,25 @@ export function TagsSectionBody({
     onVisibleCountChange,
   });
   const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+  const viewState = useMemo(
+    () =>
+      getTagsSectionViewState({
+        selectedTags,
+        resultCount: results.length,
+      }),
+    [results.length, selectedTags],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50 px-3 py-2">
         <p className="text-[11px] font-medium text-slate-500">
-          {selectedTags.length > 0 ? `${selectedTags.length} 件選択中` : "タグで絞り込めます"}
+          {viewState.headerText}
         </p>
         <button
           type="button"
           onClick={onTagClear}
-          disabled={selectedTags.length === 0}
+          disabled={!viewState.hasSelection}
           className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Clear
@@ -858,7 +889,38 @@ export function TagsSectionBody({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="space-y-1">
+            {viewState.hasSelection ? (
+              results.length === 0 ? (
+                <div className="px-1 py-1">
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                    {viewState.helperMessage}
+                  </p>
+                </div>
+              ) : (
+                renderSidebarResultRows({
+                  results: visibleResults,
+                  shortcutSection: "search",
+                  openSource: "tag-sidebar",
+                  testIdPrefix: "tag-card",
+                  footer: (
+                    <LoadMoreFooter
+                      canLoadMore={canLoadMore}
+                      onLoadMore={handleLoadMore}
+                      testId="sidebar-tags-load-more"
+                    />
+                  ),
+                  ...cardActions,
+                })
+              )
+            ) : (
+              <div className="px-1 py-1">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+                  {viewState.helperMessage}
+                </p>
+              </div>
+            )}
+
+            <div className={clsx("space-y-1", viewState.hasSelection && "border-t border-slate-200/70 pt-3")}>
               {tags.map((tag) => {
                 const selected = selectedTags.includes(tag.name);
                 return (
@@ -882,35 +944,6 @@ export function TagsSectionBody({
                 );
               })}
             </div>
-
-            {selectedTags.length === 0 ? (
-              <div className="px-1 py-1">
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  タグを選ぶと、このパネル内に一致カードを表示します
-                </p>
-              </div>
-            ) : results.length === 0 ? (
-              <div className="px-1 py-1">
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
-                  選択中のタグに一致するカードはありません
-                </p>
-              </div>
-            ) : (
-              renderSidebarResultRows({
-                results: visibleResults,
-                shortcutSection: "search",
-                openSource: "tag-sidebar",
-                testIdPrefix: "tag-card",
-                footer: (
-                  <LoadMoreFooter
-                    canLoadMore={canLoadMore}
-                    onLoadMore={handleLoadMore}
-                    testId="sidebar-tags-load-more"
-                  />
-                ),
-                ...cardActions,
-              })
-            )}
           </div>
         )}
       </div>
