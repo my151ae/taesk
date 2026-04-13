@@ -346,6 +346,7 @@
 .editor :global(.ProseMirror h3),
 .editor :global(.ProseMirror summary) {
     margin: 0 !important;
+    padding-top: 0 !important;
     padding-bottom: 2px !important;
     border-bottom: none;
     line-height: 1.5;
@@ -354,17 +355,55 @@
     position: relative;
 }
 
+.editor :global(.ProseMirror p),
+.editor :global(.ProseMirror summary) {
+    line-height: 1.5;
+}
+
+.editor :global(.ProseMirror p + p) {
+    margin-top: 0.5rem !important;
+}
+
+.editor :global(.ProseMirror h1 + p),
+.editor :global(.ProseMirror h2 + p),
+.editor :global(.ProseMirror h3 + p),
+.editor :global(.ProseMirror summary + p) {
+    margin-top: 0.5rem !important;
+}
+
+.editor :global(.ProseMirror p + h1),
+.editor :global(.ProseMirror p + h2),
+.editor :global(.ProseMirror p + h3),
+.editor :global(.ProseMirror h1 + h1),
+.editor :global(.ProseMirror h1 + h2),
+.editor :global(.ProseMirror h1 + h3),
+.editor :global(.ProseMirror h2 + h1),
+.editor :global(.ProseMirror h2 + h2),
+.editor :global(.ProseMirror h2 + h3),
+.editor :global(.ProseMirror h3 + h1),
+.editor :global(.ProseMirror h3 + h2),
+.editor :global(.ProseMirror h3 + h3),
+.editor :global(.ProseMirror summary + h1),
+.editor :global(.ProseMirror summary + h2),
+.editor :global(.ProseMirror summary + h3) {
+    margin-top: 1rem !important;
+}
+
 .editor :global(.ProseMirror h1),
 .editor :global(.ProseMirror h2),
 .editor :global(.ProseMirror h3) {
-    padding-top: 1rem !important;
-    padding-bottom: 0.2rem !important;
+    margin-top: 1rem !important;
+    line-height: 1.1 !important;
+    padding-bottom: 2px !important;
+}
+
+.editor :global(.ProseMirror > h1:first-child),
+.editor :global(.ProseMirror > h2:first-child),
+.editor :global(.ProseMirror > h3:first-child) {
+    margin-top: 0 !important;
 }
 
 .editor :global(.ProseMirror p)::after,
-.editor :global(.ProseMirror h1)::after,
-.editor :global(.ProseMirror h2)::after,
-.editor :global(.ProseMirror h3)::after,
 .editor :global(.ProseMirror summary)::after {
     content: "";
     display: block;
@@ -372,6 +411,19 @@
     left: 0;
     right: 0;
     bottom: 0;
+    border-bottom: 1px solid #e5e7eb;
+    pointer-events: none;
+}
+
+.editor :global(.ProseMirror h1)::after,
+.editor :global(.ProseMirror h2)::after,
+.editor :global(.ProseMirror h3)::after {
+    content: "";
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 1px;
     border-bottom: 1px solid #e5e7eb;
     pointer-events: none;
 }

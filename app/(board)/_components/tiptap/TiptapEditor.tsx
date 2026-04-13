@@ -111,6 +111,8 @@ export default function TiptapEditor({
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
+    const BLOCK_ACTION_HANDLE_HEIGHT = 28;
+
     // Use a ref to track if we're silently updating content to avoid trigger loops
     const isUpdatingRef = useRef(false);
     const lastAppliedDocRef = useRef<ProseMirrorNode | null>(null);
@@ -490,6 +492,26 @@ export default function TiptapEditor({
         return new DOMRect(rect.x, rect.y, rect.width, rect.height);
     }, []);
 
+    const getTextAlignedRect = useCallback((element: HTMLElement): DOMRect => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        const paddingTop = Number.parseFloat(style.paddingTop || '0');
+        const paddingBottom = Number.parseFloat(style.paddingBottom || '0');
+        const lineHeight = Number.parseFloat(style.lineHeight || '');
+        const contentHeight = Math.max(0, rect.height - paddingTop - paddingBottom);
+        const alignedHeight =
+            Number.isFinite(lineHeight) && lineHeight > 0
+                ? Math.min(lineHeight, contentHeight || lineHeight)
+                : contentHeight || rect.height;
+
+        return new DOMRect(
+            rect.x,
+            rect.y + paddingTop,
+            rect.width,
+            alignedHeight,
+        );
+    }, []);
+
     const getBlockTargetRect = useCallback((view: Editor['view'], target: ResolvedBlockTarget): DOMRect | null => {
         const nodeDom = view.nodeDOM(target.pos);
         if (!(nodeDom instanceof HTMLElement)) {
@@ -516,8 +538,16 @@ export default function TiptapEditor({
             }
         }
 
+        if (
+            target.nodeType === 'paragraph' ||
+            target.nodeType === 'heading' ||
+            target.nodeType === 'details'
+        ) {
+            return getTextAlignedRect(nodeDom);
+        }
+
         return cloneDomRect(nodeDom.getBoundingClientRect());
-    }, [cloneDomRect]);
+    }, [cloneDomRect, getTextAlignedRect]);
 
     const getBlockTargetAtPos = useCallback((view: Editor['view'], state: EditorState, pos: number): RenderableBlockActionTarget | null => {
         const target = resolveBlockTargetAtPos(state, pos);
@@ -1353,7 +1383,13 @@ export default function TiptapEditor({
                         data-block-pos={target.pos}
                         data-block-start-pos={target.blockPos}
                         className={styles.blockActionHandle}
-                        style={{ top: Math.max(target.rect.top - rootRect.top, 4), left: 12 }}
+                        style={{
+                            top: Math.max(
+                                target.rect.top - rootRect.top + Math.max((target.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0),
+                                4,
+                            ),
+                            left: 12,
+                        }}
                         onMouseDown={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
