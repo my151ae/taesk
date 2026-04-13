@@ -23,6 +23,7 @@ export type ResolvedBlockTarget = {
   parentListNode: ProseMirrorNode | null;
   parentListIndex: number | null;
   itemIndex: number | null;
+  isTopLevelListItem: boolean;
 };
 
 export function getNodeChildren(node: ProseMirrorNode): ProseMirrorNode[] {
@@ -98,6 +99,26 @@ function isSameTopLevelListType(
   );
 }
 
+function buildEmptyListItemNode(state: EditorState, target: ResolvedBlockTarget): ProseMirrorNode {
+  const paragraph = state.schema.nodes.paragraph.create();
+
+  if (target.nodeType === "taskItem") {
+    return state.schema.nodes.taskItem.create(
+      { ...(target.node.attrs ?? {}), checked: false },
+      Fragment.fromArray([paragraph]),
+    );
+  }
+
+  if (target.nodeType === "listItem") {
+    return state.schema.nodes.listItem.create(
+      target.node.attrs ?? null,
+      Fragment.fromArray([paragraph]),
+    );
+  }
+
+  return paragraph;
+}
+
 export function canMoveBlock(
   state: EditorState,
   target: ResolvedBlockTarget,
@@ -109,6 +130,10 @@ export function canMoveBlock(
     const nextIndex = target.itemIndex + delta;
     if (nextIndex >= 0 && nextIndex < target.parentListNode.childCount) {
       return true;
+    }
+
+    if (!target.isTopLevelListItem) {
+      return false;
     }
 
     if (target.parentListIndex != null) {
@@ -137,6 +162,23 @@ export function buildInsertParagraphBeforeBlockTransaction(
   let selectionPos = target.pos + 1;
 
   if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+    if (!target.isTopLevelListItem) {
+      const insertedItem = buildEmptyListItemNode(state, target);
+      const children = getNodeChildren(target.parentListNode);
+      const nextChildren = [
+        ...children.slice(0, target.itemIndex),
+        insertedItem,
+        ...children.slice(target.itemIndex),
+      ];
+      tr = tr.replaceWith(
+        target.parentListPos,
+        target.parentListPos + target.parentListNode.nodeSize,
+        target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+      );
+      selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, target.itemIndex) + 2;
+      return setSelectionForAction(tr, selectionPos, 1);
+    }
+
     const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, "before");
     tr = tr.replaceWith(
       target.parentListPos,
@@ -176,6 +218,24 @@ export function buildInsertParagraphAfterBlockTransaction(
   let selectionPos = target.pos + target.node.nodeSize + 1;
 
   if (target.parentListNode && target.parentListPos != null && target.itemIndex != null) {
+    if (!target.isTopLevelListItem) {
+      const insertedItem = buildEmptyListItemNode(state, target);
+      const children = getNodeChildren(target.parentListNode);
+      const insertIndex = target.itemIndex + 1;
+      const nextChildren = [
+        ...children.slice(0, insertIndex),
+        insertedItem,
+        ...children.slice(insertIndex),
+      ];
+      tr = tr.replaceWith(
+        target.parentListPos,
+        target.parentListPos + target.parentListNode.nodeSize,
+        target.parentListNode.copy(Fragment.fromArray(nextChildren)),
+      );
+      selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, insertIndex) + 2;
+      return setSelectionForAction(tr, selectionPos, 1);
+    }
+
     const replacement = splitListAroundItem(target.parentListNode, target.itemIndex, paragraph, "after");
     tr = tr.replaceWith(
       target.parentListPos,
@@ -273,6 +333,10 @@ export function buildMoveBlockTransaction(
       );
       const selectionPos = target.parentListPos + getTopLevelOffset(nextChildren, nextIndex) + 2;
       return setSelectionForAction(tr, selectionPos, 1);
+    }
+
+    if (!target.isTopLevelListItem) {
+      return null;
     }
 
     if (target.parentListIndex == null) {

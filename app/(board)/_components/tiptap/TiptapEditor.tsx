@@ -45,8 +45,9 @@ import {
     clearExpandedHiddenRunsMeta,
     TaskCompletionVisibility,
     getTaskCompletionState,
-    isTopLevelTaskItemHandleVisible,
+    isTaskItemHandleVisible,
     setTaskCompletionVisibilityMeta,
+    taskCompletionVisibilityPluginKey,
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
 
 export type FocusTitleRequest = {
@@ -292,6 +293,7 @@ export default function TiptapEditor({
                         parentListNode: null,
                         parentListIndex: null,
                         itemIndex: null,
+                        isTopLevelListItem: false,
                     };
                 }
                 continue;
@@ -308,16 +310,15 @@ export default function TiptapEditor({
                     parentListNode: null,
                     parentListIndex: null,
                     itemIndex: null,
+                    isTopLevelListItem: false,
                 };
             }
 
             if ((node.type.name === 'taskItem' || node.type.name === 'listItem') && depth >= 2) {
                 const parentList = $pos.node(depth - 1);
-                const grandParent = $pos.node(depth - 2);
-                if (
-                    (parentList.type.name === 'taskList' || parentList.type.name === 'bulletList' || parentList.type.name === 'orderedList') &&
-                    grandParent.type.name === 'doc'
-                ) {
+                const listParent = depth >= 2 ? $pos.node(depth - 2) : null;
+                if (parentList.type.name === 'taskList' || parentList.type.name === 'bulletList' || parentList.type.name === 'orderedList') {
+                    const isTopLevelListItem = listParent?.type.name === 'doc';
                     return {
                         pos: $pos.before(depth),
                         nodeType: node.type.name as BlockNodeType,
@@ -326,8 +327,9 @@ export default function TiptapEditor({
                         topLevelIndex: null,
                         parentListPos: $pos.before(depth - 1),
                         parentListNode: parentList,
-                        parentListIndex: $pos.index(depth - 2),
+                        parentListIndex: isTopLevelListItem ? $pos.index(depth - 2) : null,
                         itemIndex: $pos.index(depth - 1),
+                        isTopLevelListItem,
                     };
                 }
                 continue;
@@ -344,6 +346,7 @@ export default function TiptapEditor({
                     parentListNode: null,
                     parentListIndex: null,
                     itemIndex: null,
+                    isTopLevelListItem: false,
                 };
             }
         }
@@ -538,6 +541,19 @@ export default function TiptapEditor({
             }
         }
 
+        if (target.nodeType === 'listItem') {
+            const listItem = nodeDom.matches('li')
+                ? nodeDom
+                : nodeDom.closest('li');
+            if (listItem instanceof HTMLElement) {
+                const textBlock = listItem.querySelector(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > summary');
+                if (textBlock instanceof HTMLElement) {
+                    return getTextAlignedRect(textBlock);
+                }
+                return cloneDomRect(listItem.getBoundingClientRect());
+            }
+        }
+
         if (
             target.nodeType === 'paragraph' ||
             target.nodeType === 'heading' ||
@@ -553,7 +569,7 @@ export default function TiptapEditor({
         const target = resolveBlockTargetAtPos(state, pos);
         if (!target) return null;
 
-        if (target.nodeType === 'taskItem' && !isTopLevelTaskItemHandleVisible(state, target.pos)) {
+        if (target.nodeType === 'taskItem' && !isTaskItemHandleVisible(state, target.pos)) {
             return null;
         }
 
@@ -751,8 +767,11 @@ export default function TiptapEditor({
             invalidateLayout();
         },
         onTransaction: ({ editor, transaction }) => {
-            if (!transaction.docChanged) return;
-            emitDocChange(editor, editor.state.doc);
+            const hasTaskCompletionMeta = transaction.getMeta(taskCompletionVisibilityPluginKey) != null;
+            if (!transaction.docChanged && !hasTaskCompletionMeta) return;
+            if (transaction.docChanged) {
+                emitDocChange(editor, editor.state.doc);
+            }
             emitShortcutState(editor);
             invalidateLayout();
         },
@@ -1171,7 +1190,7 @@ export default function TiptapEditor({
 
                 const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
                 if (!target?.rect) {
-                    return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
+                    return node.type.name === 'details' ? false : true;
                 }
 
                 const isDuplicate = nextTargets.some((candidate) => (
@@ -1181,7 +1200,7 @@ export default function TiptapEditor({
                     nextTargets.push(target);
                 }
 
-                return node.type.name === 'taskItem' || node.type.name === 'listItem' || node.type.name === 'details' ? false : true;
+                return node.type.name === 'details' ? false : true;
             });
             setRenderableBlocks(nextTargets);
         });
@@ -1392,7 +1411,7 @@ export default function TiptapEditor({
                                         : 0),
                                 4,
                             ),
-                            left: 12,
+                            left: Math.max(target.rect.left - rootRect.left - BLOCK_ACTION_HANDLE_HEIGHT, 4),
                         }}
                         onMouseDown={(event) => {
                             event.preventDefault();

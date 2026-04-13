@@ -415,9 +415,9 @@ export const getTaskCompletionCurrentlyHiddenRuns = (state: EditorState): Hidden
 export const isTaskItemHiddenAtPos = (state: EditorState, pos: number): boolean =>
   getTaskItemMetaAtPos(state, pos)?.visibility === 'hidden';
 
-export const isTopLevelTaskItemHandleVisible = (state: EditorState, pos: number): boolean => {
+export const isTaskItemHandleVisible = (state: EditorState, pos: number): boolean => {
   const meta = getTaskItemMetaAtPos(state, pos);
-  return Boolean(meta?.isTopLevel && meta.visibility === 'visible');
+  return Boolean(meta?.visibility === 'visible');
 };
 
 export const setTaskCompletionVisibilityMeta = (transaction: Transaction, showCompletedLines: boolean): Transaction =>

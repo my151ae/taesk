@@ -55,8 +55,11 @@ CardModal 本文エディタにおける `details`（トグル）機能の仕様
   - `doc` 直下 `taskList` / `bulletList` / `orderedList` 内の top-level `taskItem` / `listItem`
   - 上記 item は子 `taskList` / `bulletList` / `orderedList` を持っていても対象に含む
   - move は item 単体ではなく、配下 subtree を保持したまま sibling 順序を入れ替える
-- nested child の `taskItem` / `listItem` は引き続き handle / move 対象に含めない
+- nested child の `taskItem` / `listItem` も handle / menu 対象に含める
+- nested child item の move は同一親 list 内の sibling reorder のみに限る
+- top-level 専用 adjacent list merge は nested child item に適用しない
 - `detailsContent` 内 block、list をまたぐ移動、indent / outdent を伴う階層変更、drag & drop は対象外
+- nested child item の `insert-above` / `insert-below` は list 外へ paragraph を差し込まず、同じ親 list に空の sibling item を追加する
 - menu 項目は target type ごとに切り替える
 - menu open 直後の初期 focus は「最初の enabled item」
 - disabled item は menu 上に表示し、roving focus では到達可能だが実行はできない

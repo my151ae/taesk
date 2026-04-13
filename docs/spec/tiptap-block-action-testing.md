@@ -48,8 +48,14 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 
 - top-level block も doc 直下 list item も、target 特定後は **children 配列の並べ替え + `replaceWith(...)`** で安定する。
 - 子 `taskList` / `bulletList` / `orderedList` を持つ top-level 親 `taskItem` / `listItem` も、subtree を保持したまま同一 list 内で reorder される前提で検証する。
-- target boundary も合わせて固定する。親 item には handle が 1 件出る一方、nested child item には handle を出さない。
+- nested child `taskItem` / `listItem` も handle 対象に含める。nested item の move は same-parent-list 内に限り、top-level 専用 adjacent list merge に入らないことを確認する。
 - shortcut 実行は menu debug を経由しないため、保存 JSON の並び順と autosave 経路で確認する。
+
+### `insert-above` / `insert-below` on nested items
+
+- top-level list item は従来どおり list split + paragraph 挿入で確認する。
+- nested `taskItem` / `listItem` は paragraph を list 外へ出さず、同じ親 list に空の sibling item を追加する前提で確認する。
+- nested item の保存確認では、追加された node type が `taskItem` / `listItem` のまま維持され、親 list 配下に入っていることを優先して見る。
 
 ## 推奨テスト方針
 
@@ -59,6 +65,7 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 4. action 実行テストは menu item click を使い、保存 JSON を `expect.poll` で確認する。
 5. `Mod-Shift-ArrowUp/Down` の shortcut 実行は menu を開かず、保存 JSON を `expect.poll` で確認する。
 6. 末尾空 paragraph が追加されうるため、`> p` の単純件数は補助扱いに留める。
+7. nested task の completed hidden run 配下では handle を出さず、run 展開後に handle が復帰することを確認する。
 
 ## 検証コマンド
 
