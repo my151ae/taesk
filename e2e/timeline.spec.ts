@@ -2000,6 +2000,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(toggleA).toHaveAttribute('aria-pressed', 'true');
       await expect(toggleB).toHaveAttribute('aria-pressed', 'false');
       await expect(sectionB.locator('[data-testid^="ab-compact-empty-dropzone-"]')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId(`bucket-compact-count-${compactIso}_b`).first()).toHaveText('1');
       await expect(sectionB.locator('[data-testid^="ab-empty-dropzone-"]')).toHaveCount(0);
       await expect(sectionB).not.toContainText('Drop or add card');
 

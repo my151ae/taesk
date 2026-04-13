@@ -844,9 +844,11 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     const renderCompactEmptyBucketDropZone = ({
         bucketKey,
         isOver,
+        count,
     }: {
         bucketKey: string;
         isOver: boolean;
+        count: number;
     }) => {
         const shortcutAttributes = buildShortcutDataAttributes({
             scope: 'board',
@@ -893,6 +895,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 data-testid={`ab-compact-empty-dropzone-${bucketKey}`}
             >
                 <span className="flex items-center gap-2 text-[10px] font-semibold">
+                    {count > 0 ? (
+                        <CountBadge
+                            value={count}
+                            testId={`bucket-compact-count-${bucketKey}`}
+                            tone={resolveAbCountBadgeTone(count)}
+                        />
+                    ) : null}
                     <span
                         aria-hidden="true"
                         className={clsx(
@@ -1017,7 +1026,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
             ) : null}
 
             {emptyStateVariant === 'compact' ? (
-                renderCompactEmptyBucketDropZone({ bucketKey, isOver })
+                renderCompactEmptyBucketDropZone({ bucketKey, isOver, count: items.length })
             ) : items.length === 0 ? (
                 null
             ) : (
