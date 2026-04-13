@@ -323,17 +323,11 @@
 /* Give headings some space but keep tight - Reduced to half as requested */
 .editor :global(.ProseMirror h1) {
     line-height: 1.1;
-    margin-top: 0.8rem !important;
-    /* Reduced from 1.5rem */
-    margin-bottom: 0.5rem !important;
 }
 
 .editor :global(.ProseMirror h2),
 .editor :global(.ProseMirror h3) {
     line-height: 1.1;
-    margin-top: 0.8rem !important;
-    /* Reduced from 1.5rem */
-    margin-bottom: 0.5rem !important;
 }
 
 .editor :global(.ProseMirror) {
@@ -358,6 +352,13 @@
     overflow-wrap: anywhere;
     word-break: break-word;
     position: relative;
+}
+
+.editor :global(.ProseMirror h1),
+.editor :global(.ProseMirror h2),
+.editor :global(.ProseMirror h3) {
+    padding-top: 1rem !important;
+    padding-bottom: 0.2rem !important;
 }
 
 .editor :global(.ProseMirror p)::after,
