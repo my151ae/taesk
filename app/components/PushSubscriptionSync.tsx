@@ -7,10 +7,12 @@ import {
   getNotificationPermission,
   isPushNotificationSupported,
   registerServiceWorker,
+  subscribeToPushNotifications,
   savePushSubscription,
 } from '@/lib/push-notifications';
 
 const MIN_SYNC_INTERVAL_MS = 60_000;
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 
 export default function PushSubscriptionSync() {
   const { user } = useAuth();
@@ -39,8 +41,25 @@ export default function PushSubscriptionSync() {
       syncInFlightRef.current = true;
 
       try {
+        const preferencesResponse = await fetch('/api/notifications/preferences', {
+          cache: 'no-store',
+        });
+
+        if (!preferencesResponse.ok) {
+          return;
+        }
+
+        const preferences = await preferencesResponse.json() as { web_push_enabled?: boolean };
+        if (preferences.web_push_enabled !== true) {
+          return;
+        }
+
         const registration = await registerServiceWorker();
-        const subscription = await registration?.pushManager.getSubscription();
+        let subscription = await registration?.pushManager.getSubscription();
+
+        if (!subscription && registration && VAPID_PUBLIC_KEY) {
+          subscription = await subscribeToPushNotifications(registration, VAPID_PUBLIC_KEY);
+        }
 
         if (!subscription) {
           return;
