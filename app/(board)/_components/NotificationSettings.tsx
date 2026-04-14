@@ -342,18 +342,21 @@ export default function NotificationSettings({
       }
 
       const automated = typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { webdriver?: boolean }).webdriver);
-      const success = automated
-        ? true
-        : await Promise.race([
+      const shouldPreviewLocally = !automated && permission === 'granted' && !isSubscribed;
+      const success = shouldPreviewLocally
+        ? await Promise.race([
             showTestNotification(),
             new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
-          ]);
-      const statusMessage = success
-        ? 'Test notification sent! 🔔'
-        : 'In-app notification sent. Enable browser permissions to preview native alerts.';
+          ])
+        : true;
+      const statusMessage = shouldPreviewLocally
+        ? success
+          ? 'Test notification sent! 🔔'
+          : 'In-app notification sent. Enable browser permissions to preview native alerts.'
+        : 'Test notification sent! 🔔';
 
       setStatusMessage(statusMessage);
-      if (!success) {
+      if (shouldPreviewLocally && !success) {
         console.warn('Browser notification unavailable; completed API-only fallback.');
       }
     } catch (err) {
