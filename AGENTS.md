@@ -70,5 +70,11 @@ cat test-results/playwright-report.json | jq '.stats'
 - schema 追加/削除/カラム変更を含む修正では、作業完了前に「対象環境へ migration が適用済みであること」を確認すること。未適用のまま fetch / select が壊れる変更は完了扱いにしてはいけない。
 - API や UI が新カラムを参照する変更では、migration 適用後に該当 fetch / mutation まで確認し、migration 未適用起因のエラーを残したまま終了しないこと。
 
+## Vercel MCP 接続手順（運用）
+- Vercel の接続確認は `mcp__vercel__list_teams` → `mcp__vercel__list_projects` の順で行う。
+- 本番挙動の確認は、対象 `projectId` を指定して `mcp__vercel__get_runtime_logs` を優先利用する（推測で原因を決めない）。
+- `deploy_to_vercel` が実行ガイドのみを返す場合があるため、実デプロイは `vercel` CLI の有無を先に確認すること（`zsh -lic 'vercel --version'`）。
+- Codex 環境で `vercel: command not found` の場合は、MCPでログ調査・状態確認を継続し、デプロイ自体はユーザー環境（またはCI/Git連携）で実施する。
+
 ## Commit & Pull Request Guidelines
 短い命令形のコミットメッセージを推奨。ユーザーの承認なしで push しない。破壊的な git コマンドはユーザー指示がある場合のみ実行すること。
