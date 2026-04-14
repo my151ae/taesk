@@ -299,8 +299,8 @@ export default function CardModalHeader({
                             <span className="text-base leading-none">✕</span>
                         </button>
 
-                        <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-center gap-2">
+                        <div className="min-w-0 flex-1 md:flex md:flex-wrap md:items-center md:gap-4">
+                            <div className="flex min-w-0 items-center gap-2 md:shrink-0">
                                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                                     <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
                                     <input
@@ -331,7 +331,7 @@ export default function CardModalHeader({
                                 )}
                             </div>
 
-                            <div className="mt-3 flex min-w-0 flex-col gap-3 md:mt-0 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:text-sm sm:gap-6">
+                            <div className="mt-3 flex min-w-0 flex-col gap-3 md:mt-0 md:flex-1 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:text-sm sm:gap-6">
                                 {dueDate && (
                                     <div
                                         className={clsx(
@@ -341,7 +341,7 @@ export default function CardModalHeader({
                                         )}
                                     >
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Start</span>
+                                    <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Start</span>
                                     <input
                                         type="time"
                                         step={60}
@@ -373,7 +373,7 @@ export default function CardModalHeader({
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Dur</span>
+                                    <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Dur</span>
                                     <div className="flex items-center gap-1">
                                         <input
                                             type="number"
@@ -416,7 +416,7 @@ export default function CardModalHeader({
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">End</span>
+                                    <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">End</span>
                                     <input
                                         type="time"
                                         step={60}
