@@ -548,7 +548,14 @@ export default function TiptapEditor({
             if (listItem instanceof HTMLElement) {
                 const textBlock = listItem.querySelector(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > summary');
                 if (textBlock instanceof HTMLElement) {
-                    return getTextAlignedRect(textBlock);
+                    const listItemRect = listItem.getBoundingClientRect();
+                    const textRect = getTextAlignedRect(textBlock);
+                    return new DOMRect(
+                        listItemRect.left,
+                        textRect.top,
+                        Math.max(textRect.right - listItemRect.left, textRect.width),
+                        textRect.height,
+                    );
                 }
                 return cloneDomRect(listItem.getBoundingClientRect());
             }
