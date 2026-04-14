@@ -344,7 +344,7 @@ export default function CardModalHeader({
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Start</span>
                                     <input
                                         type="time"
-                                        step={900}
+                                        step={60}
                                         value={dueStart}
                                         onChange={(e) => onDueStartChange(e.target.value)}
                                         className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
@@ -419,7 +419,7 @@ export default function CardModalHeader({
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">End</span>
                                     <input
                                         type="time"
-                                        step={900}
+                                        step={60}
                                         value={dueEnd}
                                         onChange={(e) => onDueEndChange(e.target.value)}
                                         className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"

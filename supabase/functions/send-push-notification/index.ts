@@ -48,6 +48,46 @@ interface QuietHoursPreference {
   timezone: string;
 }
 
+type SubscriptionRow = {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  failure_count?: number | null;
+};
+
+function dedupeSubscriptionsByUserAgent(subscriptions: SubscriptionRow[]): SubscriptionRow[] {
+  const toMillis = (value: string | null | undefined) => {
+    if (!value) return 0;
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
+
+  const sorted = [...subscriptions].sort((left, right) => {
+    const leftTs = Math.max(toMillis(left.updated_at), toMillis(left.created_at));
+    const rightTs = Math.max(toMillis(right.updated_at), toMillis(right.created_at));
+    return rightTs - leftTs;
+  });
+
+  const seenKeys = new Set<string>();
+  const deduped: SubscriptionRow[] = [];
+
+  for (const subscription of sorted) {
+    const normalizedUa = (subscription.user_agent ?? '').trim();
+    const key = normalizedUa.length > 0 ? `ua:${normalizedUa}` : `endpoint:${subscription.endpoint}`;
+    if (seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    deduped.push(subscription);
+  }
+
+  return deduped;
+}
+
 function isWithinQuietHours(quietHours: QuietHoursPreference, referenceDate: Date = new Date()): boolean {
   try {
     if (!quietHours.start || !quietHours.end || !quietHours.timezone) {
@@ -260,10 +300,19 @@ Deno.serve(async (req) => {
       },
     });
 
+    const targetSubscriptions = dedupeSubscriptionsByUserAgent(subscriptions as SubscriptionRow[]);
+    const droppedDuplicateSubscriptions = Math.max(0, subscriptions.length - targetSubscriptions.length);
     const rateLimitPerMinute = parseInt(Deno.env.get('PUSH_RATE_LIMIT_PER_MINUTE') ?? '10', 10);
     const summary = { sent: 0, failed: 0, skipped: 0 };
 
-    for (const sub of subscriptions) {
+    if (droppedDuplicateSubscriptions > 0) {
+      console.log(
+        `Deduped subscriptions for ${notificationData.recipient_id}: ${subscriptions.length} -> ${targetSubscriptions.length}`
+      );
+      summary.skipped += droppedDuplicateSubscriptions;
+    }
+
+    for (const sub of targetSubscriptions) {
       const subscriptionId = sub.id as string | undefined;
       if (!subscriptionId) {
         console.warn('Subscription without ID encountered, skipping');
