@@ -5,6 +5,9 @@ import { withErrorHandling } from '@/lib/server/with-error-handling';
 
 const DEFAULT_NOTIFICATIONS_PAGE_SIZE = 20;
 const MAX_NOTIFICATIONS_PAGE_SIZE = 100;
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+};
 
 type NotificationsCursor = {
   created_at: string;
@@ -112,6 +115,8 @@ const getHandler = async (request: NextRequest) => {
     unreadCount: unreadCount ?? 0,
     hasMore,
     nextCursor,
+  }, {
+    headers: NO_STORE_HEADERS,
   });
 };
 
@@ -160,7 +165,10 @@ const postHandler = async (request: NextRequest) => {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-  return NextResponse.json({ notification }, { status: 201 });
+  return NextResponse.json({ notification }, {
+    status: 201,
+    headers: NO_STORE_HEADERS,
+  });
 };
 
 export const GET = withErrorHandling(getHandler, 'notifications-get');

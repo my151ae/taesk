@@ -78,6 +78,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache authenticated API responses.
+  // Stale notification payloads are especially confusing in mobile PWA mode.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   // For font files and other static assets, use network-first strategy
   // but don't fail loudly if network fails
   if (url.pathname.endsWith('.woff2') ||

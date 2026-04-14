@@ -92,6 +92,32 @@ export default function NotificationsBell({ onOpenNotificationsPanel }: Notifica
     };
   }, [user?.id, startPolling, stopPolling]);
 
+  useEffect(() => {
+    if (!featureFlags.notifications || !user?.id || typeof window === 'undefined') {
+      return;
+    }
+
+    const refreshNotifications = () => {
+      void fetchNotifications({ silent: true });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshNotifications();
+      }
+    };
+
+    window.addEventListener('focus', refreshNotifications);
+    window.addEventListener('online', refreshNotifications);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', refreshNotifications);
+      window.removeEventListener('online', refreshNotifications);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user?.id, fetchNotifications]);
+
   if (!featureFlags.notifications) {
     return null;
   }

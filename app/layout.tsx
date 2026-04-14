@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/app/contexts/AuthContext";
 import NotificationSoundPlayer from "@/app/components/NotificationSoundPlayer";
 import NotificationBadgeListener from "@/app/components/NotificationBadgeListener";
+import PushSubscriptionSync from "@/app/components/PushSubscriptionSync";
 
 const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3000";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
         <AuthProvider>
           <NotificationSoundPlayer />
           <NotificationBadgeListener />
+          <PushSubscriptionSync />
           {children}
         </AuthProvider>
       </body>
