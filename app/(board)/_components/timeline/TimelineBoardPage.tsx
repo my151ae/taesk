@@ -1331,10 +1331,11 @@ function TimelineBoardPageContent({
       leftPanelMode: "notifications",
       method: "replace",
     });
+    void fetchNotifications({ silent: true });
     if (typeof window !== "undefined" && window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
       setExpandedSectionKey("notifications");
     }
-  }, [updateBoardUiState]);
+  }, [fetchNotifications, updateBoardUiState]);
 
   const handleMobileLeftPanelSelect = useCallback((key: SidebarSectionKey) => {
     if (key === "overdue") {
@@ -1358,6 +1359,7 @@ function TimelineBoardPageContent({
         leftPanelMode: "notifications",
         method: "replace",
       });
+      void fetchNotifications({ silent: true });
       return;
     }
 
@@ -1383,7 +1385,7 @@ function TimelineBoardPageContent({
       tag: selectedTags[0] ?? resolvedState.tag ?? null,
       method: "replace",
     });
-  }, [resolvedState.tag, searchQuery, selectedTags, updateBoardUiState]);
+  }, [fetchNotifications, resolvedState.tag, searchQuery, selectedTags, updateBoardUiState]);
 
   const handleOpenNotification = useCallback(async (notification: Notification) => {
     setNotificationFeedback(null);
@@ -1395,9 +1397,10 @@ function TimelineBoardPageContent({
       typeof notification.payload?.board_slug === "string" ? notification.payload.board_slug.trim() : "";
 
     if (notification.type === "daily_digest" && boardShortId) {
+      const currentLeftPanelMode = resolvedState.leftPanelMode;
       const boardUrl = boardSlugTail.length > 0
-        ? `/b/${boardShortId}/${boardSlugTail}?lp=overdue&rp=timeline`
-        : `/b/${boardShortId}?lp=overdue&rp=timeline`;
+        ? `/b/${boardShortId}/${boardSlugTail}?lp=${currentLeftPanelMode}&rp=timeline`
+        : `/b/${boardShortId}?lp=${currentLeftPanelMode}&rp=timeline`;
       await markAsRead(notification.id);
       router.push(boardUrl);
       return;
@@ -1421,7 +1424,7 @@ function TimelineBoardPageContent({
     }));
     openCardModal(cardShortId, "notifications");
     void markAsRead(notification.id);
-  }, [currentBoard.id, markAsRead, openCardModal, router, setModalCardOverride]);
+  }, [currentBoard.id, markAsRead, openCardModal, resolvedState.leftPanelMode, router, setModalCardOverride]);
 
   const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
     setSidebarVisibleCounts((prev) => {

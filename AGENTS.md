@@ -40,12 +40,14 @@
 ## Build, Test, and Development Commands
 - `npm run dev` は使用可能。ただし起動前に既存プロセスを確認し、不要な dev サーバーを残したまま別ポートへ退避起動させないこと。
 - ビルドエラー確認のための `npm run build` は実行可能。
+- Codex / MCP 経由のシェルでは `PATH` が最小化され、`node` / `npm` / `npx` が見えないことがある。**Node 系コマンドは必ず `zsh -lic '...'` で実行**して `~/.zprofile` / `~/.zshrc`（`nvm` 含む）を読み込むこと。
+- `command not found: npm` が出た場合も、環境破損と断定せず次を先に実行して確認すること: `zsh -lic 'node -v && npm -v && npx -v'`
 
 ```bash
 lsof -i :3000
-npm run lint
-npm run build
-npx playwright test --reporter=json > test-results/playwright-report.json
+zsh -lic 'npm run lint'
+zsh -lic 'npm run build'
+zsh -lic 'PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json'
 cat test-results/playwright-report.json | jq '.stats'
 ```
 

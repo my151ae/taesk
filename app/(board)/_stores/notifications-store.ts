@@ -180,7 +180,9 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       const params = new URLSearchParams({
         limit: String(NOTIFICATIONS_PAGE_SIZE),
       });
-      const response = await fetch(`/api/notifications?${params.toString()}`);
+      const response = await fetch(`/api/notifications?${params.toString()}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch notifications');
       }
@@ -209,7 +211,9 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
         limit: String(NOTIFICATIONS_PAGE_SIZE),
         before: nextCursor,
       });
-      const response = await fetch(`/api/notifications?${params.toString()}`);
+      const response = await fetch(`/api/notifications?${params.toString()}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch more notifications');
       }

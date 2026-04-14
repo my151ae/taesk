@@ -335,6 +335,12 @@ export default function NotificationSettings({
     setDailyDigestPreview(null);
 
     try {
+      // Always create the server-side notification first so list state is the source of truth.
+      const response = await fetch('/api/notifications/test', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error('Failed to send in-app test notification');
+      }
+
       const automated = typeof navigator !== 'undefined' && Boolean((navigator as Navigator & { webdriver?: boolean }).webdriver);
       const success = automated
         ? true
@@ -346,18 +352,9 @@ export default function NotificationSettings({
         ? 'Test notification sent! 🔔'
         : 'In-app notification sent. Enable browser permissions to preview native alerts.';
 
-      try {
-        const response = await fetch('/api/notifications/test', { method: 'POST' });
-        if (!response.ok) {
-          throw new Error('Failed to send in-app test notification');
-        }
-        setStatusMessage(statusMessage);
-        if (!success) {
-          console.warn('Browser notification unavailable; completed API-only fallback.');
-        }
-      } catch (apiError) {
-        console.error('Failed to send in-app test notification:', apiError);
-        throw apiError;
+      setStatusMessage(statusMessage);
+      if (!success) {
+        console.warn('Browser notification unavailable; completed API-only fallback.');
       }
     } catch (err) {
       console.error('Failed to send test notification:', err);
