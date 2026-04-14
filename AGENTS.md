@@ -64,6 +64,7 @@ cat test-results/playwright-report.json | jq '.stats'
 - Supabase MCP の認証・疎通手順は `docs/spec/supabase-mcp-auth.md` を SSOT とする。
 - 認証が切れた場合は `codex mcp login supabase` を実行し、ブラウザで OAuth を完了する。
 - 接続確認は `mcp__supabase__list_projects`（MCP ツール呼び出し）を最初に実行する。
+- Supabase 作業（接続確認 / データ確認 / SQL 実行 / migration 適用確認）は、**CLI より先に Supabase MCP を優先**して使うこと。CLI は MCP で不足する操作の補助として使う。
 - `list_mcp_resources(server=\"supabase\")` は Supabase 側で未実装のため `Method not found` でも異常とは限らない。
 - **DB スキーマを変える修正では、コード変更だけで終えず必ず migration を作成・適用すること。** `supabase/migrations/` に migration を追加しただけでは完了扱いにしない。
 - schema 追加/削除/カラム変更を含む修正では、作業完了前に「対象環境へ migration が適用済みであること」を確認すること。未適用のまま fetch / select が壊れる変更は完了扱いにしてはいけない。
