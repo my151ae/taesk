@@ -2,40 +2,41 @@
 
 ## Summary
 
-- `lp` は left panel section、`rp` は right panel mode を表す。
-- `lp` は `rp` を変更しない。left/right の state model は完全に分離する。
-- canonical default は `lp=overdue&rp=timeline`。
-- `Search` / `Overdue` / `Completed` / `Tags` / `Trash` は left self-contained とし、right-panel dedicated view は持たせない。
-- desktop / mobile は同じ `BoardUiState` を共有し、viewport を理由に `rp` を別 mode へ書き換えない。
+- `pp` は primary panel section、`mp` は main panel mode を表す。
+- `pp` は `mp` を変更しない。primary/main の state model は完全に分離する。
+- canonical default は `pp=overdue&mp=timeline`。
+- `Search` / `Overdue` / `Completed` / `Tags` / `Trash` は primary self-contained とし、main-panel dedicated view は持たせない。
+- desktop / mobile は同じ `BoardUiState` を共有し、viewport を理由に `mp` を別 mode へ書き換えない。
 
 ## Panel Ownership
 
-- Left panel:
+- Primary panel:
   - `none`
   - `overdue`
   - `completed`
   - `search`
   - `tags`
   - `trash`
-- Right panel:
+- Main panel:
   - `timeline`
   - `list`
   - `month`
 
 ## Strict Canonical Contract
 
-- canonical URL は常に `lp` と `rp` を持つ。
-- `date` は `rp=timeline` / `rp=month` のとき有効。
-- `q` は `lp=search` のときだけ有効。
-- `tag` は `lp=tags` のときだけ有効。
+- canonical URL は常に `pp` と `mp` を持つ。
+- `date` は `mp=timeline` / `mp=month` のとき有効。
+- `q` は `pp=search` のときだけ有効。
+- `tag` は `pp=tags` のときだけ有効。
+- `checked` / `unchecked` は `pp=tags` のときだけ有効。
 - serialize は strict に不要パラメータを落とす。
 
 ## Invalid URL Policy
 
 - 旧 `view` / `before` / `after` / `range` / `time` query は invalid URL とする。
-- `lp` または `rp` が欠ける URL は invalid URL とする。
+- `pp` または `mp` が欠ける URL は invalid URL とする。
 - contract 外の mode や query も invalid URL とする。
-- invalid URL の reset / canonical move 先は `lp=overdue&rp=timeline`。
+- invalid URL の reset / canonical move 先は `pp=overdue&mp=timeline`。
 
 ## Desktop Behavior
 
@@ -63,26 +64,26 @@
 ## Mobile Behavior
 
 - Phase 1 では mobile に left-panel 専用 sheet/panel は追加しない。
-- mobile では context bar のラベルで current `lp` を示す。
-- right panel は current `rp` の内容をそのまま表示する。
-- `rp=month` も mobile でそのまま描画する。
+- mobile では context bar のラベルで current `pp` を示す。
+- main panel は current `mp` の内容をそのまま表示する。
+- `mp=month` も mobile でそのまま描画する。
 - Phase 2 で mobile に desktop 相当の self-contained left UI を追加する。
 
 ## Test Matrix
 
-- `lp=search&rp=timeline&q=...` が valid。
-- `lp=search&rp=list&q=...` が valid。
-- `lp=search&rp=month&q=...` が valid。
-- `lp=tags&rp=timeline&tag=...` が valid。
-- `lp=tags&rp=list&tag=...` が valid。
-- `lp=tags&rp=month&tag=...` が valid。
-- `lp=trash&rp=timeline` が valid。
-- `lp=trash&rp=list` が valid。
-- `lp=trash&rp=month` が valid。
-- `lp=completed&rp=timeline` が valid。
-- `lp=completed&rp=list` が valid。
-- `lp=completed&rp=month` が valid。
-- `lp` / `rp` 欠落 URL は invalid。
+- `pp=search&mp=timeline&q=...` が valid。
+- `pp=search&mp=list&q=...` が valid。
+- `pp=search&mp=month&q=...` が valid。
+- `pp=tags&mp=timeline&tag=...` が valid。
+- `pp=tags&mp=list&tag=...` が valid。
+- `pp=tags&mp=month&tag=...` が valid。
+- `pp=trash&mp=timeline` が valid。
+- `pp=trash&mp=list` が valid。
+- `pp=trash&mp=month` が valid。
+- `pp=completed&mp=timeline` が valid。
+- `pp=completed&mp=list` が valid。
+- `pp=completed&mp=month` が valid。
+- `pp` / `mp` 欠落 URL は invalid。
 - Search は right panel mode を変えない。
 - Search results は left sidebar にのみ出る。
 - Tags は left panel 内で未選択 / 0件 / 一致ありを表現する。

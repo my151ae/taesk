@@ -30,11 +30,11 @@
 - 不具合報告が `/b/...` に関する場合、Timeline 側のみを対象に調査・修正する。
 - CardModal のタイトル/本文境界は、矢印によるフォーカス移動に加えて、タイトル欄の通常の `Enter` で本文1行目へ標準 paragraph を追加して本文へ移す。本文先頭行頭の `Backspace` は、先頭が空の top-level paragraph の場合だけその段落を削除してタイトル末尾へ戻し、それ以外は本文を変えずタイトル末尾へ戻す。IME 確定中の `Enter` は除外する。詳細は `docs/spec/keyboard-navigation.md` を参照すること。
 - 左パネルのセクション追加は、**別ページを新設せず** `/b/...` の既存レイアウト内で完結させることをデフォルトとする。
-- board navigation の canonical URL は `lp` / `rp` を使い、旧 `view` / `before` / `after` / `range` / `time` 契約は救済しない。契約外 URL は invalid URL として扱う。
-- board navigation は no-exception contract を採用し、`lp` は left section、`rp` は right panel mode のみを表す。`lp` が `rp` を暗黙変更してはいけない。
-- canonical default は `lp=overdue&rp=timeline` とする。invalid URL からの reset 先も同一 canonical URL とする。
-- `rp` は `timeline` / `list` / `month` を正とし、desktop / mobile は同じ `BoardUiState` を共有する。viewport を理由に `rp` を別 mode へ書き換えてはいけない。
-- `Search` / `Overdue` / `Tags` は left self-contained とし、入力・選択・結果表示は左パネル内で完結させる。
+- board navigation の canonical URL は `pp` / `mp` を使い、旧 `view` / `before` / `after` / `range` / `time` 契約は救済しない。契約外 URL は invalid URL として扱う。
+- board navigation は no-exception contract を採用し、`pp` は primary section、`mp` は main panel mode のみを表す。`pp` が `mp` を暗黙変更してはいけない。
+- canonical default は `pp=overdue&mp=timeline` とする。invalid URL からの reset 先も同一 canonical URL とする。
+- `mp` は `timeline` / `list` / `month` を正とし、desktop / mobile は同じ `BoardUiState` を共有する。viewport を理由に `mp` を別 mode へ書き換えてはいけない。
+- `Search` / `Overdue` / `Completed` / `Tags` / `Trash` は primary self-contained とし、入力・選択・結果表示は左パネル内で完結させる。
 - 右パネル上部は今後も 2 段構成をデフォルトとし、1段目はレイアウト種別（例: `Timeline` / `List` / `Month`）、2段目はその左パネル項目に対応する専用メニューを配置する。行高・余白は既存 Timeline / List / Month ヘッダーに合わせて統一する。
 
 ## Build, Test, and Development Commands

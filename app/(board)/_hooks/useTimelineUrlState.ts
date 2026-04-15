@@ -12,8 +12,8 @@ type UseTimelineUrlStateArgs = {
 };
 
 export type TimelineViewMode = "timeline" | "list" | "month";
-export type LeftPanelMode = "none" | "overdue" | "completed" | "notifications" | "tags" | "search" | "trash";
-export type RightPanelMode = "timeline" | "list" | "month";
+export type PrimaryPanelMode = "none" | "overdue" | "completed" | "notifications" | "tags" | "search" | "trash";
+export type MainPanelMode = "timeline" | "list" | "month";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
 export type ListWindowPresetKey =
@@ -26,15 +26,15 @@ export type ListWindowPresetKey =
   | "minus3";
 
 export type BoardUiState = {
-  leftPanel: {
-    mode: LeftPanelMode;
+  primaryPanel: {
+    mode: PrimaryPanelMode;
     state: {
       tag?: string | null;
       q?: string | null;
     };
   };
-  rightPanel: {
-    mode: RightPanelMode;
+  mainPanel: {
+    mode: MainPanelMode;
     state: Record<string, never>;
   };
 };
@@ -42,10 +42,10 @@ export type BoardUiState = {
 export type UrlParseErrorCode =
   | "LEGACY_QUERY"
   | "UNKNOWN_PARAM"
-  | "MISSING_LP"
-  | "MISSING_RP"
-  | "INVALID_LP"
-  | "INVALID_RP"
+  | "MISSING_PP"
+  | "MISSING_MP"
+  | "INVALID_PP"
+  | "INVALID_MP"
   | "INVALID_DATE"
   | "INVALID_TAG"
   | "INVALID_Q"
@@ -60,8 +60,8 @@ export type ResolvedTimelineUrlState = {
   hasQuery: boolean;
   hasExplicitBoardState: boolean;
   view: TimelineViewMode;
-  leftPanelMode: LeftPanelMode;
-  rightPanelMode: RightPanelMode;
+  primaryPanelMode: PrimaryPanelMode;
+  mainPanelMode: MainPanelMode;
   boardUiState: BoardUiState;
   date: string | null;
   tag: string | null;
@@ -93,8 +93,8 @@ type MonthUrlUpdateArgs = {
 };
 
 type BoardUrlUpdateArgs = {
-  leftPanelMode?: LeftPanelMode;
-  rightPanelMode?: RightPanelMode;
+  primaryPanelMode?: PrimaryPanelMode;
+  mainPanelMode?: MainPanelMode;
   date?: string | null;
   tag?: string | null;
   searchQuery?: string | null;
@@ -110,7 +110,7 @@ type ParseDefaults = {
 };
 
 const LEGACY_KEYS = new Set(["view", "range", "before", "after", "time"]);
-const KNOWN_KEYS = new Set(["lp", "rp", "date", "tag", "q", "card"]);
+const KNOWN_KEYS = new Set(["pp", "mp", "date", "tag", "q", "checked", "unchecked", "card"]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ZERO_LIST_WINDOW: ListWindow = { before: 15, after: 15 };
 
@@ -167,11 +167,20 @@ const normalizeListWindow = (before: number, after: number): ListWindow => {
   return { before: normalizedBefore, after: normalizedAfter };
 };
 
-const isLeftPanelMode = (value: string | null): value is LeftPanelMode =>
+const isPrimaryPanelMode = (value: string | null): value is PrimaryPanelMode =>
   value === "none" || value === "overdue" || value === "completed" || value === "notifications" || value === "tags" || value === "search" || value === "trash";
 
-const isRightPanelMode = (value: string | null): value is RightPanelMode =>
+const isMainPanelMode = (value: string | null): value is MainPanelMode =>
   value === "timeline" || value === "list" || value === "month";
+
+const parseBooleanSearchParam = (
+  value: string | null,
+): { ok: true; value: boolean | null } | { ok: false } => {
+  if (value == null) return { ok: true, value: null };
+  if (value === "1") return { ok: true, value: true };
+  if (value === "0") return { ok: true, value: false };
+  return { ok: false };
+};
 
 const buildDefaultResolvedState = (
   defaults: ParseDefaults,
@@ -181,11 +190,11 @@ const buildDefaultResolvedState = (
   hasQuery,
   hasExplicitBoardState: false,
   view: "timeline",
-  leftPanelMode: "overdue",
-  rightPanelMode: "timeline",
+  primaryPanelMode: "overdue",
+  mainPanelMode: "timeline",
   boardUiState: {
-    leftPanel: { mode: "overdue", state: { tag: null, q: null } },
-    rightPanel: { mode: "timeline", state: {} },
+    primaryPanel: { mode: "overdue", state: { tag: null, q: null } },
+    mainPanel: { mode: "timeline", state: {} },
   },
   date: null,
   tag: null,
@@ -201,8 +210,8 @@ const buildDefaultResolvedState = (
 
 export function normalizeBoardUiState(
   input: {
-    leftPanelMode: LeftPanelMode;
-    rightPanelMode: RightPanelMode;
+    primaryPanelMode: PrimaryPanelMode;
+    mainPanelMode: MainPanelMode;
     date?: string | null;
     tag?: string | null;
     searchQuery?: string | null;
@@ -217,44 +226,44 @@ export function normalizeBoardUiState(
   };
   const card = null;
   const today = todayJstIso();
-  let leftPanelMode = input.leftPanelMode;
-  let rightPanelMode = input.rightPanelMode;
+  let primaryPanelMode = input.primaryPanelMode;
+  let mainPanelMode = input.mainPanelMode;
   let date = input.date && isValidIsoDate(input.date) ? input.date : null;
   let tag = input.tag?.trim() ? input.tag.trim() : null;
   let searchQuery = input.searchQuery?.trim() ? input.searchQuery.trim() : "";
   let showChecked = input.showChecked ?? true;
   let showUnchecked = input.showUnchecked ?? true;
 
-  if (rightPanelMode === "list") {
+  if (mainPanelMode === "list") {
     date = null;
   }
-  if (leftPanelMode !== "tags") {
+  if (primaryPanelMode !== "tags") {
     tag = null;
     showChecked = true;
     showUnchecked = true;
   }
-  if (leftPanelMode !== "search") {
+  if (primaryPanelMode !== "search") {
     searchQuery = "";
   }
 
   const anchorOffset = date ? getDayDiff(date, today) : 0;
-  const view = rightPanelMode;
+  const view = mainPanelMode;
 
   return {
     hasQuery: true,
     hasExplicitBoardState: true,
     view,
-    leftPanelMode,
-    rightPanelMode,
+    primaryPanelMode,
+    mainPanelMode,
     boardUiState: {
-      leftPanel: {
-        mode: leftPanelMode,
+      primaryPanel: {
+        mode: primaryPanelMode,
         state: {
           tag,
           q: searchQuery || null,
         },
       },
-      rightPanel: { mode: rightPanelMode, state: {} },
+      mainPanel: { mode: mainPanelMode, state: {} },
     },
     date,
     tag,
@@ -272,13 +281,13 @@ export function normalizeBoardUiState(
 export function serializeBoardUiStateToSearchParams(args: {
   state: Pick<
     ResolvedTimelineUrlState,
-    "leftPanelMode" | "rightPanelMode" | "date" | "tag" | "searchQuery" | "showChecked" | "showUnchecked"
+    "primaryPanelMode" | "mainPanelMode" | "date" | "tag" | "searchQuery" | "showChecked" | "showUnchecked"
   >;
   card?: string | null;
 }) {
   const normalized = normalizeBoardUiState({
-    leftPanelMode: args.state.leftPanelMode,
-    rightPanelMode: args.state.rightPanelMode,
+    primaryPanelMode: args.state.primaryPanelMode,
+    mainPanelMode: args.state.mainPanelMode,
     date: args.state.date,
     tag: args.state.tag,
     searchQuery: args.state.searchQuery,
@@ -287,17 +296,23 @@ export function serializeBoardUiStateToSearchParams(args: {
   });
 
   const params = new URLSearchParams();
-  params.set("lp", normalized.leftPanelMode);
-  params.set("rp", normalized.rightPanelMode);
+  params.set("pp", normalized.primaryPanelMode);
+  params.set("mp", normalized.mainPanelMode);
 
-  if ((normalized.rightPanelMode === "timeline" || normalized.rightPanelMode === "month") && normalized.date) {
+  if ((normalized.mainPanelMode === "timeline" || normalized.mainPanelMode === "month") && normalized.date) {
     params.set("date", normalized.date);
   }
-  if (normalized.leftPanelMode === "tags" && normalized.tag) {
+  if (normalized.primaryPanelMode === "tags" && normalized.tag) {
     params.set("tag", normalized.tag);
   }
-  if (normalized.leftPanelMode === "search" && normalized.searchQuery) {
+  if (normalized.primaryPanelMode === "search" && normalized.searchQuery) {
     params.set("q", normalized.searchQuery);
+  }
+  if (normalized.primaryPanelMode === "tags" && !normalized.showChecked) {
+    params.set("checked", "0");
+  }
+  if (normalized.primaryPanelMode === "tags" && !normalized.showUnchecked) {
+    params.set("unchecked", "0");
   }
 
   const card = normalizeCardValue(args.card);
@@ -340,20 +355,20 @@ export function parseBoardUiStateFromSearchParams(
     };
   }
 
-  const rawLp = searchParams.get("lp");
-  if (!rawLp) {
-    return { parseResult: { ok: false, code: "MISSING_LP" }, resolvedState: defaultResolved };
+  const rawPrimaryPanelMode = searchParams.get("pp");
+  if (!rawPrimaryPanelMode) {
+    return { parseResult: { ok: false, code: "MISSING_PP" }, resolvedState: defaultResolved };
   }
-  if (!isLeftPanelMode(rawLp)) {
-    return { parseResult: { ok: false, code: "INVALID_LP" }, resolvedState: defaultResolved };
+  if (!isPrimaryPanelMode(rawPrimaryPanelMode)) {
+    return { parseResult: { ok: false, code: "INVALID_PP" }, resolvedState: defaultResolved };
   }
 
-  const rawRp = searchParams.get("rp");
-  if (!rawRp) {
-    return { parseResult: { ok: false, code: "MISSING_RP" }, resolvedState: defaultResolved };
+  const rawMainPanelMode = searchParams.get("mp");
+  if (!rawMainPanelMode) {
+    return { parseResult: { ok: false, code: "MISSING_MP" }, resolvedState: defaultResolved };
   }
-  if (rawRp && !isRightPanelMode(rawRp)) {
-    return { parseResult: { ok: false, code: "INVALID_RP" }, resolvedState: defaultResolved };
+  if (rawMainPanelMode && !isMainPanelMode(rawMainPanelMode)) {
+    return { parseResult: { ok: false, code: "INVALID_MP" }, resolvedState: defaultResolved };
   }
 
   const rawDate = searchParams.get("date");
@@ -369,13 +384,23 @@ export function parseBoardUiStateFromSearchParams(
   if (!parsedQuery.ok) {
     return { parseResult: { ok: false, code: "INVALID_Q" }, resolvedState: defaultResolved };
   }
+  const parsedChecked = parseBooleanSearchParam(searchParams.get("checked"));
+  if (!parsedChecked.ok) {
+    return { parseResult: { ok: false, code: "INVALID_CHECKED" }, resolvedState: defaultResolved };
+  }
+  const parsedUnchecked = parseBooleanSearchParam(searchParams.get("unchecked"));
+  if (!parsedUnchecked.ok) {
+    return { parseResult: { ok: false, code: "INVALID_UNCHECKED" }, resolvedState: defaultResolved };
+  }
   const normalized = normalizeBoardUiState(
     {
-      leftPanelMode: rawLp,
-      rightPanelMode: rawRp as RightPanelMode,
+      primaryPanelMode: rawPrimaryPanelMode,
+      mainPanelMode: rawMainPanelMode as MainPanelMode,
       date: rawDate,
       tag: parsedTag.value,
       searchQuery: parsedQuery.value,
+      showChecked: parsedChecked.value ?? true,
+      showUnchecked: parsedUnchecked.value ?? true,
     },
     safeDefaults,
   );
@@ -472,8 +497,8 @@ export const useTimelineUrlState = ({
 
   const updateBoardUiState = useCallback(
     ({
-      leftPanelMode,
-      rightPanelMode,
+      primaryPanelMode,
+      mainPanelMode,
       date,
       tag,
       searchQuery,
@@ -484,8 +509,8 @@ export const useTimelineUrlState = ({
     }: BoardUrlUpdateArgs) => {
       const params = serializeBoardUiStateToSearchParams({
         state: {
-          leftPanelMode: leftPanelMode ?? resolvedState.leftPanelMode,
-          rightPanelMode: rightPanelMode ?? resolvedState.rightPanelMode,
+          primaryPanelMode: primaryPanelMode ?? resolvedState.primaryPanelMode,
+          mainPanelMode: mainPanelMode ?? resolvedState.mainPanelMode,
           date: date === undefined ? resolvedState.date : date,
           tag: tag === undefined ? resolvedState.tag : tag,
           searchQuery: searchQuery === undefined ? resolvedState.searchQuery : (searchQuery ?? ""),
@@ -503,39 +528,39 @@ export const useTimelineUrlState = ({
   const updateUrlForTimeline = useCallback(
     ({ date, method, card }: TimelineUrlUpdateArgs) => {
       updateBoardUiState({
-        leftPanelMode: resolvedState.leftPanelMode,
-        rightPanelMode: "timeline",
+        primaryPanelMode: resolvedState.primaryPanelMode,
+        mainPanelMode: "timeline",
         date: date ?? resolvedState.date ?? todayJstIso(),
         card,
         method,
       });
     },
-    [resolvedState.date, resolvedState.leftPanelMode, updateBoardUiState],
+    [resolvedState.date, resolvedState.primaryPanelMode, updateBoardUiState],
   );
 
   const updateUrlForList = useCallback(
     ({ method, card }: ListUrlUpdateArgs) => {
       updateBoardUiState({
-        leftPanelMode: resolvedState.leftPanelMode,
-        rightPanelMode: "list",
+        primaryPanelMode: resolvedState.primaryPanelMode,
+        mainPanelMode: "list",
         card,
         method,
       });
     },
-    [resolvedState.leftPanelMode, updateBoardUiState],
+    [resolvedState.primaryPanelMode, updateBoardUiState],
   );
 
   const updateUrlForMonth = useCallback(
     ({ date, method, card }: MonthUrlUpdateArgs) => {
       updateBoardUiState({
-        leftPanelMode: resolvedState.leftPanelMode,
-        rightPanelMode: "month",
+        primaryPanelMode: resolvedState.primaryPanelMode,
+        mainPanelMode: "month",
         date: date ?? resolvedState.date ?? todayJstIso(),
         card,
         method,
       });
     },
-    [resolvedState.date, resolvedState.leftPanelMode, updateBoardUiState],
+    [resolvedState.date, resolvedState.primaryPanelMode, updateBoardUiState],
   );
 
   const setCard = useCallback(
@@ -550,8 +575,8 @@ export const useTimelineUrlState = ({
       }
       const params = serializeBoardUiStateToSearchParams({
         state: {
-          leftPanelMode: resolvedState.leftPanelMode,
-          rightPanelMode: resolvedState.rightPanelMode,
+          primaryPanelMode: resolvedState.primaryPanelMode,
+          mainPanelMode: resolvedState.mainPanelMode,
           date: resolvedState.date,
           tag: resolvedState.tag,
           searchQuery: resolvedState.searchQuery,
@@ -567,8 +592,8 @@ export const useTimelineUrlState = ({
       navigateWithNativeHistory,
       resolvedState.date,
       resolvedState.hasExplicitBoardState,
-      resolvedState.leftPanelMode,
-      resolvedState.rightPanelMode,
+      resolvedState.primaryPanelMode,
+      resolvedState.mainPanelMode,
       resolvedState.searchQuery,
       resolvedState.showChecked,
       resolvedState.showUnchecked,

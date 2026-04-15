@@ -57,7 +57,7 @@ Timeline ボード移行後の Playwright 運用ルールをまとめます。�
 ```
 
 - `test:timeline` は Timeline ビュー専用 spec を単体で実行。
-- month view を追加した変更では、`rp=month` deep-link、month から Timeline 遷移、mobile month 表示を JSON レポート付きで確認する。
+- month view を追加した変更では、`mp=month` deep-link、month から Timeline 遷移、mobile month 表示を JSON レポート付きで確認する。
 - その他の `test:*` スクリプトはバッチ実行時と同じ `--project=core` を使用。
 - 重い spec はタグで再分割して回す。現状は `test:comments:modal` / `test:comments:crud` / `test:comments:mentions` と `test:permissions:ui` / `test:permissions:api` を優先する。
 - Team-first 権限モデル移行後は、permissions 系で `TEAM_MEMBERSHIP_REQUIRED`、`LAST_BOARD_OWNER_TRANSFER_REQUIRED`、pending board access の消化を重点確認する。

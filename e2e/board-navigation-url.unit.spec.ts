@@ -16,16 +16,16 @@ test.describe("board navigation canonical url helpers", () => {
     const parsed = parseBoardUiStateFromSearchParams(new URLSearchParams(), defaults);
 
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("overdue");
-    expect(parsed.resolvedState.rightPanelMode).toBe("timeline");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("overdue");
+    expect(parsed.resolvedState.mainPanelMode).toBe("timeline");
     expect(parsed.resolvedState.date).toBeNull();
   });
 
   test("search timeline round-trip preserves q without forcing list", async () => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "search",
-        rightPanelMode: "timeline",
+        primaryPanelMode: "search",
+        mainPanelMode: "timeline",
         date: "2026-03-31",
         tag: null,
         searchQuery: "meeting",
@@ -34,12 +34,12 @@ test.describe("board navigation canonical url helpers", () => {
       },
     });
 
-    expect(params.toString()).toBe("lp=search&rp=timeline&date=2026-03-31&q=meeting");
+    expect(params.toString()).toBe("pp=search&mp=timeline&date=2026-03-31&q=meeting");
 
     const parsed = parseBoardUiStateFromSearchParams(params, defaults);
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("search");
-    expect(parsed.resolvedState.rightPanelMode).toBe("timeline");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("search");
+    expect(parsed.resolvedState.mainPanelMode).toBe("timeline");
     expect(parsed.resolvedState.date).toBe("2026-03-31");
     expect(parsed.resolvedState.searchQuery).toBe("meeting");
   });
@@ -47,8 +47,8 @@ test.describe("board navigation canonical url helpers", () => {
   test("search list round-trip preserves q and drops date", async () => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "search",
-        rightPanelMode: "list",
+        primaryPanelMode: "search",
+        mainPanelMode: "list",
         date: "2026-03-31",
         tag: null,
         searchQuery: "meeting",
@@ -57,12 +57,12 @@ test.describe("board navigation canonical url helpers", () => {
       },
     });
 
-    expect(params.toString()).toBe("lp=search&rp=list&q=meeting");
+    expect(params.toString()).toBe("pp=search&mp=list&q=meeting");
 
     const parsed = parseBoardUiStateFromSearchParams(params, defaults);
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("search");
-    expect(parsed.resolvedState.rightPanelMode).toBe("list");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("search");
+    expect(parsed.resolvedState.mainPanelMode).toBe("list");
     expect(parsed.resolvedState.date).toBeNull();
     expect(parsed.resolvedState.searchQuery).toBe("meeting");
   });
@@ -70,8 +70,8 @@ test.describe("board navigation canonical url helpers", () => {
   test("tags round-trip preserves tag on both timeline and list modes", async () => {
     const timelineParams = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "tags",
-        rightPanelMode: "timeline",
+        primaryPanelMode: "tags",
+        mainPanelMode: "timeline",
         date: "2026-03-31",
         tag: "Memo",
         searchQuery: "",
@@ -79,12 +79,12 @@ test.describe("board navigation canonical url helpers", () => {
         showUnchecked: true,
       },
     });
-    expect(timelineParams.toString()).toBe("lp=tags&rp=timeline&date=2026-03-31&tag=Memo");
+    expect(timelineParams.toString()).toBe("pp=tags&mp=timeline&date=2026-03-31&tag=Memo");
 
     const listParams = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "tags",
-        rightPanelMode: "list",
+        primaryPanelMode: "tags",
+        mainPanelMode: "list",
         date: "2026-03-31",
         tag: "Memo",
         searchQuery: "",
@@ -92,20 +92,42 @@ test.describe("board navigation canonical url helpers", () => {
         showUnchecked: true,
       },
     });
-    expect(listParams.toString()).toBe("lp=tags&rp=list&tag=Memo");
+    expect(listParams.toString()).toBe("pp=tags&mp=list&tag=Memo");
 
     const parsed = parseBoardUiStateFromSearchParams(listParams, defaults);
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("tags");
-    expect(parsed.resolvedState.rightPanelMode).toBe("list");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("tags");
+    expect(parsed.resolvedState.mainPanelMode).toBe("list");
     expect(parsed.resolvedState.tag).toBe("Memo");
   });
 
-  test("trash round-trip preserves lp without extra params", async () => {
+  test("tags round-trip preserves checked/unchecked filters", async () => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "trash",
-        rightPanelMode: "list",
+        primaryPanelMode: "tags",
+        mainPanelMode: "timeline",
+        date: "2026-03-31",
+        tag: "Memo",
+        searchQuery: "",
+        showChecked: false,
+        showUnchecked: true,
+      },
+    });
+
+    expect(params.toString()).toBe("pp=tags&mp=timeline&date=2026-03-31&tag=Memo&checked=0");
+
+    const parsed = parseBoardUiStateFromSearchParams(params, defaults);
+    expect(parsed.parseResult).toEqual({ ok: true });
+    expect(parsed.resolvedState.primaryPanelMode).toBe("tags");
+    expect(parsed.resolvedState.showChecked).toBe(false);
+    expect(parsed.resolvedState.showUnchecked).toBe(true);
+  });
+
+  test("trash round-trip preserves pp without extra params", async () => {
+    const params = serializeBoardUiStateToSearchParams({
+      state: {
+        primaryPanelMode: "trash",
+        mainPanelMode: "list",
         date: "2026-03-31",
         tag: "Memo",
         searchQuery: "meeting",
@@ -114,22 +136,22 @@ test.describe("board navigation canonical url helpers", () => {
       },
     });
 
-    expect(params.toString()).toBe("lp=trash&rp=list");
+    expect(params.toString()).toBe("pp=trash&mp=list");
 
     const parsed = parseBoardUiStateFromSearchParams(params, defaults);
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("trash");
-    expect(parsed.resolvedState.rightPanelMode).toBe("list");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("trash");
+    expect(parsed.resolvedState.mainPanelMode).toBe("list");
     expect(parsed.resolvedState.date).toBeNull();
     expect(parsed.resolvedState.tag).toBeNull();
     expect(parsed.resolvedState.searchQuery).toBe("");
   });
 
-  test("completed round-trip preserves lp without extra params", async () => {
+  test("completed round-trip preserves pp without extra params", async () => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "completed",
-        rightPanelMode: "timeline",
+        primaryPanelMode: "completed",
+        mainPanelMode: "timeline",
         date: "2026-03-31",
         tag: "Memo",
         searchQuery: "meeting",
@@ -138,12 +160,12 @@ test.describe("board navigation canonical url helpers", () => {
       },
     });
 
-    expect(params.toString()).toBe("lp=completed&rp=timeline&date=2026-03-31");
+    expect(params.toString()).toBe("pp=completed&mp=timeline&date=2026-03-31");
 
     const parsed = parseBoardUiStateFromSearchParams(params, defaults);
     expect(parsed.parseResult).toEqual({ ok: true });
-    expect(parsed.resolvedState.leftPanelMode).toBe("completed");
-    expect(parsed.resolvedState.rightPanelMode).toBe("timeline");
+    expect(parsed.resolvedState.primaryPanelMode).toBe("completed");
+    expect(parsed.resolvedState.mainPanelMode).toBe("timeline");
     expect(parsed.resolvedState.tag).toBeNull();
     expect(parsed.resolvedState.searchQuery).toBe("");
   });
@@ -151,8 +173,8 @@ test.describe("board navigation canonical url helpers", () => {
   test("normalize drops params that do not belong to the current panel mode", async () => {
     const normalized = normalizeBoardUiState(
       {
-        leftPanelMode: "none",
-        rightPanelMode: "list",
+        primaryPanelMode: "none",
+        mainPanelMode: "list",
         date: "2026-03-31",
         tag: "Memo",
         searchQuery: "meeting",
@@ -160,8 +182,8 @@ test.describe("board navigation canonical url helpers", () => {
       defaults,
     );
 
-    expect(normalized.leftPanelMode).toBe("none");
-    expect(normalized.rightPanelMode).toBe("list");
+    expect(normalized.primaryPanelMode).toBe("none");
+    expect(normalized.mainPanelMode).toBe("list");
     expect(normalized.date).toBeNull();
     expect(normalized.tag).toBeNull();
     expect(normalized.searchQuery).toBe("");
@@ -172,16 +194,40 @@ test.describe("board navigation canonical url helpers", () => {
     expect(parsed.parseResult).toEqual({ ok: false, code: "LEGACY_QUERY", detail: "view" });
   });
 
-  test("missing rp is invalid", async () => {
-    const parsed = parseBoardUiStateFromSearchParams(new URLSearchParams("lp=overdue"), defaults);
-    expect(parsed.parseResult).toEqual({ ok: false, code: "MISSING_RP" });
+  test("missing mp is invalid", async () => {
+    const parsed = parseBoardUiStateFromSearchParams(new URLSearchParams("pp=overdue"), defaults);
+    expect(parsed.parseResult).toEqual({ ok: false, code: "MISSING_MP" });
   });
 
-  test("timeline-nav is invalid lp", async () => {
+  test("timeline-nav is invalid pp", async () => {
     const parsed = parseBoardUiStateFromSearchParams(
-      new URLSearchParams("lp=timeline-nav&rp=timeline"),
+      new URLSearchParams("pp=timeline-nav&mp=timeline"),
       defaults,
     );
-    expect(parsed.parseResult).toEqual({ ok: false, code: "INVALID_LP" });
+    expect(parsed.parseResult).toEqual({ ok: false, code: "INVALID_PP" });
+  });
+
+  test("unknown param is invalid", async () => {
+    const parsed = parseBoardUiStateFromSearchParams(
+      new URLSearchParams("pp=overdue&mp=timeline&lp=overdue"),
+      defaults,
+    );
+    expect(parsed.parseResult).toEqual({ ok: false, code: "UNKNOWN_PARAM", detail: "lp" });
+  });
+
+  test("invalid checked flag is invalid", async () => {
+    const parsed = parseBoardUiStateFromSearchParams(
+      new URLSearchParams("pp=tags&mp=timeline&checked=yes"),
+      defaults,
+    );
+    expect(parsed.parseResult).toEqual({ ok: false, code: "INVALID_CHECKED" });
+  });
+
+  test("invalid unchecked flag is invalid", async () => {
+    const parsed = parseBoardUiStateFromSearchParams(
+      new URLSearchParams("pp=tags&mp=timeline&unchecked=no"),
+      defaults,
+    );
+    expect(parsed.parseResult).toEqual({ ok: false, code: "INVALID_UNCHECKED" });
   });
 });

@@ -2407,13 +2407,13 @@ test.describe('@feature:timeline Timeline view', () => {
     }
 
     await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto(`${boardContext.canonicalPath}?lp=overdue`);
+    await page.goto(`${boardContext.canonicalPath}?pp=overdue`);
 
     await expect(page.getByRole('heading', { name: 'Invalid/legacy URL' })).toBeVisible();
-    await expect(page.getByText('MISSING_RP')).toBeVisible();
+    await expect(page.getByText('MISSING_MP')).toBeVisible();
 
     await page.getByRole('button', { name: 'URLをリセット' }).click();
-    await expect(page).toHaveURL(new RegExp(`\\?lp=overdue&rp=timeline$`));
+    await expect(page).toHaveURL(new RegExp(`\\?pp=overdue&mp=timeline$`));
     await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
   });
 
@@ -2550,7 +2550,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.setViewportSize({ width: 1440, height: 960 });
-      await page.goto(`${boardContext.canonicalPath}?lp=overdue&rp=list`);
+      await page.goto(`${boardContext.canonicalPath}?pp=overdue&mp=list`);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
       const listCard = page.locator(`[data-card-id="${cardId}"]`).first();
@@ -2606,7 +2606,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
 
       await page.setViewportSize({ width: 393, height: 852 });
-      await page.goto(`${boardContext.canonicalPath}?lp=overdue&rp=list`);
+      await page.goto(`${boardContext.canonicalPath}?pp=overdue&mp=list`);
       const mobileCard = page.locator(`[data-card-id="${cardId}"]:visible`).first();
       await expect(mobileCard).toBeVisible({ timeout: 20_000 });
       await mobileCard.getByTestId('timeline-card-title-display').click();
@@ -2911,25 +2911,25 @@ test.describe('@feature:timeline Timeline view', () => {
     const consoleErrors = attachConsoleErrorCollector(page);
 
     try {
-      const timelineUrl = `${boardContext.canonicalPath}?lp=overdue&rp=timeline`;
-      const listUrl = `${boardContext.canonicalPath}?lp=overdue&rp=list`;
-      const monthUrl = `${boardContext.canonicalPath}?lp=overdue&rp=month`;
+      const timelineUrl = `${boardContext.canonicalPath}?pp=overdue&mp=timeline`;
+      const listUrl = `${boardContext.canonicalPath}?pp=overdue&mp=list`;
+      const monthUrl = `${boardContext.canonicalPath}?pp=overdue&mp=month`;
       await page.setViewportSize({ width: 393, height: 852 });
       await page.goto(timelineUrl);
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
       await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
-      await expect(page).toHaveURL(/rp=timeline/);
+      await expect(page).toHaveURL(/mp=timeline/);
 
       await page.goto(listUrl);
-      await expect(page).toHaveURL(/rp=list/);
+      await expect(page).toHaveURL(/mp=list/);
       await expect(page.getByRole('textbox', { name: '基準日' }).last()).toBeVisible();
 
       await page.goto(monthUrl);
-      await expect(page).toHaveURL(/rp=month/);
+      await expect(page).toHaveURL(/mp=month/);
       await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
 
       await page.goto(timelineUrl);
-      await expect(page).toHaveURL(/rp=timeline/);
+      await expect(page).toHaveURL(/mp=timeline/);
       await expect(page.getByTestId('mobile-timeline-rail')).toBeVisible();
       consoleErrors.assertClean();
     } finally {

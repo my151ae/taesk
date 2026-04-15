@@ -24,7 +24,7 @@ import type {
 } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { useTimelineDragAndDrop } from "@/app/(board)/_hooks/useTimelineDragAndDrop";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
-import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
+import type { PrimaryPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import type { SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { TimelineViewportState } from "@/app/(board)/_components/timeline/timelineViewportState";
@@ -38,7 +38,7 @@ export type DesktopMainPanelViewMode = "timeline" | "list" | "month";
 
 export type UseTimelineBoardViewModelsArgs = {
   viewMode: DesktopMainPanelViewMode;
-  activeLeftPanelMode: LeftPanelMode;
+  activeLeftPanelMode: PrimaryPanelMode;
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;

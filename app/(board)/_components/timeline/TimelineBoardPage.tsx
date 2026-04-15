@@ -45,7 +45,7 @@ import { useCardModal } from "@/app/(board)/_hooks/useCardModal";
 import { useTimelineUrlState, type ListWindow, type ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
 import {
   serializeBoardUiStateToSearchParams,
-  type LeftPanelMode,
+  type PrimaryPanelMode,
 } from "@/app/(board)/_hooks/useTimelineUrlState";
 import { useTimelineScrollSync } from "@/app/(board)/_hooks/useTimelineScrollSync";
 import { useTimelineData } from "@/app/(board)/_hooks/useTimelineData";
@@ -110,12 +110,12 @@ const bucketLaneId = (bucketKey: string) => `bucket:${bucketKey}`;
 const OVERDUE_LANE_ID = "overdue";
 const MOBILE_BREAKPOINT_QUERY = "(min-width: 768px)";
 
-const leftPanelModeToSidebarSection = (mode: LeftPanelMode): SidebarSectionKey | null => {
+const primaryPanelModeToSidebarSection = (mode: PrimaryPanelMode): SidebarSectionKey | null => {
   if (mode === "overdue" || mode === "completed" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
   return null;
 };
 
-const normalizeMobileLeftPanelMode = (mode: LeftPanelMode): LeftPanelMode => {
+const normalizeMobilePrimaryPanelMode = (mode: PrimaryPanelMode): PrimaryPanelMode => {
   if (mode === "none") return "overdue";
   return mode;
 };
@@ -256,8 +256,8 @@ function TimelineBoardPageContent({
     return window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches;
   });
   const isMobileViewport = !isDesktopViewport;
-  const activeLeftSectionKey = leftPanelModeToSidebarSection(resolvedState.leftPanelMode);
-  const mobileLeftPanelMode = normalizeMobileLeftPanelMode(resolvedState.leftPanelMode);
+  const activeLeftSectionKey = primaryPanelModeToSidebarSection(resolvedState.primaryPanelMode);
+  const mobileLeftPanelMode = normalizeMobilePrimaryPanelMode(resolvedState.primaryPanelMode);
   const [expandedSectionKey, setExpandedSectionKey] = useState<SidebarSectionKey | null>(activeLeftSectionKey);
   const [overdueSortOrder, setOverdueSortOrder] = useState<OverdueSortOrder>("newest");
   const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
@@ -289,13 +289,13 @@ function TimelineBoardPageContent({
 
   useEffect(() => {
     if (!isMobileViewport) return;
-    if (resolvedState.leftPanelMode === mobileLeftPanelMode) return;
+    if (resolvedState.primaryPanelMode === mobileLeftPanelMode) return;
 
     updateBoardUiState({
-      leftPanelMode: mobileLeftPanelMode,
+      primaryPanelMode: mobileLeftPanelMode,
       method: "replace",
     });
-  }, [isMobileViewport, mobileLeftPanelMode, resolvedState.leftPanelMode, updateBoardUiState]);
+  }, [isMobileViewport, mobileLeftPanelMode, resolvedState.primaryPanelMode, updateBoardUiState]);
 
   const handleRealtimeTrashChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
     setTrashItems((prev) => {
@@ -468,7 +468,7 @@ function TimelineBoardPageContent({
 
   const handleResolveTrashedCard = useCallback(() => {
     updateBoardUiState({
-      leftPanelMode: "trash",
+      primaryPanelMode: "trash",
       method: "replace",
     });
     setExpandedSectionKey("trash");
@@ -538,9 +538,9 @@ function TimelineBoardPageContent({
     setSelectedTags,
     tagSummaries,
   } = useTimelineFiltering(data, {
-    initialSearchQuery: resolvedState.leftPanelMode === "search" ? resolvedState.searchQuery : "",
+    initialSearchQuery: resolvedState.primaryPanelMode === "search" ? resolvedState.searchQuery : "",
     initialSelectedTags:
-      resolvedState.leftPanelMode === "tags" && resolvedState.tag ? [resolvedState.tag] : [],
+      resolvedState.primaryPanelMode === "tags" && resolvedState.tag ? [resolvedState.tag] : [],
   });
   const sortedFilteredData = useMemo(() => {
     if (!filteredData) return null;
@@ -1239,7 +1239,7 @@ function TimelineBoardPageContent({
     (value: string) => {
       setSearchQuery(value);
       updateBoardUiState({
-        leftPanelMode: "search",
+        primaryPanelMode: "search",
         searchQuery: value,
         method: "replace",
       });
@@ -1252,7 +1252,7 @@ function TimelineBoardPageContent({
       const next = typeof updater === "function" ? updater(selectedTags) : updater;
       setSelectedTags(next);
       updateBoardUiState({
-        leftPanelMode: "tags",
+        primaryPanelMode: "tags",
         tag: next[0] ?? null,
         method: "replace",
       });
@@ -1278,7 +1278,7 @@ function TimelineBoardPageContent({
 
       if (key === "overdue") {
         updateBoardUiState({
-          leftPanelMode: "overdue",
+          primaryPanelMode: "overdue",
           method: "replace",
         });
         return;
@@ -1286,7 +1286,7 @@ function TimelineBoardPageContent({
 
       if (key === "completed") {
         updateBoardUiState({
-          leftPanelMode: "completed",
+          primaryPanelMode: "completed",
           method: "replace",
         });
         return;
@@ -1294,7 +1294,7 @@ function TimelineBoardPageContent({
 
       if (key === "search") {
         updateBoardUiState({
-          leftPanelMode: "search",
+          primaryPanelMode: "search",
           searchQuery,
           method: "replace",
         });
@@ -1303,7 +1303,7 @@ function TimelineBoardPageContent({
 
       if (key === "notifications") {
         updateBoardUiState({
-          leftPanelMode: "notifications",
+          primaryPanelMode: "notifications",
           method: "replace",
         });
         return;
@@ -1311,14 +1311,14 @@ function TimelineBoardPageContent({
 
       if (key === "trash") {
         updateBoardUiState({
-          leftPanelMode: "trash",
+          primaryPanelMode: "trash",
           method: "replace",
         });
         return;
       }
 
       updateBoardUiState({
-        leftPanelMode: "tags",
+        primaryPanelMode: "tags",
         tag: selectedTags[0] ?? resolvedState.tag ?? null,
         method: "replace",
       });
@@ -1328,7 +1328,7 @@ function TimelineBoardPageContent({
 
   const handleOpenNotificationsPanel = useCallback(() => {
     updateBoardUiState({
-      leftPanelMode: "notifications",
+      primaryPanelMode: "notifications",
       method: "replace",
     });
     void fetchNotifications({ silent: true });
@@ -1340,7 +1340,7 @@ function TimelineBoardPageContent({
   const handleMobileLeftPanelSelect = useCallback((key: SidebarSectionKey) => {
     if (key === "overdue") {
       updateBoardUiState({
-        leftPanelMode: "overdue",
+        primaryPanelMode: "overdue",
         method: "replace",
       });
       return;
@@ -1348,7 +1348,7 @@ function TimelineBoardPageContent({
 
     if (key === "completed") {
       updateBoardUiState({
-        leftPanelMode: "completed",
+        primaryPanelMode: "completed",
         method: "replace",
       });
       return;
@@ -1356,7 +1356,7 @@ function TimelineBoardPageContent({
 
     if (key === "notifications") {
       updateBoardUiState({
-        leftPanelMode: "notifications",
+        primaryPanelMode: "notifications",
         method: "replace",
       });
       void fetchNotifications({ silent: true });
@@ -1365,7 +1365,7 @@ function TimelineBoardPageContent({
 
     if (key === "search") {
       updateBoardUiState({
-        leftPanelMode: "search",
+        primaryPanelMode: "search",
         searchQuery,
         method: "replace",
       });
@@ -1374,14 +1374,14 @@ function TimelineBoardPageContent({
 
     if (key === "trash") {
       updateBoardUiState({
-        leftPanelMode: "trash",
+        primaryPanelMode: "trash",
         method: "replace",
       });
       return;
     }
 
     updateBoardUiState({
-      leftPanelMode: "tags",
+      primaryPanelMode: "tags",
       tag: selectedTags[0] ?? resolvedState.tag ?? null,
       method: "replace",
     });
@@ -1397,10 +1397,10 @@ function TimelineBoardPageContent({
       typeof notification.payload?.board_slug === "string" ? notification.payload.board_slug.trim() : "";
 
     if (notification.type === "daily_digest" && boardShortId) {
-      const currentLeftPanelMode = resolvedState.leftPanelMode;
+      const currentPrimaryPanelMode = resolvedState.primaryPanelMode;
       const boardUrl = boardSlugTail.length > 0
-        ? `/b/${boardShortId}/${boardSlugTail}?lp=${currentLeftPanelMode}&rp=timeline`
-        : `/b/${boardShortId}?lp=${currentLeftPanelMode}&rp=timeline`;
+        ? `/b/${boardShortId}/${boardSlugTail}?pp=${currentPrimaryPanelMode}&mp=timeline`
+        : `/b/${boardShortId}?pp=${currentPrimaryPanelMode}&mp=timeline`;
       await markAsRead(notification.id);
       router.push(boardUrl);
       return;
@@ -1424,7 +1424,7 @@ function TimelineBoardPageContent({
     }));
     openCardModal(cardShortId, "notifications");
     void markAsRead(notification.id);
-  }, [currentBoard.id, markAsRead, openCardModal, resolvedState.leftPanelMode, router, setModalCardOverride]);
+  }, [currentBoard.id, markAsRead, openCardModal, resolvedState.primaryPanelMode, router, setModalCardOverride]);
 
   const handleSidebarVisibleCountChange = useCallback((section: IncrementalPanelSectionKey, nextCount: number) => {
     setSidebarVisibleCounts((prev) => {
@@ -1489,7 +1489,7 @@ function TimelineBoardPageContent({
     timelineTransitionPending: !timelineDataReady,
     onShortcutsClick: () => setShowShortcutsModal(true),
     expandedSectionKey,
-    activeLeftPanelMode: resolvedState.leftPanelMode,
+    activeLeftPanelMode: resolvedState.primaryPanelMode,
     mobileLeftPanelMode,
     activeLeftSectionKey,
     onExpandedSectionChange: handleExpandedSectionChange,
@@ -1653,8 +1653,8 @@ function TimelineBoardPageContent({
       onResetInvalidUrl={() => {
         const params = serializeBoardUiStateToSearchParams({
           state: {
-            leftPanelMode: "overdue",
-            rightPanelMode: "timeline",
+            primaryPanelMode: "overdue",
+            mainPanelMode: "timeline",
             date: null,
             tag: null,
             searchQuery: "",
@@ -1667,8 +1667,8 @@ function TimelineBoardPageContent({
       onMoveToCanonicalUrl={() => {
         const params = serializeBoardUiStateToSearchParams({
           state: {
-            leftPanelMode: "overdue",
-            rightPanelMode: "timeline",
+            primaryPanelMode: "overdue",
+            mainPanelMode: "timeline",
             date: null,
             tag: null,
             searchQuery: "",
@@ -1738,15 +1738,15 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   });
 
   const effectiveParseResult =
-    !featureFlags.notifications && resolvedState.leftPanelMode === "notifications"
-      ? ({ ok: false, code: "INVALID_LP" } as const)
+    !featureFlags.notifications && resolvedState.primaryPanelMode === "notifications"
+      ? ({ ok: false, code: "INVALID_PP" } as const)
       : parseResult;
 
   const handleResetInvalidUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "overdue",
-        rightPanelMode: "timeline",
+        primaryPanelMode: "overdue",
+        mainPanelMode: "timeline",
         date: null,
         tag: null,
         searchQuery: "",
@@ -1760,8 +1760,8 @@ export default function TimelineBoardPage({ initialBoard }: TimelineBoardPagePro
   const handleMoveToCanonicalUrl = useCallback(() => {
     const params = serializeBoardUiStateToSearchParams({
       state: {
-        leftPanelMode: "overdue",
-        rightPanelMode: "timeline",
+        primaryPanelMode: "overdue",
+        mainPanelMode: "timeline",
         date: null,
         tag: null,
         searchQuery: "",

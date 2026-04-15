@@ -253,8 +253,8 @@ self.addEventListener('notificationclick', (event) => {
   } else if (data.board_id && data.board_short_id) {
     // Navigate to board
     url = data.board_slug
-      ? `/b/${data.board_short_id}/${data.board_slug}?lp=overdue&rp=timeline`
-      : `/b/${data.board_short_id}?lp=overdue&rp=timeline`;
+      ? `/b/${data.board_short_id}/${data.board_slug}?pp=overdue&mp=timeline`
+      : `/b/${data.board_short_id}?pp=overdue&mp=timeline`;
   }
 
   // Focus or open window

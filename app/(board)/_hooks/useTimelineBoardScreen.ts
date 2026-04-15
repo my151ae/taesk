@@ -21,7 +21,7 @@ import { useDesktopTimelineScreen } from "@/app/(board)/_hooks/useDesktopTimelin
 import { useMobileTimelineScreen } from "@/app/(board)/_hooks/useMobileTimelineScreen";
 import { buildTimelineOverlayState } from "@/app/(board)/_components/timeline/timeline-render-model";
 import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlState";
-import type { LeftPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
+import type { PrimaryPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
@@ -66,8 +66,8 @@ export type UseTimelineBoardScreenArgs = {
   viewMode: "timeline" | "list" | "month";
   timelineTransitionPending: boolean;
   onShortcutsClick: () => void;
-  activeLeftPanelMode: LeftPanelMode;
-  mobileLeftPanelMode: LeftPanelMode;
+  activeLeftPanelMode: PrimaryPanelMode;
+  mobileLeftPanelMode: PrimaryPanelMode;
   activeLeftSectionKey: SidebarSectionKey | null;
   expandedSectionKey: SidebarSectionKey | null;
   onExpandedSectionChange: (key: SidebarSectionKey | null) => void;
