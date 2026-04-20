@@ -124,7 +124,7 @@ export const TimelineBucketCard = ({
                     note={item.excerpt ?? undefined}
                     noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
                     notePreviewLines={2}
-                    rightMeta={null}
+                    rightMeta={item.is_parent ? `子${item.child_count ?? 0}` : null}
                     onOpen={() => {
                         openCardModal(item.short_id);
                     }}

@@ -12,6 +12,7 @@ test.describe("sidebar section types", () => {
       "completed",
       "notifications",
       "search",
+      "parents",
       "tags",
       "trash",
     ]);
@@ -21,6 +22,7 @@ test.describe("sidebar section types", () => {
     expect(INCREMENTAL_PANEL_SECTION_KEYS).toEqual([
       "completed",
       "search",
+      "parents",
       "tags",
       "trash",
     ]);

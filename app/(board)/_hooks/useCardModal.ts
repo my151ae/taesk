@@ -28,6 +28,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     const [isModalClosing, setIsModalClosing] = useState(false);
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
     const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
+    const [cardOpenSource, setCardOpenSource] = useState<string | null>(null);
+    const [forceStandardModal, setForceStandardModal] = useState(false);
 
     const cardModalShortIdRef = useRef<string | null>(null);
     const cardModalStatusRef = useRef<CardModalStatus>('idle');
@@ -44,13 +46,21 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         console.log('[timeline] openCardModal', { shortId, source: debugSource });
 
         // Instant open via local state
+        setCardOpenSource(debugSource ?? null);
+        setForceStandardModal(debugSource === "context-menu");
         setActiveCardId(shortId);
         setCardInUrl(shortId, { method: 'push' });
     }, [dataMode, setCardInUrl]);
 
+    const openStandardModalForCurrentCard = useCallback(() => {
+        setForceStandardModal(true);
+    }, []);
+
     const closeCardModal = useCallback(() => {
         setIsModalClosing(true);
         setActiveCardId(null);
+        setCardOpenSource(null);
+        setForceStandardModal(false);
         cardModalShortIdRef.current = null;
         setModalCardOverride(null);
         setCardModalStatus('idle');
@@ -70,6 +80,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
             return {
                 id: eventCard.card_id,
                 title: eventCard.title,
+                parent_card_id: eventCard.parent_card_id ?? null,
+                is_parent: Boolean(eventCard.is_parent),
+                child_count: eventCard.child_count ?? 0,
                 content: normalizeContent(eventCard.content),
                 excerpt: eventCard.excerpt ?? null,
                 checklist: normalizeChecklist(eventCard.checklist ?? EMPTY_CHECKLIST),
@@ -110,6 +123,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
                 return {
                     id: bucketItem.card_id,
                     title: bucketItem.title,
+                    parent_card_id: bucketItem.parent_card_id ?? null,
+                    is_parent: Boolean(bucketItem.is_parent),
+                    child_count: bucketItem.child_count ?? 0,
                     content: normalizeContent(bucketItem.content),
                     excerpt: bucketItem.excerpt ?? null,
                     checklist: normalizeChecklist(bucketItem.checklist ?? EMPTY_CHECKLIST),
@@ -149,6 +165,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
             return {
                 id: overdueItem.card_id,
                 title: overdueItem.title,
+                parent_card_id: overdueItem.parent_card_id ?? null,
+                is_parent: Boolean(overdueItem.is_parent),
+                child_count: overdueItem.child_count ?? 0,
                 content: normalizeContent(overdueItem.content),
                 excerpt: overdueItem.excerpt ?? null,
                 checklist: normalizeChecklist(overdueItem.checklist ?? EMPTY_CHECKLIST),
@@ -354,7 +373,10 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         setModalCardOverride,
         isModalClosing,
         openCardModal,
+        openStandardModalForCurrentCard,
         closeCardModal,
         modalProfiles,
+        cardOpenSource,
+        forceStandardModal,
     };
 }

@@ -31,7 +31,7 @@ const getHandler = async (
 
   const { data: cards, error } = await supabase
     .from("cards")
-    .select("id, title, content, excerpt, due_date, due_start, due_end, checked, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at")
+    .select("id, title, parent_card_id, is_parent, content, excerpt, due_date, due_start, due_end, checked, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at")
     .eq("board_id", boardId)
     .not("deleted_at", "is", null);
 

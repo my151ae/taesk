@@ -12,7 +12,7 @@ type UseTimelineUrlStateArgs = {
 };
 
 export type TimelineViewMode = "timeline" | "list" | "month";
-export type PrimaryPanelMode = "none" | "overdue" | "completed" | "notifications" | "tags" | "search" | "trash";
+export type PrimaryPanelMode = "none" | "overdue" | "completed" | "notifications" | "tags" | "search" | "parents" | "trash";
 export type MainPanelMode = "timeline" | "list" | "month";
 export type UrlUpdateMethod = "replace" | "push";
 export type ListWindow = { before: number; after: number };
@@ -168,7 +168,7 @@ const normalizeListWindow = (before: number, after: number): ListWindow => {
 };
 
 const isPrimaryPanelMode = (value: string | null): value is PrimaryPanelMode =>
-  value === "none" || value === "overdue" || value === "completed" || value === "notifications" || value === "tags" || value === "search" || value === "trash";
+  value === "none" || value === "overdue" || value === "completed" || value === "notifications" || value === "tags" || value === "search" || value === "parents" || value === "trash";
 
 const isMainPanelMode = (value: string | null): value is MainPanelMode =>
   value === "timeline" || value === "list" || value === "month";

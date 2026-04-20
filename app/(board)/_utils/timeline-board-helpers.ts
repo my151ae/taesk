@@ -36,6 +36,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
     events.push(
       {
         card_id: "mock-spec",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
         due_date: days[0].isoDate,
         due_start: "09:30:00",
         due_end: "10:30:00",
@@ -49,6 +52,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       },
       {
         card_id: "mock-deepwork-a",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
         due_date: days[0].isoDate,
         due_start: "13:00:00",
         due_end: "14:00:00",
@@ -62,6 +68,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       },
       {
         card_id: "mock-deepwork-b",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
         due_date: days[0].isoDate,
         due_start: "13:30:00",
         due_end: "14:30:00",
@@ -79,6 +88,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
   if (days[1]) {
     events.push({
       card_id: "mock-design-review",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
       due_date: days[1].isoDate,
       due_start: "10:00:00",
       due_end: "11:00:00",
@@ -102,6 +114,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       acc[aKey].push(
         {
           card_id: "mock-finish-spec",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Finish spec",
           due_date: day.isoDate,
           due_start: null,
@@ -115,6 +130,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
         },
         {
           card_id: "mock-prepare-meeting",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Prepare meeting",
           due_date: day.isoDate,
           due_start: null,
@@ -128,6 +146,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
         },
         {
           card_id: "mock-fix-bug",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Fix bug #123",
           due_date: day.isoDate,
           due_start: null,
@@ -143,6 +164,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       acc[bKey].push(
         {
           card_id: "mock-organize-docs",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Organize docs",
           due_date: day.isoDate,
           due_start: null,
@@ -156,6 +180,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
         },
         {
           card_id: "mock-break-task",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Break down big task",
           due_date: day.isoDate,
           due_start: null,
@@ -174,6 +201,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       acc[aKey].push(
         {
           card_id: "mock-finish-review",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Finish review",
           due_date: day.isoDate,
           due_start: null,
@@ -187,6 +217,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
         },
         {
           card_id: "mock-prepare-slides",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Prepare slides",
           due_date: day.isoDate,
           due_start: null,
@@ -202,6 +235,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
       acc[bKey].push(
         {
           card_id: "mock-refactor",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Refactor old code",
           due_date: day.isoDate,
           due_start: null,
@@ -215,6 +251,9 @@ export const buildMockTimeline = (range: number = DEFAULT_TIMELINE_DAY_RANGE): T
         },
         {
           card_id: "mock-research",
+  parent_card_id: null,
+  is_parent: false,
+  child_count: 0,
           title: "Research item",
           due_date: day.isoDate,
           due_start: null,

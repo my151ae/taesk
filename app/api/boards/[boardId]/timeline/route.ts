@@ -14,6 +14,8 @@ const DEFAULT_TIMELINE_START_HOUR = 5;
 
 type TimelineCardRow = {
   id: string;
+  parent_card_id: string | null;
+  is_parent: boolean | null;
   title: string;
   checklist: unknown;
   content: unknown;
@@ -125,7 +127,7 @@ const getHandler = async (
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const cardsSelect =
-    'id, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, checked_at, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
+    'id, parent_card_id, is_parent, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, checked_at, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
 
   const { data: cards, error: fetchError } = await supabase
     .from('cards')
@@ -149,6 +151,16 @@ const getHandler = async (
   }, {} as Record<string, TimelineBucketItem[]>);
   const overdue: TimelineOverdueItem[] = [];
   const todayIso = formatDateJst(now, 0, timelineStartHour);
+  const childCountByParentId = new Map<string, number>();
+
+  cards?.forEach((card) => {
+    if (card.parent_card_id) {
+      childCountByParentId.set(
+        card.parent_card_id,
+        (childCountByParentId.get(card.parent_card_id) ?? 0) + 1
+      );
+    }
+  });
 
   cards?.forEach((card) => {
     const checklist = normalizeChecklist((card.checklist ?? EMPTY_CHECKLIST) as Parameters<typeof normalizeChecklist>[0]);
@@ -164,6 +176,9 @@ const getHandler = async (
         const end = toMinutes(card.due_end);
         events.push({
           card_id: card.id,
+          parent_card_id: card.parent_card_id,
+          is_parent: Boolean(card.is_parent),
+          child_count: childCountByParentId.get(card.id) ?? 0,
           due_date: dateOnly!,
           due_start: card.due_start,
           due_end: card.due_end,
@@ -199,6 +214,9 @@ const getHandler = async (
         }
         abBuckets[key].push({
           card_id: card.id,
+          parent_card_id: card.parent_card_id,
+          is_parent: Boolean(card.is_parent),
+          child_count: childCountByParentId.get(card.id) ?? 0,
           title: card.title,
           content: card.content ?? null,
           excerpt: card.excerpt ?? null,
@@ -228,6 +246,9 @@ const getHandler = async (
     if (isOverdue) {
       overdue.push({
         card_id: card.id,
+        parent_card_id: card.parent_card_id,
+        is_parent: Boolean(card.is_parent),
+        child_count: childCountByParentId.get(card.id) ?? 0,
         title: card.title,
         content: card.content ?? null,
         excerpt: card.excerpt ?? null,

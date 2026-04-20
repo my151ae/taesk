@@ -22,11 +22,13 @@ import {
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 import MobileMonthView from "@/app/(board)/_components/timeline/MobileMonthView";
+import ParentChildPanel from "@/app/(board)/_components/timeline/ParentChildPanel";
 import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import {
   CompletedSectionBody,
   OverdueSectionBody,
+  ParentCardsSectionBody,
   SearchSectionBody,
   TagsSectionBody,
   TrashSectionBody,
@@ -70,6 +72,7 @@ type SidebarMenuBaseProps = Omit<
 >;
 type ShortcutsModalProps = ComponentProps<typeof ShortcutsModal>;
 type CardModalProps = ComponentProps<typeof CardModal>;
+type ParentChildPanelProps = ComponentProps<typeof ParentChildPanel>;
 type CardContextMenuProps = ComponentProps<typeof CardContextMenu>;
 
 type ParseResult = { ok: true } | { ok: false; code: string };
@@ -137,6 +140,7 @@ export type TimelineBoardScreenProps = {
   shortcutsProps: ShortcutsModalProps;
   shortcutBarProps: ShortcutBarConfig;
   modalProps: CardModalProps | null;
+  parentPanelProps: ParentChildPanelProps | null;
   cardModalError: string | null;
   contextMenu:
     | {
@@ -185,6 +189,7 @@ export default function TimelineBoardScreen({
   shortcutsProps,
   shortcutBarProps,
   modalProps,
+  parentPanelProps,
   cardModalError,
   contextMenu,
   bucketCreateMenu,
@@ -441,6 +446,17 @@ export default function TimelineBoardScreen({
           searchInputTestId="mobile-left-panel-search-input"
           visibleCount={mobile.leftPanelProps.visibleCounts.search}
           onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("search", nextCount)}
+          {...commonProps}
+          onRenameCardTitle={undefined}
+        />
+      );
+    }
+    if (currentMobileSection.key === "parents") {
+      return (
+        <ParentCardsSectionBody
+          results={currentMobileSection.results}
+          visibleCount={mobile.leftPanelProps.visibleCounts.parents}
+          onVisibleCountChange={(nextCount) => mobile.leftPanelProps.onVisibleCountChange("parents", nextCount)}
           {...commonProps}
           onRenameCardTitle={undefined}
         />
@@ -802,6 +818,7 @@ export default function TimelineBoardScreen({
 
         <TimelineBoardDialogs {...dialogsProps} />
         <ShortcutsModal {...shortcutsProps} />
+        {parentPanelProps ? <ParentChildPanel {...parentPanelProps} /> : null}
         {modalProps ? <CardModal {...modalProps} /> : null}
         {cardModalError ? (
           <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">

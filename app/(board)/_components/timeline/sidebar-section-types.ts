@@ -1,6 +1,6 @@
 "use client";
 
-export type SidebarSectionKey = "overdue" | "completed" | "notifications" | "search" | "tags" | "trash";
+export type SidebarSectionKey = "overdue" | "completed" | "notifications" | "search" | "parents" | "tags" | "trash";
 
 export type IncrementalPanelSectionKey = Exclude<SidebarSectionKey, "overdue" | "notifications">;
 
@@ -9,6 +9,7 @@ export const SIDEBAR_SECTION_KEYS: SidebarSectionKey[] = [
   "completed",
   "notifications",
   "search",
+  "parents",
   "tags",
   "trash",
 ];
@@ -16,6 +17,7 @@ export const SIDEBAR_SECTION_KEYS: SidebarSectionKey[] = [
 export const INCREMENTAL_PANEL_SECTION_KEYS: IncrementalPanelSectionKey[] = [
   "completed",
   "search",
+  "parents",
   "tags",
   "trash",
 ];

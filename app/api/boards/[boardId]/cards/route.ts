@@ -49,6 +49,8 @@ const CreateCardSchema = z.object({
   ]).optional(),
   due_bucket: z.enum(['a', 'b']).nullable().optional(),
   due_bucket_position: z.number().nullable().optional(),
+  parent_card_id: z.string().uuid().nullable().optional(),
+  is_parent: z.boolean().optional(),
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),
@@ -176,6 +178,13 @@ const postHandler = async (
     end_reminder_minutes: parsed.data.end_reminder_minutes ?? 0,
     due_bucket: parsed.data.due_bucket ?? null,
     due_bucket_position: parsed.data.due_bucket_position ?? null,
+    parent_card_id: parsed.data.parent_card_id ?? null,
+    is_parent:
+      typeof parsed.data.is_parent === "boolean"
+        ? parsed.data.is_parent
+        : parsed.data.parent_card_id
+          ? false
+          : false,
     checked: parsed.data.checked ?? false,
     checked_at: parsed.data.checked ? new Date().toISOString() : null,
     assignee_id: parsed.data.assignee_id ?? null,
@@ -188,6 +197,13 @@ const postHandler = async (
     updated_at: parsed.data.updated_at,
     duration: parsed.data.duration ?? 60,
   });
+
+  if (payload.is_parent === true && payload.parent_card_id) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "parent card cannot have parent_card_id" } },
+      { status: 400 }
+    );
+  }
 
   const performInsert = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase

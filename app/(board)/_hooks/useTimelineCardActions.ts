@@ -121,6 +121,9 @@ function buildCardFromTimelineMatch(data: TimelineResponse | null, cardId: strin
   return {
     id: cardId,
     title: sourceEvent?.title ?? sourceBucketItem?.title ?? sourceOverdueItem?.title ?? "Untitled card",
+    parent_card_id: sourceEvent?.parent_card_id ?? sourceBucketItem?.parent_card_id ?? sourceOverdueItem?.parent_card_id ?? null,
+    is_parent: sourceEvent?.is_parent ?? sourceBucketItem?.is_parent ?? sourceOverdueItem?.is_parent ?? false,
+    child_count: sourceEvent?.child_count ?? sourceBucketItem?.child_count ?? sourceOverdueItem?.child_count ?? 0,
     checklist: sourceEvent?.checklist ?? sourceBucketItem?.checklist ?? sourceOverdueItem?.checklist ?? null,
     content: sourceEvent?.content ?? sourceBucketItem?.content ?? sourceOverdueItem?.content ?? buildDefaultBodyContent(),
     excerpt: sourceEvent?.excerpt ?? sourceBucketItem?.excerpt ?? sourceOverdueItem?.excerpt ?? null,

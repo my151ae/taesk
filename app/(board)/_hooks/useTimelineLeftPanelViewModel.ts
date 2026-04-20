@@ -24,6 +24,7 @@ type LeftPanelArgs = Pick<
   | "completedResetKey"
   | "completedGroupedResults"
   | "completedResults"
+  | "parentResults"
   | "notificationUnreadCount"
   | "searchResults"
   | "trashItems"
@@ -113,6 +114,14 @@ export function useTimelineLeftPanelViewModel(args: LeftPanelArgs) {
         results: args.searchResults,
       },
       {
+        key: "parents",
+        tone: "neutral",
+        id: "desktop-sidebar-parents-panel",
+        label: "Parents",
+        count: args.parentResults.length,
+        results: args.parentResults,
+      },
+      {
         key: "tags",
         tone: "neutral",
         id: "desktop-sidebar-tags-panel",
@@ -140,6 +149,7 @@ export function useTimelineLeftPanelViewModel(args: LeftPanelArgs) {
     args.completedResults,
     args.notificationUnreadCount,
     args.overdue,
+    args.parentResults,
     args.searchQuery,
     args.searchResults,
     args.tagResults,

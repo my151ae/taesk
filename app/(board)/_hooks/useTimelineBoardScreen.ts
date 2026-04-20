@@ -109,6 +109,7 @@ export type UseTimelineBoardScreenArgs = {
   abBuckets: TimelineResponse["abBuckets"];
   overdue: TimelineResponse["overdue"];
   completedResults: TimelineSearchResultItem[];
+  parentResults: TimelineSearchResultItem[];
   completedCurrentMonthCount: number;
   completedCurrentMonthKey: string | null;
   completedGroupedResults: CompletedResultsGroup[];
@@ -217,10 +218,13 @@ export type UseTimelineBoardScreenArgs = {
   handleCardModalDelete: (cardId: string) => Promise<boolean>;
   handleRestoreCard: (cardId: string) => Promise<boolean>;
   closeCardModal: () => void;
+  openStandardModalForCurrentCard: () => void;
   historySaveWarning: string | null;
   retryHistorySave: () => void;
   closeModalWithoutHistory: () => void;
   cardModalError: string | null;
+  cardOpenSource: string | null;
+  forceStandardModal: boolean;
   data: TimelineResponse | null;
   moveCardByDayOffset: (cardId: string, offset: number) => Promise<boolean>;
   overdueSortOrder: OverdueSortOrder;
@@ -301,6 +305,7 @@ export function useTimelineBoardScreen({
   abBuckets,
   overdue,
   completedResults,
+  parentResults,
   completedCurrentMonthCount,
   completedCurrentMonthKey,
   completedGroupedResults,
@@ -398,10 +403,13 @@ export function useTimelineBoardScreen({
   handleCardModalDelete,
   handleRestoreCard,
   closeCardModal,
+  openStandardModalForCurrentCard,
   historySaveWarning,
   retryHistorySave,
   closeModalWithoutHistory,
   cardModalError,
+  cardOpenSource,
+  forceStandardModal,
   data,
   moveCardByDayOffset,
   overdueSortOrder,
@@ -476,6 +484,7 @@ export function useTimelineBoardScreen({
     abBuckets,
     overdue,
     completedResults,
+    parentResults,
     completedCurrentMonthCount,
     completedCurrentMonthKey,
     completedGroupedResults,
@@ -672,8 +681,23 @@ export function useTimelineBoardScreen({
     shortcutBarProps: {
       maxVisibleItems: 5,
     } satisfies ShortcutBarConfig,
+    parentPanelProps:
+      modalCard &&
+      (cardModalStatus === "ready" || cardModalStatus === "loading") &&
+      modalCard.is_parent &&
+      !forceStandardModal &&
+      cardOpenSource !== "context-menu"
+        ? {
+            parentCard: modalCard,
+            onClose: closeCardModal,
+            onOpenAsCardModal: openStandardModalForCurrentCard,
+            onOpenCardModal: openCardModal,
+          }
+        : null,
     modalProps:
-      modalCard && (cardModalStatus === "ready" || cardModalStatus === "loading")
+      modalCard &&
+      (cardModalStatus === "ready" || cardModalStatus === "loading") &&
+      (!modalCard.is_parent || forceStandardModal || cardOpenSource === "context-menu")
         ? {
             card: modalCard,
             boards: availableBoards,

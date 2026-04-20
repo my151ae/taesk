@@ -13,6 +13,7 @@ import {
   CompletedSectionBody,
   type CompletedResultsGroup,
   OverdueSectionBody,
+  ParentCardsSectionBody,
   SearchSectionBody,
   TagsSectionBody,
   TrashSectionBody,
@@ -70,6 +71,11 @@ export type DesktopSidebarSection =
     })
   | (DesktopSidebarSectionBase & {
       key: "search";
+      tone: "neutral";
+      results: readonly TimelineSearchResultItem[];
+    })
+  | (DesktopSidebarSectionBase & {
+      key: "parents";
       tone: "neutral";
       results: readonly TimelineSearchResultItem[];
     })
@@ -201,6 +207,16 @@ function TrashIcon() {
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 7V5.75A1.75 1.75 0 0 1 10.75 4h2.5A1.75 1.75 0 0 1 15 5.75V7" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 7l.7 11.2A2 2 0 0 0 9.7 20h4.6a2 2 0 0 0 1.99-1.8L17 7" />
+    </svg>
+  );
+}
+
+function ParentIcon() {
+  return (
+    <svg className="h-[1.125rem] w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <rect x="4.5" y="5.5" width="15" height="13" rx="2.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9.5h8M8 13.5h5" />
+      <circle cx="16.5" cy="15.5" r="2.5" />
     </svg>
   );
 }
@@ -374,6 +390,8 @@ export function DesktopSidebarMenu({
         return <NotificationIcon />;
       case "search":
         return <SearchIcon />;
+      case "parents":
+        return <ParentIcon />;
       case "tags":
         return <TagIcon />;
       case "trash":
@@ -430,6 +448,29 @@ export function DesktopSidebarMenu({
           onQueryChange={actions.onSearchQueryChange}
           visibleCount={visibleCounts.search}
           onVisibleCountChange={(nextCount) => onVisibleCountChange("search", nextCount)}
+          openCardModal={openCardModal}
+          onToggleCheck={onToggleCheck}
+          onRenameCardTitle={undefined}
+          onCardContextMenu={onCardContextMenu}
+          onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
+          contextMenuCardId={contextMenuCardId}
+          selectedCardIds={selectedCardIds}
+          selectionLeadCardId={selectionLeadCardId}
+          onShiftSelect={onShiftSelect}
+          onClearSelection={onClearSelection}
+          onActivateCard={onActivateCard}
+          activeCardId={activeCardId}
+          activeLaneId={activeLaneId}
+        />
+      );
+    }
+
+    if (section.key === "parents") {
+      return (
+        <ParentCardsSectionBody
+          results={section.results}
+          visibleCount={visibleCounts.parents}
+          onVisibleCountChange={(nextCount) => onVisibleCountChange("parents", nextCount)}
           openCardModal={openCardModal}
           onToggleCheck={onToggleCheck}
           onRenameCardTitle={undefined}

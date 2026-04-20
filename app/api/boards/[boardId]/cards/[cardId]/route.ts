@@ -51,6 +51,8 @@ const UpdateCardSchema = z.object({
   ]).optional(),
   due_bucket: z.enum(['a', 'b']).nullable().optional(),
   due_bucket_position: z.number().nullable().optional(),
+  parent_card_id: z.string().uuid().nullable().optional(),
+  is_parent: z.boolean().optional(),
   checked: z.boolean().optional(),
   assignee_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().nullable().optional(),
@@ -102,6 +104,43 @@ const patchHandler = async (
   );
 
   const normalizedPayload: Record<string, unknown> = stripUndefinedValues({ ...parsed.data });
+
+  if (Object.prototype.hasOwnProperty.call(normalizedPayload, "parent_card_id")) {
+    if (normalizedPayload.parent_card_id === cardId) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "card cannot be parent of itself" } },
+        { status: 400 }
+      );
+    }
+    if (normalizedPayload.parent_card_id !== null) {
+      normalizedPayload.is_parent = false;
+    }
+  }
+
+  if (normalizedPayload.is_parent === true && normalizedPayload.parent_card_id) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "parent card cannot have parent_card_id" } },
+      { status: 400 }
+    );
+  }
+
+  if (
+    normalizedPayload.is_parent === true &&
+    !Object.prototype.hasOwnProperty.call(normalizedPayload, "parent_card_id")
+  ) {
+    const { data: currentCard } = await supabase
+      .from("cards")
+      .select("parent_card_id")
+      .eq("id", cardId)
+      .eq("board_id", boardId)
+      .maybeSingle();
+    if (currentCard?.parent_card_id) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "child card cannot be marked as parent" } },
+        { status: 409 }
+      );
+    }
+  }
   if (typeof parsed.data.checked === 'boolean') {
     const { data: currentCard, error: currentCardError } = await supabase
       .from('cards')
@@ -221,7 +260,7 @@ const deleteHandler = async (
 
   const { data: card } = await supabase
     .from('cards')
-    .select('id, title, content, excerpt, due_date, due_start, due_end, checked, checked_at, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at')
+    .select('id, title, parent_card_id, is_parent, content, excerpt, due_date, due_start, due_end, checked, checked_at, tags, assignee_id, assignee_ids, assigned_to, due_bucket, due_bucket_position, duration, short_id, slug, deleted_at, purge_after_at')
     .eq('id', cardId)
     .eq('board_id', boardId)
     .maybeSingle();
@@ -242,6 +281,20 @@ const deleteHandler = async (
 
   const deletedAt = new Date().toISOString();
   const purgeAfterAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: unlinkError } = await supabase
+    .from('cards')
+    .update({ parent_card_id: null })
+    .eq('board_id', boardId)
+    .eq('parent_card_id', cardId)
+    .is('deleted_at', null);
+
+  if (unlinkError) {
+    return NextResponse.json(
+      { error: { code: 'DB_ERROR', message: unlinkError.message } },
+      { status: 500 }
+    );
+  }
 
   const { data: trashedCard, error } = await supabase
     .from('cards')

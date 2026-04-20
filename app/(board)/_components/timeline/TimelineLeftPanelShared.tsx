@@ -662,6 +662,56 @@ export function SearchSectionBody({
   );
 }
 
+export function ParentCardsSectionBody({
+  results,
+  visibleCount,
+  onVisibleCountChange,
+  ...cardActions
+}: {
+  results: readonly TimelineSearchResultItem[];
+} & SharedCardActions & IncrementalVisibilityProps) {
+  const resetKey = useMemo(
+    () => results.map((result) => result.item.card_id).join(","),
+    [results],
+  );
+  const { sliceEnd, canLoadMore, handleLoadMore } = useIncrementalVisibleCount({
+    total: results.length,
+    resetKey,
+    visibleCount,
+    onVisibleCountChange,
+  });
+  const visibleResults = useMemo(() => results.slice(0, sliceEnd), [results, sliceEnd]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {results.length === 0 ? (
+        <div className="px-3 py-4">
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-white/90 px-3 py-3 text-[11px] text-slate-500">
+            親カードはありません
+          </p>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 [scrollbar-gutter:stable]">
+          {renderSidebarResultRows({
+            results: visibleResults,
+            shortcutSection: "search",
+            openSource: "parents",
+            testIdPrefix: "parents-card",
+            footer: (
+              <LoadMoreFooter
+                canLoadMore={canLoadMore}
+                onLoadMore={handleLoadMore}
+                testId="sidebar-parents-load-more"
+              />
+            ),
+            ...cardActions,
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CompletedSectionBody({
   results,
   groupedResults,

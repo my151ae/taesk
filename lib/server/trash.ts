@@ -5,6 +5,8 @@ type TrashCardRow = Pick<
   Card,
   | "id"
   | "title"
+  | "parent_card_id"
+  | "is_parent"
   | "content"
   | "excerpt"
   | "due_date"
@@ -37,6 +39,9 @@ export function mapCardRowToTrashItem(card: TrashCardRow): TrashCardItem | null 
 
   return {
     card_id: card.id,
+    parent_card_id: card.parent_card_id ?? null,
+    is_parent: Boolean(card.is_parent),
+    child_count: 0,
     title: card.title,
     content: card.content ?? null,
     excerpt: card.excerpt ?? null,

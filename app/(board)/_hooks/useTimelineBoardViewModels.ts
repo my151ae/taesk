@@ -80,6 +80,7 @@ export type UseTimelineBoardViewModelsArgs = {
   abBuckets: Record<string, TimelineBucketItem[]>;
   overdue: TimelineOverdueItem[];
   completedResults: TimelineSearchResultItem[];
+  parentResults: TimelineSearchResultItem[];
   completedCurrentMonthCount: number;
   completedCurrentMonthKey: string | null;
   completedGroupedResults: CompletedResultsGroup[];

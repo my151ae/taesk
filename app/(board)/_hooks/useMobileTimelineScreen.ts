@@ -12,13 +12,13 @@ type UseMobileTimelineScreenArgs = {
   viewMode: TimelineBoardScreenProps["mobile"]["viewMode"];
   timelineTransitionPending: boolean;
   leftPanelProps: TimelineBoardScreenProps["mobile"]["leftPanelProps"];
-  mobileLeftPanelMode: "overdue" | "completed" | "notifications" | "search" | "tags" | "trash" | "none";
+  mobileLeftPanelMode: "overdue" | "completed" | "notifications" | "search" | "parents" | "tags" | "trash" | "none";
   selectedTags: string[];
   tagSummaries: Array<{ name: string; count: number }>;
   tagResults: unknown[];
   searchQuery: string;
   overdueCount: number;
-  onMobileLeftPanelSelect: (key: "overdue" | "completed" | "notifications" | "search" | "tags" | "trash") => void;
+  onMobileLeftPanelSelect: (key: "overdue" | "completed" | "notifications" | "search" | "parents" | "tags" | "trash") => void;
   overdueSortOrder: TimelineBoardScreenProps["desktop"]["overdueSortOrder"];
   onOverdueSortOrderChange: TimelineBoardScreenProps["desktop"]["onOverdueSortOrderChange"];
 };
@@ -68,6 +68,7 @@ export function useMobileTimelineScreen({
           mobileLeftPanelMode === "completed" ||
           mobileLeftPanelMode === "notifications" ||
           mobileLeftPanelMode === "search" ||
+          mobileLeftPanelMode === "parents" ||
           mobileLeftPanelMode === "tags" ||
           mobileLeftPanelMode === "trash"
             ? mobileLeftPanelMode

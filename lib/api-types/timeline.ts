@@ -19,6 +19,9 @@ export interface TimelineDay {
 
 export interface TimelineEvent {
   card_id: string;
+  parent_card_id?: string | null;
+  is_parent?: boolean;
+  child_count?: number;
   due_date: string;
   due_start: string | null;
   due_end: string | null;
@@ -46,6 +49,9 @@ export interface TimelineEvent {
 
 export interface TimelineBucketItem {
   card_id: string;
+  parent_card_id?: string | null;
+  is_parent?: boolean;
+  child_count?: number;
   title: string;
   content?: JSONContent | null;
   excerpt?: string | null;
@@ -72,6 +78,9 @@ export interface TimelineBucketItem {
 
 export interface TimelineOverdueItem {
   card_id: string;
+  parent_card_id?: string | null;
+  is_parent?: boolean;
+  child_count?: number;
   title: string;
   content?: JSONContent | null;
   excerpt?: string | null;
@@ -109,6 +118,9 @@ export interface TimelineResponse {
 
 export interface TrashCardItem {
   card_id: string;
+  parent_card_id?: string | null;
+  is_parent?: boolean;
+  child_count?: number;
   title: string;
   content?: JSONContent | null;
   excerpt?: string | null;

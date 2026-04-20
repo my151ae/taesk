@@ -82,6 +82,9 @@ export type DueBucket = 'a' | 'b';
 export interface Card {
   id: string;
   title: string;
+  parent_card_id?: string | null;
+  is_parent?: boolean;
+  child_count?: number;
   checklist: Checklist | null;
   content: JSONContent;
   excerpt?: string | null;

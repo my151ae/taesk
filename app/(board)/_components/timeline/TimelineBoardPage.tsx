@@ -25,6 +25,7 @@ import {
   COMPLETED_UNDATED_GROUP_KEY,
   SIDEBAR_INCREMENT_PAGE_SIZE,
 } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
+import { buildTimelineCardTimeText } from "@/app/(board)/_components/timeline/timeline-card-meta";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import {
   DEFAULT_TIMELINE_DAY_RANGE,
@@ -88,6 +89,7 @@ const buildMockTimelineResponse = () => buildMockTimeline(DAY_WINDOW_RANGE);
 const createInitialSidebarVisibleCounts = (): SidebarVisibleCountState => ({
   completed: SIDEBAR_INCREMENT_PAGE_SIZE,
   search: SIDEBAR_INCREMENT_PAGE_SIZE,
+  parents: SIDEBAR_INCREMENT_PAGE_SIZE,
   tags: SIDEBAR_INCREMENT_PAGE_SIZE,
   trash: SIDEBAR_INCREMENT_PAGE_SIZE,
 });
@@ -111,7 +113,7 @@ const OVERDUE_LANE_ID = "overdue";
 const MOBILE_BREAKPOINT_QUERY = "(min-width: 768px)";
 
 const primaryPanelModeToSidebarSection = (mode: PrimaryPanelMode): SidebarSectionKey | null => {
-  if (mode === "overdue" || mode === "completed" || mode === "notifications" || mode === "search" || mode === "tags" || mode === "trash") return mode;
+  if (mode === "overdue" || mode === "completed" || mode === "notifications" || mode === "search" || mode === "parents" || mode === "tags" || mode === "trash") return mode;
   return null;
 };
 
@@ -481,8 +483,11 @@ function TimelineBoardPageContent({
     setCardModalError,
     setModalCardOverride,
     openCardModal,
+    openStandardModalForCurrentCard,
     closeCardModal,
     modalProfiles,
+    cardOpenSource,
+    forceStandardModal,
   } = useCardModal({
     initialBoard,
     dataMode,
@@ -608,6 +613,57 @@ function TimelineBoardPageContent({
       return left.item.card_id.localeCompare(right.item.card_id);
     });
   }, [data]);
+  const parentResults = useMemo<TimelineSearchResultItem[]>(() => {
+    if (!sortedFilteredData) return [];
+
+    const byCardId = new Map<string, TimelineSearchResultItem>();
+    const push = (entry: TimelineSearchResultItem) => {
+      const cardId = entry.item.card_id;
+      if (!cardId || byCardId.has(cardId)) return;
+      byCardId.set(cardId, entry);
+    };
+
+    sortedFilteredData.overdue.forEach((item) => {
+      if (!item.is_parent) return;
+      push({
+        kind: "overdue",
+        item,
+        badgeLabel: item.due_bucket?.toUpperCase() ?? "O",
+        timeText: buildTimelineCardTimeText(item, { includeDate: true, includeDuration: true }),
+      });
+    });
+    sortedFilteredData.events.forEach((item) => {
+      if (!item.is_parent) return;
+      push({
+        kind: "event",
+        item,
+        badgeLabel: item.due_bucket?.toUpperCase() ?? "T",
+        timeText: buildTimelineCardTimeText(item, { includeDate: true, includeDuration: true }),
+      });
+    });
+    Object.entries(sortedFilteredData.abBuckets).forEach(([bucketKey, items]) => {
+      const badgeLabel = bucketKey.endsWith("_a") ? "A" : bucketKey.endsWith("_b") ? "B" : "L";
+      items.forEach((item) => {
+        if (!item.is_parent) return;
+        push({
+          kind: "bucket",
+          item,
+          badgeLabel,
+          timeText: buildTimelineCardTimeText(item, { includeDate: true, includeDuration: true }),
+        });
+      });
+    });
+
+    return Array.from(byCardId.values()).sort((left, right) => {
+      const dateA = left.item.due_date ?? "9999-12-31";
+      const dateB = right.item.due_date ?? "9999-12-31";
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = left.item.due_start ?? left.item.due_end ?? "99:99";
+      const timeB = right.item.due_start ?? right.item.due_end ?? "99:99";
+      if (timeA !== timeB) return timeA.localeCompare(timeB);
+      return (left.item.title ?? "").localeCompare(right.item.title ?? "");
+    });
+  }, [sortedFilteredData]);
 
   const completedCurrentMonthKey = buildCurrentCompletedMonthKeyJst();
   const completedGroupedResults = useMemo(
@@ -630,10 +686,11 @@ function TimelineBoardPageContent({
     () => ({
       completed: completedResetKey,
       search: searchQuery.trim() ? `${searchQuery.trim()}::${searchResults.map((result) => result.item.card_id).join(",")}` : "",
+      parents: parentResults.map((result) => result.item.card_id).join(","),
       tags: `${selectedTags.join(",")}::${tagResults.map((result) => result.item.card_id).join(",")}`,
       trash: trashItems.map((item) => item.card_id).join(","),
     }),
-    [completedResetKey, searchQuery, searchResults, selectedTags, tagResults, trashItems],
+    [completedResetKey, parentResults, searchQuery, searchResults, selectedTags, tagResults, trashItems],
   );
   const previousSidebarVisibleResetKeysRef = useRef<Record<IncrementalPanelSectionKey, string> | null>(null);
 
@@ -1317,6 +1374,14 @@ function TimelineBoardPageContent({
         return;
       }
 
+      if (key === "parents") {
+        updateBoardUiState({
+          primaryPanelMode: "parents",
+          method: "replace",
+        });
+        return;
+      }
+
       updateBoardUiState({
         primaryPanelMode: "tags",
         tag: selectedTags[0] ?? resolvedState.tag ?? null,
@@ -1375,6 +1440,14 @@ function TimelineBoardPageContent({
     if (key === "trash") {
       updateBoardUiState({
         primaryPanelMode: "trash",
+        method: "replace",
+      });
+      return;
+    }
+
+    if (key === "parents") {
+      updateBoardUiState({
+        primaryPanelMode: "parents",
         method: "replace",
       });
       return;
@@ -1531,6 +1604,7 @@ function TimelineBoardPageContent({
     abBuckets: sortedFilteredData?.abBuckets ?? {},
     overdue: visibleOverdueItems,
     completedResults,
+    parentResults,
     completedCurrentMonthCount,
     completedCurrentMonthKey,
     completedGroupedResults,
@@ -1636,10 +1710,13 @@ function TimelineBoardPageContent({
     handleCardModalDelete,
     handleRestoreCard,
     closeCardModal,
+    openStandardModalForCurrentCard,
     historySaveWarning,
     retryHistorySave,
     closeModalWithoutHistory,
     cardModalError,
+    cardOpenSource,
+    forceStandardModal,
     data,
     moveCardByDayOffset,
     overdueSortOrder,
