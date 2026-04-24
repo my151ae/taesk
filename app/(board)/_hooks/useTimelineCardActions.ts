@@ -517,8 +517,10 @@ export function useTimelineCardActions({
 
     const optimisticId = payload.id ?? crypto.randomUUID();
     const optimisticCard = buildOptimisticCard(payload, initialBoardId, optimisticId);
+    const focusLaneId = options?.focusLaneId ?? resolveCreatedCardLaneId(optimisticCard);
 
     setData((prev) => (prev ? applyCardUpdate(prev, optimisticCard, "INSERT") : prev));
+    onCardCreated?.(optimisticCard.id, focusLaneId);
 
     try {
       const response = await fetch(`/api/boards/${initialBoardId}/cards`, {
@@ -531,7 +533,6 @@ export function useTimelineCardActions({
       if (body.card) {
         const newCard = body.card;
         setData((prev) => (prev ? applyCardUpdate(prev, newCard, "UPDATE") : prev));
-        onCardCreated?.(newCard.id, options?.focusLaneId ?? resolveCreatedCardLaneId(newCard));
         if (options?.openModal !== false && newCard.short_id) openCardModal(newCard.short_id, "create-card");
       }
     } catch {

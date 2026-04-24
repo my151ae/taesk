@@ -417,6 +417,7 @@ export function useTimelineBoardScreen({
   filteredData,
 }: UseTimelineBoardScreenArgs): TimelineBoardScreenContentProps {
   const { items: contextMenuItems } = useTimelineCardContextMenuItems({
+    boardId: currentBoard.id,
     contextMenuCardId: contextMenu.cardId,
     contextMenuTargetCardIds: contextMenu.targetCardIds,
     data,
@@ -424,6 +425,7 @@ export function useTimelineBoardScreen({
     handleToggleCardChecked,
     moveCardByDayOffset,
     handleCardModalDelete,
+    refreshTimeline: () => fetchTimelineForDialogs(),
     onBulkActionSuccess: clearSelection,
   });
 

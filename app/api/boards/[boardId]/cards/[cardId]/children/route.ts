@@ -154,6 +154,15 @@ const postHandler = async (
     .limit(1)
     .maybeSingle();
   const idShort = (maxIdShortData?.id_short ?? 0) + 1;
+  const { data: maxPositionData } = await supabase
+    .from("cards")
+    .select("position")
+    .eq("board_id", boardId)
+    .eq("list_id", firstList.id)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = (maxPositionData?.position ?? 0) + 1024;
 
   const childTitle = parsed.data.title ?? "";
   const { data: createdCard, error: createError } = await supabase
@@ -180,6 +189,7 @@ const postHandler = async (
       id_short: idShort,
       slug: slugify(childTitle || "child"),
       user_id: user.id,
+      position,
       created_at: now,
       updated_at: now,
       duration: 60,
