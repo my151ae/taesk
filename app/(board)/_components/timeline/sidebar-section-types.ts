@@ -6,18 +6,18 @@ export type IncrementalPanelSectionKey = Exclude<SidebarSectionKey, "overdue" | 
 
 export const SIDEBAR_SECTION_KEYS: SidebarSectionKey[] = [
   "overdue",
-  "completed",
+  "tags",
+  "parents",
   "notifications",
   "search",
-  "parents",
-  "tags",
+  "completed",
   "trash",
 ];
 
 export const INCREMENTAL_PANEL_SECTION_KEYS: IncrementalPanelSectionKey[] = [
-  "completed",
-  "search",
-  "parents",
   "tags",
+  "parents",
+  "search",
+  "completed",
   "trash",
 ];
