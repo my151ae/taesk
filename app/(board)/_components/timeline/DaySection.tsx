@@ -222,6 +222,7 @@ export const DaySection = memo(function DaySection({
                         onActivateCard={onActivateCard}
                         activeCardId={activeCardId}
                         activeLaneId={activeLaneId}
+                        activeDragCardId={activeDragCardId}
                         pendingTitleEditCardId={pendingTitleEditCardId}
                         onPendingTitleEditConsumed={onPendingTitleEditConsumed}
                     />

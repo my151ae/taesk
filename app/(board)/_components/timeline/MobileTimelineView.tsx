@@ -43,6 +43,8 @@ import {
   buildTimelineInteractionLock,
 } from "@/app/(board)/_components/timeline/timeline-render-model";
 
+const MOBILE_BUCKET_DROP_PLACEHOLDER_MIN_HEIGHT_PX = 52;
+
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 
 
@@ -355,6 +357,7 @@ function MobileAbBucket({
   onCreateBucketCard,
   onToggleCheck,
   bucketIndicator,
+  activeDragCardId,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   contextMenuCardId,
@@ -367,6 +370,7 @@ function MobileAbBucket({
   onCreateBucketCard: (bucketKey: string, afterCardId?: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
+  activeDragCardId: string | null;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   contextMenuCardId: string | null;
@@ -375,31 +379,35 @@ function MobileAbBucket({
     id: `bucket-drop:${bucketKey}`,
     data: { type: "ab-bucket", bucketKey },
   });
-  const renderAddButton = (position: "top" | "bottom", onClick: (e: React.MouseEvent<HTMLButtonElement>) => void) => (
-    <div
-      className={`pointer-events-none relative mx-0.5 h-0 shrink-0 ${
-        position === "top"
-          ? "sticky top-0 z-10"
-          : "z-10"
-      }`}
-    >
-      <button
-        type="button"
-        tabIndex={-1}
-        data-arrow-skip="true"
-        onClick={onClick}
-        className={`pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
-          isOver
-            ? "border-sky-400 bg-sky-50 text-sky-700"
-            : "border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+  const renderAddButton = (position: "top" | "bottom", onClick: (e: React.MouseEvent<HTMLButtonElement>) => void) => {
+    if (activeDragCardId) return null;
+
+    return (
+      <div
+        className={`pointer-events-none relative mx-0.5 h-0 shrink-0 ${
+          position === "top"
+            ? "sticky top-0 z-10"
+            : "z-10"
         }`}
-        aria-label="Add card"
-        data-testid={`ab-add-${position}-${bucketKey}`}
       >
-        <span aria-hidden="true">＋</span>
-      </button>
-    </div>
-  );
+        <button
+          type="button"
+          tabIndex={-1}
+          data-arrow-skip="true"
+          onClick={onClick}
+          className={`pointer-events-auto absolute left-1/2 top-0 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[9px] leading-none shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-150 scale-90 opacity-75 hover:scale-100 hover:opacity-100 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 ${
+            isOver
+              ? "border-sky-400 bg-sky-50 text-sky-700"
+              : "border-slate-300/90 bg-white text-slate-400 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+          }`}
+          aria-label="Add card"
+          data-testid={`ab-add-${position}-${bucketKey}`}
+        >
+          <span aria-hidden="true">＋</span>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -412,7 +420,16 @@ function MobileAbBucket({
         <p className="text-[10px] font-semibold text-slate-700">{sectionLabel}</p>
       </div>
       <div className="space-y-1 px-2 pb-2">
-        {items.length === 0 ? (
+        {items.length === 0 && bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId == null ? (
+          <div
+            aria-hidden="true"
+            className="rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+            style={{
+              height: Math.max(bucketIndicator.placeholderHeight, MOBILE_BUCKET_DROP_PLACEHOLDER_MIN_HEIGHT_PX),
+              backgroundColor: "rgb(226 232 240 / 0.7)",
+            }}
+          />
+        ) : items.length === 0 ? (
           renderAddButton("bottom", (e) => {
             e.stopPropagation();
             onRequestCreateBucketCard({
@@ -441,6 +458,7 @@ function MobileAbBucket({
                   openCardModal={openCardModal}
                   onToggleCheck={onToggleCheck}
                   bucketIndicator={bucketIndicator}
+                  activeDragCardId={activeDragCardId}
                   onCardContextMenu={onCardContextMenu}
                   onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                   isContextMenuOpen={contextMenuCardId === item.card_id}
@@ -1005,6 +1023,7 @@ export default function MobileTimelineView({
                               onCreateBucketCard={onCreateBucketCard}
                               onToggleCheck={onToggleCheck}
                               bucketIndicator={bucketIndicator}
+                              activeDragCardId={activeDragCardId}
                               onCardContextMenu={onCardContextMenu}
                               onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                               contextMenuCardId={contextMenuCardId}
@@ -1038,6 +1057,7 @@ function MobileBucketCard({
   openCardModal,
   onToggleCheck,
   bucketIndicator,
+  activeDragCardId,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   isContextMenuOpen,
@@ -1047,20 +1067,44 @@ function MobileBucketCard({
   openCardModal: (shortId: string | null, source: string) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   bucketIndicator: DragAndDropBindings["bucketIndicator"];
+  activeDragCardId: string | null;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   isContextMenuOpen: boolean;
 }) {
-  const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
+  const cardMeasureRef = useRef<HTMLDivElement | null>(null);
+  const [cardHeight, setCardHeight] = useState(MOBILE_BUCKET_DROP_PLACEHOLDER_MIN_HEIGHT_PX);
+  const { setNodeRef: setTopRef } = useDroppable({
     id: `bucket-item-top:${bucketKey}:${item.card_id}`,
     data: { type: "bucket-item-top", bucketKey, cardId: item.card_id },
   });
-  const { setNodeRef: setBottomRef, isOver: isOverBottom } = useDroppable({
+  const { setNodeRef: setBottomRef } = useDroppable({
     id: `bucket-item-bottom:${bucketKey}:${item.card_id}`,
     data: { type: "bucket-item-bottom", bucketKey, cardId: item.card_id },
   });
-  const showFallbackBottomLine =
-    bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id;
+  const dropIndicatorMode =
+    bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id
+      ? bucketIndicator.mode
+      : null;
+  const placeholderHeight = Math.max(cardHeight, MOBILE_BUCKET_DROP_PLACEHOLDER_MIN_HEIGHT_PX);
+  const isDraggingThisCard = activeDragCardId === item.card_id;
+
+  useLayoutEffect(() => {
+    const node = cardMeasureRef.current;
+    if (!node) return;
+
+    const updateHeight = () => {
+      const nextHeight = Math.ceil(node.getBoundingClientRect().height);
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setCardHeight(nextHeight);
+      }
+    };
+
+    updateHeight();
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(node);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   return (
     <DraggableCard
@@ -1072,9 +1116,22 @@ function MobileBucketCard({
     >
       {(dragHandleProps) => (
       <div
-        className="relative flex w-full flex-col select-none pt-4"
+        className={clsx(
+          "relative flex w-full flex-col select-none pt-4",
+          isDraggingThisCard && "h-0 overflow-hidden pt-0"
+        )}
+        data-bucket-card-id={item.card_id}
+        data-bucket={bucketKey}
         onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
       >
+        {dropIndicatorMode === "before" && (
+          <div
+            aria-hidden="true"
+            className="mb-2 rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+            style={{ height: placeholderHeight, backgroundColor: "rgb(226 232 240 / 0.7)" }}
+          />
+        )}
+        <div ref={cardMeasureRef} className="w-full">
         <TimelineCard
           title={item.title || ""}
           checked={item.checked}
@@ -1108,6 +1165,7 @@ function MobileBucketCard({
           focusGroup="bucket"
           dragHandleProps={dragHandleProps}
         />
+        </div>
 
         <div
           ref={setTopRef}
@@ -1120,9 +1178,12 @@ function MobileBucketCard({
           style={{ bottom: -12, height: "calc(50% + 12px)" }}
         />
 
-        {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
-        {(isOverBottom || showFallbackBottomLine) && (
-          <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-50/10 z-0" />
+        {dropIndicatorMode === "after" && (
+          <div
+            aria-hidden="true"
+            className="mt-2 rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+            style={{ height: placeholderHeight, backgroundColor: "rgb(226 232 240 / 0.7)" }}
+          />
         )}
       </div>
       )}

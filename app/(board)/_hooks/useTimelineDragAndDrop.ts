@@ -70,6 +70,8 @@ export const HIDDEN_POINTER_PREVIEW: PointerPreviewState = {
 export type BucketIndicator = {
     bucketKey: string;
     cardId: string | null;
+    mode: 'before' | 'after';
+    placeholderHeight: number;
 };
 
 export type ActiveResizeState = {
@@ -84,6 +86,7 @@ export type ActiveResizeState = {
 
 export type DragSession = ActiveDragState & {
     sourceKind: DragSourceKind;
+    placeholderHeight: number;
     pointerPreview: PointerPreviewState;
     bucketIndicator: BucketIndicator | null;
     isOverABList: boolean;
@@ -272,6 +275,7 @@ export function useTimelineDragAndDrop({
             window.addEventListener('pointermove', handler, { passive: true });
         }
         const kind = event.active.data.current?.kind as DragSourceKind;
+        const placeholderHeight = Math.max(52, Math.ceil(event.active.rect.current?.initial?.height ?? 52));
         let nextSession: DragSession | null = null;
         if (kind === 'event') {
             const eventData = event.active.data.current?.event as TimelineEvent;
@@ -282,6 +286,7 @@ export function useTimelineDragAndDrop({
                 startMinutes,
                 duration,
                 sourceKind: kind,
+                placeholderHeight,
                 pointerPreview: HIDDEN_POINTER_PREVIEW,
                 bucketIndicator: null,
                 isOverABList: false,
@@ -294,6 +299,7 @@ export function useTimelineDragAndDrop({
                 startMinutes: 9 * 60,
                 duration,
                 sourceKind: kind,
+                placeholderHeight,
                 pointerPreview: HIDDEN_POINTER_PREVIEW,
                 bucketIndicator: null,
                 isOverABList: false,
@@ -307,6 +313,7 @@ export function useTimelineDragAndDrop({
                 startMinutes,
                 duration,
                 sourceKind: kind,
+                placeholderHeight,
                 pointerPreview: HIDDEN_POINTER_PREVIEW,
                 bucketIndicator: null,
                 isOverABList: false,
@@ -472,6 +479,61 @@ export function useTimelineDragAndDrop({
         [findAbScrollContainerAtPointer, isPointerInAbColumn, resolvePointerForAutoScroll, timelineScrollRef]
     );
 
+    const resolveBucketIndicatorFromPointer = useCallback(
+        (bucketKey: string, pointerY: number | null, activeCardId: string, placeholderHeight: number): BucketIndicator | null => {
+            const items = data?.abBuckets?.[bucketKey] ?? [];
+            if (!bucketKey) return null;
+            if (!items.length) {
+                return { bucketKey, cardId: null, mode: 'after', placeholderHeight };
+            }
+            if (pointerY == null) {
+                const fallbackCardId = items.find((item) => item.card_id !== activeCardId)?.card_id ?? items[0]?.card_id ?? null;
+                return fallbackCardId ? { bucketKey, cardId: fallbackCardId, mode: 'after', placeholderHeight } : null;
+            }
+
+            const cardRects = Array.from(
+                document.querySelectorAll<HTMLElement>(`[data-bucket="${CSS.escape(bucketKey)}"][data-bucket-card-id]`)
+            )
+                .map((node) => ({
+                    cardId: node.dataset.bucketCardId ?? null,
+                    rect: node.getBoundingClientRect(),
+                }))
+                .filter((entry): entry is { cardId: string; rect: DOMRect } => {
+                    return Boolean(entry.cardId) && entry.cardId !== activeCardId && entry.rect.height > 0;
+                });
+
+            if (!cardRects.length) {
+                const fallbackCardId = items.find((item) => item.card_id !== activeCardId)?.card_id ?? items[0]?.card_id ?? null;
+                return fallbackCardId ? { bucketKey, cardId: fallbackCardId, mode: 'after' } : null;
+            }
+
+            const first = cardRects[0];
+            if (pointerY < first.rect.top) {
+                return { bucketKey, cardId: first.cardId, mode: 'before', placeholderHeight };
+            }
+
+            const last = cardRects[cardRects.length - 1];
+            if (pointerY > last.rect.bottom) {
+                return { bucketKey, cardId: last.cardId, mode: 'after', placeholderHeight };
+            }
+
+            let closest = cardRects[0];
+            let closestDistance = Number.POSITIVE_INFINITY;
+            for (const entry of cardRects) {
+                const midpoint = entry.rect.top + entry.rect.height / 2;
+                const distance = Math.abs(pointerY - midpoint);
+                if (distance < closestDistance) {
+                    closest = entry;
+                    closestDistance = distance;
+                }
+            }
+
+            const mode = pointerY < closest.rect.top + closest.rect.height / 2 ? 'before' : 'after';
+            return { bucketKey, cardId: closest.cardId, mode, placeholderHeight };
+        },
+        [data?.abBuckets]
+    );
+
     const handleDragMove = (event: DragMoveEvent) => {
         const currentState = interactionStateRef.current;
         const currentDrag = currentState.mode === 'dragging' ? currentState.dragSession : null;
@@ -494,25 +556,24 @@ export function useTimelineDragAndDrop({
         const isAB = overType === 'ab-bucket' || overType === 'bucket-item' || overType === 'bucket-item-top' || overType === 'bucket-item-bottom';
         const isOverAbArea = !visualTimelineTarget && (Boolean(hoveredAbEl) || isAB);
         const nextBucketIndicator =
-            !visualTimelineTarget && overType === 'ab-bucket'
+            !visualTimelineTarget && (overType === 'bucket-item-top' || overType === 'bucket-item-bottom')
                 ? (() => {
                     const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
-                    const items = bucketKey && data?.abBuckets ? data.abBuckets[bucketKey] ?? [] : [];
-                    if (bucketKey && items.length) {
-                        const nextPointerY = resolvePointerClientY(event, latestPointerRef.current, dragStartPointerRef.current);
-                        const bucketRect = event.over?.rect;
-                        let targetIndex = 0;
-                        if (bucketRect && nextPointerY != null) {
-                            const relativeY = nextPointerY - bucketRect.top;
-                            const clampedY = Math.max(0, Math.min(bucketRect.height, relativeY));
-                            const ratio = bucketRect.height > 0 ? clampedY / bucketRect.height : 0;
-                            targetIndex = Math.min(items.length - 1, Math.max(0, Math.round(ratio * (items.length - 1))));
-                        }
-                        return { bucketKey, cardId: items[targetIndex]?.card_id ?? null } satisfies BucketIndicator;
-                    }
-                    return null;
+                    const cardId = event.over?.data.current?.cardId as string | undefined;
+                    if (!bucketKey || !cardId) return null;
+                    return {
+                        bucketKey,
+                        cardId,
+                        mode: overType === 'bucket-item-top' ? 'before' : 'after',
+                        placeholderHeight: currentDrag.placeholderHeight,
+                    } satisfies BucketIndicator;
                 })()
-                : null;
+                : !visualTimelineTarget && overType === 'ab-bucket'
+                    ? (() => {
+                    const bucketKey = event.over?.data.current?.bucketKey as string | undefined;
+                    return bucketKey ? resolveBucketIndicatorFromPointer(bucketKey, pointerY, currentDrag.cardId, currentDrag.placeholderHeight) : null;
+                })()
+                    : null;
         updateDragAutoScroll(event);
 
         if (!visualTimelineTarget && overType !== 'timeline-column') {
@@ -675,6 +736,7 @@ export function useTimelineDragAndDrop({
                 bucketKey,
                 activeCardId: cardId,
                 targetCardId: completedDrag?.bucketIndicator?.bucketKey === bucketKey ? completedDrag.bucketIndicator.cardId : fallbackTargetCardId,
+                mode: completedDrag?.bucketIndicator?.bucketKey === bucketKey ? completedDrag.bucketIndicator.mode : 'after',
             });
             const payload = buildBucketDropPayload({
                 bucketKey,

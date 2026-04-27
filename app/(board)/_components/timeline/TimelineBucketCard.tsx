@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { TimelineBucketItem } from '@/app/(board)/_utils/timeline-helpers';
 import { buildTimelineCardFloatingLabel, buildTimelineCardStatusItems } from '@/app/(board)/_components/timeline/timeline-card-meta';
@@ -11,6 +11,8 @@ import {
 } from './TimelineCard';
 
 const DROP_ZONE_MARGIN_PX = 12;
+const MIN_DROP_PLACEHOLDER_HEIGHT_PX = 52;
+
 const resolveBucketShortcutSection = (bucketKey: string): 'a' | 'b' =>
     bucketKey.endsWith('_a') ? 'a' : 'b';
 
@@ -20,7 +22,7 @@ type TimelineBucketCardProps = {
     openCardModal: (shortId: string | null) => void;
     onToggleCheck: (cardId: string, checked: boolean) => void;
     onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
-    showFallbackBottomLine?: boolean;
+    dropIndicatorMode?: 'before' | 'after' | null;
     onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
     onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
     isContextMenuOpen: boolean;
@@ -38,6 +40,7 @@ type TimelineBucketCardProps = {
     onActivateCard?: (cardId: string, laneId: string) => void;
     activeCardId?: string | null;
     activeLaneId?: string | null;
+    activeDragCardId?: string | null;
     autoStartTitleEdit?: boolean;
     onAutoStartTitleEditConsumed?: () => void;
 };
@@ -48,7 +51,7 @@ export const TimelineBucketCard = ({
     openCardModal,
     onToggleCheck,
     onRenameCardTitle,
-    showFallbackBottomLine = false,
+    dropIndicatorMode = null,
     onCardContextMenu,
     onCardContextMenuByKeyboard,
     isContextMenuOpen,
@@ -61,19 +64,43 @@ export const TimelineBucketCard = ({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    activeDragCardId,
     autoStartTitleEdit = false,
     onAutoStartTitleEditConsumed,
 }: TimelineBucketCardProps) => {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const { setNodeRef: setTopRef, isOver: isOverTop } = useDroppable({
+    const cardMeasureRef = useRef<HTMLDivElement | null>(null);
+    const [cardHeight, setCardHeight] = useState(MIN_DROP_PLACEHOLDER_HEIGHT_PX);
+    const { setNodeRef: setTopRef } = useDroppable({
         id: `bucket-item-top:${bucketKey}:${item.card_id}`,
         data: { type: 'bucket-item-top', bucketKey, cardId: item.card_id },
     });
 
-    const { setNodeRef: setBottomRef, isOver: isOverBottom } = useDroppable({
+    const { setNodeRef: setBottomRef } = useDroppable({
         id: `bucket-item-bottom:${bucketKey}:${item.card_id}`,
         data: { type: 'bucket-item-bottom', bucketKey, cardId: item.card_id },
     });
+    const placeholderHeight = Math.max(cardHeight, MIN_DROP_PLACEHOLDER_HEIGHT_PX);
+    const showDropBefore = dropIndicatorMode === 'before';
+    const showDropAfter = dropIndicatorMode === 'after';
+    const isDraggingThisCard = activeDragCardId === item.card_id;
+
+    useLayoutEffect(() => {
+        const node = cardMeasureRef.current;
+        if (!node) return;
+
+        const updateHeight = () => {
+            const nextHeight = Math.ceil(node.getBoundingClientRect().height);
+            if (Number.isFinite(nextHeight) && nextHeight > 0) {
+                setCardHeight(nextHeight);
+            }
+        };
+
+        updateHeight();
+        const resizeObserver = new ResizeObserver(updateHeight);
+        resizeObserver.observe(node);
+        return () => resizeObserver.disconnect();
+    }, []);
 
     return (
         <DraggableCard
@@ -83,7 +110,16 @@ export const TimelineBucketCard = ({
             disabled={isContextMenuOpen || isEditingTitle}
         >
             {(dragHandleProps) => (
-            <div className="relative min-w-0 pt-4 select-none has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
+            <div
+                className={clsx(
+                    "relative min-w-0 pt-4 select-none has-[:focus]:z-10",
+                    isDraggingThisCard && "h-0 overflow-hidden pt-0"
+                )}
+                data-testid={`ab-card-${item.card_id}`}
+                data-bucket-card-id={item.card_id}
+                data-bucket={bucketKey}
+                onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
+            >
                 {/* Drop Zones */}
                 <div
                     ref={setTopRef}
@@ -97,10 +133,14 @@ export const TimelineBucketCard = ({
                 />
 
                 {/* Indicators */}
-                {isOverTop && <div className="absolute left-0 right-0 top-0 h-0.5 bg-sky-500 z-30" />}
-                {(isOverBottom || showFallbackBottomLine) && (
-                    <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-500 z-30" />
+                {showDropBefore && (
+                    <div
+                        aria-hidden="true"
+                        className="mb-2 rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+                        style={{ height: placeholderHeight, backgroundColor: 'rgb(226 232 240 / 0.7)' }}
+                    />
                 )}
+                <div ref={cardMeasureRef}>
 
                 <TimelineCard
                     title={item.title || ""}
@@ -159,6 +199,14 @@ export const TimelineBucketCard = ({
                     onTitleEditStateChange={setIsEditingTitle}
                     dragHandleProps={dragHandleProps}
                 />
+                </div>
+                {showDropAfter && (
+                    <div
+                        aria-hidden="true"
+                        className="mt-2 rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+                        style={{ height: placeholderHeight, backgroundColor: 'rgb(226 232 240 / 0.7)' }}
+                    />
+                )}
             </div>
             )}
         </DraggableCard>

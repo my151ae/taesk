@@ -48,6 +48,7 @@ type TimelineDayBucketProps = {
     onActivateCard: (cardId: string, laneId: string) => void;
     activeCardId: string | null;
     activeLaneId: string | null;
+    activeDragCardId: string | null;
     pendingTitleEditCardId: string | null;
     onPendingTitleEditConsumed: () => void;
 };
@@ -506,6 +507,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     onActivateCard,
     activeCardId,
     activeLaneId,
+    activeDragCardId,
     pendingTitleEditCardId,
     onPendingTitleEditConsumed,
 }: TimelineDayBucketProps) {
@@ -585,6 +587,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
     }, [sectionCounts]);
 
     const recomputeMeasurements = useCallback(() => {
+        if (activeDragCardId) return;
+
         setMeasurements((current) => {
             let changed = false;
             const next = { ...current };
@@ -629,7 +633,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
 
             return changed ? next : current;
         });
-    }, [sectionCounts]);
+    }, [activeDragCardId, sectionCounts]);
 
     useEffect(() => {
         recomputeMeasurements();
@@ -783,6 +787,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         revealClassName?: string;
         showDropLine?: boolean;
     }) => {
+        if (activeDragCardId) return null;
+
         const shortcutAttributes = buildShortcutDataAttributes({
             scope: 'board',
             region: 'main-panel',
@@ -999,7 +1005,13 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
         bucketKey: string;
         isOver: boolean;
         emptyStateVariant: BucketEmptyStateVariant;
-    }) => (
+    }) => {
+        const showEmptyDropPlaceholder =
+            items.length === 0 &&
+            bucketIndicator?.bucketKey === bucketKey &&
+            bucketIndicator.cardId == null;
+
+        return (
         <div
             ref={(node) => setContentRef(section, node)}
             className="min-h-0 min-w-0 space-y-1 pl-[1px] py-[1px]"
@@ -1025,7 +1037,16 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 })
             ) : null}
 
-            {emptyStateVariant === 'compact' ? (
+            {showEmptyDropPlaceholder ? (
+                <div
+                    aria-hidden="true"
+                    className="rounded-lg border-2 border-sky-500 bg-sky-500 shadow-inner"
+                    style={{
+                        height: Math.max(bucketIndicator.placeholderHeight, 52),
+                        backgroundColor: 'rgb(226 232 240 / 0.7)',
+                    }}
+                />
+            ) : emptyStateVariant === 'compact' ? (
                 renderCompactEmptyBucketDropZone({ bucketKey, isOver, count: items.length })
             ) : items.length === 0 ? (
                 null
@@ -1038,7 +1059,11 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             openCardModal={(shortId) => openCardModal(shortId, 'bucket-list')}
                             onToggleCheck={onToggleCheck}
                             onRenameCardTitle={onRenameCardTitle}
-                            showFallbackBottomLine={bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id}
+                            dropIndicatorMode={
+                                bucketIndicator?.bucketKey === bucketKey && bucketIndicator.cardId === item.card_id
+                                    ? bucketIndicator.mode
+                                    : null
+                            }
                             onCardContextMenu={onCardContextMenu}
                             onCardContextMenuByKeyboard={onCardContextMenuByKeyboard}
                             isContextMenuOpen={contextMenuCardId === item.card_id}
@@ -1051,6 +1076,7 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                             onActivateCard={onActivateCard}
                             activeCardId={activeCardId}
                             activeLaneId={activeLaneId}
+                            activeDragCardId={activeDragCardId}
                             autoStartTitleEdit={pendingTitleEditCardId === item.card_id}
                             onAutoStartTitleEditConsumed={onPendingTitleEditConsumed}
                         />
@@ -1076,7 +1102,8 @@ export const TimelineDayBucket = memo(function TimelineDayBucket({
                 ))
             )}
         </div>
-    );
+        );
+    };
 
     const renderBucketSection = ({
         section,

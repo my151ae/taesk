@@ -7,6 +7,7 @@ type BucketDropPositionInput = {
   bucketKey: string;
   activeCardId: string;
   targetCardId?: string | null;
+  mode?: "before" | "after";
 };
 
 export function resolveSourceDueBucket(args: {
@@ -69,6 +70,7 @@ export function resolveBucketDropPosition({
   bucketItems,
   activeCardId,
   targetCardId,
+  mode = "after",
 }: BucketDropPositionInput): number {
   if (!bucketItems.length) return Date.now();
   if (!targetCardId) return bucketItems[0]?.bucketPosition != null ? bucketItems[0].bucketPosition - 1000 : Date.now();
@@ -76,7 +78,7 @@ export function resolveBucketDropPosition({
   return resolveBucketInsertPosition({
     bucketItems,
     targetCardId,
-    mode: "after",
+    mode,
   });
 }
 
