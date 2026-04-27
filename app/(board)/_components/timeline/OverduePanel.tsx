@@ -44,6 +44,7 @@ function OverdueCardRow({
       data={{ kind: "overdue", cardId: item.card_id, item }}
       disabled={isContextMenuOpen}
     >
+      {(dragHandleProps) => (
       <div
         className="min-w-0 pt-4"
         data-testid={`overdue-card-${item.card_id}`}
@@ -80,8 +81,10 @@ function OverdueCardRow({
           className="min-h-0 border-rose-200 bg-rose-50/80"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"
+          dragHandleProps={dragHandleProps}
         />
       </div>
+      )}
     </DraggableCard>
   );
 }

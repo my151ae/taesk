@@ -138,6 +138,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
             // コンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen || isEditingTitle}
         >
+            {(dragHandleProps) => (
             <div
                 className="absolute transition hover:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 data-stack-mode={layout?.presentationMode ?? 'full-width'}
@@ -210,6 +211,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     inlineTitleEdit
                     onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(event.card_id, nextTitle).then(() => undefined) : undefined}
                     onTitleEditStateChange={setIsEditingTitle}
+                    dragHandleProps={dragHandleProps}
                 />
                 <div
                     className="absolute top-0 left-1/2 -ml-8 w-16 h-4 -mt-2 cursor-ns-resize z-10 flex items-center justify-center group"
@@ -230,6 +232,7 @@ export const TimelineEventItem = memo(function TimelineEventItem({
                     <div className="w-8 h-1 bg-slate-400/0 rounded-full group-hover:bg-slate-300/80 transition-colors" />
                 </div>
             </div>
+            )}
         </DraggableCard >
     );
 });

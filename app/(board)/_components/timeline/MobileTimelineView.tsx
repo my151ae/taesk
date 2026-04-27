@@ -241,6 +241,7 @@ function MobileTimelineColumn({
               attachListenersToChild
               disabled={contextMenuCardId === event.card_id}
             >
+              {(dragHandleProps) => (
               <div
                 className="absolute"
                 data-stack-mode={layout?.presentationMode ?? "full-width"}
@@ -331,10 +332,12 @@ function MobileTimelineColumn({
                       return current;
                     });
                   }}
+                  dragHandleProps={dragHandleProps}
                 />
                   );
                 })()}
               </div>
+              )}
             </DraggableCard>
           );
         })}
@@ -1067,6 +1070,7 @@ function MobileBucketCard({
       attachListenersToChild
       disabled={isContextMenuOpen}
     >
+      {(dragHandleProps) => (
       <div
         className="relative flex w-full flex-col select-none pt-4"
         onContextMenu={(e) => onCardContextMenu(e, item.card_id)}
@@ -1102,6 +1106,7 @@ function MobileBucketCard({
           className="w-full min-h-0"
           onOpenContextMenu={(rect) => onCardContextMenuByKeyboard(item.card_id, rect)}
           focusGroup="bucket"
+          dragHandleProps={dragHandleProps}
         />
 
         <div
@@ -1120,6 +1125,7 @@ function MobileBucketCard({
           <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-sky-50/10 z-0" />
         )}
       </div>
+      )}
     </DraggableCard>
   );
 }

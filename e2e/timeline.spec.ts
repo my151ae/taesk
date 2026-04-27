@@ -196,12 +196,15 @@ async function dragLocatorToPoint(
   locator: Locator,
   target: { x: number; y: number }
 ): Promise<void> {
-  const box = await locator.boundingBox();
+  const dragHandle = locator.locator('[data-testid^="timeline-card-drag-handle-"]').first();
+  const dragHandleCount = await dragHandle.count();
+  const dragSource = dragHandleCount > 0 ? dragHandle : locator;
+  const box = await dragSource.boundingBox();
   if (!box) {
     throw new Error('Failed to resolve draggable locator bounds');
   }
 
-  const sourceX = box.x + Math.min(Math.max(box.width * 0.5, 24), box.width - 12);
+  const sourceX = box.x + Math.min(Math.max(box.width * 0.5, 4), box.width - 4);
   const sourceY = box.y + Math.min(Math.max(box.height * 0.35, 18), box.height - 12);
 
   await page.mouse.move(sourceX, sourceY);
@@ -2250,7 +2253,7 @@ test.describe('@feature:timeline Timeline view', () => {
         x: targetBucketBox.x + targetBucketBox.width * 0.5,
         y: targetBucketBox.y + Math.min(32, targetBucketBox.height * 0.35),
       });
-      await expect(targetSectionB.locator('.bg-sky-500')).toBeVisible();
+      await expect(targetSectionB.locator('.bg-sky-500').first()).toBeVisible();
 
       const [patchResponse] = await Promise.all([
         patchResponsePromise,

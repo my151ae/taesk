@@ -82,6 +82,7 @@ export const TimelineBucketCard = ({
             // コンテキストメニュー表示中はDnD無効化
             disabled={isContextMenuOpen || isEditingTitle}
         >
+            {(dragHandleProps) => (
             <div className="relative min-w-0 pt-4 select-none has-[:focus]:z-10" data-testid={`ab-card-${item.card_id}`} data-bucket={bucketKey} onContextMenu={(e) => onCardContextMenu(e, item.card_id)}>
                 {/* Drop Zones */}
                 <div
@@ -132,7 +133,7 @@ export const TimelineBucketCard = ({
                     showOpenButton
                     paddingClass="py-1"
                     className={clsx(
-                        "min-h-0 cursor-grab active:cursor-grabbing",
+                        "min-h-0",
                         isActive && "shadow-md"
                     )}
                     shortcutContext={{
@@ -156,8 +157,10 @@ export const TimelineBucketCard = ({
                     inlineTitleEdit
                     onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
                     onTitleEditStateChange={setIsEditingTitle}
+                    dragHandleProps={dragHandleProps}
                 />
             </div>
+            )}
         </DraggableCard>
     );
 };

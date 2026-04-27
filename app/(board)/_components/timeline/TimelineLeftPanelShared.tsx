@@ -345,7 +345,7 @@ function SidebarCardRow({
   });
   const floatingLabel = [bucketPrefix, _timeText].filter(Boolean).join(" ") || null;
 
-  const card = (
+  const renderCard = (dragHandleProps?: React.ComponentProps<typeof TimelineCard>["dragHandleProps"]) => (
     <div
       className="relative min-w-0 select-none pt-4 has-[:focus]:z-10"
       data-testid={testId}
@@ -393,11 +393,12 @@ function SidebarCardRow({
         inlineTitleEdit={inlineTitleEdit}
         onRenameTitle={onRenameCardTitle ? (nextTitle) => onRenameCardTitle(item.card_id, nextTitle).then(() => undefined) : undefined}
         onTitleEditStateChange={setIsEditingTitle}
+        dragHandleProps={dragHandleProps}
       />
     </div>
   );
 
-  if (!draggable) return card;
+  if (!draggable) return renderCard();
 
   return (
     <DraggableCard
@@ -405,7 +406,7 @@ function SidebarCardRow({
       data={{ kind: "overdue", cardId: item.card_id, item }}
       disabled={isContextMenuOpen || isEditingTitle}
     >
-      {card}
+      {(dragHandleProps) => renderCard(dragHandleProps)}
     </DraggableCard>
   );
 }

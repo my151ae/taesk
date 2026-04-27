@@ -19,6 +19,7 @@ import {
     buildShortcutDataAttributes,
     type ShortcutContextDescriptor,
 } from '@/app/(board)/_components/timeline/shortcut-bar-registry';
+import type { TimelineDragHandleProps } from '@/app/(board)/_components/timeline/TimelineDraggableCard';
 
 export const TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS = 'line-clamp-2';
 const NOTE_PREVIEW_LINE_HEIGHT_EM = 1.25;
@@ -72,6 +73,7 @@ type TimelineCardProps = {
     hideLeftColumn?: boolean;
     statusItems?: TimelineCardStatusItem[];
     showDragHandle?: boolean;
+    dragHandleProps?: TimelineDragHandleProps;
     densityMode?: 'default' | 'compact' | 'minimal';
     reminderEnabled?: boolean;
     shortcutContext?: ShortcutContextDescriptor | null;
@@ -132,6 +134,7 @@ export function TimelineCard({
     hideLeftColumn = false,
     statusItems,
     showDragHandle = !hideLeftColumn,
+    dragHandleProps,
     densityMode = 'default',
     reminderEnabled = false,
     shortcutContext,
@@ -660,11 +663,22 @@ export function TimelineCard({
                                     >
                                         {showDragHandle ? (
                                             <span
-                                                aria-hidden="true"
+                                                {...dragHandleProps}
+                                                aria-label={dragHandleProps ? 'カードをドラッグ' : undefined}
+                                                aria-hidden={dragHandleProps ? undefined : 'true'}
+                                                role={dragHandleProps ? 'button' : undefined}
+                                                tabIndex={dragHandleProps ? -1 : undefined}
+                                                onPointerDown={(event) => {
+                                                    event.stopPropagation();
+                                                    dragHandleProps?.onPointerDown?.(event);
+                                                }}
                                                 className={clsx(
-                                                    'pointer-events-none inline-flex h-4 w-4 items-center justify-center rounded text-slate-400',
+                                                    'inline-flex h-4 w-4 items-center justify-center rounded text-slate-400',
+                                                    dragHandleProps ? 'cursor-grab touch-none active:cursor-grabbing hover:bg-slate-100 hover:text-slate-600' : 'pointer-events-none',
                                                     isTimelineDimChecked && 'text-slate-300'
                                                 )}
+                                                style={dragHandleProps?.style}
+                                                data-testid={dragHandleProps ? `timeline-card-drag-handle-${cardId}` : undefined}
                                             >
                                                 <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
                                                     <circle cx="5" cy="4" r="1" />

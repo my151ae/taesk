@@ -1,6 +1,19 @@
-import { ReactNode, ReactElement, isValidElement, cloneElement, useCallback } from 'react';
+import {
+    ReactNode,
+    ReactElement,
+    isValidElement,
+    cloneElement,
+    useCallback,
+    type HTMLAttributes,
+    type RefCallback,
+} from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+
+export type TimelineDragHandleProps = {
+    ref: RefCallback<HTMLElement>;
+    style: { touchAction: 'none' };
+} & HTMLAttributes<HTMLElement>;
 
 export const DraggableCard = ({
     id,
@@ -12,12 +25,12 @@ export const DraggableCard = ({
 }: {
     id: string;
     data: Record<string, unknown>;
-    children: ReactNode;
+    children: ReactNode | ((dragHandleProps: TimelineDragHandleProps) => ReactNode);
     extraNodeRef?: (node: HTMLElement | null) => void;
     attachListenersToChild?: boolean;
     disabled?: boolean;
 }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({
         id,
         data: { ...data, id },
         disabled,
@@ -36,11 +49,23 @@ export const DraggableCard = ({
 
     const draggingClass = !disabled && isDragging ? 'pointer-events-none opacity-0' : '';
 
-    if (attachListenersToChild && isValidElement(children)) {
-        const child = children as ReactElement;
+    const dragHandleProps: TimelineDragHandleProps = {
+        ref: setActivatorNodeRef,
+        style: { touchAction: 'none' },
+        ...(disabled ? {} : listeners),
+        ...draggableAttributes,
+    };
+
+    const hasDedicatedHandle = typeof children === 'function';
+    const resolvedChildren = hasDedicatedHandle ? children(dragHandleProps) : children;
+
+    if (attachListenersToChild && isValidElement(resolvedChildren)) {
+        const child = resolvedChildren as ReactElement;
         const mergedRef = (node: HTMLElement | null) => {
             combinedRef(node);
         };
+        const childListeners = hasDedicatedHandle || disabled ? {} : listeners;
+        const childAttributes = hasDedicatedHandle || disabled ? {} : draggableAttributes;
         return cloneElement(child, {
             ref: mergedRef,
             style: {
@@ -49,8 +74,8 @@ export const DraggableCard = ({
                 touchAction: 'manipulation',
             },
             className: [child.props.className, draggingClass].filter(Boolean).join(' '),
-            ...(disabled ? {} : listeners),
-            ...draggableAttributes,
+            ...childListeners,
+            ...childAttributes,
         });
     }
 
@@ -62,7 +87,7 @@ export const DraggableCard = ({
             {...(disabled ? {} : listeners)}
             {...draggableAttributes}
         >
-            {children}
+            {resolvedChildren}
         </div>
     );
 };
