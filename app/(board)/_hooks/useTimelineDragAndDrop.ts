@@ -504,7 +504,7 @@ export function useTimelineDragAndDrop({
 
             if (!cardRects.length) {
                 const fallbackCardId = items.find((item) => item.card_id !== activeCardId)?.card_id ?? items[0]?.card_id ?? null;
-                return fallbackCardId ? { bucketKey, cardId: fallbackCardId, mode: 'after' } : null;
+                return fallbackCardId ? { bucketKey, cardId: fallbackCardId, mode: 'after', placeholderHeight } : null;
             }
 
             const first = cardRects[0];
