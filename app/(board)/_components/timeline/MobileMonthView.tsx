@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { TimelineListCard } from "@/app/(board)/_components/timeline/TimelineListCard";
 import {
   buildMonthCells,
+  formatMonthDayNumber,
   formatMonthTitle,
   type MonthCardEntry,
 } from "@/app/(board)/_components/timeline/month-view-helpers";
@@ -121,7 +122,7 @@ export default function MobileMonthView(props: MobileMonthViewProps) {
                       cell.day.isoDate === todayIso && "bg-sky-200 text-sky-800 ring-1 ring-sky-300",
                     )}
                   >
-                    {Number(cell.day.isoDate.slice(-2))}
+                    {formatMonthDayNumber(cell.day.isoDate)}
                   </span>
                   {cell.activeCount > 0 || cell.completedCount > 0 ? (
                     <span className="text-[10px] text-slate-400">

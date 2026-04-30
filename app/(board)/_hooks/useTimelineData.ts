@@ -375,7 +375,12 @@ export const useTimelineData = ({
           }
           const payload = (await response.json()) as TimelineResponse;
           mergeResponseIntoCache(cacheRef.current, payload, { startOffset, range });
-          pruneCache(cacheRef.current, addDaysToIso(currentTimelineIso, startOffset));
+          pruneCache(
+            cacheRef.current,
+            addDaysToIso(currentTimelineIso, startOffset),
+            Math.max(21, Math.abs(startOffset)),
+            Math.max(28, range - 1),
+          );
           const nextData = buildPayloadFromCache(cacheRef.current);
           setDataState(nextData);
           setDataMode("api");

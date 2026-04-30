@@ -100,7 +100,7 @@ type DesktopMainArgs = Pick<
 >;
 
 export function useDesktopTimelineMainPanelViewModel(args: DesktopMainArgs) {
-  const availableKeys = useMemo(() => ["timeline", "list", "month"] as const, []);
+  const availableKeys = useMemo(() => ["timeline", "month", "list"] as const, []);
   const activeKey = args.viewMode;
   const fallbackKey = args.viewMode;
   const openTimelineDay = args.openTimelineDay;
@@ -352,8 +352,8 @@ export function useDesktopTimelineMainPanelViewModel(args: DesktopMainArgs) {
     tabs: {
       items: [
         { key: "timeline" as const, label: "Timeline" },
-        { key: "list" as const, label: "List" },
         { key: "month" as const, label: "Month" },
+        { key: "list" as const, label: "List" },
       ],
       activeKey,
       availableKeys,

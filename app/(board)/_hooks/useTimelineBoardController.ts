@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
 import {
   getMonthGridSpec,
+  normalizeMonthAnchorDate,
 } from "@/app/(board)/_components/timeline/month-view-helpers";
 import type {
   ListWindow,
@@ -142,8 +143,8 @@ export function useTimelineBoardController({
   const [listAnchorOffset, setListAnchorOffset] = useState<number>(resolvedState.anchorOffset);
   const [monthAnchorDate, setMonthAnchorDate] = useState<string>(
     resolvedState.view === "month"
-      ? resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)
-      : getCurrentTimelineIsoDateJst(timelineStartHour)
+      ? normalizeMonthAnchorDate(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour))
+      : normalizeMonthAnchorDate(getCurrentTimelineIsoDateJst(timelineStartHour))
   );
   const previousBoardIdRef = useRef(boardId ?? null);
 
@@ -166,7 +167,7 @@ export function useTimelineBoardController({
     }
     setAnchorDayIso(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
     if (resolvedState.view === "month") {
-      setMonthAnchorDate(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour));
+      setMonthAnchorDate(normalizeMonthAnchorDate(resolvedState.date ?? getCurrentTimelineIsoDateJst(timelineStartHour)));
     }
     setListWindow(nextListWindow);
     setListWindowPresetKey(derivePresetFromWindow(nextListWindow));
@@ -208,7 +209,9 @@ export function useTimelineBoardController({
       setViewMode(mode);
       const today = getCurrentTimelineIsoDateJst(timelineStartHour);
       const currentDayIso =
-        anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || monthAnchorDate || listAnchorDate || resolvedState.date || today;
+        mode === "timeline" && viewMode === "month"
+          ? monthAnchorDate || resolvedState.date || today
+          : anchorDayIso || dataDays?.[activeDayIndex]?.isoDate || monthAnchorDate || listAnchorDate || resolvedState.date || today;
 
       if (mode === "timeline") {
         updateUrlForTimeline({
@@ -218,9 +221,10 @@ export function useTimelineBoardController({
       }
 
       if (mode === "month") {
-        setMonthAnchorDate(currentDayIso);
+        const nextMonthAnchor = normalizeMonthAnchorDate(currentDayIso);
+        setMonthAnchorDate(nextMonthAnchor);
         updateUrlForMonth({
-          date: currentDayIso,
+          date: nextMonthAnchor,
           method: "replace",
         });
         return;
@@ -245,6 +249,7 @@ export function useTimelineBoardController({
       updateUrlForList,
       updateUrlForMonth,
       updateUrlForTimeline,
+      viewMode,
     ]
   );
 
@@ -272,7 +277,7 @@ export function useTimelineBoardController({
   }, [shiftMonth]);
 
   const handleMonthToday = useCallback(() => {
-    const today = getCurrentTimelineIsoDateJst(timelineStartHour);
+    const today = normalizeMonthAnchorDate(getCurrentTimelineIsoDateJst(timelineStartHour));
     setMonthAnchorDate(today);
     if (viewMode === "month") {
       updateUrlForMonth({ date: today, method: "push" });

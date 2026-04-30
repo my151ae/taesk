@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import { getCurrentTimelineIsoDateJst, getDayDiff } from "@/app/(board)/_utils/timeline-helpers";
-import { getMonthGridSpec } from "@/app/(board)/_components/timeline/month-view-helpers";
+import { getMonthGridSpec, normalizeMonthAnchorDate } from "@/app/(board)/_components/timeline/month-view-helpers";
 import {
   LIST_WINDOW_PRESETS,
   listWindowRange,
@@ -173,7 +173,7 @@ export function useTimelineBoardModeSync({
         pendingListWindowAutoSyncRef.current = false;
         pendingListWindowAutoSyncAttemptsRef.current = 0;
       } else if (mode === "month") {
-        const nextMonthAnchor = targetDate;
+        const nextMonthAnchor = normalizeMonthAnchorDate(targetDate);
         const monthGrid = getMonthGridSpec(nextMonthAnchor);
         const startOffset = getDayDiff(monthGrid.gridStartIso, today);
         setDayWindowStart(startOffset);
@@ -324,7 +324,8 @@ export function useTimelineBoardModeSync({
     }
 
     const today = getCurrentTimelineIsoDateJst(timelineStartHour);
-    const monthGrid = getMonthGridSpec(monthAnchorDate || today);
+    const normalizedMonthAnchor = normalizeMonthAnchorDate(monthAnchorDate || today);
+    const monthGrid = getMonthGridSpec(normalizedMonthAnchor);
     const startOffset = getDayDiff(monthGrid.gridStartIso, today);
 
     if (status === "loading") return;
@@ -334,7 +335,7 @@ export function useTimelineBoardModeSync({
       previousViewModeRef.current = "month";
       if (!suppressMonthUrlSyncRef.current) {
         updateUrlForMonth({
-          date: monthAnchorDate || today,
+          date: normalizedMonthAnchor,
           method: "replace",
         });
       }
@@ -342,6 +343,9 @@ export function useTimelineBoardModeSync({
     }
 
     hasAppliedInitialMonthWindowRef.current = true;
+    if (normalizedMonthAnchor !== monthAnchorDate) {
+      setMonthAnchorDate(normalizedMonthAnchor);
+    }
     setDayWindowStart(startOffset);
     dayWindowStartRef.current = startOffset;
     void fetchTimeline(startOffset, { range: monthGrid.range });
@@ -353,6 +357,7 @@ export function useTimelineBoardModeSync({
     fetchTimeline,
     monthAnchorDate,
     setDayWindowStart,
+    setMonthAnchorDate,
     status,
     suppressMonthUrlSyncRef,
     timelineStartHour,

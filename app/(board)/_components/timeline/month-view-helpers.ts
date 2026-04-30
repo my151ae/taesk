@@ -54,7 +54,7 @@ export const getMonthGridSpec = (anchorIsoDate: string) => {
   const range = weeks * 7;
 
   return {
-    anchorIsoDate,
+    anchorIsoDate: startOfMonth.toISOString().slice(0, 10),
     monthStartIso: startOfMonth.toISOString().slice(0, 10),
     monthEndIso: endOfMonth.toISOString().slice(0, 10),
     gridStartIso: gridStart.toISOString().slice(0, 10),
@@ -63,6 +63,8 @@ export const getMonthGridSpec = (anchorIsoDate: string) => {
   };
 };
 
+export const normalizeMonthAnchorDate = (anchorIsoDate: string) => getMonthGridSpec(anchorIsoDate).monthStartIso;
+
 export const formatMonthTitle = (anchorIsoDate: string) => {
   const date = new Date(`${anchorIsoDate}T00:00:00Z`);
   return new Intl.DateTimeFormat("ja-JP", {
@@ -70,6 +72,15 @@ export const formatMonthTitle = (anchorIsoDate: string) => {
     year: "numeric",
     month: "long",
   }).format(date);
+};
+
+export const formatMonthDayNumber = (isoDate: string) => {
+  const [, month, day] = isoDate.split("-");
+  const dayNumber = Number(day);
+  if (dayNumber === 1) {
+    return `${Number(month)}/${dayNumber}`;
+  }
+  return String(dayNumber);
 };
 
 export const buildMonthCells = ({
@@ -87,9 +98,15 @@ export const buildMonthCells = ({
   maxVisiblePerSection?: number;
   maxVisibleTotal?: number;
 }): MonthDayCell[] => {
-  const anchorMonth = anchorIsoDate.slice(0, 7);
+  const monthGrid = getMonthGridSpec(anchorIsoDate);
+  const anchorMonth = monthGrid.monthStartIso.slice(0, 7);
+  const daysByIso = new Map(days.map((day) => [day.isoDate, day]));
+  const monthDays = Array.from({ length: monthGrid.range }, (_, index) => {
+    const isoDate = addDaysToIsoDate(monthGrid.gridStartIso, index);
+    return daysByIso.get(isoDate);
+  }).filter((day): day is TimelineDay => Boolean(day));
 
-  return days.map((day) => {
+  return monthDays.map((day) => {
     const timedEvents = [...(eventsByDay[day.isoDate] ?? [])]
       .sort((left, right) => (left.due_start ?? "").localeCompare(right.due_start ?? ""))
     const bucketA = [...(abBuckets[`${day.key}_a`] ?? [])]

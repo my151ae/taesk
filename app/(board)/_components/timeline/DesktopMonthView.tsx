@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { TimelineListCard } from "@/app/(board)/_components/timeline/TimelineListCard";
 import {
   buildMonthCells,
+  formatMonthDayNumber,
   formatMonthTitle,
   type MonthCardEntry,
 } from "@/app/(board)/_components/timeline/month-view-helpers";
@@ -165,7 +166,7 @@ export function DesktopMonthView(props: DesktopMonthViewProps) {
                         : "text-slate-500",
                   )}
                 >
-                  {Number(cell.day.isoDate.slice(-2))}
+                  {formatMonthDayNumber(cell.day.isoDate)}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400">
                   {cell.activeCount}件{cell.completedCount > 0 ? ` 完${cell.completedCount}` : ""}

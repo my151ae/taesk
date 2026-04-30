@@ -14,6 +14,12 @@ import {
     buildMobileTimelineViewState,
     buildVisibleDays,
 } from '../app/(board)/_components/timeline/timeline-render-model';
+import {
+    buildMonthCells,
+    formatMonthDayNumber,
+    getMonthGridSpec,
+    normalizeMonthAnchorDate,
+} from '../app/(board)/_components/timeline/month-view-helpers';
 import { hasPrefetchedNeighborsForDay, resolveAnchorDayFromPayload } from '../app/(board)/_hooks/useTimelineNavigation';
 import {
     formatShortcutKeyLabel,
@@ -197,6 +203,59 @@ test.describe('timeline day boundary helpers', () => {
     test('getMsUntilNextTimelineBoundary returns remaining time until next timeline day turnover', async () => {
         expect(getMsUntilNextTimelineBoundary('2026-03-29T19:30:00.000Z', 5)).toBe(30 * 60 * 1000);
         expect(getMsUntilNextTimelineBoundary('2026-03-29T20:10:00.000Z', 5)).toBe(23 * 60 * 60 * 1000 + 50 * 60 * 1000);
+    });
+});
+
+test.describe('month view helpers', () => {
+    test('normalizes month anchors while starting the grid on the correct weekday', async () => {
+        const spec = getMonthGridSpec('2026-03-19');
+
+        expect(spec.anchorIsoDate).toBe('2026-03-01');
+        expect(spec.monthStartIso).toBe('2026-03-01');
+        expect(spec.gridStartIso).toBe('2026-02-23');
+        expect(normalizeMonthAnchorDate('2026-03-19')).toBe('2026-03-01');
+    });
+
+    test('buildMonthCells ignores cached days outside the active month grid', async () => {
+        const days = Array.from({ length: 70 }, (_, index) => {
+            const isoDate = new Date(Date.UTC(2026, 3, 27 + index)).toISOString().slice(0, 10);
+            return { key: isoDate, label: isoDate, isoDate };
+        });
+
+        const cells = buildMonthCells({
+            days,
+            eventsByDay: {},
+            abBuckets: {},
+            anchorIsoDate: '2026-05-01',
+        });
+
+        expect(cells.at(0)?.day.isoDate).toBe('2026-04-27');
+        expect(cells.at(-1)?.day.isoDate).toBe('2026-05-31');
+        expect(cells).toHaveLength(35);
+    });
+
+    test('buildMonthCells keeps all loaded days through the end of a 30 day month', async () => {
+        const days = Array.from({ length: 35 }, (_, index) => {
+            const isoDate = new Date(Date.UTC(2026, 2, 30 + index)).toISOString().slice(0, 10);
+            return { key: isoDate, label: isoDate, isoDate };
+        });
+
+        const cells = buildMonthCells({
+            days,
+            eventsByDay: {},
+            abBuckets: {},
+            anchorIsoDate: '2026-04-01',
+        });
+
+        expect(cells.at(0)?.day.isoDate).toBe('2026-03-30');
+        expect(cells.map((cell) => cell.day.isoDate)).toContain('2026-04-30');
+        expect(cells.at(-1)?.day.isoDate).toBe('2026-05-03');
+        expect(cells).toHaveLength(35);
+    });
+
+    test('formats only the first day with month and day', async () => {
+        expect(formatMonthDayNumber('2026-04-01')).toBe('4/1');
+        expect(formatMonthDayNumber('2026-04-02')).toBe('2');
     });
 });
 
