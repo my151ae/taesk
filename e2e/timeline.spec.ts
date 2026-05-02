@@ -5469,6 +5469,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(eventCard).toBeVisible();
 
       await eventCard.focus();
+      await expect(eventCard).toBeFocused();
 
       const boardBar = page.getByTestId('board-shortcut-bar');
       await expect(boardBar).toBeVisible();
@@ -5481,7 +5482,7 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(eventCardBox).not.toBeNull();
       expect(boardBarBox!.y).toBeLessThan(eventCardBox!.y);
 
-      await page.keyboard.press('Escape');
+      await eventCard.press('Escape');
       const cardMenu = page.getByRole('menu', { name: 'カード操作メニュー' });
       await expect(cardMenu).toBeVisible();
       await expect(boardBar).toContainText('タイムライン');
@@ -5492,7 +5493,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(cardMenu).toBeHidden();
       await expect(eventCard).toBeFocused();
 
-      await page.keyboard.press('Enter');
+      await eventCard.press('Enter');
 
       const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
@@ -5581,7 +5582,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await eventCard.focus();
       await expect(eventCard).toBeFocused();
 
-      await page.keyboard.press('Escape');
+      await eventCard.press('Escape');
 
       const cardMenu = page.getByRole('menu', { name: 'カード操作メニュー' });
       const boardBar = page.getByTestId('board-shortcut-bar');
