@@ -60,6 +60,23 @@ function assertContext<T>(value: T | null | undefined, message: string): T {
   return value;
 }
 
+function cardDetailRoot(page: Page) {
+  return page.getByTestId('card-peek-root');
+}
+
+async function openCommentsPanel(page: Page): Promise<void> {
+  const detail = cardDetailRoot(page);
+  const showDetailsButton = detail.getByTitle('Show details');
+  if (await showDetailsButton.isVisible().catch(() => false)) {
+    await showDetailsButton.click();
+  }
+
+  const commentsButton = detail.getByRole('button', { name: 'Comments' });
+  await expect(commentsButton).toBeVisible({ timeout: 10000 });
+  await commentsButton.click();
+  await expect(detail.getByTestId('comments-panel')).toBeVisible({ timeout: 10000 });
+}
+
 async function seedTestBoard(boardName: string): Promise<TestBoardContext> {
   const testUserId = await getTestUserId();
   const testTeamId = await getTestTeamId();
@@ -266,33 +283,25 @@ async function openCardModalViaQuery(page: Page, card: TestCardContext, boardCon
   // If query-param open doesn't trigger immediately, retry query navigation once.
   // Fallback to card button is only used when query opening is unavailable.
   try {
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+    await expect(cardDetailRoot(page)).toBeVisible({ timeout: 15000 });
   } catch {
     if (targetUrl) {
       await page.goto(targetUrl);
       await page.waitForLoadState('domcontentloaded');
-      await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+      await expect(cardDetailRoot(page)).toBeVisible({ timeout: 15000 });
     } else {
       const fallbackCardElement = page.locator(`[data-card-id="${card.id}"]`).first();
       await fallbackCardElement.waitFor({ state: 'visible', timeout: 15000 });
       await fallbackCardElement.focus();
       await page.keyboard.press('Enter');
-      await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 15000 });
+      await expect(cardDetailRoot(page)).toBeVisible({ timeout: 15000 });
     }
   }
 
-  // Give the modal a moment to finish rendering
+  // Give the detail pane a moment to finish rendering
   await page.waitForTimeout(500);
 
-  // Switch to Comments tab explicitly
-  const commentsTab = page.getByRole('tab', { name: 'Comments' });
-  if (await commentsTab.isVisible()) {
-    await commentsTab.click();
-    await page.waitForTimeout(300);
-  }
-
-  // Wait for Comments section to be ready
-  await expect(page.getByText('Comments', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+  await openCommentsPanel(page);
 
   // Give it a moment to settle
   await page.waitForTimeout(500);
@@ -368,10 +377,13 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openCardModalViaQuery(page, currentCard);
 
-    const modal = page.getByRole('dialog');
-    await modal.getByTitle('Show details').click();
+    const modal = cardDetailRoot(page);
+    const showDetailsButton = modal.getByTitle('Show details');
+    if (await showDetailsButton.isVisible().catch(() => false)) {
+      await showDetailsButton.click();
+    }
     await expect(modal.getByTestId('card-modal-tags-panel')).toBeVisible();
-    await expect(modal.getByTestId('card-modal-tags-panel').getByPlaceholder('+ Add tag...')).toBeVisible();
+    await expect(modal.getByTestId('card-modal-tags-panel').getByPlaceholder('TAGS Add or Select')).toBeVisible();
   });
 
   test('should move card modal actions into overflow menu on narrow width @comments:modal', async ({ page }) => {
@@ -381,7 +393,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await openCardModalViaQuery(page, currentCard);
     await installClipboardMock(page);
 
-    const modal = page.getByRole('dialog');
+    const modal = cardDetailRoot(page);
     const overflowButton = modal.getByTestId('card-modal-overflow-button');
     await expect(overflowButton).toBeVisible();
     await overflowButton.evaluate((element) => {
@@ -414,7 +426,7 @@ test.describe('Comments Feature @feature:comments', () => {
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
+    await expect(cardDetailRoot(page)).toBeVisible({ timeout: 5000 });
     expect(page.url()).toContain(`card=${currentCard.shortId}`);
   });
 
@@ -947,7 +959,7 @@ test.describe('Comments Performance @feature:comments', () => {
     await openCardModalViaQuery(page, createdCard, currentBoard);
 
     // Wait for modal to be visible
-    await page.locator('[role="dialog"]').waitFor({ state: 'visible', timeout: 5000 });
+    await cardDetailRoot(page).waitFor({ state: 'visible', timeout: 5000 });
 
     // Wait for comments panel to be visible
     await page.locator('[data-testid="comments-panel"]').waitFor({ state: 'visible', timeout: 5000 });
@@ -993,7 +1005,7 @@ test.describe('Comments Performance @feature:comments', () => {
 
     // Close modal
     await page.keyboard.press('Escape');
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 3000 });
+    await expect(cardDetailRoot(page)).not.toBeVisible({ timeout: 3000 });
 
     // Clear requests array
     memberRequests.length = 0;
@@ -1066,7 +1078,7 @@ test.describe('Comments Performance @feature:comments', () => {
 
     const openStartedAt = Date.now();
     await openButton.click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    await expect(cardDetailRoot(page)).toBeVisible({ timeout: 5000 });
     const modalVisibleMs = Date.now() - openStartedAt;
 
     await expect(page).toHaveURL(new RegExp(`[?&]card=${currentCard.shortId}(?:&|$)`), { timeout: 5000 });

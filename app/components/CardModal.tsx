@@ -57,7 +57,6 @@ interface CardModalProps {
     onRetryHistorySave?: () => void;
     onCloseWithoutHistory?: () => void;
     shortcutBar?: ShortcutBarConfig;
-    presentation?: "modal" | "peek";
     peekMode?: "compact" | "standard" | "wide" | "full";
     peekWidth?: number;
     onPeekModeChange?: (mode: "compact" | "standard" | "wide" | "full") => void;
@@ -79,13 +78,11 @@ export function CardModal({
     onRetryHistorySave,
     onCloseWithoutHistory,
     shortcutBar,
-    presentation = "modal",
     peekMode = "standard",
     peekWidth = 720,
     onPeekModeChange,
     onPeekResizeStart,
 }: CardModalProps) {
-    const isPeek = presentation === "peek";
     const {
         content,
         setContent,
@@ -317,7 +314,7 @@ export function CardModal({
         hasPendingChangesRef,
         hasAutoSavedEditsRef,
         clearAutoSaveTimers,
-        trapFocus: !isPeek,
+        trapFocus: false,
     });
 
     const syncActiveShortcutDescriptor = useCallback(() => {
@@ -712,19 +709,40 @@ export function CardModal({
         []
     );
 
-    const detailContent = (
+    const computedWidth = peekMode === "full" ? "calc(100vw - 24px)" : `${peekWidth}px`;
+
+    return (
+        <aside
+            className="fixed bottom-0 right-0 top-0 z-[80] flex w-full flex-col border-l border-slate-200 bg-white shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-800 md:w-[var(--card-peek-width)]"
+            style={{ "--card-peek-width": computedWidth, maxWidth: "calc(100vw - 24px)" } as CSSProperties & Record<"--card-peek-width", string>}
+            aria-label="Card detail"
+            data-testid="card-peek-root"
+        >
+            <div
+                role="separator"
+                aria-orientation="vertical"
+                onMouseDown={onPeekResizeStart}
+                className="absolute left-0 top-0 hidden h-full w-2 -translate-x-1 cursor-col-resize touch-none md:block"
+                data-testid="card-peek-resize-handle"
+            >
+                <div className="mx-auto h-full w-px bg-slate-200 hover:bg-sky-400" />
+            </div>
+            <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800/95">
+                <button
+                    type="button"
+                    onClick={() => onPeekModeChange?.(peekMode === "full" ? "standard" : "full")}
+                    className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                    data-testid="card-peek-toggle-full"
+                    aria-label={peekMode === "full" ? "標準幅に戻す" : "最大化"}
+                >
+                    {peekMode === "full" ? "Std" : "Full"}
+                </button>
+            </div>
             <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className={
-                    isPeek
-                        ? "relative h-full min-h-0 w-full bg-white outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
-                        : "relative z-10 h-full max-h-[100dvh] sm:h-[90vh] sm:max-h-[90vh] w-full max-w-6xl rounded-none sm:rounded-2xl bg-white shadow-2xl outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
-                }
-                role={isPeek ? undefined : "dialog"}
-                aria-modal={isPeek ? undefined : true}
-                aria-labelledby="modal-title"
-                data-testid={isPeek ? "card-peek-detail" : "card-modal-root"}
+                className="relative h-full min-h-0 w-full bg-white outline-none dark:bg-gray-800 flex flex-col overflow-hidden"
+                data-testid="card-peek-detail"
                 onClick={(e) => e.stopPropagation()}
                 onFocusCapture={(event) => {
                     if (isLoading || isHistoryPreviewing) {
@@ -1019,51 +1037,6 @@ export function CardModal({
                     )}
                 </div>
             </div>
-    );
-
-    if (isPeek) {
-        const computedWidth = peekMode === "full" ? "calc(100vw - 24px)" : `${peekWidth}px`;
-        return (
-            <aside
-                className="fixed bottom-0 right-0 top-0 z-[80] flex w-full flex-col border-l border-slate-200 bg-white shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-800 md:w-[var(--card-peek-width)]"
-                style={{ "--card-peek-width": computedWidth, maxWidth: "calc(100vw - 24px)" } as CSSProperties & Record<"--card-peek-width", string>}
-                aria-label="Card detail"
-                data-testid="card-peek-root"
-            >
-                <div
-                    role="separator"
-                    aria-orientation="vertical"
-                    onMouseDown={onPeekResizeStart}
-                    className="absolute left-0 top-0 hidden h-full w-2 -translate-x-1 cursor-col-resize touch-none md:block"
-                    data-testid="card-peek-resize-handle"
-                >
-                    <div className="mx-auto h-full w-px bg-slate-200 hover:bg-sky-400" />
-                </div>
-                <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800/95">
-                    <button
-                        type="button"
-                        onClick={() => onPeekModeChange?.(peekMode === "full" ? "standard" : "full")}
-                        className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                        data-testid="card-peek-toggle-full"
-                        aria-label={peekMode === "full" ? "標準幅に戻す" : "最大化"}
-                    >
-                        {peekMode === "full" ? "Std" : "Full"}
-                    </button>
-                </div>
-                {detailContent}
-            </aside>
-        );
-    }
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:items-center sm:p-4" role="presentation">
-            <div
-                aria-hidden="true"
-                className="absolute inset-0 bg-black/50"
-                onClick={requestClose}
-                data-testid="card-modal-overlay"
-            />
-            {detailContent}
-        </div>
+        </aside>
     );
 }

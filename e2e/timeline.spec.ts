@@ -117,7 +117,7 @@ async function countVisibleTaskItemHandles(modal: Locator): Promise<number> {
 }
 
 function cardDetailRoot(page: Page): Locator {
-  return page.getByTestId('card-peek-root').or(page.locator('[role="dialog"]'));
+  return page.getByTestId('card-peek-root');
 }
 
 async function clearLastBlockAction(page: Page): Promise<void> {
@@ -1048,11 +1048,11 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(overdueOne).toHaveAttribute('data-selected', 'true');
       await expect(overdueTwo).toHaveAttribute('data-selected', 'true');
       await page.getByTestId(`cardOpenButton-overdue-${cards[3].id}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await expect(overdueOne).toHaveAttribute('data-selected', 'true');
       await expect(overdueTwo).toHaveAttribute('data-selected', 'true');
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
     }
@@ -1792,9 +1792,9 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByTestId(`completed-badge-${completedBCardId}`)).toHaveText('B');
       await expect(page.getByTestId(`completed-badge-${completedEventCardId}`)).toHaveText('A');
       await page.getByTestId(`cardOpenButton-timeline-${completedEventCardId}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
       await expect(page.getByTestId(`ab-card-${activeACardId}`).first()).toBeVisible();
       await expect(page.getByTestId(`ab-card-${activeBCardId}`).first()).toBeVisible();
 
@@ -2400,9 +2400,9 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(searchToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(searchPanel).toBeVisible();
       await page.getByTestId(`cardOpenButton-search-${bucketCardId}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', [overdueCardId, bucketCardId]);
     }
@@ -2577,7 +2577,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await titleDisplay.click();
       const titleInput = listCard.getByTestId('timeline-card-title-input');
       await expect(titleInput).toBeVisible();
-      await expect(page.getByTestId('card-modal-overlay')).toHaveCount(0);
+      await expect(page.getByTestId('card-peek-root')).toHaveCount(0);
 
       await titleInput.fill(renamedTitle);
       await titleInput.dispatchEvent('compositionstart');
@@ -2606,11 +2606,11 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.getByTestId('desktop-sidebar-overdue-panel-toggle').focus();
       await listCard.click({ position: { x: 24, y: 24 } });
-      await expect(page.getByTestId('card-modal-overlay')).toHaveCount(0);
+      await expect(page.getByTestId('card-peek-root')).toHaveCount(0);
       await listCard.getByTestId(`cardOpenButton-overdue-${cardId}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
 
       await page.setViewportSize({ width: 393, height: 852 });
       await page.goto(`${boardContext.canonicalPath}?pp=overdue&mp=list`);
@@ -2619,9 +2619,9 @@ test.describe('@feature:timeline Timeline view', () => {
       await mobileCard.getByTestId('timeline-card-title-display').click();
       await expect(mobileCard.getByTestId('timeline-card-title-input')).toHaveCount(0);
       await mobileCard.getByTestId(`cardOpenButton-overdue-${cardId}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
     } finally {
       await page.unroute(new RegExp(`/api/boards/${boardContext.boardId}/cards/${cardId}$`));
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
@@ -2760,9 +2760,9 @@ test.describe('@feature:timeline Timeline view', () => {
       await mobileEvent.scrollIntoViewIfNeeded();
       await expect(mobileEvent).toBeVisible({ timeout: 20_000 });
       await mobileEvent.getByTestId(`cardOpenButton-mobile-timeline-${cardId}`).click();
-      await expect(page.getByTestId('card-modal-overlay')).toBeVisible();
+      await expect(page.getByTestId('card-peek-root')).toBeVisible();
       await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-modal-overlay')).toBeHidden();
+      await expect(page.getByTestId('card-peek-root')).toBeHidden();
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

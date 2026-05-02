@@ -30,7 +30,6 @@ import type { TimelineViewportState } from "@/app/(board)/_components/timeline/t
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
-const CARD_PEEK_V2_ENABLED = process.env.NEXT_PUBLIC_CARD_PEEK_V2 !== "false";
 
 export type TimelineBoardScreenContentProps = Omit<
   TimelineBoardScreenProps,
@@ -219,13 +218,10 @@ export type UseTimelineBoardScreenArgs = {
   handleCardModalDelete: (cardId: string) => Promise<boolean>;
   handleRestoreCard: (cardId: string) => Promise<boolean>;
   closeCardModal: () => void;
-  openStandardModalForCurrentCard: () => void;
   historySaveWarning: string | null;
   retryHistorySave: () => void;
   closeModalWithoutHistory: () => void;
   cardModalError: string | null;
-  cardOpenSource: string | null;
-  forceStandardModal: boolean;
   data: TimelineResponse | null;
   moveCardByDayOffset: (cardId: string, offset: number) => Promise<boolean>;
   overdueSortOrder: OverdueSortOrder;
@@ -404,13 +400,10 @@ export function useTimelineBoardScreen({
   handleCardModalDelete,
   handleRestoreCard,
   closeCardModal,
-  openStandardModalForCurrentCard,
   historySaveWarning,
   retryHistorySave,
   closeModalWithoutHistory,
   cardModalError,
-  cardOpenSource,
-  forceStandardModal,
   data,
   moveCardByDayOffset,
   overdueSortOrder,
@@ -684,24 +677,9 @@ export function useTimelineBoardScreen({
     shortcutBarProps: {
       maxVisibleItems: 5,
     } satisfies ShortcutBarConfig,
-    parentPanelProps:
-      modalCard &&
-      (cardModalStatus === "ready" || cardModalStatus === "loading") &&
-      modalCard.is_parent &&
-      !CARD_PEEK_V2_ENABLED &&
-      !forceStandardModal &&
-      cardOpenSource !== "context-menu"
-        ? {
-            parentCard: modalCard,
-            onClose: closeCardModal,
-            onOpenAsCardModal: openStandardModalForCurrentCard,
-            onOpenCardModal: openCardModal,
-          }
-        : null,
     modalProps:
       modalCard &&
-      (cardModalStatus === "ready" || cardModalStatus === "loading") &&
-      (CARD_PEEK_V2_ENABLED || !modalCard.is_parent || forceStandardModal || cardOpenSource === "context-menu")
+      (cardModalStatus === "ready" || cardModalStatus === "loading")
         ? {
             card: modalCard,
             boards: availableBoards,

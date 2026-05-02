@@ -25,11 +25,9 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     const [modalCardOverride, setModalCardOverride] = useState<Card | null>(null);
     const [cardModalStatus, setCardModalStatus] = useState<CardModalStatus>('idle');
     const [cardModalError, setCardModalError] = useState<string | null>(null);
-    const [isModalClosing, setIsModalClosing] = useState(false);
+    const [isCardPeekClosing, setIsCardPeekClosing] = useState(false);
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
     const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
-    const [cardOpenSource, setCardOpenSource] = useState<string | null>(null);
-    const [forceStandardModal, setForceStandardModal] = useState(false);
 
     const cardModalShortIdRef = useRef<string | null>(null);
     const cardModalStatusRef = useRef<CardModalStatus>('idle');
@@ -46,21 +44,13 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         console.log('[timeline] openCardModal', { shortId, source: debugSource });
 
         // Instant open via local state
-        setCardOpenSource(debugSource ?? null);
-        setForceStandardModal(debugSource === "context-menu");
         setActiveCardId(shortId);
         setCardInUrl(shortId, { method: 'push' });
     }, [dataMode, setCardInUrl]);
 
-    const openStandardModalForCurrentCard = useCallback(() => {
-        setForceStandardModal(true);
-    }, []);
-
     const closeCardModal = useCallback(() => {
-        setIsModalClosing(true);
+        setIsCardPeekClosing(true);
         setActiveCardId(null);
-        setCardOpenSource(null);
-        setForceStandardModal(false);
         cardModalShortIdRef.current = null;
         setModalCardOverride(null);
         setCardModalStatus('idle');
@@ -70,7 +60,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
 
 
     const modalCardFromData = useMemo(() => {
-        if (isModalClosing) return null;
+        if (isCardPeekClosing) return null;
         const targetShortId = activeCardId || cardIdFromUrl;
         if (!targetShortId || !data) return null;
 
@@ -202,7 +192,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         }
 
         return null;
-    }, [data, activeCardId, cardIdFromUrl, initialBoard.id, isModalClosing]);
+    }, [data, activeCardId, cardIdFromUrl, initialBoard.id, isCardPeekClosing]);
 
     const modalCard = useMemo(
         () => modalCardOverride ?? modalCardFromData,
@@ -227,7 +217,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     // 2. Load Full Card Data: Fetch only when ID changes or modal opens
     useEffect(() => {
         if (!targetShortId) {
-            if (isModalClosing) setIsModalClosing(false);
+            if (isCardPeekClosing) setIsCardPeekClosing(false);
             cardModalShortIdRef.current = null;
             setModalProfiles((prev) => (prev.length ? [] : prev));
             setCardModalStatus((prev) => (prev === 'idle' ? prev : 'idle'));
@@ -235,8 +225,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
             return;
         }
 
-        if (isModalClosing) {
-            if (activeCardId) setIsModalClosing(false);
+        if (isCardPeekClosing) {
+            if (activeCardId) setIsCardPeekClosing(false);
             else return;
         }
 
@@ -319,7 +309,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isModalClosing, activeCardId, onResolveTrashedCard]);
+    }, [targetShortId, isCardPeekClosing, activeCardId, onResolveTrashedCard]);
 
     // Load Board Members
     useEffect(() => {
@@ -371,12 +361,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         cardModalError,
         setCardModalError,
         setModalCardOverride,
-        isModalClosing,
         openCardModal,
-        openStandardModalForCurrentCard,
         closeCardModal,
         modalProfiles,
-        cardOpenSource,
-        forceStandardModal,
     };
 }

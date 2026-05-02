@@ -2,7 +2,7 @@
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import clsx from "clsx";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -22,7 +22,6 @@ import {
 import MobileTimelineView from "@/app/(board)/_components/timeline/MobileTimelineView";
 import MobileListView from "@/app/(board)/_components/timeline/MobileListView";
 import MobileMonthView from "@/app/(board)/_components/timeline/MobileMonthView";
-import ParentChildPanel from "@/app/(board)/_components/timeline/ParentChildPanel";
 import { SidebarSectionShell } from "@/app/(board)/_components/timeline/SidebarSectionShell";
 import { DesktopSidebarMenu } from "@/app/(board)/_components/timeline/DesktopSidebarMenu";
 import {
@@ -72,7 +71,6 @@ type SidebarMenuBaseProps = Omit<
 >;
 type ShortcutsModalProps = ComponentProps<typeof ShortcutsModal>;
 type CardModalProps = ComponentProps<typeof CardModal>;
-type ParentChildPanelProps = ComponentProps<typeof ParentChildPanel>;
 type CardContextMenuProps = ComponentProps<typeof CardContextMenu>;
 type CardPeekMode = "compact" | "standard" | "wide" | "full";
 
@@ -141,7 +139,6 @@ export type TimelineBoardScreenProps = {
   shortcutsProps: ShortcutsModalProps;
   shortcutBarProps: ShortcutBarConfig;
   modalProps: CardModalProps | null;
-  parentPanelProps: ParentChildPanelProps | null;
   cardModalError: string | null;
   contextMenu:
     | {
@@ -214,7 +211,6 @@ export default function TimelineBoardScreen({
   shortcutsProps,
   shortcutBarProps,
   modalProps,
-  parentPanelProps,
   cardModalError,
   contextMenu,
   bucketCreateMenu,
@@ -224,7 +220,6 @@ export default function TimelineBoardScreen({
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
   const [desktopHorizontalStepRequest, setDesktopHorizontalStepRequest] = useState<HorizontalStepRequest>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
-  const cardPeekEnabled = process.env.NEXT_PUBLIC_CARD_PEEK_V2 !== "false";
   const [cardPeekMode, setCardPeekMode] = useState<CardPeekMode>("standard");
   const [cardPeekWidth, setCardPeekWidth] = useState(CARD_PEEK_WIDTHS.standard);
   const previousPeekLayoutRef = useRef<{ mode: CardPeekMode; width: number }>({
@@ -250,12 +245,12 @@ export default function TimelineBoardScreen({
   }, []);
 
   useEffect(() => {
-    if (!cardPeekEnabled || !modalProps || typeof window === "undefined") return;
+    if (!modalProps || typeof window === "undefined") return;
     window.localStorage.setItem(
       CARD_PEEK_STORAGE_KEY,
       JSON.stringify({ mode: cardPeekMode, widthPx: cardPeekWidth }),
     );
-  }, [cardPeekEnabled, cardPeekMode, cardPeekWidth, modalProps]);
+  }, [cardPeekMode, cardPeekWidth, modalProps]);
 
   const handleCardPeekModeChange = useCallback((mode: CardPeekMode) => {
     setCardPeekMode((currentMode) => {
@@ -360,6 +355,8 @@ export default function TimelineBoardScreen({
     "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 hover:bg-slate-50";
   const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
   const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "2.5rem";
+  const shouldReserveCardPeekSpace = modalProps && (cardPeekMode === "compact" || cardPeekMode === "standard");
+  const cardPeekReservedWidth = shouldReserveCardPeekSpace ? `${cardPeekWidth}px` : "0px";
 
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
@@ -765,7 +762,8 @@ export default function TimelineBoardScreen({
   return (
     <div className="h-screen overflow-x-hidden bg-[#f4f5f7]">
       <div
-        className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4"
+        className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 transition-[padding-right] duration-200 md:px-4 md:pb-4 md:pr-[calc(1rem+var(--card-peek-reserved-width))] xl:px-6 xl:pb-4 xl:pr-[calc(1.5rem+var(--card-peek-reserved-width))] 2xl:px-8 2xl:pb-4 2xl:pr-[calc(2rem+var(--card-peek-reserved-width))]"
+        style={{ "--card-peek-reserved-width": cardPeekReservedWidth } as CSSProperties & Record<"--card-peek-reserved-width", string>}
         onKeyDownCapture={(event) => {
           handleTimelineCardArrowFocus(event);
         }}
@@ -918,11 +916,9 @@ export default function TimelineBoardScreen({
 
         <TimelineBoardDialogs {...dialogsProps} />
         <ShortcutsModal {...shortcutsProps} />
-        {!cardPeekEnabled && parentPanelProps ? <ParentChildPanel {...parentPanelProps} /> : null}
         {modalProps ? (
           <CardModal
             {...modalProps}
-            presentation={cardPeekEnabled ? "peek" : "modal"}
             peekMode={cardPeekMode}
             peekWidth={cardPeekWidth}
             onPeekModeChange={handleCardPeekModeChange}
