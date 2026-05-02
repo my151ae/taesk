@@ -30,6 +30,7 @@ import type { TimelineViewportState } from "@/app/(board)/_components/timeline/t
 
 type ViewModels = ReturnType<typeof useTimelineBoardViewModels>;
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
+const CARD_PEEK_V2_ENABLED = process.env.NEXT_PUBLIC_CARD_PEEK_V2 !== "false";
 
 export type TimelineBoardScreenContentProps = Omit<
   TimelineBoardScreenProps,
@@ -687,6 +688,7 @@ export function useTimelineBoardScreen({
       modalCard &&
       (cardModalStatus === "ready" || cardModalStatus === "loading") &&
       modalCard.is_parent &&
+      !CARD_PEEK_V2_ENABLED &&
       !forceStandardModal &&
       cardOpenSource !== "context-menu"
         ? {
@@ -699,7 +701,7 @@ export function useTimelineBoardScreen({
     modalProps:
       modalCard &&
       (cardModalStatus === "ready" || cardModalStatus === "loading") &&
-      (!modalCard.is_parent || forceStandardModal || cardOpenSource === "context-menu")
+      (CARD_PEEK_V2_ENABLED || !modalCard.is_parent || forceStandardModal || cardOpenSource === "context-menu")
         ? {
             card: modalCard,
             boards: availableBoards,

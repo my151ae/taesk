@@ -22,6 +22,7 @@ type UseCardModalLifecycleArgs = {
   hasPendingChangesRef: React.MutableRefObject<boolean>;
   hasAutoSavedEditsRef: React.MutableRefObject<boolean>;
   clearAutoSaveTimers: () => void;
+  trapFocus?: boolean;
 };
 
 export function useCardModalLifecycle({
@@ -41,6 +42,7 @@ export function useCardModalLifecycle({
   hasPendingChangesRef,
   hasAutoSavedEditsRef,
   clearAutoSaveTimers,
+  trapFocus = true,
 }: UseCardModalLifecycleArgs) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
@@ -110,9 +112,10 @@ export function useCardModalLifecycle({
       (focusable[0] ?? dialog).focus();
     };
 
-    const trapFocus = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       const dialog = dialogRef.current;
       if (!dialog) return;
+      if (!trapFocus && !dialog.contains(document.activeElement)) return;
 
       if (event.key === "Escape") {
         event.preventDefault();
@@ -120,6 +123,7 @@ export function useCardModalLifecycle({
         return;
       }
 
+      if (!trapFocus) return;
       if (event.key !== "Tab") return;
 
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
@@ -154,18 +158,20 @@ export function useCardModalLifecycle({
       }
     };
 
-    document.addEventListener("keydown", trapFocus);
-    focusFirstElement();
+    document.addEventListener("keydown", handleKeyDown);
+    if (trapFocus) {
+      focusFirstElement();
+    }
 
     return () => {
-      document.removeEventListener("keydown", trapFocus);
+      document.removeEventListener("keydown", handleKeyDown);
       clearExpandedHiddenRuns();
       clearAutoSaveTimers();
-      if (previousActiveElement && document.body.contains(previousActiveElement)) {
+      if (trapFocus && previousActiveElement && document.body.contains(previousActiveElement)) {
         previousActiveElement.focus();
       }
     };
-  }, [clearAutoSaveTimers, clearExpandedHiddenRuns]);
+  }, [clearAutoSaveTimers, clearExpandedHiddenRuns, trapFocus]);
 
   return {
     dialogRef,

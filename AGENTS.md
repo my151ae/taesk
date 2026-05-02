@@ -14,6 +14,7 @@
 > **最優先ルール（テスト・ログ取得）**
 > - `npm run dev` / `NODE_ENV=test npm run dev` の起動前には、既存の Next.js 開発サーバーが残っていないか確認すること。意図せず `3001`, `3002` などへ退避起動させない。
 > - すべての検証・テストは `npx playwright test --reporter=json` のように **必ず JSON レポートを出力**して解析すること。
+> - 長い Playwright spec や UI 変更の検証では、全体 spec を1本の JSON reporter で長時間走らせず、先に `--list` で対象テストを確認し、`-g` などで focused shard に分割して JSON ファイルを複数出すこと。JSON reporter は終了までファイルが 0 byte のままになり得るため、進捗確認可能な単位に分ける。
 > - テスト結果やログ確認で停止せずに済むよう、JSON ファイルを生成したうえで内容を確認し、失敗時は詳細を抽出する。
 
 ## Design & Responsive Guidelines
@@ -47,13 +48,15 @@
 lsof -i :3000
 zsh -lic 'npm run lint'
 zsh -lic 'npm run build'
-zsh -lic 'PW_WORKERS=1 npx playwright test --reporter=json > test-results/playwright-report.json'
-cat test-results/playwright-report.json | jq '.stats'
+zsh -lic 'PW_WORKERS=1 npx playwright test e2e/timeline.spec.ts --list'
+zsh -lic 'PW_WORKERS=1 npx playwright test e2e/timeline.spec.ts -g "card|modal|peek" --reporter=json > test-results/playwright-card-detail.json'
+cat test-results/playwright-card-detail.json | jq '.stats'
 ```
 
 ## Testing Guidelines
 - `npm run dev` や Playwright 実行前に `lsof -i :3000` で Next.js サーバーが残っていないか確認すること。
 - 既存サーバーを使い回さない場合は、先に停止してから起動すること。`3001` 以降への自動退避を許容しない。
+- Playwright の長い spec は `--list` でテスト名を確認してから、機能単位の `-g` 実行へ分割すること。各 shard は `test-results/<scope>.json` のように別ファイルへ保存し、それぞれ `jq '.stats'` と失敗詳細を確認する。
 - 検証が必要な場合は Playwright 実行後に chrome-devtools MCP を使ってログ・スナップショットを取得する。
 - Playwright が pass しても完了扱いにせず、**必ず browser console の runtime error / hydration error / React error (`Maximum update depth exceeded` など) を確認すること。** console error が残っている場合は、原因特定と解消、または未解消理由の明記まで行う。
 - Timeline / List / Month の UI 変更では、focused E2E 実行後に browser console を確認し、エラー 0 件を確認するまで終了しないこと。

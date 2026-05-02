@@ -116,6 +116,10 @@ async function countVisibleTaskItemHandles(modal: Locator): Promise<number> {
   return visibleCount;
 }
 
+function cardDetailRoot(page: Page): Locator {
+  return page.getByTestId('card-peek-root').or(page.locator('[role="dialog"]'));
+}
+
 async function clearLastBlockAction(page: Page): Promise<void> {
   await page.evaluate(() => {
     delete (window as typeof window & {
@@ -1372,7 +1376,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(light2).not.toContainText(/\d{2}:\d{2} - \d{2}:\d{2}\[\d+h( \d+m)?\]/);
 
       await split1.click();
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 500 });
+      await expect(cardDetailRoot(page)).not.toBeVisible({ timeout: 500 });
 
       const split1AfterFocus = await split1.evaluate((el) => {
         const host = el.parentElement as HTMLElement | null;
@@ -1386,9 +1390,9 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(Number(split1AfterFocus)).toBeGreaterThan(Number(split2AfterFocus));
 
       await split1.click();
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+      await expect(cardDetailRoot(page)).toBeVisible({ timeout: 10_000 });
       await page.keyboard.press('Escape');
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+      await expect(cardDetailRoot(page)).not.toBeVisible({ timeout: 10_000 });
 
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(boardContext.canonicalPath);
@@ -3392,7 +3396,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -3483,7 +3487,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -3595,7 +3599,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -3657,7 +3661,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -3747,7 +3751,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      let modal = page.getByRole('dialog');
+      let modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const firstMetrics = await readMetrics(modal);
@@ -3756,7 +3760,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.goto(boardContext.canonicalPath);
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      modal = page.getByRole('dialog');
+      modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const reopenedMetrics = await readMetrics(modal);
@@ -3813,7 +3817,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -3960,7 +3964,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${sourceShortId}`);
-      const sourceModal = page.getByRole('dialog');
+      const sourceModal = cardDetailRoot(page);
       await expect(sourceModal).toBeVisible();
       const sourceEditor = sourceModal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -3971,7 +3975,7 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(payload.plainText).toContain(':::details');
 
       await page.goto(`${boardContext.canonicalPath}?card=${targetShortId}`);
-      const targetModal = page.getByRole('dialog');
+      const targetModal = cardDetailRoot(page);
       await expect(targetModal).toBeVisible();
       const targetEditor = targetModal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -4053,7 +4057,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(page.getByRole('heading', { name: boardContext.boardName })).toBeVisible();
 
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -4125,7 +4129,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const openSidebarToggle = modal.locator('button[title="Show details"]');
@@ -4230,7 +4234,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
 
@@ -4288,7 +4292,7 @@ test.describe('@feature:timeline Timeline view', () => {
       }, { timeout: 20_000 });
 
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const reopenedModal = page.getByRole('dialog');
+      const reopenedModal = cardDetailRoot(page);
       await expect(reopenedModal).toBeVisible();
       const signResponse = await signResponsePromise;
       expect(signResponse.ok(), `image sign API failed: ${signResponse.status()}`).toBeTruthy();
@@ -4357,7 +4361,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const firstParagraph = modal.locator('.ProseMirror > p').nth(0);
@@ -4505,7 +4509,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
@@ -4650,7 +4654,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
@@ -4783,7 +4787,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
@@ -4901,7 +4905,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       const firstChecklistLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li:first-child p').first();
@@ -4981,7 +4985,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5064,7 +5068,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5142,7 +5146,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5215,7 +5219,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5307,7 +5311,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5378,7 +5382,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.locator('[data-sticky-title] textarea').first();
@@ -5490,7 +5494,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.keyboard.press('Enter');
 
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       await expect(boardBar).toHaveCount(0);
 
@@ -5595,7 +5599,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await page.keyboard.press('Enter');
 
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       await expect(boardBar).toHaveCount(0);
       await page.keyboard.press('Escape');
@@ -5689,7 +5693,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
@@ -5719,7 +5723,7 @@ test.describe('@feature:timeline Timeline view', () => {
       expect(detailsNode?.attrs?.open).toBe(false);
 
       await page.reload();
-      const reopenedModal = page.getByRole('dialog');
+      const reopenedModal = cardDetailRoot(page);
       await expect(reopenedModal).toBeVisible();
       await expect(reopenedModal.locator('.ProseMirror summary').first()).toContainText('詳細');
       await expect(reopenedModal.locator('.ProseMirror div[data-type="detailsContent"][hidden]').first()).toBeAttached();
@@ -5775,7 +5779,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       await page.evaluate(() => {
@@ -5874,7 +5878,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
@@ -5941,7 +5945,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
@@ -6038,7 +6042,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const handles = modal.getByTestId('tiptap-block-handle');
       const paragraphHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]');
@@ -6135,7 +6139,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const paragraphHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]');
       await expect(paragraphHandles).toHaveCount(2);
@@ -6232,7 +6236,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const headingHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first();
       const headingHandlePos = await headingHandle.getAttribute('data-block-pos');
@@ -6325,7 +6329,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       await clearLastBlockAction(page);
 
@@ -6414,7 +6418,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const paragraphHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]').first();
@@ -6508,7 +6512,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const detailsHandle = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="details"]').first();
@@ -6604,7 +6608,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const listItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="listItem"]');
@@ -6710,7 +6714,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const topTaskItems = modal.locator('.ProseMirror > ul[data-type="taskList"] > li');
@@ -6860,7 +6864,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const taskItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
@@ -6966,7 +6970,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const taskItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
@@ -7079,7 +7083,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       await modal.locator('.ProseMirror h2').click();
@@ -7182,7 +7186,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       await modal.locator('.ProseMirror > ul[data-type="taskList"] > li:nth-child(2) > div > p').click();
@@ -7311,7 +7315,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const parentTaskItem = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
@@ -7440,7 +7444,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       await modal.locator('.ProseMirror > ul[data-type="taskList"] > li > div > ul[data-type="taskList"] > li:nth-child(2) > div > p').click();
@@ -7549,7 +7553,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const listItemHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="listItem"]');
@@ -7678,7 +7682,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       expect(await countVisibleTaskItemHandles(modal)).toBe(2);
@@ -7752,7 +7756,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const checkedTaskLine = modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first();
@@ -7936,7 +7940,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
@@ -8080,7 +8084,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const topTaskList = modal.locator('.ProseMirror > ul[data-type="taskList"]').first();
@@ -8197,7 +8201,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
@@ -8338,7 +8342,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
@@ -8510,7 +8514,7 @@ test.describe('@feature:timeline Timeline view', () => {
     try {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const completedLinesPanel = modal.getByTestId('card-modal-completed-lines-panel');
@@ -8543,10 +8547,10 @@ test.describe('@feature:timeline Timeline view', () => {
       }, { timeout: 5000, intervals: [500, 1000] }).toBe(savedBeforePreviewToggle?.updatedAt ?? null);
 
       await page.goto(boardContext.canonicalPath);
-      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(cardDetailRoot(page)).toHaveCount(0);
 
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const reopenedModal = page.getByRole('dialog');
+      const reopenedModal = cardDetailRoot(page);
       await expect(reopenedModal).toBeVisible();
       const reopenedCompletedLinesPanel = reopenedModal.getByTestId('card-modal-completed-lines-panel');
       if (!(await reopenedCompletedLinesPanel.isVisible())) {
@@ -8611,7 +8615,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       await openBlockActionMenu(page, modal, modal.getByTestId('tiptap-block-handle').first());
@@ -8672,7 +8676,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
 
       const titleInput = modal.getByTestId('card-modal-title-input');
@@ -8743,7 +8747,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
     try {
       await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
-      const modal = page.getByRole('dialog');
+      const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const bodyEditor = modal.locator('.ProseMirror[data-autofocus="true"]').first();
       await bodyEditor.click();

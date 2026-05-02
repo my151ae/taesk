@@ -2,7 +2,7 @@
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import clsx from "clsx";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -74,6 +74,7 @@ type ShortcutsModalProps = ComponentProps<typeof ShortcutsModal>;
 type CardModalProps = ComponentProps<typeof CardModal>;
 type ParentChildPanelProps = ComponentProps<typeof ParentChildPanel>;
 type CardContextMenuProps = ComponentProps<typeof CardContextMenu>;
+type CardPeekMode = "compact" | "standard" | "wide" | "full";
 
 type ParseResult = { ok: true } | { ok: false; code: string };
 type TabItem = { key: "timeline" | "list" | "month"; label: string };
@@ -178,6 +179,30 @@ function TimelineLoadingPlaceholder() {
   );
 }
 
+const CARD_PEEK_WIDTHS: Record<Exclude<CardPeekMode, "full">, number> = {
+  compact: 360,
+  standard: 720,
+  wide: 1040,
+};
+const CARD_PEEK_STORAGE_KEY = "taesk.cardPeek.layout.v1";
+const CARD_PEEK_SNAP_TOLERANCE = 48;
+const CARD_PEEK_MIN_WIDTH = 320;
+const CARD_PEEK_MAX_WIDTH = 1280;
+
+const clampPeekWidth = (width: number) => Math.min(CARD_PEEK_MAX_WIDTH, Math.max(CARD_PEEK_MIN_WIDTH, Math.round(width)));
+
+const resolveModeFromWidth = (width: number): Exclude<CardPeekMode, "full"> | null => {
+  const candidates: Array<{ mode: Exclude<CardPeekMode, "full">; width: number }> = [
+    { mode: "compact", width: CARD_PEEK_WIDTHS.compact },
+    { mode: "standard", width: CARD_PEEK_WIDTHS.standard },
+    { mode: "wide", width: CARD_PEEK_WIDTHS.wide },
+  ];
+  const nearest = candidates.reduce((best, candidate) =>
+    Math.abs(candidate.width - width) < Math.abs(best.width - width) ? candidate : best,
+  );
+  return Math.abs(nearest.width - width) <= CARD_PEEK_SNAP_TOLERANCE ? nearest.mode : null;
+};
+
 export default function TimelineBoardScreen({
   parseResult,
   onResetInvalidUrl,
@@ -199,6 +224,81 @@ export default function TimelineBoardScreen({
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
   const [desktopHorizontalStepRequest, setDesktopHorizontalStepRequest] = useState<HorizontalStepRequest>(null);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+  const cardPeekEnabled = process.env.NEXT_PUBLIC_CARD_PEEK_V2 !== "false";
+  const [cardPeekMode, setCardPeekMode] = useState<CardPeekMode>("standard");
+  const [cardPeekWidth, setCardPeekWidth] = useState(CARD_PEEK_WIDTHS.standard);
+  const previousPeekLayoutRef = useRef<{ mode: CardPeekMode; width: number }>({
+    mode: "standard",
+    width: CARD_PEEK_WIDTHS.standard,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(CARD_PEEK_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { mode?: CardPeekMode; widthPx?: number };
+      if (parsed.mode === "compact" || parsed.mode === "standard" || parsed.mode === "wide" || parsed.mode === "full") {
+        setCardPeekMode(parsed.mode);
+      }
+      if (typeof parsed.widthPx === "number" && Number.isFinite(parsed.widthPx)) {
+        setCardPeekWidth(clampPeekWidth(parsed.widthPx));
+      }
+    } catch {
+      window.localStorage.removeItem(CARD_PEEK_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!cardPeekEnabled || !modalProps || typeof window === "undefined") return;
+    window.localStorage.setItem(
+      CARD_PEEK_STORAGE_KEY,
+      JSON.stringify({ mode: cardPeekMode, widthPx: cardPeekWidth }),
+    );
+  }, [cardPeekEnabled, cardPeekMode, cardPeekWidth, modalProps]);
+
+  const handleCardPeekModeChange = useCallback((mode: CardPeekMode) => {
+    setCardPeekMode((currentMode) => {
+      if (mode === "full") {
+        previousPeekLayoutRef.current = { mode: currentMode, width: cardPeekWidth };
+        return "full";
+      }
+      if (currentMode === "full" && mode === "standard") {
+        const previous = previousPeekLayoutRef.current;
+        setCardPeekWidth(previous.width);
+        return previous.mode === "full" ? "standard" : previous.mode;
+      }
+      setCardPeekWidth(CARD_PEEK_WIDTHS[mode]);
+      return mode;
+    });
+  }, [cardPeekWidth]);
+
+  const handleCardPeekResizeStart = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (cardPeekMode === "full") return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = cardPeekWidth;
+    let latestWidth = startWidth;
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const nextWidth = clampPeekWidth(startWidth + startX - moveEvent.clientX);
+      latestWidth = nextWidth;
+      setCardPeekWidth(nextWidth);
+    };
+
+    const handleUp = () => {
+      const snappedMode = resolveModeFromWidth(latestWidth);
+      if (snappedMode) {
+        setCardPeekMode(snappedMode);
+        setCardPeekWidth(CARD_PEEK_WIDTHS[snappedMode]);
+      }
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  }, [cardPeekMode, cardPeekWidth]);
 
   const setBoardShortcutContextFromTarget = useCallback((target: EventTarget | null) => {
     const nextDescriptor = getShortcutContextFromTarget(target);
@@ -818,8 +918,17 @@ export default function TimelineBoardScreen({
 
         <TimelineBoardDialogs {...dialogsProps} />
         <ShortcutsModal {...shortcutsProps} />
-        {parentPanelProps ? <ParentChildPanel {...parentPanelProps} /> : null}
-        {modalProps ? <CardModal {...modalProps} /> : null}
+        {!cardPeekEnabled && parentPanelProps ? <ParentChildPanel {...parentPanelProps} /> : null}
+        {modalProps ? (
+          <CardModal
+            {...modalProps}
+            presentation={cardPeekEnabled ? "peek" : "modal"}
+            peekMode={cardPeekMode}
+            peekWidth={cardPeekWidth}
+            onPeekModeChange={handleCardPeekModeChange}
+            onPeekResizeStart={handleCardPeekResizeStart}
+          />
+        ) : null}
         {cardModalError ? (
           <div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
             {cardModalError}
