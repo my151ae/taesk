@@ -2,7 +2,7 @@
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import clsx from "clsx";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -355,8 +355,6 @@ export default function TimelineBoardScreen({
     "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 hover:bg-slate-50";
   const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
   const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "2.5rem";
-  const shouldReserveCardPeekSpace = modalProps && (cardPeekMode === "compact" || cardPeekMode === "standard");
-  const cardPeekReservedWidth = shouldReserveCardPeekSpace ? `${cardPeekWidth}px` : "0px";
 
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
@@ -762,8 +760,7 @@ export default function TimelineBoardScreen({
   return (
     <div className="h-screen overflow-x-hidden bg-[#f4f5f7]">
       <div
-        className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 transition-[padding-right] duration-200 md:px-4 md:pb-4 md:pr-[calc(1rem+var(--card-peek-reserved-width))] xl:px-6 xl:pb-4 xl:pr-[calc(1.5rem+var(--card-peek-reserved-width))] 2xl:px-8 2xl:pb-4 2xl:pr-[calc(2rem+var(--card-peek-reserved-width))]"
-        style={{ "--card-peek-reserved-width": cardPeekReservedWidth } as CSSProperties & Record<"--card-peek-reserved-width", string>}
+        className="box-border flex h-full w-full flex-col gap-0 px-3 pb-4 md:px-4 md:pb-4 xl:px-6 xl:pb-4 2xl:px-8 2xl:pb-4"
         onKeyDownCapture={(event) => {
           handleTimelineCardArrowFocus(event);
         }}
