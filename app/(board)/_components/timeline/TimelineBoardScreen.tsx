@@ -335,10 +335,6 @@ export default function TimelineBoardScreen({
   }, []);
 
   const syncBoardShortcutContextFromActiveElement = useCallback(() => {
-    if (modalProps) {
-      setDesktopShortcutDescriptor(null);
-      return;
-    }
     const scope = desktopScopeRef.current;
     const activeElement = document.activeElement;
     if (!(scope && activeElement instanceof Element) || !scope.contains(activeElement)) {
@@ -353,7 +349,6 @@ export default function TimelineBoardScreen({
   }, [modalProps, syncBoardShortcutContextFromActiveElement]);
 
   const boardShortcutPayload = useMemo(() => {
-    if (modalProps) return createEmptyShortcutBarPayload("board");
     if (contextMenu.open && contextMenu.cardId) {
       const sourceCard = typeof document !== "undefined"
         ? document.querySelector(`[data-card-id="${contextMenu.cardId}"]`)
@@ -377,12 +372,14 @@ export default function TimelineBoardScreen({
         state: "active",
       }) ?? createEmptyShortcutBarPayload("context-menu");
     }
-    if (!desktopShortcutDescriptor) return createEmptyShortcutBarPayload("board");
+    if (!desktopShortcutDescriptor) {
+      return createEmptyShortcutBarPayload("board");
+    }
     return resolveShortcutBarPayload({
       ...desktopShortcutDescriptor,
       state: "active",
     }) ?? createEmptyShortcutBarPayload("board");
-  }, [bucketCreateMenu.open, contextMenu.cardId, contextMenu.open, desktop.activeView, desktopShortcutDescriptor, modalProps]);
+  }, [bucketCreateMenu.open, contextMenu.cardId, contextMenu.open, desktop.activeView, desktopShortcutDescriptor]);
   const activeTabClassName =
     "inline-flex h-6 shrink-0 items-center rounded-full bg-slate-200 px-3 text-[11px] font-semibold text-slate-800 shadow-sm ring-1 ring-slate-300";
   const inactiveTabClassName =
@@ -839,7 +836,6 @@ export default function TimelineBoardScreen({
             handleTimelineCardArrowFocus(event);
           }}
           onFocusCapture={(event) => {
-            if (modalProps) return;
             setBoardShortcutContextFromTarget(event.target);
           }}
           onBlurCapture={() => {
@@ -849,39 +845,37 @@ export default function TimelineBoardScreen({
             });
           }}
         >
-          {!modalProps ? (
-            <StatusShortcutBar
-              payload={boardShortcutPayload}
-              maxVisibleItems={shortcutBarProps.maxVisibleItems}
-              className="mb-0 shrink-0 rounded-t-2xl rounded-b-none border-b-0 shadow-sm ring-0"
-              dataTestId="board-shortcut-bar"
-              trailingAction={
-                <button
-                  type="button"
-                  onClick={() => setIsHeaderCollapsed((prev) => !prev)}
-                  data-focus-group="header"
-                  data-focus-part="control"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-800"
-                  aria-label={headerToggleLabel}
-                  aria-expanded={!isHeaderCollapsed}
-                  data-testid="board-header-toggle"
-                  title={headerToggleLabel}
+          <StatusShortcutBar
+            payload={boardShortcutPayload}
+            maxVisibleItems={shortcutBarProps.maxVisibleItems}
+            className="mb-0 shrink-0 rounded-t-2xl rounded-b-none border-b-0 shadow-sm ring-0"
+            dataTestId="board-shortcut-bar"
+            trailingAction={
+              <button
+                type="button"
+                onClick={() => setIsHeaderCollapsed((prev) => !prev)}
+                data-focus-group="header"
+                data-focus-part="control"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-800"
+                aria-label={headerToggleLabel}
+                aria-expanded={!isHeaderCollapsed}
+                data-testid="board-header-toggle"
+                title={headerToggleLabel}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className={clsx("h-4 w-4 transition-transform duration-200", isHeaderCollapsed && "rotate-180")}
+                  aria-hidden="true"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                    className={clsx("h-4 w-4 transition-transform duration-200", isHeaderCollapsed && "rotate-180")}
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 14.25 3.75-3.75 3.75 3.75" />
-                  </svg>
-                </button>
-              }
-            />
-          ) : null}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 14.25 3.75-3.75 3.75 3.75" />
+                </svg>
+              </button>
+            }
+          />
           {desktop.activeView === "timeline" ? (
             <>
               <DndContext

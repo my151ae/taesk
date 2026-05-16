@@ -65,7 +65,7 @@ export function StatusShortcutBar({
   return (
     <div
       className={clsx(
-        "flex h-9 items-center gap-2.5 rounded-2xl border border-slate-200 bg-white/95 px-3 shadow-sm ring-1 ring-black/5 backdrop-blur-sm",
+        "flex h-9 min-w-0 items-center gap-2.5 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 px-3 shadow-sm ring-1 ring-black/5 backdrop-blur-sm",
         className
       )}
       data-testid={dataTestId}
@@ -76,10 +76,10 @@ export function StatusShortcutBar({
       data-shortcut-bar-part={resolvedPayload.part ?? ""}
     >
       <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex items-center gap-2.5 overflow-x-auto">
+        <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">
           {visibleItems.map((item) => (
-            <div key={item.id} className="flex shrink-0 items-center gap-1.5">
-              <div className="flex items-center gap-1">
+            <div key={item.id} className="flex min-w-0 shrink items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1">
                 {item.keys.map((key, index) => (
                   <div key={`${item.id}-${key}-${index}`} className="flex items-center gap-1">
                     {index > 0 ? <span className="text-[10px] text-slate-400">+</span> : null}
@@ -87,7 +87,7 @@ export function StatusShortcutBar({
                   </div>
                 ))}
               </div>
-              <span className={clsx("text-[11px] font-medium leading-none", item.enabled ? "text-slate-700" : "text-slate-300")}>
+              <span className={clsx("min-w-0 truncate text-[11px] font-medium leading-none", item.enabled ? "text-slate-700" : "text-slate-300")}>
                 {item.label}
               </span>
             </div>

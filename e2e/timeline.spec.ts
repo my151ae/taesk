@@ -5501,7 +5501,7 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
-      await expect(boardBar).toHaveCount(0);
+      await expect(boardBar).toBeVisible();
 
       const modalBar = page.getByTestId('modal-shortcut-bar');
       await expect(modalBar).toBeVisible();
