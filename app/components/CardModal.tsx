@@ -737,39 +737,6 @@ export function CardModal({
             >
                 <div className="mx-auto h-full w-px bg-slate-200 hover:bg-sky-400" />
             </div>
-            <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800/95">
-                {(["compact", "standard", "wide"] as const).map((mode) => (
-                    <button
-                        key={mode}
-                        type="button"
-                        onClick={() => onPeekModeChange?.(mode)}
-                        className={`rounded px-2 py-1 text-xs font-medium ${
-                            peekMode === mode
-                                ? "bg-slate-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                                : "text-slate-600 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                        }`}
-                        data-testid={`card-peek-size-${mode}`}
-                        aria-label={
-                            mode === "compact"
-                                ? "Sサイズで表示"
-                                : mode === "standard"
-                                    ? "Mサイズで表示"
-                                    : "Lサイズで表示"
-                        }
-                    >
-                        {mode === "compact" ? "S" : mode === "standard" ? "M" : "L"}
-                    </button>
-                ))}
-                <button
-                    type="button"
-                    onClick={() => onPeekModeChange?.(peekMode === "full" ? "standard" : "full")}
-                    className="rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                    data-testid="card-peek-toggle-full"
-                    aria-label={peekMode === "full" ? "標準幅に戻す" : "最大化"}
-                >
-                    {peekMode === "full" ? "Std" : "Full"}
-                </button>
-            </div>
             <div
                 ref={dialogRef}
                 tabIndex={-1}
@@ -838,6 +805,8 @@ export function CardModal({
                     onRequestClose={requestClose}
                     showSidebar={showSidebar}
                     onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+                    peekMode={peekMode}
+                    onPeekModeChange={onPeekModeChange}
                 />
                 <div className="shrink-0 border-b border-slate-200 bg-slate-50/90 px-0 py-0 dark:border-gray-700 dark:bg-gray-900/80">
                     <StatusShortcutBar

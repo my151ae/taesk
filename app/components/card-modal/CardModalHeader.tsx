@@ -22,6 +22,9 @@ const getProfileInitials = (profile: ProfileSummary): string => {
 type BucketOption = { value: DueBucket; label: string };
 type ReminderMinuteOption = 0 | 5 | 10 | 15 | 30 | 60;
 type HeaderActionId = "copyLink" | "googleSync";
+type CardPeekMode = "compact" | "standard" | "wide" | "full";
+type CardPeekSizeMode = Exclude<CardPeekMode, "full">;
+const CARD_PEEK_SIZE_MODES: readonly CardPeekSizeMode[] = ["compact", "standard", "wide"];
 
 type CardModalHeaderProps = {
     dueDate: string;
@@ -70,6 +73,8 @@ type CardModalHeaderProps = {
     onRequestClose: () => void;
     showSidebar: boolean;
     onToggleSidebar: () => void;
+    peekMode: CardPeekMode;
+    onPeekModeChange?: (mode: CardPeekMode) => void;
 };
 
 function HeaderActionButton({
@@ -132,6 +137,8 @@ export default function CardModalHeader({
     onRequestClose,
     showSidebar,
     onToggleSidebar,
+    peekMode,
+    onPeekModeChange,
 }: CardModalHeaderProps) {
     const [mobileMetaExpanded, setMobileMetaExpanded] = useState(false);
     const actionOrder = useMemo<HeaderActionId[]>(() => {
@@ -148,6 +155,7 @@ export default function CardModalHeader({
     const actionsContainerRef = useRef<HTMLDivElement | null>(null);
     const overflowMenuRef = useRef<HTMLDivElement | null>(null);
     const measureRefs = useRef<Partial<Record<HeaderActionId, HTMLDivElement | null>>>({});
+    const peekSizeButtonRefs = useRef<Partial<Record<CardPeekSizeMode, HTMLButtonElement | null>>>({});
 
     const [visibleActionIds, setVisibleActionIds] = useState<HeaderActionId[]>([]);
     const [showOverflowMenu, setShowOverflowMenu] = useState(false);
@@ -226,6 +234,28 @@ export default function CardModalHeader({
         setShowOverflowMenu((prev) => !prev);
     };
 
+    const focusPeekSizeButton = useCallback((mode: CardPeekSizeMode) => {
+        window.requestAnimationFrame(() => {
+            peekSizeButtonRefs.current[mode]?.focus();
+        });
+    }, []);
+
+    const handlePeekSizeChange = useCallback((mode: CardPeekSizeMode) => {
+        onPeekModeChange?.(mode);
+        focusPeekSizeButton(mode);
+    }, [focusPeekSizeButton, onPeekModeChange]);
+
+    const handlePeekSizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, mode: CardPeekSizeMode) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const currentIndex = CARD_PEEK_SIZE_MODES.indexOf(mode);
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        const nextIndex = (currentIndex + direction + CARD_PEEK_SIZE_MODES.length) % CARD_PEEK_SIZE_MODES.length;
+        handlePeekSizeChange(CARD_PEEK_SIZE_MODES[nextIndex]);
+    }, [handlePeekSizeChange]);
+
     useEffect(() => {
         if (!dueDate) {
             setMobileMetaExpanded(false);
@@ -264,7 +294,7 @@ export default function CardModalHeader({
     };
 
     return (
-        <div className="relative z-30 flex flex-col gap-3 border-b border-slate-200 p-3 pb-2 dark:border-gray-700 sm:p-4 sm:pb-3">
+        <div className="relative z-30 flex flex-col gap-1.5 border-b border-slate-200 p-2.5 pb-2 dark:border-gray-700 sm:p-3 sm:pb-2.5">
             <div className="absolute left-0 top-0 -z-10 opacity-0 pointer-events-none">
                 <div className="flex items-center gap-2 whitespace-nowrap">
                     {actionOrder.includes("copyLink") && (
@@ -287,9 +317,9 @@ export default function CardModalHeader({
                 </div>
             </div>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-1.5 sm:gap-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-1.5">
                         <button
                             type="button"
                             onClick={onRequestClose}
@@ -299,15 +329,14 @@ export default function CardModalHeader({
                             <span className="text-base leading-none">✕</span>
                         </button>
 
-                        <div className="min-w-0 flex-1 md:flex md:flex-wrap md:items-center md:gap-4">
-                            <div className="flex min-w-0 items-center gap-2 md:shrink-0">
-                                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-                                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Date</span>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <div className="flex min-w-[128px] items-center gap-1.5">
                                     <input
                                         type="date"
                                         value={dueDate ? new Date(dueDate).toISOString().split("T")[0] : ""}
                                         onChange={(e) => onDueDateChange(e.target.value)}
-                                        className="min-w-0 rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
+                                        className="w-[128px] rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                     />
                                 </div>
                                 {hasMobileExpandableMeta && (
@@ -329,25 +358,22 @@ export default function CardModalHeader({
                                         </svg>
                                     </button>
                                 )}
-                            </div>
-
-                            <div className="mt-3 flex min-w-0 flex-col gap-3 md:mt-0 md:flex-1 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:text-sm sm:gap-6">
                                 {dueDate && (
                                     <div
                                         className={clsx(
-                                            "flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2",
+                                            "min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1",
                                             mobileMetaExpanded ? "flex" : "hidden",
                                             "md:flex"
                                         )}
                                     >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                     <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Start</span>
                                     <input
                                         type="time"
                                         step={60}
                                         value={dueStart}
                                         onChange={(e) => onDueStartChange(e.target.value)}
-                                        className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
+                                        className="w-[82px] rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                     />
                                     <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">
                                         <input
@@ -372,7 +398,7 @@ export default function CardModalHeader({
                                         </select>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                     <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">Dur</span>
                                     <div className="flex items-center gap-1">
                                         <input
@@ -415,14 +441,14 @@ export default function CardModalHeader({
                                         <span className="text-[10px] font-medium text-slate-400 dark:text-gray-500">min</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                     <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">End</span>
                                     <input
                                         type="time"
                                         step={60}
                                         value={dueEnd}
                                         onChange={(e) => onDueEndChange(e.target.value)}
-                                        className="rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
+                                        className="w-[82px] rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                     />
                                     <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">
                                         <input
@@ -449,11 +475,13 @@ export default function CardModalHeader({
                                 </div>
                                     </div>
                                 )}
+                            </div>
 
+                            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
                                 {dueDate && (
                                     <div
                                         className={clsx(
-                                            "items-center gap-2 sm:border-l sm:border-slate-100 sm:pl-4 sm:dark:border-gray-700",
+                                            "items-center gap-1.5",
                                             mobileMetaExpanded ? "flex" : "hidden",
                                             "md:flex"
                                         )}
@@ -559,127 +587,151 @@ export default function CardModalHeader({
                                 </div>
                                     </div>
                                 )}
+
+                                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1.5">
+                                    <div className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800/95">
+                                        {CARD_PEEK_SIZE_MODES.map((mode) => (
+                                            <button
+                                                key={mode}
+                                                ref={(node) => { peekSizeButtonRefs.current[mode] = node; }}
+                                                type="button"
+                                                onClick={() => handlePeekSizeChange(mode)}
+                                                onKeyDown={(event) => handlePeekSizeKeyDown(event, mode)}
+                                                className={clsx(
+                                                    "rounded px-2 py-1 text-xs font-semibold transition-colors",
+                                                    peekMode === mode
+                                                        ? "bg-slate-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                                                        : "text-slate-600 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                )}
+                                                data-testid={`card-peek-size-${mode}`}
+                                                aria-label={mode === "compact" ? "Sサイズで表示" : mode === "standard" ? "Mサイズで表示" : "Lサイズで表示"}
+                                            >
+                                                {mode === "compact" ? "S" : mode === "standard" ? "M" : "L"}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="relative z-10 flex min-w-0 items-center justify-start gap-2">
+                                        <div
+                                            ref={actionsContainerRef}
+                                            className="flex min-w-0 items-center justify-start gap-2"
+                                        >
+                                            {visibleActionIds.map((actionId) => renderInlineAction(actionId))}
+                                        </div>
+
+                                        {overflowActionIds.length > 0 && (
+                                            <div ref={overflowMenuRef} className="relative shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleToggleOverflowMenu}
+                                                    aria-expanded={showOverflowMenu}
+                                                    aria-label="Card modal actions"
+                                                    data-testid="card-modal-overflow-button"
+                                                    className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                                    </svg>
+                                                </button>
+
+                                                {showOverflowMenu && (
+                                                    <div
+                                                        className="absolute left-0 top-full z-[120] mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+                                                        data-testid="card-modal-overflow-menu"
+                                                    >
+                                                        {boards.length > 1 && (
+                                                            <div className="space-y-2">
+                                                                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
+                                                                    Board
+                                                                </label>
+                                                                <select
+                                                                    value={targetBoardId}
+                                                                    onChange={(e) => onTargetBoardChange(e.target.value)}
+                                                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                                                                >
+                                                                    {boards.map((board) => (
+                                                                        <option key={board.id} value={board.id}>
+                                                                            {board.name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+
+                                                        {dueDate && (
+                                                            <div className="space-y-2">
+                                                                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
+                                                                    Bucket
+                                                                </label>
+                                                                <select
+                                                                    value={(dueBucket ?? defaultBucket) as DueBucket}
+                                                                    onChange={(e) => onBucketChange(e.target.value as DueBucket)}
+                                                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                                                                >
+                                                                    {bucketOptions.map((option) => (
+                                                                        <option key={option.value} value={option.value}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+
+                                                        {overflowActionIds.includes("copyLink") && cardShortId && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    onCopyLink();
+                                                                    setShowOverflowMenu(false);
+                                                                }}
+                                                                className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                                data-testid="card-modal-copy-link-overflow"
+                                                            >
+                                                                <span>Copy Link</span>
+                                                                <span className="text-xs text-slate-400">/c/{cardShortId}</span>
+                                                            </button>
+                                                        )}
+
+                                                        {overflowActionIds.includes("googleSync") && googleSync && (
+                                                            <div className="rounded-xl border border-slate-200 p-3 dark:border-gray-600">
+                                                                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
+                                                                    Google Calendar
+                                                                </p>
+                                                                <GoogleSyncToggle
+                                                                    cardId={googleSync.cardId}
+                                                                    initialStatus={googleSync.status}
+                                                                    connected={googleSync.connected}
+                                                                    canWrite={googleSync.canWrite}
+                                                                    onStatusChange={googleSync.onStatusChange}
+                                                                    displayMode="menu"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={onToggleSidebar}
+                                            className={clsx(
+                                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all duration-200",
+                                                showSidebar
+                                                    ? "bg-sky-50 text-sky-500 ring-1 ring-sky-200 dark:bg-sky-900/40 dark:ring-sky-800"
+                                                    : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
+                                            )}
+                                            title={showSidebar ? "Hide details" : "Show details"}
+                                        >
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div className="relative z-10 flex items-start justify-end gap-2 pl-2">
-                    <div
-                        ref={actionsContainerRef}
-                        className="flex min-w-0 items-center justify-end gap-2"
-                    >
-                        {visibleActionIds.map((actionId) => renderInlineAction(actionId))}
-                    </div>
-
-                    {overflowActionIds.length > 0 && (
-                        <div ref={overflowMenuRef} className="relative shrink-0">
-                            <button
-                                type="button"
-                                onClick={handleToggleOverflowMenu}
-                                aria-expanded={showOverflowMenu}
-                                aria-label="Card modal actions"
-                                data-testid="card-modal-overflow-button"
-                                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                            >
-                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                                </svg>
-                            </button>
-
-                            {showOverflowMenu && (
-                                <div
-                                    className="absolute right-0 top-full z-[120] mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
-                                    data-testid="card-modal-overflow-menu"
-                                >
-                                    {boards.length > 1 && (
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
-                                                Board
-                                            </label>
-                                            <select
-                                                value={targetBoardId}
-                                                onChange={(e) => onTargetBoardChange(e.target.value)}
-                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                                            >
-                                                {boards.map((board) => (
-                                                    <option key={board.id} value={board.id}>
-                                                        {board.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-
-                                    {dueDate && (
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
-                                                Bucket
-                                            </label>
-                                            <select
-                                                value={(dueBucket ?? defaultBucket) as DueBucket}
-                                                onChange={(e) => onBucketChange(e.target.value as DueBucket)}
-                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                                            >
-                                                {bucketOptions.map((option) => (
-                                                    <option key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-
-                                    {overflowActionIds.includes("copyLink") && cardShortId && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                onCopyLink();
-                                                setShowOverflowMenu(false);
-                                            }}
-                                            className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-                                            data-testid="card-modal-copy-link-overflow"
-                                        >
-                                            <span>Copy Link</span>
-                                            <span className="text-xs text-slate-400">/c/{cardShortId}</span>
-                                        </button>
-                                    )}
-
-                                    {overflowActionIds.includes("googleSync") && googleSync && (
-                                        <div className="rounded-xl border border-slate-200 p-3 dark:border-gray-600">
-                                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-gray-500">
-                                                Google Calendar
-                                            </p>
-                                            <GoogleSyncToggle
-                                                cardId={googleSync.cardId}
-                                                initialStatus={googleSync.status}
-                                                connected={googleSync.connected}
-                                                canWrite={googleSync.canWrite}
-                                                onStatusChange={googleSync.onStatusChange}
-                                                displayMode="menu"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={onToggleSidebar}
-                        className={clsx(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all duration-200",
-                            showSidebar
-                                ? "bg-sky-50 text-sky-500 ring-1 ring-sky-200 dark:bg-sky-900/40 dark:ring-sky-800"
-                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700"
-                        )}
-                        title={showSidebar ? "Hide details" : "Show details"}
-                    >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </button>
                 </div>
             </div>
         </div>
