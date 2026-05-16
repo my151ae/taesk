@@ -218,6 +218,7 @@ export type UseTimelineBoardScreenArgs = {
   handleCardModalSave: NonNullable<TimelineBoardScreenProps["modalProps"]>["onSave"];
   handleCardModalDelete: (cardId: string) => Promise<boolean>;
   handleRestoreCard: (cardId: string) => Promise<boolean>;
+  handlePromoteCardToParent: (cardId: string) => Promise<boolean>;
   closeCardModal: () => void;
   modalOpenSource: string | null;
   historySaveWarning: string | null;
@@ -402,6 +403,7 @@ export function useTimelineBoardScreen({
   handleCardModalSave,
   handleCardModalDelete,
   handleRestoreCard,
+  handlePromoteCardToParent,
   closeCardModal,
   modalOpenSource,
   historySaveWarning,
@@ -693,6 +695,7 @@ export function useTimelineBoardScreen({
             onSave: handleCardModalSave,
             onDelete: handleCardModalDelete,
             onRestore: handleRestoreCard,
+            onPromoteToParent: handlePromoteCardToParent,
             onMoveToBoard: () => {},
             onClose: closeCardModal,
             isLoading: cardModalStatus === "loading",

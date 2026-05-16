@@ -1068,6 +1068,30 @@ function TimelineBoardPageContent({
     }
   }, [currentBoard.id, setCardModalError, setData, setModalCardOverride]);
 
+  const handlePromoteCardToParent = useCallback(async (cardId: string) => {
+    try {
+      const response = await fetch(`/api/boards/${currentBoard.id}/cards/${cardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          is_parent: true,
+          parent_card_id: null,
+        }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.card) {
+        throw new Error(body?.error?.message || "親カード化に失敗しました");
+      }
+
+      setData((prev) => (prev ? applyCardUpdate(prev, body.card as Card, "UPDATE") : prev));
+      setModalCardOverride(body.card as Card);
+      return true;
+    } catch (error) {
+      setCardModalError(error instanceof Error ? error.message : "親カード化に失敗しました");
+      return false;
+    }
+  }, [currentBoard.id, setCardModalError, setData, setModalCardOverride]);
+
   const handleCardModalDelete = useCallback(async (cardId: string) => {
     const success = await handleTrashCardMove(cardId);
     if (success) {
@@ -1807,6 +1831,7 @@ function TimelineBoardPageContent({
     handleCardModalSave,
     handleCardModalDelete,
     handleRestoreCard,
+    handlePromoteCardToParent,
     closeCardModal,
     modalOpenSource,
     historySaveWarning,

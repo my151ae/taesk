@@ -61,6 +61,8 @@ type CardModalHeaderProps = {
     onTargetBoardChange: (boardId: string) => void;
     onDurationChange: (value: number | "") => void;
     onBucketChange: (bucket: DueBucket) => void;
+    canPromoteToParent?: boolean;
+    onPromoteToParent?: () => void | Promise<void> | Promise<boolean>;
     cardShortId: string | null;
     onCopyLink: () => void;
     googleSync?: {
@@ -131,6 +133,8 @@ export default function CardModalHeader({
     onTargetBoardChange,
     onDurationChange,
     onBucketChange,
+    canPromoteToParent = false,
+    onPromoteToParent,
     cardShortId,
     onCopyLink,
     googleSync,
@@ -608,6 +612,19 @@ export default function CardModalHeader({
                                             </button>
                                         ))}
                                     </div>
+
+                                    {canPromoteToParent && onPromoteToParent ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void onPromoteToParent();
+                                            }}
+                                            className="inline-flex h-8 shrink-0 items-center rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                            data-testid="card-modal-promote-parent"
+                                        >
+                                            親カード化
+                                        </button>
+                                    ) : null}
 
                                     <div className="relative z-10 flex min-w-0 items-center justify-start gap-2">
                                         <div

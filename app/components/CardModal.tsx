@@ -53,6 +53,7 @@ interface CardModalProps {
     onSave: (payload: CardModalSavePayload) => void;
     onDelete: (id: string) => void;
     onRestore?: (id: string) => void | Promise<void> | Promise<boolean>;
+    onPromoteToParent?: (id: string) => void | Promise<void> | Promise<boolean>;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
     onClose: () => void;
     isLoading?: boolean;
@@ -73,6 +74,7 @@ export function CardModal({
     onSave,
     onDelete,
     onRestore,
+    onPromoteToParent,
     profiles,
     availableTags = [],
     onMoveToBoard,
@@ -838,6 +840,8 @@ export function CardModal({
                     duration={duration}
                     onDurationChange={handleDurationChange}
                     onBucketChange={handleBucketChange}
+                    canPromoteToParent={!card.is_parent && !card.parent_card_id && !isHistoryPreviewing}
+                    onPromoteToParent={onPromoteToParent ? () => onPromoteToParent(card.id) : undefined}
                     cardShortId={card.short_id ?? null}
                     onCopyLink={handleCopyLink}
                     googleSync={{
