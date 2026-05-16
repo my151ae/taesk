@@ -114,6 +114,7 @@ type DesktopSidebarMenuProps = {
   onOpenNotificationSettings: () => void;
   onRestoreTrashCard: (cardId: string) => Promise<boolean>;
   openCardModal: (shortId: string | null, source: string) => void;
+  onOpenOverdueTimelineCard?: (item: TimelineOverdueItem) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   onRenameCardTitle?: (cardId: string, nextTitle: string) => Promise<boolean>;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
@@ -361,6 +362,7 @@ export function DesktopSidebarMenu({
   onOpenNotificationSettings,
   onRestoreTrashCard,
   openCardModal,
+  onOpenOverdueTimelineCard,
   onToggleCheck,
   onRenameCardTitle,
   onCardContextMenu,
@@ -408,6 +410,7 @@ export function DesktopSidebarMenu({
           items={section.items}
           allowDrag={allowOverdueDrag}
           openCardModal={openCardModal}
+          onOpenOverdueTimelineCard={onOpenOverdueTimelineCard}
           onToggleCheck={onToggleCheck}
           onRenameCardTitle={onRenameCardTitle}
           onCardContextMenu={onCardContextMenu}

@@ -355,6 +355,21 @@ export default function TimelineBoardScreen({
     "inline-flex h-6 shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 hover:bg-slate-50";
   const desktopSidebarExpanded = desktop.leftPanelProps.state.expandedSectionKey !== null;
   const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "2.5rem";
+  const handleDesktopOpenOverdueTimelineCard = useCallback(
+    (item: Parameters<NonNullable<typeof desktop.leftPanelProps.onOpenOverdueTimelineCard>>[0]) => {
+      setCardPeekMode("compact");
+      setCardPeekWidth(CARD_PEEK_WIDTHS.compact);
+      if (item.due_date) {
+        setDesktopHorizontalStepRequest({
+          id: ++requestIdRef.current,
+          direction: "date",
+          targetIso: item.due_date,
+        });
+      }
+      desktop.leftPanelProps.onOpenOverdueTimelineCard?.(item);
+    },
+    [desktop.leftPanelProps],
+  );
 
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
@@ -366,6 +381,7 @@ export default function TimelineBoardScreen({
         >
           <DesktopSidebarMenu
             {...desktop.leftPanelProps}
+            onOpenOverdueTimelineCard={handleDesktopOpenOverdueTimelineCard}
             overdueSortOrder={desktop.overdueSortOrder}
             onOverdueSortOrderChange={desktop.onOverdueSortOrderChange}
           />
@@ -376,7 +392,7 @@ export default function TimelineBoardScreen({
         </section>
       </div>
     ),
-    [desktop.leftPanelProps, desktop.onOverdueSortOrderChange, desktop.overdueSortOrder, desktopSidebarWidth]
+    [desktop.leftPanelProps, desktop.onOverdueSortOrderChange, desktop.overdueSortOrder, desktopSidebarWidth, handleDesktopOpenOverdueTimelineCard]
   );
   const headerToggleLabel = isHeaderCollapsed ? "メインヘッダーを表示" : "メインヘッダーを隠す";
   const [showMobileSelector, setShowMobileSelector] = useState(false);
@@ -505,6 +521,14 @@ export default function TimelineBoardScreen({
   const renderMobilePanelBody = useCallback(() => {
     const commonProps = {
       openCardModal: mobile.leftPanelProps.openCardModal,
+      onOpenOverdueTimelineCard: mobile.leftPanelProps.onOpenOverdueTimelineCard
+        ? (item: Parameters<NonNullable<typeof mobile.leftPanelProps.onOpenOverdueTimelineCard>>[0]) => {
+            setCardPeekMode("compact");
+            setCardPeekWidth(CARD_PEEK_WIDTHS.compact);
+            setIsMobilePanelCollapsed(true);
+            mobile.leftPanelProps.onOpenOverdueTimelineCard?.(item);
+          }
+        : undefined,
       onToggleCheck: mobile.leftPanelProps.onToggleCheck,
       onRenameCardTitle: mobile.leftPanelProps.onRenameCardTitle,
       onCardContextMenu: mobile.leftPanelProps.onCardContextMenu,

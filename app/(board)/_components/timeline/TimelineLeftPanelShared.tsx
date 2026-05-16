@@ -34,6 +34,7 @@ type SharedSelectionProps = {
 
 type SharedCardActions = SharedSelectionProps & {
   openCardModal: (shortId: string | null, source: string) => void;
+  onOpenOverdueTimelineCard?: (item: TimelineOverdueItem) => void;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
@@ -283,6 +284,7 @@ function SidebarCardRow({
   onToggleCheck,
   onRenameCardTitle,
   openCardModal,
+  onOpenOverdueTimelineCard,
   onCardContextMenu,
   onCardContextMenuByKeyboard,
   isContextMenuOpen,
@@ -322,6 +324,7 @@ function SidebarCardRow({
   draggable?: boolean;
   onToggleCheck: (cardId: string, checked: boolean) => void;
   openCardModal: (shortId: string | null, source: string) => void;
+  onOpenOverdueTimelineCard?: (item: TimelineOverdueItem) => void;
   onCardContextMenu: (e: React.MouseEvent, cardId: string) => void;
   onCardContextMenuByKeyboard: (cardId: string, rect: DOMRect) => void;
   isContextMenuOpen: boolean;
@@ -370,7 +373,13 @@ function SidebarCardRow({
         note={item.excerpt ?? undefined}
         noteClampClass={TIMELINE_LIST_CARD_NOTE_CLAMP_CLASS}
         notePreviewLines={2}
-        onOpen={() => openCardModal(item.short_id, openSource)}
+        onOpen={() => {
+          if (openSource === "overdue" && onOpenOverdueTimelineCard) {
+            onOpenOverdueTimelineCard(item as TimelineOverdueItem);
+            return;
+          }
+          openCardModal(item.short_id, openSource);
+        }}
         openButtonTestId={`cardOpenButton-${openSource}-${item.card_id}`}
         showOpenButton
         paddingClass="py-1"
@@ -564,6 +573,7 @@ export function OverdueSectionBody({
                 onToggleCheck={cardActions.onToggleCheck}
                 onRenameCardTitle={cardActions.onRenameCardTitle}
                 openCardModal={cardActions.openCardModal}
+                onOpenOverdueTimelineCard={cardActions.onOpenOverdueTimelineCard}
                 onCardContextMenu={cardActions.onCardContextMenu}
                 onCardContextMenuByKeyboard={cardActions.onCardContextMenuByKeyboard}
                 isContextMenuOpen={cardActions.contextMenuCardId === item.card_id}

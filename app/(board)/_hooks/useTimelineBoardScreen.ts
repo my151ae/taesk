@@ -87,6 +87,7 @@ export type UseTimelineBoardScreenArgs = {
   debouncedHandleAnchorScroll: (dayIso: string, scrollTop: number) => void;
   handleTimelineViewMount: () => void;
   openCardModal: (shortId: string | null, source: string) => void;
+  onOpenOverdueTimelineCard?: (item: TimelineResponse["overdue"][number]) => void;
   handleToggleCardChecked: (cardId: string, checked: boolean) => Promise<boolean>;
   handleRenameCardTitle: (cardId: string, nextTitle: string) => Promise<boolean>;
   activeResize: DragAndDropBindings["activeResize"];
@@ -280,6 +281,7 @@ export function useTimelineBoardScreen({
   debouncedHandleAnchorScroll,
   handleTimelineViewMount,
   openCardModal,
+  onOpenOverdueTimelineCard,
   handleToggleCardChecked,
   handleRenameCardTitle,
   activeResize,
@@ -597,6 +599,7 @@ export function useTimelineBoardScreen({
     onOpenNotification,
     onRestoreTrashCard: handleRestoreCard,
     openCardModal,
+    onOpenOverdueTimelineCard,
     onToggleCheck: handleToggleCardChecked,
     onCardContextMenu: handleCardContextMenu,
     onCardContextMenuByKeyboard: handleCardContextMenuByKeyboard,

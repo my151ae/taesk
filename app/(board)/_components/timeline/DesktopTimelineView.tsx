@@ -56,6 +56,7 @@ const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 export type HorizontalStepRequest =
   | { id: number; direction: "prev" | "next" | "today" | "prevRange" | "nextRange" }
+  | { id: number; direction: "date"; targetIso: string }
   | null;
 
 export type DesktopTimelineViewProps = {
@@ -607,6 +608,13 @@ export function DesktopTimelineView({
       const todayIso = getCurrentTimelineIsoDateJst(timelineStartHour);
       targetIndex = currentDays.findIndex((day) => day.isoDate === todayIso);
       if (targetIndex < 0) targetIndex = 0; // 見つからない場合は先頭
+    } else if (request.direction === "date") {
+      targetIndex = currentDays.findIndex((day) => day.isoDate === request.targetIso);
+      if (targetIndex < 0) {
+        resetHorizontalMotionFlags();
+        consumeRequest();
+        return;
+      }
     } else if (request.direction === "nextRange") {
       targetIndex = Math.min(currentDays.length - 1, currentIndex + dayRange);
     } else if (request.direction === "prevRange") {

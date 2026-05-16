@@ -32,6 +32,7 @@ import {
   getCurrentTimelineIsoDateJst,
   getDayDiff,
   type TimelineEvent,
+  type TimelineOverdueItem,
   getNowMinutesJst,
   getTimelineIsoDateJst,
   minuteToPixels,
@@ -120,6 +121,16 @@ const primaryPanelModeToSidebarSection = (mode: PrimaryPanelMode): SidebarSectio
 const normalizeMobilePrimaryPanelMode = (mode: PrimaryPanelMode): PrimaryPanelMode => {
   if (mode === "none") return "overdue";
   return mode;
+};
+
+const findTimelineCardElementById = (cardId: string) => {
+  const mainPanel = document.querySelector<HTMLElement>('[data-testid="desktop-main-panel"]');
+  const candidates = mainPanel
+    ? mainPanel.querySelectorAll<HTMLElement>("[data-card-id]")
+    : document.querySelectorAll<HTMLElement>(
+        '[data-focus-group="timeline"][data-focus-part="card"], [data-focus-group="bucket"][data-focus-part="card"]',
+      );
+  return Array.from(candidates).find((candidate) => candidate.dataset.cardId === cardId) ?? null;
 };
 
 const sortTrashItems = (items: TrashCardItem[]) =>
@@ -321,7 +332,11 @@ function TimelineBoardPageContent({
 
   const focusCardById = useCallback((cardId: string | null) => {
     if (!cardId) return;
-    const target = document.querySelector(`[data-card-id="${cardId}"]`) as HTMLElement | null;
+    const target =
+      findTimelineCardElementById(cardId) ??
+      Array.from(document.querySelectorAll<HTMLElement>("[data-card-id]"))
+        .find((candidate) => candidate.dataset.cardId === cardId) ??
+      null;
     target?.focus();
   }, []);
 
@@ -344,6 +359,12 @@ function TimelineBoardPageContent({
     handleShiftSelect,
   } = useTimelineCardSelection();
   const [pendingTitleEditCardId, setPendingTitleEditCardId] = useState<string | null>(null);
+  const pendingOverdueTimelineFocusRef = useRef<{
+    cardId: string;
+    shortId: string | null;
+    openDetails: boolean;
+    availableAt: number;
+  } | null>(null);
 
   const {
     contextMenu,
@@ -1244,6 +1265,84 @@ function TimelineBoardPageContent({
     suppressMonthUrlSyncRef,
   });
 
+  const focusPendingOverdueTimelineCard = useCallback(() => {
+    const pending = pendingOverdueTimelineFocusRef.current;
+    if (!pending) return false;
+    if (Date.now() < pending.availableAt) return false;
+
+    const target = findTimelineCardElementById(pending.cardId);
+    if (!target) return false;
+
+    target.scrollIntoView({
+      behavior: "auto",
+      block: "center",
+      inline: "nearest",
+    });
+    target.focus({ preventScroll: true });
+    pendingOverdueTimelineFocusRef.current = null;
+
+    if (pending.openDetails && pending.shortId) {
+      window.setTimeout(() => {
+        openCardModal(pending.shortId, "overdue");
+      }, 120);
+    }
+
+    return true;
+  }, [openCardModal]);
+
+  const schedulePendingOverdueTimelineFocus = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (focusPendingOverdueTimelineCard()) return;
+        window.setTimeout(() => {
+          focusPendingOverdueTimelineCard();
+        }, 120);
+      });
+    });
+  }, [focusPendingOverdueTimelineCard]);
+
+  const handleOpenOverdueTimelineCard = useCallback(async (item: TimelineOverdueItem) => {
+    if (!item.due_date) {
+      openCardModal(item.short_id, "overdue");
+      return;
+    }
+
+    clearSelection();
+    pendingOverdueTimelineFocusRef.current = {
+      cardId: item.card_id,
+      shortId: item.short_id,
+      openDetails: true,
+      availableAt: Date.now() + (viewMode === "timeline" ? 520 : 620),
+    };
+    setActiveCard(
+      item.card_id,
+      item.due_bucket ? bucketLaneId(`${item.due_date}_${item.due_bucket}`) : timelineLaneId(item.due_date),
+    );
+
+    if (viewMode !== "timeline") {
+      modeSync.handleViewModeChange("timeline");
+    }
+
+    await goToDay(item.due_date);
+    window.setTimeout(() => {
+      schedulePendingOverdueTimelineFocus();
+    }, viewMode === "timeline" ? 520 : 620);
+  }, [
+    clearSelection,
+    goToDay,
+    modeSync,
+    openCardModal,
+    schedulePendingOverdueTimelineFocus,
+    setActiveCard,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "timeline" || status === "loading") return;
+    schedulePendingOverdueTimelineFocus();
+  }, [data?.events, schedulePendingOverdueTimelineFocus, status, viewMode]);
+
   const handleListTodayWithFocusRestore = useCallback(() => {
     scheduleToolbarFocusRestore();
     modeSync.handleListToday();
@@ -1579,6 +1678,7 @@ function TimelineBoardPageContent({
     debouncedHandleAnchorScroll,
     handleTimelineViewMount,
     openCardModal,
+    onOpenOverdueTimelineCard: handleOpenOverdueTimelineCard,
     handleToggleCardChecked,
     handleRenameCardTitle,
     activeResize,

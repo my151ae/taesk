@@ -1047,12 +1047,16 @@ test.describe('@feature:timeline Timeline view', () => {
 
       await expect(overdueOne).toHaveAttribute('data-selected', 'true');
       await expect(overdueTwo).toHaveAttribute('data-selected', 'true');
-      await page.getByTestId(`cardOpenButton-overdue-${cards[3].id}`).click();
-      await expect(page.getByTestId('card-peek-root')).toBeVisible();
-      await expect(overdueOne).toHaveAttribute('data-selected', 'true');
-      await expect(overdueTwo).toHaveAttribute('data-selected', 'true');
-      await page.keyboard.press('Escape');
-      await expect(page.getByTestId('card-peek-root')).toBeHidden();
+      await page
+        .getByTestId('desktop-sidebar-overdue-panel')
+        .getByTestId(`cardOpenButton-overdue-${cards[3].id}`)
+        .click();
+      await expect(page).toHaveURL(new RegExp(`mp=timeline`));
+      await expect(page).toHaveURL(new RegExp(`date=${overdueIso}`));
+      const focusedTimelineCard = page.locator(`[data-focus-group="timeline"][data-focus-part="card"][data-card-id="${cards[3].id}"]`).first();
+      await expect(focusedTimelineCard).toBeVisible({ timeout: 20_000 });
+      await expect(focusedTimelineCard).toBeFocused();
+      await expect(page.getByTestId('card-peek-root')).toHaveCount(0);
     } finally {
       await supabaseAdmin.from('cards').delete().in('id', cards.map((card) => card.id));
     }
