@@ -832,6 +832,12 @@ export function DesktopTimelineView({
                     title: item.title,
                     rangeLabel,
                   });
+                  const segmentLeft = leftSpacerWidth + item.startColumn * columnWidth;
+                  const segmentWidth = (item.endColumn - item.startColumn + 1) * columnWidth;
+                  const hiddenSegmentLeft = Math.min(
+                    Math.max(0, scrollLeft - segmentLeft),
+                    Math.max(0, segmentWidth - 24),
+                  );
                   return (
                     <button
                       key={`${item.id}-${item.start}-${item.end}`}
@@ -847,10 +853,18 @@ export function DesktopTimelineView({
                       }}
                       title={inlineLabel}
                     >
-                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
-                        G
+                      <span
+                        className="flex min-w-0 items-center gap-2"
+                        style={{
+                          maxWidth: `calc(100% - ${hiddenSegmentLeft}px)`,
+                          transform: `translateX(${hiddenSegmentLeft}px)`,
+                        }}
+                      >
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide text-emerald-700">
+                          G
+                        </span>
+                        <span className="min-w-0 truncate">{inlineLabel}</span>
                       </span>
-                      <span className="min-w-0 truncate">{inlineLabel}</span>
                     </button>
                   );
                 })}
