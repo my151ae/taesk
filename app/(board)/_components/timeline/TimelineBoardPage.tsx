@@ -505,6 +505,7 @@ function TimelineBoardPageContent({
     setModalCardOverride,
     openCardModal,
     closeCardModal,
+    modalOpenSource,
     modalProfiles,
   } = useCardModal({
     initialBoard,
@@ -1807,6 +1808,7 @@ function TimelineBoardPageContent({
     handleCardModalDelete,
     handleRestoreCard,
     closeCardModal,
+    modalOpenSource,
     historySaveWarning,
     retryHistorySave,
     closeModalWithoutHistory,

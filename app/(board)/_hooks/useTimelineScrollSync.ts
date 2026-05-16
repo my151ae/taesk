@@ -213,8 +213,15 @@ export const useTimelineScrollSync = ({
     }
   }, []);
 
-  const debouncedHandleScroll = useDebounce(handleTimelineScroll, 500);
+  const debouncedHandleScrollWithAnchorGuard = useDebounce((scrollTop: number, scheduledAnchorDayIso: string | null) => {
+    if (scheduledAnchorDayIso !== stateRef.current.anchorDayIso) return;
+    handleTimelineScroll(scrollTop);
+  }, 500);
+  const debouncedHandleScroll = useCallback((scrollTop: number) => {
+    debouncedHandleScrollWithAnchorGuard(scrollTop, stateRef.current.anchorDayIso);
+  }, [debouncedHandleScrollWithAnchorGuard]);
   const debouncedHandleAnchorScroll = useDebounce((dayIso: string, scrollTop: number) => {
+    if (dayIso !== stateRef.current.anchorDayIso) return;
     handleTimelineScroll(scrollTop, dayIso);
   }, 500);
 

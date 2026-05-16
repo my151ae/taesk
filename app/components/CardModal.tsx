@@ -41,6 +41,9 @@ const BUCKET_OPTIONS: { value: DueBucket; label: string }[] = [
     { value: 'b', label: 'B (if possible)' },
 ];
 const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
+const SIDEBAR_DOCKED_MIN_WIDTH = 680;
+const SIDEBAR_OVERLAY_MAX_WIDTH = 384;
+const SIDEBAR_OVERLAY_REVEAL_WIDTH = 96;
 
 interface CardModalProps {
     card: Card;
@@ -57,6 +60,7 @@ interface CardModalProps {
     onRetryHistorySave?: () => void;
     onCloseWithoutHistory?: () => void;
     shortcutBar?: ShortcutBarConfig;
+    openSource?: string | null;
     peekMode?: "compact" | "standard" | "wide" | "full";
     peekWidth?: number;
     onPeekModeChange?: (mode: "compact" | "standard" | "wide" | "full") => void;
@@ -78,6 +82,7 @@ export function CardModal({
     onRetryHistorySave,
     onCloseWithoutHistory,
     shortcutBar,
+    openSource,
     peekMode = "standard",
     peekWidth = 720,
     onPeekModeChange,
@@ -148,6 +153,7 @@ export function CardModal({
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
     const didFocusTitleOnOpenRef = useRef(false);
+    const initialSidebarStateKeyRef = useRef<string | null>(null);
     const titleIsComposingRef = useRef(false);
 
     const {
@@ -169,16 +175,25 @@ export function CardModal({
         activeSidebarTab,
     });
     const shouldFocusTitleOnOpen = !isLoading && !isHistoryPreviewing && title.trim().length === 0;
+    const sidebarLayoutMode = showSidebar && peekWidth >= SIDEBAR_DOCKED_MIN_WIDTH ? "docked" : "overlay";
+    const sidebarOverlayWidth = Math.min(
+        SIDEBAR_OVERLAY_MAX_WIDTH,
+        Math.max(320, peekWidth >= 460 ? peekWidth - SIDEBAR_OVERLAY_REVEAL_WIDTH : peekWidth)
+    );
 
     useEffect(() => {
-        if (peekMode === "compact") {
+        const stateKey = `${card.id}:${openSource ?? "unknown"}:${peekMode}`;
+        if (initialSidebarStateKeyRef.current === stateKey) return;
+        initialSidebarStateKeyRef.current = stateKey;
+
+        if (openSource === "overdue" || peekMode === "compact") {
             setShowSidebar(false);
             return;
         }
         if (peekMode === "standard" || peekMode === "wide") {
             setShowSidebar(true);
         }
-    }, [peekMode, setShowSidebar]);
+    }, [card.id, openSource, peekMode, setShowSidebar]);
 
     useEffect(() => {
         didFocusTitleOnOpenRef.current = false;
@@ -452,7 +467,7 @@ export function CardModal({
                 cancelAnimationFrame(frameId);
             }
         };
-    }, [resizeTitleInput, showSidebar, stickyTitleChecklistProgress]);
+    }, [resizeTitleInput, showSidebar, sidebarLayoutMode, stickyTitleChecklistProgress]);
 
     const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (isHistoryPreviewing) return;
@@ -865,9 +880,12 @@ export function CardModal({
                 )}
 
                 {/* 2 Column Layout - Vertical on mobile, Horizontal on desktop */}
-                <div ref={resizeRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden sm:flex-row">
+                <div
+                    ref={resizeRef}
+                    className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${sidebarLayoutMode === "docked" ? "flex-col sm:flex-row" : "flex-col"}`}
+                >
                     {/* Left Column - Details (Note) */}
-                    <div className={`flex min-h-0 min-w-0 flex-1 flex-col p-0 ${showSidebar ? "hidden sm:flex" : "flex"}`}>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col p-0">
                         {!isLoading && (
                             <div
                                 className="z-20"
@@ -1002,14 +1020,18 @@ export function CardModal({
                     {/* Right Column - Sidebar (integrated conditionally on mobile) */}
                     {showSidebar && (
                         <>
-                            <div
-                                role="separator"
-                                aria-orientation="vertical"
-                                onMouseDown={startResizing}
-                                className="hidden sm:block w-1 cursor-col-resize bg-slate-100 hover:bg-sky-100"
-                            />
+                            {sidebarLayoutMode === "docked" ? (
+                                <div
+                                    role="separator"
+                                    aria-orientation="vertical"
+                                    onMouseDown={startResizing}
+                                    className="hidden sm:block w-1 cursor-col-resize bg-slate-100 hover:bg-sky-100"
+                                />
+                            ) : null}
                             <CardModalSidebar
                                 sidebarWidth={sidebarWidth}
+                                overlayWidth={sidebarOverlayWidth}
+                                layoutMode={sidebarLayoutMode}
                                 cardId={card.id}
                                 boardId={card.board_id}
                                 profiles={profiles}

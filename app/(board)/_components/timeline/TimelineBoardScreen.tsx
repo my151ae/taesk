@@ -185,6 +185,7 @@ const CARD_PEEK_STORAGE_KEY = "taesk.cardPeek.layout.v1";
 const CARD_PEEK_SNAP_TOLERANCE = 48;
 const CARD_PEEK_MIN_WIDTH = 320;
 const CARD_PEEK_MAX_WIDTH = 1280;
+const CARD_PEEK_COMPACT_BREAKPOINT = 900;
 
 const clampPeekWidth = (width: number) => Math.min(CARD_PEEK_MAX_WIDTH, Math.max(CARD_PEEK_MIN_WIDTH, Math.round(width)));
 
@@ -199,6 +200,9 @@ const resolveModeFromWidth = (width: number): Exclude<CardPeekMode, "full"> | nu
   );
   return Math.abs(nearest.width - width) <= CARD_PEEK_SNAP_TOLERANCE ? nearest.mode : null;
 };
+
+const resolveOpenPeekMode = (availableWidth: number): Exclude<CardPeekMode, "full"> =>
+  availableWidth < CARD_PEEK_COMPACT_BREAKPOINT ? "compact" : "standard";
 
 export default function TimelineBoardScreen({
   parseResult,
@@ -226,6 +230,7 @@ export default function TimelineBoardScreen({
     mode: "standard",
     width: CARD_PEEK_WIDTHS.standard,
   });
+  const hadModalPropsRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -251,6 +256,18 @@ export default function TimelineBoardScreen({
       JSON.stringify({ mode: cardPeekMode, widthPx: cardPeekWidth }),
     );
   }, [cardPeekMode, cardPeekWidth, modalProps]);
+
+  useEffect(() => {
+    const isOpeningModal = Boolean(modalProps) && !hadModalPropsRef.current;
+    hadModalPropsRef.current = Boolean(modalProps);
+    if (!isOpeningModal || typeof window === "undefined") return;
+
+    const desktopWidth = desktopScopeRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    const availableWidth = Math.min(window.innerWidth, desktopWidth);
+    const nextMode = resolveOpenPeekMode(availableWidth);
+    setCardPeekMode(nextMode);
+    setCardPeekWidth(CARD_PEEK_WIDTHS[nextMode]);
+  }, [modalProps]);
 
   const handleCardPeekModeChange = useCallback((mode: CardPeekMode) => {
     setCardPeekMode((currentMode) => {

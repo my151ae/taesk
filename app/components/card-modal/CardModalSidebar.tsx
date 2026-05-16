@@ -8,6 +8,8 @@ type SidebarTab = "comments" | "history";
 
 type CardModalSidebarProps = {
   sidebarWidth: number;
+  overlayWidth?: number;
+  layoutMode?: "overlay" | "docked";
   cardId: string;
   boardId: string;
   profiles: ProfileSummary[];
@@ -30,6 +32,8 @@ type CardModalSidebarProps = {
 
 export default function CardModalSidebar({
   sidebarWidth,
+  overlayWidth,
+  layoutMode = "docked",
   cardId,
   boardId,
   profiles,
@@ -54,10 +58,17 @@ export default function CardModalSidebar({
 
   return (
     <div
-      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
-      className="flex-1 min-h-0 border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-gray-700 overflow-y-auto flex flex-col shrink-0 w-full sm:flex-none sm:w-[var(--sidebar-width)]"
+      style={{
+        "--sidebar-width": `${sidebarWidth}px`,
+        "--sidebar-overlay-width": `${overlayWidth ?? sidebarWidth}px`,
+      } as CSSProperties}
+      className={
+        layoutMode === "overlay"
+          ? "absolute bottom-0 right-0 top-0 z-30 flex min-h-0 min-w-0 w-[min(100%,var(--sidebar-overlay-width))] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-[-16px_0_28px_rgba(15,23,42,0.12)] dark:border-gray-700 dark:bg-gray-800"
+          : "flex min-h-0 min-w-0 w-full flex-1 shrink-0 flex-col overflow-y-auto border-t border-slate-100 sm:w-[min(var(--sidebar-width),45vw)] sm:flex-none sm:border-l sm:border-t-0 dark:border-gray-700"
+      }
     >
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-6 pt-3">
+      <div className="flex-1 min-h-0 flex flex-col px-4 pb-6 pt-3 sm:px-6">
         <div className="space-y-5">
           <section className="space-y-2" data-testid="card-modal-completed-lines-panel">
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-300">

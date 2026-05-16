@@ -27,6 +27,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     const [cardModalError, setCardModalError] = useState<string | null>(null);
     const [isCardPeekClosing, setIsCardPeekClosing] = useState(false);
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
+    const [modalOpenSource, setModalOpenSource] = useState<string | null>(null);
     const [modalProfiles, setModalProfiles] = useState<ProfileSummary[]>([]);
 
     const cardModalShortIdRef = useRef<string | null>(null);
@@ -44,6 +45,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         console.log('[timeline] openCardModal', { shortId, source: debugSource });
 
         // Instant open via local state
+        setModalOpenSource(debugSource ?? null);
         setActiveCardId(shortId);
         setCardInUrl(shortId, { method: 'push' });
     }, [dataMode, setCardInUrl]);
@@ -51,6 +53,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     const closeCardModal = useCallback(() => {
         setIsCardPeekClosing(true);
         setActiveCardId(null);
+        setModalOpenSource(null);
         cardModalShortIdRef.current = null;
         setModalCardOverride(null);
         setCardModalStatus('idle');
@@ -363,6 +366,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         setModalCardOverride,
         openCardModal,
         closeCardModal,
+        modalOpenSource,
         modalProfiles,
     };
 }
