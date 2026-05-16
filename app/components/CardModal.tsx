@@ -151,10 +151,12 @@ export function CardModal({
     });
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
+    const cardPeekRootRef = useRef<HTMLElement | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
     const didFocusTitleOnOpenRef = useRef(false);
     const initialSidebarStateKeyRef = useRef<string | null>(null);
     const titleIsComposingRef = useRef(false);
+    const [cardPeekActualWidth, setCardPeekActualWidth] = useState(0);
 
     const {
         historyItems,
@@ -175,25 +177,52 @@ export function CardModal({
         activeSidebarTab,
     });
     const shouldFocusTitleOnOpen = !isLoading && !isHistoryPreviewing && title.trim().length === 0;
-    const sidebarLayoutMode = showSidebar && peekWidth >= SIDEBAR_DOCKED_MIN_WIDTH ? "docked" : "overlay";
+    const canDockSidebar = cardPeekActualWidth >= SIDEBAR_DOCKED_MIN_WIDTH;
+    const sidebarLayoutMode = showSidebar && canDockSidebar ? "docked" : "overlay";
     const sidebarOverlayWidth = Math.min(
         SIDEBAR_OVERLAY_MAX_WIDTH,
         Math.max(320, peekWidth >= 460 ? peekWidth - SIDEBAR_OVERLAY_REVEAL_WIDTH : peekWidth)
     );
 
+    useLayoutEffect(() => {
+        const node = cardPeekRootRef.current;
+        if (!node) return;
+
+        const syncWidth = () => {
+            setCardPeekActualWidth(node.getBoundingClientRect().width);
+        };
+        syncWidth();
+
+        if (typeof ResizeObserver === "undefined") {
+            window.addEventListener("resize", syncWidth);
+            return () => window.removeEventListener("resize", syncWidth);
+        }
+
+        const observer = new ResizeObserver(syncWidth);
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, []);
+
     useEffect(() => {
+        if (cardPeekActualWidth <= 0) return;
+
         const stateKey = `${card.id}:${openSource ?? "unknown"}:${peekMode}`;
         if (initialSidebarStateKeyRef.current === stateKey) return;
         initialSidebarStateKeyRef.current = stateKey;
 
-        if (openSource === "overdue" || peekMode === "compact") {
+        if (openSource === "overdue" || peekMode === "compact" || !canDockSidebar) {
             setShowSidebar(false);
             return;
         }
         if (peekMode === "standard" || peekMode === "wide") {
             setShowSidebar(true);
         }
-    }, [card.id, openSource, peekMode, setShowSidebar]);
+    }, [canDockSidebar, card.id, cardPeekActualWidth, openSource, peekMode, setShowSidebar]);
+
+    useEffect(() => {
+        if (!showSidebar || canDockSidebar) return;
+        setShowSidebar(false);
+    }, [canDockSidebar, setShowSidebar, showSidebar]);
 
     useEffect(() => {
         didFocusTitleOnOpenRef.current = false;
@@ -738,6 +767,7 @@ export function CardModal({
 
     return (
         <aside
+            ref={cardPeekRootRef}
             className="fixed bottom-0 right-0 top-0 z-[80] flex w-full flex-col border-l border-slate-200 bg-white shadow-2xl outline-none dark:border-gray-700 dark:bg-gray-800 md:w-[var(--card-peek-width)]"
             style={{ "--card-peek-width": computedWidth, maxWidth: "calc(100vw - 24px)" } as CSSProperties & Record<"--card-peek-width", string>}
             aria-label="Card detail"

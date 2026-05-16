@@ -2,7 +2,7 @@
 
 import { DndContext, DragOverlay, MeasuringStrategy } from "@dnd-kit/core";
 import clsx from "clsx";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { CardModal } from "@/app/components/CardModal";
 import TimelineBoardHeader from "@/app/(board)/_components/timeline/TimelineBoardHeader";
 import TimelineBoardDialogs from "@/app/(board)/_components/timeline/TimelineBoardDialogs";
@@ -185,7 +185,7 @@ const CARD_PEEK_STORAGE_KEY = "taesk.cardPeek.layout.v1";
 const CARD_PEEK_SNAP_TOLERANCE = 48;
 const CARD_PEEK_MIN_WIDTH = 320;
 const CARD_PEEK_MAX_WIDTH = 1280;
-const CARD_PEEK_COMPACT_BREAKPOINT = 900;
+const CARD_PEEK_STANDARD_MIN_AVAILABLE_WIDTH = CARD_PEEK_WIDTHS.standard * 2;
 
 const clampPeekWidth = (width: number) => Math.min(CARD_PEEK_MAX_WIDTH, Math.max(CARD_PEEK_MIN_WIDTH, Math.round(width)));
 
@@ -202,7 +202,7 @@ const resolveModeFromWidth = (width: number): Exclude<CardPeekMode, "full"> | nu
 };
 
 const resolveOpenPeekMode = (availableWidth: number): Exclude<CardPeekMode, "full"> =>
-  availableWidth < CARD_PEEK_COMPACT_BREAKPOINT ? "compact" : "standard";
+  availableWidth >= CARD_PEEK_STANDARD_MIN_AVAILABLE_WIDTH ? "standard" : "compact";
 
 export default function TimelineBoardScreen({
   parseResult,
@@ -220,6 +220,7 @@ export default function TimelineBoardScreen({
   bucketCreateMenu,
 }: TimelineBoardScreenProps) {
   const desktopScopeRef = useRef<HTMLDivElement | null>(null);
+  const desktopMainPanelRef = useRef<HTMLElement | null>(null);
   const requestIdRef = useRef(0);
   const [desktopShortcutDescriptor, setDesktopShortcutDescriptor] = useState<ShortcutContextDescriptor | null>(null);
   const [desktopHorizontalStepRequest, setDesktopHorizontalStepRequest] = useState<HorizontalStepRequest>(null);
@@ -230,7 +231,21 @@ export default function TimelineBoardScreen({
     mode: "standard",
     width: CARD_PEEK_WIDTHS.standard,
   });
-  const hadModalPropsRef = useRef(false);
+  const modalOpenStateKeyRef = useRef<string | null>(null);
+
+  const resolveAvailablePeekWidth = useCallback(() => {
+    if (typeof window === "undefined") return CARD_PEEK_WIDTHS.standard;
+    const mainPanelWidth = desktopMainPanelRef.current?.getBoundingClientRect().width;
+    if (mainPanelWidth && mainPanelWidth > 0) return mainPanelWidth;
+    const desktopWidth = desktopScopeRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    return Math.min(window.innerWidth, desktopWidth);
+  }, []);
+
+  const applyOpenPeekLayout = useCallback(() => {
+    const nextMode = resolveOpenPeekMode(resolveAvailablePeekWidth());
+    setCardPeekMode(nextMode);
+    setCardPeekWidth(CARD_PEEK_WIDTHS[nextMode]);
+  }, [resolveAvailablePeekWidth]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -257,17 +272,19 @@ export default function TimelineBoardScreen({
     );
   }, [cardPeekMode, cardPeekWidth, modalProps]);
 
-  useEffect(() => {
-    const isOpeningModal = Boolean(modalProps) && !hadModalPropsRef.current;
-    hadModalPropsRef.current = Boolean(modalProps);
-    if (!isOpeningModal || typeof window === "undefined") return;
+  useLayoutEffect(() => {
+    if (!modalProps || typeof window === "undefined") {
+      modalOpenStateKeyRef.current = null;
+      return;
+    }
 
-    const desktopWidth = desktopScopeRef.current?.getBoundingClientRect().width ?? window.innerWidth;
-    const availableWidth = Math.min(window.innerWidth, desktopWidth);
-    const nextMode = resolveOpenPeekMode(availableWidth);
-    setCardPeekMode(nextMode);
-    setCardPeekWidth(CARD_PEEK_WIDTHS[nextMode]);
-  }, [modalProps]);
+    const openStateKey = `${modalProps.card.id}:${modalProps.openSource ?? "unknown"}`;
+    if (modalOpenStateKeyRef.current === openStateKey) return;
+    modalOpenStateKeyRef.current = openStateKey;
+
+    if (modalProps.openSource === "overdue") return;
+    applyOpenPeekLayout();
+  }, [applyOpenPeekLayout, modalProps]);
 
   const handleCardPeekModeChange = useCallback((mode: CardPeekMode) => {
     setCardPeekMode((currentMode) => {
@@ -374,8 +391,7 @@ export default function TimelineBoardScreen({
   const desktopSidebarWidth = desktopSidebarExpanded ? "clamp(252px, 19vw, 292px)" : "2.5rem";
   const handleDesktopOpenOverdueTimelineCard = useCallback(
     (item: Parameters<NonNullable<typeof desktop.leftPanelProps.onOpenOverdueTimelineCard>>[0]) => {
-      setCardPeekMode("compact");
-      setCardPeekWidth(CARD_PEEK_WIDTHS.compact);
+      applyOpenPeekLayout();
       if (item.due_date) {
         setDesktopHorizontalStepRequest({
           id: ++requestIdRef.current,
@@ -385,7 +401,7 @@ export default function TimelineBoardScreen({
       }
       desktop.leftPanelProps.onOpenOverdueTimelineCard?.(item);
     },
-    [desktop.leftPanelProps],
+    [applyOpenPeekLayout, desktop.leftPanelProps],
   );
 
   const renderDesktopShell = useCallback(
@@ -404,7 +420,7 @@ export default function TimelineBoardScreen({
           />
         </aside>
 
-        <section data-testid="desktop-main-panel" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <section ref={desktopMainPanelRef} data-testid="desktop-main-panel" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {content}
         </section>
       </div>
@@ -540,8 +556,7 @@ export default function TimelineBoardScreen({
       openCardModal: mobile.leftPanelProps.openCardModal,
       onOpenOverdueTimelineCard: mobile.leftPanelProps.onOpenOverdueTimelineCard
         ? (item: Parameters<NonNullable<typeof mobile.leftPanelProps.onOpenOverdueTimelineCard>>[0]) => {
-            setCardPeekMode("compact");
-            setCardPeekWidth(CARD_PEEK_WIDTHS.compact);
+            applyOpenPeekLayout();
             setIsMobilePanelCollapsed(true);
             mobile.leftPanelProps.onOpenOverdueTimelineCard?.(item);
           }
@@ -654,7 +669,7 @@ export default function TimelineBoardScreen({
       );
     }
     return null;
-  }, [currentMobileSection, mobile.leftPanelProps, mobile.viewMode]);
+  }, [applyOpenPeekLayout, currentMobileSection, mobile.leftPanelProps, mobile.viewMode]);
 
   const renderMobileTopArea = useCallback(() => (
     <>
