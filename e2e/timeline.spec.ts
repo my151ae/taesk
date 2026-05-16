@@ -7037,7 +7037,7 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
-  test('moves heading with Mod-Shift-ArrowUp shortcut', async ({ page }) => {
+  test('moves heading with Mod-ArrowUp shortcut', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
       throw new Error('Missing board context for timeline spec');
@@ -7050,7 +7050,7 @@ test.describe('@feature:timeline Timeline view', () => {
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
     const timestamp = new Date().toISOString();
-    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+Shift+ArrowUp' : 'Control+Shift+ArrowUp';
+    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+ArrowUp';
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,
@@ -7128,7 +7128,7 @@ test.describe('@feature:timeline Timeline view', () => {
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
     const timestamp = new Date().toISOString();
-    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+Shift+ArrowUp' : 'Control+Shift+ArrowUp';
+    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+ArrowUp';
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,
@@ -7386,7 +7386,7 @@ test.describe('@feature:timeline Timeline view', () => {
     const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const isoDay = isoDateJst();
     const timestamp = new Date().toISOString();
-    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+Shift+ArrowUp' : 'Control+Shift+ArrowUp';
+    const moveUpShortcut = process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+ArrowUp';
 
     const { error: insertError } = await supabaseAdmin.from('cards').insert({
       id: cardId,

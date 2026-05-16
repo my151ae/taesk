@@ -575,13 +575,15 @@ test.describe('shortcut bar registry helpers', () => {
 
         expect(payload?.contextLabel).toBe('カード本文');
         expect(payload?.items.map((item) => item.id)).toEqual([
-            'modal-body-focus-title-column',
-            'modal-body-focus-title-end',
+            'modal-body-move-line-up',
+            'modal-body-move-line-down',
             'modal-body-undo',
             'modal-body-redo',
             'modal-body-indent',
             'modal-body-outdent',
             'modal-body-close',
+            'modal-body-focus-title-column',
+            'modal-body-focus-title-end',
         ]);
         expect(payload?.items.map((item) => item.enabled)).toEqual([
             true,
@@ -590,6 +592,8 @@ test.describe('shortcut bar registry helpers', () => {
             true,
             true,
             false,
+            true,
+            true,
             true,
         ]);
     });

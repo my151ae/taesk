@@ -696,7 +696,7 @@ export default function TiptapEditor({
                 const { state } = view;
                 const isMoveShortcut =
                     (event.metaKey || event.ctrlKey) &&
-                    event.shiftKey &&
+                    !event.altKey &&
                     (event.key === 'ArrowUp' || event.key === 'ArrowDown');
 
                 if (isMoveShortcut) {

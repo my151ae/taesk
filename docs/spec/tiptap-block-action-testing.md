@@ -63,7 +63,7 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 2. 先頭/末尾 block では `move-up` / `move-down` の disabled 状態を確認する。
 3. keyboard navigation は `ArrowUp` / `ArrowDown` / `Escape` を別テストで確認し、disabled item への roving focus と非実行も確認する。
 4. action 実行テストは menu item click を使い、保存 JSON を `expect.poll` で確認する。
-5. `Mod-Shift-ArrowUp/Down` の shortcut 実行は menu を開かず、保存 JSON を `expect.poll` で確認する。
+5. `Mod-ArrowUp/Down` の shortcut 実行は menu を開かず、保存 JSON を `expect.poll` で確認する。
 6. 末尾空 paragraph が追加されうるため、`> p` の単純件数は補助扱いに留める。
 7. nested task の completed hidden run 配下では handle を出さず、run 展開後に handle が復帰することを確認する。
 
