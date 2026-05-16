@@ -188,10 +188,13 @@ const CARD_PEEK_MAX_WIDTH = 1280;
 const CARD_PEEK_STANDARD_MIN_AVAILABLE_WIDTH = CARD_PEEK_WIDTHS.standard * 2;
 
 const clampPeekWidth = (width: number) => Math.min(CARD_PEEK_MAX_WIDTH, Math.max(CARD_PEEK_MIN_WIDTH, Math.round(width)));
+const resolveCompactPeekWidth = (availableWidth: number) => clampPeekWidth(availableWidth / 2);
+const resolvePresetPeekWidth = (mode: Exclude<CardPeekMode, "full">, availableWidth: number) =>
+  mode === "compact" ? resolveCompactPeekWidth(availableWidth) : CARD_PEEK_WIDTHS[mode];
 
-const resolveModeFromWidth = (width: number): Exclude<CardPeekMode, "full"> | null => {
+const resolveModeFromWidth = (width: number, availableWidth: number): Exclude<CardPeekMode, "full"> | null => {
   const candidates: Array<{ mode: Exclude<CardPeekMode, "full">; width: number }> = [
-    { mode: "compact", width: CARD_PEEK_WIDTHS.compact },
+    { mode: "compact", width: resolveCompactPeekWidth(availableWidth) },
     { mode: "standard", width: CARD_PEEK_WIDTHS.standard },
     { mode: "wide", width: CARD_PEEK_WIDTHS.wide },
   ];
@@ -242,9 +245,10 @@ export default function TimelineBoardScreen({
   }, []);
 
   const applyOpenPeekLayout = useCallback(() => {
-    const nextMode = resolveOpenPeekMode(resolveAvailablePeekWidth());
+    const availableWidth = resolveAvailablePeekWidth();
+    const nextMode = resolveOpenPeekMode(availableWidth);
     setCardPeekMode(nextMode);
-    setCardPeekWidth(CARD_PEEK_WIDTHS[nextMode]);
+    setCardPeekWidth(resolvePresetPeekWidth(nextMode, availableWidth));
   }, [resolveAvailablePeekWidth]);
 
   useEffect(() => {
@@ -297,10 +301,10 @@ export default function TimelineBoardScreen({
         setCardPeekWidth(previous.width);
         return previous.mode === "full" ? "standard" : previous.mode;
       }
-      setCardPeekWidth(CARD_PEEK_WIDTHS[mode]);
+      setCardPeekWidth(resolvePresetPeekWidth(mode, resolveAvailablePeekWidth()));
       return mode;
     });
-  }, [cardPeekWidth]);
+  }, [cardPeekWidth, resolveAvailablePeekWidth]);
 
   const handleCardPeekResizeStart = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (cardPeekMode === "full") return;
@@ -316,10 +320,11 @@ export default function TimelineBoardScreen({
     };
 
     const handleUp = () => {
-      const snappedMode = resolveModeFromWidth(latestWidth);
+      const availableWidth = resolveAvailablePeekWidth();
+      const snappedMode = resolveModeFromWidth(latestWidth, availableWidth);
       if (snappedMode) {
         setCardPeekMode(snappedMode);
-        setCardPeekWidth(CARD_PEEK_WIDTHS[snappedMode]);
+        setCardPeekWidth(resolvePresetPeekWidth(snappedMode, availableWidth));
       }
       document.removeEventListener("mousemove", handleMove);
       document.removeEventListener("mouseup", handleUp);
@@ -327,7 +332,7 @@ export default function TimelineBoardScreen({
 
     document.addEventListener("mousemove", handleMove);
     document.addEventListener("mouseup", handleUp);
-  }, [cardPeekMode, cardPeekWidth]);
+  }, [cardPeekMode, cardPeekWidth, resolveAvailablePeekWidth]);
 
   const setBoardShortcutContextFromTarget = useCallback((target: EventTarget | null) => {
     const nextDescriptor = getShortcutContextFromTarget(target);

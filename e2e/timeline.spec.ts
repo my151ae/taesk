@@ -1810,7 +1810,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(cardMenu).toBeVisible();
       await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();
       await page.keyboard.press('ArrowDown');
-      await expect(cardMenu.getByRole('menuitem', { name: '完了にする' })).toBeFocused();
+      await expect(cardMenu.getByRole('menuitem', { name: /^Todayへ:/ })).toBeFocused();
       await page.keyboard.press('Escape');
       await expect(cardMenu).toBeHidden();
       await expect(completedBFocusable).toBeFocused();
@@ -5597,7 +5597,7 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();
 
       await page.keyboard.press('ArrowDown');
-      await expect(cardMenu.getByRole('menuitem', { name: '完了にする' })).toBeFocused();
+      await expect(cardMenu.getByRole('menuitem', { name: /^Todayへ:/ })).toBeFocused();
 
       await page.keyboard.press('ArrowUp');
       await expect(cardMenu.getByRole('menuitem', { name: 'カードを開く' })).toBeFocused();

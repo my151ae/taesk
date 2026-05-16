@@ -112,12 +112,6 @@ export function useTimelineCardContextMenuItems({
 
     nextItems.push(
       {
-        label: toggleLabel,
-        onClick: async () => {
-          await runForTargetCards((cardId) => handleToggleCardChecked(cardId, hasUncheckedCard));
-        },
-      },
-      {
         label: `Todayへ:${dateLabel(0)}`,
         onClick: async () => {
           await runForTargetCards((cardId) => moveCardByDayOffset(cardId, 0));
@@ -168,11 +162,9 @@ export function useTimelineCardContextMenuItems({
         ],
       },
       {
-        label: "ゴミ箱へ移動",
-        variant: "danger",
+        label: toggleLabel,
         onClick: async () => {
-          if (!confirm("カードをゴミ箱へ移動しますか？")) return;
-          await runForTargetCards((cardId) => handleCardModalDelete(cardId));
+          await runForTargetCards((cardId) => handleToggleCardChecked(cardId, hasUncheckedCard));
         },
       },
     );
@@ -180,7 +172,7 @@ export function useTimelineCardContextMenuItems({
     if (!isBulkMenu && selectedCard) {
       const cardId = selectedCard.card_id;
       if (selectedCard.is_parent) {
-        nextItems.unshift({
+        nextItems.push({
           label: "子カードを追加",
           onClick: async () => {
             const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/children`, {
@@ -251,6 +243,17 @@ export function useTimelineCardContextMenuItems({
         });
       }
     }
+
+    nextItems.push(
+      {
+        label: "ゴミ箱へ移動",
+        variant: "danger",
+        onClick: async () => {
+          if (!confirm("カードをゴミ箱へ移動しますか？")) return;
+          await runForTargetCards((cardId) => handleCardModalDelete(cardId));
+        },
+      },
+    );
 
     return nextItems;
   }, [
