@@ -432,6 +432,27 @@ export default function TimelineBoardScreen({
     modalProps?.onOpenCardLink?.(shortId);
   }, [applyOpenPeekLayout, desktop.activeView, desktop.timelineViewProps.abBuckets, desktop.timelineViewProps.eventsByDay, modalProps]);
 
+  const lastScrolledCardIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!modalProps?.card) {
+      lastScrolledCardIdRef.current = null;
+      return;
+    }
+
+    const card = modalProps.card;
+    if (card.id === lastScrolledCardIdRef.current) return;
+    lastScrolledCardIdRef.current = card.id;
+
+    if (desktop.activeView === "timeline" && card.due_date) {
+      setDesktopHorizontalStepRequest({
+        id: ++requestIdRef.current,
+        direction: "date",
+        targetIso: card.due_date,
+      });
+    }
+  }, [modalProps?.card?.id, modalProps?.card?.due_date, desktop.activeView]);
+
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-b-2xl border border-slate-200 border-t-slate-200 bg-white shadow-sm">

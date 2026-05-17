@@ -399,6 +399,39 @@ export function DesktopTimelineView({
     };
   }, [timelineScrollRef, hourHeight, setHourHeight, timelineStartHour]);
 
+  // A/Bリスト上での Shift + マウスクロールによる横スクロールサポート
+  useEffect(() => {
+    const container = horizontalScrollRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Shiftキーが押されているスクロールのみ対象
+      if (!e.shiftKey) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // マウスが A/Bリスト（.ab-col または [data-ab-day]）の上にある場合のみ介入
+      const isOnAbList = target.closest('.ab-col') || target.closest('[data-ab-day]');
+      if (!isOnAbList) return;
+
+      // スクロール量を取得（環境により deltaX または deltaY に値が入る）
+      const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      if (delta === 0) return;
+
+      // デフォルトのスクロール（バケット内部の縦スクロールなど）を抑制し、
+      // タイムライン全体の横スクロールコンテナをスクロールさせる
+      e.preventDefault();
+      container.scrollLeft += delta;
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [horizontalScrollRef]);
+
+
   // Ghost card state for Timeline
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; minutes: number } | null>(null);
   const [activeStackItem, setActiveStackItem] = useState<{ kind: StackedTimelineItemKind; id: string } | null>(null);

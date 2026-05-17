@@ -648,7 +648,7 @@ export default function TiptapEditor({
             Link.configure({
                 autolink: false,
                 linkOnPaste: false,
-                openOnClick: true,
+                openOnClick: false,
                 HTMLAttributes: {
                     class: 'taesk-card-link',
                 },
@@ -790,6 +790,27 @@ export default function TiptapEditor({
                     if (Math.abs(delta) <= lineStep * 1.5) return;
                     scrollContainer.scrollTop = beforeTop + Math.sign(delta) * lineStep;
                 });
+                return false;
+            },
+            handleClick: (view, pos, event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                const link = target?.closest('a');
+                if (link instanceof HTMLAnchorElement) {
+                    const href = link.getAttribute('href') || '';
+                    const match = link.href.match(/\/c\/([^/?#]+)(?:[/?#]|$)/);
+                    if (
+                        match &&
+                        (href.startsWith('/c/') ||
+                            href.includes('/c/') ||
+                            (typeof window !== 'undefined' && link.href.includes(window.location.host + '/c/')))
+                    ) {
+                        const shortId = match[1];
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onOpenCardLink?.(shortId);
+                        return true;
+                    }
+                }
                 return false;
             },
         },
@@ -1499,10 +1520,12 @@ export default function TiptapEditor({
 
     const handleEditorClick = (event: ReactMouseEvent<HTMLDivElement>) => {
         const target = event.target instanceof Element ? event.target : null;
-        const link = target?.closest('a[href^="/c/"]');
+        const link = target?.closest('a');
         if (link instanceof HTMLAnchorElement) {
-            const shortId = link.getAttribute('href')?.match(/^\/c\/([^/?#]+)/)?.[1];
-            if (shortId) {
+            const href = link.getAttribute('href') || '';
+            const match = link.href.match(/\/c\/([^/?#]+)(?:[/?#]|$)/);
+            if (match && (href.startsWith('/c/') || href.includes('/c/') || (typeof window !== 'undefined' && link.href.includes(window.location.host + '/c/')))) {
+                const shortId = match[1];
                 event.preventDefault();
                 event.stopPropagation();
                 onOpenCardLink?.(shortId);
