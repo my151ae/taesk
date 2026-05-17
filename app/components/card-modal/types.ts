@@ -3,6 +3,21 @@ import type { JSONContent } from '@tiptap/react';
 
 export type ReminderMinuteOption = 0 | 5 | 10 | 15 | 30 | 60;
 
+export type CardModalDirtyFields = {
+  title: boolean;
+  content: boolean;
+  checked: boolean;
+  tags: boolean;
+  dueDate: boolean;
+  dueStart: boolean;
+  dueEnd: boolean;
+  reminders: boolean;
+  dueBucket: boolean;
+  duration: boolean;
+  assignees: boolean;
+  targetBoard: boolean;
+};
+
 export type CardModalSavePayload = {
   id: string;
   title: string;

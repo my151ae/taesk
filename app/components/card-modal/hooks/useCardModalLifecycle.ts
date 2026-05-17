@@ -83,7 +83,6 @@ export function useCardModalLifecycle({
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) return;
-    if (hasPendingChangesRef.current) return;
     if (isLoading) return;
 
     const metadataKey = JSON.stringify({
@@ -131,7 +130,6 @@ export function useCardModalLifecycle({
     card.assigned_to,
     card.board_id,
     isLoading,
-    hasPendingChangesRef,
     syncExternalMetadata,
   ]);
 

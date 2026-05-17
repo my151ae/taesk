@@ -26,12 +26,7 @@ import { useCardModalAutoSave } from "@/app/components/card-modal/hooks/useCardM
 import { useCardModalLifecycle } from "@/app/components/card-modal/hooks/useCardModalLifecycle";
 import { useCardModalMemberPicker } from "@/app/components/card-modal/hooks/useCardModalMemberPicker";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
-import {
-    countCheckedLines,
-    countNonEmptyLines,
-    normalizeChecklist,
-    type Checklist,
-} from "@/lib/checklist";
+import { useChildCardSummaries } from "@/app/components/card-modal/hooks/useChildCardSummaries";
 import {
     buildShortcutDataAttributes,
     createEmptyShortcutBarPayload,
@@ -50,52 +45,6 @@ const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
 const SIDEBAR_DOCKED_MIN_WIDTH = 680;
 const SIDEBAR_OVERLAY_MAX_WIDTH = 384;
 const SIDEBAR_OVERLAY_REVEAL_WIDTH = 96;
-
-type ChildCardSummary = {
-    id: string;
-    short_id: string | null;
-    title: string;
-    checklist: Checklist | null;
-    content: JSONContent | null;
-    due_date: string | null;
-    due_start: string | null;
-    due_end: string | null;
-    due_bucket: DueBucket | null;
-    created_at: string;
-};
-
-const formatChildCardDate = (value: string | null) => {
-    if (!value) return "日付なし";
-    const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return value;
-    return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short" }).format(date);
-};
-
-const formatChildCardTimeRange = (start: string | null, end: string | null) => {
-    if (!start && !end) return "時間なし";
-    if (start && end) return `${start.slice(0, 5)}-${end.slice(0, 5)}`;
-    return (start ?? end ?? "").slice(0, 5);
-};
-
-const formatChildCardBucket = (bucket: DueBucket | null) => (bucket ? bucket.toUpperCase() : "-");
-
-const countTaskItemsInContent = (content: JSONContent | null | undefined) => {
-    const progress = { checked: 0, total: 0 };
-
-    const visit = (node: JSONContent | null | undefined) => {
-        if (!node) return;
-        if (node.type === "taskItem") {
-            progress.total += 1;
-            if (node.attrs?.checked === true) {
-                progress.checked += 1;
-            }
-        }
-        node.content?.forEach((child) => visit(child));
-    };
-
-    visit(content);
-    return progress;
-};
 
 interface CardModalProps {
     card: Card;
@@ -195,6 +144,7 @@ export function CardModal({
         setEditorError,
         filteredProfiles,
         selectedAssignees,
+        markFieldDirty,
         resetDraft,
         syncExternalMetadata,
     } = useCardModalDraft({ card, profiles });
@@ -208,7 +158,13 @@ export function CardModal({
         canIndent: false,
         canOutdent: false,
     });
-    const [childCards, setChildCards] = useState<ChildCardSummary[]>([]);
+    const { childCardLinkMetaByShortId } = useChildCardSummaries({
+        boardId: card.board_id,
+        cardId: card.id,
+        isParent: Boolean(card.is_parent),
+        childCount: card.child_count,
+        refreshKey: childSummaryRefreshKey,
+    });
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const cardPeekRootRef = useRef<HTMLElement | null>(null);
@@ -308,55 +264,6 @@ export function CardModal({
         );
         return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
     }, [content]);
-
-    useEffect(() => {
-        if (!card.is_parent) {
-            setChildCards((prev) => (prev.length ? [] : prev));
-            return;
-        }
-
-        const abortController = new AbortController();
-        const loadChildCards = async () => {
-            try {
-                const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/children`, {
-                    signal: abortController.signal,
-                });
-                const body = await response.json().catch(() => null);
-                if (abortController.signal.aborted) return;
-                if (!response.ok) {
-                    throw new Error(body?.error?.message || "子カードの読み込みに失敗しました");
-                }
-                const nextChildren = Array.isArray(body?.children) ? body.children : [];
-                setChildCards(nextChildren as ChildCardSummary[]);
-            } catch (error) {
-                if (abortController.signal.aborted) return;
-                setChildCards([]);
-            }
-        };
-
-        void loadChildCards();
-        return () => abortController.abort();
-    }, [card.board_id, card.child_count, card.id, card.is_parent, childSummaryRefreshKey]);
-
-    const childCardLinkMetaByShortId = useMemo(() => {
-        return childCards.reduce<Record<string, string>>((acc, child) => {
-            if (!child.short_id) return acc;
-            const checklist = normalizeChecklist(child.checklist ?? null);
-            const checklistProgress = {
-                checked: countCheckedLines(checklist),
-                total: countNonEmptyLines(checklist),
-            };
-            const contentProgress = countTaskItemsInContent(child.content);
-            const progress = checklistProgress.total > 0 ? checklistProgress : contentProgress;
-            acc[child.short_id] = [
-                formatChildCardDate(child.due_date),
-                formatChildCardTimeRange(child.due_start, child.due_end),
-                formatChildCardBucket(child.due_bucket),
-                `${progress.checked}/${progress.total}`,
-            ].join(" ");
-            return acc;
-        }, {});
-    }, [childCards]);
 
     const mergedAvailableTags = useMemo(() => {
         const nextTags = new Set<string>();
@@ -648,6 +555,7 @@ export function CardModal({
     const handleAddMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
         if (!assigneeIds.includes(profileId)) {
+            markFieldDirty("assignees");
             setAssigneeIds([...assigneeIds, profileId]);
             setAssigneeTouched(true);
             triggerAutoSave();
@@ -657,6 +565,7 @@ export function CardModal({
 
     const handleRemoveMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("assignees");
         setAssigneeIds(assigneeIds.filter(id => id !== profileId));
         setAssigneeTouched(true);
         triggerAutoSave();
@@ -668,6 +577,7 @@ export function CardModal({
             e.preventDefault();
             const nextTag = tagInput.trim();
             if (!tags.includes(nextTag)) {
+                markFieldDirty("tags");
                 setTags([...tags, nextTag]);
                 triggerAutoSave();
             }
@@ -684,13 +594,15 @@ export function CardModal({
             return;
         }
 
+        markFieldDirty("tags");
         setTags([...tags, trimmedValue]);
         setTagInput('');
         triggerAutoSave();
-    }, [isHistoryPreviewing, mergedAvailableTags, setTagInput, setTags, tags, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, mergedAvailableTags, setTagInput, setTags, tags, triggerAutoSave]);
 
     const handleRemoveTag = (tagToRemove: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("tags");
         setTags(tags.filter(t => t !== tagToRemove));
         triggerAutoSave();
     };
@@ -713,12 +625,14 @@ export function CardModal({
 
     const handleDueDateInputChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("dueDate");
         setDueDate(value ? new Date(value).toISOString() : '');
         triggerAutoSave();
-    }, [isHistoryPreviewing, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
 
     const handleDueStartChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("dueStart");
         setDueStart(value);
         handleTimeToggle(!!value);
 
@@ -729,14 +643,16 @@ export function CardModal({
             const endMins = startMins + duration;
             const h = Math.floor(endMins / 60) % 24;
             const m = endMins % 60;
+            markFieldDirty("dueEnd");
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
 
         triggerAutoSave();
-    }, [isHistoryPreviewing, handleTimeToggle, duration, triggerAutoSave]);
+    }, [isHistoryPreviewing, handleTimeToggle, duration, markFieldDirty, triggerAutoSave]);
 
     const handleDueEndChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("dueEnd");
         setDueEnd(value);
 
         // Update duration based on start time
@@ -746,44 +662,50 @@ export function CardModal({
             const startMins = sH * 60 + sM;
             let endMins = eH * 60 + eM;
             if (endMins < startMins) endMins += 24 * 60; // Cross midnight
+            markFieldDirty("duration");
             setDuration(Math.max(0, endMins - startMins));
         }
 
         triggerAutoSave();
-    }, [isHistoryPreviewing, dueStart, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, markFieldDirty, triggerAutoSave]);
 
     const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("reminders");
         setStartReminderEnabled(enabled);
         if (enabled && !REMINDER_MINUTE_OPTIONS.includes(startReminderMinutes)) {
             setStartReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, startReminderMinutes, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, startReminderMinutes, triggerAutoSave]);
 
     const handleStartReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("reminders");
         setStartReminderMinutes(minutes);
         triggerAutoSave();
-    }, [isHistoryPreviewing, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
 
     const handleEndReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("reminders");
         setEndReminderEnabled(enabled);
         if (enabled && !REMINDER_MINUTE_OPTIONS.includes(endReminderMinutes)) {
             setEndReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, endReminderMinutes, triggerAutoSave]);
+    }, [isHistoryPreviewing, endReminderMinutes, markFieldDirty, triggerAutoSave]);
 
     const handleEndReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("reminders");
         setEndReminderMinutes(minutes);
         triggerAutoSave();
-    }, [isHistoryPreviewing, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
 
     const handleDurationChange = useCallback((value: number | "") => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("duration");
         if (value === "") {
             setDuration("");
             return;
@@ -798,19 +720,22 @@ export function CardModal({
             const endMins = startMins + nextDuration;
             const h = Math.floor(endMins / 60) % 24;
             const m = endMins % 60;
+            markFieldDirty("dueEnd");
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, dueStart, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, markFieldDirty, triggerAutoSave]);
 
     const handleTargetBoardChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("targetBoard");
         setTargetBoardId(value);
         triggerAutoSave();
-    }, [isHistoryPreviewing, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
 
     const handleBucketChange = (next: DueBucket) => {
         if (isHistoryPreviewing) return;
+        markFieldDirty("dueBucket");
         setDueBucket(next);
         setDueBucketPosition(Date.now());
         triggerAutoSave();
@@ -843,6 +768,7 @@ export function CardModal({
 
     const handleApplyHistory = useCallback(() => {
         if (!previewHistoryContent || !selectedHistoryId) return;
+        markFieldDirty("content");
         setContent(previewHistoryContent);
         hasPendingChangesRef.current = false;
         handleSave(false, {
@@ -850,7 +776,7 @@ export function CardModal({
             historySourceId: selectedHistoryId,
             contentOverride: previewHistoryContent,
         });
-    }, [previewHistoryContent, selectedHistoryId, handleSave]);
+    }, [previewHistoryContent, selectedHistoryId, markFieldDirty, handleSave]);
 
     const titleShortcutAttributes = useMemo(
         () =>
@@ -1052,6 +978,7 @@ export function CardModal({
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
                                             const val = e.target.checked;
+                                            markFieldDirty("checked");
                                             setChecked(val);
                                             triggerAutoSave();
                                         }}
@@ -1074,6 +1001,7 @@ export function CardModal({
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
                                             const normalizedTitle = e.target.value.replace(/\r?\n/g, "");
+                                            markFieldDirty("title");
                                             setTitle(normalizedTitle);
                                             triggerAutoSave();
                                         }}
@@ -1150,6 +1078,7 @@ export function CardModal({
                                                     onShortcutStateChange={setBodyShortcutState}
                                                     onChange={(val) => {
                                                         if (isHistoryPreviewing) return;
+                                                        markFieldDirty("content");
                                                         setContent(val);
                                                         triggerAutoSave(val);
                                                         if (editorError) {

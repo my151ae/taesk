@@ -174,6 +174,16 @@ const rebuildCardLocationIndex = (cache: TimelineCache) => {
   cache.cardLocationById = nextIndex;
 };
 
+// Timeline fetch responses are the only source that may update the loaded
+// window metadata (`loadedSpans`, `lastRequestedWindow`, startOffset/range).
+//
+// Realtime and optimistic card mutations must preserve the current visible
+// window. They should update card placement/content only, not infer a new
+// timeline window from the resulting view payload.
+//
+// When an API response includes `startOffset` and `range`, treat those as the
+// source of truth. Recomputing from `days[0]` is only a fallback for legacy or
+// mock payloads.
 const syncCacheFromResponse = (cache: TimelineCache, payload: TimelineResponse, currentTimelineIso: string) => {
   cache.daysByIso = new Map(payload.days.map((day) => [day.isoDate, day]));
 
@@ -222,6 +232,8 @@ const mergeResponseIntoCache = (
   payload: TimelineResponse,
   request: { startOffset: number; range: number },
 ) => {
+  // Range fetches are allowed to extend loaded spans and replace the visible
+  // request window because they are explicit timeline data fetches.
   payload.days.forEach((day) => {
     cache.daysByIso.set(day.isoDate, day);
     cache.eventsByIso.set(day.isoDate, []);
@@ -255,6 +267,36 @@ const mergeResponseIntoCache = (
   cache.availableTags = payload.availableTags ?? cache.availableTags;
   cache.serverNow = payload.serverNow ?? cache.serverNow;
   cache.lastRequestedWindow = request;
+  rebuildCardLocationIndex(cache);
+};
+
+const mergeViewPayloadIntoCachePreservingWindow = (cache: TimelineCache, payload: TimelineResponse) => {
+  payload.days.forEach((day) => {
+    cache.daysByIso.set(day.isoDate, day);
+    cache.eventsByIso.set(day.isoDate, []);
+    cache.abBucketsByKey.set(`${day.key}_a`, []);
+    cache.abBucketsByKey.set(`${day.key}_b`, []);
+  });
+
+  payload.events.forEach((event) => {
+    if (!cache.daysByIso.has(event.due_date)) return;
+    const current = cache.eventsByIso.get(event.due_date) ?? [];
+    current.push(event);
+    cache.eventsByIso.set(event.due_date, current);
+  });
+
+  payload.days.forEach((day) => {
+    const events = cache.eventsByIso.get(day.isoDate) ?? [];
+    cache.eventsByIso.set(day.isoDate, sortEvents(events));
+  });
+
+  Object.entries(payload.abBuckets ?? {}).forEach(([bucketKey, items]) => {
+    cache.abBucketsByKey.set(bucketKey, sortBucketItems(items));
+  });
+
+  cache.overdue = payload.overdue ?? cache.overdue;
+  cache.availableTags = payload.availableTags ?? cache.availableTags;
+  cache.serverNow = payload.serverNow ?? cache.serverNow;
   rebuildCardLocationIndex(cache);
 };
 
@@ -310,6 +352,60 @@ export const useTimelineData = ({
     traceRef.current = createClientTrace("timeline");
   }, []);
 
+  const replaceTimelineFromFetch = useCallback((
+    payload: TimelineResponse,
+    request?: { startOffset: number; range: number },
+  ): TimelineResponse | null => {
+    if (request) {
+      mergeResponseIntoCache(cacheRef.current, payload, request);
+    } else {
+      syncCacheFromResponse(
+        cacheRef.current,
+        payload,
+        getCurrentTimelineIsoDateJst(timelineStartHour),
+      );
+    }
+    return buildPayloadFromCache(cacheRef.current);
+  }, [timelineStartHour]);
+
+  const replaceTimelineFromCardMutation = useCallback((payload: TimelineResponse): TimelineResponse | null => {
+    mergeViewPayloadIntoCachePreservingWindow(cacheRef.current, payload);
+    return buildPayloadFromCache(cacheRef.current);
+  }, []);
+
+  const applyOptimisticCardUpdate = useCallback((
+    current: TimelineResponse | null,
+    card: Card,
+    eventType: "INSERT" | "UPDATE" | "DELETE",
+  ): TimelineResponse | null => {
+    if (!current) return current;
+    const next = applyCardUpdate(current, card, eventType);
+    return {
+      ...next,
+      startOffset: current.startOffset,
+      range: current.range,
+    };
+  }, []);
+
+  const applyRealtimeCardUpdate = useCallback((
+    current: TimelineResponse | null,
+    payload: RealtimePostgresChangesPayload<Card>,
+  ): TimelineResponse | null => {
+    if (!current) return current;
+
+    const { eventType } = payload;
+    if (eventType !== "INSERT" && eventType !== "UPDATE" && eventType !== "DELETE") {
+      return current;
+    }
+
+    const record = eventType === "DELETE" ? (payload.old as Card) : (payload.new as Card);
+    return applyOptimisticCardUpdate(current, record, eventType);
+  }, [applyOptimisticCardUpdate]);
+
+  const rollbackTimeline = useCallback((snapshot: TimelineResponse | null): TimelineResponse | null => {
+    return snapshot;
+  }, []);
+
   const setData = useCallback<Dispatch<SetStateAction<TimelineResponse | null>>>(
     (value) => {
       setDataState((current) => {
@@ -318,15 +414,13 @@ export const useTimelineData = ({
           cacheRef.current = createEmptyCache();
           return next;
         }
-        syncCacheFromResponse(
-          cacheRef.current,
-          next,
-          getCurrentTimelineIsoDateJst(timelineStartHour),
-        );
-        return buildPayloadFromCache(cacheRef.current);
+        // Legacy external callers still use setData for optimistic card
+        // updates and rollback snapshots. Preserve the payload's window
+        // metadata instead of deriving a new window from mutated card rows.
+        return replaceTimelineFromCardMutation(rollbackTimeline(next)!);
       });
     },
-    [timelineStartHour],
+    [replaceTimelineFromCardMutation, rollbackTimeline],
   );
 
   const ensureTimelineRange = useCallback(
@@ -376,7 +470,7 @@ export const useTimelineData = ({
             throw new Error(body?.error?.message || "Failed to load timeline");
           }
           const payload = (await response.json()) as TimelineResponse;
-          mergeResponseIntoCache(cacheRef.current, payload, { startOffset, range });
+          replaceTimelineFromFetch(payload, { startOffset, range });
           pruneCache(
             cacheRef.current,
             addDaysToIso(currentTimelineIso, startOffset),
@@ -405,8 +499,7 @@ export const useTimelineData = ({
             console.warn("[timeline] fetch failed, rendering mock data", error);
             setErrorMessage("Showing sample schedule until sync succeeds");
             const fallback = buildMockTimelineResponse();
-            syncCacheFromResponse(cacheRef.current, fallback, currentTimelineIso);
-            const nextData = buildPayloadFromCache(cacheRef.current);
+            const nextData = replaceTimelineFromFetch(fallback);
             setDataState(nextData);
             setDataMode("mock");
             return nextData;
@@ -431,6 +524,7 @@ export const useTimelineData = ({
       buildMockTimelineResponse,
       dayWindowStartRef,
       initialBoard?.id,
+      replaceTimelineFromFetch,
       setDayWindowStart,
       timelineStartHour,
     ],
@@ -453,18 +547,13 @@ export const useTimelineData = ({
   const removeComment = useCommentsStore((state) => state.removeComment);
 
   const handleCardChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
-    setData((prev) => {
-      if (!prev) return prev;
-
-      const { eventType } = payload;
-      const record = eventType === "DELETE" ? (payload.old as Card) : (payload.new as Card);
-      if (eventType === "INSERT" || eventType === "UPDATE" || eventType === "DELETE") {
-        return applyCardUpdate(prev, record, eventType);
-      }
-      return prev;
+    setDataState((current) => {
+      const next = applyRealtimeCardUpdate(current, payload);
+      if (!next) return next;
+      return replaceTimelineFromCardMutation(next);
     });
     onRealtimeCardChange?.(payload);
-  }, [onRealtimeCardChange, setData]);
+  }, [applyRealtimeCardUpdate, onRealtimeCardChange, replaceTimelineFromCardMutation]);
 
   const { realtimeStatus } = useRealtimeBoard(initialBoard.id, {
     onCardChange: handleCardChange,

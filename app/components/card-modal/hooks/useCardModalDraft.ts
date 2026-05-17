@@ -1,13 +1,33 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JSONContent } from "@tiptap/react";
 
 import type { Card, DueBucket, ProfileSummary } from "@/lib/supabase";
 import { normalizeContent } from "@/lib/tiptap";
-import type { ReminderMinuteOption } from "@/app/components/card-modal/types";
+import type { CardModalDirtyFields, ReminderMinuteOption } from "@/app/components/card-modal/types";
 
 const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
+
+const createCleanDirtyFields = (): CardModalDirtyFields => ({
+  title: false,
+  content: false,
+  checked: false,
+  tags: false,
+  dueDate: false,
+  dueStart: false,
+  dueEnd: false,
+  reminders: false,
+  dueBucket: false,
+  duration: false,
+  assignees: false,
+  targetBoard: false,
+});
+
+const normalizeReminderMinutes = (value: unknown): ReminderMinuteOption =>
+  REMINDER_MINUTE_OPTIONS.includes((value ?? 0) as ReminderMinuteOption)
+    ? ((value ?? 0) as ReminderMinuteOption)
+    : 0;
 
 function resolveInitialAssigneeIds(card: Card): string[] {
   if (card.assignee_ids && card.assignee_ids.length > 0) {
@@ -56,6 +76,22 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState<"comments" | "history" | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [dirtyFields, setDirtyFields] = useState<CardModalDirtyFields>(() => createCleanDirtyFields());
+  const dirtyFieldsRef = useRef<CardModalDirtyFields>(dirtyFields);
+
+  useEffect(() => {
+    dirtyFieldsRef.current = dirtyFields;
+  }, [dirtyFields]);
+
+  const markFieldDirty = useCallback((field: keyof CardModalDirtyFields) => {
+    setDirtyFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  }, []);
+
+  const clearDirtyFields = useCallback(() => {
+    const clean = createCleanDirtyFields();
+    dirtyFieldsRef.current = clean;
+    setDirtyFields(clean);
+  }, []);
 
   const filteredProfiles = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
@@ -113,32 +149,47 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setTargetBoardId(nextCard.board_id);
     setActiveSidebarTab(null);
     setEditorError(null);
-  }, []);
+    clearDirtyFields();
+  }, [clearDirtyFields]);
 
   const syncExternalMetadata = useCallback((nextCard: Card) => {
-    setTags(nextCard.tags || []);
-    setDueDate(nextCard.due_date || "");
-    setDueStart(nextCard.due_start ? nextCard.due_start.slice(0, 5) : "");
-    setDueEnd(nextCard.due_end ? nextCard.due_end.slice(0, 5) : "");
-    setStartReminderEnabled(Boolean(nextCard.start_reminder_enabled));
-    setStartReminderMinutes(
-      REMINDER_MINUTE_OPTIONS.includes((nextCard.start_reminder_minutes ?? 0) as ReminderMinuteOption)
-        ? (nextCard.start_reminder_minutes ?? 0) as ReminderMinuteOption
-        : 0
-    );
-    setEndReminderEnabled(Boolean(nextCard.end_reminder_enabled));
-    setEndReminderMinutes(
-      REMINDER_MINUTE_OPTIONS.includes((nextCard.end_reminder_minutes ?? 0) as ReminderMinuteOption)
-        ? (nextCard.end_reminder_minutes ?? 0) as ReminderMinuteOption
-        : 0
-    );
-    setDueBucket(nextCard.due_bucket ?? null);
-    setDueBucketPosition(nextCard.due_bucket_position ?? null);
-    setDuration(nextCard.duration ?? 60);
-    setChecked(nextCard.checked || false);
-    setAssigneeIds(resolveInitialAssigneeIds(nextCard));
-    setAssigneeTouched(false);
-    setTargetBoardId(nextCard.board_id);
+    const dirty = dirtyFieldsRef.current;
+
+    if (!dirty.tags) {
+      setTags(nextCard.tags || []);
+    }
+    if (!dirty.dueDate) {
+      setDueDate(nextCard.due_date || "");
+    }
+    if (!dirty.dueStart) {
+      setDueStart(nextCard.due_start ? nextCard.due_start.slice(0, 5) : "");
+    }
+    if (!dirty.dueEnd) {
+      setDueEnd(nextCard.due_end ? nextCard.due_end.slice(0, 5) : "");
+    }
+    if (!dirty.reminders) {
+      setStartReminderEnabled(Boolean(nextCard.start_reminder_enabled));
+      setStartReminderMinutes(normalizeReminderMinutes(nextCard.start_reminder_minutes));
+      setEndReminderEnabled(Boolean(nextCard.end_reminder_enabled));
+      setEndReminderMinutes(normalizeReminderMinutes(nextCard.end_reminder_minutes));
+    }
+    if (!dirty.dueBucket) {
+      setDueBucket(nextCard.due_bucket ?? null);
+      setDueBucketPosition(nextCard.due_bucket_position ?? null);
+    }
+    if (!dirty.duration) {
+      setDuration(nextCard.duration ?? 60);
+    }
+    if (!dirty.checked) {
+      setChecked(nextCard.checked || false);
+    }
+    if (!dirty.assignees) {
+      setAssigneeIds(resolveInitialAssigneeIds(nextCard));
+      setAssigneeTouched(false);
+    }
+    if (!dirty.targetBoard) {
+      setTargetBoardId(nextCard.board_id);
+    }
   }, []);
 
   return {
@@ -190,6 +241,9 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setEditorError,
     filteredProfiles,
     selectedAssignees,
+    dirtyFields,
+    markFieldDirty,
+    clearDirtyFields,
     resetDraft,
     syncExternalMetadata,
   };
