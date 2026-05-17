@@ -355,6 +355,7 @@ export function CardModal({
             onSave,
             getDirtyRevision,
             clearDirtyFieldsIfRevisionUnchanged,
+            setEditorError,
             onMoveToBoard,
     ]);
 
@@ -629,14 +630,14 @@ export function CardModal({
                 setDueBucketPosition(Date.now());
             }
         }
-    }, [dueDate, dueBucket]);
+    }, [dueDate, dueBucket, setDueBucket, setDueBucketPosition, setDueEnd, setDueStart]);
 
     const handleDueDateInputChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
         markFieldDirty("dueDate");
         setDueDate(value ? new Date(value).toISOString() : '');
         triggerAutoSave();
-    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, setDueDate, triggerAutoSave]);
 
     const handleDueStartChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
@@ -656,7 +657,7 @@ export function CardModal({
         }
 
         triggerAutoSave();
-    }, [isHistoryPreviewing, handleTimeToggle, duration, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, handleTimeToggle, duration, markFieldDirty, setDueEnd, setDueStart, triggerAutoSave]);
 
     const handleDueEndChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
@@ -675,7 +676,7 @@ export function CardModal({
         }
 
         triggerAutoSave();
-    }, [isHistoryPreviewing, dueStart, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, markFieldDirty, setDueEnd, setDuration, triggerAutoSave]);
 
     const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
@@ -685,14 +686,14 @@ export function CardModal({
             setStartReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, markFieldDirty, startReminderMinutes, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, setStartReminderEnabled, setStartReminderMinutes, startReminderMinutes, triggerAutoSave]);
 
     const handleStartReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
         if (isHistoryPreviewing) return;
         markFieldDirty("reminders");
         setStartReminderMinutes(minutes);
         triggerAutoSave();
-    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, setStartReminderMinutes, triggerAutoSave]);
 
     const handleEndReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
@@ -702,14 +703,14 @@ export function CardModal({
             setEndReminderMinutes(0);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, endReminderMinutes, markFieldDirty, triggerAutoSave]);
+    }, [endReminderMinutes, isHistoryPreviewing, markFieldDirty, setEndReminderEnabled, setEndReminderMinutes, triggerAutoSave]);
 
     const handleEndReminderMinutesChange = useCallback((minutes: ReminderMinuteOption) => {
         if (isHistoryPreviewing) return;
         markFieldDirty("reminders");
         setEndReminderMinutes(minutes);
         triggerAutoSave();
-    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, setEndReminderMinutes, triggerAutoSave]);
 
     const handleDurationChange = useCallback((value: number | "") => {
         if (isHistoryPreviewing) return;
@@ -732,14 +733,14 @@ export function CardModal({
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
         triggerAutoSave();
-    }, [isHistoryPreviewing, dueStart, markFieldDirty, triggerAutoSave]);
+    }, [dueStart, isHistoryPreviewing, markFieldDirty, setDueEnd, setDuration, triggerAutoSave]);
 
     const handleTargetBoardChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
         markFieldDirty("targetBoard");
         setTargetBoardId(value);
         triggerAutoSave();
-    }, [isHistoryPreviewing, markFieldDirty, triggerAutoSave]);
+    }, [isHistoryPreviewing, markFieldDirty, setTargetBoardId, triggerAutoSave]);
 
     const handleBucketChange = (next: DueBucket) => {
         if (isHistoryPreviewing) return;
@@ -784,7 +785,7 @@ export function CardModal({
             historySourceId: selectedHistoryId,
             contentOverride: previewHistoryContent,
         });
-    }, [previewHistoryContent, selectedHistoryId, markFieldDirty, handleSave]);
+    }, [previewHistoryContent, selectedHistoryId, markFieldDirty, setContent, hasPendingChangesRef, handleSave]);
 
     const titleShortcutAttributes = useMemo(
         () =>
