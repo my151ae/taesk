@@ -10,6 +10,7 @@ type UseCardModalLifecycleArgs = {
   isLoading?: boolean;
   onRequestClose: () => void;
   resetDraft: (card: Card) => void;
+  syncExternalMetadata: (card: Card) => void;
   resetHistoryState: () => void;
   setShowSidebar: (value: boolean) => void;
   setActiveSidebarTab: (value: "comments" | "history" | null) => void;
@@ -30,6 +31,7 @@ export function useCardModalLifecycle({
   isLoading,
   onRequestClose,
   resetDraft,
+  syncExternalMetadata,
   resetHistoryState,
   setShowSidebar,
   setActiveSidebarTab,
@@ -47,6 +49,7 @@ export function useCardModalLifecycle({
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardIdRef = useRef(card.id);
   const hasAppliedInitialLoadRef = useRef(false);
+  const lastSyncedMetadataKeyRef = useRef<string | null>(null);
   const previousLoadingRef = useRef<boolean | null>(null);
   const requestCloseRef = useRef<() => void>(() => {});
 
@@ -68,6 +71,7 @@ export function useCardModalLifecycle({
       clearExpandedHiddenRuns();
       cardIdRef.current = card.id;
       hasAppliedInitialLoadRef.current = false;
+      lastSyncedMetadataKeyRef.current = null;
       previousLoadingRef.current = null;
       resetDraft(card);
       hasPendingChangesRef.current = false;
@@ -76,6 +80,60 @@ export function useCardModalLifecycle({
       setShowCompletedLines(true);
     }
   }, [card, clearExpandedHiddenRuns, resetDraft, resetHistoryState, hasPendingChangesRef, hasAutoSavedEditsRef, setShowCompletedLines]);
+
+  useEffect(() => {
+    if (card.id !== cardIdRef.current) return;
+    if (hasPendingChangesRef.current) return;
+    if (isLoading) return;
+
+    const metadataKey = JSON.stringify({
+      id: card.id,
+      due_date: card.due_date ?? null,
+      due_start: card.due_start ?? null,
+      due_end: card.due_end ?? null,
+      due_bucket: card.due_bucket ?? null,
+      due_bucket_position: card.due_bucket_position ?? null,
+      duration: card.duration ?? null,
+      checked: card.checked ?? false,
+      checked_at: card.checked_at ?? null,
+      start_reminder_enabled: card.start_reminder_enabled ?? false,
+      start_reminder_minutes: card.start_reminder_minutes ?? 0,
+      end_reminder_enabled: card.end_reminder_enabled ?? false,
+      end_reminder_minutes: card.end_reminder_minutes ?? 0,
+      tags: card.tags ?? [],
+      assignee_id: card.assignee_id ?? null,
+      assignee_ids: card.assignee_ids ?? null,
+      assigned_to: card.assigned_to ?? null,
+      board_id: card.board_id,
+    });
+
+    if (metadataKey === lastSyncedMetadataKeyRef.current) return;
+    lastSyncedMetadataKeyRef.current = metadataKey;
+    syncExternalMetadata(card);
+  }, [
+    card,
+    card.id,
+    card.due_date,
+    card.due_start,
+    card.due_end,
+    card.due_bucket,
+    card.due_bucket_position,
+    card.duration,
+    card.checked,
+    card.checked_at,
+    card.start_reminder_enabled,
+    card.start_reminder_minutes,
+    card.end_reminder_enabled,
+    card.end_reminder_minutes,
+    card.tags,
+    card.assignee_id,
+    card.assignee_ids,
+    card.assigned_to,
+    card.board_id,
+    isLoading,
+    hasPendingChangesRef,
+    syncExternalMetadata,
+  ]);
 
   useEffect(() => {
     if (card.id !== cardIdRef.current) return;

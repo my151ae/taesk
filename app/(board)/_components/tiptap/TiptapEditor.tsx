@@ -1,8 +1,10 @@
 'use client';
 
 import { useEditor, EditorContent, JSONContent, type Editor } from '@tiptap/react';
-import { EditorState, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
+import { Extension } from '@tiptap/core';
+import { EditorState, Plugin, PluginKey, Selection, TextSelection, Transaction } from '@tiptap/pm/state';
 import { DOMSerializer, Fragment, Slice, type Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -53,6 +55,75 @@ import {
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
 
 const CHILD_CARD_LINK_PLACEHOLDER = "__TAESK_CHILD_CARD_LINK__";
+const cardLinkMetaPluginKey = new PluginKey<{ metaByShortId: Record<string, string> }>("cardLinkMeta");
+
+const setCardLinkMeta = (tr: Transaction, metaByShortId: Record<string, string>) =>
+    tr.setMeta(cardLinkMetaPluginKey, { metaByShortId });
+
+const extractCardShortIdFromHref = (href: string | null | undefined): string | null => {
+    if (!href) return null;
+    const match = href.match(/\/c\/([^/?#]+)(?:[/?#]|$)/);
+    return match?.[1] ?? null;
+};
+
+const CardLinkMeta = Extension.create<{ metaByShortId: Record<string, string> }>({
+    name: "cardLinkMeta",
+
+    addOptions() {
+        return { metaByShortId: {} };
+    },
+
+    addProseMirrorPlugins() {
+        const initialMetaByShortId = this.options.metaByShortId;
+
+        return [
+            new Plugin({
+                key: cardLinkMetaPluginKey,
+                state: {
+                    init: () => ({ metaByShortId: initialMetaByShortId }),
+                    apply: (tr, previous) => {
+                        const meta = tr.getMeta(cardLinkMetaPluginKey) as
+                            | { metaByShortId?: Record<string, string> }
+                            | undefined;
+                        return meta?.metaByShortId ? { metaByShortId: meta.metaByShortId } : previous;
+                    },
+                },
+                props: {
+                    decorations: (state) => {
+                        const pluginState = cardLinkMetaPluginKey.getState(state);
+                        const metaByShortId = pluginState?.metaByShortId ?? {};
+                        const decorations: Decoration[] = [];
+
+                        state.doc.descendants((node, pos) => {
+                            if (!node.isText) return;
+                            const linkMark = node.marks.find((mark) => mark.type.name === "link");
+                            const shortId = extractCardShortIdFromHref(linkMark?.attrs?.href);
+                            if (!shortId) return;
+                            const label = metaByShortId[shortId];
+                            if (!label) return;
+
+                            decorations.push(
+                                Decoration.widget(
+                                    pos + node.nodeSize,
+                                    () => {
+                                        const span = document.createElement("span");
+                                        span.className = "taesk-card-link-meta";
+                                        span.contentEditable = "false";
+                                        span.textContent = label;
+                                        return span;
+                                    },
+                                    { key: `card-link-meta-${shortId}-${pos}`, side: 1 }
+                                )
+                            );
+                        });
+
+                        return DecorationSet.create(state.doc, decorations);
+                    },
+                },
+            }),
+        ];
+    },
+});
 
 export type FocusTitleRequest = {
     mode?: 'column' | 'end';
@@ -93,6 +164,7 @@ type TiptapEditorProps = {
     showCompletedLines?: boolean;
     boardId?: string;
     cardId?: string;
+    cardLinkMetaByShortId?: Record<string, string>;
     onOpenCardLink?: (shortId: string) => void;
     onEditorError?: (message: string | null) => void;
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
@@ -110,6 +182,7 @@ export default function TiptapEditor({
     showCompletedLines = false,
     boardId,
     cardId,
+    cardLinkMetaByShortId = {},
     onOpenCardLink,
     onEditorError,
     onRegisterBodyBridge,
@@ -688,6 +761,9 @@ export default function TiptapEditor({
             }),
             TaskCompletionVisibility.configure({
                 showCompletedLines,
+            }),
+            CardLinkMeta.configure({
+                metaByShortId: cardLinkMetaByShortId,
             }),
         ],
         content: initialContent || { type: 'doc', content: [] },
@@ -1302,6 +1378,11 @@ export default function TiptapEditor({
         editor.view.dispatch(setTaskCompletionVisibilityMeta(editor.state.tr, showCompletedLines));
         invalidateLayout();
     }, [editor, invalidateLayout, showCompletedLines]);
+
+    useEffect(() => {
+        if (!editor) return;
+        editor.view.dispatch(setCardLinkMeta(editor.state.tr, cardLinkMetaByShortId));
+    }, [cardLinkMetaByShortId, editor]);
 
     useLayoutEffect(() => {
         if (!editor) {

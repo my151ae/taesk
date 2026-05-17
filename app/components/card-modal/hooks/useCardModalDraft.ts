@@ -115,6 +115,32 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     setEditorError(null);
   }, []);
 
+  const syncExternalMetadata = useCallback((nextCard: Card) => {
+    setTags(nextCard.tags || []);
+    setDueDate(nextCard.due_date || "");
+    setDueStart(nextCard.due_start ? nextCard.due_start.slice(0, 5) : "");
+    setDueEnd(nextCard.due_end ? nextCard.due_end.slice(0, 5) : "");
+    setStartReminderEnabled(Boolean(nextCard.start_reminder_enabled));
+    setStartReminderMinutes(
+      REMINDER_MINUTE_OPTIONS.includes((nextCard.start_reminder_minutes ?? 0) as ReminderMinuteOption)
+        ? (nextCard.start_reminder_minutes ?? 0) as ReminderMinuteOption
+        : 0
+    );
+    setEndReminderEnabled(Boolean(nextCard.end_reminder_enabled));
+    setEndReminderMinutes(
+      REMINDER_MINUTE_OPTIONS.includes((nextCard.end_reminder_minutes ?? 0) as ReminderMinuteOption)
+        ? (nextCard.end_reminder_minutes ?? 0) as ReminderMinuteOption
+        : 0
+    );
+    setDueBucket(nextCard.due_bucket ?? null);
+    setDueBucketPosition(nextCard.due_bucket_position ?? null);
+    setDuration(nextCard.duration ?? 60);
+    setChecked(nextCard.checked || false);
+    setAssigneeIds(resolveInitialAssigneeIds(nextCard));
+    setAssigneeTouched(false);
+    setTargetBoardId(nextCard.board_id);
+  }, []);
+
   return {
     content,
     setContent,
@@ -165,5 +191,6 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     filteredProfiles,
     selectedAssignees,
     resetDraft,
+    syncExternalMetadata,
   };
 }

@@ -130,6 +130,34 @@
     box-shadow: inset 0 -1px 0 rgba(2, 132, 199, 0.35), 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
+.editor :global(.ProseMirror p:has(a.taesk-card-link + .taesk-card-link-meta)),
+.editor :global(.ProseMirror p:has(a[href^="/c/"] + .taesk-card-link-meta)) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+}
+
+.editor :global(.ProseMirror .taesk-card-link-meta) {
+    margin-left: auto;
+    border-radius: 0.35rem;
+    background: #f1f5f9;
+    padding: 0.08rem 0.4rem;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+    .editor :global(.ProseMirror .taesk-card-link-meta) {
+        margin-left: 1.45rem;
+        white-space: normal;
+    }
+}
+
 .editor :global(ul[data-type="taskList"] li) {
     margin: 0 !important;
     padding: 0 !important;

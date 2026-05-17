@@ -27,6 +27,12 @@ import { useCardModalLifecycle } from "@/app/components/card-modal/hooks/useCard
 import { useCardModalMemberPicker } from "@/app/components/card-modal/hooks/useCardModalMemberPicker";
 import { StatusShortcutBar } from "@/app/(board)/_components/timeline/StatusShortcutBar";
 import {
+    countCheckedLines,
+    countNonEmptyLines,
+    normalizeChecklist,
+    type Checklist,
+} from "@/lib/checklist";
+import {
     buildShortcutDataAttributes,
     createEmptyShortcutBarPayload,
     getShortcutContextFromTarget,
@@ -45,6 +51,52 @@ const SIDEBAR_DOCKED_MIN_WIDTH = 680;
 const SIDEBAR_OVERLAY_MAX_WIDTH = 384;
 const SIDEBAR_OVERLAY_REVEAL_WIDTH = 96;
 
+type ChildCardSummary = {
+    id: string;
+    short_id: string | null;
+    title: string;
+    checklist: Checklist | null;
+    content: JSONContent | null;
+    due_date: string | null;
+    due_start: string | null;
+    due_end: string | null;
+    due_bucket: DueBucket | null;
+    created_at: string;
+};
+
+const formatChildCardDate = (value: string | null) => {
+    if (!value) return "日付なし";
+    const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short" }).format(date);
+};
+
+const formatChildCardTimeRange = (start: string | null, end: string | null) => {
+    if (!start && !end) return "時間なし";
+    if (start && end) return `${start.slice(0, 5)}-${end.slice(0, 5)}`;
+    return (start ?? end ?? "").slice(0, 5);
+};
+
+const formatChildCardBucket = (bucket: DueBucket | null) => (bucket ? bucket.toUpperCase() : "-");
+
+const countTaskItemsInContent = (content: JSONContent | null | undefined) => {
+    const progress = { checked: 0, total: 0 };
+
+    const visit = (node: JSONContent | null | undefined) => {
+        if (!node) return;
+        if (node.type === "taskItem") {
+            progress.total += 1;
+            if (node.attrs?.checked === true) {
+                progress.checked += 1;
+            }
+        }
+        node.content?.forEach((child) => visit(child));
+    };
+
+    visit(content);
+    return progress;
+};
+
 interface CardModalProps {
     card: Card;
     boards: Board[];
@@ -62,6 +114,7 @@ interface CardModalProps {
     onRetryHistorySave?: () => void;
     onCloseWithoutHistory?: () => void;
     shortcutBar?: ShortcutBarConfig;
+    childSummaryRefreshKey?: number;
     openSource?: string | null;
     peekMode?: "compact" | "standard" | "wide" | "full";
     peekWidth?: number;
@@ -86,6 +139,7 @@ export function CardModal({
     onRetryHistorySave,
     onCloseWithoutHistory,
     shortcutBar,
+    childSummaryRefreshKey = 0,
     openSource,
     peekMode = "standard",
     peekWidth = 720,
@@ -142,6 +196,7 @@ export function CardModal({
         filteredProfiles,
         selectedAssignees,
         resetDraft,
+        syncExternalMetadata,
     } = useCardModalDraft({ card, profiles });
     const resizeRef = useRef<HTMLDivElement>(null);
     const { sidebarWidth, startResizing } = useCardModalResize({ resizeRef });
@@ -153,6 +208,7 @@ export function CardModal({
         canIndent: false,
         canOutdent: false,
     });
+    const [childCards, setChildCards] = useState<ChildCardSummary[]>([]);
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const cardPeekRootRef = useRef<HTMLElement | null>(null);
@@ -252,6 +308,55 @@ export function CardModal({
         );
         return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
     }, [content]);
+
+    useEffect(() => {
+        if (!card.is_parent) {
+            setChildCards((prev) => (prev.length ? [] : prev));
+            return;
+        }
+
+        const abortController = new AbortController();
+        const loadChildCards = async () => {
+            try {
+                const response = await fetch(`/api/boards/${card.board_id}/cards/${card.id}/children`, {
+                    signal: abortController.signal,
+                });
+                const body = await response.json().catch(() => null);
+                if (abortController.signal.aborted) return;
+                if (!response.ok) {
+                    throw new Error(body?.error?.message || "子カードの読み込みに失敗しました");
+                }
+                const nextChildren = Array.isArray(body?.children) ? body.children : [];
+                setChildCards(nextChildren as ChildCardSummary[]);
+            } catch (error) {
+                if (abortController.signal.aborted) return;
+                setChildCards([]);
+            }
+        };
+
+        void loadChildCards();
+        return () => abortController.abort();
+    }, [card.board_id, card.child_count, card.id, card.is_parent, childSummaryRefreshKey]);
+
+    const childCardLinkMetaByShortId = useMemo(() => {
+        return childCards.reduce<Record<string, string>>((acc, child) => {
+            if (!child.short_id) return acc;
+            const checklist = normalizeChecklist(child.checklist ?? null);
+            const checklistProgress = {
+                checked: countCheckedLines(checklist),
+                total: countNonEmptyLines(checklist),
+            };
+            const contentProgress = countTaskItemsInContent(child.content);
+            const progress = checklistProgress.total > 0 ? checklistProgress : contentProgress;
+            acc[child.short_id] = [
+                formatChildCardDate(child.due_date),
+                formatChildCardTimeRange(child.due_start, child.due_end),
+                formatChildCardBucket(child.due_bucket),
+                `${progress.checked}/${progress.total}`,
+            ].join(" ");
+            return acc;
+        }, {});
+    }, [childCards]);
 
     const mergedAvailableTags = useMemo(() => {
         const nextTags = new Set<string>();
@@ -360,6 +465,7 @@ export function CardModal({
         isLoading,
         onRequestClose: requestClose,
         resetDraft,
+        syncExternalMetadata,
         resetHistoryState,
         setShowSidebar,
         setActiveSidebarTab,
@@ -1036,6 +1142,7 @@ export function CardModal({
                                                     showCompletedLines={showCompletedLines}
                                                     boardId={card.board_id}
                                                     cardId={card.id}
+                                                    cardLinkMetaByShortId={childCardLinkMetaByShortId}
                                                     onOpenCardLink={onOpenCardLink}
                                                     onEditorError={setEditorError}
                                                     onRegisterBodyBridge={handleRegisterBodyBridge}

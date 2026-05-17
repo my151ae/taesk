@@ -203,13 +203,15 @@ const syncCacheFromResponse = (cache: TimelineCache, payload: TimelineResponse, 
   cache.serverNow = payload.serverNow ?? null;
 
   const startOffset =
-    payload.days.length > 0
-      ? getDayDiff(payload.days[0]!.isoDate, currentTimelineIso)
-      : payload.startOffset ?? 0;
+    typeof payload.startOffset === "number"
+      ? payload.startOffset
+      : payload.days.length > 0
+        ? getDayDiff(payload.days[0]!.isoDate, currentTimelineIso)
+        : 0;
 
   cache.lastRequestedWindow = {
     startOffset,
-    range: payload.days.length || payload.range || 0,
+    range: payload.range || payload.days.length || 0,
   };
 
   rebuildCardLocationIndex(cache);

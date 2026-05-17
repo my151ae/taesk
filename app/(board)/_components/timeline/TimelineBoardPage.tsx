@@ -10,7 +10,7 @@ import { featureFlags } from "@/lib/featureFlags";
 import { sortTimelineOverdueItems, type OverdueSortOrder } from "@/lib/timeline-overdue-sort";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { TimelineResponse, TrashCardItem } from "@/lib/api-types/timeline";
-import { EMPTY_CHECKLIST } from "@/lib/checklist";
+import { EMPTY_CHECKLIST, normalizeChecklist } from "@/lib/checklist";
 import { normalizeContent } from "@/lib/tiptap";
 
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -165,6 +165,12 @@ const mapCardToTrashItem = (card: Partial<Card> & { id: string }): TrashCardItem
   };
 };
 
+const normalizeRealtimeCard = (card: Card): Card => ({
+  ...card,
+  checklist: normalizeChecklist(card.checklist ?? EMPTY_CHECKLIST),
+  content: normalizeContent(card.content),
+});
+
 const buildNotificationFallbackCard = ({
   boardId,
   shortId,
@@ -276,6 +282,9 @@ function TimelineBoardPageContent({
   const [trashItems, setTrashItems] = useState<TrashCardItem[]>([]);
   const [sidebarVisibleCounts, setSidebarVisibleCounts] = useState<SidebarVisibleCountState>(() => createInitialSidebarVisibleCounts());
   const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
+  const [childSummaryRefreshKey, setChildSummaryRefreshKey] = useState(0);
+  const modalCardRef = useRef<Card | null>(null);
+  const setModalCardOverrideRef = useRef<((card: Card | null) => void) | null>(null);
   const {
     notifications,
     loading: notificationsLoading,
@@ -310,7 +319,7 @@ function TimelineBoardPageContent({
     });
   }, [isMobileViewport, mobileLeftPanelMode, resolvedState.primaryPanelMode, updateBoardUiState]);
 
-  const handleRealtimeTrashChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
+  const handleRealtimeCardChange = useCallback((payload: RealtimePostgresChangesPayload<Card>) => {
     setTrashItems((prev) => {
       if (payload.eventType === "DELETE") {
         return prev.filter((item) => item.card_id !== payload.old.id);
@@ -323,6 +332,29 @@ function TimelineBoardPageContent({
       }
       return sortTrashItems([...existing, nextTrashItem]);
     });
+
+    if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") return;
+
+    const realtimeCard = normalizeRealtimeCard(payload.new as Card);
+    const openModalCard = modalCardRef.current;
+    const setOpenModalCard = setModalCardOverrideRef.current;
+    if (!openModalCard) return;
+
+    if (openModalCard.id === realtimeCard.id && setOpenModalCard) {
+      const shouldKeepParentCard =
+        Boolean(realtimeCard.parent_card_id) &&
+        (realtimeCard.parent_card_id === openModalCard.parent_card_id ||
+          realtimeCard.parent_card_id === openModalCard.parent_card?.id);
+      setOpenModalCard({
+        ...openModalCard,
+        ...realtimeCard,
+        parent_card: shouldKeepParentCard ? openModalCard.parent_card ?? null : null,
+      });
+    }
+
+    if (openModalCard.is_parent && realtimeCard.parent_card_id === openModalCard.id) {
+      setChildSummaryRefreshKey((current) => current + 1);
+    }
   }, []);
 
   useEffect(() => {
@@ -473,7 +505,7 @@ function TimelineBoardPageContent({
     dayWindowStartRef,
     setDayWindowStart,
     buildMockTimelineResponse,
-    onRealtimeCardChange: handleRealtimeTrashChange,
+    onRealtimeCardChange: handleRealtimeCardChange,
   });
 
   const fetchTrash = useCallback(async () => {
@@ -514,6 +546,14 @@ function TimelineBoardPageContent({
     setCardInUrl: setCard,
     onResolveTrashedCard: handleResolveTrashedCard,
   });
+
+  useEffect(() => {
+    modalCardRef.current = modalCard;
+  }, [modalCard]);
+
+  useEffect(() => {
+    setModalCardOverrideRef.current = setModalCardOverride;
+  }, [setModalCardOverride]);
 
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const { timelineHeaderHeight, timelineViewportHeight, liveNowMinutes, liveNowIsoDate } =
@@ -1829,6 +1869,7 @@ function TimelineBoardPageContent({
     cardModalStatus,
     modalProfiles,
     handleCardModalSave,
+    childSummaryRefreshKey,
     handleCardModalDelete,
     handleRestoreCard,
     handlePromoteCardToParent,

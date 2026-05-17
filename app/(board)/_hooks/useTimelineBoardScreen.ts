@@ -216,6 +216,7 @@ export type UseTimelineBoardScreenArgs = {
   cardModalStatus: "idle" | "loading" | "ready" | "error";
   modalProfiles: ProfileSummary[];
   handleCardModalSave: NonNullable<TimelineBoardScreenProps["modalProps"]>["onSave"];
+  childSummaryRefreshKey: number;
   handleCardModalDelete: (cardId: string) => Promise<boolean>;
   handleRestoreCard: (cardId: string) => Promise<boolean>;
   handlePromoteCardToParent: (cardId: string) => Promise<boolean>;
@@ -401,6 +402,7 @@ export function useTimelineBoardScreen({
   cardModalStatus,
   modalProfiles,
   handleCardModalSave,
+  childSummaryRefreshKey,
   handleCardModalDelete,
   handleRestoreCard,
   handlePromoteCardToParent,
@@ -694,6 +696,7 @@ export function useTimelineBoardScreen({
             profiles: modalProfiles,
             availableTags,
             onSave: handleCardModalSave,
+            childSummaryRefreshKey,
             onDelete: handleCardModalDelete,
             onRestore: handleRestoreCard,
             onPromoteToParent: handlePromoteCardToParent,

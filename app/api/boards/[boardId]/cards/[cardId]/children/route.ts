@@ -7,13 +7,18 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import { getBoardMembership, requireAuthenticatedUser } from "@/lib/server/api-security";
 import { buildDefaultBodyContent } from "@/lib/tiptap";
 import { generateShortId, slugify } from "@/lib/card-utils";
+import type { Checklist } from "@/lib/checklist";
+import type { JSONContent } from "@tiptap/react";
 
 type ChildCardRow = {
   id: string;
   short_id: string | null;
   title: string;
+  checklist: Checklist | null;
+  content: JSONContent | null;
   due_date: string | null;
   due_start: string | null;
+  due_end: string | null;
   due_bucket: "a" | "b" | null;
   created_at: string;
 };
@@ -56,7 +61,7 @@ const getHandler = async (
 
   const { data: children, error } = await supabase
     .from("cards")
-    .select("id, short_id, title, due_date, due_start, due_bucket, created_at")
+    .select("id, short_id, title, checklist, content, due_date, due_start, due_end, due_bucket, created_at")
     .eq("board_id", boardId)
     .eq("parent_card_id", cardId)
     .is("deleted_at", null)

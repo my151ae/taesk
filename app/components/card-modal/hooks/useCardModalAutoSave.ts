@@ -57,6 +57,7 @@ export function useCardModalAutoSave({
       }
       const latestContent = pendingAutoSaveContentRef.current ?? undefined;
       pendingAutoSaveContentRef.current = null;
+      hasPendingChangesRef.current = false;
       onAutoSave(latestContent);
     }, 2000);
     if (!autoSaveMaxTimeoutRef.current) {
@@ -68,6 +69,7 @@ export function useCardModalAutoSave({
         autoSaveMaxTimeoutRef.current = null;
         const latestContent = pendingAutoSaveContentRef.current ?? undefined;
         pendingAutoSaveContentRef.current = null;
+        hasPendingChangesRef.current = false;
         onAutoSave(latestContent);
       }, 15000);
     }
@@ -78,6 +80,7 @@ export function useCardModalAutoSave({
     const latestContent = pendingAutoSaveContentRef.current ?? undefined;
     pendingAutoSaveContentRef.current = null;
     const hadPending = hasPendingChangesRef.current || hasAutoSavedEditsRef.current;
+    hasPendingChangesRef.current = false;
     hasAutoSavedEditsRef.current = false;
     if (hadPending) {
       onAutoSave(latestContent, options);

@@ -48,10 +48,18 @@ import { ToolbarMenuSelect } from "@/app/(board)/_components/timeline/ToolbarMen
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 
 const ALL_DAY_ROW_HEIGHT = 24;
+const WHEEL_LINE_DELTA_PX = 16;
+const WHEEL_PAGE_DELTA_PX = 800;
 
 // EMPTY配列の参照を安定化（memo効率化）
 const EMPTY_EVENTS: readonly TimelineEvent[] = Object.freeze([]);
 const EMPTY_BUCKET: readonly TimelineBucketItem[] = Object.freeze([]);
+
+const normalizeWheelDelta = (delta: number, deltaMode: number) => {
+  if (deltaMode === WheelEvent.DOM_DELTA_LINE) return delta * WHEEL_LINE_DELTA_PX;
+  if (deltaMode === WheelEvent.DOM_DELTA_PAGE) return delta * WHEEL_PAGE_DELTA_PX;
+  return delta;
+};
 
 type DragAndDropBindings = ReturnType<typeof useTimelineDragAndDrop>;
 export type HorizontalStepRequest =
@@ -399,15 +407,12 @@ export function DesktopTimelineView({
     };
   }, [timelineScrollRef, hourHeight, setHourHeight, timelineStartHour]);
 
-  // A/Bリスト上での Shift + マウスクロールによる横スクロールサポート
+  // A/Bリスト上での Shift + マウスホイール / トラックパッド横スクロールサポート
   useEffect(() => {
     const container = horizontalScrollRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Shiftキーが押されているスクロールのみ対象
-      if (!e.shiftKey) return;
-
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
@@ -415,12 +420,17 @@ export function DesktopTimelineView({
       const isOnAbList = target.closest('.ab-col') || target.closest('[data-ab-day]');
       if (!isOnAbList) return;
 
-      // スクロール量を取得（環境により deltaX または deltaY に値が入る）
-      const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      const deltaX = normalizeWheelDelta(e.deltaX, e.deltaMode);
+      const deltaY = normalizeWheelDelta(e.deltaY, e.deltaMode);
+      const isTrackpadHorizontal = deltaX !== 0 && Math.abs(deltaX) >= Math.abs(deltaY);
+      const isShiftWheelHorizontal = e.shiftKey && deltaY !== 0;
+      if (!isTrackpadHorizontal && !isShiftWheelHorizontal) return;
+
+      const delta = isTrackpadHorizontal ? deltaX : deltaY;
       if (delta === 0) return;
 
-      // デフォルトのスクロール（バケット内部の縦スクロールなど）を抑制し、
-      // タイムライン全体の横スクロールコンテナをスクロールさせる
+      // 横方向の意図がある wheel だけを親の横スクロールへ渡す。
+      // 通常の縦スクロールは A/B バケット内部のスクロールとして残す。
       e.preventDefault();
       container.scrollLeft += delta;
     };

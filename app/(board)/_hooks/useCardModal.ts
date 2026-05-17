@@ -220,11 +220,12 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
                 if (
                     prev?.short_id === targetShortId &&
                     prev.parent_card &&
-                    modalCardFromData.parent_card_id === prev.parent_card_id &&
+                    (!modalCardFromData.parent_card_id || modalCardFromData.parent_card_id === prev.parent_card_id) &&
                     !modalCardFromData.parent_card
                 ) {
                     return {
                         ...modalCardFromData,
+                        parent_card_id: prev.parent_card_id,
                         parent_card: prev.parent_card,
                     };
                 }

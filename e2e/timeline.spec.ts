@@ -822,6 +822,61 @@ test.describe('@feature:timeline Timeline view', () => {
     }
   });
 
+  test('desktop A/B list accepts trackpad horizontal wheel gestures', async ({ page }) => {
+    test.skip(!boardContext, 'Missing board context for timeline spec');
+    const consoleErrors = attachConsoleErrorCollector(page);
+
+    try {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto(boardContext!.canonicalPath);
+      await expect(page.getByRole('heading', { name: boardContext!.boardName })).toBeVisible();
+
+      const horizontalScroller = page.getByTestId('desktop-timeline-horizontal-scroll');
+      const abScroller = page.locator('[data-ab-scroll-container="true"]').first();
+      await expect(abScroller).toBeVisible({ timeout: 20_000 });
+
+      const before = await horizontalScroller.evaluate((element) => {
+        if (!(element instanceof HTMLDivElement)) {
+          throw new Error('desktop timeline horizontal scroller not found');
+        }
+        element.scrollLeft = 0;
+        return {
+          clientWidth: element.clientWidth,
+          scrollLeft: element.scrollLeft,
+          scrollWidth: element.scrollWidth,
+        };
+      });
+      expect(before.scrollWidth).toBeGreaterThan(before.clientWidth);
+
+      const defaultPrevented = await abScroller.evaluate((element) => {
+        const event = new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaX: 240,
+          deltaY: 12,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        });
+        return !element.dispatchEvent(event);
+      });
+
+      expect(defaultPrevented).toBe(true);
+      await expect
+        .poll(async () =>
+          horizontalScroller.evaluate((element) => {
+            if (!(element instanceof HTMLDivElement)) {
+              throw new Error('desktop timeline horizontal scroller not found');
+            }
+            return element.scrollLeft;
+          }),
+        )
+        .toBeGreaterThan(before.scrollLeft);
+
+      consoleErrors.assertClean();
+    } finally {
+      consoleErrors.dispose();
+    }
+  });
+
   test('supports shift-click multi select within the same timeline lane and switches between bulk and single menus', async ({ page }) => {
     test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
     if (!boardContext) {
