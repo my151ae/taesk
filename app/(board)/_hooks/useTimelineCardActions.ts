@@ -305,7 +305,7 @@ export function useTimelineCardActions({
   const handleCardModalSave = useCallback(
     async (savePayload: CardModalSavePayload) => {
       const targetCard = modalCard && modalCard.id === savePayload.id ? modalCard : null;
-      if (!targetCard) return;
+      if (!targetCard) return false;
       let requestId = 0;
       try {
         setHistorySaveWarning(null);
@@ -394,7 +394,7 @@ export function useTimelineCardActions({
           signal: controller.signal,
         });
         const body = await response.json().catch(() => null) as { card?: Card; error?: { message?: string } } | null;
-        if (requestId !== saveRequestIdRef.current) return;
+        if (requestId !== saveRequestIdRef.current) return false;
         if (!response.ok) throw new Error(body?.error?.message || "Failed to update card");
 
         if (body?.card) {
@@ -415,7 +415,7 @@ export function useTimelineCardActions({
               signal: controller.signal,
             });
           } catch (historyError) {
-            if (historyError instanceof Error && historyError.name === "AbortError") return;
+            if (historyError instanceof Error && historyError.name === "AbortError") return false;
             historyRetryContextRef.current = {
               boardId: targetCard.board_id,
               cardId: targetCard.id,
@@ -425,7 +425,7 @@ export function useTimelineCardActions({
             return;
           }
 
-          if (requestId !== saveRequestIdRef.current) return;
+          if (requestId !== saveRequestIdRef.current) return false;
           historyRetryContextRef.current = null;
           setHistorySaveWarning(null);
 
@@ -441,11 +441,13 @@ export function useTimelineCardActions({
           }
           closeCardModal();
         }
+        return true;
       } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") return;
+        if (error instanceof Error && error.name === "AbortError") return false;
         setCardModalError(error instanceof Error ? error.message : "Failed to save card");
         // 楽観更新失敗時はサーバー状態へ戻す
         void fetchTimeline(data?.startOffset);
+        return false;
       } finally {
         if (requestId === saveRequestIdRef.current) saveAbortRef.current = null;
       }

@@ -51,7 +51,7 @@ interface CardModalProps {
     boards: Board[];
     profiles: ProfileSummary[];
     availableTags?: string[];
-    onSave: (payload: CardModalSavePayload) => void;
+    onSave: (payload: CardModalSavePayload) => void | boolean | Promise<void | boolean>;
     onDelete: (id: string) => void;
     onRestore?: (id: string) => void | Promise<void> | Promise<boolean>;
     onPromoteToParent?: (id: string) => void | Promise<void> | Promise<boolean>;
@@ -145,6 +145,7 @@ export function CardModal({
         filteredProfiles,
         selectedAssignees,
         markFieldDirty,
+        clearDirtyFields,
         resetDraft,
         syncExternalMetadata,
     } = useCardModalDraft({ card, profiles });
@@ -278,7 +279,7 @@ export function CardModal({
         return Array.from(nextTags).sort((left, right) => left.localeCompare(right));
     }, [availableTags, tags]);
 
-    const handleSave = useCallback((isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; forceHistorySnapshot?: boolean; }) => {
+    const handleSave = useCallback(async (isAutoSave = false, options?: { restoreFromHistory?: boolean; historySourceId?: string; contentOverride?: JSONContent; forceHistorySnapshot?: boolean; }) => {
         const normalizedDueDate = dueDate || null;
         const hasTime = dueStart && dueEnd; // Both must be present
         const normalizedStart = hasTime ? `${dueStart}:00` : null;
@@ -298,7 +299,7 @@ export function CardModal({
         if (!isAutoSave) {
             setEditorError(null);
         }
-        onSave({
+        const saveResult = await onSave({
             id: card.id,
             title: nextTitle,
             content: normalizedContent,
@@ -322,6 +323,9 @@ export function CardModal({
             restoreFromHistory: options?.restoreFromHistory,
             historySourceId: options?.historySourceId,
         });
+        if (saveResult !== false) {
+            clearDirtyFields();
+        }
 
         if (!isAutoSave && !options?.restoreFromHistory && targetBoardId !== card.board_id) {
             onMoveToBoard(card.id, targetBoardId);
@@ -347,6 +351,7 @@ export function CardModal({
             checked,
             targetBoardId,
             onSave,
+            clearDirtyFields,
             onMoveToBoard,
     ]);
 
@@ -359,7 +364,7 @@ export function CardModal({
     } = useCardModalAutoSave({
         isHistoryPreviewing,
         onAutoSave: (contentOverride, options) =>
-            handleSave(true, {
+            void handleSave(true, {
                 contentOverride,
                 forceHistorySnapshot: options?.forceHistorySnapshot,
             }),
