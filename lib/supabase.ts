@@ -83,6 +83,12 @@ export interface Card {
   id: string;
   title: string;
   parent_card_id?: string | null;
+  parent_card?: {
+    id: string;
+    title: string;
+    short_id: string | null;
+    slug?: string | null;
+  } | null;
   is_parent?: boolean;
   child_count?: number;
   checklist: Checklist | null;

@@ -406,6 +406,32 @@ export default function TimelineBoardScreen({
     [applyOpenPeekLayout, desktop.leftPanelProps],
   );
 
+  const handleOpenBodyCardLink = useCallback((shortId: string) => {
+    applyOpenPeekLayout();
+
+    const targetEvent = Object.values(desktop.timelineViewProps.eventsByDay)
+      .flat()
+      .find((event) => event.short_id === shortId);
+    const targetBucketItem = Object.values(desktop.timelineViewProps.abBuckets)
+      .flat()
+      .find((item) => item.short_id === shortId);
+    const targetDueDate = targetEvent?.due_date ?? targetBucketItem?.due_date ?? null;
+
+    if (desktop.activeView === "timeline" && targetDueDate) {
+      setDesktopHorizontalStepRequest({
+        id: ++requestIdRef.current,
+        direction: "date",
+        targetIso: targetDueDate,
+      });
+      window.setTimeout(() => {
+        modalProps?.onOpenCardLink?.(shortId);
+      }, 180);
+      return;
+    }
+
+    modalProps?.onOpenCardLink?.(shortId);
+  }, [applyOpenPeekLayout, desktop.activeView, desktop.timelineViewProps.abBuckets, desktop.timelineViewProps.eventsByDay, modalProps]);
+
   const renderDesktopShell = useCallback(
     (content: ReactNode) => (
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-b-2xl border border-slate-200 border-t-slate-200 bg-white shadow-sm">
@@ -971,6 +997,7 @@ export default function TimelineBoardScreen({
         {modalProps ? (
           <CardModal
             {...modalProps}
+            onOpenCardLink={handleOpenBodyCardLink}
             peekMode={cardPeekMode}
             peekWidth={cardPeekWidth}
             onPeekModeChange={handleCardPeekModeChange}

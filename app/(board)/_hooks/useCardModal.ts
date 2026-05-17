@@ -74,6 +74,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
                 id: eventCard.card_id,
                 title: eventCard.title,
                 parent_card_id: eventCard.parent_card_id ?? null,
+                parent_card: eventCard.parent_card ?? null,
                 is_parent: Boolean(eventCard.is_parent),
                 child_count: eventCard.child_count ?? 0,
                 content: normalizeContent(eventCard.content),
@@ -117,6 +118,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
                     id: bucketItem.card_id,
                     title: bucketItem.title,
                     parent_card_id: bucketItem.parent_card_id ?? null,
+                    parent_card: bucketItem.parent_card ?? null,
                     is_parent: Boolean(bucketItem.is_parent),
                     child_count: bucketItem.child_count ?? 0,
                     content: normalizeContent(bucketItem.content),
@@ -159,6 +161,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
                 id: overdueItem.card_id,
                 title: overdueItem.title,
                 parent_card_id: overdueItem.parent_card_id ?? null,
+                parent_card: overdueItem.parent_card ?? null,
                 is_parent: Boolean(overdueItem.is_parent),
                 child_count: overdueItem.child_count ?? 0,
                 content: normalizeContent(overdueItem.content),
@@ -213,7 +216,20 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     // 1. Initial Data Sync: Keep local state in sync with timeline data if available
     useEffect(() => {
         if (targetShortId && modalCardFromData) {
-            setModalCardOverride(modalCardFromData);
+            setModalCardOverride((prev) => {
+                if (
+                    prev?.short_id === targetShortId &&
+                    prev.parent_card &&
+                    modalCardFromData.parent_card_id === prev.parent_card_id &&
+                    !modalCardFromData.parent_card
+                ) {
+                    return {
+                        ...modalCardFromData,
+                        parent_card: prev.parent_card,
+                    };
+                }
+                return modalCardFromData;
+            });
         }
     }, [targetShortId, modalCardFromData]);
 

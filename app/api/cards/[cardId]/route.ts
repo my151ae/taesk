@@ -97,6 +97,7 @@ const getHandler = async (
     ? {
       ...effectiveCard,
       child_count: 0,
+      parent_card: null as { id: string; title: string; short_id: string | null; slug: string | null } | null,
       checklist: normalizeChecklist(effectiveCard.checklist ?? EMPTY_CHECKLIST),
       content: effectiveCard.content ?? null,
     }
@@ -110,6 +111,17 @@ const getHandler = async (
       .eq('parent_card_id', normalizedCard.id)
       .is('deleted_at', null);
     normalizedCard.child_count = count ?? 0;
+
+    if (normalizedCard.parent_card_id) {
+      const { data: parentCard } = await supabase
+        .from('cards')
+        .select('id, title, short_id, slug')
+        .eq('id', normalizedCard.parent_card_id)
+        .eq('board_id', normalizedCard.board_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      normalizedCard.parent_card = parentCard ?? null;
+    }
   }
 
   return NextResponse.json({ card: normalizedCard, board, profiles }, { status: 200 });

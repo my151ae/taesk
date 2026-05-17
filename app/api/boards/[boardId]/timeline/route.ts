@@ -15,6 +15,7 @@ const DEFAULT_TIMELINE_START_HOUR = 5;
 type TimelineCardRow = {
   id: string;
   parent_card_id: string | null;
+  parent_card: { id: string; short_id: string; title: string; } | null;
   is_parent: boolean | null;
   title: string;
   checklist: unknown;
@@ -127,7 +128,7 @@ const getHandler = async (
   const dayKeyMap = new Map(days.map((day) => [day.isoDate, day.key]));
 
   const cardsSelect =
-    'id, parent_card_id, is_parent, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, checked_at, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
+    'id, parent_card_id, parent_card:parent_card_id(id, short_id, title), is_parent, title, checklist, content, excerpt, list_id, board_id, position, tags, due_date, due_start, due_end, start_reminder_enabled, start_reminder_minutes, end_reminder_enabled, end_reminder_minutes, due_bucket, checked, checked_at, assignee_id, assignee_ids, assigned_to, short_id, id_short, slug, duration, due_bucket_position';
 
   const { data: cards, error: fetchError } = await supabase
     .from('cards')
@@ -177,6 +178,7 @@ const getHandler = async (
         events.push({
           card_id: card.id,
           parent_card_id: card.parent_card_id,
+          parent_card: card.parent_card,
           is_parent: Boolean(card.is_parent),
           child_count: childCountByParentId.get(card.id) ?? 0,
           due_date: dateOnly!,
@@ -215,6 +217,7 @@ const getHandler = async (
         abBuckets[key].push({
           card_id: card.id,
           parent_card_id: card.parent_card_id,
+          parent_card: card.parent_card,
           is_parent: Boolean(card.is_parent),
           child_count: childCountByParentId.get(card.id) ?? 0,
           title: card.title,
@@ -247,6 +250,7 @@ const getHandler = async (
       overdue.push({
         card_id: card.id,
         parent_card_id: card.parent_card_id,
+        parent_card: card.parent_card,
         is_parent: Boolean(card.is_parent),
         child_count: childCountByParentId.get(card.id) ?? 0,
         title: card.title,

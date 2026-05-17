@@ -55,6 +55,7 @@ interface CardModalProps {
     onRestore?: (id: string) => void | Promise<void> | Promise<boolean>;
     onPromoteToParent?: (id: string) => void | Promise<void> | Promise<boolean>;
     onMoveToBoard: (cardId: string, targetBoardId: string) => void;
+    onOpenCardLink?: (shortId: string) => void;
     onClose: () => void;
     isLoading?: boolean;
     historySaveWarning?: string | null;
@@ -78,6 +79,7 @@ export function CardModal({
     profiles,
     availableTags = [],
     onMoveToBoard,
+    onOpenCardLink,
     onClose,
     isLoading,
     historySaveWarning,
@@ -842,6 +844,15 @@ export function CardModal({
                     onBucketChange={handleBucketChange}
                     canPromoteToParent={!card.is_parent && !card.parent_card_id && !isHistoryPreviewing}
                     onPromoteToParent={onPromoteToParent ? () => onPromoteToParent(card.id) : undefined}
+                    parentCardLink={
+                        card.parent_card?.short_id
+                            ? {
+                                title: card.parent_card.title || "親カード",
+                                shortId: card.parent_card.short_id,
+                            }
+                            : null
+                    }
+                    onOpenParentCard={onOpenCardLink}
                     cardShortId={card.short_id ?? null}
                     onCopyLink={handleCopyLink}
                     googleSync={{
@@ -1025,6 +1036,7 @@ export function CardModal({
                                                     showCompletedLines={showCompletedLines}
                                                     boardId={card.board_id}
                                                     cardId={card.id}
+                                                    onOpenCardLink={onOpenCardLink}
                                                     onEditorError={setEditorError}
                                                     onRegisterBodyBridge={handleRegisterBodyBridge}
                                                     onRequestFocusTitle={handleRequestFocusTitle}

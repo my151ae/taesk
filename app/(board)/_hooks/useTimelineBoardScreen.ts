@@ -430,6 +430,7 @@ export function useTimelineBoardScreen({
   });
 
   const activeDragCardId = activeDrag?.cardId ?? null;
+  const visualActiveCardId = modalCard?.id ?? activeCardId;
   const { overlayBucketEntry, overlayOverdueEntry, overlayTimelineEvent, overlayCardData } = useMemo(
     () =>
       buildTimelineOverlayState({
@@ -526,7 +527,7 @@ export function useTimelineBoardScreen({
     onShiftSelect,
     onClearSelection: clearSelection,
     onActivateCard,
-    activeCardId,
+    activeCardId: visualActiveCardId,
     activeLaneId,
     pendingTitleEditCardId,
     onPendingTitleEditConsumed,
@@ -614,7 +615,7 @@ export function useTimelineBoardScreen({
     onShiftSelect,
     onClearSelection: clearSelection,
     onActivateCard,
-    activeCardId,
+    activeCardId: visualActiveCardId,
     activeLaneId,
   };
 
@@ -697,6 +698,7 @@ export function useTimelineBoardScreen({
             onRestore: handleRestoreCard,
             onPromoteToParent: handlePromoteCardToParent,
             onMoveToBoard: () => {},
+            onOpenCardLink: (shortId: string) => openCardModal(shortId, "body-card-link"),
             onClose: closeCardModal,
             isLoading: cardModalStatus === "loading",
             openSource: modalOpenSource,

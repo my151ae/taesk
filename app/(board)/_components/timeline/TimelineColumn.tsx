@@ -349,11 +349,13 @@ export const TimelineColumn = memo(function TimelineColumn({
                                     isContextMenuOpen={contextMenuCardId === event.card_id}
                                     isActive={
                                         selectionLeadCardId === event.card_id ||
+                                        activeCardId === event.card_id ||
                                         (activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id)
                                     }
                                     zIndex={
                                         (
                                             selectionLeadCardId === event.card_id ||
+                                            activeCardId === event.card_id ||
                                             (activeStackItem?.kind === 'card' && activeStackItem.id === event.card_id)
                                         )
                                             ? 30

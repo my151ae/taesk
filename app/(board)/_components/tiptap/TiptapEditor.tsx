@@ -11,7 +11,7 @@ import Link from '@tiptap/extension-link';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
@@ -93,6 +93,7 @@ type TiptapEditorProps = {
     showCompletedLines?: boolean;
     boardId?: string;
     cardId?: string;
+    onOpenCardLink?: (shortId: string) => void;
     onEditorError?: (message: string | null) => void;
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
@@ -109,6 +110,7 @@ export default function TiptapEditor({
     showCompletedLines = false,
     boardId,
     cardId,
+    onOpenCardLink,
     onEditorError,
     onRegisterBodyBridge,
     onRequestFocusTitle,
@@ -1495,16 +1497,30 @@ export default function TiptapEditor({
         closeBlockMenu();
     };
 
+    const handleEditorClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const link = target?.closest('a[href^="/c/"]');
+        if (link instanceof HTMLAnchorElement) {
+            const shortId = link.getAttribute('href')?.match(/^\/c\/([^/?#]+)/)?.[1];
+            if (shortId) {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenCardLink?.(shortId);
+                return;
+            }
+        }
+
+        if (event.target === event.currentTarget) {
+            editor.chain().focus().run();
+        }
+    };
+
     return (
         <div
             ref={assignRootRef}
             className={`w-full bg-white dark:bg-gray-800 rounded-lg cursor-text ${styles.editor}`}
             data-show-completed-lines={showCompletedLines ? 'true' : 'false'}
-            onClick={(event) => {
-                if (event.target === event.currentTarget) {
-                    editor.chain().focus().run();
-                }
-            }}
+            onClick={handleEditorClick}
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
         >

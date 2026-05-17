@@ -63,6 +63,11 @@ type CardModalHeaderProps = {
     onBucketChange: (bucket: DueBucket) => void;
     canPromoteToParent?: boolean;
     onPromoteToParent?: () => void | Promise<void> | Promise<boolean>;
+    parentCardLink?: {
+        title: string;
+        shortId: string;
+    } | null;
+    onOpenParentCard?: (shortId: string) => void;
     cardShortId: string | null;
     onCopyLink: () => void;
     googleSync?: {
@@ -135,6 +140,8 @@ export default function CardModalHeader({
     onBucketChange,
     canPromoteToParent = false,
     onPromoteToParent,
+    parentCardLink = null,
+    onOpenParentCard,
     cardShortId,
     onCopyLink,
     googleSync,
@@ -480,6 +487,18 @@ export default function CardModalHeader({
                             </div>
 
                             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                                {parentCardLink ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenParentCard?.(parentCardLink.shortId)}
+                                        className="inline-flex h-7 max-w-full shrink-0 cursor-pointer items-center gap-1.5 truncate rounded-md border border-slate-300 bg-slate-50 px-2.5 text-xs font-semibold text-sky-800 shadow-sm transition-colors hover:border-sky-400 hover:bg-sky-50 dark:border-gray-600 dark:bg-gray-800 dark:text-sky-200 dark:hover:border-sky-500 dark:hover:bg-gray-700"
+                                        data-testid="card-modal-parent-link"
+                                        title={`親カード: ${parentCardLink.title}`}
+                                    >
+                                        <span className="text-[10px] leading-none text-sky-500" aria-hidden>▣</span>
+                                        <span className="min-w-0 truncate">{parentCardLink.title}</span>
+                                    </button>
+                                ) : null}
                                 {dueDate && (
                                     <div
                                         className={clsx(
