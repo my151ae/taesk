@@ -10,6 +10,7 @@ export type BlockActionType =
   | "move-down"
   | "insert-above"
   | "insert-below"
+  | "convert-child-card"
   | "duplicate"
   | "delete"
   | "toggle-details"
@@ -44,11 +45,19 @@ export function getBlockActionItems(
     ];
   }
 
-  return [
+  const items: BlockActionItem[] = [
     { action: "move-up", label: "上へ移動", disabled: !canMoveUp },
     { action: "move-down", label: "下へ移動", disabled: !canMoveDown },
     { action: "insert-above", label: "上に段落を追加" },
     { action: "insert-below", label: "下に段落を追加" },
+  ];
+
+  if (targetType === "listItem" || targetType === "taskItem") {
+    items.push({ action: "convert-child-card", label: "子カード化" });
+  }
+
+  return [
+    ...items,
     { action: "toggle-details", label: "トグルに変換" },
     { action: "duplicate", label: "複製" },
     { action: "delete", label: "削除", destructive: true },

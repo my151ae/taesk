@@ -11,7 +11,7 @@ import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-detai
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
-import { parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
+import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -38,6 +38,7 @@ import {
     canMoveBlock,
     createToggleDetailsSelection,
     createUnsetDetailsSelection,
+    getNodeChildren,
     type MoveBlockDirection,
     type ResolvedBlockTarget,
 } from '@/app/(board)/_components/tiptap/tiptap-block-actions';
@@ -883,6 +884,76 @@ export default function TiptapEditor({
         return true;
     }, [closeBlockMenu, editor, resolveBlockTargetAtPos, unsetActiveDetails]);
 
+    const convertListItemToChildCard = useCallback(async (target: ResolvedBlockTarget): Promise<boolean> => {
+        if (!editor || !boardId || !cardId) return false;
+        if (!target.parentListNode || target.parentListPos == null || target.itemIndex == null) return false;
+        if (target.nodeType !== "listItem" && target.nodeType !== "taskItem") return false;
+
+        const firstTextBlock = Array.from({ length: target.node.childCount }, (_, index) => target.node.child(index))
+            .find((child) => child.type.name === "paragraph" || child.type.name === "heading");
+        const title = (firstTextBlock?.textContent ?? "").trim();
+        if (!title) {
+            onEditorError?.("空の行は子カード化できません");
+            return false;
+        }
+
+        const childContentNodes: ProseMirrorNode[] = [];
+        target.node.forEach((child) => {
+            if (child !== firstTextBlock) {
+                childContentNodes.push(child);
+            }
+        });
+        const childContent = childContentNodes.length > 0
+            ? {
+                type: "doc",
+                content: childContentNodes.map((node) => node.toJSON()),
+            }
+            : buildDefaultBodyContent();
+
+        const paragraph = editor.state.schema.nodes.paragraph.create(
+            null,
+            editor.state.schema.text(`${title} ↗`),
+        );
+        const replacementItem = target.node.type.create(
+            target.nodeType === "taskItem" ? { ...(target.node.attrs ?? {}), checked: false } : target.node.attrs,
+            Fragment.fromArray([paragraph]),
+        );
+        const listChildren = getNodeChildren(target.parentListNode);
+        const nextListChildren = [
+            ...listChildren.slice(0, target.itemIndex),
+            replacementItem,
+            ...listChildren.slice(target.itemIndex + 1),
+        ];
+        const transaction = editor.state.tr.replaceWith(
+            target.parentListPos,
+            target.parentListPos + target.parentListNode.nodeSize,
+            target.parentListNode.copy(Fragment.fromArray(nextListChildren)),
+        );
+
+        onEditorError?.(null);
+        try {
+            const response = await fetch(`/api/boards/${boardId}/cards/${cardId}/convert-body-list-item`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title,
+                    child_content: childContent,
+                    parent_content: transaction.doc.toJSON(),
+                }),
+            });
+            const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+            if (!response.ok) {
+                throw new Error(body?.error?.message || "子カード化に失敗しました");
+            }
+
+            applyBlockActionTransaction(editor, transaction);
+            return true;
+        } catch (error) {
+            onEditorError?.(error instanceof Error ? error.message : "子カード化に失敗しました");
+            return false;
+        }
+    }, [applyBlockActionTransaction, boardId, cardId, editor, onEditorError]);
+
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
 
     useEffect(() => {
@@ -1369,6 +1440,10 @@ export default function TiptapEditor({
             case 'delete': {
                 const transaction = buildDeleteBlockTransaction(editor.state, resolvedMenuTarget);
                 applyBlockActionTransaction(editor, transaction);
+                break;
+            }
+            case 'convert-child-card': {
+                void convertListItemToChildCard(resolvedMenuTarget);
                 break;
             }
             case 'toggle-details': {

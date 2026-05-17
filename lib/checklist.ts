@@ -2,7 +2,15 @@ export const CHECKLIST_VERSION = 1;
 export const MAX_CHECKLIST_LINES = 200;
 export const MAX_CHECKLIST_TEXT_LENGTH = 500;
 
-export type ChecklistLine = { id: string; level: number; checked: boolean; text: string };
+export type ChecklistLine = {
+  id: string;
+  level: number;
+  checked: boolean;
+  text: string;
+  linked_card_id?: string;
+  linked_card_short_id?: string;
+  linked_card_slug?: string;
+};
 export type Checklist = { version: typeof CHECKLIST_VERSION; lines: ChecklistLine[] };
 
 export const EMPTY_CHECKLIST: Checklist = { version: CHECKLIST_VERSION, lines: [] };
@@ -31,6 +39,9 @@ export const clampChecklist = (
     level: Math.max(0, Math.floor(line?.level ?? 0)),
     checked: Boolean(line?.checked),
     text: clampLine(line?.text ?? '', maxLen),
+    ...(line?.linked_card_id ? { linked_card_id: line.linked_card_id } : {}),
+    ...(line?.linked_card_short_id ? { linked_card_short_id: line.linked_card_short_id } : {}),
+    ...(line?.linked_card_slug ? { linked_card_slug: line.linked_card_slug } : {}),
   }));
   return { version: CHECKLIST_VERSION, lines };
 };

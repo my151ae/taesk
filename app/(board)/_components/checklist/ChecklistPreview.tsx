@@ -71,6 +71,15 @@ export function ChecklistPreview({ checklist, maxLines = 3, className, onClick, 
               >
                 {line.text || 'タスクを書く'}
               </span>
+              {line.linked_card_id ? (
+                <span
+                  className="shrink-0 text-[11px] font-medium text-sky-600"
+                  title="子カードへのリンク"
+                  aria-label="子カードへのリンク"
+                >
+                  ↗
+                </span>
+              ) : null}
             </li>
           );
         })}

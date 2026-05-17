@@ -3,13 +3,17 @@ import { z } from "zod";
 
 import { authorizeBoardMutation } from "@/lib/server/board-request";
 import { withErrorHandling } from "@/lib/server/with-error-handling";
-import { normalizeChecklist } from "@/lib/checklist";
-import { buildDefaultBodyContent, deriveExcerptFromContent, parseMarkdownToTiptapContent } from "@/lib/tiptap";
+import {
+  buildDefaultBodyContent,
+  deriveExcerptFromContent,
+  normalizeContent,
+} from "@/lib/tiptap";
 import { generateShortId, slugify } from "@/lib/card-utils";
 
 const postSchema = z.object({
-  target_line_id: z.string().min(1),
-  card_updated_at: z.string().datetime(),
+  title: z.string().trim().min(1).max(255),
+  child_content: z.unknown(),
+  parent_content: z.unknown(),
 });
 
 const postHandler = async (
@@ -32,7 +36,7 @@ const postHandler = async (
 
   const { data: parentCard, error: parentFetchError } = await supabase
     .from("cards")
-    .select("id, board_id, list_id, parent_card_id, is_parent, due_date, due_bucket, checklist, updated_at")
+    .select("id, board_id, list_id, parent_card_id, due_date, due_bucket, updated_at")
     .eq("id", cardId)
     .eq("board_id", boardId)
     .is("deleted_at", null)
@@ -44,63 +48,18 @@ const postHandler = async (
       { status: 500 }
     );
   }
+
   if (!parentCard || parentCard.parent_card_id) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Parent card not found" } },
       { status: 404 }
     );
   }
-  if (parentCard.updated_at !== parsed.data.card_updated_at) {
-    return NextResponse.json(
-      { error: { code: "CONFLICT", message: "Card was updated. Please retry." } },
-      { status: 409 }
-    );
-  }
 
-  const checklist = normalizeChecklist(parentCard.checklist);
-  const startIndex = checklist.lines.findIndex((line) => line.id === parsed.data.target_line_id);
-  if (startIndex < 0) {
-    return NextResponse.json(
-      { error: { code: "CONFLICT", message: "Target checklist line no longer exists" } },
-      { status: 409 }
-    );
-  }
-
-  const startLine = checklist.lines[startIndex];
-  if (startLine.linked_card_id) {
-    return NextResponse.json(
-      { error: { code: "CONFLICT", message: "Target checklist line is already linked to a child card" } },
-      { status: 409 }
-    );
-  }
-  const baseLevel = startLine.level;
-  let endIndexExclusive = startIndex + 1;
-  while (endIndexExclusive < checklist.lines.length) {
-    if (checklist.lines[endIndexExclusive].level <= baseLevel) break;
-    endIndexExclusive += 1;
-  }
-
-  const block = checklist.lines.slice(startIndex, endIndexExclusive);
-  if (!block.length || !block[0]?.text?.trim()) {
-    return NextResponse.json(
-      { error: { code: "CONFLICT", message: "Invalid checklist block" } },
-      { status: 409 }
-    );
-  }
-
-  const title = block[0].text.trim();
-  const bodyMarkdown = block
-    .slice(1)
-    .map((line) => {
-      const relativeIndent = Math.max(0, line.level - baseLevel - 1);
-      const indent = "  ".repeat(relativeIndent);
-      const mark = line.checked ? "[x]" : "[ ]";
-      return `${indent}- ${mark} ${line.text}`;
-    })
-    .join("\n");
-  const parsedBody = bodyMarkdown ? parseMarkdownToTiptapContent(bodyMarkdown) : null;
-  const content = parsedBody ?? buildDefaultBodyContent();
-  const excerpt = deriveExcerptFromContent(content);
+  const childContent = normalizeContent(parsed.data.child_content) ?? buildDefaultBodyContent();
+  const parentContent = normalizeContent(parsed.data.parent_content);
+  const parentExcerpt = deriveExcerptFromContent(parentContent);
+  const childExcerpt = deriveExcerptFromContent(childContent);
 
   const { data: maxIdShortData } = await supabase
     .from("cards")
@@ -111,6 +70,16 @@ const postHandler = async (
     .maybeSingle();
   const idShort = (maxIdShortData?.id_short ?? 0) + 1;
 
+  const { data: maxPositionData } = await supabase
+    .from("cards")
+    .select("position")
+    .eq("board_id", boardId)
+    .eq("list_id", parentCard.list_id)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = (maxPositionData?.position ?? 0) + 1024;
+
   const now = new Date().toISOString();
   const { data: childCard, error: childCreateError } = await supabase
     .from("cards")
@@ -119,10 +88,10 @@ const postHandler = async (
       list_id: parentCard.list_id,
       parent_card_id: cardId,
       is_parent: false,
-      title,
+      title: parsed.data.title,
       checklist: { version: 1, lines: [] },
-      content,
-      excerpt,
+      content: childContent,
+      excerpt: childExcerpt,
       tags: [],
       due_date: parentCard.due_date ?? null,
       due_start: null,
@@ -135,8 +104,9 @@ const postHandler = async (
       assigned_to: null,
       short_id: generateShortId(),
       id_short: idShort,
-      slug: slugify(title),
+      slug: slugify(parsed.data.title),
       user_id: user.id,
+      position,
       created_at: now,
       updated_at: now,
       duration: 60,
@@ -151,30 +121,20 @@ const postHandler = async (
     );
   }
 
-  const linkedLine = {
-    ...startLine,
-    checked: false,
-    linked_card_id: childCard.id,
-    linked_card_short_id: childCard.short_id ?? undefined,
-    linked_card_slug: childCard.slug ?? undefined,
+  const parentUpdate = {
+    content: parentContent,
+    excerpt: parentExcerpt,
+    is_parent: true,
+    updated_at: new Date().toISOString(),
   };
-  const remainingLines = [
-    ...checklist.lines.slice(0, startIndex),
-    linkedLine,
-    ...checklist.lines.slice(endIndexExclusive),
-  ];
-  const nextChecklist = { ...checklist, lines: remainingLines };
-  const { data: updatedParent, error: parentUpdateError } = await supabase
+  const parentUpdateQuery = supabase
     .from("cards")
-    .update({
-      checklist: nextChecklist,
-      is_parent: true,
-      updated_at: new Date().toISOString(),
-    })
+    .update(parentUpdate)
     .eq("id", cardId)
     .eq("board_id", boardId)
-    .eq("updated_at", parsed.data.card_updated_at)
-    .is("deleted_at", null)
+    .is("deleted_at", null);
+
+  const { data: updatedParent, error: parentUpdateError } = await parentUpdateQuery
     .select("*")
     .maybeSingle();
 
@@ -186,6 +146,7 @@ const postHandler = async (
       .update({ deleted_at: deletedAt, purge_after_at: purgeAfterAt })
       .eq("id", childCard.id)
       .eq("board_id", boardId);
+
     return NextResponse.json(
       { error: { code: "CONFLICT", message: "Card was updated. Please retry." } },
       { status: 409 }
@@ -195,4 +156,4 @@ const postHandler = async (
   return NextResponse.json({ card: childCard, parent: updatedParent }, { status: 201 });
 };
 
-export const POST = withErrorHandling(postHandler, "cards-convert-checklist-line-post");
+export const POST = withErrorHandling(postHandler, "cards-convert-body-list-item-post");

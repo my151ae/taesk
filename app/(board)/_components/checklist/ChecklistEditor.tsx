@@ -56,7 +56,15 @@ const areLinesEqual = (a: ChecklistLine[], b: ChecklistLine[]) => {
     const left = a[i];
     const right = b[i];
     if (!left || !right) return false;
-    if (left.id !== right.id || left.level !== right.level || left.checked !== right.checked || left.text !== right.text) {
+    if (
+      left.id !== right.id ||
+      left.level !== right.level ||
+      left.checked !== right.checked ||
+      left.text !== right.text ||
+      left.linked_card_id !== right.linked_card_id ||
+      left.linked_card_short_id !== right.linked_card_short_id ||
+      left.linked_card_slug !== right.linked_card_slug
+    ) {
       return false;
     }
   }
@@ -353,6 +361,15 @@ export function ChecklistEditor({
               data-checklist-line={line.id}
               data-testid="checklist-editor"
             />
+            {line.linked_card_id ? (
+              <span
+                className="shrink-0 rounded px-1 text-[11px] font-medium leading-5 text-sky-600"
+                title="子カードへのリンク"
+                aria-label="子カードへのリンク"
+              >
+                ↗
+              </span>
+            ) : null}
           </div>
         ))}
       </div>
