@@ -145,7 +145,8 @@ export function CardModal({
         filteredProfiles,
         selectedAssignees,
         markFieldDirty,
-        clearDirtyFields,
+        getDirtyRevision,
+        clearDirtyFieldsIfRevisionUnchanged,
         resetDraft,
         syncExternalMetadata,
     } = useCardModalDraft({ card, profiles });
@@ -295,6 +296,7 @@ export function CardModal({
         const nextTitle = title.trim();
         const nextChecked = checked;
         const nextExcerpt = deriveExcerptFromContent(normalizedContent);
+        const dirtyRevisionAtSaveStart = getDirtyRevision();
 
         if (!isAutoSave) {
             setEditorError(null);
@@ -324,7 +326,7 @@ export function CardModal({
             historySourceId: options?.historySourceId,
         });
         if (saveResult !== false) {
-            clearDirtyFields();
+            clearDirtyFieldsIfRevisionUnchanged(dirtyRevisionAtSaveStart);
         }
 
         if (!isAutoSave && !options?.restoreFromHistory && targetBoardId !== card.board_id) {
@@ -351,7 +353,8 @@ export function CardModal({
             checked,
             targetBoardId,
             onSave,
-            clearDirtyFields,
+            getDirtyRevision,
+            clearDirtyFieldsIfRevisionUnchanged,
             onMoveToBoard,
     ]);
 

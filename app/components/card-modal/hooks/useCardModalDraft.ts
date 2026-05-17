@@ -78,12 +78,14 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [dirtyFields, setDirtyFields] = useState<CardModalDirtyFields>(() => createCleanDirtyFields());
   const dirtyFieldsRef = useRef<CardModalDirtyFields>(dirtyFields);
+  const dirtyRevisionRef = useRef(0);
 
   useEffect(() => {
     dirtyFieldsRef.current = dirtyFields;
   }, [dirtyFields]);
 
   const markFieldDirty = useCallback((field: keyof CardModalDirtyFields) => {
+    dirtyRevisionRef.current += 1;
     setDirtyFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
   }, []);
 
@@ -92,6 +94,14 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     dirtyFieldsRef.current = clean;
     setDirtyFields(clean);
   }, []);
+
+  const getDirtyRevision = useCallback(() => dirtyRevisionRef.current, []);
+
+  const clearDirtyFieldsIfRevisionUnchanged = useCallback((revision: number) => {
+    if (dirtyRevisionRef.current !== revision) return false;
+    clearDirtyFields();
+    return true;
+  }, [clearDirtyFields]);
 
   const filteredProfiles = useMemo(() => {
     const query = memberSearch.trim().toLowerCase();
@@ -244,6 +254,8 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
     dirtyFields,
     markFieldDirty,
     clearDirtyFields,
+    getDirtyRevision,
+    clearDirtyFieldsIfRevisionUnchanged,
     resetDraft,
     syncExternalMetadata,
   };
