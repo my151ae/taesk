@@ -171,6 +171,28 @@ const getHandler = async (
     const dayKey = dateOnly ? dayKeyMap.get(dateOnly) ?? null : null;
     const hasTime = card.due_start && card.due_end;
 
+    // parent_cardが配列またはオブジェクトとして返される可能性があるため、安全に正規化します
+    let parentCardObj: { id: string; short_id: string; title: string; } | null = null;
+    if (card.parent_card) {
+      if (Array.isArray(card.parent_card)) {
+        if (card.parent_card.length > 0) {
+          const first = card.parent_card[0];
+          parentCardObj = {
+            id: String(first.id),
+            short_id: String(first.short_id ?? ''),
+            title: String(first.title ?? ''),
+          };
+        }
+      } else {
+        const single = card.parent_card as any;
+        parentCardObj = {
+          id: String(single.id),
+          short_id: String(single.short_id ?? ''),
+          title: String(single.title ?? ''),
+        };
+      }
+    }
+
     if (dayKey) {
       if (hasTime) {
         const start = toMinutes(card.due_start);
@@ -178,7 +200,7 @@ const getHandler = async (
         events.push({
           card_id: card.id,
           parent_card_id: card.parent_card_id,
-          parent_card: card.parent_card,
+          parent_card: parentCardObj,
           is_parent: Boolean(card.is_parent),
           child_count: childCountByParentId.get(card.id) ?? 0,
           due_date: dateOnly!,
@@ -217,7 +239,7 @@ const getHandler = async (
         abBuckets[key].push({
           card_id: card.id,
           parent_card_id: card.parent_card_id,
-          parent_card: card.parent_card,
+          parent_card: parentCardObj,
           is_parent: Boolean(card.is_parent),
           child_count: childCountByParentId.get(card.id) ?? 0,
           title: card.title,
@@ -250,7 +272,7 @@ const getHandler = async (
       overdue.push({
         card_id: card.id,
         parent_card_id: card.parent_card_id,
-        parent_card: card.parent_card,
+        parent_card: parentCardObj,
         is_parent: Boolean(card.is_parent),
         child_count: childCountByParentId.get(card.id) ?? 0,
         title: card.title,
