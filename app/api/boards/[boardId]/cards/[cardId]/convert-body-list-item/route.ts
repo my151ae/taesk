@@ -10,11 +10,33 @@ import {
 } from "@/lib/tiptap";
 import { generateShortId, slugify } from "@/lib/card-utils";
 
+const CHILD_CARD_LINK_PLACEHOLDER = "__TAESK_CHILD_CARD_LINK__";
+
 const postSchema = z.object({
   title: z.string().trim().min(1).max(255),
   child_content: z.unknown(),
   parent_content: z.unknown(),
 });
+
+const replaceChildCardLinkPlaceholder = (value: unknown, href: string): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceChildCardLinkPlaceholder(item, href));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const next: Record<string, unknown> = {};
+  for (const [key, childValue] of Object.entries(value)) {
+    if (key === "href" && childValue === CHILD_CARD_LINK_PLACEHOLDER) {
+      next[key] = href;
+      continue;
+    }
+    next[key] = replaceChildCardLinkPlaceholder(childValue, href);
+  }
+  return next;
+};
 
 const postHandler = async (
   request: NextRequest,
@@ -57,8 +79,6 @@ const postHandler = async (
   }
 
   const childContent = normalizeContent(parsed.data.child_content) ?? buildDefaultBodyContent();
-  const parentContent = normalizeContent(parsed.data.parent_content);
-  const parentExcerpt = deriveExcerptFromContent(parentContent);
   const childExcerpt = deriveExcerptFromContent(childContent);
 
   const { data: maxIdShortData } = await supabase
@@ -121,6 +141,10 @@ const postHandler = async (
     );
   }
 
+  const parentContent = normalizeContent(
+    replaceChildCardLinkPlaceholder(parsed.data.parent_content, `/c/${childCard.short_id}`)
+  );
+  const parentExcerpt = deriveExcerptFromContent(parentContent);
   const parentUpdate = {
     content: parentContent,
     excerpt: parentExcerpt,

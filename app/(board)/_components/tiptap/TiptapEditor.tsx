@@ -7,6 +7,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -50,6 +51,8 @@ import {
     setTaskCompletionVisibilityMeta,
     taskCompletionVisibilityPluginKey,
 } from '@/app/(board)/_components/tiptap/TaskCompletionVisibility';
+
+const CHILD_CARD_LINK_PLACEHOLDER = "__TAESK_CHILD_CARD_LINK__";
 
 export type FocusTitleRequest = {
     mode?: 'column' | 'end';
@@ -640,6 +643,14 @@ export default function TiptapEditor({
             TaskItem.configure({
                 nested: true,
             }),
+            Link.configure({
+                autolink: false,
+                linkOnPaste: false,
+                openOnClick: true,
+                HTMLAttributes: {
+                    class: 'taesk-card-link',
+                },
+            }),
             Details.configure({
                 persist: true,
             }),
@@ -888,6 +899,9 @@ export default function TiptapEditor({
         if (!editor || !boardId || !cardId) return false;
         if (!target.parentListNode || target.parentListPos == null || target.itemIndex == null) return false;
         if (target.nodeType !== "listItem" && target.nodeType !== "taskItem") return false;
+        const parentListNode = target.parentListNode;
+        const parentListPos = target.parentListPos;
+        const itemIndex = target.itemIndex;
 
         const firstTextBlock = Array.from({ length: target.node.childCount }, (_, index) => target.node.child(index))
             .find((child) => child.type.name === "paragraph" || child.type.name === "heading");
@@ -910,25 +924,33 @@ export default function TiptapEditor({
             }
             : buildDefaultBodyContent();
 
-        const paragraph = editor.state.schema.nodes.paragraph.create(
-            null,
-            editor.state.schema.text(`${title} ↗`),
-        );
-        const replacementItem = target.node.type.create(
-            target.nodeType === "taskItem" ? { ...(target.node.attrs ?? {}), checked: false } : target.node.attrs,
-            Fragment.fromArray([paragraph]),
-        );
-        const listChildren = getNodeChildren(target.parentListNode);
-        const nextListChildren = [
-            ...listChildren.slice(0, target.itemIndex),
-            replacementItem,
-            ...listChildren.slice(target.itemIndex + 1),
-        ];
-        const transaction = editor.state.tr.replaceWith(
-            target.parentListPos,
-            target.parentListPos + target.parentListNode.nodeSize,
-            target.parentListNode.copy(Fragment.fromArray(nextListChildren)),
-        );
+        const buildLinkedParentTransaction = (href: string): Transaction => {
+            const linkMark = editor.state.schema.marks.link?.create({
+                href,
+                class: "taesk-card-link",
+            });
+            const linkedText = linkMark
+                ? editor.state.schema.text(title, [linkMark])
+                : editor.state.schema.text(`${title} ↗`);
+            const paragraph = editor.state.schema.nodes.paragraph.create(null, linkedText);
+            const replacementItem = target.node.type.create(
+                target.nodeType === "taskItem" ? { ...(target.node.attrs ?? {}), checked: false } : target.node.attrs,
+                Fragment.fromArray([paragraph]),
+            );
+            const listChildren = getNodeChildren(parentListNode);
+            const nextListChildren = [
+                ...listChildren.slice(0, itemIndex),
+                replacementItem,
+                ...listChildren.slice(itemIndex + 1),
+            ];
+            return editor.state.tr.replaceWith(
+                parentListPos,
+                parentListPos + parentListNode.nodeSize,
+                parentListNode.copy(Fragment.fromArray(nextListChildren)),
+            );
+        };
+
+        const placeholderTransaction = buildLinkedParentTransaction(CHILD_CARD_LINK_PLACEHOLDER);
 
         onEditorError?.(null);
         try {
@@ -938,14 +960,19 @@ export default function TiptapEditor({
                 body: JSON.stringify({
                     title,
                     child_content: childContent,
-                    parent_content: transaction.doc.toJSON(),
+                    parent_content: placeholderTransaction.doc.toJSON(),
                 }),
             });
-            const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+            const body = await response.json().catch(() => null) as {
+                card?: { short_id?: string | null };
+                error?: { message?: string };
+            } | null;
             if (!response.ok) {
                 throw new Error(body?.error?.message || "子カード化に失敗しました");
             }
 
+            const childHref = body?.card?.short_id ? `/c/${body.card.short_id}` : CHILD_CARD_LINK_PLACEHOLDER;
+            const transaction = buildLinkedParentTransaction(childHref);
             applyBlockActionTransaction(editor, transaction);
             return true;
         } catch (error) {

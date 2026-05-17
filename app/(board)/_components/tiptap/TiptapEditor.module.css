@@ -95,6 +95,35 @@
     background: transparent;
 }
 
+.editor :global(.ProseMirror a.taesk-card-link),
+.editor :global(.ProseMirror a[href^="/c/"]) {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 0.375rem;
+    padding: 0.05rem 0.25rem;
+    color: #0f172a;
+    font-weight: 500;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.editor :global(.ProseMirror a.taesk-card-link::before),
+.editor :global(.ProseMirror a[href^="/c/"]::before) {
+    content: "↗";
+    color: #0ea5e9;
+    font-size: 0.78em;
+    line-height: 1;
+}
+
+.editor :global(.ProseMirror a.taesk-card-link:hover),
+.editor :global(.ProseMirror a[href^="/c/"]:hover) {
+    background: #f1f5f9;
+    color: #0369a1;
+}
+
 .editor :global(ul[data-type="taskList"] li) {
     margin: 0 !important;
     padding: 0 !important;
