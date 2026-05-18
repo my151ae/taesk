@@ -1019,7 +1019,7 @@ export function CardModal({
                                         disabled={isHistoryPreviewing}
                                         onChange={(e) => {
                                             if (isHistoryPreviewing) return;
-                                            const normalizedTitle = e.target.value.replace(/\r?\n/g, "");
+                                            const normalizedTitle = e.target.value.replace(/\r/g, "");
                                             markFieldDirty("title");
                                             setTitle(normalizedTitle);
                                             triggerAutoSave();
