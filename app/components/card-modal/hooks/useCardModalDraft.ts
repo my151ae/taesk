@@ -86,6 +86,9 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
 
   const markFieldDirty = useCallback((field: keyof CardModalDirtyFields) => {
     dirtyRevisionRef.current += 1;
+    dirtyFieldsRef.current = dirtyFieldsRef.current[field]
+      ? dirtyFieldsRef.current
+      : { ...dirtyFieldsRef.current, [field]: true };
     setDirtyFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
   }, []);
 
@@ -164,7 +167,14 @@ export function useCardModalDraft({ card, profiles }: UseCardModalDraftArgs) {
 
   const syncExternalMetadata = useCallback((nextCard: Card) => {
     const dirty = dirtyFieldsRef.current;
+    const activeElement = typeof document !== "undefined" ? document.activeElement : null;
+    const isTitleFocused =
+      activeElement instanceof HTMLElement &&
+      activeElement.getAttribute("data-testid") === "card-modal-title-input";
 
+    if (!dirty.title && !isTitleFocused) {
+      setTitle(nextCard.title || "");
+    }
     if (!dirty.tags) {
       setTags(nextCard.tags || []);
     }

@@ -49,6 +49,7 @@ type CardModalHeaderProps = {
     onDueDateChange: (value: string) => void;
     onDueStartChange: (value: string) => void;
     onDueEndChange: (value: string) => void;
+    onDueTimeCommit: () => void;
     startReminderEnabled: boolean;
     startReminderMinutes: ReminderMinuteOption;
     endReminderEnabled: boolean;
@@ -60,6 +61,7 @@ type CardModalHeaderProps = {
     onEndReminderMinutesChange: (minutes: ReminderMinuteOption) => void;
     onTargetBoardChange: (boardId: string) => void;
     onDurationChange: (value: number | "") => void;
+    onDurationCommit: () => void;
     onBucketChange: (bucket: DueBucket) => void;
     canPromoteToParent?: boolean;
     onPromoteToParent?: () => void | Promise<void> | Promise<boolean>;
@@ -126,6 +128,7 @@ export default function CardModalHeader({
     onDueDateChange,
     onDueStartChange,
     onDueEndChange,
+    onDueTimeCommit,
     startReminderEnabled,
     startReminderMinutes,
     endReminderEnabled,
@@ -137,6 +140,7 @@ export default function CardModalHeader({
     onEndReminderMinutesChange,
     onTargetBoardChange,
     onDurationChange,
+    onDurationCommit,
     onBucketChange,
     canPromoteToParent = false,
     onPromoteToParent,
@@ -382,6 +386,12 @@ export default function CardModalHeader({
                                         step={60}
                                         value={dueStart}
                                         onChange={(e) => onDueStartChange(e.target.value)}
+                                        onBlur={onDueTimeCommit}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
                                         className="w-[82px] rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                     />
                                     <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">
@@ -425,6 +435,12 @@ export default function CardModalHeader({
                                                 if (isNaN(val)) return;
                                                 onDurationChange(val);
                                             }}
+                                            onBlur={onDurationCommit}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.currentTarget.blur();
+                                                }
+                                            }}
                                             className="w-14 rounded-md border border-slate-200 bg-transparent px-1 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                         />
                                         <span className="text-[10px] font-medium text-slate-400 dark:text-gray-500">min</span>
@@ -437,6 +453,12 @@ export default function CardModalHeader({
                                         step={60}
                                         value={dueEnd}
                                         onChange={(e) => onDueEndChange(e.target.value)}
+                                        onBlur={onDueTimeCommit}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
                                         className="w-[82px] rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                     />
                                     <label className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-gray-400">

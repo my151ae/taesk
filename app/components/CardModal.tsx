@@ -144,6 +144,7 @@ export function CardModal({
         setEditorError,
         filteredProfiles,
         selectedAssignees,
+        dirtyFields,
         markFieldDirty,
         getDirtyRevision,
         clearDirtyFieldsIfRevisionUnchanged,
@@ -363,6 +364,7 @@ export function CardModal({
         hasPendingChangesRef,
         hasAutoSavedEditsRef,
         triggerAutoSave,
+        flushPendingAutoSave,
         clearAutoSaveTimers,
         requestClose,
     } = useCardModalAutoSave({
@@ -375,6 +377,16 @@ export function CardModal({
         onRequestClose: onClose,
         onCancelHistoryPreview: cancelHistoryPreview,
     });
+
+    const commitDraftSave = useCallback(() => {
+        if (isHistoryPreviewing) return;
+        if (hasPendingChangesRef.current || hasAutoSavedEditsRef.current) {
+            flushPendingAutoSave();
+            return;
+        }
+        if (!Object.values(dirtyFields).some(Boolean)) return;
+        void handleSave(true);
+    }, [dirtyFields, flushPendingAutoSave, handleSave, hasAutoSavedEditsRef, hasPendingChangesRef, isHistoryPreviewing]);
 
     const { dialogRef } = useCardModalLifecycle({
         card,
@@ -534,6 +546,7 @@ export function CardModal({
         if (event.key === "Enter") {
             event.preventDefault();
             event.stopPropagation();
+            flushPendingAutoSave();
             bodyBridgeRef.current?.insertLeadingParagraphAndFocus();
             return;
         }
@@ -559,7 +572,7 @@ export function CardModal({
         event.preventDefault();
         event.stopPropagation();
         bridge.focusBody(event.key === "ArrowDown" ? selectionStart : 0);
-    }, [isHistoryPreviewing, title.length]);
+    }, [flushPendingAutoSave, isHistoryPreviewing, title.length]);
 
     const handleAddMember = (profileId: string) => {
         if (isHistoryPreviewing) return;
@@ -655,9 +668,7 @@ export function CardModal({
             markFieldDirty("dueEnd");
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
-
-        triggerAutoSave();
-    }, [isHistoryPreviewing, handleTimeToggle, duration, markFieldDirty, setDueEnd, setDueStart, triggerAutoSave]);
+    }, [isHistoryPreviewing, handleTimeToggle, duration, markFieldDirty, setDueEnd, setDueStart]);
 
     const handleDueEndChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
@@ -674,9 +685,7 @@ export function CardModal({
             markFieldDirty("duration");
             setDuration(Math.max(0, endMins - startMins));
         }
-
-        triggerAutoSave();
-    }, [isHistoryPreviewing, dueStart, markFieldDirty, setDueEnd, setDuration, triggerAutoSave]);
+    }, [isHistoryPreviewing, dueStart, markFieldDirty, setDueEnd, setDuration]);
 
     const handleStartReminderEnabledChange = useCallback((enabled: boolean) => {
         if (isHistoryPreviewing) return;
@@ -732,8 +741,7 @@ export function CardModal({
             markFieldDirty("dueEnd");
             setDueEnd(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
         }
-        triggerAutoSave();
-    }, [dueStart, isHistoryPreviewing, markFieldDirty, setDueEnd, setDuration, triggerAutoSave]);
+    }, [dueStart, isHistoryPreviewing, markFieldDirty, setDueEnd, setDuration]);
 
     const handleTargetBoardChange = useCallback((value: string) => {
         if (isHistoryPreviewing) return;
@@ -870,6 +878,7 @@ export function CardModal({
                     onDueDateChange={handleDueDateInputChange}
                     onDueStartChange={handleDueStartChange}
                     onDueEndChange={handleDueEndChange}
+                    onDueTimeCommit={commitDraftSave}
                     startReminderEnabled={startReminderEnabled}
                     startReminderMinutes={startReminderMinutes}
                     endReminderEnabled={endReminderEnabled}
@@ -882,6 +891,7 @@ export function CardModal({
                     onTargetBoardChange={handleTargetBoardChange}
                     duration={duration}
                     onDurationChange={handleDurationChange}
+                    onDurationCommit={commitDraftSave}
                     onBucketChange={handleBucketChange}
                     canPromoteToParent={!card.is_parent && !card.parent_card_id && !isHistoryPreviewing}
                     onPromoteToParent={onPromoteToParent ? () => onPromoteToParent(card.id) : undefined}
@@ -1022,6 +1032,7 @@ export function CardModal({
                                         }}
                                         onBlur={() => {
                                             titleIsComposingRef.current = false;
+                                            flushPendingAutoSave();
                                         }}
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"

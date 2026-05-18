@@ -87,6 +87,7 @@ export function useCardModalLifecycle({
 
     const metadataKey = JSON.stringify({
       id: card.id,
+      title: card.title ?? "",
       due_date: card.due_date ?? null,
       due_start: card.due_start ?? null,
       due_end: card.due_end ?? null,
@@ -112,6 +113,7 @@ export function useCardModalLifecycle({
   }, [
     card,
     card.id,
+    card.title,
     card.due_date,
     card.due_start,
     card.due_end,
