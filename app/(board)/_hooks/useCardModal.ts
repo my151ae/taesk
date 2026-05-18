@@ -23,6 +23,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     const cardIdFromUrl = searchParams?.get('card');
 
     const [modalCardOverride, setModalCardOverride] = useState<Card | null>(null);
+    const [creatingModalCard, setCreatingModalCard] = useState<Card | null>(null);
     const [cardModalStatus, setCardModalStatus] = useState<CardModalStatus>('idle');
     const [cardModalError, setCardModalError] = useState<string | null>(null);
     const [isCardPeekClosing, setIsCardPeekClosing] = useState(false);
@@ -45,16 +46,28 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         console.log('[timeline] openCardModal', { shortId, source: debugSource });
 
         // Instant open via local state
+        setCreatingModalCard(null);
         setModalOpenSource(debugSource ?? null);
         setActiveCardId(shortId);
         setCardInUrl(shortId, { method: 'push' });
     }, [dataMode, setCardInUrl]);
+
+    const beginCreateCardModal = useCallback((card: Card, debugSource?: string) => {
+        if (dataMode !== 'api') return;
+
+        setCreatingModalCard(card);
+        setModalCardOverride(null);
+        setModalOpenSource(debugSource ?? null);
+        setCardModalError(null);
+        setCardModalStatus('loading');
+    }, [dataMode]);
 
     const closeCardModal = useCallback(() => {
         setIsCardPeekClosing(true);
         setActiveCardId(null);
         setModalOpenSource(null);
         cardModalShortIdRef.current = null;
+        setCreatingModalCard(null);
         setModalCardOverride(null);
         setCardModalStatus('idle');
         setCardInUrl(null, { method: 'push' });
@@ -201,8 +214,8 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     }, [data, activeCardId, cardIdFromUrl, initialBoard.id, isCardPeekClosing]);
 
     const modalCard = useMemo(
-        () => modalCardOverride ?? modalCardFromData,
-        [modalCardOverride, modalCardFromData]
+        () => creatingModalCard ?? modalCardOverride ?? modalCardFromData,
+        [creatingModalCard, modalCardOverride, modalCardFromData]
     );
 
     useEffect(() => {
@@ -237,6 +250,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
     // 2. Load Full Card Data: Fetch only when ID changes or modal opens
     useEffect(() => {
         if (!targetShortId) {
+            if (creatingModalCard) return;
             if (isCardPeekClosing) setIsCardPeekClosing(false);
             cardModalShortIdRef.current = null;
             setModalProfiles((prev) => (prev.length ? [] : prev));
@@ -329,7 +343,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         return () => {
             abortController.abort();
         };
-    }, [targetShortId, isCardPeekClosing, activeCardId, onResolveTrashedCard]);
+    }, [targetShortId, isCardPeekClosing, activeCardId, onResolveTrashedCard, creatingModalCard]);
 
     // Load Board Members
     useEffect(() => {
@@ -381,6 +395,7 @@ export function useCardModal({ initialBoard, dataMode, data, setCardInUrl, onRes
         cardModalError,
         setCardModalError,
         setModalCardOverride,
+        beginCreateCardModal,
         openCardModal,
         closeCardModal,
         modalOpenSource,

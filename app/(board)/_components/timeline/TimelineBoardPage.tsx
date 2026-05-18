@@ -535,6 +535,7 @@ function TimelineBoardPageContent({
     cardModalError,
     setCardModalError,
     setModalCardOverride,
+    beginCreateCardModal,
     openCardModal,
     closeCardModal,
     modalOpenSource,
@@ -1079,6 +1080,7 @@ function TimelineBoardPageContent({
     setData,
     fetchTimeline,
     openCardModal,
+    beginCreateCardModal,
     closeCardModal,
     modalCard,
     setModalCardOverride,
@@ -1090,7 +1092,7 @@ function TimelineBoardPageContent({
     onCardCreated: (cardId, laneId) => {
       clearSelection();
       setActiveCard(cardId, laneId);
-      setPendingTitleEditCardId(cardId);
+      setPendingTitleEditCardId(null);
     },
   });
 

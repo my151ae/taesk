@@ -146,13 +146,15 @@ export function TimelineCard({
     onActivateCard,
     activeCardId = null,
     activeLaneId = null,
-    inlineTitleEdit = false,
-    onRenameTitle,
+    inlineTitleEdit: _inlineTitleEdit = false,
+    onRenameTitle: _onRenameTitle,
     onTitleEditStateChange,
     autoStartTitleEdit = false,
     onAutoStartTitleEditConsumed,
     showOpenButton = false,
 }: TimelineCardProps) {
+    const inlineTitleEdit = false;
+    const onRenameTitle = _onRenameTitle;
     const containerRef = useRef<HTMLDivElement | null>(null);
     const checkboxRef = useRef<HTMLDivElement | null>(null);
     const titleInputRef = useRef<HTMLInputElement | null>(null);

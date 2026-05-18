@@ -30,6 +30,7 @@ interface UseTimelineCardActionsProps {
   setData: React.Dispatch<React.SetStateAction<TimelineResponse | null>>;
   fetchTimeline: (offset?: number) => Promise<TimelineResponse | null>;
   openCardModal: (shortId: string, source?: string) => void;
+  beginCreateCardModal?: (card: Card, source?: string) => void;
   closeCardModal: () => void;
   modalCard: Card | null;
   setModalCardOverride: (card: Card | null) => void;
@@ -163,6 +164,7 @@ export function useTimelineCardActions({
   setData,
   fetchTimeline,
   openCardModal,
+  beginCreateCardModal,
   closeCardModal,
   modalCard,
   setModalCardOverride,
@@ -523,6 +525,9 @@ export function useTimelineCardActions({
 
     setData((prev) => (prev ? applyCardUpdate(prev, optimisticCard, "INSERT") : prev));
     onCardCreated?.(optimisticCard.id, focusLaneId);
+    if (options?.openModal !== false) {
+      beginCreateCardModal?.(optimisticCard, "create-card");
+    }
 
     try {
       const response = await fetch(`/api/boards/${initialBoardId}/cards`, {
@@ -540,8 +545,11 @@ export function useTimelineCardActions({
     } catch {
       setErrorMessage("Failed to create card");
       setData((prev) => (prev ? applyCardUpdate(prev, { id: optimisticId } as Card, "DELETE") : prev));
+      if (options?.openModal !== false) {
+        closeCardModal();
+      }
     }
-  }, [dataMode, initialBoardId, setData, openCardModal, setErrorMessage, onCardCreated]);
+  }, [dataMode, initialBoardId, setData, openCardModal, beginCreateCardModal, closeCardModal, setErrorMessage, onCardCreated]);
 
   const handleColumnClick = useCallback((day: TimelineDay, minutes: number) => {
     const title = "";
@@ -556,7 +564,7 @@ export function useTimelineCardActions({
       due_start: minutesToTime(minutes),
       due_end: minutesToTime(minutes + 60),
     };
-    createCard(payload, { openModal: false, focusLaneId: `timeline:${day.isoDate}` });
+    createCard(payload, { focusLaneId: `timeline:${day.isoDate}` });
   }, [createCard]);
 
   const handleBucketClick = useCallback((bucketKey: string, afterCardId?: string) => {
@@ -580,7 +588,7 @@ export function useTimelineCardActions({
       due_bucket_position: position,
     };
 
-    createCard(payload, { openModal: false, focusLaneId: `bucket:${bucketKey}` });
+    createCard(payload, { focusLaneId: `bucket:${bucketKey}` });
   }, [bucketDayMap, createCard, data?.abBuckets]);
 
   const handleToggleCardChecked = useCallback(async (cardId: string, nextChecked: boolean) => {
