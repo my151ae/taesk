@@ -423,27 +423,7 @@ export default function CardModalHeader({
                                                 }
                                                 const val = parseInt(raw, 10);
                                                 if (isNaN(val)) return;
-
-                                                const prev = typeof duration === "number" ? duration : 0;
-                                                const diff = val - prev;
-
-                                                if (Math.abs(diff) === 5 || Math.abs(diff) === 1) {
-                                                    let nextVal = val;
-                                                    if (diff > 0) {
-                                                        if (prev >= 5) {
-                                                            nextVal = (Math.floor(prev / 5) + 1) * 5;
-                                                        } else {
-                                                            nextVal = prev + 1;
-                                                        }
-                                                    } else if (prev > 5) {
-                                                        nextVal = (Math.ceil(prev / 5) - 1) * 5;
-                                                    } else {
-                                                        nextVal = Math.max(0, prev - 1);
-                                                    }
-                                                    onDurationChange(nextVal);
-                                                } else {
-                                                    onDurationChange(val);
-                                                }
+                                                onDurationChange(val);
                                             }}
                                             className="w-14 rounded-md border border-slate-200 bg-transparent px-1 py-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-gray-600 dark:bg-gray-700"
                                         />
