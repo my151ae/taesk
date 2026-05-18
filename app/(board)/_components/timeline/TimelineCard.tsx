@@ -396,6 +396,7 @@ export function TimelineCard({
         onOpen();
     }, [onOpen]);
     const shortcutAttributes = shortcutContext ? buildShortcutDataAttributes(shortcutContext) : undefined;
+    const isActiveCard = Boolean(cardId && activeCardId === cardId);
     const handleFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
         if (cardId && selectionLane) {
             onActivateCard?.(cardId, selectionLane);
@@ -410,7 +411,7 @@ export function TimelineCard({
                 'relative flex flex-row items-stretch border text-left shadow-sm w-full max-w-full outline-none transition-shadow',
                 resolvedBackgroundClass,
                 resolvedBorderClassName,
-                isSelected && "border-sky-500 bg-sky-50/90 shadow-[0_0_0_2px_rgba(14,165,233,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:bg-sky-500 before:content-['']",
+                (isSelected || isActiveCard) && "border-sky-500 bg-sky-50/90 shadow-[0_0_0_2px_rgba(14,165,233,0.18)] before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l before:bg-sky-500 before:content-['']",
                 paddingClass === 'py-3' ? 'py-0' : '', // パディングの調整
                 'hover:ring-2 hover:ring-sky-200', // ホバー時のリング
                 'focus:ring-2 focus:ring-sky-500', // フォーカス時のリング
@@ -422,6 +423,7 @@ export function TimelineCard({
             data-card-id={cardId}
             data-selection-lane={selectionLane ?? undefined}
             data-selected={isSelected ? 'true' : undefined}
+            data-detail-open={isActiveCard ? 'true' : undefined}
             data-checked-visual={isTimelineDimChecked ? 'timeline-dim' : undefined}
             {...shortcutAttributes}
             tabIndex={tabIndex ?? 0}

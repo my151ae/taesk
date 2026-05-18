@@ -555,6 +555,12 @@ function TimelineBoardPageContent({
     setModalCardOverrideRef.current = setModalCardOverride;
   }, [setModalCardOverride]);
 
+  useEffect(() => {
+    if (selectedCardIds.length > 1 && modalCard) {
+      closeCardModal();
+    }
+  }, [closeCardModal, modalCard, selectedCardIds.length]);
+
   const timelineHeaderRef = useRef<HTMLDivElement | null>(null);
   const { timelineHeaderHeight, timelineViewportHeight, liveNowMinutes, liveNowIsoDate } =
     useTimelineViewport({
