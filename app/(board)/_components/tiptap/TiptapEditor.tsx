@@ -225,6 +225,7 @@ function TiptapEditor({
         reason: ActiveBlockHandle['reason'];
     } | null>(null);
     const activeBlockHandleRef = useRef<ActiveBlockHandle | null>(null);
+    const isMenuOpenRef = useRef(false);
     const lastChecklistProgressRef = useRef<ChecklistProgress | null>(null);
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -232,6 +233,7 @@ function TiptapEditor({
     const [activeBlockHandle, setActiveBlockHandle] = useState<ActiveBlockHandle | null>(null);
 
     const closeBlockMenu = useCallback(() => {
+        isMenuOpenRef.current = false;
         setIsMenuOpen(false);
         setMenuTarget(null);
     }, []);
@@ -660,12 +662,11 @@ function TiptapEditor({
                 if (row instanceof HTMLElement) {
                     const textBlock = row.querySelector(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > summary');
                     if (textBlock instanceof HTMLElement) {
-                        const taskItemRect = taskItem.getBoundingClientRect();
                         const textRect = getTextAlignedRect(textBlock);
                         return new DOMRect(
-                            taskItemRect.left,
+                            textRect.left,
                             textRect.top,
-                            Math.max(textRect.right - taskItemRect.left, textRect.width),
+                            textRect.width,
                             textRect.height,
                         );
                     }
@@ -682,12 +683,11 @@ function TiptapEditor({
             if (listItem instanceof HTMLElement) {
                 const textBlock = listItem.querySelector(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > summary');
                 if (textBlock instanceof HTMLElement) {
-                    const listItemRect = listItem.getBoundingClientRect();
                     const textRect = getTextAlignedRect(textBlock);
                     return new DOMRect(
-                        listItemRect.left,
+                        textRect.left,
                         textRect.top,
-                        Math.max(textRect.right - listItemRect.left, textRect.width),
+                        textRect.width,
                         textRect.height,
                     );
                 }
@@ -1050,6 +1050,24 @@ function TiptapEditor({
         if (!target || !editor) return;
         scheduleActiveBlockMeasure(Math.max(0, Math.min(target.blockPos + 1, editor.state.doc.content.size)), reason);
     }, [editor, menuTarget, scheduleActiveBlockMeasure]);
+
+    const getBlockPosFromPointerTarget = useCallback((target: EventTarget | null): number | null => {
+        if (!editor || !(target instanceof Element)) return null;
+        const editorDom = editor.view.dom;
+        if (!editorDom.contains(target)) return null;
+
+        const blockElement = target.closest(
+            'li[data-type="taskItem"], li, div[data-type="details"], summary, p, h1, h2, h3'
+        );
+        if (!(blockElement instanceof HTMLElement) || !editorDom.contains(blockElement)) return null;
+
+        try {
+            const pos = editor.view.posAtDOM(blockElement, 0);
+            return Number.isFinite(pos) ? pos : null;
+        } catch {
+            return null;
+        }
+    }, [editor]);
 
     const applyBlockActionTransaction = useCallback((nextEditor: Editor | null, transaction: Transaction | null): boolean => {
         if (!nextEditor) return false;
@@ -1670,7 +1688,16 @@ function TiptapEditor({
     };
 
     const handlePointerMove = (event: ReactMouseEvent<HTMLDivElement>) => {
-        if (suppressBlockUi || isMenuOpen) return;
+        if (suppressBlockUi || isMenuOpenRef.current) return;
+        const eventTarget = event.target instanceof Element ? event.target : null;
+        if (eventTarget?.closest('[data-testid="tiptap-block-handle"], [data-testid="tiptap-block-menu"]')) {
+            return;
+        }
+        const blockPos = getBlockPosFromPointerTarget(event.target);
+        if (blockPos != null) {
+            scheduleActiveBlockMeasure(blockPos, 'hover');
+            return;
+        }
         const coords = { left: event.clientX, top: event.clientY };
         const result = editor.view.posAtCoords(coords);
         if (!result) return;
@@ -1678,7 +1705,7 @@ function TiptapEditor({
     };
 
     const handlePointerLeave = () => {
-        if (isMenuOpen) return;
+        if (isMenuOpenRef.current) return;
         setActiveBlockHandleIfChanged(null);
     };
 
@@ -1748,7 +1775,14 @@ function TiptapEditor({
                             nodeType: activeBlockHandle.nodeType,
                             fallbackAnchorRect: cloneDomRect(activeBlockHandle.rect),
                         });
+                        isMenuOpenRef.current = true;
                         setIsMenuOpen(true);
+                    }}
+                    onMouseMove={(event) => {
+                        event.stopPropagation();
+                    }}
+                    onMouseEnter={() => {
+                        setActiveBlockHandleIfChanged(activeBlockHandle);
                     }}
                 >
                     <span className={styles.blockActionHandleDots}>⋮⋮</span>
