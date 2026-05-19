@@ -12,14 +12,17 @@ CardModal 本文エディタの block action（`move-up` / `move-down` / `insert
 
 ## どこを見るか
 
-### 1. handle を block identity とみなす
+### 1. active handle を block identity とみなす
 
-本文エディタの block handle は hover DOM 逆引きではなく、`editor.state.doc.descendants(...)` と `getBlockTargetAtPos(...)` から `renderableBlocks` を作って描画する。E2E では本文 DOM の見た目ではなく、以下を起点にする。
+本文エディタの block handle は、全 block を常時描画しない。hover / active / menu 対象の 1 block だけを `getBlockTargetAtPos(...)` で解決して描画する。E2E では対象テキストを hover して handle を出し、以下を起点にする。
 
 - `data-testid="tiptap-block-handle"`
 - `data-block-node-type`
 - `data-block-pos`
 - `data-block-start-pos`
+
+同時に表示される handle は最大 1 個とする。複数 handle の常時表示や件数は期待しない。
+completed line visibility のように複数行の表示状態を確認する場合は、handle 件数ではなく `.ProseMirror li[data-type="taskItem"]` の可視状態を確認する。
 
 ### 2. 保存結果をポーリングする
 
@@ -59,7 +62,7 @@ block action 実行後の保存確認は、固定 sleep ではなく `expect.pol
 
 ## 推奨テスト方針
 
-1. `openBlockActionMenu()` で menu 表示と初期 focus を確認する。
+1. 対象 block のテキストを hover して active handle を表示し、`openBlockActionMenu()` で menu 表示と初期 focus を確認する。
 2. 先頭/末尾 block では `move-up` / `move-down` の disabled 状態を確認する。
 3. keyboard navigation は `ArrowUp` / `ArrowDown` / `Escape` を別テストで確認し、disabled item への roving focus と非実行も確認する。
 4. action 実行テストは menu item click を使い、保存 JSON を `expect.poll` で確認する。

@@ -11,7 +11,6 @@ import TiptapEditor, {
 import { JSONContent } from "@tiptap/react";
 import {
     deriveExcerptFromContent,
-    getTiptapPlainText,
     normalizeContent,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
@@ -170,12 +169,14 @@ export function CardModal({
     });
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
+    const latestContentRef = useRef<JSONContent>(normalizeContent(card.content));
     const cardPeekRootRef = useRef<HTMLElement | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
     const didFocusTitleOnOpenRef = useRef(false);
     const initialSidebarStateKeyRef = useRef<string | null>(null);
     const titleIsComposingRef = useRef(false);
     const [cardPeekActualWidth, setCardPeekActualWidth] = useState(0);
+    const [checklistProgress, setChecklistProgress] = useState<{ checked: number; total: number }>({ checked: 0, total: 0 });
 
     const {
         historyItems,
@@ -251,22 +252,9 @@ export function CardModal({
         bodyBridgeRef.current?.clearExpandedHiddenRuns();
     }, []);
 
-    const stickyTitleChecklistProgress = useMemo(() => {
-        const plainText = getTiptapPlainText(normalizeContent(content));
-        const progress = plainText.split(/\r?\n/).reduce(
-            (acc, line) => {
-                const match = line.match(/^\s*\[([ xX])\]\s+(.*)$/);
-                if (!match || !match[2]?.trim()) return acc;
-                acc.total += 1;
-                if (match[1].toLowerCase() === "x") {
-                    acc.checked += 1;
-                }
-                return acc;
-            },
-            { checked: 0, total: 0 }
-        );
-        return progress.total > 0 ? `${progress.checked}/${progress.total}` : null;
-    }, [content]);
+    const stickyTitleChecklistProgress = checklistProgress.total > 0
+        ? `${checklistProgress.checked}/${checklistProgress.total}`
+        : null;
 
     const mergedAvailableTags = useMemo(() => {
         const nextTags = new Set<string>();
@@ -292,7 +280,7 @@ export function CardModal({
         const normalizedBucketPosition: number | null =
             normalizedBucket != null ? dueBucketPosition ?? null : null;
 
-        const sourceContent = options?.contentOverride ?? content;
+        const sourceContent = options?.contentOverride ?? latestContentRef.current ?? content;
         const normalizedContent = normalizeContent(sourceContent);
         const nextTitle = title.trim();
         const nextChecked = checked;
@@ -409,6 +397,12 @@ export function CardModal({
         trapFocus: false,
     });
 
+    useEffect(() => {
+        const normalized = normalizeContent(card.content);
+        latestContentRef.current = normalized;
+        setChecklistProgress({ checked: 0, total: 0 });
+    }, [card.id, card.content]);
+
     const syncActiveShortcutDescriptor = useCallback(() => {
         const isReadonly = Boolean(isLoading || isHistoryPreviewing);
         if (isReadonly) {
@@ -454,6 +448,35 @@ export function CardModal({
 
     const handleRegisterBodyBridge = useCallback((bridge: BodyEditorBridge | null) => {
         bodyBridgeRef.current = bridge;
+    }, []);
+
+    const handleBodyDraftChange = useCallback((val: JSONContent) => {
+        if (isHistoryPreviewing) return;
+        latestContentRef.current = normalizeContent(val);
+        markFieldDirty("content");
+        triggerAutoSave(val);
+        if (editorError) {
+            setEditorError(null);
+        }
+    }, [editorError, isHistoryPreviewing, markFieldDirty, setEditorError, triggerAutoSave]);
+
+    const handleChecklistProgressChange = useCallback((progress: { checked: number; total: number }) => {
+        setChecklistProgress((previous) => (
+            previous.checked === progress.checked && previous.total === progress.total
+                ? previous
+                : progress
+        ));
+    }, []);
+
+    const handleBodyShortcutStateChange = useCallback((nextState: BodyEditorShortcutState) => {
+        setBodyShortcutState((previous) => (
+            previous.canUndo === nextState.canUndo &&
+            previous.canRedo === nextState.canRedo &&
+            previous.canIndent === nextState.canIndent &&
+            previous.canOutdent === nextState.canOutdent
+                ? previous
+                : nextState
+        ));
     }, []);
 
     const handleRequestFocusTitle = useCallback((request: FocusTitleRequest) => {
@@ -541,7 +564,13 @@ export function CardModal({
         const nativeEvent = event.nativeEvent as KeyboardEvent & { keyCode?: number };
         const isImeComposing = titleIsComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229;
 
-        if (isImeComposing) return;
+        if (isImeComposing) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            return;
+        }
 
         if (event.key === "Enter") {
             event.preventDefault();
@@ -785,13 +814,15 @@ export function CardModal({
 
     const handleApplyHistory = useCallback(() => {
         if (!previewHistoryContent || !selectedHistoryId) return;
+        const restoredContent = normalizeContent(previewHistoryContent);
         markFieldDirty("content");
-        setContent(previewHistoryContent);
+        latestContentRef.current = restoredContent;
+        setContent(restoredContent);
         hasPendingChangesRef.current = false;
         handleSave(false, {
             restoreFromHistory: true,
             historySourceId: selectedHistoryId,
-            contentOverride: previewHistoryContent,
+            contentOverride: restoredContent,
         });
     }, [previewHistoryContent, selectedHistoryId, markFieldDirty, setContent, hasPendingChangesRef, handleSave]);
 
@@ -1095,16 +1126,10 @@ export function CardModal({
                                                     onEditorError={setEditorError}
                                                     onRegisterBodyBridge={handleRegisterBodyBridge}
                                                     onRequestFocusTitle={handleRequestFocusTitle}
-                                                    onShortcutStateChange={setBodyShortcutState}
-                                                    onChange={(val) => {
-                                                        if (isHistoryPreviewing) return;
-                                                        markFieldDirty("content");
-                                                        setContent(val);
-                                                        triggerAutoSave(val);
-                                                        if (editorError) {
-                                                            setEditorError(null);
-                                                        }
-                                                    }}
+                                                    onShortcutStateChange={handleBodyShortcutStateChange}
+                                                    shortcutStateEnabled={activeShortcutDescriptor?.part === "editor"}
+                                                    onChecklistProgressChange={handleChecklistProgressChange}
+                                                    onChange={handleBodyDraftChange}
                                                     placeholder="メモを入力..."
                                                     data-autofocus={!isHistoryPreviewing && !shouldFocusTitleOnOpen}
                                                 />

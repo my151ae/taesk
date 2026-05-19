@@ -103,17 +103,29 @@ async function triggerBlockAction(
 }
 
 async function countVisibleTaskItemHandles(modal: Locator): Promise<number> {
-  const handles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]');
-  const count = await handles.count();
+  const taskItems = modal.locator('.ProseMirror li[data-type="taskItem"]');
+  const count = await taskItems.count();
   let visibleCount = 0;
 
   for (let index = 0; index < count; index += 1) {
-    if (await handles.nth(index).isVisible()) {
+    if (await taskItems.nth(index).isVisible()) {
       visibleCount += 1;
     }
   }
 
   return visibleCount;
+}
+
+async function hoverEditorTextAndGetBlockHandle(
+  modal: Locator,
+  text: string,
+  nodeType: 'paragraph' | 'heading' | 'listItem' | 'taskItem' | 'details',
+): Promise<Locator> {
+  await modal.locator('.ProseMirror').getByText(text, { exact: false }).first().hover();
+  const handle = modal.locator(`[data-testid="tiptap-block-handle"][data-block-node-type="${nodeType}"]`).first();
+  await expect(handle).toBeVisible();
+  await expect(modal.getByTestId('tiptap-block-handle')).toHaveCount(1);
+  return handle;
 }
 
 function cardDetailRoot(page: Page): Locator {
@@ -6105,19 +6117,15 @@ test.describe('@feature:timeline Timeline view', () => {
       const modal = cardDetailRoot(page);
       await expect(modal).toBeVisible();
       const handles = modal.getByTestId('tiptap-block-handle');
-      const paragraphHandles = modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="paragraph"]');
-      await expect(handles).toHaveCount(5);
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]')).toHaveCount(1);
-      await expect(modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]')).toHaveCount(2);
-      await expect(paragraphHandles).toHaveCount(2);
+      await expect(handles).toHaveCount(1);
 
-      await triggerBlockAction(page, modal, paragraphHandles.first(), 'insert-above');
+      await triggerBlockAction(page, modal, await hoverEditorTextAndGetBlockHandle(modal, 'First paragraph', 'paragraph'), 'insert-above');
 
-      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="heading"]').first(), 'duplicate');
+      await triggerBlockAction(page, modal, await hoverEditorTextAndGetBlockHandle(modal, 'Section heading', 'heading'), 'duplicate');
 
-      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'insert-below');
+      await triggerBlockAction(page, modal, await hoverEditorTextAndGetBlockHandle(modal, 'Task alpha', 'taskItem'), 'insert-below');
 
-      await triggerBlockAction(page, modal, modal.locator('[data-testid="tiptap-block-handle"][data-block-node-type="taskItem"]').first(), 'delete');
+      await triggerBlockAction(page, modal, await hoverEditorTextAndGetBlockHandle(modal, 'Task alpha', 'taskItem'), 'delete');
 
       await expect
         .poll(async () => {

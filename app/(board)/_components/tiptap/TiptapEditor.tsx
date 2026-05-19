@@ -12,7 +12,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details';
 import styles from './TiptapEditor.module.css';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
@@ -156,6 +156,20 @@ type RenderableBlockActionTarget = {
     rect: DOMRect | null;
 };
 
+type ActiveBlockHandle = {
+    pos: number;
+    blockPos: number;
+    nodeType: BlockNodeType;
+    rect: DOMRect;
+    containerRect: DOMRect;
+    reason: 'hover' | 'menu' | 'keyboard' | 'block-action' | 'scroll' | 'resize' | 'visibility';
+};
+
+type ChecklistProgress = {
+    checked: number;
+    total: number;
+};
+
 type TiptapEditorProps = {
     initialContent?: JSONContent | null;
     onChange?: (content: JSONContent) => void;
@@ -170,11 +184,13 @@ type TiptapEditorProps = {
     onRegisterBodyBridge?: ((bridge: BodyEditorBridge | null) => void);
     onRequestFocusTitle?: (request: FocusTitleRequest) => void;
     onShortcutStateChange?: (state: BodyEditorShortcutState) => void;
+    shortcutStateEnabled?: boolean;
+    onChecklistProgressChange?: (progress: ChecklistProgress) => void;
     'data-autofocus'?: boolean;
     containerRef?: RefObject<HTMLDivElement>;
 };
 
-export default function TiptapEditor({
+function TiptapEditor({
     initialContent,
     onChange,
     placeholder = "Type '/' for commands…",
@@ -188,6 +204,8 @@ export default function TiptapEditor({
     onRegisterBodyBridge,
     onRequestFocusTitle,
     onShortcutStateChange,
+    shortcutStateEnabled = true,
+    onChecklistProgressChange,
     'data-autofocus': dataAutofocus,
     containerRef
 }: TiptapEditorProps) {
@@ -199,19 +217,23 @@ export default function TiptapEditor({
     const lastEmittedDocRef = useRef<ProseMirrorNode | null>(null);
     const signedUrlRequestIdRef = useRef(0);
     const rootRef = useRef<HTMLDivElement | null>(null);
+    const shortcutFrameRef = useRef<number | null>(null);
+    const lastShortcutStateRef = useRef<BodyEditorShortcutState | null>(null);
+    const measureFrameRef = useRef<number | null>(null);
+    const pendingMeasureRef = useRef<{
+        pos: number;
+        reason: ActiveBlockHandle['reason'];
+    } | null>(null);
+    const activeBlockHandleRef = useRef<ActiveBlockHandle | null>(null);
+    const lastChecklistProgressRef = useRef<ChecklistProgress | null>(null);
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImageUploadInFlight, setIsImageUploadInFlight] = useState(false);
-    const [layoutVersion, setLayoutVersion] = useState(0);
-    const [renderableBlocks, setRenderableBlocks] = useState<RenderableBlockActionTarget[]>([]);
+    const [activeBlockHandle, setActiveBlockHandle] = useState<ActiveBlockHandle | null>(null);
 
     const closeBlockMenu = useCallback(() => {
         setIsMenuOpen(false);
         setMenuTarget(null);
-    }, []);
-
-    const invalidateLayout = useCallback(() => {
-        setLayoutVersion((current) => current + 1);
     }, []);
 
     const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
@@ -323,30 +345,52 @@ export default function TiptapEditor({
 
         return itemTypes.some((itemType) =>
             direction === 'indent'
-                ? currentEditor.can().chain().focus().sinkListItem(itemType).run()
-                : currentEditor.can().chain().focus().liftListItem(itemType).run()
+                ? currentEditor.can().sinkListItem(itemType)
+                : currentEditor.can().liftListItem(itemType)
         );
     }, []);
 
-    const emitShortcutState = useCallback((currentEditor: Editor | null) => {
+    const statesEqual = (left: BodyEditorShortcutState | null, right: BodyEditorShortcutState) => (
+        left?.canUndo === right.canUndo &&
+        left?.canRedo === right.canRedo &&
+        left?.canIndent === right.canIndent &&
+        left?.canOutdent === right.canOutdent
+    );
+
+    const emitShortcutState = useCallback((currentEditor: Editor | null, force = false) => {
         if (!onShortcutStateChange) return;
-        if (!currentEditor || !editable) {
-            onShortcutStateChange({
+        if (!currentEditor || !editable || !shortcutStateEnabled) {
+            const emptyState = {
                 canUndo: false,
                 canRedo: false,
                 canIndent: false,
                 canOutdent: false,
-            });
+            };
+            if (force || !statesEqual(lastShortcutStateRef.current, emptyState)) {
+                lastShortcutStateRef.current = emptyState;
+                onShortcutStateChange(emptyState);
+            }
             return;
         }
 
-        onShortcutStateChange({
-            canUndo: currentEditor.can().chain().focus().undo().run(),
-            canRedo: currentEditor.can().chain().focus().redo().run(),
+        const nextState = {
+            canUndo: currentEditor.can().undo(),
+            canRedo: currentEditor.can().redo(),
             canIndent: canRunListIndentCommand(currentEditor, 'indent'),
             canOutdent: canRunListIndentCommand(currentEditor, 'outdent'),
+        };
+        if (!force && statesEqual(lastShortcutStateRef.current, nextState)) return;
+        lastShortcutStateRef.current = nextState;
+        onShortcutStateChange(nextState);
+    }, [canRunListIndentCommand, editable, onShortcutStateChange, shortcutStateEnabled]);
+
+    const scheduleShortcutState = useCallback((currentEditor: Editor | null, force = false) => {
+        if (shortcutFrameRef.current != null) return;
+        shortcutFrameRef.current = window.requestAnimationFrame(() => {
+            shortcutFrameRef.current = null;
+            emitShortcutState(currentEditor, force);
         });
-    }, [canRunListIndentCommand, editable, onShortcutStateChange]);
+    }, [emitShortcutState]);
 
     const resolveBlockTargetAtPos = useCallback((state: EditorState, pos: number): ResolvedBlockTarget | null => {
         const clampedPos = Math.max(0, Math.min(pos, state.doc.content.size));
@@ -679,6 +723,58 @@ export default function TiptapEditor({
         };
     }, [getBlockTargetRect, resolveBlockTargetAtPos]);
 
+    const sameRect = (left: DOMRect | null | undefined, right: DOMRect | null | undefined): boolean => {
+        if (!left || !right) return left === right;
+        return (
+            Math.abs(left.top - right.top) < 0.5 &&
+            Math.abs(left.left - right.left) < 0.5 &&
+            Math.abs(left.width - right.width) < 0.5 &&
+            Math.abs(left.height - right.height) < 0.5
+        );
+    };
+
+    const sameActiveBlockHandle = (left: ActiveBlockHandle | null, right: ActiveBlockHandle | null): boolean => {
+        if (!left || !right) return left === right;
+        return (
+            left.pos === right.pos &&
+            left.blockPos === right.blockPos &&
+            left.nodeType === right.nodeType &&
+            sameRect(left.rect, right.rect) &&
+            sameRect(left.containerRect, right.containerRect)
+        );
+    };
+
+    const emitChecklistProgress = useCallback((doc: ProseMirrorNode) => {
+        if (!onChecklistProgressChange) return;
+        const nextProgress: ChecklistProgress = { checked: 0, total: 0 };
+
+        doc.descendants((node) => {
+            if (node.type.name === 'taskItem') {
+                nextProgress.total += 1;
+                if (node.attrs?.checked === true) {
+                    nextProgress.checked += 1;
+                }
+                return true;
+            }
+
+            if (node.type.name === 'paragraph') {
+                const match = node.textContent.match(/^\s*\[([ xX])\]\s+\S/);
+                if (match) {
+                    nextProgress.total += 1;
+                    if (match[1].toLowerCase() === 'x') {
+                        nextProgress.checked += 1;
+                    }
+                }
+            }
+            return true;
+        });
+
+        const previous = lastChecklistProgressRef.current;
+        if (previous?.checked === nextProgress.checked && previous.total === nextProgress.total) return;
+        lastChecklistProgressRef.current = nextProgress;
+        onChecklistProgressChange(nextProgress);
+    }, [onChecklistProgressChange]);
+
     const resolveRenderableBlockTarget = useCallback((state: EditorState, target: Pick<RenderableBlockActionTarget, 'pos' | 'blockPos' | 'nodeType'> | null): ResolvedBlockTarget | null => {
         if (!target) return null;
 
@@ -890,31 +986,70 @@ export default function TiptapEditor({
                 return false;
             },
         },
-        onUpdate: ({ editor }) => {
-            emitDocChange(editor, editor.state.doc);
-            emitShortcutState(editor);
-            invalidateLayout();
-        },
         onTransaction: ({ editor, transaction }) => {
             const hasTaskCompletionMeta = transaction.getMeta(taskCompletionVisibilityPluginKey) != null;
-            if (!transaction.docChanged && !hasTaskCompletionMeta) return;
             if (transaction.docChanged) {
                 emitDocChange(editor, editor.state.doc);
+                emitChecklistProgress(editor.state.doc);
             }
-            emitShortcutState(editor);
-            invalidateLayout();
+            if (transaction.docChanged || transaction.selectionSet || hasTaskCompletionMeta) {
+                scheduleShortcutState(editor);
+            }
         },
         onSelectionUpdate: ({ editor }) => {
-            emitShortcutState(editor);
-            invalidateLayout();
+            scheduleShortcutState(editor);
         },
         autofocus: dataAutofocus ? 'start' : false,
         onCreate: ({ editor }) => {
             lastAppliedDocRef.current = editor.state.doc;
-            emitShortcutState(editor);
-            invalidateLayout();
+            emitChecklistProgress(editor.state.doc);
+            scheduleShortcutState(editor, true);
         },
     });
+
+    const setActiveBlockHandleIfChanged = useCallback((nextHandle: ActiveBlockHandle | null) => {
+        if (sameActiveBlockHandle(activeBlockHandleRef.current, nextHandle)) return;
+        activeBlockHandleRef.current = nextHandle;
+        setActiveBlockHandle(nextHandle);
+    }, []);
+
+    const measureActiveBlockAtPos = useCallback((pos: number, reason: ActiveBlockHandle['reason']): ActiveBlockHandle | null => {
+        if (!editor) return null;
+        const root = rootRef.current;
+        if (!root) return null;
+
+        const target = getBlockTargetAtPos(editor.view, editor.state, pos);
+        if (!target?.rect) return null;
+
+        return {
+            pos: target.pos,
+            blockPos: target.blockPos,
+            nodeType: target.nodeType,
+            rect: cloneDomRect(target.rect),
+            containerRect: cloneDomRect(root.getBoundingClientRect()),
+            reason,
+        };
+    }, [cloneDomRect, editor, getBlockTargetAtPos]);
+
+    const scheduleActiveBlockMeasure = useCallback((pos: number, reason: ActiveBlockHandle['reason']) => {
+        pendingMeasureRef.current = { pos, reason };
+        if (measureFrameRef.current != null) return;
+
+        measureFrameRef.current = window.requestAnimationFrame(() => {
+            measureFrameRef.current = null;
+            const pending = pendingMeasureRef.current;
+            pendingMeasureRef.current = null;
+            if (!pending) return;
+            setActiveBlockHandleIfChanged(measureActiveBlockAtPos(pending.pos, pending.reason));
+        });
+    }, [measureActiveBlockAtPos, setActiveBlockHandleIfChanged]);
+
+    const remeasureCurrentBlock = useCallback((reason: ActiveBlockHandle['reason']) => {
+        const current = activeBlockHandleRef.current;
+        const target = menuTarget ?? current;
+        if (!target || !editor) return;
+        scheduleActiveBlockMeasure(Math.max(0, Math.min(target.blockPos + 1, editor.state.doc.content.size)), reason);
+    }, [editor, menuTarget, scheduleActiveBlockMeasure]);
 
     const applyBlockActionTransaction = useCallback((nextEditor: Editor | null, transaction: Transaction | null): boolean => {
         if (!nextEditor) return false;
@@ -1083,8 +1218,19 @@ export default function TiptapEditor({
     const suppressBlockUi = !editable || isImageUploadInFlight || !editor;
 
     useEffect(() => {
-        emitShortcutState(editor);
-    }, [editor, emitShortcutState]);
+        scheduleShortcutState(editor, true);
+    }, [editor, scheduleShortcutState, shortcutStateEnabled]);
+
+    useEffect(() => {
+        return () => {
+            if (shortcutFrameRef.current != null) {
+                window.cancelAnimationFrame(shortcutFrameRef.current);
+            }
+            if (measureFrameRef.current != null) {
+                window.cancelAnimationFrame(measureFrameRef.current);
+            }
+        };
+    }, []);
 
     const focusBody = useCallback((offset?: number | null) => {
         if (!editor) return;
@@ -1117,8 +1263,8 @@ export default function TiptapEditor({
     const clearExpandedHiddenRuns = useCallback(() => {
         if (!editor) return;
         editor.view.dispatch(clearExpandedHiddenRunsMeta(editor.state.tr));
-        invalidateLayout();
-    }, [editor, invalidateLayout]);
+        remeasureCurrentBlock('visibility');
+    }, [editor, remeasureCurrentBlock]);
 
     useEffect(() => {
         if (!onRegisterBodyBridge) return;
@@ -1317,6 +1463,7 @@ export default function TiptapEditor({
                 editor.commands.setContent(hydratedContent, { emitUpdate: false });
                 isUpdatingRef.current = false;
             }
+            emitChecklistProgress(nextDoc);
         };
 
         void hydrateContent();
@@ -1324,13 +1471,14 @@ export default function TiptapEditor({
         return () => {
             cancelled = true;
         };
-    }, [initialContent, editor, boardId, cardId, onEditorError]);
+    }, [initialContent, editor, boardId, cardId, emitChecklistProgress, onEditorError]);
 
     useEffect(() => {
         if (suppressBlockUi) {
             closeBlockMenu();
+            setActiveBlockHandleIfChanged(null);
         }
-    }, [closeBlockMenu, suppressBlockUi]);
+    }, [closeBlockMenu, setActiveBlockHandleIfChanged, suppressBlockUi]);
 
     useEffect(() => {
         const handleEscape = (event: KeyboardEvent) => {
@@ -1352,7 +1500,7 @@ export default function TiptapEditor({
         const root = rootRef.current;
         const scrollParent = findScrollableAncestor(root);
         const handleLayoutChange = () => {
-            invalidateLayout();
+            remeasureCurrentBlock('scroll');
         };
 
         window.addEventListener('resize', handleLayoutChange);
@@ -1362,7 +1510,7 @@ export default function TiptapEditor({
             window.removeEventListener('resize', handleLayoutChange);
             scrollParent?.removeEventListener('scroll', handleLayoutChange);
         };
-    }, [editor, findScrollableAncestor, invalidateLayout, layoutVersion]);
+    }, [editor, findScrollableAncestor, remeasureCurrentBlock]);
 
     // Update editable state
     useEffect(() => {
@@ -1376,59 +1524,13 @@ export default function TiptapEditor({
         const pluginState = getTaskCompletionState(editor.state);
         if (pluginState?.showCompletedLines === showCompletedLines) return;
         editor.view.dispatch(setTaskCompletionVisibilityMeta(editor.state.tr, showCompletedLines));
-        invalidateLayout();
-    }, [editor, invalidateLayout, showCompletedLines]);
+        remeasureCurrentBlock('visibility');
+    }, [editor, remeasureCurrentBlock, showCompletedLines]);
 
     useEffect(() => {
         if (!editor) return;
         editor.view.dispatch(setCardLinkMeta(editor.state.tr, cardLinkMetaByShortId));
     }, [cardLinkMetaByShortId, editor]);
-
-    useLayoutEffect(() => {
-        if (!editor) {
-            setRenderableBlocks([]);
-            return;
-        }
-
-        const frameId = window.requestAnimationFrame(() => {
-            if (suppressBlockUi) {
-                setRenderableBlocks([]);
-                return;
-            }
-
-            const nextTargets: RenderableBlockActionTarget[] = [];
-            editor.state.doc.descendants((node, pos) => {
-                if (
-                    node.type.name !== 'details' &&
-                    node.type.name !== 'paragraph' &&
-                    node.type.name !== 'heading' &&
-                    node.type.name !== 'taskItem' &&
-                    node.type.name !== 'listItem'
-                ) {
-                    return true;
-                }
-
-                const target = getBlockTargetAtPos(editor.view, editor.state, pos + 1);
-                if (!target?.rect) {
-                    return node.type.name === 'details' ? false : true;
-                }
-
-                const isDuplicate = nextTargets.some((candidate) => (
-                    candidate.blockPos === target.blockPos && candidate.nodeType === target.nodeType
-                ));
-                if (!isDuplicate) {
-                    nextTargets.push(target);
-                }
-
-                return node.type.name === 'details' ? false : true;
-            });
-            setRenderableBlocks(nextTargets);
-        });
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-        };
-    }, [editor, getBlockTargetAtPos, layoutVersion, suppressBlockUi]);
 
     useEffect(() => {
         if (!editor) return;
@@ -1439,7 +1541,7 @@ export default function TiptapEditor({
 
         const observer = typeof ResizeObserver !== 'undefined'
             ? new ResizeObserver(() => {
-                invalidateLayout();
+                remeasureCurrentBlock('resize');
             })
             : null;
 
@@ -1451,39 +1553,7 @@ export default function TiptapEditor({
         return () => {
             observer?.disconnect();
         };
-    }, [editor, invalidateLayout]);
-
-    useLayoutEffect(() => {
-        if (!menuTarget) return;
-
-        const nextAnchor = renderableBlocks.find((target) => (
-            target.blockPos === menuTarget.blockPos && target.nodeType === menuTarget.nodeType
-        ))?.rect ?? null;
-
-        if (!nextAnchor) return;
-
-        setMenuTarget((current) => {
-            if (!current || current.blockPos !== menuTarget.blockPos || current.nodeType !== menuTarget.nodeType) {
-                return current;
-            }
-
-            const currentRect = current.fallbackAnchorRect;
-            if (
-                currentRect &&
-                Math.abs(currentRect.top - nextAnchor.top) < 0.5 &&
-                Math.abs(currentRect.left - nextAnchor.left) < 0.5 &&
-                Math.abs(currentRect.width - nextAnchor.width) < 0.5 &&
-                Math.abs(currentRect.height - nextAnchor.height) < 0.5
-            ) {
-                return current;
-            }
-
-            return {
-                ...current,
-                fallbackAnchorRect: cloneDomRect(nextAnchor),
-            };
-        });
-    }, [cloneDomRect, layoutVersion, menuTarget, renderableBlocks]);
+    }, [editor, remeasureCurrentBlock]);
 
     const assignRootRef = useCallback((node: HTMLDivElement | null) => {
         if (rootRef.current === node) {
@@ -1497,25 +1567,24 @@ export default function TiptapEditor({
         if (containerRef) {
             (containerRef as { current: HTMLDivElement | null }).current = node;
         }
-        invalidateLayout();
-    }, [containerRef, invalidateLayout]);
+        if (editor) {
+            scheduleActiveBlockMeasure(editor.state.selection.from, 'keyboard');
+        }
+    }, [containerRef, editor, scheduleActiveBlockMeasure]);
 
     if (!editor) {
         return null;
     }
 
-    const rootRect = rootRef.current?.getBoundingClientRect() ?? null;
-    const activeRenderableMenuTarget = menuTarget
-        ? renderableBlocks.find((target) => target.blockPos === menuTarget.blockPos && target.nodeType === menuTarget.nodeType) ?? null
-        : null;
     const resolvedMenuTarget = menuTarget
-        ? resolveRenderableBlockTarget(editor.state, activeRenderableMenuTarget ?? {
+        ? resolveRenderableBlockTarget(editor.state, activeBlockHandle ?? {
             pos: Math.max(0, Math.min(menuTarget.blockPos + 1, editor.state.doc.content.size)),
             blockPos: menuTarget.blockPos,
             nodeType: menuTarget.nodeType,
         })
         : null;
-    const menuAnchorRect = activeRenderableMenuTarget?.rect ?? menuTarget?.fallbackAnchorRect ?? null;
+    const menuAnchorRect = activeBlockHandle?.rect ?? menuTarget?.fallbackAnchorRect ?? null;
+    const menuContainerRect = activeBlockHandle?.containerRect ?? null;
     const menuItems = menuTarget
         ? getBlockActionItems(menuTarget.nodeType, {
             canMoveUp: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'up') : false,
@@ -1596,7 +1665,21 @@ export default function TiptapEditor({
                 break;
             }
         }
+        remeasureCurrentBlock('block-action');
         closeBlockMenu();
+    };
+
+    const handlePointerMove = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if (suppressBlockUi || isMenuOpen) return;
+        const coords = { left: event.clientX, top: event.clientY };
+        const result = editor.view.posAtCoords(coords);
+        if (!result) return;
+        scheduleActiveBlockMeasure(result.pos, 'hover');
+    };
+
+    const handlePointerLeave = () => {
+        if (isMenuOpen) return;
+        setActiveBlockHandleIfChanged(null);
     };
 
     const handleEditorClick = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1627,57 +1710,55 @@ export default function TiptapEditor({
             onClick={handleEditorClick}
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
+            onMouseMove={handlePointerMove}
+            onMouseLeave={handlePointerLeave}
         >
-            {renderableBlocks.map((target, index) => {
-                if (!target.rect || !rootRect) return null;
-                return (
-                    <button
-                        key={`${target.blockPos}-${target.nodeType}`}
-                        type="button"
-                        tabIndex={-1}
-                        aria-label="ブロックメニューを開く"
-                        data-testid="tiptap-block-handle"
-                        data-block-index={index}
-                        data-block-node-type={target.nodeType}
-                        data-block-pos={target.pos}
-                        data-block-start-pos={target.blockPos}
-                        className={styles.blockActionHandle}
-                        style={{
-                            top: Math.max(
-                                target.rect.top -
-                                    rootRect.top +
-                                    (target.nodeType === 'heading'
-                                        ? Math.max((target.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0)
-                                        : 0),
-                                4,
-                            ),
-                            left: Math.max(target.rect.left - rootRect.left - BLOCK_ACTION_HANDLE_HEIGHT, 4),
-                        }}
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            if (!target.rect) return;
-                            setMenuTarget({
-                                blockPos: target.blockPos,
-                                nodeType: target.nodeType,
-                                fallbackAnchorRect: cloneDomRect(target.rect),
-                            });
-                            setIsMenuOpen(true);
-                        }}
-                    >
-                        <span className={styles.blockActionHandleDots}>⋮⋮</span>
-                    </button>
-                );
-            })}
+            {activeBlockHandle ? (
+                <button
+                    key={`${activeBlockHandle.blockPos}-${activeBlockHandle.nodeType}`}
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="ブロックメニューを開く"
+                    data-testid="tiptap-block-handle"
+                    data-block-index={0}
+                    data-block-node-type={activeBlockHandle.nodeType}
+                    data-block-pos={activeBlockHandle.pos}
+                    data-block-start-pos={activeBlockHandle.blockPos}
+                    className={styles.blockActionHandle}
+                    style={{
+                        top: Math.max(
+                            activeBlockHandle.rect.top -
+                                activeBlockHandle.containerRect.top +
+                                (activeBlockHandle.nodeType === 'heading'
+                                    ? Math.max((activeBlockHandle.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0)
+                                    : 0),
+                            4,
+                        ),
+                        left: Math.max(activeBlockHandle.rect.left - activeBlockHandle.containerRect.left - BLOCK_ACTION_HANDLE_HEIGHT, 4),
+                    }}
+                    onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setMenuTarget({
+                            blockPos: activeBlockHandle.blockPos,
+                            nodeType: activeBlockHandle.nodeType,
+                            fallbackAnchorRect: cloneDomRect(activeBlockHandle.rect),
+                        });
+                        setIsMenuOpen(true);
+                    }}
+                >
+                    <span className={styles.blockActionHandleDots}>⋮⋮</span>
+                </button>
+            ) : null}
             <EditorContent editor={editor} />
-            {isMenuOpen && menuAnchorRect && rootRect ? (
+            {isMenuOpen && menuAnchorRect && menuContainerRect ? (
                 <BlockActionMenu
                     anchorRect={menuAnchorRect}
-                    containerRect={rootRect}
+                    containerRect={menuContainerRect}
                     items={menuItems}
                     onClose={closeBlockMenu}
                     onSelect={handleBlockAction}
@@ -1686,3 +1767,5 @@ export default function TiptapEditor({
         </div>
     );
 }
+
+export default memo(TiptapEditor);
