@@ -764,6 +764,29 @@ function TiptapEditor({
         );
     };
 
+    const choosePointerBlockTarget = (targets: RenderableBlockActionTarget[]): RenderableBlockActionTarget | null => {
+        const uniqueTargets = targets.filter((target, index) => (
+            target.rect &&
+            targets.findIndex((candidate) => (
+                candidate.blockPos === target.blockPos &&
+                candidate.nodeType === target.nodeType
+            )) === index
+        ));
+
+        uniqueTargets.sort((left, right) => {
+            const leftRect = left.rect;
+            const rightRect = right.rect;
+            if (!leftRect || !rightRect) return leftRect ? -1 : 1;
+            const heightDelta = leftRect.height - rightRect.height;
+            if (Math.abs(heightDelta) > 0.5) return heightDelta;
+            const leftDelta = rightRect.left - leftRect.left;
+            if (Math.abs(leftDelta) > 0.5) return leftDelta;
+            return right.blockPos - left.blockPos;
+        });
+
+        return uniqueTargets[0] ?? null;
+    };
+
     const emitChecklistProgress = useCallback((doc: ProseMirrorNode) => {
         if (!onChecklistProgressChange) return;
         const nextProgress: ChecklistProgress = { checked: 0, total: 0 };
@@ -1071,25 +1094,32 @@ function TiptapEditor({
         scheduleActiveBlockMeasure(Math.max(0, Math.min(target.blockPos + 1, editor.state.doc.content.size)), reason);
     }, [editor, menuTarget, scheduleActiveBlockMeasure]);
 
-    const getFallbackBlockPosFromPoint = useCallback((x: number, y: number): number | null => {
+    const getFallbackBlockPosFromPoint = useCallback((x: number, y: number): RenderableBlockActionTarget | null => {
         if (!editor) return null;
-        const target = document.elementFromPoint(x, y);
-        if (!target) return null;
         const editorDom = editor.view.dom;
-        if (!editorDom.contains(target)) return null;
+        const elements = document.elementsFromPoint(x, y);
 
-        const blockElement = target.closest(
-            'li[data-type="taskItem"], li, div[data-type="details"], div[data-type="detailsSummary"], summary, p, h1, h2, h3'
-        );
-        if (!(blockElement instanceof HTMLElement) || !editorDom.contains(blockElement)) return null;
+        const candidates: RenderableBlockActionTarget[] = [];
+        for (const element of elements) {
+            if (!editorDom.contains(element)) continue;
+            const blockElement = element.closest(
+                'li[data-type="taskItem"], li, div[data-type="details"], div[data-type="detailsSummary"], summary, p, h1, h2, h3'
+            );
+            if (!(blockElement instanceof HTMLElement) || !editorDom.contains(blockElement)) continue;
 
-        try {
-            const pos = editor.view.posAtDOM(blockElement, 0);
-            return Number.isFinite(pos) ? pos : null;
-        } catch {
-            return null;
+            try {
+                const pos = editor.view.posAtDOM(blockElement, 0);
+                const target = getBlockTargetAtPos(editor.view, editor.state, pos);
+                if (target?.rect && y >= target.rect.top - 1 && y <= target.rect.bottom + 1) {
+                    candidates.push(target);
+                }
+            } catch {
+                // Ignore DOM nodes that ProseMirror cannot map.
+            }
         }
-    }, [editor]);
+
+        return choosePointerBlockTarget(candidates);
+    }, [editor, getBlockTargetAtPos]);
 
     const resolveBlockPosFromPointer = useCallback((point: PointerProbe): number | null => {
         if (!editor) return null;
@@ -1111,28 +1141,34 @@ function TiptapEditor({
             clampX(point.x + 96),
         ]));
 
-        let fallbackPos: number | null = null;
+        const candidates: RenderableBlockActionTarget[] = [];
         for (const probeX of probeXs) {
             const result = editor.view.posAtCoords({ left: probeX, top: point.y });
             if (!result) {
-                fallbackPos = fallbackPos ?? getFallbackBlockPosFromPoint(probeX, point.y);
+                const fallbackTarget = getFallbackBlockPosFromPoint(probeX, point.y);
+                if (fallbackTarget) {
+                    candidates.push(fallbackTarget);
+                }
                 continue;
             }
 
             const target = getBlockTargetAtPos(editor.view, editor.state, result.pos);
             if (!target?.rect) {
-                fallbackPos = fallbackPos ?? result.pos;
                 continue;
             }
 
             if (point.y >= target.rect.top - 1 && point.y <= target.rect.bottom + 1) {
-                return result.pos;
+                candidates.push(target);
+                continue;
             }
 
-            fallbackPos = fallbackPos ?? result.pos;
+            const fallbackTarget = getFallbackBlockPosFromPoint(probeX, point.y);
+            if (fallbackTarget) {
+                candidates.push(fallbackTarget);
+            }
         }
 
-        return fallbackPos;
+        return choosePointerBlockTarget(candidates)?.pos ?? null;
     }, [editor, getBlockTargetAtPos, getFallbackBlockPosFromPoint]);
 
     const schedulePointerProbe = useCallback((point: PointerProbe) => {
