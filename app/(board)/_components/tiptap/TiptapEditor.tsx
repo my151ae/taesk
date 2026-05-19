@@ -161,8 +161,19 @@ type ActiveBlockHandle = {
     blockPos: number;
     nodeType: BlockNodeType;
     rect: DOMRect;
-    containerRect: DOMRect;
-    reason: 'hover' | 'menu' | 'keyboard' | 'block-action' | 'scroll' | 'resize' | 'visibility';
+    rootRect: DOMRect;
+    reason: 'pointer' | 'menu' | 'keyboard' | 'block-action' | 'scroll' | 'resize' | 'details' | 'completed-visibility';
+};
+
+type PointerProbe = {
+    x: number;
+    y: number;
+};
+
+type LockedBlockTarget = {
+    pos: number;
+    blockPos: number;
+    nodeType: BlockNodeType;
 };
 
 type ChecklistProgress = {
@@ -220,11 +231,15 @@ function TiptapEditor({
     const shortcutFrameRef = useRef<number | null>(null);
     const lastShortcutStateRef = useRef<BodyEditorShortcutState | null>(null);
     const measureFrameRef = useRef<number | null>(null);
+    const pointerFrameRef = useRef<number | null>(null);
+    const pendingPointerRef = useRef<PointerProbe | null>(null);
     const pendingMeasureRef = useRef<{
         pos: number;
         reason: ActiveBlockHandle['reason'];
     } | null>(null);
     const activeBlockHandleRef = useRef<ActiveBlockHandle | null>(null);
+    const menuLockedBlockRef = useRef<LockedBlockTarget | null>(null);
+    const pointerInsideEditorRef = useRef(false);
     const isMenuOpenRef = useRef(false);
     const lastChecklistProgressRef = useRef<ChecklistProgress | null>(null);
     const [menuTarget, setMenuTarget] = useState<ActiveBlockMenuTarget | null>(null);
@@ -234,8 +249,13 @@ function TiptapEditor({
 
     const closeBlockMenu = useCallback(() => {
         isMenuOpenRef.current = false;
+        menuLockedBlockRef.current = null;
         setIsMenuOpen(false);
         setMenuTarget(null);
+        if (!pointerInsideEditorRef.current) {
+            activeBlockHandleRef.current = null;
+            setActiveBlockHandle(null);
+        }
     }, []);
 
     const findScrollableAncestor = useCallback((start: HTMLElement | null): HTMLElement | null => {
@@ -740,7 +760,7 @@ function TiptapEditor({
             left.blockPos === right.blockPos &&
             left.nodeType === right.nodeType &&
             sameRect(left.rect, right.rect) &&
-            sameRect(left.containerRect, right.containerRect)
+            sameRect(left.rootRect, right.rootRect)
         );
     };
 
@@ -1026,7 +1046,7 @@ function TiptapEditor({
             blockPos: target.blockPos,
             nodeType: target.nodeType,
             rect: cloneDomRect(target.rect),
-            containerRect: cloneDomRect(root.getBoundingClientRect()),
+            rootRect: cloneDomRect(root.getBoundingClientRect()),
             reason,
         };
     }, [cloneDomRect, editor, getBlockTargetAtPos]);
@@ -1046,18 +1066,20 @@ function TiptapEditor({
 
     const remeasureCurrentBlock = useCallback((reason: ActiveBlockHandle['reason']) => {
         const current = activeBlockHandleRef.current;
-        const target = menuTarget ?? current;
+        const target = menuLockedBlockRef.current ?? menuTarget ?? current;
         if (!target || !editor) return;
         scheduleActiveBlockMeasure(Math.max(0, Math.min(target.blockPos + 1, editor.state.doc.content.size)), reason);
     }, [editor, menuTarget, scheduleActiveBlockMeasure]);
 
-    const getBlockPosFromPointerTarget = useCallback((target: EventTarget | null): number | null => {
-        if (!editor || !(target instanceof Element)) return null;
+    const getFallbackBlockPosFromPoint = useCallback((x: number, y: number): number | null => {
+        if (!editor) return null;
+        const target = document.elementFromPoint(x, y);
+        if (!target) return null;
         const editorDom = editor.view.dom;
         if (!editorDom.contains(target)) return null;
 
         const blockElement = target.closest(
-            'li[data-type="taskItem"], li, div[data-type="details"], summary, p, h1, h2, h3'
+            'li[data-type="taskItem"], li, div[data-type="details"], div[data-type="detailsSummary"], summary, p, h1, h2, h3'
         );
         if (!(blockElement instanceof HTMLElement) || !editorDom.contains(blockElement)) return null;
 
@@ -1068,6 +1090,66 @@ function TiptapEditor({
             return null;
         }
     }, [editor]);
+
+    const resolveBlockPosFromPointer = useCallback((point: PointerProbe): number | null => {
+        if (!editor) return null;
+        const root = rootRef.current;
+        if (!root) return null;
+
+        const rootRect = root.getBoundingClientRect();
+        const minX = rootRect.left + 48;
+        const maxX = rootRect.right - 8;
+        const clampX = (value: number) => Math.min(Math.max(value, minX), maxX);
+        const probeXs = Array.from(new Set([
+            clampX(point.x),
+            clampX(minX),
+            clampX(rootRect.left + 80),
+            clampX(rootRect.left + 112),
+            clampX(rootRect.left + 144),
+            clampX(rootRect.left + 176),
+            clampX(rootRect.left + 224),
+            clampX(point.x + 96),
+        ]));
+
+        let fallbackPos: number | null = null;
+        for (const probeX of probeXs) {
+            const result = editor.view.posAtCoords({ left: probeX, top: point.y });
+            if (!result) {
+                fallbackPos = fallbackPos ?? getFallbackBlockPosFromPoint(probeX, point.y);
+                continue;
+            }
+
+            const target = getBlockTargetAtPos(editor.view, editor.state, result.pos);
+            if (!target?.rect) {
+                fallbackPos = fallbackPos ?? result.pos;
+                continue;
+            }
+
+            if (point.y >= target.rect.top - 1 && point.y <= target.rect.bottom + 1) {
+                return result.pos;
+            }
+
+            fallbackPos = fallbackPos ?? result.pos;
+        }
+
+        return fallbackPos;
+    }, [editor, getBlockTargetAtPos, getFallbackBlockPosFromPoint]);
+
+    const schedulePointerProbe = useCallback((point: PointerProbe) => {
+        pendingPointerRef.current = point;
+        if (pointerFrameRef.current != null) return;
+
+        pointerFrameRef.current = window.requestAnimationFrame(() => {
+            pointerFrameRef.current = null;
+            const pending = pendingPointerRef.current;
+            pendingPointerRef.current = null;
+            if (!pending || isMenuOpenRef.current) return;
+
+            const blockPos = resolveBlockPosFromPointer(pending);
+            if (blockPos == null) return;
+            scheduleActiveBlockMeasure(blockPos, 'pointer');
+        });
+    }, [resolveBlockPosFromPointer, scheduleActiveBlockMeasure]);
 
     const applyBlockActionTransaction = useCallback((nextEditor: Editor | null, transaction: Transaction | null): boolean => {
         if (!nextEditor) return false;
@@ -1247,6 +1329,9 @@ function TiptapEditor({
             if (measureFrameRef.current != null) {
                 window.cancelAnimationFrame(measureFrameRef.current);
             }
+            if (pointerFrameRef.current != null) {
+                window.cancelAnimationFrame(pointerFrameRef.current);
+            }
         };
     }, []);
 
@@ -1281,7 +1366,7 @@ function TiptapEditor({
     const clearExpandedHiddenRuns = useCallback(() => {
         if (!editor) return;
         editor.view.dispatch(clearExpandedHiddenRunsMeta(editor.state.tr));
-        remeasureCurrentBlock('visibility');
+        remeasureCurrentBlock('completed-visibility');
     }, [editor, remeasureCurrentBlock]);
 
     useEffect(() => {
@@ -1542,7 +1627,7 @@ function TiptapEditor({
         const pluginState = getTaskCompletionState(editor.state);
         if (pluginState?.showCompletedLines === showCompletedLines) return;
         editor.view.dispatch(setTaskCompletionVisibilityMeta(editor.state.tr, showCompletedLines));
-        remeasureCurrentBlock('visibility');
+        remeasureCurrentBlock('completed-visibility');
     }, [editor, remeasureCurrentBlock, showCompletedLines]);
 
     useEffect(() => {
@@ -1602,7 +1687,7 @@ function TiptapEditor({
         })
         : null;
     const menuAnchorRect = activeBlockHandle?.rect ?? menuTarget?.fallbackAnchorRect ?? null;
-    const menuContainerRect = activeBlockHandle?.containerRect ?? null;
+    const menuContainerRect = activeBlockHandle?.rootRect ?? null;
     const menuItems = menuTarget
         ? getBlockActionItems(menuTarget.nodeType, {
             canMoveUp: resolvedMenuTarget ? canMoveBlock(editor.state, resolvedMenuTarget, 'up') : false,
@@ -1670,6 +1755,7 @@ function TiptapEditor({
                 editor.view.dispatch(editor.state.tr.setSelection(selection));
                 insertDetailsAtSelection(editor);
                 editor.view.focus();
+                remeasureCurrentBlock('details');
                 closeBlockMenu();
                 break;
             }
@@ -1679,6 +1765,7 @@ function TiptapEditor({
                 editor.view.dispatch(editor.state.tr.setSelection(selection));
                 unsetActiveDetails(editor);
                 editor.view.focus();
+                remeasureCurrentBlock('details');
                 closeBlockMenu();
                 break;
             }
@@ -1687,24 +1774,18 @@ function TiptapEditor({
         closeBlockMenu();
     };
 
-    const handlePointerMove = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const handleEditorPointerMove = (event: ReactMouseEvent<HTMLDivElement>) => {
+        pointerInsideEditorRef.current = true;
         if (suppressBlockUi || isMenuOpenRef.current) return;
         const eventTarget = event.target instanceof Element ? event.target : null;
         if (eventTarget?.closest('[data-testid="tiptap-block-handle"], [data-testid="tiptap-block-menu"]')) {
             return;
         }
-        const blockPos = getBlockPosFromPointerTarget(event.target);
-        if (blockPos != null) {
-            scheduleActiveBlockMeasure(blockPos, 'hover');
-            return;
-        }
-        const coords = { left: event.clientX, top: event.clientY };
-        const result = editor.view.posAtCoords(coords);
-        if (!result) return;
-        scheduleActiveBlockMeasure(result.pos, 'hover');
+        schedulePointerProbe({ x: event.clientX, y: event.clientY });
     };
 
-    const handlePointerLeave = () => {
+    const handleEditorPointerLeave = () => {
+        pointerInsideEditorRef.current = false;
         if (isMenuOpenRef.current) return;
         setActiveBlockHandleIfChanged(null);
     };
@@ -1737,8 +1818,8 @@ function TiptapEditor({
             onClick={handleEditorClick}
             onCopyCapture={handleCopyCapture}
             onPasteCapture={handlePasteCapture}
-            onMouseMove={handlePointerMove}
-            onMouseLeave={handlePointerLeave}
+            onPointerMove={handleEditorPointerMove}
+            onPointerLeave={handleEditorPointerLeave}
         >
             {activeBlockHandle ? (
                 <button
@@ -1755,13 +1836,13 @@ function TiptapEditor({
                     style={{
                         top: Math.max(
                             activeBlockHandle.rect.top -
-                                activeBlockHandle.containerRect.top +
+                                activeBlockHandle.rootRect.top +
                                 (activeBlockHandle.nodeType === 'heading'
                                     ? Math.max((activeBlockHandle.rect.height - BLOCK_ACTION_HANDLE_HEIGHT) / 2, 0)
                                     : 0),
                             4,
                         ),
-                        left: Math.max(activeBlockHandle.rect.left - activeBlockHandle.containerRect.left - BLOCK_ACTION_HANDLE_HEIGHT, 4),
+                        left: Math.max(activeBlockHandle.rect.left - activeBlockHandle.rootRect.left - BLOCK_ACTION_HANDLE_HEIGHT, 4),
                     }}
                     onMouseDown={(event) => {
                         event.preventDefault();
@@ -1770,6 +1851,11 @@ function TiptapEditor({
                     onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
+                        menuLockedBlockRef.current = {
+                            pos: activeBlockHandle.pos,
+                            blockPos: activeBlockHandle.blockPos,
+                            nodeType: activeBlockHandle.nodeType,
+                        };
                         setMenuTarget({
                             blockPos: activeBlockHandle.blockPos,
                             nodeType: activeBlockHandle.nodeType,
