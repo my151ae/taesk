@@ -19,6 +19,26 @@ const EMPTY_DOC: JSONContent = {
   ],
 };
 
+const CHILD_CARD_LINK_CLASS = "taesk-card-link taesk-child-card-link";
+
+const isChildCardHref = (href: string): boolean => /^\/c\/[^/?#]+(?:[/?#]|$)/.test(href);
+
+const getChildCardLink = (node: JSONContent): { text: string; href: string } | null => {
+  if (node.type !== "taskItem") return null;
+
+  const paragraph = node.content?.find((child) => child.type === "paragraph");
+  const textNode = paragraph?.content?.find((child) => child.type === "text");
+  if (!textNode || !textNode.text) return null;
+
+  const linkMark = (textNode.marks as TiptapMark[] | undefined)?.find((mark) => mark.type === "link");
+  const href = typeof linkMark?.attrs?.href === "string" ? linkMark.attrs.href.trim() : "";
+  const className = typeof linkMark?.attrs?.class === "string" ? linkMark.attrs.class : "";
+  if (!href || !isChildCardHref(href)) return null;
+  if (!className.includes("taesk-child-card-link") && !className.includes("taesk-card-link")) return null;
+
+  return { text: textNode.text, href };
+};
+
 export const normalizeContent = (value: unknown): JSONContent => {
   if (Array.isArray(value)) {
     return EMPTY_DOC;
@@ -41,6 +61,7 @@ type MarkdownSerializeContext = {
   indentLevel: number;
   inListItem: boolean;
   suppressBlockFormatting: boolean;
+  childCardLink?: { text: string; href: string } | null;
 };
 
 type MarkdownParseResult =
@@ -174,6 +195,7 @@ const serializeListItem = (
         indentLevel: context.indentLevel + 1,
         inListItem: false,
         suppressBlockFormatting: false,
+        childCardLink: null,
       });
       if (nested) {
         lines.push(nested);
@@ -191,7 +213,10 @@ const serializeListItem = (
 
     const childLines = rendered.split("\n");
     if (!hasPrefixedContent) {
-      lines.push(`${LIST_INDENT.repeat(context.indentLevel)}${prefix}${childLines[0]}`);
+      const firstLine = context.childCardLink
+        ? `[${escapeMarkdownText(context.childCardLink.text)}](${context.childCardLink.href})`
+        : childLines[0];
+      lines.push(`${LIST_INDENT.repeat(context.indentLevel)}${prefix}${firstLine}`);
       const continuationIndent = `${LIST_INDENT.repeat(context.indentLevel)}${" ".repeat(prefix.length)}`;
       childLines.slice(1).forEach((line) => {
         lines.push(line.length > 0 ? `${continuationIndent}${line}` : "");
@@ -249,6 +274,13 @@ const serializeMarkdownNode = (node: JSONContent, context: MarkdownSerializeCont
     case "taskList":
       return (node.content ?? [])
         .map((child) => {
+          const childCardLink = getChildCardLink(child);
+          if (childCardLink) {
+            return serializeListItem(child, "- [card] ", {
+              ...context,
+              childCardLink,
+            });
+          }
           const checked = Boolean(child.attrs?.checked);
           return serializeListItem(child, checked ? "- [x] " : "- [ ] ", context);
         })
@@ -257,6 +289,13 @@ const serializeMarkdownNode = (node: JSONContent, context: MarkdownSerializeCont
     case "listItem":
       return serializeListItem(node, "- ", context);
     case "taskItem": {
+      const childCardLink = getChildCardLink(node);
+      if (childCardLink) {
+        return serializeListItem(node, "- [card] ", {
+          ...context,
+          childCardLink,
+        });
+      }
       const checked = Boolean(node.attrs?.checked);
       return serializeListItem(node, checked ? "- [x] " : "- [ ] ", context);
     }
@@ -360,6 +399,7 @@ export const serializeTiptapSliceToMarkdown = (slice: Slice): string => {
 };
 
 const headingPattern = /^(#{1,3})\s+(.+)$/;
+const childCardPattern = /^- \[card\]\s+\[(.+)\]\((\/c\/[^)\s]+)\)$/;
 const taskPattern = /^- \[([ xX])\]\s+(.*)$/;
 const bulletPattern = /^- (?!\[[ xX]\]\s)(.+)$/;
 const orderedPattern = /^(\d+)\.\s+(.*)$/;
@@ -382,6 +422,22 @@ const createInlineContent = (text: string): JSONContent[] | undefined => {
   return content.length > 0 ? content : undefined;
 };
 
+const createChildCardInlineContent = (text: string, href: string): JSONContent[] => [
+  {
+    type: "text",
+    text,
+    marks: [
+      {
+        type: "link",
+        attrs: {
+          href,
+          class: CHILD_CARD_LINK_CLASS,
+        },
+      },
+    ],
+  },
+];
+
 const createParagraphBlock = (lines: string[]): JSONContent => ({
   type: "paragraph",
   content: createInlineContent(lines.join("\n")),
@@ -401,6 +457,7 @@ const isRecognizedTopLevelMarkdownLine = (line: string, allowDetails: boolean): 
   if (hasTopLevelIndent(line)) return false;
   return (
     headingPattern.test(line) ||
+    childCardPattern.test(line) ||
     taskPattern.test(line) ||
     bulletPattern.test(line) ||
     orderedPattern.test(line) ||
@@ -516,6 +573,28 @@ const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
 
     if (hasTopLevelIndent(line)) {
       return { kind: "fallback", reason: "unsupported-structure" };
+    }
+
+    if (childCardPattern.test(line)) {
+      const taskItems: JSONContent[] = [];
+      while (index < lines.length) {
+        const currentLine = lines[index];
+        const match = currentLine.match(childCardPattern);
+        if (!match || hasTopLevelIndent(currentLine)) break;
+        taskItems.push({
+          type: "taskItem",
+          attrs: { checked: false },
+          content: [
+            {
+              type: "paragraph",
+              content: createChildCardInlineContent(match[1].trim(), match[2].trim()),
+            },
+          ],
+        });
+        index += 1;
+      }
+      blocks.push({ type: "taskList", content: taskItems });
+      continue;
     }
 
     const headingMatch = line.match(headingPattern);

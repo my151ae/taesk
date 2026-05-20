@@ -150,7 +150,7 @@ export function useChildCardSummaries({
         bucketLabel,
         checklistChecked: progress.checked,
         checklistTotal: progress.total,
-        linkMeta: [dateLabel, timeLabel, bucketLabel, `${progress.checked}/${progress.total}`].join(" "),
+        linkMeta: [child.title, dateLabel, timeLabel, bucketLabel, `${progress.checked}/${progress.total}`].join(" "),
       };
       return acc;
     }, {});

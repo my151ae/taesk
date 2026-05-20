@@ -480,6 +480,47 @@ test.describe('Markdown serializer helpers', () => {
     expect(serializeTiptapContentToMarkdown(content)).toBe('Body only');
   });
 
+  test('serializes and parses taesk child card links', async () => {
+    const content: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    {
+                      type: 'text',
+                      text: '紹介求人選定',
+                      marks: [
+                        {
+                          type: 'link',
+                          attrs: {
+                            href: '/c/abc123',
+                            class: 'taesk-card-link taesk-child-card-link',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const markdown = '- [card] [紹介求人選定](/c/abc123)';
+    expect(serializeTiptapContentToMarkdown(content)).toBe(markdown);
+    expect(parseMarkdownToTiptapContent(markdown)).toEqual(content);
+  });
+
   test('parses markdown v2 structures into tiptap content', async () => {
     const parsed = parseMarkdownToTiptapContent(
       [

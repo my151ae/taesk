@@ -116,51 +116,42 @@
     transition: color 120ms ease, text-decoration-color 120ms ease;
 }
 
+.editor :global(.ProseMirror a.taesk-card-link:has(.taesk-card-link-resolved)),
+.editor :global(.ProseMirror a[href^="/c/"]:has(.taesk-card-link-resolved)) {
+    user-select: none;
+}
+
+.editor :global(.ProseMirror .taesk-card-link-resolved),
+.editor :global(.ProseMirror .taesk-card-link-resolved-tail) {
+    font-size: 0;
+    line-height: 0;
+}
+
+.editor :global(.ProseMirror .taesk-card-link-resolved::after) {
+    content: attr(data-taesk-card-link-label);
+    font-size: 1rem;
+    line-height: 1.5;
+    white-space: normal;
+}
+
 .editor :global(.ProseMirror a.taesk-card-link::before),
 .editor :global(.ProseMirror a[href^="/c/"]::before) {
     content: "";
     position: relative;
-    top: 0.08em;
+    top: 0.04em;
     flex: 0 0 auto;
-    width: 0.78em;
-    height: 0.96em;
-    border: 1.5px solid currentColor;
-    border-radius: 0.12em;
+    width: 0.86em;
+    height: 0.86em;
+    border: 1.4px solid currentColor;
+    border-radius: 0.16em;
     opacity: 0.72;
+    box-shadow: -0.22em -0.22em 0 -0.09em #ffffff, -0.22em -0.22em 0 0 currentColor;
 }
 
 .editor :global(.ProseMirror a.taesk-card-link:hover),
 .editor :global(.ProseMirror a[href^="/c/"]:hover) {
     color: #0f172a;
     text-decoration-color: #64748b;
-}
-
-.editor :global(.ProseMirror p:has(a.taesk-card-link + .taesk-card-link-meta)),
-.editor :global(.ProseMirror p:has(a[href^="/c/"] + .taesk-card-link-meta)) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.5rem;
-}
-
-.editor :global(.ProseMirror .taesk-card-link-meta) {
-    margin-left: auto;
-    border-radius: 0.35rem;
-    background: #f1f5f9;
-    padding: 0.08rem 0.4rem;
-    color: #64748b;
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.35;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 640px) {
-    .editor :global(.ProseMirror .taesk-card-link-meta) {
-        margin-left: 1.45rem;
-        white-space: normal;
-    }
 }
 
 .editor :global(ul[data-type="taskList"] li) {
@@ -182,6 +173,7 @@
 /* チェックボックス側 */
 .editor :global(ul[data-type="taskList"] > li > label) {
     grid-column: 1;
+    grid-row: 1;
     margin-top: 0 !important;
     margin-right: 0 !important;
     display: flex;
@@ -194,9 +186,56 @@
     cursor: pointer;
 }
 
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block > label) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block) {
+    border-radius: 6px;
+    background: #eef2f7;
+    color: #334155;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a.taesk-card-link::before),
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a[href^="/c/"]::before) {
+    content: none;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a.taesk-card-link),
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a[href^="/c/"]) {
+    color: inherit;
+    text-decoration: none;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a.taesk-card-link:hover),
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block a[href^="/c/"]:hover) {
+    color: #0f172a;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block::before) {
+    content: "";
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    justify-self: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    background-image: url("/icons/cupsel.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    pointer-events: none;
+}
+
+.editor :global(ul[data-type="taskList"] > li.taesk-child-card-block::after) {
+    content: none;
+}
+
 /* テキスト側（div）が残り幅を取る） */
 .editor :global(ul[data-type="taskList"] > li > div) {
     grid-column: 2;
+    grid-row: 1;
     min-width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;

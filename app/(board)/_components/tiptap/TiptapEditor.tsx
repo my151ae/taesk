@@ -93,28 +93,52 @@ const CardLinkMeta = Extension.create<{ metaByShortId: Record<string, string> }>
                         const pluginState = cardLinkMetaPluginKey.getState(state);
                         const metaByShortId = pluginState?.metaByShortId ?? {};
                         const decorations: Decoration[] = [];
+                        let activeResolvedLink: { href: string; end: number } | null = null;
 
                         state.doc.descendants((node, pos) => {
+                            if (node.type.name === "taskItem") {
+                                let hasResolvedCardLink = false;
+                                node.descendants((child) => {
+                                    if (!child.isText) return;
+                                    const linkMark = child.marks.find((mark) => mark.type.name === "link");
+                                    const className = typeof linkMark?.attrs?.class === "string" ? linkMark.attrs.class : "";
+                                    const shortId = extractCardShortIdFromHref(linkMark?.attrs?.href);
+                                    if ((shortId && metaByShortId[shortId]) || className.includes("taesk-child-card-link")) {
+                                        hasResolvedCardLink = true;
+                                    }
+                                });
+                                if (hasResolvedCardLink) {
+                                    decorations.push(
+                                        Decoration.node(pos, pos + node.nodeSize, {
+                                            class: "taesk-child-card-block",
+                                        })
+                                    );
+                                }
+                            }
+
                             if (!node.isText) return;
                             const linkMark = node.marks.find((mark) => mark.type.name === "link");
+                            const href = typeof linkMark?.attrs?.href === "string" ? linkMark.attrs.href : null;
                             const shortId = extractCardShortIdFromHref(linkMark?.attrs?.href);
-                            if (!shortId) return;
+                            if (!shortId || !href) {
+                                activeResolvedLink = null;
+                                return;
+                            }
                             const label = metaByShortId[shortId];
-                            if (!label) return;
+                            if (!label) {
+                                activeResolvedLink = null;
+                                return;
+                            }
 
+                            const isContinuation = activeResolvedLink?.href === href && activeResolvedLink.end === pos;
                             decorations.push(
-                                Decoration.widget(
-                                    pos + node.nodeSize,
-                                    () => {
-                                        const span = document.createElement("span");
-                                        span.className = "taesk-card-link-meta";
-                                        span.contentEditable = "false";
-                                        span.textContent = label;
-                                        return span;
-                                    },
-                                    { key: `card-link-meta-${shortId}-${pos}`, side: 1 }
-                                )
+                                Decoration.inline(pos, pos + node.nodeSize, {
+                                    class: isContinuation ? "taesk-card-link-resolved-tail" : "taesk-card-link-resolved",
+                                    contenteditable: "false",
+                                    "data-taesk-card-link-label": label,
+                                })
                             );
+                            activeResolvedLink = { href, end: pos + node.nodeSize };
                         });
 
                         return DecorationSet.create(state.doc, decorations);
@@ -1297,7 +1321,7 @@ function TiptapEditor({
         const buildLinkedParentTransaction = (href: string): Transaction => {
             const linkMark = editor.state.schema.marks.link?.create({
                 href,
-                class: "taesk-card-link",
+                class: "taesk-card-link taesk-child-card-link",
             });
             const linkedText = linkMark
                 ? editor.state.schema.text(title, [linkMark])
