@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import TimelineBoardPage from "@/app/(board)/_components/timeline/TimelineBoardPage";
@@ -14,6 +14,7 @@ type PageParams = {
 
 type PageProps = {
   params: Promise<PageParams>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export const revalidate = 0;
@@ -61,15 +62,36 @@ export async function generateMetadata({ params }: { params: Promise<PageParams>
 
 import { createServerSupabaseClient } from "@/lib/supabase";
 
-export default async function BoardByShortIdPage({ params }: PageProps) {
+const buildCurrentBoardPath = (
+  shortId: string,
+  slug: string[] | undefined,
+  searchParams?: Record<string, string | string[] | undefined>
+) => {
+  const current = ["/b", shortId, ...(slug ?? [])].join("/");
+  const params = new URLSearchParams();
+  Object.entries(searchParams ?? {}).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item != null) params.append(key, item);
+      });
+      return;
+    }
+    if (value != null) params.set(key, value);
+  });
+  const query = params.toString();
+  return query ? `${current}?${query}` : current;
+};
+
+export default async function BoardByShortIdPage({ params, searchParams }: PageProps) {
   const supabase = await createServerSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { short_id, slug } = await params;
 
   if (authError || !user) {
-    permanentRedirect("/login");
+    const currentPath = buildCurrentBoardPath(short_id, slug, await searchParams);
+    redirect(`/login?next=${encodeURIComponent(currentPath)}`);
   }
 
-  const { short_id, slug } = await params;
   const board = await getBoardByShortIdCached(short_id);
 
   if (!board) {

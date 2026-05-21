@@ -15,7 +15,7 @@ export default async function BoardDefaultPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect("/login");
+    redirect("/login?next=%2Fboard");
   }
 
   const lastBoardId = cookieStore.get(LAST_BOARD_COOKIE)?.value ?? null;
