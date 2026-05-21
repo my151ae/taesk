@@ -24,6 +24,10 @@ export type GoogleCalendarEventsResponse = {
   connected: boolean;
   canWrite?: boolean; // Added for v2
   events: GoogleCalendarEvent[];
+  source?: 'cache' | 'google' | 'none';
+  stale?: boolean;
+  lastSyncedAt?: string | null;
+  backgroundRefreshRecommended?: boolean;
   status?: 'connected' | 'disconnected';
   error?: string;
 };

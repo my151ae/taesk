@@ -88,6 +88,8 @@ type CachedGoogleEventRow = {
   description: string | null;
 };
 
+const STALE_CACHE_MS = 5 * 60 * 1000;
+
 type GoogleApiErrorShape = {
   code?: number;
   response?: { status?: number };
@@ -361,6 +363,12 @@ async function fetchCachedEvents(
   }
 
   return (data ?? []).map(rowToGoogleCalendarEvent);
+}
+
+function isStaleLastSyncedAt(lastSyncedAt: string | null): boolean {
+  if (!lastSyncedAt) return true;
+  const syncedMs = Date.parse(lastSyncedAt);
+  return !Number.isFinite(syncedMs) || Date.now() - syncedMs > STALE_CACHE_MS;
 }
 
 async function getSyncState(
@@ -750,6 +758,56 @@ export async function listCachedEventsForRange(
   const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
   const canWrite = hasCalendarWritePermission(account.scope);
   return { events, canWrite };
+}
+
+export async function listCachedEventsForRangeDbOnly(
+  userId: string,
+  start: Date,
+  end: Date,
+  options?: { calendarId?: string; supabase?: SupabaseClient }
+): Promise<{
+  connected: boolean;
+  events: GoogleCalendarEvent[];
+  canWrite: boolean;
+  lastSyncedAt: string | null;
+  stale: boolean;
+}> {
+  const supabase = options?.supabase ?? await createServerSupabaseClient();
+  const { data: account, error: accountError } = await supabase
+    .from("google_calendar_accounts")
+    .select("id, scope")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (accountError) {
+    console.error("[googleCalendar] failed to load cached account", accountError);
+    throw accountError;
+  }
+
+  if (!account) {
+    return {
+      connected: false,
+      events: [],
+      canWrite: false,
+      lastSyncedAt: null,
+      stale: true,
+    };
+  }
+
+  const calendarId = options?.calendarId ?? "primary";
+  const syncState = await getSyncState(supabase, account.id, calendarId);
+  const lastSyncedAt = syncState?.last_synced_at ?? null;
+  const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+
+  return {
+    connected: true,
+    events,
+    canWrite: hasCalendarWritePermission(account.scope),
+    lastSyncedAt,
+    stale: isStaleLastSyncedAt(lastSyncedAt),
+  };
 }
 
 export async function disconnectGoogleCalendarAccount(userId: string, supabase?: SupabaseClient) {

@@ -9,6 +9,8 @@ type WeekBlock = {
   events: Map<string, GoogleCalendarEvent>;
 };
 
+type FetchMode = "cache-only" | "refresh";
+
 const toErrorMessage = (value: unknown): string | null => {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -84,8 +86,11 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   const blocksRef = useRef<Map<string, WeekBlock>>(new Map());
-  const inflightWeekKeysRef = useRef<Set<string>>(new Set());
+  const inflightRequestsRef = useRef<Set<string>>(new Set());
   const permissionCheckedRef = useRef(false);
+  const refreshRecommendedWeekKeysRef = useRef<Set<string>>(new Set());
+  const refreshAttemptedWeekKeysRef = useRef<Set<string>>(new Set());
+  const manualRefreshRequestedRef = useRef(false);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastVisibleEventsSignatureRef = useRef<string>("");
 
@@ -112,12 +117,13 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     setEvents(nextEvents);
   }, [requiredWeekKeys]);
 
-  const fetchWeek = useCallback(async (weekKey: string) => {
-    if (inflightWeekKeysRef.current.has(weekKey)) return;
+  const fetchWeek = useCallback(async (weekKey: string, mode: FetchMode) => {
+    const requestKey = `${mode}:${weekKey}`;
+    if (inflightRequestsRef.current.has(requestKey)) return;
 
-    inflightWeekKeysRef.current.add(weekKey);
+    inflightRequestsRef.current.add(requestKey);
     const controller = new AbortController();
-    abortControllersRef.current.set(weekKey, controller);
+    abortControllersRef.current.set(requestKey, controller);
 
     try {
       const start = new Date(`${weekKey}T00:00:00.000Z`);
@@ -125,7 +131,11 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       const params = new URLSearchParams({
         start: start.toISOString(),
         end: end.toISOString(),
+        mode,
       });
+      if (mode === "refresh") {
+        params.set("syncCardsOnFetch", "false");
+      }
 
       const response = await fetch(`/api/calendar/events?${params.toString()}`, {
         signal: controller.signal,
@@ -147,7 +157,9 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
         const message =
           toErrorMessage((body as { error?: unknown } | null)?.error) ??
           "Failed to fetch Google Calendar events";
-        setStatus("error");
+        if (mode === "cache-only" && events.length === 0 && blocksRef.current.size === 0) {
+          setStatus("error");
+        }
         setError(message);
         setBackgroundStatus("error");
         return;
@@ -165,19 +177,33 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       setStatus("success");
       setError(toErrorMessage((body as { error?: unknown } | null)?.error) ?? null);
       rebuildVisibleEvents();
+
+      if (mode === "cache-only") {
+        if (body?.backgroundRefreshRecommended) {
+          refreshRecommendedWeekKeysRef.current.add(weekKey);
+          refreshAttemptedWeekKeysRef.current.add(weekKey);
+          setBackgroundStatus("loading");
+          void fetchWeek(weekKey, "refresh");
+        } else {
+          refreshRecommendedWeekKeysRef.current.delete(weekKey);
+        }
+      }
     } catch (err) {
       if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Failed to fetch Google Calendar events";
-      if (!permissionCheckedRef.current) {
+      if (!permissionCheckedRef.current && mode === "cache-only") {
         setStatus("error");
       }
       setError(message);
       setBackgroundStatus("error");
     } finally {
-      inflightWeekKeysRef.current.delete(weekKey);
-      abortControllersRef.current.delete(weekKey);
+      inflightRequestsRef.current.delete(requestKey);
+      abortControllersRef.current.delete(requestKey);
+      if (mode === "refresh") {
+        setBackgroundStatus("idle");
+      }
     }
-  }, [rebuildVisibleEvents]);
+  }, [events.length, rebuildVisibleEvents]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,7 +217,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
         setStatus("loading");
         try {
-          const response = await fetch("/api/calendar/events");
+          const response = await fetch("/api/calendar/events?mode=cache-only");
           const body = (await response.json().catch(() => null)) as GoogleCalendarEventsResponse | null;
           if (cancelled) return;
 
@@ -215,6 +241,40 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
           setCanWrite(body?.canWrite ?? false);
           setStatus("success");
           setError(null);
+
+          if (body?.backgroundRefreshRecommended) {
+            setBackgroundStatus("loading");
+            void fetch("/api/calendar/events?mode=refresh&syncCardsOnFetch=false")
+              .then(async (refreshResponse) => {
+                const refreshBody = (await refreshResponse.json().catch(() => null)) as GoogleCalendarEventsResponse | null;
+                if (cancelled) return;
+                if (refreshBody?.connected === false) {
+                  setCanWrite(false);
+                  setStatus("disconnected");
+                  setError(toErrorMessage((refreshBody as { error?: unknown } | null)?.error) ?? null);
+                  return;
+                }
+                if (!refreshResponse.ok) {
+                  setError(
+                    toErrorMessage((refreshBody as { error?: unknown } | null)?.error) ??
+                    "Failed to refresh Google Calendar events"
+                  );
+                  setBackgroundStatus("error");
+                  return;
+                }
+                setCanWrite(refreshBody?.canWrite ?? false);
+                setStatus("success");
+                setError(null);
+              })
+              .catch((err) => {
+                if (cancelled) return;
+                setError(err instanceof Error ? err.message : "Failed to refresh Google Calendar events");
+                setBackgroundStatus("error");
+              })
+              .finally(() => {
+                if (!cancelled) setBackgroundStatus("idle");
+              });
+          }
         } catch (err) {
           if (cancelled) return;
           setStatus("error");
@@ -230,6 +290,20 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
           setStatus("success");
         }
         setBackgroundStatus("idle");
+        const refreshWeekKeys = requiredWeekKeys.filter((weekKey) => {
+          if (refreshAttemptedWeekKeysRef.current.has(weekKey)) return false;
+          if (manualRefreshRequestedRef.current) return true;
+          return refreshRecommendedWeekKeysRef.current.has(weekKey);
+        });
+        if (refreshWeekKeys.length > 0) {
+          refreshWeekKeys.forEach((weekKey) => refreshAttemptedWeekKeysRef.current.add(weekKey));
+          setBackgroundStatus("loading");
+          await Promise.all(refreshWeekKeys.map((weekKey) => fetchWeek(weekKey, "refresh")));
+          if (cancelled) return;
+          rebuildVisibleEvents();
+          setBackgroundStatus("idle");
+        }
+        manualRefreshRequestedRef.current = false;
         return;
       }
 
@@ -239,11 +313,10 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
         setBackgroundStatus("loading");
       }
 
-      await Promise.all(missingWeekKeys.map((weekKey) => fetchWeek(weekKey)));
+      await Promise.all(missingWeekKeys.map((weekKey) => fetchWeek(weekKey, "cache-only")));
       if (cancelled) return;
 
       rebuildVisibleEvents();
-      setBackgroundStatus("idle");
       if (permissionCheckedRef.current) {
         setStatus("success");
       }
@@ -267,7 +340,10 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
   const refresh = useCallback(() => {
     requiredWeekKeys.forEach((weekKey) => {
       blocksRef.current.delete(weekKey);
+      refreshRecommendedWeekKeysRef.current.delete(weekKey);
+      refreshAttemptedWeekKeysRef.current.delete(weekKey);
     });
+    manualRefreshRequestedRef.current = true;
     if (requiredWeekKeys.length === 0) {
       permissionCheckedRef.current = false;
     }
