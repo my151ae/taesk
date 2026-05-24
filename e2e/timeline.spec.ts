@@ -4176,30 +4176,65 @@ test.describe('@feature:timeline Timeline view', () => {
       await bodyEditor.click();
       const selectAllModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
       await page.keyboard.press(`${selectAllModifier}+A`);
-      await pastePlainText(page, [
-        '◆あなたのIDはow26052001です。',
-        '',
-        '◆あなたのメールアドレスは"nijican@gmail.com"です。',
-      ].join('\n'));
+      const pasteCases = [
+        {
+          text: [
+            '◆あなたのIDはow26052001です。',
+            '',
+            '◆あなたのメールアドレスは"nijican@gmail.com"です。',
+          ].join('\n'),
+          paragraphs: [
+            '◆あなたのIDはow26052001です。',
+            '◆あなたのメールアドレスは"nijican@gmail.com"です。',
+          ],
+          hardBreakCounts: [0, 0],
+        },
+        {
+          text: 'aaa\nbbb\n\nccc',
+          paragraphs: ['aaabbb', 'ccc'],
+          hardBreakCounts: [1, 0],
+        },
+        {
+          text: 'CRLF first\r\nCRLF second',
+          paragraphs: ['CRLF firstCRLF second'],
+          hardBreakCounts: [1],
+        },
+        {
+          text: 'CR first\rCR second',
+          paragraphs: ['CR firstCR second'],
+          hardBreakCounts: [1],
+        },
+        {
+          text: '\nleading blank\ntrailing newline\n',
+          paragraphs: ['leading blanktrailing newline'],
+          hardBreakCounts: [1],
+        },
+      ];
 
-      await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
+      for (const pasteCase of pasteCases) {
+        await pastePlainText(page, pasteCase.text);
+        await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
 
-      const nodeSummary = await bodyEditor.evaluate((root) => {
-        const textContent = root.textContent ?? '';
-        const paragraphs = Array.from(root.querySelectorAll(':scope > p')).map((paragraph) => paragraph.textContent ?? '');
-        return {
-          textContent,
-          paragraphs,
-        };
-      });
+        const nodeSummary = await bodyEditor.evaluate((root) => {
+          const textContent = root.textContent ?? '';
+          const paragraphs = Array.from(root.querySelectorAll(':scope > p')).map((paragraph) => ({
+            text: paragraph.textContent ?? '',
+            hardBreakCount: paragraph.querySelectorAll('br:not(.ProseMirror-trailingBreak)').length,
+          }));
+          return {
+            textContent,
+            paragraphs,
+          };
+        });
 
-      expect(nodeSummary.textContent).toContain('◆あなたのIDはow26052001です。');
-      expect(nodeSummary.textContent).toContain('◆あなたのメールアドレスは"nijican@gmail.com"です。');
-      expect(nodeSummary.paragraphs).toEqual([
-        '◆あなたのIDはow26052001です。',
-        '',
-        '◆あなたのメールアドレスは"nijican@gmail.com"です。',
-      ]);
+        expect(nodeSummary.paragraphs.map((paragraph) => paragraph.text)).toEqual(pasteCase.paragraphs);
+        expect(nodeSummary.paragraphs.map((paragraph) => paragraph.hardBreakCount)).toEqual(pasteCase.hardBreakCounts);
+        pasteCase.paragraphs
+          .filter((paragraph) => paragraph.length > 0)
+          .forEach((paragraph) => expect(nodeSummary.textContent).toContain(paragraph));
+
+        await page.keyboard.press(`${selectAllModifier}+A`);
+      }
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }

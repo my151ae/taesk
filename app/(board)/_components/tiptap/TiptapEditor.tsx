@@ -1519,15 +1519,26 @@ function TiptapEditor({
         const normalized = text.replace(/\r\n?/g, '\n');
         if (!normalized.includes('\n')) return false;
 
-        const lines = normalized.replace(/\n+$/, '').split('\n');
-        if (lines.length <= 1) return false;
-        if (!lines.some((line) => line.trim().length > 0)) return false;
+        const groups = normalized
+            .replace(/^\n+|\n+$/g, '')
+            .split(/\n{2,}/)
+            .map((group) => group.split('\n'))
+            .filter((group) => group.some((line) => line.trim().length > 0));
+        if (groups.length === 0) return false;
 
         const paragraphType = editor.schema.nodes.paragraph;
-        if (!paragraphType) return false;
+        const hardBreakType = editor.schema.nodes.hardBreak;
+        if (!paragraphType || !hardBreakType) return false;
 
-        const paragraphNodes = lines.map((line) => {
-            const content = line.length > 0 ? Fragment.from(editor.schema.text(line)) : undefined;
+        const paragraphNodes = groups.map((group) => {
+            const inlineNodes = group.flatMap((line, index) => {
+                const nodes = index > 0 ? [hardBreakType.create()] : [];
+                if (line.length > 0) {
+                    nodes.push(editor.schema.text(line));
+                }
+                return nodes;
+            });
+            const content = inlineNodes.length > 0 ? Fragment.fromArray(inlineNodes) : undefined;
             return paragraphType.create(null, content);
         });
 
