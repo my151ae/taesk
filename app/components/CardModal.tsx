@@ -230,23 +230,21 @@ export function CardModal({
         if (initialSidebarStateKeyRef.current === stateKey) return;
         initialSidebarStateKeyRef.current = stateKey;
 
-        if (openSource === "overdue" || peekMode === "compact" || !canDockSidebar) {
-            setShowSidebar(false);
-            return;
-        }
-        if (peekMode === "standard" || peekMode === "wide") {
-            setShowSidebar(true);
-        }
-    }, [canDockSidebar, card.id, cardPeekActualWidth, openSource, peekMode, setShowSidebar]);
-
-    useEffect(() => {
-        if (!showSidebar || canDockSidebar) return;
         setShowSidebar(false);
-    }, [canDockSidebar, setShowSidebar, showSidebar]);
+    }, [canDockSidebar, card.id, cardPeekActualWidth, openSource, peekMode, setShowSidebar]);
 
     useEffect(() => {
         didFocusTitleOnOpenRef.current = false;
     }, [card.id]);
+
+    const handleToggleSidebar = useCallback(() => {
+        setShowSidebar((prev) => {
+            if (!prev) {
+                setActiveSidebarTab((tab) => tab ?? "comments");
+            }
+            return !prev;
+        });
+    }, [setActiveSidebarTab, setShowSidebar]);
 
     const clearExpandedHiddenRuns = useCallback(() => {
         bodyBridgeRef.current?.clearExpandedHiddenRuns();
@@ -946,7 +944,7 @@ export function CardModal({
                     }}
                     onRequestClose={requestClose}
                     showSidebar={showSidebar}
-                    onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+                    onToggleSidebar={handleToggleSidebar}
                     peekMode={peekMode}
                     onPeekModeChange={onPeekModeChange}
                 />

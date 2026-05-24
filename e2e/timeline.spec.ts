@@ -4176,20 +4176,30 @@ test.describe('@feature:timeline Timeline view', () => {
       await bodyEditor.click();
       const selectAllModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
       await page.keyboard.press(`${selectAllModifier}+A`);
-      await pastePlainText(page, 'A\nB\nC');
+      await pastePlainText(page, [
+        '◆あなたのIDはow26052001です。',
+        '',
+        '◆あなたのメールアドレスは"nijican@gmail.com"です。',
+      ].join('\n'));
 
       await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
 
       const nodeSummary = await bodyEditor.evaluate((root) => {
         const textContent = root.textContent ?? '';
+        const paragraphs = Array.from(root.querySelectorAll(':scope > p')).map((paragraph) => paragraph.textContent ?? '');
         return {
           textContent,
+          paragraphs,
         };
       });
 
-      expect(nodeSummary.textContent).toContain('A');
-      expect(nodeSummary.textContent).toContain('B');
-      expect(nodeSummary.textContent).toContain('C');
+      expect(nodeSummary.textContent).toContain('◆あなたのIDはow26052001です。');
+      expect(nodeSummary.textContent).toContain('◆あなたのメールアドレスは"nijican@gmail.com"です。');
+      expect(nodeSummary.paragraphs).toEqual([
+        '◆あなたのIDはow26052001です。',
+        '',
+        '◆あなたのメールアドレスは"nijican@gmail.com"です。',
+      ]);
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -4261,10 +4271,8 @@ test.describe('@feature:timeline Timeline view', () => {
 
       const commentsPanel = modal.getByTestId('comments-panel');
 
-      if (await closeSidebarToggle.isVisible()) {
-        await closeSidebarToggle.click();
-        await expect(openSidebarToggle).toBeVisible();
-      }
+      await expect(openSidebarToggle).toBeVisible();
+      await expect(commentsPanel).toHaveCount(0);
 
       await openSidebarToggle.click();
       await expect(closeSidebarToggle).toBeVisible();

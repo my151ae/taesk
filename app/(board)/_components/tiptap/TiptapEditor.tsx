@@ -1513,6 +1513,38 @@ function TiptapEditor({
         return true;
     }, [editor, onChange]);
 
+    const applyPlainTextMultilinePaste = useCallback((text: string): boolean => {
+        if (!editor) return false;
+
+        const normalized = text.replace(/\r\n?/g, '\n');
+        if (!normalized.includes('\n')) return false;
+
+        const lines = normalized.replace(/\n+$/, '').split('\n');
+        if (lines.length <= 1) return false;
+        if (!lines.some((line) => line.trim().length > 0)) return false;
+
+        const paragraphType = editor.schema.nodes.paragraph;
+        if (!paragraphType) return false;
+
+        const paragraphNodes = lines.map((line) => {
+            const content = line.length > 0 ? Fragment.from(editor.schema.text(line)) : undefined;
+            return paragraphType.create(null, content);
+        });
+
+        const { state, dispatch } = editor.view;
+        const fragment = Fragment.fromArray(paragraphNodes);
+        const insertFrom = state.selection.from;
+        const insertedSize = fragment.size;
+        const tr = state.tr.replaceSelection(new Slice(fragment, 0, 0));
+        const selectionPos = Math.min(insertFrom + insertedSize, tr.doc.content.size);
+        const nextSelection = Selection.near(tr.doc.resolve(selectionPos), -1);
+        const nextTr = tr.setSelection(nextSelection).scrollIntoView();
+        dispatch(nextTr);
+        onChange?.(nextTr.doc.toJSON() as JSONContent);
+        editor.view.focus();
+        return true;
+    }, [editor, onChange]);
+
     const handleMarkdownPasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         if (!editor || !editor.isEditable || !event.clipboardData) return false;
 
@@ -1524,7 +1556,14 @@ function TiptapEditor({
         }
 
         const parsedContent = parseMarkdownToTiptapContent(text);
-        if (!parsedContent) return false;
+        if (!parsedContent) {
+            const appliedPlainText = applyPlainTextMultilinePaste(text);
+            if (!appliedPlainText) return false;
+
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+        }
 
         const applied = applyParsedMarkdownPaste(parsedContent);
         if (!applied) return false;
@@ -1532,7 +1571,7 @@ function TiptapEditor({
         event.preventDefault();
         event.stopPropagation();
         return true;
-    }, [applyParsedMarkdownPaste, editor, isSelectionInLeadingTaskItemState]);
+    }, [applyParsedMarkdownPaste, applyPlainTextMultilinePaste, editor, isSelectionInLeadingTaskItemState]);
 
     const handleImagePasteCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         const directImageFiles = extractImageFilesFromClipboard(event.clipboardData);
