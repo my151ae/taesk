@@ -10,9 +10,13 @@ import { useNotificationsStore } from '@/app/(board)/_stores/notifications-store
 
 type NotificationsBellProps = {
   onOpenNotificationsPanel?: () => void;
+  badgeTestId?: string;
 };
 
-export default function NotificationsBell({ onOpenNotificationsPanel }: NotificationsBellProps) {
+export default function NotificationsBell({
+  onOpenNotificationsPanel,
+  badgeTestId = "notification-badge",
+}: NotificationsBellProps) {
   const { user } = useAuth();
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const {
@@ -147,7 +151,7 @@ export default function NotificationsBell({ onOpenNotificationsPanel }: Notifica
         </svg>
         {unreadCount > 0 && (
           <span
-            data-testid="notification-badge"
+            data-testid={badgeTestId}
             className="absolute right-[0.1rem] top-[0.1rem] z-10 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white"
           >
             {unreadCount}

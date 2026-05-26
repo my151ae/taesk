@@ -641,7 +641,10 @@ export default function TimelineHeader({
                     >
                         Today
                     </button>
-                    <NotificationsBell onOpenNotificationsPanel={onOpenNotificationsPanel} />
+                    <NotificationsBell
+                        onOpenNotificationsPanel={onOpenNotificationsPanel}
+                        badgeTestId="mobile-notification-badge"
+                    />
                     <div ref={mobileActionsRef} className="relative z-[130]">
                     <button
                         ref={mobileActionsButtonRef}

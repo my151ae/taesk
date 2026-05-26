@@ -85,3 +85,4 @@ test-*.log
 *.temp
 *.swp
 *~
+.vercel
