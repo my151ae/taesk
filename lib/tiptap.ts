@@ -401,6 +401,7 @@ export const serializeTiptapSliceToMarkdown = (slice: Slice): string => {
 const headingPattern = /^(#{1,3})\s+(.+)$/;
 const childCardPattern = /^- \[card\]\s+\[(.+)\]\((\/c\/[^)\s]+)\)$/;
 const taskPattern = /^- \[([ xX])\]\s+(.*)$/;
+const taskLinePattern = /^(\s*)- \[([ xX])\]\s+(.*)$/;
 const bulletPattern = /^- (?!\[[ xX]\]\s)(.+)$/;
 const orderedPattern = /^(\d+)\.\s+(.*)$/;
 const imagePattern = /^!\[(.*)\]\((.+)\)$/;
@@ -506,6 +507,64 @@ const parseDetailsBlocksFromMarkdown = (markdown: string): JSONContent | null =>
   };
 };
 
+const getMarkdownIndentWidth = (value: string): number => value.replace(/\t/g, "  ").length;
+
+const parseTaskListBlock = (lines: string[], startIndex: number): { node: JSONContent; nextIndex: number } | null => {
+  const firstMatch = lines[startIndex]?.match(taskLinePattern);
+  if (!firstMatch || getMarkdownIndentWidth(firstMatch[1]) !== 0) return null;
+
+  const root: JSONContent = { type: "taskList", content: [] };
+  const stack: Array<{ indent: number; list: JSONContent }> = [{ indent: 0, list: root }];
+  let index = startIndex;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) break;
+
+    const match = line.match(taskLinePattern);
+    if (!match) break;
+
+    const indent = getMarkdownIndentWidth(match[1]);
+    const checked = match[2].toLowerCase() === "x";
+    const text = match[3].trim();
+
+    while (stack.length > 1 && indent < stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+
+    let target = stack[stack.length - 1];
+    if (indent > target.indent) {
+      const parentItems = target.list.content ?? [];
+      const parentItem = parentItems[parentItems.length - 1];
+      if (!parentItem) return null;
+
+      const nestedList: JSONContent = { type: "taskList", content: [] };
+      parentItem.content = [...(parentItem.content ?? []), nestedList];
+      target = { indent, list: nestedList };
+      stack.push(target);
+    } else if (indent !== target.indent) {
+      return null;
+    }
+
+    target.list.content = [
+      ...(target.list.content ?? []),
+      {
+        type: "taskItem",
+        attrs: { checked },
+        content: [
+          {
+            type: "paragraph",
+            content: createInlineContent(text),
+          },
+        ],
+      },
+    ];
+    index += 1;
+  }
+
+  return (root.content?.length ?? 0) > 0 ? { node: root, nextIndex: index } : null;
+};
+
 const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
   const normalized = normalizeMarkdownInput(markdown);
   if (!normalized) {
@@ -609,24 +668,12 @@ const parseMarkdownToResult = (markdown: string): MarkdownParseResult => {
     }
 
     if (taskPattern.test(line)) {
-      const taskItems: JSONContent[] = [];
-      while (index < lines.length) {
-        const currentLine = lines[index];
-        const match = currentLine.match(taskPattern);
-        if (!match || hasTopLevelIndent(currentLine)) break;
-        taskItems.push({
-          type: "taskItem",
-          attrs: { checked: match[1].toLowerCase() === "x" },
-          content: [
-            {
-              type: "paragraph",
-              content: createInlineContent(match[2].trim()),
-            },
-          ],
-        });
-        index += 1;
+      const taskList = parseTaskListBlock(lines, index);
+      if (!taskList) {
+        return { kind: "fallback", reason: "unsupported-structure" };
       }
-      blocks.push({ type: "taskList", content: taskItems });
+      blocks.push(taskList.node);
+      index = taskList.nextIndex;
       continue;
     }
 
@@ -713,6 +760,28 @@ export const parseMarkdownToTiptapContent = (markdown: string): JSONContent | nu
   return result.kind === "parsed" ? result.content : null;
 };
 
+export const buildTiptapContentFromPlainTextPaste = (text: string): JSONContent => {
+  const parsedContent = parseMarkdownToTiptapContent(text);
+  if (parsedContent) {
+    return parsedContent;
+  }
+
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const groups = normalized
+    .replace(/^\n+|\n+$/g, "")
+    .split(/\n{2,}/)
+    .map((group) => group.split("\n"))
+    .filter((group) => group.some((line) => line.trim().length > 0));
+  if (groups.length === 0) {
+    return EMPTY_DOC;
+  }
+
+  return {
+    type: "doc",
+    content: groups.map((group) => createParagraphBlock(group)),
+  };
+};
+
 /**
  * 段落・リスト・チェックボックスを含むテキスト抽出（改行保持）。
  * taskItem は `[ ]` / `[x]` をプレフィックスしてカード上で視覚化する。
@@ -788,12 +857,52 @@ export const deriveTitleFromBody = (content: JSONContent): string => {
   return "";
 };
 
+export const sanitizePastedTitleLine = (line: string): string => {
+  let normalized = line.trim();
+
+  const childCardMatch = normalized.match(childCardPattern);
+  if (childCardMatch) {
+    return clampText(childCardMatch[1].trim(), MAX_TITLE_LENGTH);
+  }
+
+  const imageMatch = normalized.match(imagePattern);
+  if (imageMatch) {
+    return clampText(imageMatch[1].trim(), MAX_TITLE_LENGTH);
+  }
+
+  normalized = normalized
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^>\s+/, "")
+    .replace(/^[-*+]\s+\[[ xX]\]\s+/, "")
+    .replace(/^\d+[.)]\s+\[[ xX]\]\s+/, "")
+    .replace(/^[-*+]\s+/, "")
+    .replace(/^\d+[.)]\s+/, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .trim();
+
+  let previous = "";
+  while (previous !== normalized) {
+    previous = normalized;
+    normalized = normalized
+      .replace(/^\*\*(.+)\*\*$/, "$1")
+      .replace(/^__(.+)__$/, "$1")
+      .replace(/^\*(.+)\*$/, "$1")
+      .replace(/^_(.+)_$/, "$1")
+      .replace(/^~~(.+)~~$/, "$1")
+      .replace(/^`(.+)`$/, "$1")
+      .trim();
+  }
+
+  return clampText(normalized, MAX_TITLE_LENGTH);
+};
+
 /**
  * ペーストされたテキストをタイトル（1行目）と本文（2行目以降）に分割する。
  */
 export const splitPastedText = (text: string): { title: string; bodyLines: string[] } => {
   const lines = text.split(/\r\n|\r|\n/);
-  const title = lines[0]?.trim() || "";
+  const title = sanitizePastedTitleLine(lines[0] ?? "");
   const bodyLines = lines.slice(1);
   return { title, bodyLines };
 };

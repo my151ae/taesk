@@ -583,6 +583,58 @@ test.describe('Markdown serializer helpers', () => {
     });
   });
 
+  test('parses nested markdown task lists into tiptap content', async () => {
+    expect(parseMarkdownToTiptapContent([
+      '- [ ] 親子カードかプロジェクトか',
+      '  - [ ] 上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？',
+      '  - [ ] Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？',
+    ].join('\n'))).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: '親子カードかプロジェクトか' }],
+                },
+                {
+                  type: 'taskList',
+                  content: [
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: false },
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [{ type: 'text', text: '上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？' }],
+                        },
+                      ],
+                    },
+                    {
+                      type: 'taskItem',
+                      attrs: { checked: false },
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [{ type: 'text', text: 'Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？' }],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   test('falls back for ambiguous details compat text', async () => {
     expect(parseMarkdownToTiptapContent('Summary\n\n- [x] Body')).toEqual({
       type: 'doc',
@@ -4235,6 +4287,19 @@ test.describe('@feature:timeline Timeline view', () => {
 
         await page.keyboard.press(`${selectAllModifier}+A`);
       }
+
+      await pastePlainText(page, [
+        '- [ ] 親子カードかプロジェクトか',
+        '  - [ ] 上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？',
+        '  - [ ] Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？',
+      ].join('\n'));
+      await expect(modal.locator('[data-sticky-title] textarea')).toHaveValue(initialTitle);
+      const topTaskItem = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
+      await expect(topTaskItem.locator(':scope > div > p')).toHaveText('親子カードかプロジェクトか');
+      const nestedTaskItems = topTaskItem.locator(':scope > div > ul[data-type="taskList"] > li');
+      await expect(nestedTaskItems).toHaveCount(2);
+      await expect(nestedTaskItems.nth(0).locator(':scope > div > p')).toHaveText('上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？');
+      await expect(nestedTaskItems.nth(1).locator(':scope > div > p')).toHaveText('Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？');
     } finally {
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
@@ -5251,6 +5316,167 @@ test.describe('@feature:timeline Timeline view', () => {
       await expect(secondParagraph).toContainText('existing body text');
 
     } finally {
+      await supabaseAdmin.from('cards').delete().eq('id', cardId);
+    }
+  });
+
+  test('splits multiline paste in the title field into title and body', async ({ page }) => {
+    test.skip(!dueColumnsAvailable, 'due_* columns missing. Please apply supabase/migrations/20251113090000_add_due_fields.sql');
+    if (!boardContext) {
+      throw new Error('Missing board context for timeline spec');
+    }
+    if (!testUserId) {
+      throw new Error('Missing authenticated test user id for timeline spec');
+    }
+
+    const consoleErrors = attachConsoleErrorCollector(page);
+    const cardId = crypto.randomUUID();
+    const shortId = `TL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const isoDay = isoDateJst();
+    const timestamp = new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin.from('cards').insert({
+      id: cardId,
+      title: '',
+      checklist: { version: 1, lines: [] },
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [] }],
+      },
+      board_id: boardContext.boardId,
+      list_id: boardContext.listId,
+      user_id: testUserId,
+      position: 1896,
+      tags: [],
+      due_date: isoDay,
+      due_start: '15:00:00',
+      due_end: '16:00:00',
+      due_bucket: null,
+      checked: false,
+      assigned_to: null,
+      assignee_id: null,
+      assignee_ids: null,
+      short_id: shortId,
+      id_short: 5039,
+      slug: 'multiline-title-paste-test',
+      created_at: timestamp,
+      updated_at: timestamp,
+    });
+
+    expect(insertError).toBeNull();
+
+    try {
+      await page.goto(`${boardContext.canonicalPath}?card=${shortId}`);
+      const modal = cardDetailRoot(page);
+      await expect(modal).toBeVisible();
+
+      const titleInput = modal.locator('[data-sticky-title] textarea').first();
+      await expect(titleInput).toHaveValue('');
+
+      const defaultPrevented = await titleInput.evaluate((input: HTMLTextAreaElement, text) => {
+        input.focus();
+        const data = new DataTransfer();
+        data.setData('text/plain', text);
+        const event = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        });
+        input.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, '## Pasted title\n# Body heading\nBody line one\nBody line two\n\n- [x] Done');
+
+      expect(defaultPrevented).toBe(true);
+      await expect(titleInput).toHaveValue('Pasted title');
+      await expect(modal.locator('.ProseMirror > h1').first()).toHaveText('Body heading');
+      const bodyParagraph = modal.locator('.ProseMirror > p').first();
+      await expect(bodyParagraph).toContainText('Body line one');
+      await expect(bodyParagraph).toContainText('Body line two');
+      await expect(bodyParagraph.locator('br')).toHaveCount(1);
+      await expect(modal.locator('.ProseMirror > ul[data-type="taskList"] > li[data-checked="true"] p').first()).toHaveText('Done');
+
+      await expect.poll(async () => {
+        const { data, error } = await supabaseAdmin
+          .from('cards')
+          .select('title, content')
+          .eq('id', cardId)
+          .single();
+        expect(error).toBeNull();
+        return {
+          title: data?.title,
+          body: (data?.content as JSONContent | null)?.content?.map((node) => ({
+            type: node.type,
+            text: node.type === 'heading'
+              ? node.content?.[0]?.text ?? ''
+              : node.type === 'paragraph'
+                ? node.content?.map((child) => child.type === 'hardBreak' ? '\n' : child.text ?? '').join('')
+              : node.content?.[0]?.content?.[0]?.content?.[0]?.text ?? '',
+            checked: node.content?.[0]?.attrs?.checked ?? null,
+          })),
+        };
+      }, { timeout: 6000 }).toEqual({
+        title: 'Pasted title',
+        body: [
+          { type: 'heading', text: 'Body heading', checked: null },
+          { type: 'paragraph', text: 'Body line one\nBody line two', checked: null },
+          { type: 'taskList', text: 'Done', checked: true },
+        ],
+      });
+
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+      const plainPasteDefaultPrevented = await titleInput.evaluate((input: HTMLTextAreaElement, text) => {
+        input.focus();
+        input.setSelectionRange(0, input.value.length);
+        const data = new DataTransfer();
+        data.setData('text/plain', text);
+        const event = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        });
+        input.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, 'Plain title\nPlain line one\nPlain line two\n\nPlain paragraph two');
+
+      expect(plainPasteDefaultPrevented).toBe(true);
+      await expect(titleInput).toHaveValue('Plain title');
+      const plainParagraphs = modal.locator('.ProseMirror > p');
+      await expect(plainParagraphs.nth(0)).toContainText('Plain line one');
+      await expect(plainParagraphs.nth(0)).toContainText('Plain line two');
+      await expect(plainParagraphs.nth(0).locator('br')).toHaveCount(1);
+      await expect(plainParagraphs.nth(1)).toHaveText('Plain paragraph two');
+
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+      const nestedTaskDefaultPrevented = await titleInput.evaluate((input: HTMLTextAreaElement, text) => {
+        input.focus();
+        input.setSelectionRange(0, input.value.length);
+        const data = new DataTransfer();
+        data.setData('text/plain', text);
+        const event = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: data,
+        });
+        input.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, [
+        'Nested task title',
+        '- [ ] 親子カードかプロジェクトか',
+        '  - [ ] 上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？',
+        '  - [ ] Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？',
+      ].join('\n'));
+
+      expect(nestedTaskDefaultPrevented).toBe(true);
+      await expect(titleInput).toHaveValue('Nested task title');
+      const topTaskItem = modal.locator('.ProseMirror > ul[data-type="taskList"] > li').first();
+      await expect(topTaskItem.locator(':scope > div > p')).toHaveText('親子カードかプロジェクトか');
+      const nestedTaskItems = topTaskItem.locator(':scope > div > ul[data-type="taskList"] > li');
+      await expect(nestedTaskItems).toHaveCount(2);
+      await expect(nestedTaskItems.nth(0).locator(':scope > div > p')).toHaveText('上の帯状の部分を固定で表示し、それプロジェクト置き場でもある？');
+      await expect(nestedTaskItems.nth(1).locator(':scope > div > p')).toHaveText('Notion風にPageを作れて、それが子カードのタイトルにすることで親子関係にできる？');
+      consoleErrors.assertClean();
+    } finally {
+      consoleErrors.dispose();
       await supabaseAdmin.from('cards').delete().eq('id', cardId);
     }
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useMemo, useLayoutEffect, useState } from "react";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import type { Card, Board, ProfileSummary, DueBucket } from "@/lib/supabase";
 import TiptapEditor, {
     BodyEditorBridge,
@@ -10,8 +10,10 @@ import TiptapEditor, {
 } from "@/app/(board)/_components/tiptap/TiptapEditor";
 import { JSONContent } from "@tiptap/react";
 import {
+    buildTiptapContentFromPlainTextPaste,
     deriveExcerptFromContent,
     normalizeContent,
+    splitPastedText,
 } from "@/lib/tiptap";
 import { useGoogleCalendar } from "@/app/(board)/_hooks/useGoogleCalendar";
 import CardModalHeader from "@/app/components/card-modal/CardModalHeader";
@@ -44,6 +46,23 @@ const REMINDER_MINUTE_OPTIONS = [0, 5, 10, 15, 30, 60] as const;
 const SIDEBAR_DOCKED_MIN_WIDTH = 680;
 const SIDEBAR_OVERLAY_MAX_WIDTH = 384;
 const SIDEBAR_OVERLAY_REVEAL_WIDTH = 96;
+
+const isEmptyParagraphNode = (node: JSONContent | undefined): boolean =>
+    node?.type === "paragraph" && (!node.content || node.content.length === 0);
+
+const isEmptyBodyContent = (value: JSONContent): boolean =>
+    value.type === "doc" && (value.content?.length ?? 0) === 1 && isEmptyParagraphNode(value.content?.[0]);
+
+const prependNodesToBodyContent = (value: JSONContent, insertedNodes: JSONContent[]): JSONContent => {
+    const normalized = normalizeContent(value);
+    const existingNodes = normalized.content ?? [];
+    return {
+        ...normalized,
+        content: isEmptyBodyContent(normalized)
+            ? insertedNodes
+            : [...insertedNodes, ...existingNodes],
+    };
+};
 
 interface CardModalProps {
     card: Card;
@@ -170,6 +189,7 @@ export function CardModal({
 
     const bodyBridgeRef = useRef<BodyEditorBridge | null>(null);
     const latestContentRef = useRef<JSONContent>(normalizeContent(card.content));
+    const latestTitleRef = useRef(card.title || "");
     const cardPeekRootRef = useRef<HTMLElement | null>(null);
     const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
     const didFocusTitleOnOpenRef = useRef(false);
@@ -280,7 +300,7 @@ export function CardModal({
 
         const sourceContent = options?.contentOverride ?? latestContentRef.current ?? content;
         const normalizedContent = normalizeContent(sourceContent);
-        const nextTitle = title.trim();
+        const nextTitle = latestTitleRef.current.trim();
         const nextChecked = checked;
         const nextExcerpt = deriveExcerptFromContent(normalizedContent);
         const dirtyRevisionAtSaveStart = getDirtyRevision();
@@ -323,7 +343,6 @@ export function CardModal({
         card.id,
         card.board_id,
         content,
-        title,
         tags,
         dueDate,
         dueStart,
@@ -398,8 +417,13 @@ export function CardModal({
     useEffect(() => {
         const normalized = normalizeContent(card.content);
         latestContentRef.current = normalized;
+        latestTitleRef.current = card.title || "";
         setChecklistProgress({ checked: 0, total: 0 });
-    }, [card.id, card.content]);
+    }, [card.id, card.content, card.title]);
+
+    useEffect(() => {
+        latestTitleRef.current = title;
+    }, [title]);
 
     const syncActiveShortcutDescriptor = useCallback(() => {
         const isReadonly = Boolean(isLoading || isHistoryPreviewing);
@@ -496,6 +520,58 @@ export function CardModal({
         input.style.height = "auto";
         input.style.height = `${input.scrollHeight}px`;
     }, []);
+
+    const handleTitlePaste = useCallback((event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+        if (isHistoryPreviewing) return;
+
+        const plainText = event.clipboardData.getData("text/plain");
+        if (!plainText || !/[\r\n]/.test(plainText)) return;
+
+        const { title: pastedTitle, bodyLines } = splitPastedText(plainText);
+        if (bodyLines.length === 0) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const input = event.currentTarget;
+        const selectionStart = input.selectionStart ?? title.length;
+        const selectionEnd = input.selectionEnd ?? selectionStart;
+        const nextTitle = `${title.slice(0, selectionStart)}${pastedTitle}${title.slice(selectionEnd)}`.replace(/\r/g, "");
+        const pastedBodyText = bodyLines.join("\n");
+
+        markFieldDirty("title");
+        latestTitleRef.current = nextTitle;
+        setTitle(nextTitle);
+        const insertedIntoEditor = bodyBridgeRef.current?.insertPlainTextAtStart(pastedBodyText) ?? false;
+        if (!insertedIntoEditor) {
+            const pastedBodyContent = buildTiptapContentFromPlainTextPaste(pastedBodyText);
+            const nextContent = prependNodesToBodyContent(latestContentRef.current ?? content, pastedBodyContent.content ?? []);
+            markFieldDirty("content");
+            setContent(nextContent);
+            latestContentRef.current = nextContent;
+            triggerAutoSave(nextContent);
+        }
+        if (editorError) {
+            setEditorError(null);
+        }
+
+        requestAnimationFrame(() => {
+            const nextPosition = selectionStart + pastedTitle.length;
+            input.setSelectionRange(nextPosition, nextPosition);
+            resizeTitleInput();
+        });
+    }, [
+        content,
+        editorError,
+        isHistoryPreviewing,
+        markFieldDirty,
+        resizeTitleInput,
+        setContent,
+        setEditorError,
+        setTitle,
+        title,
+        triggerAutoSave,
+    ]);
 
     useLayoutEffect(() => {
         resizeTitleInput();
@@ -1050,6 +1126,7 @@ export function CardModal({
                                             if (isHistoryPreviewing) return;
                                             const normalizedTitle = e.target.value.replace(/\r/g, "");
                                             markFieldDirty("title");
+                                            latestTitleRef.current = normalizedTitle;
                                             setTitle(normalizedTitle);
                                             triggerAutoSave();
                                         }}
@@ -1063,6 +1140,7 @@ export function CardModal({
                                             titleIsComposingRef.current = false;
                                             flushPendingAutoSave();
                                         }}
+                                        onPaste={handleTitlePaste}
                                         onKeyDown={handleTitleKeyDown}
                                         placeholder="タイトルなし"
                                         className="min-h-[1lh] min-w-0 basis-0 flex-1 resize-none overflow-hidden bg-transparent border-none p-0 text-xl font-bold leading-tight text-slate-900 break-words dark:text-gray-100 placeholder-slate-400 focus:ring-0 focus:outline-none disabled:opacity-60"

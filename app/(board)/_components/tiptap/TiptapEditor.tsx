@@ -14,7 +14,7 @@ import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-detai
 import styles from './TiptapEditor.module.css';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
-import { buildDefaultBodyContent, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
+import { buildDefaultBodyContent, buildTiptapContentFromPlainTextPaste, parseMarkdownToTiptapContent, serializeTiptapSliceToMarkdown } from '@/lib/tiptap';
 import {
     CARD_IMAGE_MAX_BYTES,
     applySignedUrlsToContent,
@@ -157,6 +157,7 @@ export type FocusTitleRequest = {
 export type BodyEditorBridge = {
     focusBody: (offset?: number | null) => void;
     insertLeadingParagraphAndFocus: () => boolean;
+    insertPlainTextAtStart: (text: string) => boolean;
     clearExpandedHiddenRuns: () => void;
 };
 
@@ -1423,6 +1424,37 @@ function TiptapEditor({
         return true;
     }, [editor, emitForcedDocChange]);
 
+    const insertPlainTextAtStart = useCallback((text: string): boolean => {
+        if (!editor || !editor.isEditable) return false;
+
+        const parsedContent = buildTiptapContentFromPlainTextPaste(text);
+        const contentNodes = parsedContent.content ?? [];
+        if (contentNodes.length === 0) return false;
+
+        let fragment: Fragment;
+        try {
+            fragment = Fragment.fromArray(contentNodes.map((node) => editor.schema.nodeFromJSON(node)));
+        } catch {
+            return false;
+        }
+
+        const { state, dispatch } = editor.view;
+        const isDefaultEmptyDoc =
+            state.doc.childCount === 1 &&
+            state.doc.firstChild?.type.name === 'paragraph' &&
+            state.doc.firstChild.content.size === 0;
+        const tr = isDefaultEmptyDoc
+            ? state.tr.replaceWith(0, state.doc.content.size, fragment)
+            : state.tr.insert(0, fragment);
+        const selectionPos = Math.min(fragment.size, tr.doc.content.size);
+        const nextTr = tr.setSelection(Selection.near(tr.doc.resolve(selectionPos), -1)).scrollIntoView();
+
+        dispatch(nextTr);
+        emitForcedDocChange(editor, nextTr.doc);
+        editor.view.focus();
+        return true;
+    }, [editor, emitForcedDocChange]);
+
     const clearExpandedHiddenRuns = useCallback(() => {
         if (!editor) return;
         editor.view.dispatch(clearExpandedHiddenRunsMeta(editor.state.tr));
@@ -1439,13 +1471,14 @@ function TiptapEditor({
         onRegisterBodyBridge({
             focusBody: (offset?: number | null) => focusBody(offset),
             insertLeadingParagraphAndFocus,
+            insertPlainTextAtStart,
             clearExpandedHiddenRuns,
         });
 
         return () => {
             onRegisterBodyBridge(null);
         };
-    }, [clearExpandedHiddenRuns, editor, focusBody, insertLeadingParagraphAndFocus, onRegisterBodyBridge]);
+    }, [clearExpandedHiddenRuns, editor, focusBody, insertLeadingParagraphAndFocus, insertPlainTextAtStart, onRegisterBodyBridge]);
 
     const handleCopyCapture = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
         if (!editor || !event.clipboardData || !editor.isEditable) return;
@@ -1519,31 +1552,18 @@ function TiptapEditor({
         const normalized = text.replace(/\r\n?/g, '\n');
         if (!normalized.includes('\n')) return false;
 
-        const groups = normalized
-            .replace(/^\n+|\n+$/g, '')
-            .split(/\n{2,}/)
-            .map((group) => group.split('\n'))
-            .filter((group) => group.some((line) => line.trim().length > 0));
-        if (groups.length === 0) return false;
+        const parsedContent = buildTiptapContentFromPlainTextPaste(text);
+        const contentNodes = parsedContent.content ?? [];
+        if (contentNodes.length === 0) return false;
 
-        const paragraphType = editor.schema.nodes.paragraph;
-        const hardBreakType = editor.schema.nodes.hardBreak;
-        if (!paragraphType || !hardBreakType) return false;
-
-        const paragraphNodes = groups.map((group) => {
-            const inlineNodes = group.flatMap((line, index) => {
-                const nodes = index > 0 ? [hardBreakType.create()] : [];
-                if (line.length > 0) {
-                    nodes.push(editor.schema.text(line));
-                }
-                return nodes;
-            });
-            const content = inlineNodes.length > 0 ? Fragment.fromArray(inlineNodes) : undefined;
-            return paragraphType.create(null, content);
-        });
+        let fragment: Fragment;
+        try {
+            fragment = Fragment.fromArray(contentNodes.map((node) => editor.schema.nodeFromJSON(node)));
+        } catch {
+            return false;
+        }
 
         const { state, dispatch } = editor.view;
-        const fragment = Fragment.fromArray(paragraphNodes);
         const insertFrom = state.selection.from;
         const insertedSize = fragment.size;
         const tr = state.tr.replaceSelection(new Slice(fragment, 0, 0));
