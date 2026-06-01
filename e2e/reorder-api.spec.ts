@@ -3,17 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from '@/lib/board-utils';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
-const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
-const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
+const E2E_SECRET = process.env.E2E_SECRET;
+const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL;
 const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
-const API_HEADERS = { 'x-e2e-secret': E2E_SECRET } as const;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error('Missing Supabase admin credentials for reorder-api.spec.ts');
+if (!supabaseUrl || !serviceRoleKey || !E2E_SECRET || !TEST_USER_EMAIL) {
+  throw new Error('Missing Supabase admin credentials, E2E_SECRET, or E2E_USER_EMAIL for reorder-api.spec.ts');
 }
+
+const API_HEADERS = { 'x-e2e-secret': E2E_SECRET } as const;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },

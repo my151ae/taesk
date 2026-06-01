@@ -16,7 +16,7 @@ begin
 
   -- If not set in config, use the default Supabase project URL
   if edge_function_url is null or edge_function_url = '/functions/v1/send-push-notification' then
-    edge_function_url := 'https://your-project-ref.supabase.co/functions/v1/send-push-notification';
+    raise exception 'app.settings.edge_function_url must be configured before installing notification push trigger';
   end if;
 
   -- Build payload for Edge Function

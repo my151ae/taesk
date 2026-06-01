@@ -4,15 +4,15 @@ import { createUniqueBoardShortId, getNextBoardIdShort, slugifyBoardName } from 
 import { createClient } from '@supabase/supabase-js';
 import { resolveTestUserId as resolveAuthUserId } from './helpers/timeline-fixtures';
 
-const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app';
+const TEST_USER_EMAIL = process.env.E2E_USER_EMAIL;
 const MOCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001';
 const MAIN_TEST_BOARD_ID = '00000000-0000-0000-0000-000000000001';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error('Missing Supabase admin credentials for board-permissions.spec.ts');
+if (!supabaseUrl || !serviceRoleKey || !TEST_USER_EMAIL) {
+  throw new Error('Missing Supabase admin credentials or E2E_USER_EMAIL for board-permissions.spec.ts');
 }
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {

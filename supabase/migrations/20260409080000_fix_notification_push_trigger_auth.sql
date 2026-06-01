@@ -19,13 +19,13 @@ begin
   edge_function_url := current_setting('app.settings.supabase_url', true) || '/functions/v1/send-push-notification';
 
   if edge_function_url is null or edge_function_url = '/functions/v1/send-push-notification' then
-    edge_function_url := 'https://your-project-ref.supabase.co/functions/v1/send-push-notification';
+    raise exception 'app.settings.edge_function_url must be configured before installing notification push trigger';
   end if;
 
   auth_token := nullif(current_setting('app.settings.anon_key', true), '');
 
   if auth_token is null then
-    auth_token := 'redacted-jwt';
+    raise exception 'app.settings.anon_key must be configured before installing notification push trigger';
   end if;
 
   payload := json_build_object(

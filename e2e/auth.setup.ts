@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com';
-const testPassword = process.env.TEST_USER_PASSWORD || 'replace-with-local-test-password';
+const testEmail = process.env.TEST_USER_EMAIL;
+const testPassword = process.env.TEST_USER_PASSWORD;
+
+if (!testEmail || !testPassword) {
+  throw new Error('Missing TEST_USER_EMAIL or TEST_USER_PASSWORD for auth.setup.ts');
+}
 
 // Auth state files
 const authFile = 'playwright/.auth/user.json';

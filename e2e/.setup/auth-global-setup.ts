@@ -22,18 +22,22 @@ if (fs.existsSync(envPath)) {
 }
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
-const E2E_SECRET = process.env.E2E_SECRET || 'redacted-e2e-secret';
+const E2E_SECRET = process.env.E2E_SECRET;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  throw new Error('Missing Supabase admin credentials for auth-global-setup');
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !E2E_SECRET) {
+  throw new Error('Missing Supabase admin credentials or E2E_SECRET for auth-global-setup');
 }
 
 const TEST_USER = {
-  email: process.env.E2E_USER_EMAIL || 'e2e-test@taesk.app',
-  password: process.env.E2E_USER_PASSWORD || 'replace-with-local-test-password',
+  email: process.env.E2E_USER_EMAIL,
+  password: process.env.E2E_USER_PASSWORD,
 };
+
+if (!TEST_USER.email || !TEST_USER.password) {
+  throw new Error('Missing E2E_USER_EMAIL or E2E_USER_PASSWORD for auth-global-setup');
+}
 
 /**
  * Global Setup for E2E Tests

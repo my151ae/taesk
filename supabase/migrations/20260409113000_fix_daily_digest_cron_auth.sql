@@ -23,20 +23,11 @@ BEGIN
     '*/5 * * * *',
     $cron$
       SELECT net.http_post(
-        url := COALESCE(
-          NULLIF(current_setting('app.settings.supabase_url', true), ''),
-          'https://your-project-ref.supabase.co'
-        ) || '/functions/v1/dispatch-daily-digests',
+        url := NULLIF(current_setting('app.settings.supabase_url', true), '') || '/functions/v1/dispatch-daily-digests',
         headers := jsonb_build_object(
           'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || COALESCE(
-            NULLIF(current_setting('app.settings.anon_key', true), ''),
-            'redacted-jwt'
-          ),
-          'apikey', COALESCE(
-            NULLIF(current_setting('app.settings.anon_key', true), ''),
-            'redacted-jwt'
-          ),
+          'Authorization', 'Bearer ' || NULLIF(current_setting('app.settings.anon_key', true), ''),
+          'apikey', NULLIF(current_setting('app.settings.anon_key', true), ''),
           'X-Cron-Secret', public.get_cron_secret()
         ),
         body := '{}'::jsonb

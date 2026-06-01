@@ -7,14 +7,14 @@ import {
   slugifyBoardName,
 } from "@/lib/board-utils";
 
-export const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? "e2e-test@taesk.app";
+export const TEST_USER_EMAIL = process.env.E2E_TEST_EMAIL ?? process.env.E2E_USER_EMAIL;
 export const MAIN_TEST_BOARD_ID = "00000000-0000-0000-0000-000000000001";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("Missing Supabase admin credentials for timeline fixtures");
+if (!supabaseUrl || !serviceRoleKey || !TEST_USER_EMAIL) {
+  throw new Error("Missing Supabase admin credentials or E2E user email for timeline fixtures");
 }
 
 export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
