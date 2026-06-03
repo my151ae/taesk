@@ -59,6 +59,7 @@ Desktop.ini
 !.claude/settings.json
 
 # MCP (Model Context Protocol) local files
+.codex/
 .mcp.json
 .mcp-local.json
 .serena/
