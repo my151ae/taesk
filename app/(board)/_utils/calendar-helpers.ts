@@ -31,7 +31,7 @@ export const buildCalendarEntriesByDay = (
   const utcDateToIso = (ms: number) => new Date(ms).toISOString().split("T")[0];
 
   googleCalendarEvents.forEach((event) => {
-    const baseId = event.id || `gcal-${event.start}`;
+    const baseId = event.eventKey || event.id || `gcal-${event.start}`;
 
     if (event.isAllDay && event.startDate && event.endDate) {
       const startMs = parseDateOnly(event.startDate);
@@ -54,6 +54,9 @@ export const buildCalendarEntriesByDay = (
               endDate: event.endDate ?? null,
               displayTz: event.displayTz ?? null,
               calendarId: event.calendarId ?? null,
+              calendarSummary: event.calendarSummary ?? null,
+              calendarBackgroundColor: event.calendarBackgroundColor ?? null,
+              calendarForegroundColor: event.calendarForegroundColor ?? null,
             };
 
             if (!allDayResult[dayIso]) allDayResult[dayIso] = [];
@@ -72,7 +75,7 @@ export const buildCalendarEntriesByDay = (
     const startMs = start.getTime();
     const endMs = end.getTime();
     let cursorMs = startMs;
-    const baseIdFallback = event.id || `gcal-${startMs}`;
+    const baseIdFallback = event.eventKey || event.id || `gcal-${startMs}`;
 
     while (cursorMs < endMs) {
       const cursor = new Date(cursorMs);
@@ -104,6 +107,9 @@ export const buildCalendarEntriesByDay = (
           endDate: event.endDate ?? null,
           displayTz: event.displayTz ?? null,
           calendarId: event.calendarId ?? null,
+          calendarSummary: event.calendarSummary ?? null,
+          calendarBackgroundColor: event.calendarBackgroundColor ?? null,
+          calendarForegroundColor: event.calendarForegroundColor ?? null,
         };
 
         const target = event.isAllDay ? allDayResult : timedResult;

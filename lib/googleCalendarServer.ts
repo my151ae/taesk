@@ -1,7 +1,11 @@
 import "server-only";
 
 import type { calendar_v3 } from "googleapis";
-import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
+import type {
+  GoogleCalendarAccessRole,
+  GoogleCalendarEvent,
+  GoogleCalendarListEntry,
+} from "@/lib/api-types/google-calendar";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   getGoogleCalendarClientForUser,
@@ -28,6 +32,7 @@ export {
 const DEFAULT_DISPLAY_TZ = "Asia/Tokyo";
 const PAST_WINDOW_DAYS = 28;   // 4 weeks
 const FUTURE_WINDOW_DAYS = 84; // 12 weeks
+const SELECTABLE_CALENDAR_ROLES = new Set<GoogleCalendarAccessRole>(["owner", "writer", "reader"]);
 
 type NormalizedGoogleEvent = GoogleCalendarEvent & {
   startUtc: string;
@@ -86,6 +91,16 @@ type CachedGoogleEventRow = {
   conference_data: Record<string, unknown> | null;
   etag: string | null;
   description: string | null;
+};
+
+type CalendarPreferenceRow = {
+  selected_calendar_ids: string[] | null;
+};
+
+type CalendarListMetadata = {
+  summary: string | null;
+  backgroundColor: string | null;
+  foregroundColor: string | null;
 };
 
 const STALE_CACHE_MS = 5 * 60 * 1000;
@@ -186,7 +201,7 @@ function mapGoogleEvent(item: calendar_v3.Schema$Event, calendarId: string): Nor
     endUtc,
     isAllDay: start.isAllDay || Boolean(item.start?.date),
     source: "google_calendar",
-    calendarId: item.organizer?.email ?? item.creator?.email ?? calendarId,
+    calendarId,
     htmlLink: item.htmlLink ?? null,
     status: item.status ?? "confirmed",
     displayTz,
@@ -319,6 +334,7 @@ async function pruneCacheWindow(
 function rowToGoogleCalendarEvent(row: CachedGoogleEventRow): GoogleCalendarEvent {
   return {
     id: row.google_event_id,
+    eventKey: `${row.calendar_id ?? "primary"}:${row.google_event_id}`,
     title: row.summary ?? "Untitled event",
     start: row.start_utc,
     end: row.end_utc,
@@ -337,6 +353,21 @@ function rowToGoogleCalendarEvent(row: CachedGoogleEventRow): GoogleCalendarEven
     conferenceData: row.conference_data,
     etag: row.etag,
     description: row.description,
+  };
+}
+
+function withCalendarMetadata(
+  event: GoogleCalendarEvent,
+  calendarId: string,
+  metadata?: CalendarListMetadata | null
+): GoogleCalendarEvent {
+  return {
+    ...event,
+    eventKey: `${calendarId}:${event.id}`,
+    calendarId,
+    calendarSummary: metadata?.summary ?? event.calendarSummary ?? null,
+    calendarBackgroundColor: metadata?.backgroundColor ?? event.calendarBackgroundColor ?? null,
+    calendarForegroundColor: metadata?.foregroundColor ?? event.calendarForegroundColor ?? null,
   };
 }
 
@@ -457,17 +488,25 @@ async function fetchAndCacheRange(
   const expandedStart = new Date(Math.min(start.getTime(), now.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000));
   const expandedEnd = new Date(Math.max(end.getTime(), now.getTime() + FUTURE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
 
-  const response = await calendar.events.list({
-    calendarId,
-    timeMin: expandedStart.toISOString(),
-    timeMax: expandedEnd.toISOString(),
-    singleEvents: true,
-    showDeleted: true,
-    orderBy: "startTime",
-    maxResults: 2500,
-  });
+  const items: calendar_v3.Schema$Event[] = [];
+  let pageToken: string | undefined;
+  let nextSyncToken: string | undefined;
+  do {
+    const response = await calendar.events.list({
+      calendarId,
+      timeMin: expandedStart.toISOString(),
+      timeMax: expandedEnd.toISOString(),
+      singleEvents: true,
+      showDeleted: true,
+      orderBy: "startTime",
+      maxResults: 2500,
+      pageToken,
+    });
+    items.push(...(response.data.items ?? []));
+    pageToken = response.data.nextPageToken ?? undefined;
+    nextSyncToken = response.data.nextSyncToken ?? nextSyncToken;
+  } while (pageToken);
 
-  const items = response.data.items ?? [];
   const normalizedEventsAll = items
     .map((item) => mapGoogleEvent(item, calendarId))
     .filter((event): event is NormalizedGoogleEvent => Boolean(event));
@@ -482,7 +521,6 @@ async function fetchAndCacheRange(
 
   await removeCancelledEvents(supabase, accountId, calendarId, normalizedEventsAll);
 
-  const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
     await persistSyncState(supabase, accountId, calendarId, {
       syncToken: nextSyncToken,
@@ -512,15 +550,23 @@ async function fetchWithSyncToken(
   syncToken: string
 ): Promise<NormalizedGoogleEvent[]> {
   const now = new Date();
-  const response = await calendar.events.list({
-    calendarId,
-    syncToken,
-    showDeleted: true,
-    maxResults: 2500,
-    singleEvents: true,
-  });
+  const items: calendar_v3.Schema$Event[] = [];
+  let pageToken: string | undefined;
+  let nextSyncToken: string | undefined;
+  do {
+    const response = await calendar.events.list({
+      calendarId,
+      syncToken,
+      showDeleted: true,
+      maxResults: 2500,
+      singleEvents: true,
+      pageToken,
+    });
+    items.push(...(response.data.items ?? []));
+    pageToken = response.data.nextPageToken ?? undefined;
+    nextSyncToken = response.data.nextSyncToken ?? nextSyncToken;
+  } while (pageToken);
 
-  const items = response.data.items ?? [];
   const normalizedEventsAll = items
     .map((item) => mapGoogleEvent(item, calendarId))
     .filter((event): event is NormalizedGoogleEvent => Boolean(event));
@@ -535,7 +581,6 @@ async function fetchWithSyncToken(
 
   await removeCancelledEvents(supabase, accountId, calendarId, normalizedEventsAll);
 
-  const nextSyncToken = response.data.nextSyncToken;
   if (nextSyncToken) {
     await persistSyncState(supabase, accountId, calendarId, {
       syncToken: nextSyncToken,
@@ -600,6 +645,200 @@ async function markWatchHeartbeat(
     .eq("calendar_id", state.calendar_id);
 }
 
+function normalizeAccessRole(value?: string | null): GoogleCalendarAccessRole {
+  if (
+    value === "none" ||
+    value === "freeBusyReader" ||
+    value === "reader" ||
+    value === "writer" ||
+    value === "owner"
+  ) {
+    return value;
+  }
+  return "none";
+}
+
+function dedupeCalendarIds(ids: string[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  ids.forEach((id) => {
+    const trimmed = id.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    result.push(trimmed);
+  });
+  return result;
+}
+
+function buildCalendarMetadataMap(calendars: GoogleCalendarListEntry[]) {
+  return new Map<string, CalendarListMetadata>(
+    calendars.map((entry) => [
+      entry.id,
+      {
+        summary: entry.summary,
+        backgroundColor: entry.backgroundColor,
+        foregroundColor: entry.foregroundColor,
+      },
+    ])
+  );
+}
+
+async function getStoredSelectedCalendarIds(
+  supabase: SupabaseClient,
+  userId: string,
+  accountId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("google_calendar_preferences")
+    .select("selected_calendar_ids")
+    .eq("user_id", userId)
+    .eq("google_account_id", accountId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[googleCalendar] failed to load preferences", error);
+    return ["primary"];
+  }
+
+  const row = data as CalendarPreferenceRow | null;
+  const ids = Array.isArray(row?.selected_calendar_ids) ? row.selected_calendar_ids : [];
+  return ids.length ? dedupeCalendarIds(ids) : ["primary"];
+}
+
+export async function listGoogleCalendarCandidatesForUser(
+  userId: string,
+  options?: { supabase?: SupabaseClient; redirectUri?: string }
+): Promise<{
+  accountId: string;
+  canWrite: boolean;
+  selectedCalendarIds: string[];
+  calendars: GoogleCalendarListEntry[];
+}> {
+  const supabase = options?.supabase ?? await createServerSupabaseClient();
+  const { calendar, account } = await getGoogleCalendarClientForUser(userId, {
+    supabase,
+    redirectUri: options?.redirectUri,
+  });
+
+  const storedSelectedIds = await getStoredSelectedCalendarIds(supabase, userId, account.id);
+  const storedSelectedSet = new Set(storedSelectedIds);
+  const entries: calendar_v3.Schema$CalendarListEntry[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const response = await calendar.calendarList.list({
+      showHidden: true,
+      maxResults: 250,
+      pageToken,
+    });
+    entries.push(...(response.data.items ?? []));
+    pageToken = response.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  const calendars = entries
+    .filter((entry) => Boolean(entry.id))
+    .map((entry): GoogleCalendarListEntry => {
+      const id = entry.id ?? "primary";
+      const accessRole = normalizeAccessRole(entry.accessRole);
+      const selectable = SELECTABLE_CALENDAR_ROLES.has(accessRole);
+      return {
+        id,
+        summary: entry.summary ?? id,
+        primary: Boolean(entry.primary),
+        hidden: Boolean(entry.hidden),
+        googleSelected: Boolean(entry.selected),
+        appSelected: storedSelectedSet.has(id) || (id === "primary" && storedSelectedSet.has("primary")),
+        accessRole,
+        selectable,
+        backgroundColor: entry.backgroundColor ?? null,
+        foregroundColor: entry.foregroundColor ?? null,
+      };
+    });
+
+  const selectableIds = new Set(calendars.filter((entry) => entry.selectable).map((entry) => entry.id));
+  const selectedCalendarIds = storedSelectedIds.filter((id) => selectableIds.has(id));
+  const primaryCalendar = calendars.find((entry) => entry.primary && entry.selectable);
+  const normalizedSelection = selectedCalendarIds.length
+    ? selectedCalendarIds
+    : primaryCalendar
+      ? [primaryCalendar.id]
+      : [];
+
+  const normalizedSet = new Set(normalizedSelection);
+  const normalizedCalendars = calendars.map((entry) => ({
+    ...entry,
+    appSelected: normalizedSet.has(entry.id),
+  }));
+
+  return {
+    accountId: account.id,
+    canWrite: hasCalendarWritePermission(account.scope),
+    selectedCalendarIds: normalizedSelection,
+    calendars: normalizedCalendars,
+  };
+}
+
+export async function saveGoogleCalendarSelectionForUser(
+  userId: string,
+  selectedCalendarIds: string[],
+  options?: { supabase?: SupabaseClient; redirectUri?: string }
+): Promise<{
+  accountId: string;
+  selectedCalendarIds: string[];
+  calendars: GoogleCalendarListEntry[];
+}> {
+  const supabase = options?.supabase ?? await createServerSupabaseClient();
+  const candidates = await listGoogleCalendarCandidatesForUser(userId, {
+    supabase,
+    redirectUri: options?.redirectUri,
+  });
+  const requested = new Set(dedupeCalendarIds(selectedCalendarIds));
+  const allowed = candidates.calendars
+    .filter((entry) => entry.selectable && requested.has(entry.id))
+    .map((entry) => entry.id);
+
+  if (!allowed.length) {
+    const error = new Error("At least one selectable Google Calendar must be selected");
+    error.name = "GoogleCalendarSelectionEmptyError";
+    throw error;
+  }
+
+  const { error } = await supabase
+    .from("google_calendar_preferences")
+    .upsert({
+      user_id: userId,
+      google_account_id: candidates.accountId,
+      selected_calendar_ids: allowed,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,google_account_id" });
+
+  if (error) {
+    console.error("[googleCalendar] failed to save preferences", error);
+    throw error;
+  }
+
+  const selectedSet = new Set(allowed);
+  return {
+    accountId: candidates.accountId,
+    selectedCalendarIds: allowed,
+    calendars: candidates.calendars.map((entry) => ({
+      ...entry,
+      appSelected: selectedSet.has(entry.id),
+    })),
+  };
+}
+
+export async function getSelectedGoogleCalendarsForUser(
+  userId: string,
+  options?: { supabase?: SupabaseClient; redirectUri?: string }
+) {
+  const result = await listGoogleCalendarCandidatesForUser(userId, options);
+  return {
+    ...result,
+    metadataByCalendarId: buildCalendarMetadataMap(result.calendars),
+  };
+}
+
 export async function syncGoogleCalendarToTaesk(
   userId: string,
   calendarId?: string,
@@ -646,6 +885,7 @@ export async function listEventsForRange(
     origin?: string;
     webhookAddress?: string;
     syncCardsOnFetch?: boolean;
+    calendarMetadata?: CalendarListMetadata | null;
   }
 ): Promise<{ events: GoogleCalendarEvent[]; canWrite: boolean }> {
   const supabase = options?.supabase ?? await createServerSupabaseClient();
@@ -723,7 +963,8 @@ export async function listEventsForRange(
         defaultDisplayTz: DEFAULT_DISPLAY_TZ,
       });
     }
-    const cached = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+    const cached = (await fetchCachedEvents(supabase, account.id, calendarId, start, end))
+      .map((event) => withCalendarMetadata(event, calendarId, options?.calendarMetadata));
     const canWriteCached = hasCalendarWritePermission(account.scope);
     return { events: cached, canWrite: canWriteCached };
   }
@@ -740,7 +981,8 @@ export async function listEventsForRange(
     });
   }
 
-  const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+  const events = (await fetchCachedEvents(supabase, account.id, calendarId, start, end))
+    .map((event) => withCalendarMetadata(event, calendarId, options?.calendarMetadata));
   const canWrite = hasCalendarWritePermission(account.scope);
 
   return { events, canWrite };
@@ -750,12 +992,13 @@ export async function listCachedEventsForRange(
   userId: string,
   start: Date,
   end: Date,
-  options?: { calendarId?: string; supabase?: SupabaseClient }
+  options?: { calendarId?: string; supabase?: SupabaseClient; calendarMetadata?: CalendarListMetadata | null }
 ): Promise<{ events: GoogleCalendarEvent[]; canWrite: boolean }> {
   const supabase = options?.supabase ?? await createServerSupabaseClient();
   const { account } = await getGoogleCalendarClientForUser(userId, { supabase });
   const calendarId = options?.calendarId ?? "primary";
-  const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+  const events = (await fetchCachedEvents(supabase, account.id, calendarId, start, end))
+    .map((event) => withCalendarMetadata(event, calendarId, options?.calendarMetadata));
   const canWrite = hasCalendarWritePermission(account.scope);
   return { events, canWrite };
 }
@@ -764,7 +1007,7 @@ export async function listCachedEventsForRangeDbOnly(
   userId: string,
   start: Date,
   end: Date,
-  options?: { calendarId?: string; supabase?: SupabaseClient }
+  options?: { calendarId?: string; supabase?: SupabaseClient; calendarMetadata?: CalendarListMetadata | null }
 ): Promise<{
   connected: boolean;
   events: GoogleCalendarEvent[];
@@ -799,7 +1042,8 @@ export async function listCachedEventsForRangeDbOnly(
   const calendarId = options?.calendarId ?? "primary";
   const syncState = await getSyncState(supabase, account.id, calendarId);
   const lastSyncedAt = syncState?.last_synced_at ?? null;
-  const events = await fetchCachedEvents(supabase, account.id, calendarId, start, end);
+  const events = (await fetchCachedEvents(supabase, account.id, calendarId, start, end))
+    .map((event) => withCalendarMetadata(event, calendarId, options?.calendarMetadata));
 
   return {
     connected: true,

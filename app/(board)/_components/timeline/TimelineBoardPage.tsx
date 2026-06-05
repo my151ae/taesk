@@ -1025,7 +1025,12 @@ function TimelineBoardPageContent({
     googleCalendarStatus,
     googleCalendarBackgroundStatus,
     googleCalendarError,
+    googleCalendars,
+    selectedGoogleCalendarIds,
+    googleCalendarPartialErrors,
+    googleCalendarSelectionStatus,
     refreshGoogleCalendar,
+    updateGoogleCalendarSelection,
   } = useTimelineCalendar({
     calendarPreset,
     windowStartIso: activeCalendarWindowRange.windowStartIso,
@@ -1034,13 +1039,12 @@ function TimelineBoardPageContent({
   });
 
   const googleCalendarLabel = useMemo(() => {
-    if (!googleCalendarEvents?.length) return "primary";
-    const ids = new Set<string>();
-    googleCalendarEvents.forEach((event) => {
-      if (event?.calendarId) ids.add(event.calendarId);
-    });
-    return ids.size ? Array.from(ids).sort().join(", ") : "primary";
-  }, [googleCalendarEvents]);
+    const selected = googleCalendars.filter((calendar) => selectedGoogleCalendarIds.includes(calendar.id));
+    if (selected.length === 1) return selected[0]?.summary ?? "primary";
+    if (selected.length > 1) return `${selected.length} calendars`;
+    if (googleCalendarEvents?.length) return "Google";
+    return "primary";
+  }, [googleCalendarEvents, googleCalendars, selectedGoogleCalendarIds]);
 
   const googleStatusText = useMemo(() => {
     if (googleCalendarStatus === "loading") return "Google予定同期中...";
@@ -1723,6 +1727,11 @@ function TimelineBoardPageContent({
     googleStatusText,
     googleCalendarStatus,
     googleCalendarError,
+    googleCalendars,
+    selectedGoogleCalendarIds,
+    googleCalendarPartialErrors,
+    googleCalendarSelectionStatus,
+    updateGoogleCalendarSelection,
     calendarPreset,
     setCalendarPreset,
     refreshGoogleCalendar,

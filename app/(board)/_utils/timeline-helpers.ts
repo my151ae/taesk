@@ -14,6 +14,9 @@ export type ExternalCalendarEntry = {
     endDate?: string | null;
     displayTz?: string | null;
     calendarId?: string | null;
+    calendarSummary?: string | null;
+    calendarBackgroundColor?: string | null;
+    calendarForegroundColor?: string | null;
 };
 
 // Constants

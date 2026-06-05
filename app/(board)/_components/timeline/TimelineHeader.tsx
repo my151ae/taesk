@@ -7,6 +7,7 @@ import NotificationsBell from '@/app/(board)/_components/NotificationsBell';
 import { User } from '@supabase/supabase-js';
 import { type UserProfile } from '@/app/(board)/_utils/timeline-helpers';
 import type { ProfileSummary } from '@/lib/supabase';
+import type { GoogleCalendarListEntry, GoogleCalendarPartialError } from '@/lib/api-types/google-calendar';
 import { getProfileInitial, resolveProfileIdentity } from '@/lib/usernames';
 
 function canCreateBoardInTeam(team: TeamView): boolean {
@@ -42,6 +43,11 @@ type TimelineHeaderProps = {
     googleStatusText: string;
     googleCalendarStatus: string;
     googleCalendarError: string | null;
+    googleCalendars: GoogleCalendarListEntry[];
+    selectedGoogleCalendarIds: string[];
+    googleCalendarPartialErrors: GoogleCalendarPartialError[];
+    googleCalendarSelectionStatus: 'idle' | 'saving' | 'error';
+    updateGoogleCalendarSelection: (selectedCalendarIds: string[]) => Promise<void>;
     calendarPreset: 'visible' | 'this-week' | 'next-week';
     setCalendarPreset: (preset: 'visible' | 'this-week' | 'next-week') => void;
     refreshGoogleCalendar: () => void;
@@ -81,6 +87,11 @@ export default function TimelineHeader({
     googleStatusText,
     googleCalendarStatus,
     googleCalendarError,
+    googleCalendars,
+    selectedGoogleCalendarIds,
+    googleCalendarPartialErrors,
+    googleCalendarSelectionStatus,
+    updateGoogleCalendarSelection,
     calendarPreset,
     setCalendarPreset,
     refreshGoogleCalendar,
@@ -114,6 +125,14 @@ export default function TimelineHeader({
     const profileIdentity = resolveProfileIdentity(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const profileInitial = getProfileInitial(profile as unknown as ProfileSummary | null, user?.email ?? null);
     const todayButtonClassName = "shrink-0 rounded-full bg-sky-200 px-2.5 py-1 text-xs font-medium text-sky-800 shadow-sm ring-1 ring-sky-300 hover:bg-sky-300";
+    const selectedGoogleCalendarSet = useMemo(() => new Set(selectedGoogleCalendarIds), [selectedGoogleCalendarIds]);
+    const selectedGoogleCalendarCount = selectedGoogleCalendarIds.length;
+    const toggleGoogleCalendar = (calendarId: string, checked: boolean) => {
+        const next = checked
+            ? [...selectedGoogleCalendarIds, calendarId]
+            : selectedGoogleCalendarIds.filter((id) => id !== calendarId);
+        void updateGoogleCalendarSelection(next);
+    };
 
     const handleCreateBoard = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -590,7 +609,7 @@ export default function TimelineHeader({
                                     style={{
                                         top: googleMenuPosition.top,
                                         left: googleMenuPosition.left,
-                                        minWidth: googleMenuPosition.minWidth,
+                                        minWidth: Math.max(googleMenuPosition.minWidth ?? 0, 320),
                                     }}
                                 >
                                     <div className="flex flex-col gap-2">
@@ -599,8 +618,59 @@ export default function TimelineHeader({
                                         {googleCalendarError && (
                                             <p className="text-xs text-red-600">{googleCalendarError}</p>
                                         )}
+                                        {googleCalendarPartialErrors.length > 0 && (
+                                            <p className="text-xs text-amber-700">
+                                                一部のカレンダーを取得できませんでした
+                                            </p>
+                                        )}
                                         {googleCalendarStatus === 'success' && (
                                             <>
+                                                <div className="max-h-48 overflow-y-auto rounded-md border border-slate-100 bg-slate-50 p-1">
+                                                    {googleCalendars.length === 0 && (
+                                                        <p className="px-2 py-1 text-xs text-slate-500">カレンダー候補がありません</p>
+                                                    )}
+                                                    {googleCalendars.map((calendar) => {
+                                                        const checked = selectedGoogleCalendarSet.has(calendar.id);
+                                                        const disabled = googleCalendarSelectionStatus === 'saving'
+                                                            || !calendar.selectable
+                                                            || (checked && selectedGoogleCalendarCount <= 1);
+                                                        const reason = !calendar.selectable
+                                                            ? calendar.accessRole === 'freeBusyReader'
+                                                                ? '予定詳細の表示権限がありません'
+                                                                : '選択できない権限です'
+                                                            : calendar.hidden
+                                                                ? 'Hidden'
+                                                                : calendar.primary
+                                                                    ? 'Primary'
+                                                                    : 'Shared';
+                                                        return (
+                                                            <label
+                                                                key={calendar.id}
+                                                                className={clsx(
+                                                                    "flex items-center gap-2 rounded px-2 py-1.5 text-xs",
+                                                                    disabled ? "text-slate-400" : "cursor-pointer text-slate-700 hover:bg-white"
+                                                                )}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checked}
+                                                                    disabled={disabled}
+                                                                    onChange={(event) => toggleGoogleCalendar(calendar.id, event.target.checked)}
+                                                                />
+                                                                <span
+                                                                    className="h-2.5 w-2.5 shrink-0 rounded-full border border-white shadow-sm"
+                                                                    style={{ backgroundColor: calendar.backgroundColor ?? '#94a3b8' }}
+                                                                    aria-hidden="true"
+                                                                />
+                                                                <span className="min-w-0 flex-1 truncate">{calendar.summary}</span>
+                                                                <span className="shrink-0 text-[10px] uppercase text-slate-400">{reason}</span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {googleCalendarSelectionStatus === 'saving' && (
+                                                    <p className="text-xs text-slate-500">保存中...</p>
+                                                )}
                                                 <select
                                                     value={calendarPreset}
                                                     onChange={(e) => setCalendarPreset(e.target.value as typeof calendarPreset)}

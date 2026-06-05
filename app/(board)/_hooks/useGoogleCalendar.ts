@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GoogleCalendarEvent, GoogleCalendarEventsResponse } from "@/lib/api-types/google-calendar";
+import type {
+  GoogleCalendarEvent,
+  GoogleCalendarEventsResponse,
+  GoogleCalendarListEntry,
+  GoogleCalendarPartialError,
+} from "@/lib/api-types/google-calendar";
 
 type GoogleCalendarStatus = "idle" | "loading" | "success" | "error" | "disconnected";
 
@@ -60,10 +65,11 @@ const buildRequiredWeekKeys = (startDate?: Date | null, endDate?: Date | null) =
 };
 
 const dedupeEventKey = (event: GoogleCalendarEvent) => {
+  const baseId = event.eventKey ?? `${event.calendarId ?? "primary"}:${event.id}`;
   if (event.isAllDay) {
-    return `${event.id}:${event.startDate ?? event.start}:${event.endDate ?? event.end}`;
+    return `${baseId}:${event.startDate ?? event.start}:${event.endDate ?? event.end}`;
   }
-  return `${event.id}:${event.start}:${event.end}`;
+  return `${baseId}:${event.start}:${event.end}`;
 };
 
 const parseIsoDateKey = (value: string | null) => (value ? new Date(`${value}T00:00:00.000Z`) : null);
@@ -80,8 +86,12 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
 
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
   const [canWrite, setCanWrite] = useState<boolean>(false);
+  const [calendars, setCalendars] = useState<GoogleCalendarListEntry[]>([]);
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
+  const [partialErrors, setPartialErrors] = useState<GoogleCalendarPartialError[]>([]);
   const [status, setStatus] = useState<GoogleCalendarStatus>("idle");
   const [backgroundStatus, setBackgroundStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [selectionStatus, setSelectionStatus] = useState<"idle" | "saving" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
@@ -93,6 +103,24 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
   const manualRefreshRequestedRef = useRef(false);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const lastVisibleEventsSignatureRef = useRef<string>("");
+
+  const applyCalendarResponseMeta = useCallback((body: GoogleCalendarEventsResponse | null) => {
+    if (Array.isArray(body?.calendars)) {
+      setCalendars(body.calendars);
+    }
+    if (Array.isArray(body?.selectedCalendarIds)) {
+      setSelectedCalendarIds(body.selectedCalendarIds);
+    }
+    setPartialErrors(Array.isArray(body?.partialErrors) ? body.partialErrors : []);
+  }, []);
+
+  const resetCalendarBlocks = useCallback(() => {
+    blocksRef.current.clear();
+    refreshRecommendedWeekKeysRef.current.clear();
+    refreshAttemptedWeekKeysRef.current.clear();
+    lastVisibleEventsSignatureRef.current = "";
+    setEvents([]);
+  }, []);
 
   const rebuildVisibleEvents = useCallback(() => {
     const merged = new Map<string, GoogleCalendarEvent>();
@@ -172,6 +200,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
       });
 
       blocksRef.current.set(weekKey, { events: blockEvents });
+      applyCalendarResponseMeta(body);
       permissionCheckedRef.current = true;
       setCanWrite(body?.canWrite ?? false);
       setStatus("success");
@@ -203,7 +232,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
         setBackgroundStatus("idle");
       }
     }
-  }, [events.length, rebuildVisibleEvents]);
+  }, [applyCalendarResponseMeta, events.length, rebuildVisibleEvents]);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,6 +267,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
           }
 
           permissionCheckedRef.current = true;
+          applyCalendarResponseMeta(body);
           setCanWrite(body?.canWrite ?? false);
           setStatus("success");
           setError(null);
@@ -263,6 +293,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
                   return;
                 }
                 setCanWrite(refreshBody?.canWrite ?? false);
+                applyCalendarResponseMeta(refreshBody);
                 setStatus("success");
                 setError(null);
               })
@@ -327,7 +358,7 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     return () => {
       cancelled = true;
     };
-  }, [endDateKey, events.length, fetchWeek, hasExplicitRange, rebuildVisibleEvents, refreshVersion, requiredWeekKeys, startDateKey]);
+  }, [applyCalendarResponseMeta, endDateKey, events.length, fetchWeek, hasExplicitRange, rebuildVisibleEvents, refreshVersion, requiredWeekKeys, startDateKey]);
 
   useEffect(() => {
     const controllers = abortControllersRef.current;
@@ -355,14 +386,58 @@ export function useGoogleCalendar(startDate?: Date | null, endDate?: Date | null
     setRefreshVersion((current) => current + 1);
   }, [events.length, requiredWeekKeys]);
 
+  const updateCalendarSelection = useCallback(async (nextSelectedCalendarIds: string[]) => {
+    setSelectionStatus("saving");
+    setError(null);
+    try {
+      const response = await fetch("/api/calendar/calendars", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedCalendarIds: nextSelectedCalendarIds }),
+      });
+      const body = (await response.json().catch(() => null)) as (GoogleCalendarEventsResponse & {
+        calendars?: GoogleCalendarListEntry[];
+        selectedCalendarIds?: string[];
+      }) | null;
+
+      if (!response.ok) {
+        throw new Error(
+          toErrorMessage((body as { error?: unknown } | null)?.error) ??
+          "Failed to save Google Calendar selection"
+        );
+      }
+
+      if (Array.isArray(body?.calendars)) {
+        setCalendars(body.calendars);
+      }
+      if (Array.isArray(body?.selectedCalendarIds)) {
+        setSelectedCalendarIds(body.selectedCalendarIds);
+      }
+      setPartialErrors([]);
+      resetCalendarBlocks();
+      manualRefreshRequestedRef.current = true;
+      setRefreshVersion((current) => current + 1);
+      setSelectionStatus("idle");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save Google Calendar selection";
+      setError(message);
+      setSelectionStatus("error");
+    }
+  }, [resetCalendarBlocks]);
+
   return {
     events,
     canWrite,
+    calendars,
+    selectedCalendarIds,
+    partialErrors,
     status,
     backgroundStatus,
+    selectionStatus,
     error,
     connected: status !== "disconnected" && status !== "error" && status !== "idle",
     isConnected: status === "success" || (status !== "disconnected" && status !== "error"),
     refresh,
+    updateCalendarSelection,
   };
 }

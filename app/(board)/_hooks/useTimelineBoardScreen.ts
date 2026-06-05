@@ -24,6 +24,7 @@ import type { ListWindowPresetKey } from "@/app/(board)/_hooks/useTimelineUrlSta
 import type { PrimaryPanelMode } from "@/app/(board)/_hooks/useTimelineUrlState";
 import type { BucketCreateRequest } from "@/app/(board)/_components/timeline/bucket-create-request";
 import type { TrashCardItem } from "@/lib/api-types/timeline";
+import type { GoogleCalendarListEntry, GoogleCalendarPartialError } from "@/lib/api-types/google-calendar";
 import type { IncrementalPanelSectionKey, SidebarSectionKey } from "@/app/(board)/_components/timeline/sidebar-section-types";
 import type { CompletedResultsGroup } from "@/app/(board)/_components/timeline/TimelineLeftPanelShared";
 import type { TimelineViewportState } from "@/app/(board)/_components/timeline/timelineViewportState";
@@ -59,6 +60,11 @@ export type UseTimelineBoardScreenArgs = {
   googleStatusText: string;
   googleCalendarStatus: string;
   googleCalendarError: string | null;
+  googleCalendars: GoogleCalendarListEntry[];
+  selectedGoogleCalendarIds: string[];
+  googleCalendarPartialErrors: GoogleCalendarPartialError[];
+  googleCalendarSelectionStatus: "idle" | "saving" | "error";
+  updateGoogleCalendarSelection: (selectedCalendarIds: string[]) => Promise<void>;
   calendarPreset: "visible" | "this-week" | "next-week";
   setCalendarPreset: (preset: "visible" | "this-week" | "next-week") => void;
   refreshGoogleCalendar: () => void;
@@ -256,6 +262,11 @@ export function useTimelineBoardScreen({
   googleStatusText,
   googleCalendarStatus,
   googleCalendarError,
+  googleCalendars,
+  selectedGoogleCalendarIds,
+  googleCalendarPartialErrors,
+  googleCalendarSelectionStatus,
+  updateGoogleCalendarSelection,
   calendarPreset,
   setCalendarPreset,
   refreshGoogleCalendar,
@@ -576,6 +587,11 @@ export function useTimelineBoardScreen({
     googleStatusText,
     googleCalendarStatus,
     googleCalendarError,
+    googleCalendars,
+    selectedGoogleCalendarIds,
+    googleCalendarPartialErrors,
+    googleCalendarSelectionStatus,
+    updateGoogleCalendarSelection,
     calendarPreset,
     setCalendarPreset,
     refreshGoogleCalendar,

@@ -5,16 +5,15 @@ import {
   listEventsForRange,
   listCachedEventsForRangeDbOnly,
   disconnectGoogleCalendarAccount,
-  getGoogleCalendarClientForUser,
   hasCalendarWritePermission,
+  getSelectedGoogleCalendarsForUser,
 } from "@/lib/googleCalendarServer";
-import type { GoogleCalendarEvent } from "@/lib/api-types/google-calendar";
+import type { GoogleCalendarEvent, GoogleCalendarPartialError } from "@/lib/api-types/google-calendar";
 import { withErrorHandling } from "@/lib/server/with-error-handling";
 
 export const runtime = "nodejs";
 
 const MAX_RANGE_DAYS = 130;
-const STALE_CACHE_MS = 5 * 60 * 1000;
 
 type GoogleApiError = {
   code?: string;
@@ -30,12 +29,6 @@ const parseDateParam = (value: string | null) => {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const isStaleLastSyncedAt = (lastSyncedAt: string | null) => {
-  if (!lastSyncedAt) return true;
-  const syncedMs = Date.parse(lastSyncedAt);
-  return !Number.isFinite(syncedMs) || Date.now() - syncedMs > STALE_CACHE_MS;
 };
 
 const getHandler = async (request: NextRequest) => {
@@ -87,6 +80,41 @@ const getHandler = async (request: NextRequest) => {
     return linkedEventIds;
   };
 
+  const getSelectedCalendars = async () => getSelectedGoogleCalendarsForUser(user.id, { supabase });
+
+  const toPartialError = (calendarId: string, error: unknown): GoogleCalendarPartialError => {
+    const parsed = toGoogleApiError(error);
+    const message = error instanceof Error ? error.message : "Failed to fetch Google Calendar events";
+    return {
+      calendarId,
+      message,
+      status: parsed.response?.status,
+    };
+  };
+
+  const loadCacheOnlyForSelected = async (
+    selectedCalendarIds: string[],
+    metadataByCalendarId: Map<string, { summary: string | null; backgroundColor: string | null; foregroundColor: string | null }>,
+    rangeStart: Date,
+    rangeEnd: Date,
+  ) => {
+    const partialErrors: GoogleCalendarPartialError[] = [];
+    const chunks = [];
+    for (const calendarId of selectedCalendarIds) {
+      try {
+        const cached = await listCachedEventsForRangeDbOnly(user.id, rangeStart, rangeEnd, {
+          supabase,
+          calendarId,
+          calendarMetadata: metadataByCalendarId.get(calendarId),
+        });
+        chunks.push({ calendarId, cached });
+      } catch (error) {
+        partialErrors.push(toPartialError(calendarId, error));
+      }
+    }
+    return { chunks, partialErrors };
+  };
+
   // MODE 1: Permission Check Only (No dates provided)
   if (!startParam && !endParam) {
     if (mode === "cache-only") {
@@ -98,36 +126,26 @@ const getHandler = async (request: NextRequest) => {
         .limit(1)
         .maybeSingle();
 
-      const { data: syncState } = account?.id
-        ? await supabase
-            .from("google_calendar_sync_states")
-            .select("last_synced_at")
-            .eq("google_account_id", account.id)
-            .eq("calendar_id", "primary")
-            .maybeSingle()
-        : { data: null };
-
-      const lastSyncedAt = syncState?.last_synced_at ?? null;
-      const stale = isStaleLastSyncedAt(lastSyncedAt);
       const connected = Boolean(account?.id);
       return NextResponse.json({
         connected,
         canWrite: account?.scope ? hasCalendarWritePermission(account.scope) : false,
         events: [],
         source: connected ? "cache" : "none",
-        stale,
-        lastSyncedAt,
-        backgroundRefreshRecommended: connected && (stale || false),
+        stale: connected,
+        lastSyncedAt: null,
+        backgroundRefreshRecommended: connected,
       }, { status: 200 });
     }
 
     try {
-      const { account } = await getGoogleCalendarClientForUser(user.id, { supabase });
-      const canWrite = hasCalendarWritePermission(account.scope);
+      const selected = await getSelectedCalendars();
       return NextResponse.json({
         connected: true,
-        canWrite,
+        canWrite: selected.canWrite,
         events: [],
+        calendars: selected.calendars,
+        selectedCalendarIds: selected.selectedCalendarIds,
         source: "google",
         stale: false,
         lastSyncedAt: null,
@@ -180,31 +198,80 @@ const getHandler = async (request: NextRequest) => {
   }
 
   const linkedEventIds = await loadLinkedEventIds();
+  let selectedCalendars: Awaited<ReturnType<typeof getSelectedCalendars>>;
+  try {
+    selectedCalendars = await getSelectedCalendars();
+  } catch (error) {
+    if (error instanceof GoogleCalendarNotConnectedError) {
+      return NextResponse.json({
+        connected: false,
+        events: [],
+        source: "none",
+        stale: true,
+        lastSyncedAt: null,
+        backgroundRefreshRecommended: false,
+      }, { status: 200 });
+    }
+    throw error;
+  }
 
   if (mode === "cache-only") {
-    const cached = await listCachedEventsForRangeDbOnly(user.id, start, end, { supabase });
-    const source = cached.connected ? "cache" : "none";
+    const { chunks, partialErrors } = await loadCacheOnlyForSelected(
+      selectedCalendars.selectedCalendarIds,
+      selectedCalendars.metadataByCalendarId,
+      start,
+      end
+    );
+    const events = chunks.flatMap((chunk) => chunk.cached.events);
+    const lastSyncedAtValues = chunks
+      .map((chunk) => chunk.cached.lastSyncedAt)
+      .filter((value): value is string => Boolean(value));
+    const stale = chunks.some((chunk) => chunk.cached.stale) || chunks.length === 0;
+    const source = chunks.length ? "cache" : "none";
     return NextResponse.json({
-      connected: cached.connected,
-      canWrite: cached.canWrite,
-      events: applyLinkedFilter(cached.events, linkedEventIds),
+      connected: true,
+      canWrite: selectedCalendars.canWrite,
+      events: applyLinkedFilter(events, linkedEventIds),
+      calendars: selectedCalendars.calendars,
+      selectedCalendarIds: selectedCalendars.selectedCalendarIds,
+      partialErrors,
       source,
-      stale: cached.stale,
-      lastSyncedAt: cached.lastSyncedAt,
-      backgroundRefreshRecommended: cached.connected && (cached.stale || source === "none"),
+      stale,
+      lastSyncedAt: lastSyncedAtValues.length ? lastSyncedAtValues.sort()[0] : null,
+      backgroundRefreshRecommended: stale || source === "none",
     }, { status: 200 });
   }
 
   try {
-    const { events, canWrite } = await listEventsForRange(user.id, start, end, {
-      supabase,
-      origin: request.nextUrl.origin,
-      syncCardsOnFetch: mode === "refresh" ? syncCardsOnFetch : true,
-    });
+    const partialErrors: GoogleCalendarPartialError[] = [];
+    const eventChunks = [];
+    for (const calendarId of selectedCalendars.selectedCalendarIds) {
+      try {
+        const result = await listEventsForRange(user.id, start, end, {
+          supabase,
+          origin: request.nextUrl.origin,
+          calendarId,
+          calendarMetadata: selectedCalendars.metadataByCalendarId.get(calendarId),
+          syncCardsOnFetch: mode === "refresh" ? syncCardsOnFetch : true,
+        });
+        eventChunks.push(result.events);
+      } catch (error) {
+        partialErrors.push(toPartialError(calendarId, error));
+      }
+    }
+
+    if (!eventChunks.length && partialErrors.length) {
+      throw partialErrors[0];
+    }
+
+    const events = eventChunks.flat();
     return NextResponse.json({
       connected: true,
-      canWrite,
+      canWrite: selectedCalendars.canWrite,
       events: applyLinkedFilter(events, linkedEventIds),
+      calendars: selectedCalendars.calendars,
+      selectedCalendarIds: selectedCalendars.selectedCalendarIds,
+      partialErrors,
       source: "google",
       stale: false,
       lastSyncedAt: new Date().toISOString(),
@@ -274,15 +341,27 @@ const getHandler = async (request: NextRequest) => {
 
     // Fallback: serve cached events if available
     try {
-      const cached = await listCachedEventsForRangeDbOnly(user.id, start, end, { supabase });
+      const { chunks, partialErrors } = await loadCacheOnlyForSelected(
+        selectedCalendars.selectedCalendarIds,
+        selectedCalendars.metadataByCalendarId,
+        start,
+        end
+      );
+      const events = chunks.flatMap((chunk) => chunk.cached.events);
+      const lastSyncedAtValues = chunks
+        .map((chunk) => chunk.cached.lastSyncedAt)
+        .filter((value): value is string => Boolean(value));
       return NextResponse.json({
-        connected: cached.connected,
-        canWrite: cached.canWrite,
-        events: applyLinkedFilter(cached.events, linkedEventIds),
-        source: cached.connected ? "cache" : "none",
+        connected: true,
+        canWrite: selectedCalendars.canWrite,
+        events: applyLinkedFilter(events, linkedEventIds),
+        calendars: selectedCalendars.calendars,
+        selectedCalendarIds: selectedCalendars.selectedCalendarIds,
+        partialErrors,
+        source: chunks.length ? "cache" : "none",
         stale: true,
-        lastSyncedAt: cached.lastSyncedAt,
-        backgroundRefreshRecommended: cached.connected,
+        lastSyncedAt: lastSyncedAtValues.length ? lastSyncedAtValues.sort()[0] : null,
+        backgroundRefreshRecommended: true,
         error: "STALE_CACHE",
       }, { status: 200 });
     } catch (cacheError) {

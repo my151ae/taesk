@@ -439,6 +439,15 @@ export interface GoogleCalendarAccount {
   updated_at: string;
 }
 
+export interface GoogleCalendarPreference {
+  id: string;
+  user_id: string;
+  google_account_id: string;
+  selected_calendar_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GoogleCalendarEventRecord {
   id: string;
   google_account_id: string;

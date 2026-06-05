@@ -74,7 +74,12 @@ export const useTimelineCalendar = ({
     status: googleCalendarStatus,
     backgroundStatus: googleCalendarBackgroundStatus,
     error: googleCalendarError,
+    calendars: googleCalendars,
+    selectedCalendarIds: selectedGoogleCalendarIds,
+    partialErrors: googleCalendarPartialErrors,
+    selectionStatus: googleCalendarSelectionStatus,
     refresh: refreshGoogleCalendar,
+    updateCalendarSelection: updateGoogleCalendarSelection,
   } = useGoogleCalendar(presetRange.start, presetRange.end);
 
   const { calendarEventsByDay, calendarAllDayEventsByDay } = useMemo(
@@ -89,6 +94,11 @@ export const useTimelineCalendar = ({
     googleCalendarStatus,
     googleCalendarBackgroundStatus,
     googleCalendarError,
+    googleCalendars,
+    selectedGoogleCalendarIds,
+    googleCalendarPartialErrors,
+    googleCalendarSelectionStatus,
     refreshGoogleCalendar,
+    updateGoogleCalendarSelection,
   };
 };

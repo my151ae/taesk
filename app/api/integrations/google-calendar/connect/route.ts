@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   createGoogleOAuthClient,
   GOOGLE_CALENDAR_SCOPE,
+  GOOGLE_CALENDAR_READONLY_SCOPE,
   resolveGoogleRedirectUri,
 } from "@/lib/googleCalendarServer";
 import { withErrorHandling } from "@/lib/server/with-error-handling";
@@ -39,7 +40,7 @@ const getHandler = async (request: NextRequest) => {
       access_type: "offline",
       prompt: "consent",
       include_granted_scopes: true,
-      scope: [GOOGLE_CALENDAR_SCOPE],
+      scope: [GOOGLE_CALENDAR_SCOPE, GOOGLE_CALENDAR_READONLY_SCOPE],
       state,
       redirect_uri: redirectUri,
     });

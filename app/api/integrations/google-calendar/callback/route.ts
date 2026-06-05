@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import {
   createGoogleOAuthClient,
   GOOGLE_CALENDAR_SCOPE,
+  GOOGLE_CALENDAR_READONLY_SCOPE,
   resolveGoogleRedirectUri,
 } from "@/lib/googleCalendarServer";
 import { sanitizeProviderError } from "@/lib/server/log-sanitizer";
@@ -94,7 +95,7 @@ const getHandler = async (request: NextRequest) => {
       ? new Date(tokens.expiry_date).toISOString()
       : new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    const scope = tokens.scope ?? (Array.isArray(tokenInfo.scopes) ? tokenInfo.scopes.join(" ") : GOOGLE_CALENDAR_SCOPE);
+    const scope = tokens.scope ?? (Array.isArray(tokenInfo.scopes) ? tokenInfo.scopes.join(" ") : `${GOOGLE_CALENDAR_SCOPE} ${GOOGLE_CALENDAR_READONLY_SCOPE}`);
     const email = tokenInfo.email ?? user.email ?? "unknown";
 
     const { data: savedAccount, error: upsertError } = await supabase

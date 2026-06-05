@@ -4,6 +4,7 @@ import type { RefObject } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Board, TeamView } from "@/lib/supabase";
 import type { UserProfile } from "@/app/(board)/_utils/timeline-helpers";
+import type { GoogleCalendarListEntry, GoogleCalendarPartialError } from "@/lib/api-types/google-calendar";
 import TimelineHeader from "@/app/(board)/_components/timeline/TimelineHeader";
 
 type TimelineBoardHeaderProps = {
@@ -28,6 +29,11 @@ type TimelineBoardHeaderProps = {
   googleStatusText: string;
   googleCalendarStatus: string;
   googleCalendarError: string | null;
+  googleCalendars: GoogleCalendarListEntry[];
+  selectedGoogleCalendarIds: string[];
+  googleCalendarPartialErrors: GoogleCalendarPartialError[];
+  googleCalendarSelectionStatus: "idle" | "saving" | "error";
+  updateGoogleCalendarSelection: (selectedCalendarIds: string[]) => Promise<void>;
   calendarPreset: "visible" | "this-week" | "next-week";
   setCalendarPreset: (preset: "visible" | "this-week" | "next-week") => void;
   refreshGoogleCalendar: () => void;
@@ -62,6 +68,11 @@ export default function TimelineBoardHeader({
   googleStatusText,
   googleCalendarStatus,
   googleCalendarError,
+  googleCalendars,
+  selectedGoogleCalendarIds,
+  googleCalendarPartialErrors,
+  googleCalendarSelectionStatus,
+  updateGoogleCalendarSelection,
   calendarPreset,
   setCalendarPreset,
   refreshGoogleCalendar,
@@ -97,6 +108,11 @@ export default function TimelineBoardHeader({
         googleStatusText={googleStatusText}
         googleCalendarStatus={googleCalendarStatus}
         googleCalendarError={googleCalendarError}
+        googleCalendars={googleCalendars}
+        selectedGoogleCalendarIds={selectedGoogleCalendarIds}
+        googleCalendarPartialErrors={googleCalendarPartialErrors}
+        googleCalendarSelectionStatus={googleCalendarSelectionStatus}
+        updateGoogleCalendarSelection={updateGoogleCalendarSelection}
         calendarPreset={calendarPreset}
         setCalendarPreset={setCalendarPreset}
         refreshGoogleCalendar={refreshGoogleCalendar}
