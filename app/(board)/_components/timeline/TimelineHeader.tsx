@@ -127,6 +127,16 @@ export default function TimelineHeader({
     const todayButtonClassName = "shrink-0 rounded-full bg-sky-200 px-2.5 py-1 text-xs font-medium text-sky-800 shadow-sm ring-1 ring-sky-300 hover:bg-sky-300";
     const selectedGoogleCalendarSet = useMemo(() => new Set(selectedGoogleCalendarIds), [selectedGoogleCalendarIds]);
     const selectedGoogleCalendarCount = selectedGoogleCalendarIds.length;
+    const orderedGoogleCalendars = useMemo(
+        () => [...googleCalendars].sort((left, right) => {
+            const leftSelected = selectedGoogleCalendarSet.has(left.id);
+            const rightSelected = selectedGoogleCalendarSet.has(right.id);
+            if (leftSelected !== rightSelected) return leftSelected ? -1 : 1;
+            if (left.primary !== right.primary) return left.primary ? -1 : 1;
+            return left.summary.localeCompare(right.summary);
+        }),
+        [googleCalendars, selectedGoogleCalendarSet],
+    );
     const toggleGoogleCalendar = (calendarId: string, checked: boolean) => {
         const next = checked
             ? [...selectedGoogleCalendarIds, calendarId]
@@ -629,7 +639,7 @@ export default function TimelineHeader({
                                                     {googleCalendars.length === 0 && (
                                                         <p className="px-2 py-1 text-xs text-slate-500">カレンダー候補がありません</p>
                                                     )}
-                                                    {googleCalendars.map((calendar) => {
+                                                    {orderedGoogleCalendars.map((calendar) => {
                                                         const checked = selectedGoogleCalendarSet.has(calendar.id);
                                                         const disabled = googleCalendarSelectionStatus === 'saving'
                                                             || !calendar.selectable
